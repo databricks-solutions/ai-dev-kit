@@ -23,7 +23,7 @@ Use this skill when:
 The recommended workflow is:
 
 1. **Write a Python file locally** in the project structure
-2. **Execute on Databricks** using `run_python_file_on_databricks(cluster_id, file_path)` or `execute_databricks_command(cluster_id, "python", code)`
+2. **Execute on Databricks** using `run_python_file_on_databricks(cluster_id, file_path)`
 
 ## Key Principles
 

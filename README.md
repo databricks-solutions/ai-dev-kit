@@ -164,32 +164,82 @@ Claude now has both **skills** (knowledge) and **MCP tools** (actions) for Datab
 | [databricks-mcp-server](databricks-mcp-server/) | MCP server wrapping core functions as tools |
 | [databricks-skills](databricks-skills/) | Skills for Claude Code with patterns & examples |
 
-## Using the Core Library Directly
+## Using the Core Library with Other Frameworks
 
-The core library can be used without the MCP server:
+The core library (`databricks-mcp-core`) is framework-agnostic. While `databricks-mcp-server` exposes it via MCP for Claude Code, you can use the same functions with any AI agent framework.
+
+### Direct Python usage
 
 ```python
 from databricks_mcp_core.sql import execute_sql, get_table_details, TableStatLevel
 
-# Execute SQL
 results = execute_sql("SELECT * FROM my_catalog.my_schema.customers LIMIT 10")
 
-# Get table statistics
 stats = get_table_details(
     catalog="my_catalog",
     schema="my_schema",
     table_names=["customers", "orders"],
     table_stat_level=TableStatLevel.DETAILED
 )
+```
 
-# Run Python on a cluster
-from databricks_mcp_core.compute import run_python_file_on_databricks
+### With LangChain
 
-result = run_python_file_on_databricks(
-    cluster_id="your-cluster-id",
-    file_path="scripts/generate_data.py"
+```python
+from langchain_core.tools import tool
+from databricks_mcp_core.sql import execute_sql, get_table_details
+from databricks_mcp_core.file import upload_folder
+
+@tool
+def run_sql(query: str) -> list:
+    """Execute a SQL query on Databricks and return results."""
+    return execute_sql(query)
+
+@tool
+def get_table_info(catalog: str, schema: str, tables: list[str]) -> dict:
+    """Get schema and statistics for Databricks tables."""
+    return get_table_details(catalog, schema, tables).model_dump()
+
+@tool
+def upload_to_workspace(local_path: str, workspace_path: str) -> dict:
+    """Upload a local folder to Databricks workspace."""
+    result = upload_folder(local_path, workspace_path)
+    return {"success": result.success, "files": result.total_files}
+
+# Use with any LangChain agent
+tools = [run_sql, get_table_info, upload_to_workspace]
+```
+
+### With OpenAI Agents SDK
+
+```python
+from agents import Agent, function_tool
+from databricks_mcp_core.sql import execute_sql
+from databricks_mcp_core.spark_declarative_pipelines.pipelines import (
+    create_pipeline, start_update, get_update
+)
+
+@function_tool
+def run_sql(query: str) -> list:
+    """Execute a SQL query on Databricks."""
+    return execute_sql(query)
+
+@function_tool
+def create_sdp_pipeline(name: str, catalog: str, schema: str, notebook_paths: list[str]) -> dict:
+    """Create a Spark Declarative Pipeline."""
+    result = create_pipeline(name, f"/Workspace/{name}", catalog, schema, notebook_paths)
+    return {"pipeline_id": result.pipeline_id}
+
+agent = Agent(
+    name="Databricks Agent",
+    tools=[run_sql, create_sdp_pipeline],
 )
 ```
+
+This separation allows you to:
+- Use the same Databricks functions across different agent frameworks
+- Build custom integrations without MCP overhead
+- Test functions directly in Python scripts
 
 ## Documentation
 
