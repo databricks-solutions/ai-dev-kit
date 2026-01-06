@@ -135,9 +135,87 @@ resources:
 
 ⚠️ **Volumes use `grants` not `permissions`** - different format from other resources
 
+### Apps Resources
+
+**Apps resource support added in Databricks CLI 0.239.0 (January 2025)**
+
+Apps in DABs have a minimal configuration - environment variables are defined in `app.yaml` in the source directory, NOT in databricks.yml.
+
+#### Generate from Existing App (Recommended)
+
+```bash
+# Generate bundle config from existing CLI-deployed app
+databricks bundle generate app --existing-app-name my-app --key my_app --profile DEFAULT
+
+# This creates:
+# - resources/my_app.app.yml (minimal resource definition)
+# - src/app/ (downloaded source files including app.yaml)
+```
+
+#### Manual Configuration
+
+**resources/my_app.app.yml:**
+```yaml
+resources:
+  apps:
+    my_app:
+      name: my-app-${bundle.target}        # Environment-specific naming
+      description: "My application"
+      source_code_path: ../src/app         # Relative to resources/ dir
+```
+
+**src/app/app.yaml:** (Environment variables go here)
+```yaml
+command:
+  - "python"
+  - "dash_app.py"
+
+env:
+  - name: USE_MOCK_BACKEND
+    value: "false"
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "your-warehouse-id"
+  - name: DATABRICKS_CATALOG
+    value: "main"
+  - name: DATABRICKS_SCHEMA
+    value: "my_schema"
+```
+
+**databricks.yml:**
+```yaml
+bundle:
+  name: my-bundle
+
+include:
+  - resources/*.yml
+
+variables:
+  warehouse_id:
+    default: "default-warehouse-id"
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      profile: dev-profile
+    variables:
+      warehouse_id: "dev-warehouse-id"
+```
+
+#### Key Differences from Other Resources
+
+| Aspect | Apps | Other Resources |
+|--------|------|-----------------|
+| **Environment vars** | In `app.yaml` (source dir) | In databricks.yml or resource file |
+| **Configuration** | Minimal (name, description, path) | Extensive (tasks, clusters, etc.) |
+| **Source path** | Points to app directory | Points to specific files |
+
+⚠️ **Important**: When source code is in project root (not src/app), use `source_code_path: ..` in the resource file
+
 ### Other Resources
 
-DABs supports schemas, models, experiments, clusters, warehouses, apps, etc. Use `databricks bundle schema` to inspect schemas.
+DABs supports schemas, models, experiments, clusters, warehouses, etc. Use `databricks bundle schema` to inspect schemas.
 
 **Reference**: [DABs Resource Types](https://docs.databricks.com/dev-tools/bundles/resources)
 
@@ -161,7 +239,36 @@ databricks bundle deploy --force             # Force overwrite remote changes
 ```bash
 databricks bundle run resource_name          # Run a pipeline or job
 databricks bundle run pipeline_name -t prod  # Run in specific environment
+
+# Apps require bundle run to start after deployment
+databricks bundle run app_resource_key -t dev    # Start/deploy the app
 ```
+
+### Monitoring & Logs
+
+**View application logs (for Apps resources):**
+```bash
+# View logs for deployed apps
+databricks apps logs <app-name> --profile <profile-name>
+
+# Examples:
+databricks apps logs my-dash-app-dev -p DEFAULT
+databricks apps logs my-streamlit-app-prod -p DEFAULT
+```
+
+**What logs show:**
+- `[SYSTEM]` - Deployment progress, file updates, dependency installation
+- `[APP]` - Application output (print statements, errors)
+- Backend connection status
+- Deployment IDs and timestamps
+- Stack traces for errors
+
+**Key log patterns to look for:**
+- ✅ `Deployment successful` - Confirms deployment completed
+- ✅ `App started successfully` - App is running
+- ✅ `Initialized real backend` - Backend connected to Unity Catalog
+- ❌ `Error:` - Look for error messages and stack traces
+- 📝 `Requirements installed` - Dependencies loaded correctly
 
 ### Cleanup
 ```bash
@@ -175,12 +282,18 @@ databricks bundle destroy -t prod --auto-approve
 
 | Issue | Solution |
 |-------|----------|
+| **App deployment fails** | Check logs: `databricks apps logs <app-name>` for error details |
+| **App not connecting to Unity Catalog** | Check logs for backend connection errors; verify warehouse ID and permissions |
 | **Wrong permission level** | Dashboards: CAN_READ/RUN/EDIT/MANAGE; Jobs: CAN_VIEW/MANAGE_RUN/MANAGE |
 | **Path resolution fails** | Use `../src/` in resources/*.yml, `./src/` in databricks.yml |
 | **Catalog doesn't exist** | Create catalog first or update variable |
 | **"admins" group error on jobs** | Cannot modify admins permissions on jobs |
 | **Volume permissions** | Use `grants` not `permissions` for volumes |
 | **Hardcoded catalog in dashboard** | Create environment-specific files or parameterize JSON |
+| **App not starting after deploy** | Apps require `databricks bundle run <resource_key>` to start |
+| **App env vars not working** | Environment variables go in `app.yaml` (source dir), not databricks.yml |
+| **Wrong app source path** | Use `../` from resources/ dir if source is in project root |
+| **Debugging any app issue** | First step: `databricks apps logs <app-name>` to see what went wrong |
 
 ## Key Principles
 
