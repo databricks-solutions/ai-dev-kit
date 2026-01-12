@@ -38,7 +38,7 @@ The installer will:
 |-------|-------------|
 | **dabs-writer** | Create and configure Databricks Asset Bundles (DABs) with best practices for multi-environment deployments |
 | **databricks-python-sdk** | Python SDK, Databricks Connect, CLI, and REST API guidance |
-| **sdp-writer** | Spark Declarative Pipelines (SDP/DLT) patterns in SQL and Python |
+| **spark-declarative-pipelines** | Spark Declarative Pipelines (SDP) patterns in SQL and Python - formerly Delta Live Tables |
 | **synthetic-data-generation** | Generate realistic test data using Faker and Spark with non-linear distributions |
 
 ## How Skills Work with MCP
@@ -51,10 +51,10 @@ The installer will:
 │  ┌──────────────────┐    ┌──────────────────────────────────┐  │
 │  │  .claude/skills/ │    │  .claude/mcp.json                │  │
 │  │                  │    │                                  │  │
-│  │  • dabs-writer   │    │  Configures MCP server that      │  │
-│  │  • sdp-writer    │    │  provides Databricks tools:      │  │
-│  │  • synthetic-    │    │  • execute_sql                   │  │
-│  │    data-gen      │    │  • get_table_details             │  │
+│  │  • dabs-writer             │    │  Configures MCP server that      │  │
+│  │  • spark-declarative-      │    │  provides Databricks tools:      │  │
+│  │    pipelines               │    │  • execute_sql                   │  │
+│  │  • synthetic-data-gen      │    │  • get_table_details             │  │
 │  │  • databricks-   │    │  • run_python_file_on_databricks │  │
 │  │    python-sdk    │    │  • ka_create, mas_create, etc.   │  │
 │  │                  │    │                                  │  │
@@ -88,7 +88,7 @@ If you prefer to install skills manually:
    ```bash
    # From a cloned repo
    cp -r ai-dev-kit/databricks-skills/dabs-writer .claude/skills/
-   cp -r ai-dev-kit/databricks-skills/sdp-writer .claude/skills/
+   cp -r ai-dev-kit/databricks-skills/spark-declarative-pipelines .claude/skills/
    ```
 
 ## Skill Structure

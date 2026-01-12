@@ -19,7 +19,9 @@ description: "Create, configure, or update Databricks' Lakeflow Spark Declarativ
 
 ## Development Workflow with MCP Tools
 
-Use MCP tools to create, run, and iterate on SDP pipelines. The **primary tool is `create_or_update_pipeline`** which handles the entire lifecycle.
+Use MCP tools to create, run, and iterate on **serverless SDP pipelines**. The **primary tool is `create_or_update_pipeline`** which handles the entire lifecycle.
+
+**IMPORTANT: Always create serverless pipelines (default).** Only use classic clusters if user explicitly requires R language, Spark RDD APIs, or JAR libraries.
 
 ### Step 1: Write Pipeline Files Locally
 
@@ -28,14 +30,15 @@ Create `.sql` or `.py` files in a local folder:
 ```
 my_pipeline/
 ├── bronze/
-│   └── ingest_orders.sql
+│   ├── ingest_orders.sql       # SQL (default for most cases)
+│   └── ingest_events.py        # Python (for complex logic)
 ├── silver/
 │   └── clean_orders.sql
 └── gold/
     └── daily_summary.sql
 ```
 
-**Example bronze layer** (`bronze/ingest_orders.sql`):
+**SQL Example** (`bronze/ingest_orders.sql`):
 ```sql
 CREATE OR REFRESH STREAMING TABLE bronze_orders
 CLUSTER BY (order_date)
@@ -50,6 +53,28 @@ FROM read_files(
   schemaHints => 'order_id STRING, customer_id STRING, amount DECIMAL(10,2), order_date DATE'
 );
 ```
+
+**Python Example** (`bronze/ingest_events.py`):
+```python
+from pyspark import pipelines as dp
+from pyspark.sql.functions import col, current_timestamp
+
+@dp.table(name="bronze_events", cluster_by=["event_date"])
+def bronze_events():
+    return (
+        spark.readStream.format("cloudFiles")
+        .option("cloudFiles.format", "json")
+        .load("/Volumes/catalog/schema/raw/events/")
+        .withColumn("_ingested_at", current_timestamp())
+        .withColumn("_source_file", col("_metadata.file_path"))
+    )
+```
+
+**Language Selection:**
+- **Default to SQL** unless user specifies Python or task requires it
+- **Use SQL** for: Transformations, aggregations, filtering, joins (90% of use cases)
+- **Use Python** for: Complex UDFs, external APIs, ML inference, dynamic paths
+- **Generate ONE language** per request unless user explicitly asks for mixed pipeline
 
 ### Step 2: Upload to Databricks Workspace
 
@@ -170,110 +195,33 @@ if not result["success"]:
 
 ---
 
-## Core SQL Patterns
-
-All examples use Unity Catalog: `catalog.schema.table`
-
-### Bronze Layer (Ingestion)
-
-```sql
-CREATE OR REFRESH STREAMING TABLE bronze_orders
-CLUSTER BY (order_date)
-AS
-SELECT
-  *,
-  current_timestamp() AS _ingested_at,
-  _metadata.file_path AS _source_file
-FROM read_files(
-  '/Volumes/catalog/schema/raw/orders/',
-  format => 'json',
-  schemaHints => 'order_id STRING, amount DECIMAL(10,2), order_date DATE'
-);
-```
-
-### Silver Layer (Cleansing with Expectations)
-
-```sql
-CREATE OR REFRESH STREAMING TABLE silver_orders (
-  CONSTRAINT valid_order_id EXPECT (order_id IS NOT NULL) ON VIOLATION DROP ROW,
-  CONSTRAINT valid_amount EXPECT (amount > 0) ON VIOLATION DROP ROW
-)
-CLUSTER BY (customer_id, order_date)
-AS
-SELECT
-  order_id,
-  customer_id,
-  CAST(order_date AS DATE) AS order_date,
-  CAST(amount AS DECIMAL(10,2)) AS amount
-FROM STREAM bronze_orders;
-```
-
-### Gold Layer (Aggregation)
-
-```sql
-CREATE OR REFRESH MATERIALIZED VIEW gold_daily_sales
-CLUSTER BY (order_day)
-AS
-SELECT
-  date_trunc('day', order_date) AS order_day,
-  COUNT(DISTINCT order_id) AS order_count,
-  SUM(amount) AS daily_sales
-FROM silver_orders
-GROUP BY date_trunc('day', order_date);
-```
-
-### SCD Type 2 (History Tracking)
-
-```sql
-CREATE OR REFRESH STREAMING TABLE customers_history;
-
-CREATE FLOW customers_cdc_flow AS
-AUTO CDC INTO customers_history
-FROM STREAM customers_cdc_source
-KEYS (customer_id)
-SEQUENCE BY event_timestamp
-STORED AS SCD TYPE 2
-TRACK HISTORY ON *;
-```
-
----
-
 ## Reference Documentation (Local)
 
 Load these for detailed patterns:
 
-- **[ingestion-patterns.md](ingestion-patterns.md)** - Auto Loader, Kafka, Event Hub, file formats
-- **[streaming-patterns.md](streaming-patterns.md)** - Deduplication, windowing, stateful operations
-- **[scd-query-patterns.md](scd-query-patterns.md)** - Querying SCD2 history tables
-- **[python-api-versions.md](python-api-versions.md)** - Modern `dp` API vs legacy `dlt` API
-- **[performance-tuning.md](performance-tuning.md)** - Liquid Clustering, optimization
-- **[dlt-migration-guide.md](dlt-migration-guide.md)** - Migrating from DLT to SDP
+- **[1-ingestion-patterns.md](1-ingestion-patterns.md)** - Auto Loader, Kafka, Event Hub, Kinesis, file formats
+- **[2-streaming-patterns.md](2-streaming-patterns.md)** - Deduplication, windowing, stateful operations, joins
+- **[3-scd-patterns.md](3-scd-patterns.md)** - Querying SCD Type 2 history tables, temporal joins
+- **[4-performance-tuning.md](4-performance-tuning.md)** - Liquid Clustering, optimization, state management
+- **[5-python-api.md](5-python-api.md)** - Modern `dp` API vs legacy `dlt` API comparison
+- **[6-dlt-migration.md](6-dlt-migration.md)** - Migrating existing DLT pipelines to SDP
 
 ---
 
 ## Best Practices (2025)
 
 ### Language Selection
-
-Ask user if not specified:
-- **SQL**: Simple transformations, SQL teams, declarative style
-- **Python**: Complex logic, UDFs, Python teams (use modern `dp` API)
+- **Default to SQL** unless user specifies Python or task clearly requires it
+- **Use SQL** for: Transformations, aggregations, filtering, joins (most cases)
+- **Use Python** for: Complex UDFs, external APIs, ML inference, dynamic paths (use modern `pyspark.pipelines as dp`)
+- **Generate ONE language** per request unless user explicitly asks for mixed pipeline
 
 ### Modern Defaults
-
-- **Use `CLUSTER BY`** (Liquid Clustering), not `PARTITION BY`
-- **Use raw `.sql`/`.py` files**, not notebooks
-- **All pipelines are serverless** and use Unity Catalog
-- **Use `read_files()`** for cloud storage ingestion
-
-### File Structure
-
-```
-pipeline_name/
-├── bronze/     # Raw ingestion
-├── silver/     # Cleansed, validated
-└── gold/       # Aggregated business layer
-```
+- **CLUSTER BY** (Liquid Clustering), not PARTITION BY - see [4-performance-tuning.md](4-performance-tuning.md)
+- **Raw `.sql`/`.py` files**, not notebooks
+- **Serverless compute ONLY** - Do not use classic clusters unless explicitly required
+- **Unity Catalog** (required for serverless)
+- **read_files()** for cloud storage ingestion - see [1-ingestion-patterns.md](1-ingestion-patterns.md)
 
 ---
 
@@ -295,16 +243,21 @@ pipeline_name/
 
 ## Advanced Pipeline Configuration (`extra_settings`)
 
-By default, pipelines are created with serverless compute and Unity Catalog. Use the `extra_settings` parameter to customize pipeline behavior for advanced use cases.
+By default, pipelines are created with **serverless compute and Unity Catalog**. Use the `extra_settings` parameter only for advanced use cases.
+
+**CRITICAL: Do NOT use `extra_settings` to set `serverless=false` unless the user explicitly requires:**
+- R language support
+- Spark RDD APIs
+- JAR libraries or Maven coordinates
 
 ### When to Use `extra_settings`
 
-- **Non-serverless compute**: Use dedicated clusters with instance pools
 - **Development mode**: Faster iteration with relaxed validation
 - **Continuous pipelines**: Real-time streaming instead of triggered runs
-- **Custom compute**: Photon, specific editions, cluster configurations
 - **Event logging**: Custom event log table location
 - **Pipeline metadata**: Tags, configuration variables
+- **Python dependencies**: Install pip packages for serverless pipelines
+- **Classic clusters** (rare): Only if user explicitly needs R, RDD APIs, or JARs
 
 ### `extra_settings` Parameter Reference
 
@@ -713,10 +666,29 @@ result = create_or_update_pipeline(
 
 ## Platform Constraints
 
+### Serverless Pipeline Requirements (Default)
+| Requirement | Details |
+|-------------|---------|
+| **Unity Catalog** | Required - serverless pipelines always use UC |
+| **Workspace Region** | Must be in serverless-enabled region |
+| **Serverless Terms** | Must accept serverless terms of use |
+| **CDC Features** | Requires serverless (or Pro/Advanced with classic clusters) |
+
+### Serverless Limitations (When Classic Clusters Required)
+| Limitation | Workaround |
+|------------|-----------|
+| **R language** | Not supported - use classic clusters if required |
+| **Spark RDD APIs** | Not supported - use classic clusters if required |
+| **JAR libraries** | Not supported - use classic clusters if required |
+| **Maven coordinates** | Not supported - use classic clusters if required |
+| **DBFS root access** | Limited - must use Unity Catalog external locations |
+| **Global temp views** | Not supported |
+
+### General Constraints
 | Constraint | Details |
 |------------|---------|
-| **Unity Catalog** | Required for all serverless pipelines |
-| **CDC Features** | Requires serverless or Pro/Advanced edition |
 | **Schema Evolution** | Streaming tables require full refresh for incompatible changes |
 | **SQL Limitations** | PIVOT clause unsupported |
 | **Sinks** | Python only, streaming only, append flows only |
+
+**Default to serverless** unless user explicitly requires R, RDD APIs, or JAR libraries.
