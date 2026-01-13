@@ -159,243 +159,180 @@ Install pip dependencies for serverless pipelines:
 
 ### Development Mode Pipeline
 
-```python
-result = create_or_update_pipeline(
-    name="my_dev_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="dev_catalog",
-    schema="dev_schema",
-    workspace_file_paths=[...],
-    start_run=True,
-    extra_settings={
-        "development": True,  # Faster iteration
-        "tags": {"environment": "development", "owner": "data-team"}
-    }
-)
+Use `create_or_update_pipeline` tool with:
+- `name`: "my_dev_pipeline"
+- `root_path`: "/Workspace/Users/user@example.com/my_pipeline"
+- `catalog`: "dev_catalog"
+- `schema`: "dev_schema"
+- `workspace_file_paths`: [...]
+- `start_run`: true
+- `extra_settings`:
+```json
+{
+    "development": true,
+    "tags": {"environment": "development", "owner": "data-team"}
+}
 ```
 
 ### Non-Serverless with Dedicated Cluster
 
-```python
-result = create_or_update_pipeline(
-    name="prod_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="prod_catalog",
-    schema="prod_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "serverless": False,
-        "clusters": [{
-            "label": "default",
-            "num_workers": 4,
-            "node_type_id": "i3.xlarge",
-            "custom_tags": {"cost_center": "analytics"}
-        }],
-        "photon": True,
-        "edition": "ADVANCED"
-    }
-)
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "serverless": false,
+    "clusters": [{
+        "label": "default",
+        "num_workers": 4,
+        "node_type_id": "i3.xlarge",
+        "custom_tags": {"cost_center": "analytics"}
+    }],
+    "photon": true,
+    "edition": "ADVANCED"
+}
 ```
 
 ### Continuous Streaming Pipeline
 
-```python
-result = create_or_update_pipeline(
-    name="realtime_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="streaming_catalog",
-    schema="realtime",
-    workspace_file_paths=[...],
-    extra_settings={
-        "continuous": True,  # Always running, processes data as it arrives
-        "configuration": {
-            "spark.sql.shuffle.partitions": "auto"
-        }
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "continuous": true,
+    "configuration": {
+        "spark.sql.shuffle.partitions": "auto"
     }
-)
+}
 ```
 
 ### Using Instance Pool
 
-```python
-result = create_or_update_pipeline(
-    name="pool_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="my_catalog",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "serverless": False,
-        "clusters": [{
-            "label": "default",
-            "instance_pool_id": "0727-104344-hauls13-pool-xyz",
-            "num_workers": 2,
-            "custom_tags": {"project": "analytics"}
-        }]
-    }
-)
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "serverless": false,
+    "clusters": [{
+        "label": "default",
+        "instance_pool_id": "0727-104344-hauls13-pool-xyz",
+        "num_workers": 2,
+        "custom_tags": {"project": "analytics"}
+    }]
+}
 ```
 
 ### Custom Event Log Location
 
-```python
-result = create_or_update_pipeline(
-    name="audited_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="my_catalog",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "event_log": {
-            "catalog": "audit_catalog",
-            "schema": "pipeline_logs",
-            "name": "my_pipeline_events"
-        }
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "event_log": {
+        "catalog": "audit_catalog",
+        "schema": "pipeline_logs",
+        "name": "my_pipeline_events"
     }
-)
+}
 ```
 
 ### Pipeline with Email Notifications
 
-```python
-result = create_or_update_pipeline(
-    name="monitored_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="my_catalog",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "notifications": [{
-            "email_recipients": ["team@example.com", "oncall@example.com"],
-            "alerts": ["on-update-failure", "on-update-fatal-failure", "on-flow-failure"]
-        }]
-    }
-)
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "notifications": [{
+        "email_recipients": ["team@example.com", "oncall@example.com"],
+        "alerts": ["on-update-failure", "on-update-fatal-failure", "on-flow-failure"]
+    }]
+}
 ```
 
 ### Production Pipeline with Autoscaling
 
-```python
-result = create_or_update_pipeline(
-    name="prod_autoscale_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="prod_catalog",
-    schema="prod_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "serverless": False,
-        "development": False,
-        "photon": True,
-        "edition": "ADVANCED",
-        "clusters": [{
-            "label": "default",
-            "autoscale": {
-                "min_workers": 2,
-                "max_workers": 8,
-                "mode": "ENHANCED"
-            },
-            "node_type_id": "i3.xlarge",
-            "spark_conf": {
-                "spark.sql.adaptive.enabled": "true"
-            },
-            "custom_tags": {"environment": "production"}
-        }],
-        "notifications": [{
-            "email_recipients": ["data-team@example.com"],
-            "alerts": ["on-update-failure"]
-        }]
-    }
-)
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "serverless": false,
+    "development": false,
+    "photon": true,
+    "edition": "ADVANCED",
+    "clusters": [{
+        "label": "default",
+        "autoscale": {
+            "min_workers": 2,
+            "max_workers": 8,
+            "mode": "ENHANCED"
+        },
+        "node_type_id": "i3.xlarge",
+        "spark_conf": {
+            "spark.sql.adaptive.enabled": "true"
+        },
+        "custom_tags": {"environment": "production"}
+    }],
+    "notifications": [{
+        "email_recipients": ["data-team@example.com"],
+        "alerts": ["on-update-failure"]
+    }]
+}
 ```
 
 ### Run as Service Principal
 
-```python
-result = create_or_update_pipeline(
-    name="scheduled_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="my_catalog",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "run_as": {
-            "service_principal_name": "00000000-0000-0000-0000-000000000000"
-        }
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "run_as": {
+        "service_principal_name": "00000000-0000-0000-0000-000000000000"
     }
-)
+}
 ```
 
 ### Continuous Pipeline with Restart Window
 
-```python
-result = create_or_update_pipeline(
-    name="realtime_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="my_catalog",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "continuous": True,
-        "restart_window": {
-            "start_hour": 2,  # 2 AM
-            "days_of_week": ["SATURDAY", "SUNDAY"],
-            "time_zone_id": "America/Los_Angeles"
-        }
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "continuous": true,
+    "restart_window": {
+        "start_hour": 2,
+        "days_of_week": ["SATURDAY", "SUNDAY"],
+        "time_zone_id": "America/Los_Angeles"
     }
-)
+}
 ```
 
 ### Serverless with Python Dependencies
 
-```python
-result = create_or_update_pipeline(
-    name="ml_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="my_catalog",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "serverless": True,
-        "environment": {
-            "dependencies": [
-                "scikit-learn==1.3.0",
-                "pandas>=2.0.0",
-                "requests"
-            ]
-        }
+Use `create_or_update_pipeline` tool with `extra_settings`:
+```json
+{
+    "serverless": true,
+    "environment": {
+        "dependencies": [
+            "scikit-learn==1.3.0",
+            "pandas>=2.0.0",
+            "requests"
+        ]
     }
-)
+}
 ```
 
 ### Update Existing Pipeline by ID
 
-If you have a pipeline ID from the Databricks UI, you can force an update:
-
-```python
-result = create_or_update_pipeline(
-    name="my_pipeline",
-    root_path="/Workspace/Users/user@example.com/my_pipeline",
-    catalog="my_catalog",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings={
-        "id": "554f4497-4807-4182-bff0-ffac4bb4f0ce"  # Forces update of this pipeline
-    }
-)
+If you have a pipeline ID from the Databricks UI, you can force an update by including `id` in `extra_settings`:
+```json
+{
+    "id": "554f4497-4807-4182-bff0-ffac4bb4f0ce"
+}
 ```
 
 ### Full JSON Export from Databricks UI
 
-You can copy pipeline settings from the Databricks UI (Pipeline Settings > JSON) and pass them directly. Invalid fields like `pipeline_type` are automatically filtered:
+You can copy pipeline settings from the Databricks UI (Pipeline Settings > JSON) and pass them directly as `extra_settings`. Invalid fields like `pipeline_type` are automatically filtered:
 
-```python
-# JSON from Databricks UI
-ui_settings = {
+```json
+{
     "id": "554f4497-4807-4182-bff0-ffac4bb4f0ce",
-    "pipeline_type": "WORKSPACE",  # Automatically filtered out
-    "continuous": False,
-    "development": True,
-    "photon": False,
+    "pipeline_type": "WORKSPACE",
+    "continuous": false,
+    "development": true,
+    "photon": false,
     "edition": "ADVANCED",
     "channel": "CURRENT",
     "clusters": [{
@@ -408,16 +345,6 @@ ui_settings = {
         "schema": "my_schema"
     }
 }
-
-result = create_or_update_pipeline(
-    name="my_pipeline",
-    root_path="/Workspace/...",
-    catalog="main",
-    schema="my_schema",
-    workspace_file_paths=[...],
-    extra_settings=ui_settings  # Pass the whole dict
-)
 ```
 
-**Note**: Explicit parameters (`name`, `root_path`, `catalog`, `schema`, `workspace_file_paths`) always take precedence over values in `extra_settings`.
-
+**Note**: Explicit tool parameters (`name`, `root_path`, `catalog`, `schema`, `workspace_file_paths`) always take precedence over values in `extra_settings`.

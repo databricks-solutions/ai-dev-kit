@@ -14,11 +14,8 @@ These libraries are useful for generating realistic synthetic data:
 - **faker**: Generates realistic names, addresses, emails, companies, dates, etc.
 - **holidays**: Provides country-specific holiday calendars for realistic date patterns
 
-These are typically NOT pre-installed on Databricks. Install them using the `execute_databricks_command` MCP tool:
-
-```
-execute_databricks_command(code="%pip install faker holidays")
-```
+These are typically NOT pre-installed on Databricks. Install them using `execute_databricks_command` tool:
+- `code`: "%pip install faker holidays"
 
 Save the returned `cluster_id` and `context_id` for subsequent calls.
 
@@ -35,36 +32,25 @@ Save the returned `cluster_id` and `context_id` for subsequent calls.
 
 The first execution auto-selects a running cluster and creates an execution context. **Reuse this context for follow-up calls** - it's much faster (~1s vs ~15s) and shares variables/imports:
 
-```
-# First execution - auto-selects cluster, creates context
-run_python_file_on_databricks(file_path="scripts/generate_data.py")
+**First execution** - use `run_python_file_on_databricks` tool:
+- `file_path`: "scripts/generate_data.py"
 
-# Returns: { success, output, error, cluster_id, context_id, ... }
-# Save cluster_id and context_id for follow-up calls
-```
+Returns: `{ success, output, error, cluster_id, context_id, ... }`
 
-If execution fails:
+Save `cluster_id` and `context_id` for follow-up calls.
+
+**If execution fails:**
 1. Read the error from the result
 2. Edit the local Python file to fix the issue
-3. Re-execute with the same `cluster_id` and `context_id`:
+3. Re-execute with same context using `run_python_file_on_databricks` tool:
+   - `file_path`: "scripts/generate_data.py"
+   - `cluster_id`: "<saved_cluster_id>"
+   - `context_id`: "<saved_context_id>"
 
-```
-run_python_file_on_databricks(
-    file_path="scripts/generate_data.py",
-    cluster_id="<saved_cluster_id>",
-    context_id="<saved_context_id>"
-)
-```
-
-Follow-up executions reuse the context (faster, shares state):
-
-```
-run_python_file_on_databricks(
-    file_path="scripts/validate_data.py",
-    cluster_id="<saved_cluster_id>",
-    context_id="<saved_context_id>"
-)
-```
+**Follow-up executions** reuse the context (faster, shares state):
+- `file_path`: "scripts/validate_data.py"
+- `cluster_id`: "<saved_cluster_id>"
+- `context_id`: "<saved_context_id>"
 
 ### Handling Failures
 
@@ -78,13 +64,10 @@ When execution fails:
 
 Databricks provides Spark, pandas, numpy, and common data libraries by default. **Only install a library if you get an import error.**
 
-```
-execute_databricks_command(
-    code="%pip install faker",
-    cluster_id="<cluster_id>",
-    context_id="<context_id>"
-)
-```
+Use `execute_databricks_command` tool:
+- `code`: "%pip install faker"
+- `cluster_id`: "<cluster_id>"
+- `context_id`: "<context_id>"
 
 The library is immediately available in the same context.
 
@@ -637,25 +620,17 @@ print(f"Incident period tickets: {len(incident_tickets):,} ({len(incident_ticket
 print(f"Incident Auth %: {(incident_tickets['category'] == 'Auth').mean()*100:.1f}%")
 ```
 
-Execute using the MCP tool:
-
-```
-run_python_file_on_databricks(file_path="scripts/generate_data.py")
-```
+Execute using `run_python_file_on_databricks` tool:
+- `file_path`: "scripts/generate_data.py"
 
 If it fails, edit the file and re-run with the same `cluster_id` and `context_id`.
 
 ### Validate Generated Data
 
-After successful execution, use `get_volume_folder_details` to verify the generated data:
-
-```
-get_volume_folder_details(
-    volume_path="my_catalog/my_schema/raw_data/customers",
-    format="parquet",
-    table_stat_level="SIMPLE"
-)
-```
+After successful execution, use `get_volume_folder_details` tool to verify the generated data:
+- `volume_path`: "my_catalog/my_schema/raw_data/customers"
+- `format`: "parquet"
+- `table_stat_level`: "SIMPLE"
 
 This returns schema, row counts, and column statistics to confirm the data was written correctly.
 
