@@ -54,3 +54,4 @@ htmlcov/
 
 # MCP Server logs
 *.log
+mcp.json

@@ -12,7 +12,7 @@ env:
   - name: PROJECTS_BASE_DIR
     value: "./projects"
   - name: ENABLED_SKILLS
-    value: "databricks-python-sdk,sdp,synthetic-data-generation"
+    value: "databricks-python-sdk,spark-declarative-pipelines,synthetic-data-generation"
   # Database - set LAKEBASE_PG_URL via app secrets
   # - name: LAKEBASE_PG_URL
   #   valueFrom:

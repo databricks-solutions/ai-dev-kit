@@ -1,22 +1,16 @@
 # Data Ingestion Patterns for SDP
 
-## Overview
+Covers data ingestion patterns for Spark Declarative Pipelines including Auto Loader for cloud storage and streaming sources like Kafka and Event Hub.
 
-This guide covers data ingestion patterns for Lakeflow Spark Declarative Pipelines, including Auto Loader for cloud storage and streaming sources like Kafka and Event Hub.
-
-**Language Support**:
-- **SQL**: Examples below use SQL syntax (primary focus)
-- **Python**: For Python syntax using modern `pyspark.pipelines` API, see:
-  - [Official Python Transform Documentation](https://docs.databricks.com/aws/en/ldp/transform/?language=Python)
-  - Local skill file: `python-api-versions.md` for migration from legacy `dlt` to modern `dp` API
+**Language Support**: SQL (primary), Python via modern `pyspark.pipelines` API. See [5-python-api.md](5-python-api.md) for Python syntax.
 
 ---
 
 ## Auto Loader (Cloud Files)
 
-Auto Loader incrementally and efficiently processes new data files as they arrive in cloud storage.
+Auto Loader incrementally processes new data files as they arrive in cloud storage.
 
-### Basic Auto Loader Pattern
+### Basic Pattern
 
 ```sql
 CREATE OR REPLACE STREAMING TABLE bronze_orders AS
@@ -32,7 +26,7 @@ FROM read_files(
 );
 ```
 
-### Auto Loader with Schema Evolution
+### Schema Evolution
 
 ```sql
 CREATE OR REPLACE STREAMING TABLE bronze_customers AS
@@ -47,9 +41,9 @@ FROM read_files(
 );
 ```
 
-### Common File Formats
+### File Formats
 
-**JSON Files**:
+**JSON**:
 ```sql
 FROM read_files(
   's3://bucket/data/',
@@ -58,7 +52,7 @@ FROM read_files(
 )
 ```
 
-**CSV Files**:
+**CSV**:
 ```sql
 FROM read_files(
   '/mnt/raw/data/',
@@ -69,7 +63,7 @@ FROM read_files(
 )
 ```
 
-**Parquet Files**:
+**Parquet** (schema auto-inferred):
 ```sql
 FROM read_files(
   'abfss://container@storage.dfs.core.windows.net/data/',
@@ -77,7 +71,7 @@ FROM read_files(
 )
 ```
 
-**Avro Files**:
+**Avro**:
 ```sql
 FROM read_files(
   '/mnt/raw/events/',
@@ -86,49 +80,32 @@ FROM read_files(
 )
 ```
 
-### Schema Inference and Hints
+### Schema Inference
 
-**Explicit Schema Hints** (recommended for production):
+**Explicit hints** (recommended for production):
 ```sql
-CREATE OR REPLACE STREAMING TABLE bronze_sales AS
-SELECT
-  *,
-  current_timestamp() AS _ingested_at
 FROM read_files(
   '/mnt/raw/sales/',
   format => 'json',
   schemaHints => 'sale_id STRING, customer_id STRING, amount DECIMAL(10,2), sale_date DATE'
-);
+)
 ```
 
-**Partial Schema Hints** (infer remaining columns):
+**Partial hints** (infer remaining columns):
 ```sql
 FROM read_files(
   '/mnt/raw/data/',
   format => 'json',
-  schemaHints => 'id STRING, critical_field DECIMAL(10,2)'  -- Other fields auto-inferred
+  schemaHints => 'id STRING, critical_field DECIMAL(10,2)'  -- Others auto-inferred
 )
 ```
 
-### File Notification Modes
-
-**Directory Listing** (default, good for small directories):
-```sql
-FROM read_files(
-  '/mnt/raw/data/',
-  format => 'json'
-  -- Uses directory listing to discover files
-)
-```
-
-**File Notification** (better for large directories):
-Configure at the pipeline level for better performance with large directories.
-
-### Rescue Data Column
+### Rescue Data and Quarantine
 
 Handle malformed records with `_rescued_data`:
 
 ```sql
+-- Flag records with parsing errors
 CREATE OR REPLACE STREAMING TABLE bronze_events AS
 SELECT
   *,
@@ -140,34 +117,13 @@ FROM read_files(
   schemaHints => 'event_id STRING, event_time TIMESTAMP'
 );
 
--- Create quarantine table for records with rescue data
+-- Quarantine for investigation
 CREATE OR REPLACE STREAMING TABLE bronze_events_quarantine AS
-SELECT *
-FROM STREAM bronze_events
-WHERE _rescued_data IS NOT NULL;
-```
+SELECT * FROM STREAM bronze_events WHERE _rescued_data IS NOT NULL;
 
-### Incremental Processing
-
-Auto Loader automatically maintains checkpoints and processes only new files:
-
-```sql
--- Bronze layer processes new files incrementally
-CREATE OR REPLACE STREAMING TABLE bronze_transactions AS
-SELECT *
-FROM read_files(
-  '/mnt/raw/transactions/',
-  format => 'json'
-);
-
--- Silver layer processes new bronze records incrementally
-CREATE OR REPLACE STREAMING TABLE silver_transactions AS
-SELECT
-  transaction_id,
-  CAST(amount AS DECIMAL(10,2)) AS amount,
-  CAST(transaction_date AS DATE) AS transaction_date
-FROM STREAM bronze_transactions
-WHERE transaction_id IS NOT NULL;
+-- Clean data for downstream
+CREATE OR REPLACE STREAMING TABLE silver_events_clean AS
+SELECT * FROM STREAM bronze_events WHERE _rescued_data IS NULL;
 ```
 
 ---
@@ -200,17 +156,12 @@ FROM read_stream(
 ### Kafka with Multiple Topics
 
 ```sql
-CREATE OR REPLACE STREAMING TABLE bronze_kafka_multi AS
-SELECT
-  CAST(value AS STRING) AS event_value,
-  topic,
-  timestamp AS kafka_timestamp
 FROM read_stream(
   format => 'kafka',
   kafka.bootstrap.servers => '${kafka_brokers}',
   subscribe => 'topic1,topic2,topic3',
   startingOffsets => 'latest'
-);
+)
 ```
 
 ### Azure Event Hub
@@ -227,7 +178,7 @@ FROM read_stream(
   format => 'eventhubs',
   eventhubs.connectionString => '${eventhub_connection_string}',
   eventhubs.consumerGroup => '${consumer_group}',
-  startingPosition => 'latest'  -- or specific timestamp
+  startingPosition => 'latest'
 );
 ```
 
@@ -263,7 +214,7 @@ SELECT
   _ingested_at
 FROM STREAM bronze_kafka_events;
 
--- Flatten the parsed JSON
+-- Flatten parsed JSON
 CREATE OR REPLACE STREAMING TABLE silver_kafka_flattened AS
 SELECT
   event_data.event_id,
@@ -278,30 +229,28 @@ FROM STREAM silver_kafka_parsed;
 
 ---
 
-## Authentication Patterns
+## Authentication
 
 ### Using Databricks Secrets
 
-**For Kafka**:
+**Kafka**:
 ```sql
 kafka.sasl.jaas.config => 'kafkashaded.org.apache.kafka.common.security.plain.PlainLoginModule required username="{{secrets/kafka/username}}" password="{{secrets/kafka/password}}";'
 ```
 
-**For Event Hub**:
+**Event Hub**:
 ```sql
 eventhubs.connectionString => '{{secrets/eventhub/connection-string}}'
 ```
 
 ### Using Pipeline Variables
 
-Define variables in pipeline configuration and reference them:
-
+Reference variables in SQL:
 ```sql
--- In pipeline SQL, reference variables
 kafka.bootstrap.servers => '${kafka_brokers}'
 ```
 
-Then set in pipeline YAML or UI:
+Define in pipeline configuration:
 ```yaml
 variables:
   kafka_brokers:
@@ -310,14 +259,14 @@ variables:
 
 ---
 
-## Best Practices
+## Key Patterns
 
 ### 1. Always Add Ingestion Timestamp
 
 ```sql
 SELECT
   *,
-  current_timestamp() AS _ingested_at
+  current_timestamp() AS _ingested_at  -- Track when data entered system
 FROM read_files(...)
 ```
 
@@ -335,80 +284,60 @@ FROM read_files(...)
 ### 3. Use Schema Hints for Production
 
 ```sql
--- ✅ Good: Explicit schema hints prevent surprises
+-- ✅ Explicit schema prevents surprises
 FROM read_files(
   '/mnt/data/',
   format => 'json',
   schemaHints => 'id STRING, amount DECIMAL(10,2), date DATE'
 )
 
--- ❌ Avoid: Fully inferred schemas can drift unexpectedly
+-- ❌ Fully inferred schemas can drift
 FROM read_files('/mnt/data/', format => 'json')
 ```
 
-### 4. Handle Rescue Data for Data Quality
+### 4. Handle Rescue Data for Quality
 
 ```sql
-CREATE OR REPLACE STREAMING TABLE bronze_data AS
-SELECT
-  *,
-  CASE WHEN _rescued_data IS NOT NULL THEN TRUE ELSE FALSE END AS has_errors
-FROM read_files(...);
-
--- Route errors to quarantine
+-- Route errors to quarantine, clean to downstream
 CREATE OR REPLACE STREAMING TABLE bronze_data_quarantine AS
 SELECT * FROM STREAM bronze_data WHERE has_errors;
 
--- Clean data for downstream
 CREATE OR REPLACE STREAMING TABLE silver_data AS
 SELECT * FROM STREAM bronze_data WHERE NOT has_errors;
 ```
 
-### 5. Use Appropriate Starting Positions
+### 5. Starting Positions
 
-**For Kafka/Event Hub**:
-- Development: `startingOffsets => 'latest'` (process new data only)
-- Backfill: `startingOffsets => 'earliest'` (process all available data)
-- Recovery: Checkpoints handle this automatically
+**Development**: `startingOffsets => 'latest'` (new data only)
+**Backfill**: `startingOffsets => 'earliest'` (all available data)
+**Recovery**: Checkpoints handle automatically
 
 ---
 
-## Common Issues and Solutions
+## Common Issues
 
-### Issue: Files not being picked up
-**Cause**: File format mismatch or incorrect path
-**Solution**: Verify format matches actual files and path is correct
-
-### Issue: Schema evolution breaking pipeline
-**Cause**: New columns added to source files
-**Solution**: Use `mode => 'PERMISSIVE'` and monitor `_rescued_data`
-
-### Issue: Kafka lag increasing
-**Cause**: Processing slower than ingestion rate
-**Solution**: Check downstream transformations for bottlenecks, consider increasing parallelism
-
-### Issue: Duplicate events from streaming sources
-**Cause**: At-least-once semantics from source
-**Solution**: Implement deduplication in silver layer with GROUP BY or ROW_NUMBER()
+| Issue | Solution |
+|-------|----------|
+| Files not picked up | Verify format matches files and path is correct |
+| Schema evolution breaking | Use `mode => 'PERMISSIVE'` and monitor `_rescued_data` |
+| Kafka lag increasing | Check downstream bottlenecks, increase parallelism |
+| Duplicate events | Implement deduplication in silver layer (see [2-streaming-patterns.md](2-streaming-patterns.md)) |
+| Parsing errors | Use rescue data pattern to quarantine malformed records |
 
 ---
 
 ## Python API Examples
 
-For Python implementations, use the modern `pyspark.pipelines` API (`dp`), not the legacy `dlt` API.
+For Python, use modern `pyspark.pipelines` API. See [5-python-api.md](5-python-api.md) for complete guidance.
 
-### Basic Auto Loader Pattern (Python)
+### Auto Loader (Python)
 
 ```python
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
-@dp.table(
-    name="bronze_orders",
-    cluster_by=["order_date"]
-)
+@dp.table(name="bronze_orders", cluster_by=["order_date"])
 def bronze_orders():
-    """Ingest raw orders using Auto Loader"""
     return (
         spark.readStream
         .format("cloudFiles")
@@ -421,12 +350,11 @@ def bronze_orders():
     )
 ```
 
-### Kafka Source (Python)
+### Kafka (Python)
 
 ```python
 @dp.table(name="bronze_kafka_events")
 def bronze_kafka_events():
-    """Ingest events from Kafka"""
     return (
         spark.readStream
         .format("kafka")
@@ -437,24 +365,18 @@ def bronze_kafka_events():
         .selectExpr(
             "CAST(key AS STRING) AS event_key",
             "CAST(value AS STRING) AS event_value",
-            "topic",
-            "partition",
-            "offset",
+            "topic", "partition", "offset",
             "timestamp AS kafka_timestamp"
         )
         .withColumn("_ingested_at", F.current_timestamp())
     )
 ```
 
-### Quarantine Pattern (Python)
+### Quarantine (Python)
 
 ```python
-@dp.table(
-    name="bronze_events",
-    cluster_by=["ingestion_date"]
-)
+@dp.table(name="bronze_events", cluster_by=["ingestion_date"])
 def bronze_events():
-    """Bronze layer with rescue data for error handling"""
     return (
         spark.readStream
         .format("cloudFiles")
@@ -470,11 +392,8 @@ def bronze_events():
 
 @dp.table(name="bronze_events_quarantine")
 def bronze_events_quarantine():
-    """Isolate malformed records"""
     return (
         dp.read.table("catalog.schema.bronze_events")
         .filter(F.col("_has_parsing_errors") == True)
     )
 ```
-
-**For Python API reference**: [Official Python Transform Documentation](https://docs.databricks.com/aws/en/ldp/transform/?language=Python)

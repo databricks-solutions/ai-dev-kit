@@ -34,14 +34,14 @@ REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/
 SKILLS_DIR=".claude/skills"
 
 # All available skills
-ALL_SKILLS="dabs-writer databricks-python-sdk sdp synthetic-data-generation"
+ALL_SKILLS="dabs-writer databricks-python-sdk spark-declarative-pipelines synthetic-data-generation"
 
 # Get skill description
 get_skill_description() {
     case "$1" in
         "dabs-writer") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
-        "sdp") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
+        "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
         "synthetic-data-generation") echo "Synthetic test data generation" ;;
         *) echo "Unknown skill" ;;
     esac
@@ -50,7 +50,7 @@ get_skill_description() {
 # Get extra files for a skill (besides SKILL.md)
 get_skill_extra_files() {
     case "$1" in
-        "sdp") echo "ingestion-patterns.md streaming-patterns.md scd-query-patterns.md python-api-versions.md performance-tuning.md dlt-migration-guide.md" ;;
+        "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md" ;;
         *) echo "" ;;
     esac
 }
