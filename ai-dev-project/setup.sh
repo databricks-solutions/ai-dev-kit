@@ -124,10 +124,13 @@ You have access to Databricks MCP tools prefixed with `mcp__databricks__`. Use `
 ## Skills
 
 Load skills for detailed guidance:
-- `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
+- `skill: "asset-bundles"` - Databricks Asset Bundles
+- `skill: "databricks-app-apx"` - Full-stack apps with APX framework
+- `skill: "databricks-app-python"` - Python apps with Dash, Streamlit, Flask
 - `skill: "databricks-python-sdk"` - Python SDK patterns
+- `skill: "mlflow-evaluation"` - MLflow evaluation and trace analysis
+- `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
 - `skill: "synthetic-data-generation"` - Test data generation
-- `skill: "dabs-writer"` - Databricks Asset Bundles
 
 ## Testing Workflow
 

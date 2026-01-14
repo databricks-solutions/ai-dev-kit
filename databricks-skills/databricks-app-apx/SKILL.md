@@ -1,4 +1,4 @@
-# Build Databricks APX Application
+# Databricks APX Application
 
 Build full-stack Databricks applications using APX framework (FastAPI + React).
 
@@ -152,7 +152,7 @@ Manually verify in browser:
 
 ### Deploy to Databricks
 
-Use DABs to deploy your APX application to Databricks. See the `dabs-writer` skill for complete deployment guidance.
+Use DABs to deploy your APX application to Databricks. See the `asset-bundles` skill for complete deployment guidance.
 
 ### Monitor Application Logs
 

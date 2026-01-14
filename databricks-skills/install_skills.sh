@@ -10,11 +10,13 @@
 #   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 #
 #   # Install specific skills
-#   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- sdp dabs-writer
+#   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- sdp asset-bundles
 #
 #   # Or run locally
-#   ./install_skills.sh                    # Install all
-#   ./install_skills.sh sdp dabs-writer    # Install specific skills
+#   ./install_skills.sh                    # Install all from URL
+#   ./install_skills.sh sdp asset-bundles    # Install specific skills from URL
+#   ./install_skills.sh --local            # Install all from local directory
+#   ./install_skills.sh --local sdp        # Install specific skill from local directory
 #   ./install_skills.sh --list             # List available skills
 #   ./install_skills.sh --help             # Show help
 #
@@ -32,15 +34,20 @@ NC='\033[0m' # No Color
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit"
 REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
 SKILLS_DIR=".claude/skills"
+INSTALL_FROM_LOCAL=false
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # All available skills
-ALL_SKILLS="dabs-writer databricks-python-sdk spark-declarative-pipelines synthetic-data-generation"
+ALL_SKILLS="asset-bundles databricks-app-apx databricks-app-python databricks-python-sdk mlflow-evaluation spark-declarative-pipelines synthetic-data-generation"
 
 # Get skill description
 get_skill_description() {
     case "$1" in
-        "dabs-writer") echo "Databricks Asset Bundles - deployment and configuration" ;;
+        "asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
+        "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
+        "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
+        "mlflow-evaluation") echo "MLflow evaluation, scoring, and trace analysis" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
         "synthetic-data-generation") echo "Synthetic test data generation" ;;
         *) echo "Unknown skill" ;;
@@ -50,7 +57,10 @@ get_skill_description() {
 # Get extra files for a skill (besides SKILL.md)
 get_skill_extra_files() {
     case "$1" in
-        "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md" ;;
+        "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
+        "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
+        "mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
+        "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md" ;;
         *) echo "" ;;
     esac
 }
@@ -66,11 +76,14 @@ show_help() {
     echo "  --help, -h     Show this help message"
     echo "  --list, -l     List all available skills"
     echo "  --all, -a      Install all skills (default if no skills specified)"
+    echo "  --local        Install from local files instead of downloading"
     echo ""
     echo "Examples:"
-    echo "  ./install_skills.sh                    # Install all skills"
-    echo "  ./install_skills.sh sdp                # Install only SDP skill"
-    echo "  ./install_skills.sh sdp dabs-writer    # Install specific skills"
+    echo "  ./install_skills.sh                    # Install all skills from URL"
+    echo "  ./install_skills.sh sdp                # Install only SDP skill from URL"
+    echo "  ./install_skills.sh sdp asset-bundles    # Install specific skills from URL"
+    echo "  ./install_skills.sh --local            # Install all skills from local directory"
+    echo "  ./install_skills.sh --local sdp        # Install SDP skill from local directory"
     echo "  ./install_skills.sh --list             # List available skills"
     echo ""
     echo "Available skills:"
@@ -120,31 +133,73 @@ download_skill() {
         rm -rf "$skill_dir"
     fi
 
-    # Download skill files
-    echo -e "  Downloading..."
-
     # Create skill directory
     mkdir -p "$skill_dir"
 
-    # Download SKILL.md (required)
-    if curl -sSL -f "${REPO_RAW_URL}/databricks-skills/${skill_name}/SKILL.md" -o "$skill_dir/SKILL.md" 2>/dev/null; then
-        echo -e "  ${GREEN}✓${NC} Downloaded SKILL.md"
-    else
-        echo -e "  ${RED}✗${NC} Failed to download SKILL.md"
-        rm -rf "$skill_dir"
-        return 1
-    fi
+    if [ "$INSTALL_FROM_LOCAL" = true ]; then
+        # Copy from local files
+        echo -e "  Copying from local..."
+        local source_dir="$SCRIPT_DIR/${skill_name}"
 
-    # Download skill-specific extra files
-    local extra_files=$(get_skill_extra_files "$skill_name")
-    if [ -n "$extra_files" ]; then
-        for extra_file in $extra_files; do
-            if curl -sSL -f "${REPO_RAW_URL}/databricks-skills/${skill_name}/${extra_file}" -o "$skill_dir/${extra_file}" 2>/dev/null; then
-                echo -e "  ${GREEN}✓${NC} Downloaded ${extra_file}"
-            else
-                echo -e "  ${YELLOW}○${NC} Optional file ${extra_file} not found"
-            fi
-        done
+        # Check if source directory exists
+        if [ ! -d "$source_dir" ]; then
+            echo -e "  ${RED}✗${NC} Source directory not found: $source_dir"
+            rm -rf "$skill_dir"
+            return 1
+        fi
+
+        # Copy SKILL.md (required)
+        if [ -f "$source_dir/SKILL.md" ]; then
+            cp "$source_dir/SKILL.md" "$skill_dir/SKILL.md"
+            echo -e "  ${GREEN}✓${NC} Copied SKILL.md"
+        else
+            echo -e "  ${RED}✗${NC} SKILL.md not found in $source_dir"
+            rm -rf "$skill_dir"
+            return 1
+        fi
+
+        # Copy skill-specific extra files
+        local extra_files=$(get_skill_extra_files "$skill_name")
+        if [ -n "$extra_files" ]; then
+            for extra_file in $extra_files; do
+                if [ -f "$source_dir/${extra_file}" ]; then
+                    # Create subdirectory if needed
+                    local extra_file_dir=$(dirname "$skill_dir/${extra_file}")
+                    mkdir -p "$extra_file_dir"
+                    cp "$source_dir/${extra_file}" "$skill_dir/${extra_file}"
+                    echo -e "  ${GREEN}✓${NC} Copied ${extra_file}"
+                else
+                    echo -e "  ${YELLOW}○${NC} Optional file ${extra_file} not found"
+                fi
+            done
+        fi
+    else
+        # Download from URL
+        echo -e "  Downloading..."
+
+        # Download SKILL.md (required)
+        if curl -sSL -f "${REPO_RAW_URL}/databricks-skills/${skill_name}/SKILL.md" -o "$skill_dir/SKILL.md" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} Downloaded SKILL.md"
+        else
+            echo -e "  ${RED}✗${NC} Failed to download SKILL.md"
+            rm -rf "$skill_dir"
+            return 1
+        fi
+
+        # Download skill-specific extra files
+        local extra_files=$(get_skill_extra_files "$skill_name")
+        if [ -n "$extra_files" ]; then
+            for extra_file in $extra_files; do
+                # Create subdirectory if needed
+                local extra_file_dir=$(dirname "$skill_dir/${extra_file}")
+                mkdir -p "$extra_file_dir"
+                if curl -sSL -f "${REPO_RAW_URL}/databricks-skills/${skill_name}/${extra_file}" -o "$skill_dir/${extra_file}" 2>/dev/null; then
+                    echo -e "  ${GREEN}✓${NC} Downloaded ${extra_file}"
+                else
+                    echo -e "  ${YELLOW}○${NC} Optional file ${extra_file} not found"
+                fi
+            done
+        fi
     fi
 
     echo -e "  ${GREEN}✓ Installed successfully${NC}"
@@ -166,6 +221,10 @@ while [ $# -gt 0 ]; do
             ;;
         --all|-a)
             SKILLS_TO_INSTALL="$ALL_SKILLS"
+            shift
+            ;;
+        --local)
+            INSTALL_FROM_LOCAL=true
             shift
             ;;
         -*)
@@ -226,6 +285,12 @@ echo -e "${GREEN}Skills to install:${NC}"
 for skill in $SKILLS_TO_INSTALL; do
     echo -e "  - $skill"
 done
+
+if [ "$INSTALL_FROM_LOCAL" = true ]; then
+    echo -e "\n${BLUE}Installing from local directory: ${SCRIPT_DIR}${NC}"
+else
+    echo -e "\n${BLUE}Installing from: ${REPO_URL}${NC}"
+fi
 
 # Download each skill
 echo -e "\n${GREEN}Installing Databricks skills...${NC}"

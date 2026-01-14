@@ -21,7 +21,7 @@ The AI Dev Kit provides everything you need to build on Databricks using AI assi
 │   │   databricks-skills/    │        │   .claude/mcp.json              │   │
 │   │                         │        │                                 │   │
 │   │   Knowledge & Patterns          │        │   MCP Server Config             │   │
-│   │   • dabs-writer                 │        │   → databricks-mcp-server       │   │
+│   │   • asset-bundles               │        │   → databricks-mcp-server       │   │
 │   │   • spark-declarative-pipelines │        │                                 │   │
 │   │   • synthetic-data-gen          │        └───────────────┬─────────────────┘   │
 │   │   • databricks-sdk              │                        │                      │
@@ -134,10 +134,13 @@ Skills teach Claude best practices and patterns:
 ```
 
 This installs to `.claude/skills/`:
-- **dabs-writer**: Databricks Asset Bundles patterns
+- **asset-bundles**: Databricks Asset Bundles patterns
+- **databricks-app-apx**: Full-stack apps with APX framework (FastAPI + React)
+- **databricks-app-python**: Python apps with Dash, Streamlit, Flask
+- **databricks-python-sdk**: SDK and API usage
+- **mlflow-evaluation**: MLflow evaluation and trace analysis
 - **spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) - formerly DLT
 - **synthetic-data-generation**: Realistic test data generation
-- **databricks-python-sdk**: SDK and API usage
 
 ### Step 5: Start Claude Code
 

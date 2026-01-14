@@ -155,9 +155,12 @@ Once configured, Claude has access to these Databricks tools:
 
 The setup script installs these skills to `.claude/skills/`:
 
-- **spark-declarative-pipelines** - Spark Declarative Pipelines (SDP/DLT)
-- **dabs-writer** - Databricks Asset Bundles
+- **asset-bundles** - Databricks Asset Bundles
+- **databricks-app-apx** - Full-stack apps with APX framework (FastAPI + React)
+- **databricks-app-python** - Python apps with Dash, Streamlit, Flask
 - **databricks-python-sdk** - Python SDK patterns
+- **mlflow-evaluation** - MLflow evaluation and trace analysis
+- **spark-declarative-pipelines** - Spark Declarative Pipelines (SDP/DLT)
 - **synthetic-data-generation** - Test data generation
 
 Use skills by asking Claude:
@@ -210,8 +213,8 @@ Check the MCP server logs - Claude Code shows tool errors in the chat. Common is
 ai-dev-project/
 ├── .claude/
 │   └── skills/            # Installed Databricks skills
+│       ├── asset-bundles/
 │       ├── spark-declarative-pipelines/
-│       ├── dabs-writer/
 │       └── ...
 ├── .cursor/
 │   └── mcp.json           # MCP server configuration

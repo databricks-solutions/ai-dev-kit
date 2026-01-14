@@ -1,11 +1,11 @@
-# Build Python App Skill
+# Databricks Python App Skill
 
 Claude Agent skill for building Python-based Databricks applications with various frameworks.
 
 ## Structure
 
 ```
-build-python-app/
+databricks-app-python/
 ├── SKILL.md           # Main skill file with core patterns
 ├── dash.md            # Dash framework specific guide
 ├── streamlit.md       # Streamlit guide (coming soon)
@@ -143,10 +143,10 @@ Before committing changes:
 
 ## Related Skills
 
-- **build-databricks-app** - APX framework (FastAPI + React)
+- **databricks-app-apx** - APX framework (FastAPI + React)
 - **databricks-dev** - General Databricks development
 - **python-dev** - Python development standards
-- **dabs-writer** - Databricks Asset Bundles
+- **asset-bundles** - Databricks Asset Bundles
 
 ## Support
 

@@ -177,9 +177,12 @@ Skills provide specialized guidance for Databricks development tasks. They are m
 3. The agent can invoke skills using the `Skill` tool: `skill: "sdp"`
 
 Skills include:
-- **sdp**: Spark Declarative Pipelines (SDP) development
-- **dabs-writer**: Databricks Asset Bundles configuration
+- **asset-bundles**: Databricks Asset Bundles configuration
+- **databricks-app-apx**: Full-stack apps with APX framework (FastAPI + React)
+- **databricks-app-python**: Python apps with Dash, Streamlit, Flask
 - **databricks-python-sdk**: Python SDK patterns
+- **mlflow-evaluation**: MLflow evaluation and trace analysis
+- **spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) development
 - **synthetic-data-generation**: Creating test datasets
 
 ### 5. Project Persistence

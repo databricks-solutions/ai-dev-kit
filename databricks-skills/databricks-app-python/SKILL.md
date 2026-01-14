@@ -1,4 +1,4 @@
-# Build Python Databricks Application
+# Databricks Python Application
 
 Build Python-based Databricks applications using frameworks like Dash, Streamlit, Flask, or other Python web frameworks.
 
@@ -749,7 +749,7 @@ databricks bundle run <resource_key> -t prod
 - Apps have minimal bundle configuration (name, description, path)
 - Must run `databricks bundle run` to start the app after deployment
 
-**For complete DABs guidance, use the `dabs-writer` skill.**
+**For complete DABs guidance, use the `asset-bundles` skill.**
 
 ### Post-Deployment Steps
 
