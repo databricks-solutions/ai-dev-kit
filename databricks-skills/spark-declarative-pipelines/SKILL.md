@@ -17,7 +17,78 @@ description: "Creates, configures, and updates Databricks Lakeflow Spark Declara
 
 ---
 
-## Development Workflow with MCP Tools
+## Quick Start: Initialize New Pipeline Project
+
+**RECOMMENDED**: Use `databricks pipelines init` to create production-ready Asset Bundle projects with multi-environment support.
+
+### When to Use Bundle Initialization
+
+Use bundle initialization for **New pipeline projects** for a professional structure from the start
+
+Use manual workflow for:
+- Quick prototyping without multi-environment needs
+- Existing manual projects you want to continue
+- Learning/experimentation
+
+### Step 1: Initialize Project
+
+I will automatically run this command when you request a new pipeline:
+
+```bash
+databricks pipelines init --output-dir ./my_pipeline
+```
+
+**Interactive Prompts:**
+- **Project name**: e.g., `customer_orders_pipeline`
+- **Initial catalog**: Unity Catalog name (e.g., `main`, `prod_catalog`)
+- **Personal schema per user?**: `yes` for dev (each user gets their own schema), `no` for prod
+- **Language**: SQL or Python (auto-detected from your request - see language detection below)
+
+**Generated Structure:**
+```
+my_pipeline/
+├── databricks.yml              # Multi-environment config (dev/prod)
+├── resources/
+│   └── *_etl.pipeline.yml      # Pipeline resource definition
+└── src/
+    └── *_etl/
+        ├── explorations/       # Exploratory code in .ipynb
+        └── transformations/    # Your .sql or .py files here
+```
+
+### Step 2: Customize Transformations
+
+Replace the example code created by the init process with custom transformation files in `src/transformations/` based on provided requirements, using best practice guidance from this skill.
+
+
+### Step 3: Deploy and Run
+
+```bash
+# Deploy to workspace (dev by default)
+databricks bundle deploy
+
+# Run pipeline
+databricks bundle run my_pipeline_etl
+
+# Deploy to production
+databricks bundle deploy --target prod
+```
+
+I can run these commands for you using the Bash tool.
+
+**For medallion architecture** (bronze/silver/gold), two approaches work:
+- **Flat with naming** (template default): `bronze_*.sql`, `silver_*.sql`, `gold_*.sql`
+- **Subdirectories**: `bronze/orders.sql`, `silver/cleaned.sql`, `gold/summary.sql`
+
+Both work with the `transformations/**` glob pattern. Choose based on preference.
+
+See **[8-project-initialization.md](8-project-initialization.md)** for complete details on bundle initialization, migration, and troubleshooting.
+
+---
+
+## Alternative: Manual Workflow (Advanced)
+
+For rapid prototyping, experimentation, or when you prefer direct control without Asset Bundles, use the manual workflow with MCP tools.
 
 Use MCP tools to create, run, and iterate on **serverless SDP pipelines**. The **primary tool is `create_or_update_pipeline`** which handles the entire lifecycle.
 
@@ -71,10 +142,14 @@ def bronze_events():
 ```
 
 **Language Selection:**
-- **Default to SQL** unless user specifies Python or task requires it
-- **Use SQL** for: Transformations, aggregations, filtering, joins (90% of use cases)
-- **Use Python** for: Complex UDFs, external APIs, ML inference, dynamic paths
-- **Generate ONE language** per request unless user explicitly asks for mixed pipeline
+- **Auto-detection**: I analyze your request for keywords:
+  - **SQL indicators**: "SQL", "sql files", "simple transformations", "aggregations", "materialized view", "CREATE OR REFRESH"
+  - **Python indicators**: "Python", ".py files", "UDF", "complex logic", "ML inference", "external API", "@dp.table", "pandas"
+- **Prompt for clarification** when language intent is unclear or mixed
+- **Use SQL** for: Transformations, aggregations, filtering, joins (most cases)
+- **Generate ONE language** per request unless you explicitly ask for mixed pipeline
+
+See **[8-project-initialization.md](8-project-initialization.md)** for detailed language detection logic.
 
 ### Step 2: Upload to Databricks Workspace
 
@@ -206,12 +281,24 @@ Load these for detailed patterns:
 - **[5-python-api.md](5-python-api.md)** - Modern `dp` API vs legacy `dlt` API comparison
 - **[6-dlt-migration.md](6-dlt-migration.md)** - Migrating existing DLT pipelines to SDP
 - **[7-advanced-configuration.md](7-advanced-configuration.md)** - `extra_settings` parameter reference and examples
+- **[8-project-initialization.md](8-project-initialization.md)** - Using `databricks pipelines init`, Asset Bundles, language detection, and migration guides
 
 ---
 
 ## Best Practices (2025)
 
+### Project Structure
+- **Default to `databricks pipelines init`** for new projects (creates Asset Bundle)
+- **Use Asset Bundles** for multi-environment deployments (dev/staging/prod)
+- **Manual structure only** for quick prototypes or legacy migration
+- **Medallion architecture**: Two approaches work with Asset Bundles:
+  - **Flat structure** (template default): `bronze_*.sql`, `silver_*.sql`, `gold_*.sql` in `transformations/`
+  - **Subdirectories**: `transformations/bronze/`, `transformations/silver/`, `transformations/gold/`
+  - Both work with the `transformations/**` glob pattern - choose based on team preference
+- See **[8-project-initialization.md](8-project-initialization.md)** for project setup details
+
 ### Language Selection
+- **Auto-detect from user prompt** - analyze keywords to infer SQL vs Python
 - **Default to SQL** unless user specifies Python or task clearly requires it
 - **Use SQL** for: Transformations, aggregations, filtering, joins (most cases)
 - **Use Python** for: Complex UDFs, external APIs, ML inference, dynamic paths (use modern `pyspark.pipelines as dp`)
