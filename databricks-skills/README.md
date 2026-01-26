@@ -41,6 +41,7 @@ The installer will:
 | **databricks-app-python** | Build Python-based Databricks apps with Dash, Streamlit, Flask, or other Python web frameworks |
 | **databricks-python-sdk** | Python SDK, Databricks Connect, CLI, and REST API guidance |
 | **mlflow-evaluation** | MLflow evaluation, scoring, and trace analysis patterns |
+| **model-serving** | Deploy and manage model serving endpoints for custom models, foundation models, external LLM proxies (OpenAI, Anthropic), and AI agents |
 | **spark-declarative-pipelines** | Spark Declarative Pipelines (SDP) patterns in SQL and Python - formerly Delta Live Tables |
 | **synthetic-data-generation** | Generate realistic test data using Faker and Spark with non-linear distributions |
 

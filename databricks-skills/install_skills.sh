@@ -38,7 +38,7 @@ INSTALL_FROM_LOCAL=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # All available skills
-ALL_SKILLS="aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-jobs databricks-python-sdk mlflow-evaluation spark-declarative-pipelines synthetic-data-generation"
+ALL_SKILLS="aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-jobs databricks-python-sdk mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation"
 
 # Get skill description
 get_skill_description() {
@@ -50,6 +50,7 @@ get_skill_description() {
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
         "mlflow-evaluation") echo "MLflow evaluation, scoring, and trace analysis" ;;
+        "model-serving") echo "Model Serving - deploy custom models, LLMs, agents, AI Gateway" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
         "synthetic-data-generation") echo "Synthetic test data generation" ;;
         *) echo "Unknown skill" ;;
@@ -64,6 +65,7 @@ get_skill_extra_files() {
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
+        "model-serving") echo "1-custom-models.md 2-foundation-models.md 3-external-models.md 4-agents.md 5-ai-gateway.md 6-common-patterns.md" ;;
         "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md" ;;
         *) echo "" ;;
     esac
