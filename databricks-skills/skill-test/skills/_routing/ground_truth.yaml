@@ -1,0 +1,144 @@
+test_cases:
+  # Single-skill routing - Spark Declarative Pipelines
+  - id: "routing_sdp_001"
+    inputs:
+      prompt: "Create a streaming table for ingesting JSON events"
+    expectations:
+      expected_skills: ["spark-declarative-pipelines"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'streaming table' - clear SDP trigger"
+
+  - id: "routing_sdp_002"
+    inputs:
+      prompt: "Build a bronze-silver-gold medallion architecture for customer data"
+    expectations:
+      expected_skills: ["spark-declarative-pipelines"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'medallion', 'bronze', 'silver', 'gold' - SDP patterns"
+
+  - id: "routing_sdp_003"
+    inputs:
+      prompt: "Implement CDC with SCD Type 2 for tracking customer changes"
+    expectations:
+      expected_skills: ["spark-declarative-pipelines"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "medium"
+      reasoning: "Mentions 'CDC' and 'SCD' - SDP features"
+
+  # Single-skill routing - Python SDK
+  - id: "routing_sdk_001"
+    inputs:
+      prompt: "How do I list clusters using the Python SDK?"
+    expectations:
+      expected_skills: ["databricks-python-sdk"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Explicitly mentions 'Python SDK'"
+
+  - id: "routing_sdk_002"
+    inputs:
+      prompt: "Use WorkspaceClient to create a new notebook"
+    expectations:
+      expected_skills: ["databricks-python-sdk"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'WorkspaceClient' - SDK class"
+
+  # Single-skill routing - Asset Bundles
+  - id: "routing_dabs_001"
+    inputs:
+      prompt: "Create a databricks asset bundle for deploying my pipeline"
+    expectations:
+      expected_skills: ["asset-bundles"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Explicitly mentions 'databricks asset bundle'"
+
+  # Single-skill routing - MLflow Evaluation
+  - id: "routing_mlflow_001"
+    inputs:
+      prompt: "How do I evaluate my agent using mlflow genai.evaluate?"
+    expectations:
+      expected_skills: ["mlflow-evaluation"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'genai.evaluate' - MLflow evaluation trigger"
+
+  # Multi-skill routing
+  - id: "routing_multi_001"
+    inputs:
+      prompt: "Create a data pipeline with streaming tables and deploy it using DABs"
+    expectations:
+      expected_skills:
+        - "spark-declarative-pipelines"
+        - "asset-bundles"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'streaming tables' (SDP) with 'DABs' (asset bundles)"
+
+  - id: "routing_multi_002"
+    inputs:
+      prompt: "Generate synthetic customer data and evaluate the agent quality with MLflow scorers"
+    expectations:
+      expected_skills:
+        - "synthetic-data-generation"
+        - "mlflow-evaluation"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'synthetic data' with 'MLflow scorers'"
+
+  - id: "routing_multi_003"
+    inputs:
+      prompt: "Build a medallion architecture with bronze ingestion and create a Genie space for SQL exploration"
+    expectations:
+      expected_skills:
+        - "spark-declarative-pipelines"
+        - "agent-bricks"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "hard"
+      reasoning: "Combines 'medallion' (SDP) with 'Genie space' (agent-bricks)"
+
+  # No skill match
+  - id: "routing_no_match_001"
+    inputs:
+      prompt: "What is the weather like today?"
+    expectations:
+      expected_skills: []
+      is_multi_skill: false
+    metadata:
+      category: "no_match"
+      difficulty: "easy"
+      reasoning: "General question, no Databricks skill should match"
+
+  - id: "routing_no_match_002"
+    inputs:
+      prompt: "Explain how neural networks work"
+    expectations:
+      expected_skills: []
+      is_multi_skill: false
+    metadata:
+      category: "no_match"
+      difficulty: "easy"
+      reasoning: "ML theory question, not specific to any Databricks skill"

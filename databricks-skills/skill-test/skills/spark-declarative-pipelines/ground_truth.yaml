@@ -1,0 +1,333 @@
+test_cases:
+  - id: "sdp_bronze_ingestion_001"
+    inputs:
+      prompt: "Create a bronze ingestion pipeline for JSON files in /Volumes/raw/orders"
+    outputs:
+      response: |
+        Here's a bronze ingestion pipeline using Spark Declarative Pipelines:
+
+        ```sql
+        CREATE OR REFRESH STREAMING TABLE bronze_orders
+        CLUSTER BY (order_date)
+        AS SELECT
+          *,
+          current_timestamp() AS _ingested_at,
+          input_file_name() AS _source_file
+        FROM read_files(
+          '/Volumes/raw/orders',
+          format => 'json',
+          inferSchema => true
+        );
+        ```
+
+        This pipeline:
+        - Uses STREAMING TABLE for incremental ingestion
+        - Uses CLUSTER BY instead of PARTITION BY for better performance
+        - Adds metadata columns for lineage tracking
+        - Uses read_files() for Auto Loader functionality
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "STREAMING TABLE"
+        - "CLUSTER BY"
+        - "_ingested_at"
+      expected_patterns:
+        - pattern: "CREATE OR REFRESH STREAMING TABLE"
+          min_count: 1
+          description: "CREATE OR REFRESH STREAMING"
+        - pattern: "CLUSTER BY"
+          min_count: 1
+          description: "CLUSTER BY"
+        - pattern: "read_files\\s*\\("
+          min_count: 1
+          description: "read_files"
+      guidelines:
+        - "Must use modern SDP syntax, not legacy DLT"
+        - "Should include metadata columns for lineage"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["bronze", "ingestion", "autoloader"]
+
+  - id: "sdp_cdc_scd2_001"
+    inputs:
+      prompt: "Implement CDC with SCD Type 2 for tracking customer dimension changes"
+    outputs:
+      response: |
+        Here's an SCD Type 2 implementation using Spark Declarative Pipelines:
+
+        ```sql
+        -- Bronze: Raw CDC events
+        CREATE OR REFRESH STREAMING TABLE bronze_customers_cdc
+        AS SELECT * FROM read_files(
+          '/Volumes/raw/customers_cdc',
+          format => 'json'
+        );
+
+        -- Silver: Apply SCD Type 2
+        CREATE OR REFRESH STREAMING TABLE silver_customers_scd2
+        CLUSTER BY (customer_id)
+        TBLPROPERTIES (
+          'pipelines.autoOptimize.zOrderCols' = 'customer_id'
+        )
+        AS SELECT
+          customer_id,
+          customer_name,
+          email,
+          address,
+          _change_type,
+          _commit_timestamp AS effective_from,
+          LEAD(_commit_timestamp) OVER (
+            PARTITION BY customer_id
+            ORDER BY _commit_timestamp
+          ) AS effective_to,
+          CASE
+            WHEN LEAD(_commit_timestamp) OVER (
+              PARTITION BY customer_id
+              ORDER BY _commit_timestamp
+            ) IS NULL THEN true
+            ELSE false
+          END AS is_current
+        FROM bronze_customers_cdc
+        WHERE _change_type IN ('INSERT', 'UPDATE');
+        ```
+
+        This implements:
+        - CDC capture from source system
+        - SCD Type 2 with effective dates
+        - Current record flag for easy querying
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "SCD Type 2"
+        - "effective_from"
+        - "is_current"
+      expected_patterns:
+        - pattern: "CREATE OR REFRESH STREAMING TABLE"
+          min_count: 2
+          description: "streaming tables"
+        - pattern: "_change_type"
+          min_count: 1
+          description: "CDC change type"
+        - pattern: "LEAD\\s*\\("
+          min_count: 1
+          description: "window function"
+      guidelines:
+        - "Must track change history with effective dates"
+        - "Should include is_current flag"
+    metadata:
+      category: "happy_path"
+      difficulty: "hard"
+      source: "manual"
+      tags: ["cdc", "scd2", "silver", "dimensions"]
+
+  - id: "sdp_silver_transform_001"
+    inputs:
+      prompt: "Create a silver transformation that cleans and deduplicates order data"
+    outputs:
+      response: |
+        Here's a silver transformation for order data:
+
+        ```sql
+        CREATE OR REFRESH STREAMING TABLE silver_orders
+        CLUSTER BY (order_date, customer_id)
+        TBLPROPERTIES (
+          'quality' = 'silver'
+        )
+        AS SELECT
+          order_id,
+          customer_id,
+          order_date,
+          TRIM(UPPER(status)) AS status,
+          CAST(amount AS DECIMAL(10, 2)) AS amount,
+          COALESCE(shipping_address, billing_address) AS address,
+          _ingested_at,
+          current_timestamp() AS _processed_at
+        FROM (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY order_id
+              ORDER BY _ingested_at DESC
+            ) AS _row_num
+          FROM bronze_orders
+          WHERE order_id IS NOT NULL
+            AND amount > 0
+        )
+        WHERE _row_num = 1;
+        ```
+
+        This transformation:
+        - Deduplicates using ROW_NUMBER window function
+        - Standardizes string fields (TRIM, UPPER)
+        - Casts amounts to proper decimal type
+        - Handles null shipping addresses with COALESCE
+        - Filters invalid records (null order_id, non-positive amounts)
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "deduplicate"
+        - "ROW_NUMBER"
+        - "DECIMAL"
+      expected_patterns:
+        - pattern: "CREATE OR REFRESH STREAMING TABLE"
+          min_count: 1
+          description: "streaming table"
+        - pattern: "ROW_NUMBER\\s*\\(\\)\\s*OVER"
+          min_count: 1
+          description: "deduplication"
+        - pattern: "CLUSTER BY"
+          min_count: 1
+          description: "clustering"
+      guidelines:
+        - "Must deduplicate records properly"
+        - "Should standardize data types and formats"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["silver", "transformation", "deduplication"]
+
+  - id: "sdp_gold_aggregate_001"
+    inputs:
+      prompt: "Create a gold aggregate table for daily sales metrics"
+    outputs:
+      response: |
+        Here's a gold aggregate for daily sales metrics:
+
+        ```sql
+        CREATE OR REFRESH MATERIALIZED VIEW gold_daily_sales
+        CLUSTER BY (sale_date)
+        AS SELECT
+          DATE(order_date) AS sale_date,
+          COUNT(DISTINCT order_id) AS total_orders,
+          COUNT(DISTINCT customer_id) AS unique_customers,
+          SUM(amount) AS total_revenue,
+          AVG(amount) AS avg_order_value,
+          MAX(amount) AS max_order_value,
+          MIN(amount) AS min_order_value
+        FROM silver_orders
+        WHERE status = 'COMPLETED'
+        GROUP BY DATE(order_date);
+        ```
+
+        This gold table:
+        - Aggregates by date for time-series analysis
+        - Calculates key business metrics
+        - Uses MATERIALIZED VIEW for pre-computed results
+        - Filters to completed orders only
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "MATERIALIZED VIEW"
+        - "GROUP BY"
+        - "SUM"
+      expected_patterns:
+        - pattern: "CREATE OR REFRESH MATERIALIZED VIEW"
+          min_count: 1
+          description: "materialized view"
+        - pattern: "GROUP BY"
+          min_count: 1
+          description: "aggregation"
+        - pattern: "CLUSTER BY"
+          min_count: 1
+          description: "clustering"
+      guidelines:
+        - "Gold tables should be business-ready aggregates"
+        - "Use MATERIALIZED VIEW for pre-computed aggregations"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["gold", "aggregation", "metrics"]
+
+  - id: "sdp_streaming_windowed_001"
+    inputs:
+      prompt: "Create a streaming pipeline for IoT sensor data with 5-minute tumbling window aggregations"
+    outputs:
+      response: |
+        Here's a streaming pipeline for IoT sensor data with windowed aggregations:
+
+        ```sql
+        -- Bronze: Ingest raw sensor events using streaming Auto Loader
+        CREATE OR REFRESH STREAMING TABLE bronze_sensor_events
+        CLUSTER BY (sensor_id)
+        AS SELECT
+          *,
+          current_timestamp() AS _ingested_at,
+          _metadata.file_path AS _source_file
+        FROM STREAM read_files(
+          '/Volumes/main/skill_test/raw_data/sensor_events/',
+          format => 'json',
+          schemaHints => 'sensor_id STRING, temperature DOUBLE, humidity DOUBLE, event_timestamp TIMESTAMP'
+        );
+
+        -- Silver: 5-minute tumbling window aggregations
+        CREATE OR REFRESH STREAMING TABLE silver_sensor_5min
+        CLUSTER BY (sensor_id)
+        AS SELECT
+          sensor_id,
+          window(event_timestamp, '5 minutes').start AS window_start,
+          window(event_timestamp, '5 minutes').end AS window_end,
+          AVG(temperature) AS avg_temperature,
+          MIN(temperature) AS min_temperature,
+          MAX(temperature) AS max_temperature,
+          AVG(humidity) AS avg_humidity,
+          COUNT(*) AS event_count
+        FROM STREAM bronze_sensor_events
+        GROUP BY sensor_id, window(event_timestamp, '5 minutes');
+        ```
+
+        This pipeline:
+        - Ingests raw sensor data incrementally using Auto Loader with STREAM wrapper
+        - Uses tumbling windows (non-overlapping 5-minute intervals)
+        - Aggregates temperature and humidity metrics per sensor per window
+        - Uses event timestamp (not processing time) for accurate windowing
+        - Uses CLUSTER BY for optimal query performance
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "STREAMING TABLE"
+        - "window"
+        - "5 minutes"
+        - "AVG"
+        - "STREAM read_files"
+      expected_patterns:
+        - pattern: "CREATE OR REFRESH STREAMING TABLE"
+          min_count: 2
+          description: "streaming tables for bronze and silver"
+        - pattern: "FROM STREAM read_files"
+          min_count: 1
+          description: "streaming source with STREAM wrapper (required for streaming tables)"
+        - pattern: "window\\s*\\(.*,\\s*'5 minutes'\\)"
+          min_count: 1
+          description: "tumbling window function"
+        - pattern: "GROUP BY.*window\\s*\\("
+          min_count: 1
+          description: "grouped by window"
+        - pattern: "FROM STREAM bronze"
+          min_count: 1
+          description: "downstream streaming source reference"
+      guidelines:
+        - "Must use STREAM wrapper around read_files() for streaming ingestion"
+        - "Must use tumbling windows for time-based aggregation"
+        - "Should use event timestamp, not processing timestamp"
+        - "Should aggregate multiple metrics per window"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "execution_verified"
+      tags: ["streaming", "windowing", "aggregation", "iot", "execution_tested"]
+      execution_verified:
+        pipeline_id: "8208e047-476b-4fe1-9e46-ef472b239aa1"
+        update_id: "21ef9b2f-e98b-4ed8-8381-8b48edd917a1"
+        verified_date: "2026-01-23"
+        tables_created:
+          - name: "main.skill_test.bronze_sensor_events"
+            rows: 100
+          - name: "main.skill_test.silver_sensor_5min"
+            rows: 54
+        learnings:
+          - "read_files() alone returns batch query; must wrap with STREAM for streaming tables"
+          - "Error without STREAM: CREATE_APPEND_ONCE_FLOW_FROM_BATCH_QUERY_NOT_ALLOWED"

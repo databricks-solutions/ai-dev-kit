@@ -1,0 +1,20 @@
+skill:
+  name: "_routing"
+  description: "Skill routing evaluation - tests Claude Code's ability to route prompts to correct skills"
+
+evaluation:
+  datasets:
+    - path: ground_truth.yaml
+      type: yaml
+
+# Scorer configuration (routing uses specialized scorers)
+scorers:
+  enabled:
+    - skill_routing_accuracy
+    - routing_precision
+    - routing_recall
+  llm_scorers: []
+  default_guidelines: []
+
+quality_gates:
+  routing_accuracy: 0.90
