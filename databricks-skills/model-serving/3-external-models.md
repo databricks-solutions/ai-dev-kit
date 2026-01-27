@@ -117,20 +117,24 @@ ServedEntityInput(
 ### AWS Bedrock
 
 ```python
-from databricks.sdk.service.serving import AmazonBedrockConfig
+from databricks.sdk.service.serving import (
+    AmazonBedrockConfig,
+    AmazonBedrockConfigBedrockProvider,
+    ExternalModelProvider,
+)
 
 # Using access keys
 ServedEntityInput(
     name="bedrock-claude",
     external_model=ExternalModel(
         name="anthropic.claude-3-sonnet-20240229-v1:0",
-        provider="amazon-bedrock",
+        provider=ExternalModelProvider.AMAZON_BEDROCK,  # Use enum!
         task="llm/v1/chat",
         amazon_bedrock_config=AmazonBedrockConfig(
             aws_region="us-east-1",
+            bedrock_provider=AmazonBedrockConfigBedrockProvider.ANTHROPIC,  # Use enum!
             aws_access_key_id="{{secrets/aws/access-key-id}}",
             aws_secret_access_key="{{secrets/aws/secret-access-key}}",
-            bedrock_provider="anthropic",
         ),
     ),
 )
@@ -140,16 +144,18 @@ ServedEntityInput(
     name="bedrock-claude-iam",
     external_model=ExternalModel(
         name="anthropic.claude-3-sonnet-20240229-v1:0",
-        provider="amazon-bedrock",
+        provider=ExternalModelProvider.AMAZON_BEDROCK,
         task="llm/v1/chat",
         amazon_bedrock_config=AmazonBedrockConfig(
             aws_region="us-east-1",
-            bedrock_provider="anthropic",
+            bedrock_provider=AmazonBedrockConfigBedrockProvider.ANTHROPIC,
             instance_profile_arn="arn:aws:iam::123456789:instance-profile/my-profile",
         ),
     ),
 )
 ```
+
+**Bedrock provider enum values:** `ANTHROPIC`, `AMAZON`, `AI21LABS`, `COHERE`
 
 ### Google Vertex AI
 

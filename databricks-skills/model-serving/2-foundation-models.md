@@ -105,17 +105,16 @@ for line in response.iter_lines():
 ### Create Provisioned Throughput Endpoint
 
 ```python
-from databricks.sdk.service.serving import PtEndpointCoreConfig, PtServedEntity
+from databricks.sdk.service.serving import PtEndpointCoreConfig, PtServedModel
 
 endpoint = w.serving_endpoints.create_provisioned_throughput_endpoint_and_wait(
     name="my-llama-pt",
     config=PtEndpointCoreConfig(
         served_entities=[
-            PtServedEntity(
-                name="llama-3-1-70b",
+            PtServedModel(
                 entity_name="system.ai.meta_llama_3_1_70b_instruct",
-                min_provisioned_throughput=500,   # Tokens/sec minimum
-                max_provisioned_throughput=2000,  # Tokens/sec maximum
+                provisioned_model_units=1,  # Number of provisioned units
+                name="llama-3-1-70b",
             )
         ]
     ),
@@ -132,12 +131,11 @@ endpoint = w.serving_endpoints.create_provisioned_throughput_endpoint_and_wait(
     name="my-finetuned-llama",
     config=PtEndpointCoreConfig(
         served_entities=[
-            PtServedEntity(
-                name="finetuned-model",
+            PtServedModel(
                 entity_name="catalog.schema.my_finetuned_llama",
+                provisioned_model_units=1,
                 entity_version="1",
-                min_provisioned_throughput=500,
-                max_provisioned_throughput=1000,
+                name="finetuned-model",
             )
         ]
     ),
@@ -152,11 +150,10 @@ w.serving_endpoints.update_provisioned_throughput_endpoint_config(
     name="my-llama-pt",
     config=PtEndpointCoreConfig(
         served_entities=[
-            PtServedEntity(
-                name="llama-3-1-70b",
+            PtServedModel(
                 entity_name="system.ai.meta_llama_3_1_70b_instruct",
-                min_provisioned_throughput=1000,  # Increased
-                max_provisioned_throughput=5000,
+                provisioned_model_units=2,  # Increased
+                name="llama-3-1-70b",
             )
         ]
     ),

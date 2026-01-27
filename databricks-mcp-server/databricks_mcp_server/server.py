@@ -10,4 +10,4 @@ from fastmcp import FastMCP
 mcp = FastMCP("Databricks MCP Server")
 
 # Import and register all tools
-from .tools import sql, compute, file, pipelines, jobs, agent_bricks, aibi_dashboards, serving
+from .tools import sql, compute, file, pipelines, jobs, agent_bricks, aibi_dashboards

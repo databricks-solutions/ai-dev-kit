@@ -69,6 +69,7 @@ w = WorkspaceClient()  # Auto-detects credentials
 endpoint = w.serving_endpoints.create_and_wait(
     name="my-model-endpoint",
     config=EndpointCoreConfigInput(
+        name="my-model-endpoint",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 entity_name="catalog.schema.my_model",  # UC model path
@@ -94,6 +95,7 @@ from databricks.sdk.service.serving import (
 endpoint = w.serving_endpoints.create_and_wait(
     name="openai-proxy",
     config=EndpointCoreConfigInput(
+        name="openai-proxy",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 name="gpt-4o",

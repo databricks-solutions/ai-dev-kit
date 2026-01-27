@@ -36,6 +36,7 @@ w = WorkspaceClient()
 endpoint = w.serving_endpoints.create_and_wait(
     name="my-sklearn-model",
     config=EndpointCoreConfigInput(
+        name="my-sklearn-model",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 entity_name="catalog.schema.my_model",
@@ -54,6 +55,7 @@ endpoint = w.serving_endpoints.create_and_wait(
 endpoint = w.serving_endpoints.create_and_wait(
     name="my-pytorch-model",
     config=EndpointCoreConfigInput(
+        name="my-pytorch-model",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 entity_name="catalog.schema.pytorch_model",

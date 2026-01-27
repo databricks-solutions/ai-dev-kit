@@ -36,6 +36,7 @@ w = WorkspaceClient()
 endpoint = w.serving_endpoints.create_and_wait(
     name="governed-endpoint",
     config=EndpointCoreConfigInput(
+        name="governed-endpoint",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 name="gpt-4o",
@@ -320,6 +321,7 @@ from databricks.sdk.service.serving import AiGatewayFallbackConfig
 endpoint = w.serving_endpoints.create_and_wait(
     name="resilient-endpoint",
     config=EndpointCoreConfigInput(
+        name="resilient-endpoint",  # Required: must match endpoint name
         served_entities=[
             # Primary
             ServedEntityInput(
@@ -413,6 +415,7 @@ w = WorkspaceClient()
 endpoint = w.serving_endpoints.create_and_wait(
     name="production-llm",
     config=EndpointCoreConfigInput(
+        name="production-llm",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 name="gpt-4o",

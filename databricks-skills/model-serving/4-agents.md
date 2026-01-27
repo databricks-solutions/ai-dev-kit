@@ -184,6 +184,7 @@ w = WorkspaceClient()
 endpoint = w.serving_endpoints.create_and_wait(
     name="weather-agent",
     config=EndpointCoreConfigInput(
+        name="weather-agent",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 entity_name="catalog.schema.weather_agent",
@@ -466,6 +467,7 @@ from databricks.sdk.service.serving import TrafficConfig, Route
 endpoint = w.serving_endpoints.create_and_wait(
     name="multi-agent",
     config=EndpointCoreConfigInput(
+        name="multi-agent",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 name="agent-v1",
@@ -555,6 +557,7 @@ from databricks.sdk.service.serving import AiGatewayConfig, AiGatewayInferenceTa
 endpoint = w.serving_endpoints.create_and_wait(
     name="monitored-agent",
     config=EndpointCoreConfigInput(
+        name="monitored-agent",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 entity_name="catalog.schema.my_agent",

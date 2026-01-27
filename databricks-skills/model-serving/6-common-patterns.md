@@ -243,6 +243,7 @@ from databricks.sdk.service.serving import TrafficConfig, Route
 endpoint = w.serving_endpoints.create_and_wait(
     name="ab-test-endpoint",
     config=EndpointCoreConfigInput(
+        name="ab-test-endpoint",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 name="model-control",
@@ -540,6 +541,7 @@ from datetime import timedelta
 endpoint = w.serving_endpoints.create_and_wait(
     name="large-model-endpoint",
     config=EndpointCoreConfigInput(
+        name="large-model-endpoint",  # Required: must match endpoint name
         served_entities=[
             ServedEntityInput(
                 entity_name="catalog.schema.large_model",
