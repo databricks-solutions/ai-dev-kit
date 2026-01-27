@@ -5,35 +5,16 @@ description: "Creates, configures, and updates Databricks Lakeflow Spark Declara
 
 # Lakeflow Spark Declarative Pipelines (SDP)
 
-## Terminology
-
-**SDP** = **Spark Declarative Pipelines** = **LDP** = **Lakeflow Declarative Pipelines** = **Lakeflow Pipelines**
-
-These terms are interchangeable and refer to the same technology:
-- Databricks' modern data pipeline framework
-- Successor to Delta Live Tables (DLT)
-- Based on Apache Spark 4.1+ declarative pipelines
-- Uses `pyspark.pipelines` module in Python
-
-**Python Import:**
-```python
-from pyspark import pipelines as dp
-```
-
-When the user mentions: "SDP", "LDP", "Lakeflow", "Spark Declarative Pipelines", or "declarative pipelines" → They all mean the same thing.
-
----
-
-## Quick Reference Card
+## Quick Reference
 
 | Concept | Details |
 |---------|---------|
-| **Name** | Spark Declarative Pipelines (SDP) / Lakeflow Pipelines (LDP) |
+| **Names** | SDP = Spark Declarative Pipelines = LDP = Lakeflow Declarative Pipelines = Lakeflow Pipelines (all interchangeable) |
 | **Python Import** | `from pyspark import pipelines as dp` |
 | **Primary Decorators** | `@dp.table()`, `@dp.materialized_view()` |
-| **Documentation** | https://docs.databricks.com/aws/en/ldp/developer/python-dev |
 | **Replaces** | Delta Live Tables (DLT) with `import dlt` |
-| **Based On** | Apache Spark 4.1+ open source |
+| **Based On** | Apache Spark 4.1+ (Databricks' modern data pipeline framework) |
+| **Docs** | https://docs.databricks.com/aws/en/ldp/developer/python-dev |
 
 ---
 
@@ -329,12 +310,6 @@ Load these for detailed patterns:
   - Both work with the `transformations/**` glob pattern - choose based on team preference
 - See **[8-project-initialization.md](8-project-initialization.md)** for project setup details
 
-### Language Selection
-- **Auto-detect from user prompt** - analyze keywords to infer SQL vs Python
-- **Default to SQL** unless user specifies Python or task clearly requires it
-- **Use SQL** for: Transformations, aggregations, filtering, joins (most cases)
-- **Use Python** for: Complex UDFs, external APIs, ML inference, dynamic paths (use modern `pyspark.pipelines as dp`)
-- **Generate ONE language** per request unless user explicitly asks for mixed pipeline
 
 ### Modern Defaults
 - **CLUSTER BY** (Liquid Clustering), not PARTITION BY - see [4-performance-tuning.md](4-performance-tuning.md)
