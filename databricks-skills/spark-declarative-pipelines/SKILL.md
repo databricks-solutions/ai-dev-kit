@@ -5,6 +5,38 @@ description: "Creates, configures, and updates Databricks Lakeflow Spark Declara
 
 # Lakeflow Spark Declarative Pipelines (SDP)
 
+## Terminology
+
+**SDP** = **Spark Declarative Pipelines** = **LDP** = **Lakeflow Declarative Pipelines** = **Lakeflow Pipelines**
+
+These terms are interchangeable and refer to the same technology:
+- Databricks' modern data pipeline framework
+- Successor to Delta Live Tables (DLT)
+- Based on Apache Spark 4.1+ declarative pipelines
+- Uses `pyspark.pipelines` module in Python
+
+**Python Import:**
+```python
+from pyspark import pipelines as dp
+```
+
+When the user mentions: "SDP", "LDP", "Lakeflow", "Spark Declarative Pipelines", or "declarative pipelines" → They all mean the same thing.
+
+---
+
+## Quick Reference Card
+
+| Concept | Details |
+|---------|---------|
+| **Name** | Spark Declarative Pipelines (SDP) / Lakeflow Pipelines (LDP) |
+| **Python Import** | `from pyspark import pipelines as dp` |
+| **Primary Decorators** | `@dp.table()`, `@dp.materialized_view()` |
+| **Documentation** | https://docs.databricks.com/aws/en/ldp/developer/python-dev |
+| **Replaces** | Delta Live Tables (DLT) with `import dlt` |
+| **Based On** | Apache Spark 4.1+ open source |
+
+---
+
 ## Official Documentation
 
 - **[Lakeflow Spark Declarative Pipelines Overview](https://docs.databricks.com/aws/en/ldp/)** - Main documentation hub
@@ -35,7 +67,7 @@ Use manual workflow for:
 I will automatically run this command when you request a new pipeline:
 
 ```bash
-databricks pipelines init --output-dir ./my_pipeline
+databricks pipelines init
 ```
 
 **Interactive Prompts:**
@@ -310,6 +342,108 @@ Load these for detailed patterns:
 - **Serverless compute ONLY** - Do not use classic clusters unless explicitly required
 - **Unity Catalog** (required for serverless)
 - **read_files()** for cloud storage ingestion - see [1-ingestion-patterns.md](1-ingestion-patterns.md)
+
+### Reading Tables in Python
+
+**Modern SDP Best Practice:**
+- Use `spark.read.table()` for batch reads
+- Use `spark.readStream.table()` for streaming reads
+- Don't use `dp.read()` or `dp.read_stream()` (old syntax, no longer documented)
+- Don't use `dlt.read()` or `dlt.read_stream()` (legacy DLT API)
+
+**Key Point:** SDP automatically tracks table dependencies from standard Spark DataFrame operations. No special read APIs are needed.
+
+#### Three-Tier Identifier Resolution
+
+SDP supports three levels of table name qualification:
+
+| Level | Syntax | When to Use |
+|-------|--------|-------------|
+| **Unqualified** | `spark.read.table("my_table")` | Reading tables within the same pipeline's target catalog/schema (recommended) |
+| **Partially-qualified** | `spark.read.table("other_schema.my_table")` | Reading from different schema in same catalog |
+| **Fully-qualified** | `spark.read.table("other_catalog.other_schema.my_table")` | Reading from external catalogs/schemas |
+
+#### Option 1: Unqualified Names (Recommended for Pipeline Tables)
+
+**Best practice for tables within the same pipeline.** SDP resolves unqualified names to the pipeline's configured target catalog and schema. This makes code portable across environments (dev/prod).
+
+```python
+@dp.table(name="silver_clean")
+def silver_clean():
+    # Reads from pipeline's target catalog/schema (e.g., dev_catalog.dev_schema.bronze_raw)
+    return (
+        spark.read.table("bronze_raw")
+        .filter(F.col("valid") == True)
+    )
+
+@dp.table(name="silver_events")
+def silver_events():
+    # Streaming read from same pipeline's bronze_events table
+    return (
+        spark.readStream.table("bronze_events")
+        .withColumn("processed_at", F.current_timestamp())
+    )
+```
+
+#### Option 2: Pipeline Parameters (For External Sources)
+
+**Use `spark.conf.get()` to parameterize external catalog/schema references.** Define parameters in pipeline configuration, then reference them at the module level.
+
+```python
+from pyspark import pipelines as dp
+from pyspark.sql import functions as F
+
+# Get parameterized values at module level (evaluated once at pipeline start)
+source_catalog = spark.conf.get("source_catalog")
+source_schema = spark.conf.get("source_schema", "sales")  # with default
+
+@dp.table(name="transaction_summary")
+def transaction_summary():
+    return (
+        spark.read.table(f"{source_catalog}.{source_schema}.transactions")
+        .groupBy("account_id")
+        .agg(
+            F.count("txn_id").alias("txn_count"),
+            F.sum("txn_amount").alias("account_revenue")
+        )
+    )
+```
+
+**Configure parameters in pipeline settings:**
+- **Asset Bundles**: Add to `pipeline.yml` under `configuration:`
+- **Manual/MCP**: Pass via `extra_settings.configuration` dict
+
+```yaml
+# In resources/my_pipeline.pipeline.yml
+configuration:
+  source_catalog: "shared_catalog"
+  source_schema: "sales"
+```
+
+#### Option 3: Fully-Qualified Names (For Fixed External References)
+
+Use when referencing specific external tables that don't change across environments:
+
+```python
+@dp.table(name="enriched_orders")
+def enriched_orders():
+    # Pipeline-internal table (unqualified)
+    orders = spark.read.table("bronze_orders")
+
+    # External reference table (fully-qualified)
+    products = spark.read.table("shared_catalog.reference.products")
+
+    return orders.join(products, "product_id")
+```
+
+#### Choosing the Right Approach
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Reading tables created in same pipeline | **Unqualified names** - portable, uses target catalog/schema |
+| Reading from external source that varies by environment | **Pipeline parameters** - configurable per deployment |
+| Reading from shared/reference tables with fixed location | **Fully-qualified names** - explicit and clear |
+| Mixed pipeline (some internal, some external) | **Combine approaches** - unqualified for internal, parameters for external |
 
 ---
 
