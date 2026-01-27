@@ -92,8 +92,8 @@ class SkillTestConfig:
         self.auth.apply()
 
     # Paths
-    skills_root: str = "databricks-skills"
-    test_definitions_path: str = "databricks-skills/skill-test/skills"
+    skills_root: str = ".claude/skills"
+    test_definitions_path: str = ".test/skills"
 
     # GRP settings
     grp_timeout_seconds: int = 30

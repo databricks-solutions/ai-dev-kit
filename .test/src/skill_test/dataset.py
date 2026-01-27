@@ -87,7 +87,7 @@ class UCDatasetSource:
 def get_dataset_source(skill_name: str, base_path: Path = None) -> DatasetSource:
     """Get the appropriate dataset source for a skill."""
     if base_path is None:
-        base_path = Path("databricks-skills/skill-test/skills")
+        base_path = Path(".test/skills")
 
     yaml_path = base_path / skill_name / "ground_truth.yaml"
     if yaml_path.exists():

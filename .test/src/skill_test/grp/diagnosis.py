@@ -23,7 +23,7 @@ class Diagnosis:
     suggested_action: str
 
 
-def find_skill_files(skill_name: str, base_path: str = "databricks-skills") -> List[Path]:
+def find_skill_files(skill_name: str, base_path: str = ".claude/skills") -> List[Path]:
     """Find all markdown files for a skill."""
     skill_path = Path(base_path) / skill_name
     if not skill_path.exists():
@@ -106,8 +106,14 @@ def find_relevant_sections(
                 if len(section["content"]) > 200:
                     excerpt += "..."
 
+                # Get relative path from .claude/skills
+                try:
+                    rel_path = file_path.relative_to(".claude/skills")
+                except ValueError:
+                    rel_path = file_path
+
                 relevant.append(SkillSection(
-                    file_path=str(file_path.relative_to("databricks-skills")),
+                    file_path=str(rel_path),
                     section_name=section["name"],
                     excerpt=excerpt.strip(),
                     line_number=section["line"]

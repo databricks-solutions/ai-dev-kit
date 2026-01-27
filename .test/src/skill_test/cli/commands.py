@@ -52,7 +52,7 @@ class CLIContext:
     mcp_get_best_cluster: Optional[MCPGetBestCluster] = None
 
     # Configuration
-    base_path: Path = field(default_factory=lambda: Path("databricks-skills/skill-test/skills"))
+    base_path: Path = field(default_factory=lambda: Path(".test/skills"))
     execution_config: DatabricksExecutionConfig = field(default_factory=DatabricksExecutionConfig)
 
     def has_databricks_tools(self) -> bool:

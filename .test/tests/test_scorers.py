@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import MagicMock
 
 # Test the routing scorer functions directly (not the decorated versions)
-from src.scorers.routing import detect_skills_from_prompt, SKILL_TRIGGERS
+from skill_test.scorers.routing import detect_skills_from_prompt, SKILL_TRIGGERS
 
 
 class TestDetectSkillsFromPrompt:
@@ -117,7 +117,7 @@ class TestSkillTriggers:
 
 
 # Tests for executor module
-from src.grp.executor import (
+from skill_test.grp.executor import (
     extract_code_blocks,
     verify_python_syntax,
     verify_sql_structure,

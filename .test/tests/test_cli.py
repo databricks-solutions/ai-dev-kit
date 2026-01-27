@@ -3,13 +3,13 @@ import pytest
 import shutil
 from pathlib import Path
 
-from src.cli import CLIContext, interactive, run, regression, init
-from src.grp import (
+from skill_test.cli import CLIContext, interactive, run, regression, init
+from skill_test.grp import (
     DatabricksExecutionConfig,
     extract_code_blocks,
     execute_code_blocks,
 )
-from src.fixtures import TestFixtureConfig
+from skill_test.fixtures import TestFixtureConfig
 
 
 @pytest.fixture

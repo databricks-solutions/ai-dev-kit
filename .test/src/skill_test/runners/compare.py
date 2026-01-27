@@ -56,7 +56,7 @@ def save_baseline(
         Path to saved baseline file
     """
     if baselines_dir is None:
-        baselines_dir = Path("databricks-skills/skill-test/baselines")
+        baselines_dir = Path(".test/baselines")
 
     baselines_dir.mkdir(parents=True, exist_ok=True)
 
@@ -87,7 +87,7 @@ def load_baseline(
     Returns None if no baseline exists.
     """
     if baselines_dir is None:
-        baselines_dir = Path("databricks-skills/skill-test/baselines")
+        baselines_dir = Path(".test/baselines")
 
     baseline_path = baselines_dir / f"{skill_name}.json"
 
