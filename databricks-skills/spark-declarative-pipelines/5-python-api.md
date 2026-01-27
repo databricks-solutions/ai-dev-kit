@@ -23,7 +23,7 @@ Databricks provides two Python APIs for Spark Declarative Pipelines:
 | **Import** | `from pyspark import pipelines as dp` | `import dlt` |
 | **Status** | ✅ **Recommended** | ⚠️ Legacy |
 | **Table decorator** | `@dp.table()` | `@dlt.table()` |
-| **Read** | `dp.read.table("catalog.schema.table")` | `dlt.read("table")` |
+| **Read** | `spark.table("catalog.schema.table")` | `dlt.read("table")` |
 | **Use for** | New projects | Maintaining existing |
 
 ---
@@ -69,7 +69,7 @@ def bronze_events():
 @dp.table(name="silver_events")
 def silver_events():
     # Explicit Unity Catalog path
-    return dp.read.table("catalog.schema.bronze_events").filter(...)
+    return spark.table("catalog.schema.bronze_events").filter(...)
 ```
 
 **Legacy**:
@@ -90,7 +90,7 @@ def silver_events():
 def silver_events():
     # Context-aware (no separate read_stream)
     return (
-        dp.read.table("catalog.schema.bronze_events")
+        spark.readStream.table("catalog.schema.bronze_events")
         .filter(F.col("event_type").isNotNull())
     )
 ```
@@ -115,7 +115,7 @@ def silver_events():
 @dp.expect_or_drop("valid_amount", "amount > 0")
 @dp.expect_or_fail("critical_field", "timestamp IS NOT NULL")
 def silver_validated():
-    return dp.read.table("catalog.schema.bronze_events")
+    return spark.table("catalog.schema.bronze_events")
 ```
 
 **Legacy**:
@@ -133,18 +133,7 @@ def silver_validated():
 ### SCD Type 2
 
 **Modern (Recommended)**:
-```python
-dp.create_streaming_table("customers_history")
-
-dp.apply_changes(
-    target="customers_history",
-    source=dp.read.table("catalog.schema.customers_cdc"),
-    keys=["customer_id"],
-    sequence_by="event_timestamp",
-    stored_as_scd_type="2",
-    track_history_column_list=["*"]
-)
-```
+See docs at https://docs.databricks.com/aws/en/ldp/cdc
 
 **Legacy**:
 ```python
@@ -241,7 +230,7 @@ dlt.read_stream("source_table")
 
 **After**:
 ```python
-dp.read.table("catalog.schema.source_table")
+spark.table("catalog.schema.source_table")
 # Streaming context-aware, no separate read_stream
 ```
 
@@ -253,9 +242,7 @@ dlt.apply_changes(target="dim_customer", source="cdc_source", ...)
 ```
 
 **After**:
-```python
-dp.apply_changes(target="dim_customer", source=dp.read.table("catalog.schema.cdc_source"), ...)
-```
+See docs at https://docs.databricks.com/aws/en/ldp/cdc
 
 ### Step 5: Update Clustering
 
@@ -283,7 +270,7 @@ def my_table():
 
 ```python
 # ✅ Modern: explicit path
-dp.read.table("catalog.schema.table")
+spark.table("catalog.schema.table")
 
 # ❌ Legacy: implicit LIVE
 dlt.read("table")
