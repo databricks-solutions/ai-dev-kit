@@ -9,6 +9,7 @@ from typing import Optional, List, Dict, Any
 from databricks.sdk.service.jobs import (
     Task,
     JobCluster,
+    JobEnvironment,
     JobSettings,
 )
 
@@ -111,6 +112,7 @@ def create_job(
     name: str,
     tasks: List[Dict[str, Any]],
     job_clusters: Optional[List[Dict[str, Any]]] = None,
+    environments: Optional[List[Dict[str, Any]]] = None,
     tags: Optional[Dict[str, str]] = None,
     timeout_seconds: Optional[int] = None,
     max_concurrent_runs: int = 1,
@@ -139,6 +141,10 @@ def create_job(
                           spark_jar_task, spark_submit_task, pipeline_task, sql_task, dbt_task, run_job_task
             - [compute]: One of new_cluster, existing_cluster_id, job_cluster_key, compute_key
         job_clusters: Optional list of job cluster definitions (for non-serverless tasks)
+        environments: Optional list of environment definitions for serverless tasks.
+            Each dict should have:
+            - environment_key: Unique identifier referenced by tasks via environment_key
+            - spec: Dict with dependencies (list of pip packages) and optionally client ("4")
         tags: Optional tags dict for organization
         timeout_seconds: Job-level timeout (0 means no timeout)
         max_concurrent_runs: Maximum number of concurrent runs (default: 1)
@@ -190,6 +196,15 @@ def create_job(
         if job_clusters:
             kwargs["job_clusters"] = [JobCluster.from_dict(jc) for jc in job_clusters]
 
+        # Convert environments if provided (for serverless tasks with dependencies)
+        # Auto-inject "client": "4" into spec if missing to avoid API error:
+        # "Either base environment or version must be provided for environment"
+        if environments:
+            for env in environments:
+                if "spec" in env and "client" not in env["spec"]:
+                    env["spec"]["client"] = "4"
+            kwargs["environments"] = [JobEnvironment.from_dict(env) for env in environments]
+
         # Add optional parameters
         if tags:
             kwargs["tags"] = tags
@@ -234,6 +249,7 @@ def update_job(
     name: Optional[str] = None,
     tasks: Optional[List[Dict[str, Any]]] = None,
     job_clusters: Optional[List[Dict[str, Any]]] = None,
+    environments: Optional[List[Dict[str, Any]]] = None,
     tags: Optional[Dict[str, str]] = None,
     timeout_seconds: Optional[int] = None,
     max_concurrent_runs: Optional[int] = None,
@@ -260,6 +276,7 @@ def update_job(
         name: New job name
         tasks: New task definitions
         job_clusters: New job cluster definitions
+        environments: New environment definitions for serverless tasks with dependencies
         tags: New tags (replaces existing)
         timeout_seconds: New timeout
         max_concurrent_runs: New max concurrent runs
@@ -295,6 +312,8 @@ def update_job(
             new_settings_dict["tasks"] = tasks
         if job_clusters is not None:
             new_settings_dict["job_clusters"] = job_clusters
+        if environments is not None:
+            new_settings_dict["environments"] = environments
         if tags is not None:
             new_settings_dict["tags"] = tags
         if timeout_seconds is not None:

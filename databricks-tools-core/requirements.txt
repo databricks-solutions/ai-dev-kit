@@ -1,2 +1,2 @@
-databricks-sdk>=0.67.0
+databricks-sdk>=0.81.0
 pydantic>=2.0.0

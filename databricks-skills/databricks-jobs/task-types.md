@@ -613,7 +613,12 @@ tasks:
 
 ## Environments
 
-Define reusable Python environments for tasks.
+Define reusable Python environments for serverless tasks with custom pip dependencies.
+
+> **IMPORTANT:** The `client` field is **required** in the environment `spec`. It specifies the
+> base serverless environment version. Use `"4"` as the value. Without it, the API returns:
+> `"Either base environment or version must be provided for environment"`.
+> The MCP `create_job` tool auto-injects `client: "4"` if omitted, but CLI/SDK calls require it explicitly.
 
 ### DABs YAML
 
@@ -621,7 +626,7 @@ Define reusable Python environments for tasks.
 environments:
   - environment_key: ml_env
     spec:
-      client: "1"
+      client: "4"
       dependencies:
         - pandas==2.0.0
         - scikit-learn==1.3.0
@@ -634,18 +639,43 @@ tasks:
       notebook_path: ../src/train_model.py
 ```
 
+### CLI JSON
+
+```json
+{
+  "environments": [
+    {
+      "environment_key": "ml_env",
+      "spec": {
+        "client": "4",
+        "dependencies": ["pandas==2.0.0", "scikit-learn==1.3.0"]
+      }
+    }
+  ]
+}
+```
+
 ### Python SDK
 
 ```python
-from databricks.sdk.service.jobs import JobEnvironment, EnvironmentSpec
+from databricks.sdk.service.jobs import JobEnvironment
+from databricks.sdk.service.compute import Environment
 
 environments = [
     JobEnvironment(
         environment_key="ml_env",
-        spec=EnvironmentSpec(
-            client="1",
+        spec=Environment(
+            client="4",
             dependencies=["pandas==2.0.0", "scikit-learn==1.3.0"]
         )
     )
 ]
 ```
+
+### Parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `environment_key` | Yes | Unique identifier referenced by tasks via `environment_key` |
+| `spec.client` | Yes | Base serverless environment version (use `"4"`) |
+| `spec.dependencies` | No | List of pip packages (e.g., `["pandas==2.0.0", "dbldatagen"]`) |
