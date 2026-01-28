@@ -4,6 +4,9 @@ skills/
 # Projects directory (local development)
 projects/
 
+# Conda environment (for Databricks Apps deployment)
+conda-env/
+
 # Python
 __pycache__/
 *.py[cod]
