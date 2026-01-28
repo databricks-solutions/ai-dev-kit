@@ -91,7 +91,7 @@ def silver_events():
 def silver_events():
     # Context-aware (no separate read_stream)
     return (
-        spark.read.table("bronze_events")
+        spark.readStream.table("catalog.schema.bronze_events")
         .filter(F.col("event_type").isNotNull())
     )
 ```
@@ -246,7 +246,7 @@ dlt.read_stream("source_table")
 
 **After**:
 ```python
-dp.read.table("catalog.schema.source_table")
+spark.table("catalog.schema.source_table")
 # Streaming context-aware, no separate read_stream
 ```
 
@@ -299,7 +299,7 @@ def my_table():
 
 ```python
 # ✅ Modern: explicit path
-dp.read.table("catalog.schema.table")
+spark.table("catalog.schema.table")
 
 # ❌ Legacy: implicit LIVE
 dlt.read("table")

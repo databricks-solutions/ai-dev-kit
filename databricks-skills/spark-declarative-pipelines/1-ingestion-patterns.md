@@ -33,12 +33,12 @@ CREATE OR REPLACE STREAMING TABLE bronze_customers AS
 SELECT
   *,
   current_timestamp() AS _ingested_at
-FROM read_files(
+FROM stream(read_files(
   '/mnt/raw/customers/',
   format => 'json',
   schemaHints => 'customer_id STRING, email STRING',
   mode => 'PERMISSIVE'  -- Handles schema changes gracefully
-);
+));
 ```
 
 ### File Formats

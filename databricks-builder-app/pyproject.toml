@@ -23,9 +23,9 @@ dependencies = [
   # Database
   "sqlalchemy[asyncio]>=2.0.41",
   "alembic>=1.16.1",
-  "asyncpg>=0.30.0",
+  "psycopg[binary]>=3.2.0",  # psycopg3 async driver with hostaddr support
   "greenlet>=3.0.0",
-  "psycopg2-binary>=2.9.11",
+  "psycopg2-binary>=2.9.11",  # For alembic migrations (sync)
   # Claude Agent SDK (successor to claude-code-sdk)
   "claude-agent-sdk>=0.1.19",
   # Databricks MCP tools (databricks-mcp-server installed from sibling dir in dev)

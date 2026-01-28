@@ -7,9 +7,12 @@ from .database import (
   get_session,
   get_session_factory,
   init_database,
+  is_dynamic_token_mode,
   is_postgres_configured,
   run_migrations,
   session_scope,
+  start_token_refresh,
+  stop_token_refresh,
   test_database_connection,
 )
 from .models import Base, Conversation, Message, Project
@@ -25,8 +28,11 @@ __all__ = [
   'get_session',
   'get_session_factory',
   'init_database',
+  'is_dynamic_token_mode',
   'is_postgres_configured',
   'run_migrations',
   'session_scope',
+  'start_token_refresh',
+  'stop_token_refresh',
   'test_database_connection',
 ]

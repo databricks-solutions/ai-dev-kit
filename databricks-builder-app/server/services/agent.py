@@ -12,16 +12,17 @@ See: https://github.com/anthropics/claude-agent-sdk-python/issues/462
 """
 
 import asyncio
-import logging
-import traceback
-import sys
 import json
+import logging
+import os
+import queue
+import sys
+import threading
 import time
+import traceback
+from contextvars import copy_context
 from pathlib import Path
 from typing import AsyncIterator
-import threading
-import queue
-from contextvars import copy_context
 
 from claude_agent_sdk import ClaudeAgentOptions, query
 from claude_agent_sdk.types import (
@@ -255,11 +256,14 @@ async def stream_agent_response(
     # Load Claude settings for Databricks model serving authentication
     claude_env = _load_claude_settings()
 
+    # Ensure stream timeout is set (1 hour to handle long tool sequences)
+    stream_timeout = os.environ.get('CLAUDE_CODE_STREAM_CLOSE_TIMEOUT', '3600000')
+    claude_env['CLAUDE_CODE_STREAM_CLOSE_TIMEOUT'] = stream_timeout
+
     # Stderr callback to capture Claude subprocess output for debugging
     def stderr_callback(line: str):
       logger.debug(f'[Claude stderr] {line.strip()}')
       # Also print to stderr for immediate visibility during development
-      import sys
       print(f'[Claude stderr] {line.strip()}', file=sys.stderr, flush=True)
 
     options = ClaudeAgentOptions(

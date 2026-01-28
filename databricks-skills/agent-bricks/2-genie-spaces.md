@@ -41,12 +41,77 @@ For Genie, typically connect to **silver or gold tables** for best results.
 
 ## Creating a Genie Space
 
-Use the `create_or_update_genie` tool:
+### Step 1: Inspect Table Schemas (Required)
 
-- `display_name`: "Sales Analytics"
-- `table_identifiers`: `["my_catalog.sales.customers", "my_catalog.sales.orders", "my_catalog.sales.products"]`
-- `description`: "Explore sales data - customers, orders, and products"
-- `sample_questions`: `["What were total sales last month?", "Who are our top 10 customers by revenue?"]`
+**Before creating a Genie Space, you MUST inspect the table schemas** to understand what data is available. Use `get_table_details` to fetch column information:
+
+```python
+# First, understand what tables and columns exist
+get_table_details(
+    catalog="my_catalog",
+    schema="sales",
+    table_stat_level="SIMPLE"  # Gets column names, types, and sample values
+)
+```
+
+This returns schema information including:
+
+- Table names and row counts
+- Column names and data types
+- Sample values and cardinality
+- Null counts and statistics
+
+### Step 2: Analyze and Plan
+
+Based on the schema information:
+
+1. **Select relevant tables** - Choose tables that support the user's use case
+2. **Identify key columns** - Note date columns, metrics, dimensions, and foreign keys
+3. **Understand relationships** - How do tables join together?
+4. **Plan sample questions** - What questions can this data answer?
+
+### Step 3: Create the Genie Space
+
+Now create the space with content tailored to the actual data:
+
+```python
+create_or_update_genie(
+    display_name="Sales Analytics",
+    table_identifiers=[
+        "my_catalog.sales.customers",
+        "my_catalog.sales.orders",
+        "my_catalog.sales.products"
+    ],
+    description="""Explore retail sales data with three related tables:
+- customers: Customer demographics including region, segment, and signup date
+- orders: Transaction history with order_date, total_amount, and status
+- products: Product catalog with category, price, and inventory
+
+Tables join on customer_id and product_id.""",
+    sample_questions=[
+        "What were total sales last month?",
+        "Who are our top 10 customers by total_amount?",
+        "How many orders were placed in Q4 by region?",
+        "What's the average order value by customer segment?",
+        "Which product categories have the highest revenue?",
+        "Show me customers who haven't ordered in 90 days"
+    ]
+)
+```
+
+### Why This Workflow Matters
+
+Sample questions that reference **actual column names** help Genie:
+
+- Learn the vocabulary of your data
+- Generate more accurate SQL queries
+- Provide better autocomplete suggestions
+
+A good description that explains **table relationships** helps Genie:
+
+- Understand how to join tables correctly
+- Know which table contains which information
+- Provide more relevant answers
 
 The `warehouse_id` is optional - if not provided, the tool auto-detects the best available warehouse.
 

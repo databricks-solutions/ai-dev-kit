@@ -1,5 +1,6 @@
 ---
-description: Configure Databricks profile for Databricks Connect
+name: databricks-config
+description: Configure Databricks profile and authenticate for Databricks Connect, Databricks CLI, and Databricks SDK.
 ---
 
 Configure the Databricks profile in ~/.databrickscfg for use with Databricks Connect.

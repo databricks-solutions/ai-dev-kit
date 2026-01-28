@@ -34,3 +34,4 @@ temp/
 
 # Keep skills but ignore any local modifications
 # .claude/skills/ is committed as part of setup
+.mcp.json

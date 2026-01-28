@@ -38,11 +38,12 @@ INSTALL_FROM_LOCAL=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # All available skills
-ALL_SKILLS="asset-bundles databricks-app-apx databricks-app-python databricks-jobs databricks-python-sdk mlflow-evaluation spark-declarative-pipelines synthetic-data-generation"
+ALL_SKILLS="aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-jobs databricks-python-sdk mlflow-evaluation spark-declarative-pipelines synthetic-data-generation"
 
 # Get skill description
 get_skill_description() {
     case "$1" in
+        "aibi-dashboards") echo "AI/BI Dashboards - create and manage dashboards" ;;
         "asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
@@ -58,6 +59,7 @@ get_skill_description() {
 # Get extra files for a skill (besides SKILL.md)
 get_skill_extra_files() {
     case "$1" in
+        "aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
