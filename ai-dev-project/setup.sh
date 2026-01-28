@@ -47,7 +47,7 @@ MCP_PYTHON="$MCP_SERVER_DIR/.venv/bin/python"
 echo ""
 echo "Checking MCP server setup..."
 if [ ! -f "$MCP_PYTHON" ]; then
-# Run the install skills script
+# Run the install MCP server script
     echo ""
     echo "Setup Databricks MCP server..."
     cd "$MCP_SERVER_DIR"
@@ -106,6 +106,7 @@ echo "Created .mcp.json"
 
 echo ""
 echo "Creating .cursor/mcp.json..."
+mkdir -p ${SCRIPT_DIR}/.cursor
 echo "$MCP_DEV_CONFIG" > "$SCRIPT_DIR/.cursor/mcp.json"
 echo "Created .cursor/mcp.json"
 

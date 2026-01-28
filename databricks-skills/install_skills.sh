@@ -326,12 +326,4 @@ for skill in $SKILLS_TO_INSTALL; do
         echo -e "  ${GREEN}✓${NC} $skill"
     fi
 done
-echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo -e "  1. Configure the Databricks MCP server in .claude/mcp.json"
-echo -e "  2. Start Claude Code in your project directory"
-echo -e "  3. Ask Claude to help with Databricks tasks!"
-echo ""
-echo -e "For MCP server setup, see:"
-echo -e "  ${BLUE}${REPO_URL}${NC}"
-echo ""
+
