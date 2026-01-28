@@ -50,77 +50,83 @@ test_cases:
       source: "manual"
       tags: ["bronze", "ingestion", "autoloader"]
 
-  - id: "sdp_cdc_scd2_001"
+  - id: "sdp_cdc_scd2_sql_001"
     inputs:
-      prompt: "Implement CDC with SCD Type 2 for tracking customer dimension changes"
+      prompt: "Implement auto_cdc with SCD Type 2 for tracking customer dimension changes"
     outputs:
       response: |
-        Here's an SCD Type 2 implementation using Spark Declarative Pipelines:
+        Here's an AUTO CDC implementation with SCD Type 2 using SQL:
 
         ```sql
-        -- Bronze: Raw CDC events
+        -- Bronze: Ingest raw CDC events from source system
         CREATE OR REFRESH STREAMING TABLE bronze_customers_cdc
-        AS SELECT * FROM read_files(
+        CLUSTER BY (customer_id)
+        AS SELECT
+          *,
+          current_timestamp() AS _ingested_at,
+          _metadata.file_path AS _source_file
+        FROM STREAM read_files(
           '/Volumes/raw/customers_cdc',
-          format => 'json'
+          format => 'json',
+          schemaHints => 'customer_id STRING, customer_name STRING, email STRING, phone STRING, address STRING, event_timestamp TIMESTAMP, operation STRING'
         );
 
-        -- Silver: Apply SCD Type 2
-        CREATE OR REFRESH STREAMING TABLE silver_customers_scd2
-        CLUSTER BY (customer_id)
-        TBLPROPERTIES (
-          'pipelines.autoOptimize.zOrderCols' = 'customer_id'
-        )
-        AS SELECT
-          customer_id,
-          customer_name,
-          email,
-          address,
-          _change_type,
-          _commit_timestamp AS effective_from,
-          LEAD(_commit_timestamp) OVER (
-            PARTITION BY customer_id
-            ORDER BY _commit_timestamp
-          ) AS effective_to,
-          CASE
-            WHEN LEAD(_commit_timestamp) OVER (
-              PARTITION BY customer_id
-              ORDER BY _commit_timestamp
-            ) IS NULL THEN true
-            ELSE false
-          END AS is_current
-        FROM bronze_customers_cdc
-        WHERE _change_type IN ('INSERT', 'UPDATE');
+        -- Silver: Apply SCD Type 2 using AUTO CDC
+        CREATE OR REFRESH STREAMING TABLE silver_customers_history
+        CLUSTER BY (customer_id);
+
+        CREATE FLOW customers_scd2_flow AS
+        AUTO CDC INTO silver_customers_history
+        FROM STREAM bronze_customers_cdc
+        KEYS (customer_id)
+        SEQUENCE BY event_timestamp
+        APPLY AS DELETE WHEN operation = 'DELETE'
+        COLUMNS * EXCEPT (operation, _ingested_at, _source_file)
+        STORED AS SCD TYPE 2
+        TRACK HISTORY ON *;
         ```
 
-        This implements:
-        - CDC capture from source system
-        - SCD Type 2 with effective dates
-        - Current record flag for easy querying
-      execution_success: true
+        This pipeline:
+        - Uses `AUTO CDC INTO` for automatic change data capture processing
+        - Creates SCD Type 2 with automatic `__START_AT` and `__END_AT` columns
+        - Handles INSERT, UPDATE, and DELETE operations from source
+        - Uses `SEQUENCE BY` to handle out-of-order events correctly
+        - Tracks history on all columns (changes create new versions)
+
+        Query current state: `SELECT * FROM silver_customers_history WHERE __END_AT IS NULL`
+      execution_success: null
     expectations:
       expected_facts:
-        - "SCD Type 2"
-        - "effective_from"
-        - "is_current"
+        - "AUTO CDC"
+        - "SCD TYPE 2"
+        - "TRACK HISTORY"
+        - "__END_AT"
       expected_patterns:
         - pattern: "CREATE OR REFRESH STREAMING TABLE"
           min_count: 2
-          description: "streaming tables"
-        - pattern: "_change_type"
+          description: "streaming tables for bronze and silver"
+        - pattern: "AUTO CDC INTO"
           min_count: 1
-          description: "CDC change type"
-        - pattern: "LEAD\\s*\\("
+          description: "AUTO CDC syntax"
+        - pattern: "STORED AS SCD TYPE 2"
           min_count: 1
-          description: "window function"
+          description: "SCD Type 2 specification"
+        - pattern: "SEQUENCE BY"
+          min_count: 1
+          description: "ordering for out-of-order handling"
+        - pattern: "TRACK HISTORY ON"
+          min_count: 1
+          description: "history tracking"
       guidelines:
-        - "Must track change history with effective dates"
-        - "Should include is_current flag"
+        - "Must use AUTO CDC INTO syntax, not manual window functions"
+        - "Must use STORED AS SCD TYPE 2"
+        - "Should use SEQUENCE BY for ordering"
+        - "Should handle DELETE operations"
     metadata:
       category: "happy_path"
       difficulty: "hard"
-      source: "manual"
-      tags: ["cdc", "scd2", "silver", "dimensions"]
+      source: "interactive"
+      tags: ["cdc", "scd2", "sql", "auto_cdc", "dimensions"]
 
   - id: "sdp_silver_transform_001"
     inputs:
@@ -331,3 +337,153 @@ test_cases:
         learnings:
           - "read_files() alone returns batch query; must wrap with STREAM for streaming tables"
           - "Error without STREAM: CREATE_APPEND_ONCE_FLOW_FROM_BATCH_QUERY_NOT_ALLOWED"
+
+  - id: "sdp_bronze_python_001"
+    inputs:
+      prompt: "Create a bronze ingestion pipeline using Python only (no SQL) for JSON files in /Volumes/raw/order"
+    outputs:
+      response: |
+        Here's a bronze ingestion pipeline using Python with the modern `pyspark.pipelines` API:
+
+        ```python
+        from pyspark import pipelines as dp
+        from pyspark.sql.functions import current_timestamp, col
+
+        @dp.table(
+            name="bronze_orders",
+            comment="Raw orders ingested from JSON files",
+            cluster_by=["order_date"]
+        )
+        def bronze_orders():
+            return (
+                spark.readStream
+                .format("cloudFiles")
+                .option("cloudFiles.format", "json")
+                .option("cloudFiles.inferColumnTypes", "true")
+                .load("/Volumes/raw/order")
+                .withColumn("_ingested_at", current_timestamp())
+                .withColumn("_source_file", col("_metadata.file_path"))
+            )
+        ```
+
+        This pipeline:
+        - Uses the modern `pyspark.pipelines` (`dp`) API (recommended for 2025)
+        - Uses Auto Loader (`cloudFiles`) for incremental file ingestion
+        - Adds metadata columns for lineage tracking (`_ingested_at`, `_source_file`)
+        - Uses Liquid Clustering with `cluster_by` instead of partitioning
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "pyspark.pipelines"
+        - "@dp.table"
+        - "cloudFiles"
+        - "_ingested_at"
+      expected_patterns:
+        - pattern: "from pyspark import pipelines as dp"
+          min_count: 1
+          description: "modern dp import"
+        - pattern: "@dp\\.table\\("
+          min_count: 1
+          description: "dp.table decorator"
+        - pattern: "cluster_by"
+          min_count: 1
+          description: "liquid clustering"
+        - pattern: "\\.format\\([\"']cloudFiles[\"']\\)"
+          min_count: 1
+          description: "Auto Loader format"
+      guidelines:
+        - "Must use modern pyspark.pipelines API, not legacy dlt"
+        - "Must use Python only, no SQL"
+        - "Should include metadata columns for lineage"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "interactive"
+      tags: ["bronze", "ingestion", "python", "autoloader"]
+
+  - id: "sdp_cdc_scd2_python_001"
+    inputs:
+      prompt: "Implement auto_cdc using Python with SCD Type 2 for tracking customer dimension changes"
+    outputs:
+      response: |
+        Here's an AUTO CDC implementation with SCD Type 2 using Python and the modern `pyspark.pipelines` API:
+
+        ```python
+        from pyspark import pipelines as dp
+        from pyspark.sql.functions import col, current_timestamp
+
+        # Bronze: Ingest raw CDC events from source
+        @dp.table(
+            name="bronze_customers_cdc",
+            comment="Raw CDC events from customer source system",
+            cluster_by=["customer_id"]
+        )
+        def bronze_customers_cdc():
+            return (
+                spark.readStream
+                .format("cloudFiles")
+                .option("cloudFiles.format", "json")
+                .option("cloudFiles.inferColumnTypes", "true")
+                .load("/Volumes/raw/customers_cdc")
+                .withColumn("_ingested_at", current_timestamp())
+            )
+
+        # Silver: Apply SCD Type 2 using AUTO CDC
+        dp.create_streaming_table(
+            name="silver_customers_history",
+            comment="Customer dimension with SCD Type 2 history tracking",
+            cluster_by=["customer_id"]
+        )
+
+        dp.create_auto_cdc_flow(
+            target="silver_customers_history",
+            source="bronze_customers_cdc",
+            keys=["customer_id"],
+            sequence_by=col("event_timestamp"),
+            stored_as_scd_type="2",
+            track_history_column_list=["customer_name", "email", "phone", "address"]
+        )
+        ```
+
+        This pipeline:
+        - Uses the modern `pyspark.pipelines` (`dp`) API
+        - Ingests CDC events from source using Auto Loader
+        - Applies SCD Type 2 with automatic `__START_AT` and `__END_AT` columns
+        - Tracks history on specified columns (changes to tracked columns create new versions)
+        - Uses `create_auto_cdc_flow()` for CDC processing with SCD Type 2
+
+        Query the current state with: `SELECT * FROM silver_customers_history WHERE __END_AT IS NULL`
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "pyspark.pipelines"
+        - "create_auto_cdc_flow"
+        - "SCD Type 2"
+        - "track_history"
+      expected_patterns:
+        - pattern: "from pyspark import pipelines as dp"
+          min_count: 1
+          description: "modern dp import"
+        - pattern: "dp\\.create_auto_cdc_flow\\("
+          min_count: 1
+          description: "auto_cdc function for CDC"
+        - pattern: "stored_as_scd_type.*2"
+          min_count: 1
+          description: "SCD Type 2 specification"
+        - pattern: "dp\\.create_streaming_table\\("
+          min_count: 1
+          description: "streaming table creation"
+        - pattern: "track_history_column_list"
+          min_count: 1
+          description: "history tracking columns"
+      guidelines:
+        - "Must use modern pyspark.pipelines API, not legacy dlt"
+        - "Must use Python only, no SQL"
+        - "Must use create_auto_cdc_flow for CDC operations"
+        - "Must implement SCD Type 2"
+        - "Should track history on specified columns"
+    metadata:
+      category: "happy_path"
+      difficulty: "hard"
+      source: "interactive"
+      tags: ["cdc", "scd2", "python", "auto_cdc", "dimensions"]

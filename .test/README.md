@@ -7,7 +7,7 @@ Test Databricks skills with real execution on serverless compute.
 ## Prerequisites
 
 ```bash
-pip install -e ".test/[dev]"
+uv pip install -e ".test/[dev]"
 ```
 
 Requires a Databricks workspace with serverless SQL/compute enabled.
@@ -27,6 +27,7 @@ This copies:
 - `references/` - YAML schemas and scorer documentation
 
 ## Quick Start
+Start a new Claude Code session from within the project root folder - `ai-dev-kit`. Then run the desired steps below.
 
 ### 1. Test an Existing Skill
 
