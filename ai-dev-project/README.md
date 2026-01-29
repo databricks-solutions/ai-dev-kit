@@ -87,6 +87,42 @@ In your project directory, create `.mcp.json` (Claude) or `.cursor/mcp.json` (Cu
 ```
 
 
+### Cursor-Specific Setup
+
+#### Enable the MCP Server
+
+After adding the MCP config, you must enable the server in Cursor:
+1. Open Cursor Settings (`Cmd+,`)
+2. Search for "MCP" 
+3. Find "databricks" under Installed MCP Servers
+4. Toggle it **on**
+
+#### Authentication with Config Profiles
+
+Cursor spawns MCP servers as subprocesses that don't inherit shell environment variables. If you use `DATABRICKS_CONFIG_PROFILE`, you must pass it explicitly in the config:
+
+```json
+{
+  "mcpServers": {
+    "databricks": {
+      "command": "/path/to/databricks-mcp-server/.venv/bin/python",
+      "args": ["/path/to/databricks-mcp-server/run_server.py"],
+      "env": {
+        "DATABRICKS_CONFIG_PROFILE": "your-profile-name"
+      }
+    }
+  }
+}
+```
+
+#### Project vs Global MCP Configs
+
+Cursor loads MCP configs from both locations:
+- **Global**: `~/.cursor/mcp.json` (applies to all projects)
+- **Project**: `.cursor/mcp.json` (project-specific)
+
+If you have the same server in both, the global config may take precedence. For project-specific profiles, remove the server from the global config.
+
 ### Manual MCP Configuration - Claude CLI
 
 To manually add or reconfigure the MCP server from another project directory:
@@ -206,6 +242,16 @@ Check the MCP server logs - Claude Code shows tool errors in the chat. Common is
 - Invalid warehouse ID
 - Missing permissions
 - Network connectivity
+
+### Cursor: MCP Server Not Loading
+
+1. Ensure the server is enabled in Cursor Settings → MCP
+2. Reload window (`Cmd+Shift+P` → "Developer: Reload Window")
+3. Check for conflicts with `~/.cursor/mcp.json`
+
+### Cursor: Authentication Errors with Config Profiles
+
+If using `DATABRICKS_CONFIG_PROFILE`, add it to the `env` block in `.cursor/mcp.json`. Shell environment variables are not inherited by MCP server subprocesses.
 
 ## Project Structure
 
