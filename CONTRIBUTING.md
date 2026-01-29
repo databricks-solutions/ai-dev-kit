@@ -12,8 +12,7 @@ This repository is maintained by Databricks and intended for contributions from 
 
 2. Set up the MCP server (includes databricks-tools-core):
    ```bash
-   cd databricks-mcp-server
-   ./setup.sh
+   ./databricks-mcp-server/setup.sh
    ```
 
 3. Configure authentication:
@@ -23,7 +22,7 @@ This repository is maintained by Databricks and intended for contributions from 
    ```
    or
       ```bash
-   export DATABRICKS_PROFILE="your-profile"
+   export DATABRICKS_CONFIG_PROFILE="your-profile"
    ```
 
 ## Code Standards
