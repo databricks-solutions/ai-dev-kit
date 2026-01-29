@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380">
+  <defs>
+    <linearGradient id="foundationGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e1e"/>
+      <stop offset="100%" style="stop-color:#2d2d2d"/>
+    </linearGradient>
+    <linearGradient id="skillGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#34d399"/>
+    </linearGradient>
+    <linearGradient id="mcpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff3621"/>
+      <stop offset="100%" style="stop-color:#ff6b4a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="380" fill="#fafafa"/>
+
+  <!-- TOP: Build Cool Stuff on Databricks -->
+  <g filter="url(#shadow)">
+    <rect x="100" y="20" width="600" height="90" rx="12" fill="url(#dbGrad)"/>
+    <text x="400" y="50" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="18" font-weight="700">Build Cool Stuff on Databricks</text>
+  </g>
+
+  <!-- Service Icons Row -->
+  <g transform="translate(115, 60)">
+    <!-- SQL -->
+    <g>
+      <rect x="0" y="0" width="70" height="40" rx="6" fill="rgba(255,255,255,0.2)"/>
+      <text x="35" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="11" font-weight="600">SQL</text>
+    </g>
+    <!-- Jobs -->
+    <g transform="translate(80, 0)">
+      <rect x="0" y="0" width="70" height="40" rx="6" fill="rgba(255,255,255,0.2)"/>
+      <text x="35" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="11" font-weight="600">Jobs</text>
+    </g>
+    <!-- Pipelines -->
+    <g transform="translate(160, 0)">
+      <rect x="0" y="0" width="70" height="40" rx="6" fill="rgba(255,255,255,0.2)"/>
+      <text x="35" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="11" font-weight="600">Pipelines</text>
+    </g>
+    <!-- Unity Catalog -->
+    <g transform="translate(240, 0)">
+      <rect x="0" y="0" width="70" height="40" rx="6" fill="rgba(255,255,255,0.2)"/>
+      <text x="35" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="11" font-weight="600">Catalog</text>
+    </g>
+    <!-- Genie -->
+    <g transform="translate(320, 0)">
+      <rect x="0" y="0" width="70" height="40" rx="6" fill="rgba(255,255,255,0.2)"/>
+      <text x="35" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="11" font-weight="600">Genie</text>
+    </g>
+    <!-- Dashboards -->
+    <g transform="translate(400, 0)">
+      <rect x="0" y="0" width="70" height="40" rx="6" fill="rgba(255,255,255,0.2)"/>
+      <text x="35" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="11" font-weight="600">AI/BI</text>
+    </g>
+    <!-- And More -->
+    <g transform="translate(480, 0)">
+      <rect x="0" y="0" width="70" height="40" rx="6" fill="rgba(255,255,255,0.2)"/>
+      <text x="35" y="25" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="11" font-weight="600">+ more</text>
+    </g>
+  </g>
+
+  <!-- Vertical arrows pointing UP to Databricks (using polygon arrowheads) -->
+  <line x1="220" y1="175" x2="220" y2="120" stroke="#94a3b8" stroke-width="2.5"/>
+  <polygon points="220,112 212,124 228,124" fill="#94a3b8"/>
+
+  <line x1="580" y1="175" x2="580" y2="120" stroke="#94a3b8" stroke-width="2.5"/>
+  <polygon points="580,112 572,124 588,124" fill="#94a3b8"/>
+
+  <!-- "enables" label - positioned between arrows -->
+  <text x="400" y="145" text-anchor="middle" fill="#64748b" font-family="system-ui, sans-serif" font-size="11" font-style="italic">enables</text>
+
+  <!-- MIDDLE: Skills and MCP Tools -->
+  <g filter="url(#shadow)">
+    <rect x="120" y="175" width="200" height="85" rx="12" fill="url(#skillGrad)"/>
+    <text x="220" y="210" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="16" font-weight="600">Skills</text>
+    <text x="220" y="232" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-family="system-ui, sans-serif" font-size="12">Knowledge &amp; Patterns</text>
+    <text x="220" y="250" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="system-ui, sans-serif" font-size="10">17+ Databricks skills</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="480" y="175" width="200" height="85" rx="12" fill="url(#mcpGrad)"/>
+    <text x="580" y="210" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="16" font-weight="600">MCP Tools</text>
+    <text x="580" y="232" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-family="system-ui, sans-serif" font-size="12">Executable Actions</text>
+    <text x="580" y="250" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="system-ui, sans-serif" font-size="10">45+ Databricks tools</text>
+  </g>
+
+  <!-- Vertical arrows pointing UP from AI Dev Kit to Skills/MCP -->
+  <line x1="220" y1="300" x2="220" y2="265" stroke="#94a3b8" stroke-width="2.5"/>
+  <polygon points="220,260 212,272 228,272" fill="#94a3b8"/>
+
+  <line x1="580" y1="300" x2="580" y2="265" stroke="#94a3b8" stroke-width="2.5"/>
+  <polygon points="580,260 572,272 588,272" fill="#94a3b8"/>
+
+  <!-- "provides" label - positioned between arrows -->
+  <text x="400" y="285" text-anchor="middle" fill="#64748b" font-family="system-ui, sans-serif" font-size="11" font-style="italic">provides</text>
+
+  <!-- BOTTOM: AI Dev Kit Foundation -->
+  <g filter="url(#shadow)">
+    <rect x="150" y="300" width="500" height="65" rx="12" fill="url(#foundationGrad)"/>
+    <text x="400" y="332" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="18" font-weight="700">AI Dev Kit</text>
+    <text x="400" y="352" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="system-ui, sans-serif" font-size="12">Trusted sources for your AI coding assistant</text>
+  </g>
+</svg>

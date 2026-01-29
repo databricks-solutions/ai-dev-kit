@@ -1,148 +1,96 @@
 # Databricks Skills for Claude Code
 
-Skills that teach Claude Code how to work effectively with Databricks. These skills provide domain knowledge, patterns, and best practices for building on the Databricks platform.
+Skills that teach Claude Code how to work effectively with Databricks - providing patterns, best practices, and code examples that work with Databricks MCP tools.
 
-## What are Skills?
+## Installation
 
-Skills are markdown files that give Claude Code specialized knowledge about specific domains. When you add these skills to your project, Claude learns:
-
-- **Best practices** for Databricks development
-- **Patterns** for common tasks (DABs, pipelines, data generation)
-- **Code examples** that work with Databricks MCP tools
-- **Conventions** and naming standards
-
-## Quick Install
-
-Run this command in your project root:
+Run in your project root:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 ```
 
-Or clone and run locally:
+This creates `.claude/skills/` and copies all skills. Claude Code loads them automatically.
 
+**Manual install:**
 ```bash
-git clone https://github.com/databricks-solutions/ai-dev-kit.git
-cd ai-dev-kit/databricks-skills
-./install_skills.sh
+mkdir -p .claude/skills
+cp -r ai-dev-kit/databricks-skills/agent-bricks .claude/skills/
 ```
-
-The installer will:
-1. Create `.claude/skills/` in your project (if needed)
-2. Download each skill
-3. Ask before overwriting existing skills
 
 ## Available Skills
 
-| Skill | Description |
-|-------|-------------|
-| **asset-bundles** | Create and configure Databricks Asset Bundles (DABs) with best practices for multi-environment deployments |
-| **databricks-app-apx** | Build full-stack Databricks apps using APX framework (FastAPI + React) |
-| **databricks-app-python** | Build Python-based Databricks apps with Dash, Streamlit, Flask, or other Python web frameworks |
-| **databricks-python-sdk** | Python SDK, Databricks Connect, CLI, and REST API guidance |
-| **mlflow-evaluation** | MLflow evaluation, scoring, and trace analysis patterns |
-| **spark-declarative-pipelines** | Spark Declarative Pipelines (SDP) patterns in SQL and Python - formerly Delta Live Tables |
-| **synthetic-data-generation** | Generate realistic test data using Faker and Spark with non-linear distributions |
+### 🤖 AI & Agents
+- **agent-bricks** - Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors
+- **mlflow-evaluation** - Model evaluation, scoring, trace analysis
+- **unstructured-pdf-generation** - Generate synthetic PDFs for RAG
 
-## How Skills Work with MCP
+### 📊 Analytics & Dashboards
+- **aibi-dashboards** - AI/BI dashboards (with SQL validation workflow)
+- **databricks-unity-catalog** - System tables for lineage, audit, billing
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Your Project                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────────┐    ┌──────────────────────────────────┐  │
-│  │  .claude/skills/ │    │  .claude/mcp.json                │  │
-│  │                  │    │                                  │  │
-│  │  • asset-bundles           │    │  Configures MCP server that      │  │
-│  │  • spark-declarative-      │    │  provides Databricks tools:      │  │
-│  │    pipelines               │    │  • execute_sql                   │  │
-│  │  • synthetic-data-gen      │    │  • get_table_details             │  │
-│  │  • databricks-   │    │  • run_python_file_on_databricks │  │
-│  │    python-sdk    │    │  • ka_create, mas_create, etc.   │  │
-│  │                  │    │                                  │  │
-│  └────────┬─────────┘    └───────────────┬──────────────────┘  │
-│           │                              │                      │
-│           ▼                              ▼                      │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                     Claude Code                           │  │
-│  │                                                           │  │
-│  │  Uses SKILLS to know HOW to do things                    │  │
-│  │  Uses MCP TOOLS to actually DO things on Databricks      │  │
-│  │                                                           │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+### 🔧 Data Engineering
+- **spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
+- **databricks-jobs** - Multi-task workflows, triggers, schedules
+- **synthetic-data-generation** - Realistic test data with Faker
 
-**Skills** = Knowledge (patterns, examples, best practices)
-**MCP Tools** = Actions (execute SQL, create tables, run code)
+### 🚀 Development & Deployment
+- **asset-bundles** - DABs for multi-environment deployments
+- **databricks-app-apx** - Full-stack apps (FastAPI + React)
+- **databricks-app-python** - Python web apps (Dash, Streamlit, Flask)
+- **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
+- **databricks-config** - Profile authentication setup
 
-## Manual Installation
+### 📚 Reference
+- **databricks-docs** - Documentation index via llms.txt
 
-If you prefer to install skills manually:
-
-1. Create the skills directory:
-   ```bash
-   mkdir -p .claude/skills
-   ```
-
-2. Copy the skills you want:
-   ```bash
-   # From a cloned repo
-   cp -r ai-dev-kit/databricks-skills/asset-bundles .claude/skills/
-   cp -r ai-dev-kit/databricks-skills/spark-declarative-pipelines .claude/skills/
-   ```
-
-## Skill Structure
-
-Each skill follows this structure:
+## How It Works
 
 ```
-skill-name/
-├── SKILL.md          # Main skill file (required)
-├── examples.md       # Code examples (optional)
-├── patterns.md       # Common patterns (optional)
-└── reference.md      # API reference (optional)
+┌────────────────────────────────────────────────┐
+│  .claude/skills/     +    .claude/mcp.json     │
+│  (Knowledge)               (Actions)           │
+│                                                │
+│  Skills teach HOW    +    MCP does it          │
+│  ↓                        ↓                    │
+│  Claude Code learns patterns and executes      │
+└────────────────────────────────────────────────┘
 ```
 
-The `SKILL.md` file contains:
-- Frontmatter with name and description
-- When to use the skill
-- Best practices and patterns
-- Code examples
+**Example:** User says "Create a sales dashboard"
+1. Claude loads `aibi-dashboards` skill → learns validation workflow
+2. Calls `get_table_details()` → gets schemas
+3. Calls `execute_sql()` → tests queries
+4. Calls `create_or_update_dashboard()` → deploys
+5. Returns working dashboard URL
 
-## Creating Custom Skills
+## Custom Skills
 
-You can create your own skills for your organization:
+Create your own in `.claude/skills/my-skill/SKILL.md`:
 
 ```markdown
 ---
-name: my-custom-skill
-description: "Description of what this skill teaches"
+name: my-skill
+description: "What this teaches"
 ---
 
-# My Custom Skill
+# My Skill
 
 ## When to Use
 ...
 
 ## Patterns
 ...
-
-## Examples
-...
 ```
 
-## Requirements
+## Troubleshooting
 
-- Claude Code CLI installed
-- Databricks workspace access (for using MCP tools)
-- Optional: Databricks MCP server configured in `.claude/mcp.json`
+**Skills not loading?** Check `.claude/skills/` exists and each skill has `SKILL.md`
+
+**Install fails?** Run `bash install_skills.sh` or check write permissions
 
 ## Related
 
-- [databricks-tools-core](../databricks-tools-core/) - Python library with Databricks functions
-- [databricks-mcp-server](../databricks-mcp-server/) - MCP server exposing tools to Claude
-- [Databricks Asset Bundles](https://docs.databricks.com/dev-tools/bundles/) - Official DABs documentation
-- [Spark Declarative Pipelines](https://docs.databricks.com/delta-live-tables/) - Official DLT/SDP documentation
+- [databricks-tools-core](../databricks-tools-core/) - Python library
+- [databricks-mcp-server](../databricks-mcp-server/) - MCP server
+- [Databricks Docs](https://docs.databricks.com/) - Official documentation

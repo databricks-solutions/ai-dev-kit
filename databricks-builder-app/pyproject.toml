@@ -19,7 +19,7 @@ dependencies = [
   "uvicorn>=0.34.0",
   "httpx>=0.28.0",
   "pydantic>=2.10.0",
-  "databricks-sdk>=0.44.1",
+  "databricks-sdk>=0.81.0",
   # Database
   "sqlalchemy[asyncio]>=2.0.41",
   "alembic>=1.16.1",

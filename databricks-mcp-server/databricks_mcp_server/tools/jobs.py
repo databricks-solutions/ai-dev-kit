@@ -73,6 +73,7 @@ def create_job(
     name: str,
     tasks: List[Dict[str, Any]],
     job_clusters: Optional[List[Dict[str, Any]]] = None,
+    environments: Optional[List[Dict[str, Any]]] = None,
     tags: Optional[Dict[str, str]] = None,
     timeout_seconds: Optional[int] = None,
     max_concurrent_runs: int = 1,
@@ -100,6 +101,12 @@ def create_job(
                           spark_jar_task, spark_submit_task, pipeline_task, sql_task, dbt_task, run_job_task
             - [compute]: One of new_cluster, existing_cluster_id, job_cluster_key, compute_key
         job_clusters: Optional list of job cluster definitions (for non-serverless tasks).
+        environments: Optional list of environment definitions for serverless tasks with
+            custom dependencies. Each dict should have:
+            - environment_key: Unique identifier (referenced by tasks via environment_key)
+            - spec: Dict with client (base environment version, defaults to "4" if omitted)
+                    and dependencies (list of pip packages like "pandas==2.0.0")
+            Example: [{"environment_key": "ml_env", "spec": {"client": "4", "dependencies": ["pandas==2.0.0", "scikit-learn"]}}]
         tags: Optional tags dict for organization.
         timeout_seconds: Job-level timeout (0 means no timeout).
         max_concurrent_runs: Maximum number of concurrent runs (default: 1).
@@ -134,6 +141,7 @@ def create_job(
         name=name,
         tasks=tasks,
         job_clusters=job_clusters,
+        environments=environments,
         tags=tags,
         timeout_seconds=timeout_seconds,
         max_concurrent_runs=max_concurrent_runs,
@@ -156,6 +164,7 @@ def update_job(
     name: Optional[str] = None,
     tasks: Optional[List[Dict[str, Any]]] = None,
     job_clusters: Optional[List[Dict[str, Any]]] = None,
+    environments: Optional[List[Dict[str, Any]]] = None,
     tags: Optional[Dict[str, str]] = None,
     timeout_seconds: Optional[int] = None,
     max_concurrent_runs: Optional[int] = None,
@@ -181,6 +190,7 @@ def update_job(
         name: New job name.
         tasks: New task definitions.
         job_clusters: New job cluster definitions.
+        environments: New environment definitions for serverless tasks with dependencies.
         tags: New tags (replaces existing).
         timeout_seconds: New timeout.
         max_concurrent_runs: New max concurrent runs.
@@ -200,6 +210,7 @@ def update_job(
         name=name,
         tasks=tasks,
         job_clusters=job_clusters,
+        environments=environments,
         tags=tags,
         timeout_seconds=timeout_seconds,
         max_concurrent_runs=max_concurrent_runs,

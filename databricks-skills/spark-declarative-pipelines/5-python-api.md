@@ -1,6 +1,6 @@
 # Python API: Modern vs Legacy
 
-**Last Updated**: December 2025
+**Last Updated**: January 2026
 **Status**: Modern API (`pyspark.pipelines`) recommended for all new projects
 
 ---
@@ -23,7 +23,8 @@ Databricks provides two Python APIs for Spark Declarative Pipelines:
 | **Import** | `from pyspark import pipelines as dp` | `import dlt` |
 | **Status** | ✅ **Recommended** | ⚠️ Legacy |
 | **Table decorator** | `@dp.table()` | `@dlt.table()` |
-| **Read** | `spark.table("catalog.schema.table")` | `dlt.read("table")` |
+| **Read** | `spark.read.table("table")` | `dlt.read("table")` |
+| **CDC/SCD** | `dp.create_auto_cdc_flow()` | `dlt.apply_changes()` |
 | **Use for** | New projects | Maintaining existing |
 
 ---
@@ -69,7 +70,7 @@ def bronze_events():
 @dp.table(name="silver_events")
 def silver_events():
     # Explicit Unity Catalog path
-    return spark.table("catalog.schema.bronze_events").filter(...)
+    return spark.read.table("bronze_events").filter(...)
 ```
 
 **Legacy**:
@@ -115,7 +116,7 @@ def silver_events():
 @dp.expect_or_drop("valid_amount", "amount > 0")
 @dp.expect_or_fail("critical_field", "timestamp IS NOT NULL")
 def silver_validated():
-    return spark.table("catalog.schema.bronze_events")
+    return spark.read.table("catalog.schema.bronze_events")
 ```
 
 **Legacy**:
@@ -130,10 +131,23 @@ def silver_validated():
 
 **Note**: Expectations API identical between versions.
 
-### SCD Type 2
+### SCD Type 2 (AUTO CDC)
 
 **Modern (Recommended)**:
-See docs at https://docs.databricks.com/aws/en/ldp/cdc
+```python
+from pyspark.sql.functions import col
+
+dp.create_streaming_table("customers_history")
+
+dp.create_auto_cdc_flow(
+    target="customers_history",
+    source="customers_cdc",
+    keys=["customer_id"],
+    sequence_by=col("event_timestamp"),
+    stored_as_scd_type="2",
+    track_history_column_list=["*"]
+)
+```
 
 **Legacy**:
 ```python
@@ -148,6 +162,8 @@ dlt.apply_changes(
     track_history_column_list=["*"]
 )
 ```
+
+**Key Difference**: Modern uses `create_auto_cdc_flow()`, legacy uses `apply_changes()`.
 
 ### Liquid Clustering
 
@@ -234,7 +250,7 @@ spark.table("catalog.schema.source_table")
 # Streaming context-aware, no separate read_stream
 ```
 
-### Step 4: Update Apply Changes
+### Step 4: Update CDC/SCD Operations
 
 **Before**:
 ```python
@@ -242,7 +258,20 @@ dlt.apply_changes(target="dim_customer", source="cdc_source", ...)
 ```
 
 **After**:
-See docs at https://docs.databricks.com/aws/en/ldp/cdc
+```python
+from pyspark.sql.functions import col
+
+dp.create_auto_cdc_flow(
+    target="dim_customer",
+    source="cdc_source",
+    keys=["customer_id"],
+    sequence_by=col("event_timestamp"),
+    stored_as_scd_type="2",
+    track_history_column_list=["*"]
+)
+```
+
+**Key Change**: `dlt.apply_changes()` → `dp.create_auto_cdc_flow()`
 
 ### Step 5: Update Clustering
 

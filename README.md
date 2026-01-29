@@ -1,262 +1,155 @@
 # Databricks AI Dev Kit
 
-Build Databricks projects with AI coding assistants (Claude Code, Cursor, etc.) using MCP (Model Context Protocol).
+<p align="center">
+  <img src="https://img.shields.io/badge/Databricks-Certified%20Gold%20Project-FFD700?style=for-the-badge&logo=databricks&logoColor=black" alt="Databricks Certified Gold Project">
+</p>
+
+---
 
 ## Overview
 
-The AI Dev Kit bridges the gap between AI coding assistants and the Databricks platform. It provides:
+Vibecoding on Databricks just got a whole lot better. The **AI Dev Kit** gives your AI coding assistant (Claude Code, Cursor, Windsurf, etc.) the trusted sources it needs to build faster and smarter on Databricks.
 
-- **Skills** - Teach AI assistants Databricks best practices and patterns
-- **MCP Tools** - Enable AI assistants to execute actions on your Databricks workspace
-- **Core Library** - Framework-agnostic Python functions for any integration
+<p align="center">
+  <img src="databricks-tools-core/docs/architecture.svg" alt="Architecture" width="700">
+</p>
 
-```
-                    ┌─────────────────────────────────────────┐
-                    │           AI Coding Assistant           │
-                    │       (Claude Code, Cursor, etc.)       │
-                    └─────────────────┬───────────────────────┘
-                                      │
-                    ┌─────────────────┼───────────────────────┐
-                    │                 │                       │
-                    ▼                 ▼                       ▼
-            ┌───────────────┐ ┌───────────────┐ ┌─────────────────────┐
-            │    Skills     │ │  MCP Server   │ │    Core Library     │
-            │               │ │               │ │                     │
-            │  Knowledge &  │ │  Tool Bridge  │ │  Python Functions   │
-            │   Patterns    │ │   (stdio)     │ │  (Framework-agnostic)│
-            └────────────┬──┘ └───────┬───────┘ └─────────────────────┘
-                         │            │
-                         ▼            ▼
-                    ┌─────────────────────────────────────────┐
-                    │          Databricks Workspace           │
-                    │                                         │
-                    │  SQL Warehouses • Clusters • Jobs       │
-                    │  Unity Catalog • Pipelines • Files      │
-                    └─────────────────────────────────────────┘
-```
+---
+
+## What Can I Build?
+
+- **Spark Declarative Pipelines** (streaming tables, CDC, SCD Type 2, Auto Loader)
+- **Databricks Jobs** (scheduled workflows, multi-task DAGs)
+- **AI/BI Dashboards** (visualizations, KPIs, analytics)
+- **Unity Catalog** (tables, volumes, governance)
+- **Genie Spaces** (natural language data exploration)
+- **Knowledge Assistants** (RAG-based document Q&A)
+- **MLflow Experiments** (evaluation, scoring, traces)
+- **Databricks Apps** (full-stack web applications)
+- ...and more
+
+---
+
+## Choose Your Own Adventure
+
+| Adventure | Best For | Start Here |
+|-----------|----------|------------|
+| :star: [**Starter Kit**](#starter-kit) | **Start here!** Claude Code + full Databricks integration | `ai-dev-project/` |
+| [**Visual Builder**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
+| [**Skills Only**](#skills-only) | Teaching your AI Databricks patterns (no actions) | Install skills |
+| [**MCP Tools Only**](#mcp-tools-only) | Just executable actions (no guidance) | Register MCP server |
+| [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
+
+---
 
 ## Quick Start
 
-### 1. Clone and Setup
+### Prerequisites
 
 ```bash
-git clone https://github.com/databricks-solutions/ai-dev-kit.git
-cd ai-dev-kit/databricks-mcp-server
-./setup.sh
-```
-
-### 2. Configure Authentication
-
-```bash
-# Option 1: Environment variables
+# Set your Databricks credentials
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
 export DATABRICKS_TOKEN="your-token"
 
-# Option 2: Profile from ~/.databrickscfg
+# Or use a profile from ~/.databrickscfg
 export DATABRICKS_CONFIG_PROFILE="your-profile"
 ```
 
-### 3. Register MCP Server
+### Starter Kit
 
-In your project directory:
-
-```bash
-claude mcp add-json databricks '{
-  "command": "/path/to/ai-dev-kit/databricks-mcp-server/.venv/bin/python",
-  "args": ["/path/to/ai-dev-kit/databricks-mcp-server/run_server.py"]
-}'
-```
-
-### 4. Install Skills (Recommended)
+The fastest way to get started with Claude Code + Databricks:
 
 ```bash
-/path/to/ai-dev-kit/databricks-skills/install_skills.sh
-```
-
-### 5. Start Claude Code
-
-```bash
+git clone https://github.com/databricks-solutions/ai-dev-kit.git
+cd ai-dev-kit/ai-dev-project
+./setup.sh
 claude
 ```
 
-Verify the MCP connection with `/mcp`. Claude now has both **skills** (knowledge) and **MCP tools** (actions) for Databricks!
+This installs skills + MCP tools and opens Claude Code ready to build on Databricks.
 
----
+### Visual Builder App
 
-## Components
-
-### [databricks-tools-core](databricks-tools-core/)
-
-Pure Python library with high-level Databricks functions. Framework-agnostic and reusable.
-
-| Module | Description |
-|--------|-------------|
-| `sql/` | SQL execution, warehouse management, table statistics |
-| `jobs/` | Job creation, run management, status monitoring |
-| `unity_catalog/` | Catalogs, schemas, tables management |
-| `compute/` | Cluster code execution, execution contexts |
-| `spark_declarative_pipelines/` | SDP/DLT pipeline creation and management |
-| `agent_bricks/` | Genie, Knowledge Assistants, Multi-Agent Supervisor |
-| `aibi_dashboards/` | AI/BI dashboard creation and management |
-| `file/` | Workspace file upload operations |
-
-### [databricks-mcp-server](databricks-mcp-server/)
-
-FastMCP server that exposes core library functions as MCP tools for AI assistants.
-
-**Available Tools:**
-- **SQL**: `execute_sql`, `execute_sql_multi`, `get_table_details`, `list_warehouses`
-- **Jobs**: `create_job`, `run_job_now`, `wait_for_run`, `get_run_output`, and more
-- **Pipelines**: `create_pipeline`, `start_update`, `get_pipeline_events`, and more
-- **Compute**: `execute_databricks_command`, `run_python_file_on_databricks`
-- **Files**: `upload_folder`, `upload_file`
-- **Agent Bricks**: Knowledge Assistant, Genie, and MAS management
-- **Dashboards**: AI/BI dashboard creation and publishing
-
-### [databricks-skills](databricks-skills/)
-
-Markdown-based skills that teach AI assistants Databricks patterns and best practices.
-
-| Skill | Description |
-|-------|-------------|
-| **spark-declarative-pipelines** | SDP/DLT patterns (streaming, CDC, SCD Type 2, Auto Loader) |
-| **asset-bundles** | Databricks Asset Bundles for multi-environment deployment |
-| **databricks-python-sdk** | SDK, Databricks Connect, CLI, and REST API |
-| **synthetic-data-generation** | Realistic test data with Faker and Spark |
-| **mlflow-evaluation** | MLflow evaluation, scoring, and trace analysis |
-| **databricks-app** | Python web apps (Dash, Streamlit, Flask) |
-| **agent-bricks** | Knowledge Assistants, Genie, Multi-Agent Supervisor |
-| **aibi-dashboards** | AI/BI dashboard creation patterns |
-| **databricks-jobs** | Job management best practices |
-| **databricks-config** | Configuration and environment setup |
-
-### [databricks-builder-app](databricks-builder-app/)
-
-Full-stack web application providing a Claude Code agent interface for Databricks Apps deployment.
-
-- **Frontend**: React with chat UI, project selector, conversation history
-- **Backend**: FastAPI with SSE streaming
-- **Agent**: Claude Code integration via `claude-agent-sdk`
-
----
-
-## Using the Core Library
-
-The core library is framework-agnostic. Use it directly or integrate with any AI agent framework.
-
-### Direct Python Usage
-
-```python
-from databricks_tools_core.sql import execute_sql, get_table_details, TableStatLevel
-
-# Execute SQL
-results = execute_sql("SELECT * FROM my_catalog.my_schema.customers LIMIT 10")
-
-# Get table statistics
-stats = get_table_details(
-    catalog="my_catalog",
-    schema="my_schema",
-    table_names=["customers", "orders"],
-    table_stat_level=TableStatLevel.DETAILED
-)
-```
-
-### With LangChain
-
-```python
-from langchain_core.tools import tool
-from databricks_tools_core.sql import execute_sql
-
-@tool
-def run_sql(query: str) -> list:
-    """Execute a SQL query on Databricks and return results."""
-    return execute_sql(query)
-
-tools = [run_sql]
-```
-
-### With OpenAI Agents SDK
-
-```python
-from agents import Agent, function_tool
-from databricks_tools_core.sql import execute_sql
-
-@function_tool
-def run_sql(query: str) -> list:
-    """Execute a SQL query on Databricks."""
-    return execute_sql(query)
-
-agent = Agent(name="Databricks Agent", tools=[run_sql])
-```
-
----
-
-## Development
+Full-stack web application with chat UI for Databricks development:
 
 ```bash
-# Clone the repo
-git clone https://github.com/databricks-solutions/ai-dev-kit.git
-cd ai-dev-kit
+cd ai-dev-kit/databricks-builder-app
+./setup.sh
+# Follow instructions to start the app
+```
 
-# Setup MCP server (includes databricks-tools-core)
-cd databricks-mcp-server
+### Skills Only
+
+Just want to teach your AI assistant Databricks patterns?
+
+```bash
+cd ai-dev-kit
+./databricks-skills/install_skills.sh
+```
+
+Skills include: Spark Declarative Pipelines, Asset Bundles, MLflow Evaluation, Synthetic Data Generation, and [more](databricks-skills/).
+
+### MCP Tools Only
+
+Just want executable Databricks actions?
+
+```bash
+cd ai-dev-kit/databricks-mcp-server
 ./setup.sh
 
-# Run integration tests
-cd ../databricks-tools-core
-uv run pytest tests/integration/ -v
+# Register with Claude Code
+claude mcp add-json databricks "{
+  \"command\": \"$(pwd)/.venv/bin/python\",
+  \"args\": [\"$(pwd)/run_server.py\"]
+}"
 ```
 
-### Test Project
+### Core Library
 
-```bash
-cd databricks-claude-test-project
-./setup.sh   # Requires databricks-mcp-server setup first
-claude
+Use `databricks-tools-core` directly in your Python projects:
+
+```python
+from databricks_tools_core.sql import execute_sql
+
+results = execute_sql("SELECT * FROM my_catalog.schema.table LIMIT 10")
 ```
+
+Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databricks-tools-core/](databricks-tools-core/) for details.
 
 ---
 
-## Project Structure
+## What's Included
 
-```
-ai-dev-kit/
-├── databricks-tools-core/          # Core Python library
-├── databricks-mcp-server/          # MCP server for AI assistants
-├── databricks-skills/              # Knowledge base for AI assistants
-│   ├── asset-bundles/
-│   ├── spark-declarative-pipelines/
-│   ├── synthetic-data-generation/
-│   ├── databricks-python-sdk/
-│   ├── databricks-app-apx/
-│   ├── databricks-app-python/
-│   ├── mlflow-evaluation/
-│   ├── agent-bricks/
-│   ├── aibi-dashboards/
-│   └── ...
-├── databricks-builder-app/         # Full-stack web application
-└── databricks-claude-test-project/ # Test sandbox
-```
+| Component | Description |
+|-----------|-------------|
+| [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
+| [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 45+ tools for AI assistants |
+| [`databricks-skills/`](databricks-skills/) | 17+ markdown skills teaching Databricks patterns |
+| [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
+| [`ai-dev-project/`](ai-dev-project/) | Starter template for new projects |
 
 ---
 
-## Acknowledgments
+## Star History
 
-MCP Databricks Command Execution API from [databricks-exec-code](https://github.com/databricks-solutions/databricks-exec-code-mcp) by Natyra Bajraktari and Henryk Borzymowski.
+<a href="https://star-history.com/#databricks-solutions/ai-dev-kit&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=databricks-solutions/ai-dev-kit&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=databricks-solutions/ai-dev-kit&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=databricks-solutions/ai-dev-kit&type=Date" />
+ </picture>
+</a>
 
 ---
 
 ## License
 
-© 2026 Databricks, Inc. All rights reserved.
+(c) 2026 Databricks, Inc. All rights reserved.
 
 The source in this project is provided subject to the [Databricks License](https://databricks.com/db-license-source). See [LICENSE.md](LICENSE.md) for details.
 
----
-
-## Third-Party Package Licenses
-
-The following packages are used by this project and are **not** included in the Databricks Runtime. Their licenses are listed below for attribution.
+<details>
+<summary><strong>Third-Party Licenses</strong></summary>
 
 | Package | Version | License | Project URL |
 |---------|---------|---------|-------------|
@@ -275,3 +168,11 @@ The following packages are used by this project and are **not** included in the 
 | [asyncpg](https://github.com/MagicStack/asyncpg) | ≥0.30.0 | Apache-2.0 | https://github.com/MagicStack/asyncpg |
 | [greenlet](https://github.com/python-greenlet/greenlet) | ≥3.0.0 | MIT | https://github.com/python-greenlet/greenlet |
 | [psycopg2-binary](https://github.com/psycopg/psycopg2) | ≥2.9.11 | LGPL-3.0 | https://github.com/psycopg/psycopg2 |
+
+</details>
+
+---
+
+## Acknowledgments
+
+MCP Databricks Command Execution API from [databricks-exec-code](https://github.com/databricks-solutions/databricks-exec-code-mcp) by Natyra Bajraktari and Henryk Borzymowski.

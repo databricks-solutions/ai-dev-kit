@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "skill-test"
+version = "0.1.0"
+description = "Testing framework for evaluating Databricks skills"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "mlflow[databricks]>=3.6.1",
+]
+
+[project.optional-dependencies]
+databricks = ["databricks-sdk>=0.20.0"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+all = ["skill-test[databricks,dev]"]
+
+[project.scripts]
+skill-test = "skill_test.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skill_test"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"

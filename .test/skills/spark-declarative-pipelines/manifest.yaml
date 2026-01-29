@@ -1,0 +1,36 @@
+skill:
+  name: "spark-declarative-pipelines"
+  source_path: "databricks-skills/spark-declarative-pipelines"
+  description: "Streaming tables, CDC, medallion architecture"
+
+evaluation:
+  datasets:
+    - path: ground_truth.yaml
+      type: yaml
+
+# Scorer configuration
+scorers:
+  # Built-in deterministic scorers to enable
+  enabled:
+    - python_syntax
+    - sql_syntax
+    - pattern_adherence
+    - no_hallucinated_apis
+    - expected_facts_present
+
+  # LLM-based scorers
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations  # Dynamic from YAML expectations.guidelines
+
+  # Default guidelines (used when test case has no guidelines)
+  default_guidelines:
+    - "Response must address the user's request completely"
+    - "Code examples must follow documented best practices"
+    - "Response must use modern APIs (not deprecated ones)"
+    - "Must use SDP syntax (CREATE OR REFRESH STREAMING TABLE)"
+
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+  execution_success: 0.8
