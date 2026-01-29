@@ -38,20 +38,25 @@ INSTALL_FROM_LOCAL=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # All available skills
-ALL_SKILLS="aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-jobs databricks-python-sdk mlflow-evaluation spark-declarative-pipelines synthetic-data-generation"
+ALL_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-jobs databricks-python-sdk databricks-unity-catalog mlflow-evaluation spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
 
 # Get skill description
 get_skill_description() {
     case "$1" in
+        "agent-bricks") echo "Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors" ;;
         "aibi-dashboards") echo "AI/BI Dashboards - create and manage dashboards" ;;
         "asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
+        "databricks-config") echo "Profile authentication setup for Databricks" ;;
+        "databricks-docs") echo "Documentation reference via llms.txt" ;;
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
+        "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
         "mlflow-evaluation") echo "MLflow evaluation, scoring, and trace analysis" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
         "synthetic-data-generation") echo "Synthetic test data generation" ;;
+        "unstructured-pdf-generation") echo "Generate synthetic PDFs for RAG" ;;
         *) echo "Unknown skill" ;;
     esac
 }
@@ -59,12 +64,16 @@ get_skill_description() {
 # Get extra files for a skill (besides SKILL.md)
 get_skill_extra_files() {
     case "$1" in
+        "agent-bricks") echo "1-knowledge-assistants.md 2-genie-spaces.md 3-multi-agent-supervisors.md" ;;
         "aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
+        "asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
+        "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
+        "databricks-unity-catalog") echo "5-system-tables.md" ;;
         "mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
-        "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md" ;;
+        "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;
         *) echo "" ;;
     esac
 }

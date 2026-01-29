@@ -9,13 +9,20 @@ You have access to Databricks MCP tools prefixed with `mcp__databricks__`. Use `
 ## Skills
 
 Load skills for detailed guidance:
+- `skill: "agent-bricks"` - Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors
+- `skill: "aibi-dashboards"` - AI/BI Dashboards
 - `skill: "asset-bundles"` - Databricks Asset Bundles
 - `skill: "databricks-app-apx"` - Full-stack apps with APX framework
 - `skill: "databricks-app-python"` - Python apps with Dash, Streamlit, Flask
+- `skill: "databricks-config"` - Profile authentication setup
+- `skill: "databricks-docs"` - Documentation reference
+- `skill: "databricks-jobs"` - Lakeflow Jobs and workflows
 - `skill: "databricks-python-sdk"` - Python SDK patterns
+- `skill: "databricks-unity-catalog"` - System tables for lineage, audit, billing
 - `skill: "mlflow-evaluation"` - MLflow evaluation and trace analysis
 - `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
 - `skill: "synthetic-data-generation"` - Test data generation
+- `skill: "unstructured-pdf-generation"` - Generate synthetic PDFs for RAG
 
 ## Testing Workflow
 

@@ -90,6 +90,8 @@ Claude now has both:
 
 | Tool | Description |
 |------|-------------|
+| `list_clusters` | List all clusters in the workspace |
+| `get_best_cluster` | Get the best available cluster for execution |
 | `execute_databricks_command` | Execute code on a Databricks cluster |
 | `run_python_file_on_databricks` | Run a local Python file on a cluster |
 
@@ -129,35 +131,74 @@ Claude now has both:
 | `get_update` | Get update status (QUEUED, RUNNING, COMPLETED, FAILED) |
 | `stop_pipeline` | Stop a running pipeline |
 | `get_pipeline_events` | Get error messages for debugging |
+| `create_or_update_pipeline` | Create or update pipeline by name (auto-detects existing) |
+| `find_pipeline_by_name` | Find pipeline by name, returns pipeline ID |
+
+### Knowledge Assistants (KA)
+
+| Tool | Description |
+|------|-------------|
+| `create_or_update_ka` | Create or update a Knowledge Assistant with document sources |
+| `get_ka` | Get KA details by tile ID |
+| `delete_ka` | Delete a Knowledge Assistant |
+
+### Genie Spaces
+
+| Tool | Description |
+|------|-------------|
+| `create_or_update_genie` | Create or update a Genie Space for SQL-based data exploration |
+| `get_genie` | Get Genie Space details by space ID |
+| `delete_genie` | Delete a Genie Space |
+
+### Multi-Agent Supervisor (MAS)
+
+| Tool | Description |
+|------|-------------|
+| `create_or_update_mas` | Create or update a Multi-Agent Supervisor |
+| `get_mas` | Get MAS details by tile ID |
+| `delete_mas` | Delete a Multi-Agent Supervisor |
+
+### AI/BI Dashboards
+
+| Tool | Description |
+|------|-------------|
+| `create_or_update_dashboard` | Create or update an AI/BI dashboard from JSON content |
+| `get_dashboard` | Get dashboard details by ID |
+| `list_dashboards` | List all dashboards in the workspace |
+| `trash_dashboard` | Move a dashboard to trash |
+| `publish_dashboard` | Publish a dashboard to make it accessible |
+| `unpublish_dashboard` | Unpublish a dashboard |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Claude Code                              │
-│                                                              │
+│                     Claude Code                             │
+│                                                             │
 │  Skills (knowledge)          MCP Tools (actions)            │
 │  └── .claude/skills/         └── .claude/mcp.json           │
 │      ├── sdp-writer              └── databricks server      │
-│      ├── asset-bundles                                        │
+│      ├── asset-bundles                                      │
 │      └── ...                                                │
 └──────────────────────────────┬──────────────────────────────┘
                                │ MCP Protocol (stdio)
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              databricks-mcp-server (FastMCP)                 │
-│                                                              │
-│  tools/sql.py ──────┐                                       │
-│  tools/compute.py ──┼──► @mcp.tool decorators               │
-│  tools/file.py ─────┤                                       │
-│  tools/jobs.py ─────┤                                       │
-│  tools/pipelines.py ┘                                       │
+│              databricks-mcp-server (FastMCP)                │
+│                                                             │
+│  tools/sql.py ──────────────┐                               │
+│  tools/compute.py ──────────┤                               │
+│  tools/file.py ─────────────┤                               │
+│  tools/jobs.py ─────────────┼──► @mcp.tool decorators       │
+│  tools/pipelines.py ────────┤                               │
+│  tools/agent_bricks.py ─────┤                               │
+│  tools/aibi_dashboards.py ──┘                               │
 └──────────────────────────────┬──────────────────────────────┘
                                │ Python imports
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   databricks-tools-core                      │
-│                                                              │
+│                   databricks-tools-core                     │
+│                                                             │
 │  sql/         compute/       jobs/         pipelines/       │
 │  └── execute  └── run_code   └── run/wait  └── create/run   │
 └──────────────────────────────┬──────────────────────────────┘
