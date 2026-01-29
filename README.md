@@ -94,8 +94,8 @@ Skills include: Spark Declarative Pipelines, Asset Bundles, MLflow Evaluation, S
 Just want executable Databricks actions?
 
 ```bash
-cd ai-dev-kit/databricks-mcp-server
-./setup.sh
+cd ai-dev-kit
+./databricks-mcp-server/setup.sh
 
 # Register with Claude Code
 claude mcp add-json databricks "{

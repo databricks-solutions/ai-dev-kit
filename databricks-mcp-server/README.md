@@ -15,12 +15,10 @@ cd ai-dev-kit
 
 ```bash
 # Install the core library
-cd databricks-tools-core
-uv pip install -e .
+uv pip install -e ./databricks-tools-core
 
 # Install the MCP server
-cd ../databricks-mcp-server
-uv pip install -e .
+uv pip install -e ./databricks-mcp-server
 ```
 
 ### Step 3: Configure Databricks authentication
@@ -36,15 +34,15 @@ export DATABRICKS_CONFIG_PROFILE="your-profile"
 
 ### Step 4: Add MCP server to Claude Code
 
-Add to your project's `.claude/mcp.json` (create the file if it doesn't exist):
+For Claude Code, add to your project's `.mcp.json` (create the file if it doesn't exist).
+For Cursor, add to your project's `.cursor/mcp.json` (create the file if it doesn't exist).
 
 ```json
 {
   "mcpServers": {
     "databricks": {
       "command": "uv",
-      "args": ["run", "python", "-m", "databricks_mcp_server.server"],
-      "cwd": "/path/to/ai-dev-kit/databricks-mcp-server",
+      "args": ["run",  "--directory", "/path/to/ai-dev-kit", "python", "databricks-mcp-server/run_server.py"],
       "defer_loading": true
     }
   }
