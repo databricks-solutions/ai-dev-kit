@@ -1,86 +1,98 @@
 ---
 name: databricks-unity-catalog
-description: "Unity Catalog system tables for lineage, audit logs, billing, compute, jobs, and query history. Use when querying system.access.audit, system.access.table_lineage, system.billing.usage, system.compute.clusters, system.lakeflow.jobs, system.lakeflow.job_run_timeline, or system.query.history."
+description: "Comprehensive Unity Catalog governance skill covering object management, access control, storage connections, metadata, system tables, and data sharing. Use when (1) creating, altering, or dropping catalogs, schemas, tables, volumes, or functions, (2) granting or revoking permissions, row-level security, or column masking, (3) configuring storage credentials, external locations, or Lakehouse Federation connections, (4) managing tags, comments, quality monitors, or naming conventions, (5) querying system tables for lineage, audit logs, billing, compute, jobs, or query history, (6) setting up Delta Sharing with shares, recipients, and providers, (7) any Unity Catalog governance, security, or metadata task."
 ---
 
-# Unity Catalog System Tables
+# Unity Catalog
 
-Guidance for querying Unity Catalog system tables for observability, lineage, and auditing.
-
-## When to Use This Skill
-
-Use this skill when:
-- Querying **lineage** (table dependencies, column-level lineage)
-- Analyzing **audit logs** (who accessed what, permission changes)
-- Monitoring **billing and usage** (DBU consumption, cost analysis)
-- Tracking **compute resources** (cluster usage, warehouse metrics)
-- Reviewing **job execution** (run history, success rates, failures)
-- Analyzing **query performance** (slow queries, warehouse utilization)
+Governance, security, and metadata management for Databricks Unity Catalog.
 
 ## Reference Files
 
-| Topic | File | Description |
-|-------|------|-------------|
-| System Tables | [5-system-tables.md](5-system-tables.md) | Lineage, audit, billing, compute, jobs, query history |
+| Topic | File | Use When |
+|-------|------|----------|
+| Object Management | [1-object-management.md](1-object-management.md) | Creating/altering/dropping catalogs, schemas, tables, volumes, functions |
+| Access Control | [2-access-control.md](2-access-control.md) | Granting permissions, row filters, column masks, service principals |
+| Storage & Connections | [3-storage-connections.md](3-storage-connections.md) | Storage credentials, external locations, Lakehouse Federation |
+| Governance & Metadata | [4-governance-metadata.md](4-governance-metadata.md) | Tags, comments, quality monitors, naming conventions |
+| System Tables | [5-system-tables.md](5-system-tables.md) | Lineage, audit logs, billing, compute, jobs, query history |
+| Data Sharing | [6-data-sharing.md](6-data-sharing.md) | Delta Sharing, shares, recipients, providers, clean rooms |
 
 ## Quick Start
 
-### Enable System Tables Access
+### Create Catalog + Schema + Table
 
 ```sql
--- Grant access to system tables
-GRANT USE CATALOG ON CATALOG system TO `data_engineers`;
-GRANT USE SCHEMA ON SCHEMA system.access TO `data_engineers`;
-GRANT SELECT ON SCHEMA system.access TO `data_engineers`;
+-- Catalog
+CREATE CATALOG IF NOT EXISTS my_catalog
+COMMENT 'Production data catalog';
+
+-- Schema (medallion layers)
+CREATE SCHEMA my_catalog.bronze COMMENT 'Raw data';
+CREATE SCHEMA my_catalog.silver COMMENT 'Cleaned data';
+CREATE SCHEMA my_catalog.gold COMMENT 'Business aggregates';
+
+-- Table
+CREATE TABLE my_catalog.bronze.raw_orders (
+    order_id BIGINT,
+    customer_id BIGINT,
+    amount DECIMAL(10, 2),
+    order_date DATE
+)
+USING DELTA
+COMMENT 'Raw orders from source';
 ```
 
-### Common Queries
+### Grant Access
 
 ```sql
--- Table lineage: What tables feed into this table?
-SELECT source_table_full_name, source_column_name
+GRANT USE CATALOG ON CATALOG my_catalog TO `data_engineers`;
+GRANT USE SCHEMA ON SCHEMA my_catalog.bronze TO `data_engineers`;
+GRANT SELECT ON ALL TABLES IN SCHEMA my_catalog.gold TO `analysts`;
+```
+
+### Query System Tables
+
+```sql
+-- Table lineage
+SELECT source_table_full_name, target_table_full_name
 FROM system.access.table_lineage
-WHERE target_table_full_name = 'catalog.schema.table'
-  AND event_date >= current_date() - 7;
+WHERE event_date >= current_date() - 7;
 
--- Audit: Recent permission changes
-SELECT event_time, user_identity.email, action_name, request_params
+-- Audit log
+SELECT event_time, user_identity.email, action_name
 FROM system.access.audit
-WHERE action_name LIKE '%GRANT%' OR action_name LIKE '%REVOKE%'
-ORDER BY event_time DESC
-LIMIT 100;
-
--- Billing: DBU usage by workspace
-SELECT workspace_id, sku_name, SUM(usage_quantity) AS total_dbus
-FROM system.billing.usage
-WHERE usage_date >= current_date() - 30
-GROUP BY workspace_id, sku_name;
+WHERE event_date >= current_date() - 7
+ORDER BY event_time DESC LIMIT 50;
 ```
 
 ## MCP Tool Integration
 
-Use `mcp__databricks__execute_sql` for system table queries:
+Use `mcp__databricks__execute_sql` for UC operations:
 
 ```python
-# Query lineage
+# Create catalog
+mcp__databricks__execute_sql(sql_query="CREATE CATALOG IF NOT EXISTS my_catalog")
+
+# Grant permissions
 mcp__databricks__execute_sql(
-    sql_query="""
-        SELECT source_table_full_name, target_table_full_name
-        FROM system.access.table_lineage
-        WHERE event_date >= current_date() - 7
-    """,
+    sql_query="GRANT SELECT ON SCHEMA my_catalog.gold TO `analysts`"
+)
+
+# Query system tables
+mcp__databricks__execute_sql(
+    sql_query="SELECT * FROM system.access.audit WHERE event_date >= current_date() - 7 LIMIT 50",
     catalog="system"
 )
 ```
 
 ## Best Practices
 
-1. **Filter by date** - System tables can be large; always use date filters
-2. **Use appropriate retention** - Check your workspace's retention settings
-3. **Grant minimal access** - System tables contain sensitive metadata
-4. **Schedule reports** - Create scheduled queries for regular monitoring
-
-## Resources
-
-- [Unity Catalog System Tables](https://docs.databricks.com/administration-guide/system-tables/)
-- [Audit Log Reference](https://docs.databricks.com/administration-guide/account-settings/audit-logs.html)
+1. **Three-level namespace**: `catalog.schema.object` for all references
+2. **Medallion architecture**: bronze (raw) / silver (cleaned) / gold (aggregated)
+3. **Grant hierarchically**: USE CATALOG -> USE SCHEMA -> object privileges
+4. **Use groups, not individuals**: Grant to groups, never to personal accounts
+5. **Service principals for automation**: Never use personal tokens in pipelines
+6. **Always filter system tables by date**: Partition key is `event_date` or `usage_date`
+7. **Tags for governance**: Classify PII, confidentiality, and compliance requirements
+8. **Liquid Clustering over partitioning**: Use `CLUSTER BY` instead of `PARTITIONED BY` for new tables
