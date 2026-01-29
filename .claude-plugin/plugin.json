@@ -8,18 +8,5 @@
   "homepage": "https://github.com/databricks-solutions/ai-dev-kit",
   "license": "DB License (see repo)",
   "keywords": ["databricks", "spark", "mlflow", "data-engineering", "ai-agents"],
-  "skills": "./databricks-skills/",
-  "hooks": {
-    "Setup": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/setup.sh",
-            "timeout": 300
-          }
-        ]
-      }
-    ]
-  }
+  "skills": "./databricks-skills/"
 }
