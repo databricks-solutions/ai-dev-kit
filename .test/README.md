@@ -263,26 +263,26 @@ Creates test scaffolding for a new skill with template files.
 
 ```bash
 # One-time setup
-pip install -e ".test/[dev]"
+uv pip install -e ".test/[dev]"
 .test/install_skill_test.sh
 
 # Use Claude Code slash command
 /skill-test spark-declarative-pipelines run
 
 # Or run scripts directly
-python .claude/skills/skill-test/scripts/run_eval.py spark-declarative-pipelines
+uv run python .claude/skills/skill-test/scripts/run_eval.py spark-declarative-pipelines
 
 # Or Python CLI
-skill-test spark-declarative-pipelines run
-python -m skill_test spark-declarative-pipelines run
+uv run skill-test spark-declarative-pipelines run
+uv run python -m skill_test spark-declarative-pipelines run
 ```
 
 ### CI/CD (GitHub Actions)
 
 ```bash
-pip install -e ".test/"
-pytest .test/tests/
-python .test/scripts/regression.py spark-declarative-pipelines
+uv pip install -e ".test/"
+uv run pytest .test/tests/
+uv run python .test/scripts/regression.py spark-declarative-pipelines
 ```
 
 ## Development Workflow

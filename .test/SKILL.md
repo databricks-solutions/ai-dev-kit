@@ -57,37 +57,37 @@ The scripts connect to Databricks MLflow via environment variables:
 
 Ensure dependencies are installed:
 ```bash
-pip install -e .test/
+uv pip install -e ".test/"
 ```
 
 ### For `mlflow` subcommand
 
 ```bash
-python .claude/skills/skill-test/scripts/mlflow_eval.py {skill_name}
+uv run python .claude/skills/skill-test/scripts/mlflow_eval.py {skill_name}
 ```
 
 ### For `run` subcommand
 
 ```bash
-python .claude/skills/skill-test/scripts/run_eval.py {skill_name}
+uv run python .claude/skills/skill-test/scripts/run_eval.py {skill_name}
 ```
 
 ### For `baseline` subcommand
 
 ```bash
-python .claude/skills/skill-test/scripts/baseline.py {skill_name}
+uv run python .claude/skills/skill-test/scripts/baseline.py {skill_name}
 ```
 
 ### For `regression` subcommand
 
 ```bash
-python .claude/skills/skill-test/scripts/regression.py {skill_name}
+uv run python .claude/skills/skill-test/scripts/regression.py {skill_name}
 ```
 
 ### For `init` subcommand
 
 ```bash
-python .claude/skills/skill-test/scripts/init_skill.py {skill_name}
+uv run python .claude/skills/skill-test/scripts/init_skill.py {skill_name}
 ```
 
 ## Command Handler
