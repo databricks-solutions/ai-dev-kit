@@ -29,6 +29,12 @@ This will:
 
 Set your Databricks credentials:
 
+Option 1: Profile:
+```bash
+export DATABRICKS_CONFIG_PROFILE=your-profile
+```
+
+Option 2: Host and Databricks Personal Access Token:
 ```bash
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
 export DATABRICKS_TOKEN="dapi..."
@@ -86,6 +92,28 @@ In your project directory, create `.mcp.json` (Claude) or `.cursor/mcp.json` (Cu
 }
 ```
 
+### Manual MCP Configuration - Claude CLI
+
+To manually add or reconfigure the MCP server from another project directory:
+
+Set variable with directory to your path:
+```bash
+export DEV_KIT_DIR=/path/to/ai-dev-kit
+```
+
+Run remove and add script for Claude. 
+```bash
+# Remove existing (if any)
+claude mcp remove databricks
+
+claude mcp add --transport stdio databricks -- ${DEV_KIT_DIR}/.venv/bin/python -- ${DEV_KIT_DIR}/databricks-mcp-server/run_server.py
+```
+
+To verify the server is configured:
+
+```bash
+claude mcp list
+```
 
 ### Cursor-Specific Setup
 
@@ -123,32 +151,10 @@ Cursor loads MCP configs from both locations:
 
 If you have the same server in both, the global config may take precedence. For project-specific profiles, remove the server from the global config.
 
-### Manual MCP Configuration - Claude CLI
-
-To manually add or reconfigure the MCP server from another project directory:
-
-Set variable with directory to your path:
-```bash
-export MCP_SERVER_DIR=/path/to/databricks-mcp-server
-```
-
-Run remove and add script for Claude. 
-```bash
-# Remove existing (if any)
-claude mcp remove databricks
-
-claude mcp add --transport stdio databricks -- ${MCP_SERVER_DIR}/.venv/bin/python -- ${MCP_SERVER_DIR}/run_server.py
-```
-
-To verify the server is configured:
-
-```bash
-claude mcp list
-```
 
 ## Available MCP Tools
 
-Once configured, Claude has access to these Databricks tools:
+Once configured, your coding agent has access to these Databricks tools:
 
 ### SQL Warehouse Tools
 | Tool | Description |
