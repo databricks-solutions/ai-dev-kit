@@ -9,5 +9,17 @@
   "license": "DB License (see repo)",
   "keywords": ["databricks", "spark", "mlflow", "data-engineering", "ai-agents"],
   "skills": "./databricks-skills/",
-  "hooks": "./.claude-plugin/hooks.json"
+  "hooks": {
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/setup.sh",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
 }
