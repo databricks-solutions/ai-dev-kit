@@ -5,10 +5,14 @@
   "author": {
     "name": "Databricks Solutions"
   },
-  "repository": "https://github.com/databricks-solutions/ai-dev-kit",
   "homepage": "https://github.com/databricks-solutions/ai-dev-kit",
-  "license": "Apache-2.0",
+  "license": "DB License (see repo)",
   "keywords": ["databricks", "spark", "mlflow", "data-engineering", "ai-agents"],
   "skills": "./databricks-skills/",
-  "hooks": "./hooks.json"
+  "hooks": [
+  {
+    "event": "plugin-installed",
+    "command": "bash ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/setup.sh"
+  }
+]
 }
