@@ -122,7 +122,7 @@ def no_hallucinated_apis(outputs: Dict[str, Any]) -> Feedback:
 
     hallucinations = [
         (r'@dlt\.table', "Legacy @dlt.table - should use @dp.table"),
-        (r'dlt\.read', "Legacy dlt.read - use spark.read or dp.read"),
+        (r'dlt\.read', "Legacy dlt.read - use spark.read"),
         (r'PARTITION BY', "PARTITION BY deprecated - use CLUSTER BY"),
         (r'mlflow\.evaluate\(', "Old mlflow.evaluate - use mlflow.genai.evaluate"),
     ]

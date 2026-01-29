@@ -63,6 +63,19 @@ def extract_code_blocks(response: str) -> List[CodeBlock]:
     return blocks
 
 
+# Databricks-specific imports that may not be available locally but are valid
+DATABRICKS_IMPORTS = {
+    "pyspark",
+    "databricks",
+    "mlflow",
+    "delta",
+    "dlt",
+    "dbutils",
+    "koalas",
+    "pandas_on_spark",
+}
+
+
 def verify_python_syntax(code: str) -> Tuple[bool, Optional[str]]:
     """Verify Python code syntax without execution."""
     try:
@@ -109,6 +122,9 @@ def execute_python_block(
                         imports.append(node.module.split('.')[0])
 
             for imp in imports:
+                # Skip Databricks-specific imports that aren't available locally
+                if imp in DATABRICKS_IMPORTS:
+                    continue
                 try:
                     __import__(imp)
                 except ImportError as e:
