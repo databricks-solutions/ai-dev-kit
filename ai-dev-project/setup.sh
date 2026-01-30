@@ -27,7 +27,7 @@ echo "✓ uv is installed"
 
 # Check if skills directory exists
 if [ ! -d "$SKILLS_DIR" ]; then
-    echo "Error: Skills directory not found at $$SKILLS_DIR"
+    echo "Error: Skills directory not found at $SKILLS_DIR"
     echo "Make sure you're running from the ai-dev-kit repository."
     exit 1
 fi
@@ -42,22 +42,22 @@ fi
 echo "✓ MCP server directory found"
 
 # Verify MCP server is set up
-MCP_PYTHON="$MCP_SERVER_DIR/.venv/bin/python"
+MCP_PYTHON="$BASE_DIR/.venv/bin/python"
 
 echo ""
 echo "Checking MCP server setup..."
 if [ ! -f "$MCP_PYTHON" ]; then
-# Run the install skills script
+# Run the install MCP server script
     echo ""
     echo "Setup Databricks MCP server..."
-    cd "$MCP_SERVER_DIR"
+    cd "$BASE_DIR"
     "$MCP_SERVER_DIR/setup.sh" "$@"
     if [ ! -f "$MCP_PYTHON" ]; then 
-        echo "Error: MCP server venv not found at $MCP_SERVER_DIR/.venv"
+        echo "Error: MCP server venv not found at $BASE_DIR/.venv"
         echo ""
         echo "Please debug MCP server setup first by running:"
-        echo "  cd $MCP_SERVER_DIR"
-        echo "  ./setup.sh   # or: uv venv && uv pip install -e ../databricks-tools-core -e ."
+        echo "  cd $BASE_DIR"
+        echo "  ./databricks-mcp-server/setup.sh   # or: uv venv && uv pip install -e ../databricks-tools-core -e ."
         exit 1
     fi
 fi
@@ -66,14 +66,14 @@ fi
 if ! "$MCP_PYTHON" -c "import databricks_mcp_server" 2>/dev/null; then
     echo ""
     echo "Setup Databricks MCP server..."
-    cd "$MCP_SERVER_DIR"
+    cd "$BASE_DIR"
     "$MCP_SERVER_DIR/setup.sh" "$@"
     if ! "$MCP_PYTHON" -c "import databricks_mcp_server" 2>/dev/null; then 
         echo "Error: MCP server packages not installed properly"
         echo ""
         echo "Please debug MCP server setup first by running:"
-        echo "  cd $MCP_SERVER_DIR"
-        echo "  ./setup.sh   # or: uv venv && uv pip install -e ../databricks-tools-core -e ."
+        echo "  cd $BASE_DIR"
+        echo "  ./databricks-mcp-server/setup.sh   # or: uv venv && uv pip install -e ../databricks-tools-core -e ."
         exit 1
     fi
 fi
@@ -91,7 +91,7 @@ MCP_DEV_CONFIG=$(cat <<EOF
 {
   "mcpServers": {
     "databricks": {
-      "command": "$MCP_SERVER_DIR/.venv/bin/python",
+      "command": "$BASE_DIR/.venv/bin/python",
       "args": ["$MCP_SERVER_DIR/run_server.py"]
     }
   }
@@ -106,6 +106,7 @@ echo "Created .mcp.json"
 
 echo ""
 echo "Creating .cursor/mcp.json..."
+mkdir -p ${SCRIPT_DIR}/.cursor
 echo "$MCP_DEV_CONFIG" > "$SCRIPT_DIR/.cursor/mcp.json"
 echo "Created .cursor/mcp.json"
 
@@ -124,13 +125,20 @@ You have access to Databricks MCP tools prefixed with `mcp__databricks__`. Use `
 ## Skills
 
 Load skills for detailed guidance:
+- `skill: "agent-bricks"` - Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors
+- `skill: "aibi-dashboards"` - AI/BI Dashboards
 - `skill: "asset-bundles"` - Databricks Asset Bundles
 - `skill: "databricks-app-apx"` - Full-stack apps with APX framework
 - `skill: "databricks-app-python"` - Python apps with Dash, Streamlit, Flask
+- `skill: "databricks-config"` - Profile authentication setup
+- `skill: "databricks-docs"` - Documentation reference
+- `skill: "databricks-jobs"` - Lakeflow Jobs and workflows
 - `skill: "databricks-python-sdk"` - Python SDK patterns
+- `skill: "databricks-unity-catalog"` - System tables for lineage, audit, billing
 - `skill: "mlflow-evaluation"` - MLflow evaluation and trace analysis
 - `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
 - `skill: "synthetic-data-generation"` - Test data generation
+- `skill: "unstructured-pdf-generation"` - Generate synthetic PDFs for RAG
 
 ## Testing Workflow
 

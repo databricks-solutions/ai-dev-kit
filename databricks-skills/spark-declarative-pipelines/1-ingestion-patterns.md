@@ -393,7 +393,7 @@ def bronze_events():
 @dp.table(name="bronze_events_quarantine")
 def bronze_events_quarantine():
     return (
-        dp.read.table("catalog.schema.bronze_events")
+        spark.read.table("catalog.schema.bronze_events")
         .filter(F.col("_has_parsing_errors") == True)
     )
 ```

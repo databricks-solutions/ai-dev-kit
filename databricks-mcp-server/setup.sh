@@ -7,7 +7,12 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TOOLS_CORE_DIR="../databricks-tools-core"
+PARENT_DIR=$(dirname ${SCRIPT_DIR})
+TOOLS_CORE_DIR="${PARENT_DIR}/databricks-tools-core"
+echo AI Dev Kit directory: $PARENT_DIR
+echo MCP Server directory: $SCRIPT_DIR
+echo Tools Core directory: $TOOLS_CORE_DIR
+
 
 echo "======================================"
 echo "Setting up Databricks MCP Server"
@@ -23,13 +28,12 @@ fi
 echo "✓ uv is installed"
 
 # Check if tools-core directory exists
-if [ ! -d "$SCRIPT_DIR/$TOOLS_CORE_DIR" ]; then
-    echo "Error: databricks-tools-core not found at $SCRIPT_DIR/$TOOLS_CORE_DIR"
+if [ ! -d "$TOOLS_CORE_DIR" ]; then
+    echo "Error: databricks-tools-core not found at $TOOLS_CORE_DIR"
     exit 1
 fi
 echo "✓ databricks-tools-core found"
 
-cd "$SCRIPT_DIR"
 
 # Create virtual environment
 echo ""
@@ -37,15 +41,17 @@ echo "Creating virtual environment..."
 uv venv --python 3.11
 echo "✓ Virtual environment created"
 
+
 # Install packages
 echo ""
 echo "Installing databricks-tools-core (editable)..."
-uv pip install --python .venv/bin/python -e "$SCRIPT_DIR/$TOOLS_CORE_DIR" --quiet
+uv pip install --python .venv/bin/python -e "$TOOLS_CORE_DIR" --quiet
 echo "✓ databricks-tools-core installed"
 
 echo ""
 echo "Installing databricks-mcp-server (editable)..."
-uv pip install --python .venv/bin/python -e . --quiet
+
+uv pip install --python .venv/bin/python -e "$SCRIPT_DIR" --quiet
 echo "✓ databricks-mcp-server installed"
 
 # Verify
@@ -65,7 +71,7 @@ if .venv/bin/python -c "import databricks_mcp_server; print('✓ MCP server can 
     {
       "mcpServers": {
         "databricks": {
-          "command": "${SCRIPT_DIR}/.venv/bin/python",
+          "command": "${PARENT_DIR}/.venv/bin/python",
           "args": ["${SCRIPT_DIR}/run_server.py"]
         }
       }
@@ -73,7 +79,7 @@ if .venv/bin/python -c "import databricks_mcp_server; print('✓ MCP server can 
 EOF
     echo ""
     echo "To setup with Claude Code CLI:"
-    echo "  claude mcp add-json databricks '{\"command\":\"$SCRIPT_DIR/.venv/bin/python\",\"args\":[\"$SCRIPT_DIR/run_server.py\"]}'"
+    echo "  claude mcp add-json databricks '{\"command\":\"$PARENT_DIR/.venv/bin/python\",\"args\":[\"$SCRIPT_DIR/run_server.py\"]}'"
     echo ""
 else
     echo "Error: Failed to import databricks_mcp_server"
