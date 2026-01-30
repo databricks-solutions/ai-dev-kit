@@ -84,7 +84,7 @@ SELECT
     event_time,
     user_identity.email AS user_email,
     action_name,
-    request_params.full_name_arg AS table_name,
+    request_params['full_name_arg'] AS table_name,
     response.status_code
 FROM system.access.audit
 WHERE event_date >= current_date() - 7
@@ -97,9 +97,9 @@ SELECT
     event_time,
     user_identity.email AS changed_by,
     action_name,
-    request_params.securable_type AS object_type,
-    request_params.securable_full_name AS object_name,
-    request_params.changes AS permission_changes
+    request_params['securable_type'] AS object_type,
+    request_params['securable_full_name'] AS object_name,
+    request_params['changes'] AS permission_changes
 FROM system.access.audit
 WHERE event_date >= current_date() - 30
   AND action_name IN ('updatePermissions', 'grantPermission', 'revokePermission')
@@ -111,7 +111,7 @@ SELECT
     user_identity.email AS user_email,
     source_ip_address,
     action_name,
-    request_params.full_name_arg AS resource,
+    request_params['full_name_arg'] AS resource,
     response.error_message
 FROM system.access.audit
 WHERE event_date >= current_date() - 7
@@ -135,8 +135,8 @@ SELECT
     event_time,
     user_identity.email AS created_by,
     action_name,
-    request_params.name AS object_name,
-    request_params.catalog_name
+    request_params['name'] AS object_name,
+    request_params['catalog_name']
 FROM system.access.audit
 WHERE event_date >= current_date() - 30
   AND action_name IN ('createCatalog', 'createSchema', 'deleteCatalog', 'deleteSchema')
@@ -149,13 +149,13 @@ SELECT
     request_params
 FROM system.access.audit
 WHERE action_name = 'createTable'
-  AND request_params.full_name_arg = 'analytics.gold.customer_360'
+  AND request_params['full_name_arg'] = 'analytics.gold.customer_360'
 ORDER BY event_time DESC
 LIMIT 1;
 
 -- What tables did a user access?
 SELECT DISTINCT
-    request_params.full_name_arg AS table_name,
+    request_params['full_name_arg'] AS table_name,
     MIN(event_time) AS first_access,
     MAX(event_time) AS last_access,
     COUNT(*) AS access_count
@@ -163,7 +163,7 @@ FROM system.access.audit
 WHERE user_identity.email = 'analyst@company.com'
   AND action_name = 'getTable'
   AND event_date >= current_date() - 30
-GROUP BY request_params.full_name_arg
+GROUP BY request_params['full_name_arg']
 ORDER BY access_count DESC;
 
 -- Track sensitive table access
@@ -174,7 +174,7 @@ SELECT
     action_name
 FROM system.access.audit
 WHERE event_date >= current_date() - 7
-  AND request_params.full_name_arg IN (
+  AND request_params['full_name_arg'] IN (
       'analytics.gold.customers',
       'analytics.gold.financial_data'
   )
@@ -371,13 +371,13 @@ ORDER BY usage_date;
 
 -- Top cost drivers by cluster
 SELECT
-    usage_metadata.cluster_id,
-    usage_metadata.cluster_name,
+    usage_metadata['cluster_id'] AS cluster_id,
+    usage_metadata['cluster_name'] AS cluster_name,
     SUM(usage_quantity) AS total_dbus
 FROM system.billing.usage
 WHERE usage_date >= current_date() - 30
-  AND usage_metadata.cluster_id IS NOT NULL
-GROUP BY usage_metadata.cluster_id, usage_metadata.cluster_name
+  AND usage_metadata['cluster_id'] IS NOT NULL
+GROUP BY usage_metadata['cluster_id'], usage_metadata['cluster_name']
 ORDER BY total_dbus DESC
 LIMIT 20;
 
