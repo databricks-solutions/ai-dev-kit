@@ -167,3 +167,53 @@ class ProjectBackup(Base):
   updated_at: Mapped[datetime] = mapped_column(
     DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
   )
+
+
+class Execution(Base):
+  """Stores execution state for session independence.
+
+  Allows users to reconnect to running/completed executions after
+  navigating away or refreshing the page.
+  """
+
+  __tablename__ = 'executions'
+
+  id: Mapped[str] = mapped_column(String(50), primary_key=True, default=generate_uuid)
+  conversation_id: Mapped[str] = mapped_column(
+    String(50), ForeignKey('conversations.id', ondelete='CASCADE'), nullable=False
+  )
+  project_id: Mapped[str] = mapped_column(
+    String(50), ForeignKey('projects.id', ondelete='CASCADE'), nullable=False
+  )
+  status: Mapped[str] = mapped_column(
+    String(20), nullable=False, default='running'
+  )  # running, completed, cancelled, error
+  events_json: Mapped[str] = mapped_column(
+    Text, nullable=False, default='[]'
+  )  # JSON array of events
+  error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+  created_at: Mapped[datetime] = mapped_column(
+    DateTime(timezone=True), default=utc_now, nullable=False
+  )
+  updated_at: Mapped[datetime] = mapped_column(
+    DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+  )
+
+  __table_args__ = (
+    Index('ix_executions_conversation_status', 'conversation_id', 'status'),
+    Index('ix_executions_conversation_created', 'conversation_id', 'created_at'),
+  )
+
+  def to_dict(self) -> dict[str, Any]:
+    """Convert to dictionary."""
+    import json
+    return {
+      'id': self.id,
+      'conversation_id': self.conversation_id,
+      'project_id': self.project_id,
+      'status': self.status,
+      'events': json.loads(self.events_json) if self.events_json else [],
+      'error': self.error,
+      'created_at': self.created_at.isoformat() if self.created_at else None,
+      'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+    }

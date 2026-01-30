@@ -1,0 +1,99 @@
+# Databricks Apps configuration for Builder App
+# Copy this file to app.yaml and customize for your deployment
+#
+# Prerequisites:
+#   1. Create the app: databricks apps create <your-app-name>
+#   2. Add Lakebase as a resource (see instructions below)
+#   3. Configure your LLM provider settings
+
+command:
+  - "uvicorn"
+  - "server.app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "$DATABRICKS_APP_PORT"
+
+env:
+  # =============================================================================
+  # Application Settings
+  # =============================================================================
+  - name: ENV
+    value: "production"
+  - name: PROJECTS_BASE_DIR
+    value: "./projects"
+  - name: PYTHONPATH
+    value: "/app/python/source_code/packages"
+  
+  # =============================================================================
+  # Skills Configuration
+  # =============================================================================
+  # Comma-separated list of skills to enable
+  - name: ENABLED_SKILLS
+    value: "agent-bricks,aibi-dashboards,asset-bundles,databricks-app-apx,databricks-app-python,databricks-config,databricks-docs,databricks-jobs,databricks-python-sdk,databricks-unity-catalog,mlflow-evaluation,spark-declarative-pipelines,synthetic-data-generation,unstructured-pdf-generation"
+  - name: SKILLS_ONLY_MODE
+    value: "false"
+  
+  # =============================================================================
+  # Database Configuration (Lakebase)
+  # =============================================================================
+  # IMPORTANT: You must add Lakebase as an app resource for database connectivity.
+  # 
+  # Steps:
+  #   1. Create a Lakebase instance in your workspace (if not exists)
+  #   2. Add it as an app resource:
+  #      databricks apps add-resource <app-name> \
+  #        --resource-type database \
+  #        --resource-name lakebase \
+  #        --database-instance <your-lakebase-instance-name>
+  #
+  # When added as a resource, Databricks automatically sets:
+  #   - PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+  #
+  # You only need to specify the instance name for OAuth token generation:
+  - name: LAKEBASE_INSTANCE_NAME
+    value: "<your-lakebase-instance-name>"
+  - name: LAKEBASE_DATABASE_NAME
+    value: "databricks_postgres"
+  
+  # =============================================================================
+  # LLM Provider Configuration
+  # =============================================================================
+  # Option 1: Databricks Foundation Models (default)
+  - name: LLM_PROVIDER
+    value: "DATABRICKS"
+  - name: DATABRICKS_MODEL
+    value: "databricks-meta-llama-3-3-70b-instruct"
+  - name: DATABRICKS_MODEL_MINI
+    value: "databricks-gemini-3-flash"
+  
+  # Option 2: Anthropic Claude (uncomment and add your key)
+  # - name: ANTHROPIC_API_KEY
+  #   value: "<your-anthropic-api-key>"
+  
+  # Option 3: Azure OpenAI (uncomment and configure)
+  # - name: LLM_PROVIDER
+  #   value: "AZURE"
+  # - name: AZURE_OPENAI_API_KEY
+  #   value: "<your-azure-api-key>"
+  # - name: AZURE_OPENAI_ENDPOINT
+  #   value: "https://<your-resource>.cognitiveservices.azure.com/"
+  # - name: AZURE_OPENAI_API_VERSION
+  #   value: "2024-08-01-preview"
+  # - name: AZURE_OPENAI_DEPLOYMENT
+  #   value: "gpt-4o"
+  # - name: AZURE_OPENAI_DEPLOYMENT_MINI
+  #   value: "gpt-4o-mini"
+  
+  # =============================================================================
+  # Claude SDK Configuration
+  # =============================================================================
+  - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
+    value: "3600000"
+  
+  # =============================================================================
+  # Permission Configuration
+  # =============================================================================
+  # Grant created resources to this principal (e.g., "account users" for all)
+  - name: AUTO_GRANT_PERMISSIONS_TO
+    value: "account users"

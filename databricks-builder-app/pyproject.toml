@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["server*"]
+where = [".", "packages"]
+include = ["server*", "databricks_tools_core*", "databricks_mcp_server*"]
 exclude = ["client*", "tests*", "scripts*"]
 
 [project]
@@ -28,11 +28,16 @@ dependencies = [
   "psycopg2-binary>=2.9.11",  # For alembic migrations (sync)
   # Claude Agent SDK (successor to claude-code-sdk)
   "claude-agent-sdk>=0.1.19",
+  "anthropic>=0.42.0",
   # Databricks MCP tools (databricks-mcp-server installed from sibling dir in dev)
   "mcp>=1.0.0",
   "fastmcp>=0.1.0",
-  "databricks-tools-core",
-  "databricks-mcp-server",
+  # databricks-tools-core and databricks-mcp-server are bundled in packages/ directory
+  "requests>=2.31.0",
+  "sqlglot>=20.0.0",
+  "sqlfluff>=3.0.0",
+  "litellm>=1.0.0",
+  "pymupdf>=1.24.0",
   # Conflict resolution pins for Databricks Apps pre-installed packages
   "tenacity==9.0.0",
   "pillow==11.1.0",

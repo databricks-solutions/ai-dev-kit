@@ -2,15 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
 import {
-  Brain,
   ChevronDown,
-  ChevronRight,
   ExternalLink,
   Loader2,
   MessageSquare,
   Send,
   Square,
-  Terminal,
   Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,6 +16,7 @@ import remarkGfm from 'remark-gfm';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SkillsExplorer } from '@/components/SkillsExplorer';
+import { FunLoader } from '@/components/FunLoader';
 import { Button } from '@/components/ui/Button';
 import {
   createConversation,
@@ -30,7 +28,7 @@ import {
   fetchWarehouses,
   invokeAgent,
 } from '@/lib/api';
-import type { Cluster, Conversation, Message, Project, Warehouse } from '@/lib/types';
+import type { Cluster, Conversation, Message, Project, Warehouse, TodoItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 // Combined activity item for display
@@ -44,92 +42,26 @@ interface ActivityItem {
   timestamp: number;
 }
 
-// Collapsible activity section component
+// Minimal activity indicator - shows only current tool being executed
 function ActivitySection({
   items,
-  isStreaming,
 }: {
   items: ActivityItem[];
   isStreaming: boolean;
 }) {
-  const [isExpanded, setIsExpanded] = useState(true);
-
   if (items.length === 0) return null;
 
-  return (
-    <div className="mb-4 rounded-lg border border-[var(--color-border)]/50 bg-[var(--color-bg-secondary)]/30 overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)]/50 transition-colors"
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ChevronRight className="h-3 w-3" />
-        )}
-        <Brain className="h-3 w-3" />
-        <span>Activity ({items.length} events)</span>
-        {isStreaming && (
-          <Loader2 className="h-3 w-3 animate-spin ml-auto" />
-        )}
-      </button>
+  // Get the most recent tool_use item (current activity)
+  const currentTool = [...items].reverse().find((item) => item.type === 'tool_use');
 
-      {isExpanded && (
-        <div className="border-t border-[var(--color-border)]/30 max-h-64 overflow-y-auto">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className={cn(
-                'px-3 py-2 text-xs border-b border-[var(--color-border)]/20 last:border-0',
-                item.type === 'thinking' && 'bg-purple-500/5',
-                item.type === 'tool_use' && 'bg-blue-500/5',
-                item.type === 'tool_result' && (item.isError ? 'bg-red-500/5' : 'bg-green-500/5')
-              )}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {item.type === 'thinking' && (
-                  <>
-                    <Brain className="h-3 w-3 text-purple-500" />
-                    <span className="font-medium text-purple-600">Thinking</span>
-                  </>
-                )}
-                {item.type === 'tool_use' && (
-                  <>
-                    <Wrench className="h-3 w-3 text-blue-500" />
-                    <span className="font-medium text-blue-600">
-                      {item.toolName}
-                    </span>
-                  </>
-                )}
-                {item.type === 'tool_result' && (
-                  <>
-                    <Terminal className="h-3 w-3 text-green-500" />
-                    <span className={cn(
-                      'font-medium',
-                      item.isError ? 'text-red-600' : 'text-green-600'
-                    )}>
-                      Result {item.isError && '(error)'}
-                    </span>
-                  </>
-                )}
-              </div>
-              <div className="text-[var(--color-text-muted)] font-mono whitespace-pre-wrap break-all">
-                {item.type === 'tool_use' && item.toolInput ? (
-                  <code className="text-[10px]">
-                    {JSON.stringify(item.toolInput, null, 2).slice(0, 500)}
-                    {JSON.stringify(item.toolInput).length > 500 && '...'}
-                  </code>
-                ) : (
-                  <span>
-                    {item.content.slice(0, 300)}
-                    {item.content.length > 300 && '...'}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  if (!currentTool) return null;
+
+  return (
+    <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+      <Wrench className="h-3 w-3 text-blue-500 animate-pulse" />
+      <span className="truncate">
+        Using {currentTool.toolName?.replace('mcp__databricks__', '')}...
+      </span>
     </div>
   );
 }
@@ -164,6 +96,7 @@ export default function ProjectPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [selectedClusterId, setSelectedClusterId] = useState<string | undefined>();
   const [clusterDropdownOpen, setClusterDropdownOpen] = useState(false);
@@ -364,6 +297,7 @@ export default function ProjectPage() {
     setIsStreaming(true);
     setStreamingText('');
     setActivityItems([]);
+    setTodos([]);
 
     // Add user message to UI immediately
     const tempUserMessage: Message = {
@@ -413,17 +347,32 @@ export default function ProjectPage() {
               setStreamingText(fullText);
             }
             // If we already have fullText from deltas, ignore this to avoid duplication
-          } else if (type === 'thinking') {
-            const thinking = event.thinking as string;
-            setActivityItems((prev) => [
-              ...prev,
-              {
-                id: `thinking-${Date.now()}`,
-                type: 'thinking',
-                content: thinking,
-                timestamp: Date.now(),
-              },
-            ]);
+          } else if (type === 'thinking' || type === 'thinking_delta') {
+            // Handle both complete thinking blocks and streaming thinking deltas
+            const thinking = (event.thinking as string) || '';
+            if (thinking) {
+              setActivityItems((prev) => {
+                // For deltas, append to the last thinking item if it exists
+                if (type === 'thinking_delta' && prev.length > 0 && prev[prev.length - 1].type === 'thinking') {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    ...updated[updated.length - 1],
+                    content: updated[updated.length - 1].content + thinking,
+                  };
+                  return updated;
+                }
+                // For complete blocks or first delta, add new item
+                return [
+                  ...prev,
+                  {
+                    id: `thinking-${Date.now()}`,
+                    type: 'thinking',
+                    content: thinking,
+                    timestamp: Date.now(),
+                  },
+                ];
+              });
+            }
           } else if (type === 'tool_use') {
             setActivityItems((prev) => [
               ...prev,
@@ -477,6 +426,12 @@ export default function ProjectPage() {
           } else if (type === 'cancelled') {
             // Agent was cancelled by user - show a toast notification
             toast.info('Generation stopped');
+          } else if (type === 'todos') {
+            // Update todo list from agent
+            const todoItems = event.todos as TodoItem[];
+            if (todoItems) {
+              setTodos(todoItems);
+            }
           }
         },
         onError: (error) => {
@@ -501,6 +456,9 @@ export default function ProjectPage() {
           }
           setStreamingText('');
           setIsStreaming(false);
+          // Clear activity items after response is finalized - only show final answer
+          setActivityItems([]);
+          setTodos([]);
 
           if (conversationId && !currentConversation?.id) {
             const conv = await fetchConversation(projectId, conversationId);
@@ -557,13 +515,12 @@ export default function ProjectPage() {
   return (
     <MainLayout projectName={project?.name} sidebar={sidebar}>
       <div className="flex flex-1 flex-col h-full">
-        {/* Chat Header */}
-        {currentConversation && (
-          <div className="flex h-14 items-center justify-between border-b border-[var(--color-border)] px-6 bg-[var(--color-bg-secondary)]/50">
-            <h2 className="font-medium text-[var(--color-text-heading)] truncate max-w-[150px]">
-              {currentConversation.title}
-            </h2>
-            <div className="flex items-center gap-2">
+        {/* Chat Header - always show configuration controls */}
+        <div className="flex h-14 items-center justify-between border-b border-[var(--color-border)] px-6 bg-[var(--color-bg-secondary)]/50">
+          <h2 className="font-medium text-[var(--color-text-heading)] truncate max-w-[150px]">
+            {currentConversation?.title || 'New Chat'}
+          </h2>
+          <div className="flex items-center gap-2">
               {/* Catalog.Schema Input */}
               <div className="flex items-center h-8 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] focus-within:ring-2 focus-within:ring-[var(--color-accent-primary)]/50">
                 <div className="flex items-center justify-center w-8 h-full border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 rounded-l-md">
@@ -731,22 +688,53 @@ export default function ProjectPage() {
                   title="Workspace working folder for uploading files and pipelines"
                 />
               </div>
-            </div>
           </div>
-        )}
+        </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6">
           {messages.length === 0 && !streamingText ? (
             <div className="flex h-full items-center justify-center">
-              <div className="text-center">
+              <div className="text-center max-w-2xl">
                 <MessageSquare className="mx-auto h-12 w-12 text-[var(--color-text-muted)]/40" />
                 <h3 className="mt-4 text-lg font-medium text-[var(--color-text-heading)]">
-                  Start a conversation
+                  What can I help you build?
                 </h3>
                 <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                  Ask Claude to help you with code in this project
+                  I can help you build data pipelines, generate synthetic data, create dashboards, and more on Databricks.
                 </p>
+
+                {/* Example prompts */}
+                <div className="mt-6 grid gap-2 text-left">
+                  <button
+                    onClick={() => setInput('Generate synthetic customer data with orders and support tickets')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
+                  >
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Generate synthetic data</span>
+                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Create realistic test datasets with customers, orders, and tickets</p>
+                  </button>
+                  <button
+                    onClick={() => setInput('Create a data pipeline to transform raw data into bronze, silver, and gold layers')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
+                  >
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Build a data pipeline</span>
+                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Create ETL workflows with bronze/silver/gold medallion architecture</p>
+                  </button>
+                  <button
+                    onClick={() => setInput('Create a dashboard to visualize customer metrics and trends')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
+                  >
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Create a dashboard</span>
+                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Build interactive visualizations with AI/BI dashboards</p>
+                  </button>
+                  <button
+                    onClick={() => setInput('What tables and data do I have in my project?')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
+                  >
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Explore my data</span>
+                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">See what tables, volumes, and resources exist in your project</p>
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -770,7 +758,21 @@ export default function ProjectPage() {
                   >
                     {message.role === 'assistant' ? (
                       <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[var(--color-accent-primary)] underline hover:text-[var(--color-accent-secondary)]"
+                              >
+                                {children}
+                              </a>
+                            ),
+                          }}
+                        >
                           {message.content}
                         </ReactMarkdown>
                       </div>
@@ -781,30 +783,15 @@ export default function ProjectPage() {
                 </div>
               ))}
 
-              {/* Activity section (thinking, tools) */}
-              {(activityItems.length > 0 || isStreaming) && (
-                <ActivitySection items={activityItems} isStreaming={isStreaming && !streamingText} />
+              {/* Activity section (thinking, tools) - shown above the loader */}
+              {activityItems.length > 0 && (
+                <ActivitySection items={activityItems} isStreaming={isStreaming} />
               )}
 
-              {/* Streaming response */}
-              {streamingText && (
+              {/* Fun loader with progress - shown while streaming (hides stream of consciousness) */}
+              {isStreaming && (
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50 px-3 py-2 shadow-sm">
-                    <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {streamingText}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Loading indicator */}
-              {isStreaming && !streamingText && activityItems.length === 0 && (
-                <div className="flex justify-start">
-                  <div className="rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50 px-4 py-3 shadow-sm">
-                    <Loader2 className="h-5 w-5 animate-spin text-[var(--color-text-muted)]" />
-                  </div>
+                  <FunLoader todos={todos} className="py-2" />
                 </div>
               )}
 

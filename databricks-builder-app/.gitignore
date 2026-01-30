@@ -4,6 +4,9 @@ skills/
 # Projects directory (local development)
 projects/
 
+# Packages (copied from sibling dirs during deployment)
+packages/
+
 # Conda environment (for Databricks Apps deployment)
 conda-env/
 
@@ -15,6 +18,7 @@ __pycache__/
 
 # Environment
 .env.local
+app.yaml
 
 # Node (client)
 client/node_modules/

@@ -5,10 +5,12 @@ Provides user-scoped CRUD operations using async SQLAlchemy.
 
 from typing import Optional
 
-from sqlalchemy import delete, func, select
+import json
+
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import selectinload
 
-from server.db import Conversation, Message, Project, session_scope
+from server.db import Conversation, Execution, Message, Project, session_scope
 
 
 class ProjectStorage:
@@ -333,6 +335,139 @@ class ConversationStorage:
       return message
 
 
+class ExecutionStorage:
+  """Execution state storage for session independence."""
+
+  def __init__(self, user_email: str, project_id: str, conversation_id: str):
+    self.user_email = user_email
+    self.project_id = project_id
+    self.conversation_id = conversation_id
+
+  async def create(self, execution_id: str) -> Execution:
+    """Create a new execution record."""
+    async with session_scope() as session:
+      # Verify conversation ownership via join
+      result = await session.execute(
+        select(Conversation.id)
+        .join(Project, Conversation.project_id == Project.id)
+        .where(
+          Conversation.id == self.conversation_id,
+          Conversation.project_id == self.project_id,
+          Project.user_email == self.user_email,
+        )
+      )
+      if not result.scalar_one_or_none():
+        raise ValueError('Conversation not found or access denied')
+
+      execution = Execution(
+        id=execution_id,
+        conversation_id=self.conversation_id,
+        project_id=self.project_id,
+        status='running',
+        events_json='[]',
+      )
+      session.add(execution)
+      await session.flush()
+      await session.refresh(execution)
+      return execution
+
+  async def get(self, execution_id: str) -> Optional[Execution]:
+    """Get an execution by ID."""
+    async with session_scope() as session:
+      result = await session.execute(
+        select(Execution)
+        .join(Conversation, Execution.conversation_id == Conversation.id)
+        .join(Project, Conversation.project_id == Project.id)
+        .where(
+          Execution.id == execution_id,
+          Execution.conversation_id == self.conversation_id,
+          Project.user_email == self.user_email,
+        )
+      )
+      return result.scalar_one_or_none()
+
+  async def get_active(self) -> Optional[Execution]:
+    """Get the active (running) execution for this conversation, if any."""
+    async with session_scope() as session:
+      result = await session.execute(
+        select(Execution)
+        .join(Conversation, Execution.conversation_id == Conversation.id)
+        .join(Project, Conversation.project_id == Project.id)
+        .where(
+          Execution.conversation_id == self.conversation_id,
+          Execution.status == 'running',
+          Project.user_email == self.user_email,
+        )
+        .order_by(Execution.created_at.desc())
+        .limit(1)
+      )
+      return result.scalar_one_or_none()
+
+  async def get_recent(self, limit: int = 10) -> list[Execution]:
+    """Get recent executions for this conversation."""
+    async with session_scope() as session:
+      result = await session.execute(
+        select(Execution)
+        .join(Conversation, Execution.conversation_id == Conversation.id)
+        .join(Project, Conversation.project_id == Project.id)
+        .where(
+          Execution.conversation_id == self.conversation_id,
+          Project.user_email == self.user_email,
+        )
+        .order_by(Execution.created_at.desc())
+        .limit(limit)
+      )
+      return list(result.scalars().all())
+
+  async def add_events(self, execution_id: str, events: list[dict]) -> bool:
+    """Append events to an execution's event list."""
+    async with session_scope() as session:
+      result = await session.execute(
+        select(Execution)
+        .join(Conversation, Execution.conversation_id == Conversation.id)
+        .join(Project, Conversation.project_id == Project.id)
+        .where(
+          Execution.id == execution_id,
+          Project.user_email == self.user_email,
+        )
+      )
+      execution = result.scalar_one_or_none()
+      if not execution:
+        return False
+
+      # Load existing events and append new ones
+      existing_events = json.loads(execution.events_json) if execution.events_json else []
+      existing_events.extend(events)
+      execution.events_json = json.dumps(existing_events)
+      return True
+
+  async def update_status(
+    self,
+    execution_id: str,
+    status: str,
+    error: Optional[str] = None,
+  ) -> bool:
+    """Update execution status."""
+    async with session_scope() as session:
+      result = await session.execute(
+        select(Execution)
+        .join(Conversation, Execution.conversation_id == Conversation.id)
+        .join(Project, Conversation.project_id == Project.id)
+        .where(
+          Execution.id == execution_id,
+          Project.user_email == self.user_email,
+        )
+      )
+      execution = result.scalar_one_or_none()
+      if not execution:
+        return False
+
+      execution.status = status
+      if error:
+        execution.error = error
+      return True
+
+
 def get_project_storage(user_email: str) -> ProjectStorage:
   """Get project storage for a user."""
   return ProjectStorage(user_email)
@@ -341,3 +476,8 @@ def get_project_storage(user_email: str) -> ProjectStorage:
 def get_conversation_storage(user_email: str, project_id: str) -> ConversationStorage:
   """Get conversation storage for a project."""
   return ConversationStorage(user_email, project_id)
+
+
+def get_execution_storage(user_email: str, project_id: str, conversation_id: str) -> ExecutionStorage:
+  """Get execution storage for a conversation."""
+  return ExecutionStorage(user_email, project_id, conversation_id)

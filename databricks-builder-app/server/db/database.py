@@ -333,8 +333,8 @@ def init_database(database_url: Optional[str] = None) -> AsyncEngine:
                 f"Failed to generate initial Lakebase token for instance: {instance_name}"
             )
 
-        # Get username (current user's email)
-        username = _get_current_user_email() or instance_name
+        # Get username (prefer explicit env var for Databricks Apps where service principal is used)
+        username = os.environ.get("LAKEBASE_USERNAME") or _get_current_user_email() or instance_name
 
         # Resolve hostname for DNS workaround (macOS Python DNS issues with long hostnames)
         global _resolved_hostaddr

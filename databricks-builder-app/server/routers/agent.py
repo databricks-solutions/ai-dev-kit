@@ -22,6 +22,7 @@ from ..services.active_stream import get_stream_manager
 from ..services.agent import get_project_directory, stream_agent_response
 from ..services.backup_manager import mark_for_backup
 from ..services.storage import ConversationStorage, ProjectStorage
+from ..services.title_generator import generate_title_async
 from ..services.user import get_current_user, get_current_token, get_workspace_url
 
 logger = logging.getLogger(__name__)
@@ -101,11 +102,23 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
     conversation_id = body.conversation_id
 
     if not conversation_id:
-        # Create new conversation with auto-title from message
-        title = body.message[:50] + ('...' if len(body.message) > 50 else '')
-        conversation = await conv_storage.create(title=title)
+        # Create new conversation with temporary title (will be updated by AI)
+        temp_title = body.message[:40].strip()
+        if len(body.message) > 40:
+            temp_title = temp_title.rsplit(' ', 1)[0] + '...'
+        conversation = await conv_storage.create(title=temp_title)
         conversation_id = conversation.id
         logger.info(f'Created new conversation: {conversation_id}')
+
+        # Generate AI title in the background (fire-and-forget)
+        asyncio.create_task(
+            generate_title_async(
+                message=body.message,
+                conversation_id=conversation_id,
+                user_email=user_email,
+                project_id=body.project_id,
+            )
+        )
     else:
         # Verify conversation exists and get session_id for resumption
         conversation = await conv_storage.get(conversation_id)
@@ -116,11 +129,12 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
     # Get session_id from conversation for resumption
     session_id = conversation.session_id if conversation else None
 
-    # Create active stream
+    # Create active stream with user_email for persistence
     stream_manager = get_stream_manager()
     stream = await stream_manager.create_stream(
         project_id=body.project_id,
         conversation_id=conversation_id,
+        user_email=user_email,
     )
 
     # Emit conversation_id as first event
@@ -180,12 +194,22 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
                     })
 
                 elif event_type == 'tool_use':
+                    tool_name = event.get('tool_name', '')
+                    tool_input = event.get('tool_input', {})
+
                     stream.add_event({
                         'type': 'tool_use',
                         'tool_id': event.get('tool_id', ''),
-                        'tool_name': event.get('tool_name', ''),
-                        'tool_input': event.get('tool_input', {}),
+                        'tool_name': tool_name,
+                        'tool_input': tool_input,
                     })
+
+                    # Emit dedicated todos event when TodoWrite is called
+                    if tool_name == 'TodoWrite' and 'todos' in tool_input:
+                        stream.add_event({
+                            'type': 'todos',
+                            'todos': tool_input['todos'],
+                        })
 
                 elif event_type == 'tool_result':
                     content = event.get('content', '')
@@ -473,3 +497,68 @@ async def list_project_files(request: Request, project_id: str):
             )
 
     return {'project_id': project_id, 'files': files}
+
+
+@router.get('/projects/{project_id}/conversations/{conversation_id}/executions')
+async def get_conversation_executions(
+    request: Request,
+    project_id: str,
+    conversation_id: str,
+):
+    """Get active and recent executions for a conversation.
+
+    Returns the current active execution (if any) and recent completed ones.
+    This enables session independence - users can reconnect after navigating away.
+    """
+    from ..services.storage import ExecutionStorage
+
+    user_email = await get_current_user(request)
+
+    # Verify project exists and belongs to user
+    project_storage = ProjectStorage(user_email)
+    project = await project_storage.get(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=404,
+            detail=f'Project {project_id} not found'
+        )
+
+    # Get executions from database
+    exec_storage = ExecutionStorage(user_email, project_id, conversation_id)
+
+    # Get active execution (if any)
+    active = await exec_storage.get_active()
+
+    # Get recent executions
+    recent = await exec_storage.get_recent(limit=5)
+
+    # Also check in-memory streams for this conversation
+    stream_manager = get_stream_manager()
+    in_memory_active = None
+    async with stream_manager._lock:
+        for stream in stream_manager._streams.values():
+            if (
+                stream.conversation_id == conversation_id
+                and not stream.is_complete
+                and not stream.is_cancelled
+            ):
+                in_memory_active = {
+                    'id': stream.execution_id,
+                    'conversation_id': stream.conversation_id,
+                    'project_id': stream.project_id,
+                    'status': 'running',
+                    'events': [e.data for e in stream.events],
+                    'error': stream.error,
+                    'created_at': None,
+                }
+                break
+
+    return {
+        'active': (
+            in_memory_active
+            or (active.to_dict() if active else None)
+        ),
+        'recent': [e.to_dict() for e in recent if e.id != (
+            active.id if active else None
+        )],
+    }

@@ -1,0 +1,43 @@
+# FastAPI and server
+fastapi[standard]>=0.115.8
+uvicorn>=0.34.0
+httpx>=0.28.0
+pydantic>=2.10.0
+python-dotenv>=1.0.1
+
+# Databricks SDK
+databricks-sdk>=0.81.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.41
+alembic>=1.16.1
+psycopg[binary]>=3.2.0
+greenlet>=3.0.0
+psycopg2-binary>=2.9.11
+
+# Claude Agent SDK
+claude-agent-sdk>=0.1.19
+anthropic>=0.42.0
+
+# MCP
+mcp>=1.0.0
+fastmcp>=0.1.0
+
+# Dependencies for databricks-tools-core
+requests>=2.31.0
+sqlglot>=20.0.0
+sqlfluff>=3.0.0
+litellm>=1.0.0
+pymupdf>=1.24.0
+
+# Conflict resolution pins for Databricks Apps pre-installed packages
+tenacity==9.0.0
+pillow==11.1.0
+websockets==15.0
+pyarrow==18.1.0
+markupsafe==3.0.2
+rich==14.0.0
+protobuf>=3.12.0,<5
+pandas==2.3.0
+flask==3.1.0
+werkzeug==3.1.3

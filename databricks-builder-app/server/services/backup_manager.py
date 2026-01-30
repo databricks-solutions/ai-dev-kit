@@ -128,13 +128,59 @@ async def restore_backup(project_id: str) -> bool:
   return True
 
 
+def _create_default_claude_md(project_dir: Path) -> None:
+  """Create a default CLAUDE.md file for a new project.
+
+  Args:
+      project_dir: Path to the project directory
+  """
+  claude_md_path = project_dir / 'CLAUDE.md'
+  if claude_md_path.exists():
+    return
+
+  default_content = """# Project Context
+
+This file tracks the Databricks resources created in this project.
+The AI assistant will update this file as resources are created.
+
+## Configuration
+
+- **Catalog:** (not yet configured)
+- **Schema:** (not yet configured)
+
+## Resources Created
+
+### Tables
+(none yet)
+
+### Volumes
+(none yet)
+
+### Pipelines
+(none yet)
+
+### Jobs
+(none yet)
+
+## Notes
+
+Add any project-specific notes or context here.
+"""
+
+  try:
+    claude_md_path.write_text(default_content)
+    logger.info(f'Created default CLAUDE.md in {project_dir}')
+  except Exception as e:
+    logger.warning(f'Failed to create CLAUDE.md: {e}')
+
+
 def ensure_project_directory(project_id: str) -> Path:
   """Ensure project directory exists, restoring from backup if needed.
 
   This is the main entry point for getting a project directory.
   If the directory doesn't exist, attempts to restore from backup.
   If no backup exists, creates an empty directory.
-  Also ensures skills are copied to the project.
+  Also ensures skills are copied to the project and CLAUDE.md exists.
 
   Args:
       project_id: The project UUID
@@ -146,6 +192,7 @@ def ensure_project_directory(project_id: str) -> Path:
 
   project_dir = Path(PROJECTS_BASE_DIR).resolve() / project_id
   needs_skills = not project_dir.exists() or not (project_dir / '.claude' / 'skills').exists()
+  is_new_project = not project_dir.exists()
 
   if not project_dir.exists():
     # Try to restore from backup
@@ -173,6 +220,10 @@ def ensure_project_directory(project_id: str) -> Path:
   # Copy skills to project if needed
   if needs_skills:
     copy_skills_to_project(project_dir)
+
+  # Create default CLAUDE.md for new projects (or if it doesn't exist)
+  if is_new_project or not (project_dir / 'CLAUDE.md').exists():
+    _create_default_claude_md(project_dir)
 
   return project_dir
 

@@ -171,3 +171,13 @@
   padding: 0;
   background: transparent;
 }
+
+.prose-xs a {
+  color: var(--color-accent-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.prose-xs a:hover {
+  color: var(--color-accent-secondary);
+}

@@ -251,6 +251,7 @@ async def stream_agent_response(
       default_schema=default_schema,
       warehouse_id=warehouse_id,
       workspace_folder=workspace_folder,
+      workspace_url=databricks_host,
     )
 
     # Load Claude settings for Databricks model serving authentication

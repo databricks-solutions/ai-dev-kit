@@ -62,7 +62,8 @@ async def get_current_user(request: Request) -> str:
 async def get_current_token(request: Request) -> str | None:
   """Get the current user's Databricks access token.
 
-  In production (Databricks Apps), extracts from X-Forwarded-Access-Token header.
+  In production (Databricks Apps), returns None to use SP OAuth credentials.
+  Using user forwarded tokens conflicts with SP OAuth env vars.
   In development, uses DATABRICKS_TOKEN env var.
 
   Args:
@@ -71,18 +72,17 @@ async def get_current_token(request: Request) -> str | None:
   Returns:
       Access token string, or None if not available
   """
-  # Try to get token from header first (production mode)
-  token = request.headers.get('X-Forwarded-Access-Token')
-  if token:
-    logger.debug('Got token from X-Forwarded-Access-Token header')
-    return token
+  # In production (Databricks Apps), use SP OAuth credentials from env vars
+  # Don't use forwarded user tokens as they conflict with SP OAuth
+  if not _is_local_development():
+    logger.debug('Production mode: using SP OAuth credentials (not user token)')
+    return None
 
   # Fall back to env var for development
-  if _is_local_development():
-    token = os.getenv('DATABRICKS_TOKEN')
-    if token:
-      logger.debug('Got token from DATABRICKS_TOKEN env var')
-      return token
+  token = os.getenv('DATABRICKS_TOKEN')
+  if token:
+    logger.debug('Got token from DATABRICKS_TOKEN env var')
+    return token
 
   return None
 

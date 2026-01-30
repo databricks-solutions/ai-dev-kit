@@ -15,11 +15,12 @@ from .database import (
   stop_token_refresh,
   test_database_connection,
 )
-from .models import Base, Conversation, Message, Project
+from .models import Base, Conversation, Execution, Message, Project
 
 __all__ = [
   'Base',
   'Conversation',
+  'Execution',
   'Message',
   'Project',
   'create_tables',
