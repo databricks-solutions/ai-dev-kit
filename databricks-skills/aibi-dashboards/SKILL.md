@@ -59,28 +59,50 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 ### 2) WIDGET FIELD EXPRESSIONS
 
+> **CRITICAL: Field Name Matching Rule**
+> The `name` in `query.fields` MUST exactly match the `fieldName` in `encodings`.
+> If they don't match, the widget shows "no selected fields to visualize" error!
+
+**Correct pattern for aggregations:**
+```json
+// In query.fields:
+{"name": "sum(spend)", "expression": "SUM(`spend`)"}
+
+// In encodings (must match!):
+{"fieldName": "sum(spend)", "displayName": "Total Spend"}
+```
+
+**WRONG - names don't match:**
+```json
+// In query.fields:
+{"name": "spend", "expression": "SUM(`spend`)"}  // name is "spend"
+
+// In encodings:
+{"fieldName": "sum(spend)", ...}  // ERROR: "sum(spend)" ≠ "spend"
+```
+
 Allowed expressions in widget queries (you CANNOT use CAST or other SQL in expressions):
 
 **For numbers:**
 ```json
-{"fieldName": "sum(revenue)", "expression": "SUM(`revenue`)"}
-{"fieldName": "avg(price)", "expression": "AVG(`price`)"}
-{"fieldName": "count(orders)", "expression": "COUNT(`order_id`)"}
-{"fieldName": "countdistinct(customers)", "expression": "COUNT(DISTINCT `customer_id`)"}
-{"fieldName": "min(date)", "expression": "MIN(`order_date`)"}
-{"fieldName": "max(date)", "expression": "MAX(`order_date`)"}
+{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}
+{"name": "avg(price)", "expression": "AVG(`price`)"}
+{"name": "count(orders)", "expression": "COUNT(`order_id`)"}
+{"name": "countdistinct(customers)", "expression": "COUNT(DISTINCT `customer_id`)"}
+{"name": "min(date)", "expression": "MIN(`order_date`)"}
+{"name": "max(date)", "expression": "MAX(`order_date`)"}
 ```
 
 **For dates** (use daily for timeseries, weekly/monthly for grouped comparisons):
 ```json
-{"fieldName": "daily(date)", "expression": "DATE_TRUNC(\"DAY\", `date`)"}
-{"fieldName": "weekly(date)", "expression": "DATE_TRUNC(\"WEEK\", `date`)"}
-{"fieldName": "monthly(date)", "expression": "DATE_TRUNC(\"MONTH\", `date`)"}
+{"name": "daily(date)", "expression": "DATE_TRUNC(\"DAY\", `date`)"}
+{"name": "weekly(date)", "expression": "DATE_TRUNC(\"WEEK\", `date`)"}
+{"name": "monthly(date)", "expression": "DATE_TRUNC(\"MONTH\", `date`)"}
 ```
 
 **Simple field reference** (for pre-aggregated data):
 ```json
-{"fieldName": "category", "expression": "`category`"}
+{"name": "category", "expression": "`category`"}
 ```
 
 If you need conditional logic or multi-field formulas, compute a derived column in the dataset SQL first.
@@ -101,7 +123,7 @@ Each widget has a position: `{"x": 0, "y": 0, "width": 2, "height": 4}`
 
 | Widget Type | Width | Height | Notes |
 |-------------|-------|--------|-------|
-| Text header | 6 | 1-2 | Full width; h=1 title only, h=2 with description |
+| Text header | 6 | 1 | Full width; use SEPARATE widgets for title and subtitle |
 | Counter/KPI | 2 | **3-4** | **NEVER height=2** - too cramped! |
 | Line/Bar chart | 3 | **5-6** | Pair side-by-side to fill row |
 | Pie chart | 3 | **5-6** | Needs space for legend |
@@ -110,7 +132,8 @@ Each widget has a position: `{"x": 0, "y": 0, "width": 2, "height": 4}`
 
 **Standard dashboard structure:**
 ```text
-y=0:  Text header (w=6, h=2) - Dashboard title + description
+y=0:  Title (w=6, h=1) - Dashboard title (use separate widget!)
+y=1:  Subtitle (w=6, h=1) - Description (use separate widget!)
 y=2:  KPIs (w=2 each, h=3) - 3 key metrics side-by-side
 y=5:  Section header (w=6, h=1) - "Trends" or similar
 y=6:  Charts (w=3 each, h=5) - Two charts side-by-side
@@ -140,19 +163,174 @@ y=12: Table (w=6, h=6) - Detailed data
 - `frame.title`: human-readable name (any characters allowed)
 - `widget.queries[0].name`: always use `"main_query"`
 
-**Counter (KPI):**
-- `widgetType`: "counter"
-- Dataset should return exactly 1 row (pre-aggregated)
-- Use `"disaggregated": true` in widget query
-- Format types: `"number-currency"`, `"number-percent"`, `"number"`
-- **Percent values must be 0-1** in the data (not 0-100)
+**CRITICAL VERSION REQUIREMENTS:**
+
+| Widget Type | Version |
+|-------------|---------|
+| counter | 2 |
+| table | 2 |
+| filter-multi-select | 2 |
+| filter-single-select | 2 |
+| filter-date-range-picker | 2 |
+| bar | 3 |
+| line | 3 |
+| pie | 3 |
+| text | N/A (no spec block) |
+
+---
+
+**Text (Headers/Descriptions):**
+- **CRITICAL: Text widgets do NOT use a spec block!**
+- Use `multilineTextboxSpec` directly on the widget
+- Supports markdown: `#`, `##`, `###`, `**bold**`, `*italic*`
+- **CRITICAL: Multiple items in the `lines` array are concatenated on a single line, NOT displayed as separate lines!**
+- For title + subtitle, use **separate text widgets** at different y positions
 
 ```json
-"format": {"type": "number-currency", "currencyCode": "USD", "abbreviation": "compact", "decimalPlaces": {"type": "max", "places": 2}}
-"format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}
+// CORRECT: Separate widgets for title and subtitle
+{
+  "widget": {
+    "name": "title",
+    "multilineTextboxSpec": {
+      "lines": ["## Dashboard Title"]
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 6, "height": 1}
+},
+{
+  "widget": {
+    "name": "subtitle",
+    "multilineTextboxSpec": {
+      "lines": ["Description text here"]
+    }
+  },
+  "position": {"x": 0, "y": 1, "width": 6, "height": 1}
+}
+
+// WRONG: Multiple lines concatenate into one line!
+{
+  "widget": {
+    "name": "title-widget",
+    "multilineTextboxSpec": {
+      "lines": ["## Dashboard Title", "Description text here"]  // Becomes "## Dashboard TitleDescription text here"
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 6, "height": 2}
+}
 ```
 
+---
+
+**Counter (KPI):**
+- `version`: **2** (NOT 3!)
+- `widgetType`: "counter"
+- **Percent values must be 0-1** in the data (not 0-100)
+
+**Two patterns for counters:**
+
+**Pattern 1: Pre-aggregated dataset (1 row, no filters)**
+- Dataset returns exactly 1 row
+- Use `"disaggregated": true` and simple field reference
+- Field `name` matches dataset column directly
+
+```json
+{
+  "widget": {
+    "name": "total-revenue",
+    "queries": [{
+      "name": "main_query",
+      "query": {
+        "datasetName": "summary_ds",
+        "fields": [{"name": "revenue", "expression": "`revenue`"}],
+        "disaggregated": true
+      }
+    }],
+    "spec": {
+      "version": 2,
+      "widgetType": "counter",
+      "encodings": {
+        "value": {"fieldName": "revenue", "displayName": "Total Revenue"}
+      },
+      "frame": {"showTitle": true, "title": "Total Revenue"}
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 2, "height": 3}
+}
+```
+
+**Pattern 2: Aggregating widget (multi-row dataset, supports filters)**
+- Dataset returns multiple rows (e.g., grouped by a filter dimension)
+- Use `"disaggregated": false` and aggregation expression
+- **CRITICAL**: Field `name` MUST match `fieldName` exactly (e.g., `"sum(spend)"`)
+
+```json
+{
+  "widget": {
+    "name": "total-spend",
+    "queries": [{
+      "name": "main_query",
+      "query": {
+        "datasetName": "by_category",
+        "fields": [{"name": "sum(spend)", "expression": "SUM(`spend`)"}],
+        "disaggregated": false
+      }
+    }],
+    "spec": {
+      "version": 2,
+      "widgetType": "counter",
+      "encodings": {
+        "value": {"fieldName": "sum(spend)", "displayName": "Total Spend"}
+      },
+      "frame": {"showTitle": true, "title": "Total Spend"}
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 2, "height": 3}
+}
+```
+
+---
+
+**Table:**
+- `version`: **2** (NOT 1 or 3!)
+- `widgetType`: "table"
+- **Columns only need `fieldName` and `displayName`** - no other properties!
+- Use `"disaggregated": true` for raw rows
+
+```json
+{
+  "widget": {
+    "name": "details-table",
+    "queries": [{
+      "name": "main_query",
+      "query": {
+        "datasetName": "details_ds",
+        "fields": [
+          {"name": "name", "expression": "`name`"},
+          {"name": "value", "expression": "`value`"}
+        ],
+        "disaggregated": true
+      }
+    }],
+    "spec": {
+      "version": 2,
+      "widgetType": "table",
+      "encodings": {
+        "columns": [
+          {"fieldName": "name", "displayName": "Name"},
+          {"fieldName": "value", "displayName": "Value"}
+        ]
+      },
+      "frame": {"showTitle": true, "title": "Details"}
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 6, "height": 6}
+}
+```
+
+---
+
 **Line / Bar Charts:**
+- `version`: **3**
 - `widgetType`: "line" or "bar"
 - Use `x`, `y`, optional `color` encodings
 - `scale.type`: `"temporal"` (dates), `"quantitative"` (numbers), `"categorical"` (strings)
@@ -181,72 +359,175 @@ y=12: Table (w=6, h=6) - Detailed data
 - **Stacked** (default): No `mark` field - bars stack on top of each other
 - **Grouped**: Add `"mark": {"layout": "group"}` - bars side-by-side for comparison
 
-**Combo Chart:**
-- `widgetType`: "combo"
-- Primary fields show as bars, secondary as line
-- Both must use same scale type
-
-```json
-"y": {
-  "primary": {"fields": [{"fieldName": "sum(orders)", "displayName": "Orders"}]},
-  "secondary": {"fields": [{"fieldName": "avg(aov)", "displayName": "AOV"}]},
-  "scale": {"type": "quantitative"}
-}
-```
-
 **Pie Chart:**
+- `version`: **3**
 - `widgetType`: "pie"
 - `angle`: quantitative aggregate
 - `color`: categorical dimension
 - Limit to 3-8 categories for readability
 
-**Table:**
-- `widgetType`: "table"
-- Use `"disaggregated": true` for raw rows
-- Set column `type`: `"string"`, `"number"`, `"datetime"`
-- Add `numberFormat` or `dateTimeFormat` as needed
+### 7) FILTERS (Global vs Page-Level)
 
-**Text:**
-- Use for headers and section breaks
-- Supports markdown: `# H1`, `## H2`, `**bold**`, `*italic*`
-- Add `\n` at end of each line in the array
-
-```json
-"textboxSpec": {
-  "lines": ["# Dashboard Title\n", "Description of what this dashboard shows.\n"]
-}
-```
-
-### 7) GLOBAL FILTERS
-
-Create a second page with `"pageType": "PAGE_TYPE_GLOBAL_FILTERS"`:
+> **CRITICAL**: Filter widgets use DIFFERENT widget types than charts!
+> - Valid types: `filter-multi-select`, `filter-single-select`, `filter-date-range-picker`
+> - **DO NOT** use `widgetType: "filter"` - this does not exist and will cause errors
+> - Filters use `spec.version: 2`
+> - **ALWAYS include `frame` with `showTitle: true`** for filter widgets
 
 **Filter widget types:**
 - `filter-date-range-picker`: for DATE/TIMESTAMP fields
 - `filter-single-select`: categorical with single selection
 - `filter-multi-select`: categorical with multiple selections
 
-**Filter structure:**
+---
+
+#### Global Filters vs Page-Level Filters
+
+| Type | Placement | Scope | Use Case |
+|------|-----------|-------|----------|
+| **Global Filter** | Dedicated page with `"pageType": "PAGE_TYPE_GLOBAL_FILTERS"` | Affects ALL pages that have datasets with the filter field | Cross-dashboard filtering (e.g., date range, campaign) |
+| **Page-Level Filter** | Regular page with `"pageType": "PAGE_TYPE_CANVAS"` | Affects ONLY widgets on that same page | Page-specific filtering (e.g., platform filter on breakdown page only) |
+
+**Key Insight**: A filter only affects datasets that contain the filter field. To have a filter affect only specific pages:
+1. Include the filter dimension in datasets for pages that should be filtered
+2. Exclude the filter dimension from datasets for pages that should NOT be filtered
+
+---
+
+#### Filter Widget Structure
+
+> **CRITICAL**: Do NOT use `associative_filter_predicate_group` - it causes SQL errors!
+> Use a simple field expression instead.
+
 ```json
 {
   "widget": {
     "name": "filter_region",
-    "queries": [
-      {"name": "ds_orders_region", "query": {"datasetName": "ds_orders", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}}
-    ],
+    "queries": [{
+      "name": "ds_data_region",
+      "query": {
+        "datasetName": "ds_data",
+        "fields": [
+          {"name": "region", "expression": "`region`"}
+        ],
+        "disaggregated": false
+      }
+    }],
     "spec": {
       "version": 2,
       "widgetType": "filter-multi-select",
       "encodings": {
-        "fields": [{"fieldName": "region", "displayName": "Region", "queryName": "ds_orders_region"}]
-      }
+        "fields": [{
+          "fieldName": "region",
+          "displayName": "Region",
+          "queryName": "ds_data_region"
+        }]
+      },
+      "frame": {"showTitle": true, "title": "Region"}
     }
   },
   "position": {"x": 0, "y": 0, "width": 2, "height": 2}
 }
 ```
 
-**Important:** All datasets must include filter fields for filtering to work across the dashboard.
+---
+
+#### Global Filter Example
+
+Place on a dedicated filter page:
+
+```json
+{
+  "name": "filters",
+  "displayName": "Filters",
+  "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+  "layout": [
+    {
+      "widget": {
+        "name": "filter_campaign",
+        "queries": [{
+          "name": "ds_campaign",
+          "query": {
+            "datasetName": "overview",
+            "fields": [{"name": "campaign_name", "expression": "`campaign_name`"}],
+            "disaggregated": false
+          }
+        }],
+        "spec": {
+          "version": 2,
+          "widgetType": "filter-multi-select",
+          "encodings": {
+            "fields": [{
+              "fieldName": "campaign_name",
+              "displayName": "Campaign",
+              "queryName": "ds_campaign"
+            }]
+          },
+          "frame": {"showTitle": true, "title": "Campaign"}
+        }
+      },
+      "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+    }
+  ]
+}
+```
+
+---
+
+#### Page-Level Filter Example
+
+Place directly on a canvas page (affects only that page):
+
+```json
+{
+  "name": "platform_breakdown",
+  "displayName": "Platform Breakdown",
+  "pageType": "PAGE_TYPE_CANVAS",
+  "layout": [
+    {
+      "widget": {
+        "name": "page-title",
+        "multilineTextboxSpec": {"lines": ["## Platform Breakdown"]}
+      },
+      "position": {"x": 0, "y": 0, "width": 4, "height": 1}
+    },
+    {
+      "widget": {
+        "name": "filter_platform",
+        "queries": [{
+          "name": "ds_platform",
+          "query": {
+            "datasetName": "platform_data",
+            "fields": [{"name": "platform", "expression": "`platform`"}],
+            "disaggregated": false
+          }
+        }],
+        "spec": {
+          "version": 2,
+          "widgetType": "filter-multi-select",
+          "encodings": {
+            "fields": [{
+              "fieldName": "platform",
+              "displayName": "Platform",
+              "queryName": "ds_platform"
+            }]
+          },
+          "frame": {"showTitle": true, "title": "Platform"}
+        }
+      },
+      "position": {"x": 4, "y": 0, "width": 2, "height": 2}
+    }
+    // ... other widgets on this page
+  ]
+}
+```
+
+---
+
+**Filter Layout Guidelines:**
+- Global filters: Position on dedicated filter page, stack vertically at `x=0`
+- Page-level filters: Position in header area of page (e.g., top-right corner)
+- Typical sizing: `width: 2, height: 2`
 
 ### 8) QUALITY CHECKLIST
 
@@ -256,10 +537,11 @@ Before deploying, verify:
 3. KPIs use height 3-4, charts use height 5-6
 4. Chart dimensions have ≤8 distinct values
 5. All widget fieldNames match dataset columns exactly
-6. Counter datasets return exactly 1 row
-7. Percent values are 0-1 (not 0-100)
-8. SQL uses Spark syntax (date_sub, not INTERVAL)
-9. **All SQL queries tested via `execute_sql` and return expected data**
+6. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
+7. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
+8. Percent values are 0-1 (not 0-100)
+9. SQL uses Spark syntax (date_sub, not INTERVAL)
+10. **All SQL queries tested via `execute_sql` and return expected data**
 
 ---
 
@@ -272,7 +554,7 @@ import json
 table_info = get_table_details(catalog="samples", schema="nyctaxi")
 
 # Step 2: Test queries
-execute_sql("SELECT COUNT(*) as trips, AVG(fare_amount) as avg_fare FROM samples.nyctaxi.trips")
+execute_sql("SELECT COUNT(*) as trips, AVG(fare_amount) as avg_fare, AVG(trip_distance) as avg_distance FROM samples.nyctaxi.trips")
 execute_sql("""
     SELECT pickup_zip, COUNT(*) as trip_count
     FROM samples.nyctaxi.trips
@@ -283,10 +565,53 @@ execute_sql("""
 
 # Step 3: Build dashboard JSON
 dashboard = {
+    "datasets": [
+        {
+            "name": "summary",
+            "displayName": "Summary Stats",
+            "queryLines": [
+                "SELECT COUNT(*) as trips, AVG(fare_amount) as avg_fare, ",
+                "AVG(trip_distance) as avg_distance ",
+                "FROM samples.nyctaxi.trips "
+            ]
+        },
+        {
+            "name": "by_zip",
+            "displayName": "Trips by ZIP",
+            "queryLines": [
+                "SELECT pickup_zip, COUNT(*) as trip_count ",
+                "FROM samples.nyctaxi.trips ",
+                "GROUP BY pickup_zip ",
+                "ORDER BY trip_count DESC ",
+                "LIMIT 10 "
+            ]
+        }
+    ],
     "pages": [{
         "name": "overview",
         "displayName": "NYC Taxi Overview",
+        "pageType": "PAGE_TYPE_CANVAS",
         "layout": [
+            # Text header - NO spec block! Use SEPARATE widgets for title and subtitle!
+            {
+                "widget": {
+                    "name": "title",
+                    "multilineTextboxSpec": {
+                        "lines": ["## NYC Taxi Dashboard"]
+                    }
+                },
+                "position": {"x": 0, "y": 0, "width": 6, "height": 1}
+            },
+            {
+                "widget": {
+                    "name": "subtitle",
+                    "multilineTextboxSpec": {
+                        "lines": ["Trip statistics and analysis"]
+                    }
+                },
+                "position": {"x": 0, "y": 1, "width": 6, "height": 1}
+            },
+            # Counter - version 2, width 2!
             {
                 "widget": {
                     "name": "total-trips",
@@ -299,7 +624,7 @@ dashboard = {
                         }
                     }],
                     "spec": {
-                        "version": 3,
+                        "version": 2,
                         "widgetType": "counter",
                         "encodings": {
                             "value": {"fieldName": "trips", "displayName": "Total Trips"}
@@ -307,7 +632,7 @@ dashboard = {
                         "frame": {"title": "Total Trips", "showTitle": True}
                     }
                 },
-                "position": {"x": 0, "y": 0, "width": 3, "height": 3}
+                "position": {"x": 0, "y": 2, "width": 2, "height": 3}
             },
             {
                 "widget": {
@@ -321,21 +646,39 @@ dashboard = {
                         }
                     }],
                     "spec": {
-                        "version": 3,
+                        "version": 2,
                         "widgetType": "counter",
                         "encodings": {
                             "value": {"fieldName": "avg_fare", "displayName": "Avg Fare"}
                         },
-                        "format": {
-                            "type": "number-currency",
-                            "currencyCode": "USD",
-                            "decimalPlaces": {"type": "max", "places": 2}
-                        },
                         "frame": {"title": "Average Fare", "showTitle": True}
                     }
                 },
-                "position": {"x": 3, "y": 0, "width": 3, "height": 3}
+                "position": {"x": 2, "y": 2, "width": 2, "height": 3}
             },
+            {
+                "widget": {
+                    "name": "total-distance",
+                    "queries": [{
+                        "name": "main_query",
+                        "query": {
+                            "datasetName": "summary",
+                            "fields": [{"name": "avg_distance", "expression": "`avg_distance`"}],
+                            "disaggregated": True
+                        }
+                    }],
+                    "spec": {
+                        "version": 2,
+                        "widgetType": "counter",
+                        "encodings": {
+                            "value": {"fieldName": "avg_distance", "displayName": "Avg Distance"}
+                        },
+                        "frame": {"title": "Average Distance", "showTitle": True}
+                    }
+                },
+                "position": {"x": 4, "y": 2, "width": 2, "height": 3}
+            },
+            # Bar chart - version 3
             {
                 "widget": {
                     "name": "trips-by-zip",
@@ -360,31 +703,39 @@ dashboard = {
                         "frame": {"title": "Trips by Pickup ZIP", "showTitle": True}
                     }
                 },
-                "position": {"x": 0, "y": 3, "width": 6, "height": 5}
+                "position": {"x": 0, "y": 5, "width": 6, "height": 5}
+            },
+            # Table - version 2, minimal column props!
+            {
+                "widget": {
+                    "name": "zip-table",
+                    "queries": [{
+                        "name": "main_query",
+                        "query": {
+                            "datasetName": "by_zip",
+                            "fields": [
+                                {"name": "pickup_zip", "expression": "`pickup_zip`"},
+                                {"name": "trip_count", "expression": "`trip_count`"}
+                            ],
+                            "disaggregated": True
+                        }
+                    }],
+                    "spec": {
+                        "version": 2,
+                        "widgetType": "table",
+                        "encodings": {
+                            "columns": [
+                                {"fieldName": "pickup_zip", "displayName": "ZIP Code"},
+                                {"fieldName": "trip_count", "displayName": "Trip Count"}
+                            ]
+                        },
+                        "frame": {"title": "Top ZIP Codes", "showTitle": True}
+                    }
+                },
+                "position": {"x": 0, "y": 10, "width": 6, "height": 5}
             }
         ]
-    }],
-    "datasets": [
-        {
-            "name": "summary",
-            "displayName": "Summary Stats",
-            "queryLines": [
-                "SELECT COUNT(*) as trips, AVG(fare_amount) as avg_fare ",
-                "FROM samples.nyctaxi.trips "
-            ]
-        },
-        {
-            "name": "by_zip",
-            "displayName": "Trips by ZIP",
-            "queryLines": [
-                "SELECT pickup_zip, COUNT(*) as trip_count ",
-                "FROM samples.nyctaxi.trips ",
-                "GROUP BY pickup_zip ",
-                "ORDER BY trip_count DESC ",
-                "LIMIT 10 "
-            ]
-        }
-    ]
+    }]
 }
 
 # Step 4: Deploy
@@ -397,17 +748,170 @@ result = create_or_update_dashboard(
 print(result["url"])
 ```
 
+## Complete Example with Filters
+
+```python
+import json
+
+# Dashboard with a global filter for region
+dashboard_with_filters = {
+    "datasets": [
+        {
+            "name": "sales",
+            "displayName": "Sales Data",
+            "queryLines": [
+                "SELECT region, SUM(revenue) as total_revenue ",
+                "FROM catalog.schema.sales ",
+                "GROUP BY region"
+            ]
+        }
+    ],
+    "pages": [
+        {
+            "name": "overview",
+            "displayName": "Sales Overview",
+            "pageType": "PAGE_TYPE_CANVAS",
+            "layout": [
+                {
+                    "widget": {
+                        "name": "total-revenue",
+                        "queries": [{
+                            "name": "main_query",
+                            "query": {
+                                "datasetName": "sales",
+                                "fields": [{"name": "total_revenue", "expression": "`total_revenue`"}],
+                                "disaggregated": True
+                            }
+                        }],
+                        "spec": {
+                            "version": 2,  # Version 2 for counters!
+                            "widgetType": "counter",
+                            "encodings": {
+                                "value": {"fieldName": "total_revenue", "displayName": "Total Revenue"}
+                            },
+                            "frame": {"title": "Total Revenue", "showTitle": True}
+                        }
+                    },
+                    "position": {"x": 0, "y": 0, "width": 6, "height": 3}
+                }
+            ]
+        },
+        {
+            "name": "filters",
+            "displayName": "Filters",
+            "pageType": "PAGE_TYPE_GLOBAL_FILTERS",  # Required for global filter page!
+            "layout": [
+                {
+                    "widget": {
+                        "name": "filter_region",
+                        "queries": [{
+                            "name": "ds_sales_region",
+                            "query": {
+                                "datasetName": "sales",
+                                "fields": [
+                                    {"name": "region", "expression": "`region`"}
+                                    # DO NOT use associative_filter_predicate_group - causes SQL errors!
+                                ],
+                                "disaggregated": False  # False for filters!
+                            }
+                        }],
+                        "spec": {
+                            "version": 2,  # Version 2 for filters!
+                            "widgetType": "filter-multi-select",  # NOT "filter"!
+                            "encodings": {
+                                "fields": [{
+                                    "fieldName": "region",
+                                    "displayName": "Region",
+                                    "queryName": "ds_sales_region"  # Must match query name!
+                                }]
+                            },
+                            "frame": {"showTitle": True, "title": "Region"}  # Always show title!
+                        }
+                    },
+                    "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+                }
+            ]
+        }
+    ]
+}
+
+# Deploy with filters
+result = create_or_update_dashboard(
+    display_name="Sales Dashboard with Filters",
+    parent_path="/Workspace/Users/me/dashboards",
+    serialized_dashboard=json.dumps(dashboard_with_filters),
+    warehouse_id=get_best_warehouse(),
+)
+print(result["url"])
+```
+
 ## Troubleshooting
 
+### Widget shows "no selected fields to visualize"
+
+**This is a field name mismatch error.** The `name` in `query.fields` must exactly match the `fieldName` in `encodings`.
+
+**Fix:** Ensure names match exactly:
+```json
+// WRONG - names don't match
+"fields": [{"name": "spend", "expression": "SUM(`spend`)"}]
+"encodings": {"value": {"fieldName": "sum(spend)", ...}}  // ERROR!
+
+// CORRECT - names match
+"fields": [{"name": "sum(spend)", "expression": "SUM(`spend`)"}]
+"encodings": {"value": {"fieldName": "sum(spend)", ...}}  // OK!
+```
+
 ### Widget shows "Invalid widget definition"
-- Verify SQL query works via `execute_sql`
-- Check `disaggregated` flag (should be `true` for pre-aggregated data)
-- Ensure field names match dataset columns exactly
+
+**Check version numbers:**
+- Counters: `version: 2`
+- Tables: `version: 2`
+- Filters: `version: 2`
+- Bar/Line/Pie charts: `version: 3`
+
+**Text widget errors:**
+- Text widgets must NOT have a `spec` block
+- Use `multilineTextboxSpec` directly on the widget object
+- Do NOT use `widgetType: "text"` - this is invalid
+
+**Table widget errors:**
+- Use `version: 2` (NOT 1 or 3)
+- Column objects only need `fieldName` and `displayName`
+- Do NOT add `type`, `numberFormat`, or other column properties
+
+**Counter widget errors:**
+- Use `version: 2` (NOT 3)
+- Ensure dataset returns exactly 1 row
 
 ### Dashboard shows empty widgets
 - Run the dataset SQL query directly to check data exists
 - Verify column aliases match widget field expressions
+- Check `disaggregated` flag (should be `true` for pre-aggregated data)
 
 ### Layout has gaps
 - Ensure each row sums to width=6
 - Check that y positions don't skip values
+
+### Filter shows "Invalid widget definition"
+- Check `widgetType` is one of: `filter-multi-select`, `filter-single-select`, `filter-date-range-picker`
+- **DO NOT** use `widgetType: "filter"` - this is invalid
+- Verify `spec.version` is `2`
+- Ensure `queryName` in encodings matches the query `name`
+- Confirm `disaggregated: false` in filter queries
+- Ensure `frame` with `showTitle: true` is included
+
+### Filter not affecting expected pages
+- **Global filters** (on `PAGE_TYPE_GLOBAL_FILTERS` page) affect all datasets containing the filter field
+- **Page-level filters** (on `PAGE_TYPE_CANVAS` page) only affect widgets on that same page
+- A filter only works on datasets that include the filter dimension column
+
+### Filter shows "UNRESOLVED_COLUMN" error for `associative_filter_predicate_group`
+- **DO NOT** use `COUNT_IF(\`associative_filter_predicate_group\`)` in filter queries
+- This internal expression causes SQL errors when the dashboard executes queries
+- Use a simple field expression instead: `{"name": "field", "expression": "\`field\`"}`
+
+### Text widget shows title and description on same line
+- Multiple items in the `lines` array are **concatenated**, not displayed on separate lines
+- Use **separate text widgets** for title and subtitle at different y positions
+- Example: title at y=0 with height=1, subtitle at y=1 with height=1

@@ -52,6 +52,20 @@ def create_or_update_dashboard(
     - Use fully-qualified table names: catalog.schema.table_name
     - All widget fieldNames must match dataset column names exactly
 
+    CRITICAL VERSION REQUIREMENTS:
+    - counter: version 2
+    - table: version 2
+    - filter-multi-select, filter-single-select, filter-date-range-picker: version 2
+    - bar, line, pie: version 3
+    - text: NO spec block (use multilineTextboxSpec directly on widget)
+
+    CRITICAL FIELD NAME MATCHING:
+    The "name" in query.fields MUST exactly match "fieldName" in encodings!
+    - CORRECT: fields=[{"name": "sum(spend)", "expression": "SUM(`spend`)"}]
+               encodings={"value": {"fieldName": "sum(spend)", ...}}
+    - WRONG:   fields=[{"name": "spend", "expression": "SUM(`spend`)"}]
+               encodings={"value": {"fieldName": "sum(spend)", ...}}  # ERROR!
+
     Widget Field Expressions (ONLY these are allowed):
     - Aggregates: SUM(`col`), AVG(`col`), COUNT(`col`), COUNT(DISTINCT `col`), MIN(`col`), MAX(`col`)
     - Date truncation: DATE_TRUNC("DAY", `date`), DATE_TRUNC("WEEK", `date`), DATE_TRUNC("MONTH", `date`)
@@ -63,19 +77,33 @@ def create_or_update_dashboard(
     - Counter/KPI: width=2, height=3-4 (NEVER height=2)
     - Charts: width=3, height=5-6
     - Tables: width=6, height=5-8
-    - Text headers: width=6, height=1-2
+    - Text headers: width=6, height=1 (use SEPARATE widgets for title and subtitle)
 
     Widget Naming:
     - widget.name: alphanumeric + hyphens + underscores ONLY (no spaces/parentheses/colons)
     - frame.title: human-readable name (any characters)
     - widget.queries[0].name: always "main_query"
 
-    Counter widgets:
-    - Dataset must return exactly 1 row
-    - Use "disaggregated": true in query
+    Text Widgets:
+    - Do NOT use a spec block - use multilineTextboxSpec directly on widget
+    - Multiple items in lines[] are CONCATENATED, not separate lines
+    - Use separate text widgets for title and subtitle at different y positions
+
+    Counter Widgets (version 2):
+    Pattern 1 - Pre-aggregated (1 row, no filters):
+    - Dataset returns exactly 1 row
+    - Use "disaggregated": true and simple field reference
+    Pattern 2 - Aggregating (multi-row, supports filters):
+    - Dataset returns multiple rows (grouped by filter dimension)
+    - Use "disaggregated": false and aggregation expression
+    - Field name must match: {"name": "sum(spend)", "expression": "SUM(`spend`)"}
     - Percent values must be 0-1 (not 0-100)
 
-    Charts (line/bar):
+    Table Widgets (version 2):
+    - Column objects only need fieldName and displayName - no other properties!
+    - Use "disaggregated": true for raw rows
+
+    Charts - line/bar/pie (version 3):
     - Use "disaggregated": true with pre-aggregated data
     - scale.type: "temporal" (dates), "quantitative" (numbers), "categorical" (strings)
     - Limit color/grouping dimensions to 3-8 distinct values
@@ -83,6 +111,20 @@ def create_or_update_dashboard(
     SQL Patterns (Spark SQL):
     - Date math: date_sub(current_date(), N), add_months(current_date(), -N)
     - AVOID INTERVAL syntax - use functions instead
+
+    Filters (CRITICAL - Global vs Page-Level):
+    - Valid filter widgetTypes: "filter-multi-select", "filter-single-select", "filter-date-range-picker"
+    - Filter widgets use spec.version: 2 (NOT 3 like charts)
+    - Filter encodings require "queryName" to bind to dataset queries
+    - Use "disaggregated": false for filter queries
+    - DO NOT use widgetType: "filter" - this is INVALID and will cause errors
+    - DO NOT use associative_filter_predicate_group - causes SQL errors
+    - ALWAYS include "frame": {"showTitle": true, "title": "..."} for filter widgets
+    
+    Global Filters vs Page-Level Filters:
+    - GLOBAL: Place on page with "pageType": "PAGE_TYPE_GLOBAL_FILTERS" - affects ALL pages
+    - PAGE-LEVEL: Place on regular "PAGE_TYPE_CANVAS" page - affects ONLY that page
+    - A filter only affects datasets containing the filter field column
 
     Args:
         display_name: Dashboard display name
