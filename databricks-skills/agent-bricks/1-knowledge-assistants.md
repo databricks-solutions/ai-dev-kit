@@ -120,6 +120,47 @@ To update the indexed documents:
 
 5. **Test the KA** in the Databricks UI
 
+## Using KA in Multi-Agent Supervisors
+
+Knowledge Assistants can be used as agents in a Multi-Agent Supervisor (MAS). Each KA has an associated model serving endpoint.
+
+### Finding the Endpoint Name
+
+Use `get_ka` to retrieve the KA details. The response includes:
+- `tile_id`: The unique identifier for the KA
+- `name`: The KA name (sanitized)
+- `endpoint_status`: Current status (ONLINE, PROVISIONING, etc.)
+
+The endpoint name follows this pattern: `ka-{tile_id}-endpoint`
+
+### Finding a KA by Name
+
+If you know the KA name but not the tile_id, use `find_ka_by_name`:
+
+```python
+find_ka_by_name(name="HR_Policy_Assistant")
+# Returns: {"found": True, "tile_id": "01abc...", "name": "HR_Policy_Assistant", "endpoint_name": "ka-01abc...-endpoint"}
+```
+
+### Example: Adding KA to MAS
+
+```python
+# First, find the KA
+ka_result = find_ka_by_name(name="HR_Policy_Assistant")
+
+# Then use it in a MAS
+create_or_update_mas(
+    name="Support MAS",
+    agents=[
+        {
+            "name": "hr_agent",
+            "endpoint_name": ka_result["endpoint_name"],
+            "description": "Answers HR policy questions from the employee handbook"
+        }
+    ]
+)
+```
+
 ## Troubleshooting
 
 ### Endpoint stays in PROVISIONING

@@ -265,7 +265,7 @@ class AgentBricksManager:
             if page_token:
                 params["page_token"] = page_token
             resp = self._get("/api/2.0/data-rooms", params=params)
-            for space in resp.get("spaces", []):
+            for space in resp.get("data_rooms", []):
                 if space.get("display_name") == display_name:
                     return GenieIds(space_id=space["space_id"], display_name=display_name)
             page_token = resp.get("next_page_token")

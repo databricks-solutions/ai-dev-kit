@@ -21,15 +21,20 @@ Use a Multi-Agent Supervisor when:
 
 ## Prerequisites
 
-Before creating a MAS, you need:
+Before creating a MAS, you need agents of one or both types:
 
-**Model Serving Endpoints**: Each agent must be deployed as a model serving endpoint in Databricks.
-
-These could be:
+**Model Serving Endpoints** (`endpoint_name`):
+- Knowledge Assistant (KA) endpoints (e.g., `ka-abc123-endpoint`)
 - Custom agents built with LangChain, LlamaIndex, etc.
 - Fine-tuned models
 - RAG applications
-- External API integrations
+
+**Genie Spaces** (`genie_space_id`):
+- Existing Genie spaces for SQL-based data exploration
+- Great for analytics, metrics, and data-driven questions
+- No separate endpoint deployment required - reference the space directly
+- To find a Genie space by name, use `find_genie_by_name(display_name="My Genie")`
+- **Note**: There is NO system table for Genie spaces - do not try to query `system.ai.genie_spaces`
 
 ## Creating a Multi-Agent Supervisor
 
@@ -40,24 +45,26 @@ Use the `create_or_update_mas` tool:
   ```json
   [
     {
-      "name": "billing_agent",
-      "endpoint_name": "billing-assistant-endpoint",
-      "description": "Handles billing, payments, invoices, and subscription questions"
+      "name": "policy_agent",
+      "ka_tile_id": "f32c5f73-466b-4798-b3a0-5396b5ece2a5",
+      "description": "Answers questions about company policies and procedures from indexed documents"
     },
     {
-      "name": "technical_agent",
-      "endpoint_name": "tech-support-endpoint",
-      "description": "Handles technical issues, bugs, and product features"
+      "name": "usage_analytics",
+      "genie_space_id": "01abc123-def4-5678-90ab-cdef12345678",
+      "description": "Answers data questions about usage metrics, trends, and statistics"
     },
     {
-      "name": "hr_agent",
-      "endpoint_name": "hr-assistant-endpoint",
-      "description": "Handles HR policies, benefits, and employee questions"
+      "name": "custom_agent",
+      "endpoint_name": "my-custom-endpoint",
+      "description": "Handles specialized queries via custom model endpoint"
     }
   ]
   ```
 - `description`: "Routes customer queries to specialized support agents"
 - `instructions`: "Analyze the user's question and route to the most appropriate agent. If unclear, ask for clarification."
+
+This example shows mixing Knowledge Assistants (policy_agent), Genie spaces (usage_analytics), and custom endpoints (custom_agent).
 
 ## Agent Configuration
 
@@ -66,8 +73,15 @@ Each agent in the `agents` list needs:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | Yes | Internal identifier for the agent |
-| `endpoint_name` | Yes | Model serving endpoint name |
-| `description` | Yes | What this agent handles (used for routing) |
+| `description` | Yes | What this agent handles (critical for routing) |
+| `ka_tile_id` | One of these | Knowledge Assistant tile ID (for document Q&A agents) |
+| `genie_space_id` | One of these | Genie space ID (for SQL-based data agents) |
+| `endpoint_name` | One of these | Model serving endpoint name (for custom agents) |
+
+**Note**: Provide exactly one of: `ka_tile_id`, `genie_space_id`, or `endpoint_name`.
+
+To find a KA tile_id, use `find_ka_by_name(name="Your KA Name")`.
+To find a Genie space_id, use `find_genie_by_name(display_name="Your Genie Name")`.
 
 ### Writing Good Descriptions
 

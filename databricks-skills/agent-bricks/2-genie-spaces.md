@@ -201,6 +201,17 @@ Write sample questions that:
 
 5. **Test** in the Databricks UI
 
+## Finding Existing Genie Spaces
+
+To find an existing Genie space by name, use `find_genie_by_name`:
+
+```python
+find_genie_by_name(display_name="Sales Analytics")
+# Returns: {"found": True, "space_id": "abc123...", "display_name": "Sales Analytics", ...}
+```
+
+**IMPORTANT**: There is NO system table for Genie spaces. Do NOT try to query `system.ai.genie_spaces` or similar tables - they don't exist. Always use the `find_genie_by_name` tool to look up existing spaces.
+
 ## Updating a Genie Space
 
 To update an existing space:

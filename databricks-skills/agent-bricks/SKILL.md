@@ -31,8 +31,9 @@ Before creating Agent Bricks, ensure you have the required data:
 - Create tables using the `spark-declarative-pipelines` skill
 
 ### For Multi-Agent Supervisors
-- **Model Serving Endpoints**: Deployed agent endpoints to orchestrate
-- These could be custom agents, fine-tuned models, or other deployed services
+- **Model Serving Endpoints**: Deployed agent endpoints (KA endpoints, custom agents, fine-tuned models)
+- **Genie Spaces**: Existing Genie spaces can be used directly as agents for SQL-based queries
+- Mix and match endpoint-based and Genie-based agents in the same MAS
 
 ## MCP Tools
 
@@ -48,6 +49,11 @@ Before creating Agent Bricks, ensure you have the required data:
 
 **get_ka** - Get Knowledge Assistant details
 - `tile_id`: The KA tile ID
+
+**find_ka_by_name** - Find a Knowledge Assistant by name
+- `name`: The exact name of the KA to find
+- Returns: `tile_id`, `name`, `endpoint_name`, `endpoint_status`
+- Use this to look up an existing KA when you know the name but not the tile_id
 
 **delete_ka** - Delete a Knowledge Assistant
 - `tile_id`: The KA tile ID to delete
@@ -82,25 +88,41 @@ Before creating Agent Bricks, ensure you have the required data:
 
 - `space_id`: The Genie space ID
 
+**find_genie_by_name** - Find a Genie Space by display name
+
+- `display_name`: The exact display name of the Genie space
+- Returns: `space_id`, `display_name`, `description`, `warehouse_id`
+- Use this to look up an existing Genie space when you know the name but not the ID
+
 **delete_genie** - Delete a Genie Space
 
 - `space_id`: The Genie space ID to delete
+
+**IMPORTANT**: There is NO system table for Genie spaces (e.g., `system.ai.genie_spaces` does not exist). To find a Genie space by name, use the `find_genie_by_name` tool.
 
 ### Multi-Agent Supervisor Tools
 
 **create_or_update_mas** - Create or update a Multi-Agent Supervisor
 - `name`: Name for the MAS
-- `agents`: List of agent configurations:
-  - `name`: Agent name
-  - `endpoint_name`: Model serving endpoint name
-  - `description`: What this agent handles (used for routing)
+- `agents`: List of agent configurations, each with:
+  - `name`: Agent identifier (required)
+  - `description`: What this agent handles - critical for routing (required)
+  - `ka_tile_id`: Knowledge Assistant tile ID (use for document Q&A agents - recommended for KAs)
+  - `genie_space_id`: Genie space ID (use for SQL-based data agents)
+  - `endpoint_name`: Model serving endpoint name (use for custom agents)
+  - Note: Provide exactly one of: `ka_tile_id`, `genie_space_id`, or `endpoint_name`
 - `description`: (optional) What the MAS does
-- `instructions`: (optional) Routing instructions
+- `instructions`: (optional) Routing instructions for the supervisor
 - `tile_id`: (optional) Existing tile_id to update
 - `examples`: (optional) List of example questions with `question` and `guideline` fields
 
 **get_mas** - Get Multi-Agent Supervisor details
 - `tile_id`: The MAS tile ID
+
+**find_mas_by_name** - Find a Multi-Agent Supervisor by name
+- `name`: The exact name of the MAS to find
+- Returns: `tile_id`, `name`, `endpoint_status`, `agents_count`
+- Use this to look up an existing MAS when you know the name but not the tile_id
 
 **delete_mas** - Delete a Multi-Agent Supervisor
 - `tile_id`: The MAS tile ID to delete

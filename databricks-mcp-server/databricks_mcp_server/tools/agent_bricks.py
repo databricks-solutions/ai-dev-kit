@@ -184,6 +184,62 @@ def get_ka(tile_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
+def find_ka_by_name(name: str) -> Dict[str, Any]:
+    """
+    Find a Knowledge Assistant by its name.
+
+    Use this to look up a KA when you know the name but not the tile_id.
+    This is useful when referencing an existing KA in a Multi-Agent Supervisor.
+
+    Args:
+        name: The name of the Knowledge Assistant to find (exact match)
+
+    Returns:
+        Dictionary with:
+        - found: True if a matching KA was found
+        - tile_id: The tile ID (if found)
+        - name: The KA name (if found)
+        - endpoint_name: The model serving endpoint name (if found)
+        - endpoint_status: Current status (if found)
+
+    Example:
+        >>> find_ka_by_name("HR_Policy_Assistant")
+        {
+            "found": True,
+            "tile_id": "01abc...",
+            "name": "HR_Policy_Assistant",
+            "endpoint_name": "ka-01abc...-endpoint",
+            "endpoint_status": "ONLINE"
+        }
+    """
+    manager = _get_manager()
+    result = manager.find_by_name(name)
+
+    if result is None:
+        return {"found": False, "name": name}
+
+    # Fetch full details to get endpoint status
+    full_details = manager.ka_get(result.tile_id)
+    endpoint_status = "UNKNOWN"
+    if full_details:
+        endpoint_status = (
+            full_details.get("knowledge_assistant", {})
+            .get("status", {})
+            .get("endpoint_status", "UNKNOWN")
+        )
+
+    # Endpoint name uses only the first segment of the tile_id (before the first hyphen)
+    tile_id_prefix = result.tile_id.split("-")[0]
+    return {
+        "found": True,
+        "tile_id": result.tile_id,
+        "name": result.name,
+        "endpoint_name": f"ka-{tile_id_prefix}-endpoint",
+        "endpoint_status": endpoint_status,
+    }
+
+
+@mcp.tool
 def delete_ka(tile_id: str) -> Dict[str, Any]:
     """
     Delete a Knowledge Assistant.
@@ -378,6 +434,64 @@ def get_genie(space_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
+def find_genie_by_name(display_name: str) -> Dict[str, Any]:
+    """
+    Find a Genie Space by its display name.
+
+    Use this to look up a Genie space when you know the name but not the space_id.
+    This is useful when referencing an existing Genie space in a Multi-Agent Supervisor.
+
+    Note: There is no system table for Genie spaces. Use this tool instead of
+    trying to query system.ai.genie_spaces or similar (which don't exist).
+
+    Args:
+        display_name: The display name of the Genie space to find (exact match)
+
+    Returns:
+        Dictionary with:
+        - found: True if a matching space was found
+        - space_id: The space ID (if found)
+        - display_name: The display name (if found)
+        - description: The description (if found)
+        - warehouse_id: The warehouse ID (if found)
+
+    Example:
+        >>> find_genie_by_name("Sales Analytics")
+        {
+            "found": True,
+            "space_id": "abc123...",
+            "display_name": "Sales Analytics",
+            "warehouse_id": "def456..."
+        }
+    """
+    manager = _get_manager()
+    result = manager.genie_find_by_name(display_name)
+
+    if result is None:
+        return {"found": False, "display_name": display_name}
+
+    # Fetch full details to get description and warehouse_id
+    full_details = manager.genie_get(result.space_id)
+    if full_details:
+        return {
+            "found": True,
+            "space_id": result.space_id,
+            "display_name": result.display_name,
+            "description": full_details.get("description", ""),
+            "warehouse_id": full_details.get("warehouse_id", ""),
+            "table_identifiers": full_details.get("table_identifiers", []),
+        }
+
+    return {
+        "found": True,
+        "space_id": result.space_id,
+        "display_name": result.display_name,
+        "description": "",
+        "warehouse_id": "",
+    }
+
+
+@mcp.tool
 def delete_genie(space_id: str) -> Dict[str, Any]:
     """
     Delete a Genie Space.
@@ -419,21 +533,25 @@ def create_or_update_mas(
     """
     Create or update a Multi-Agent Supervisor (MAS).
 
-    A MAS orchestrates multiple agent endpoints, routing user queries to the
-    appropriate specialized agent based on the query content.
+    A MAS orchestrates multiple agents, routing user queries to the appropriate
+    specialized agent based on the query content. Supports both model serving
+    endpoints and Genie spaces as agents.
 
     Args:
         name: Name for the MAS (will be sanitized for Databricks naming rules)
-        agents: List of agent configurations, each with:
-            - name: Agent name
-            - endpoint_name: The model serving endpoint name
-            - description: What this agent does (used for routing)
+        agents: List of agent configurations. Each agent requires:
+            - name: Agent identifier (used internally for routing)
+            - description: What this agent handles (critical for routing decisions)
+            - endpoint_name: Model serving endpoint name (for custom agents)
+            - genie_space_id: Genie space ID (for SQL-based data agents)
+            - ka_tile_id: Knowledge Assistant tile ID (for document Q&A agents)
+            Note: Provide exactly one of: endpoint_name, genie_space_id, or ka_tile_id.
         description: Optional description of what the MAS does
-        instructions: Optional instructions for the supervisor
+        instructions: Optional routing instructions for the supervisor
         tile_id: Optional existing tile_id to update instead of create
         examples: Optional list of example questions, each with:
             - question: The example question
-            - guideline: Optional guideline for evaluation
+            - guideline: Expected routing behavior or answer guidelines
 
     Returns:
         Dictionary with:
@@ -444,40 +562,84 @@ def create_or_update_mas(
         - agents_count: Number of configured agents
 
     Example:
+        >>> # Mix of Knowledge Assistants, Genie spaces, and custom endpoints
         >>> create_or_update_mas(
         ...     name="Customer Support MAS",
         ...     agents=[
         ...         {
-        ...             "name": "billing_agent",
-        ...             "endpoint_name": "billing-assistant-endpoint",
-        ...             "description": "Handles billing and payment questions"
+        ...             "name": "policy_agent",
+        ...             "ka_tile_id": "f32c5f73-466b-...",
+        ...             "description": "Answers questions about company policies and procedures"
         ...         },
         ...         {
-        ...             "name": "technical_agent",
-        ...             "endpoint_name": "tech-support-endpoint",
-        ...             "description": "Handles technical support questions"
+        ...             "name": "analytics_agent",
+        ...             "genie_space_id": "01abc123...",
+        ...             "description": "Answers data questions about usage and metrics"
+        ...         },
+        ...         {
+        ...             "name": "custom_agent",
+        ...             "endpoint_name": "my-custom-endpoint",
+        ...             "description": "Handles specialized queries via custom agent"
         ...         }
         ...     ],
-        ...     description="Routes customer queries to specialized agents"
+        ...     description="Routes customer queries to specialized agents",
+        ...     instructions="Route policy questions to policy_agent, data questions to analytics_agent."
         ... )
         {
             "tile_id": "01xyz...",
             "name": "Customer_Support_MAS",
             "operation": "created",
             "endpoint_status": "PROVISIONING",
-            "agents_count": 2
+            "agents_count": 3
         }
     """
     manager = _get_manager()
 
-    # Build agent list for API
+    # Validate and build agent list for API
     agent_list = []
-    for agent in agents:
+    for i, agent in enumerate(agents):
+        agent_name = agent.get("name", "")
+        if not agent_name:
+            return {"error": f"Agent at index {i} is missing required 'name' field"}
+
+        agent_description = agent.get("description", "")
+        if not agent_description:
+            return {"error": f"Agent '{agent_name}' is missing required 'description' field"}
+
+        has_endpoint = bool(agent.get("endpoint_name"))
+        has_genie = bool(agent.get("genie_space_id"))
+        has_ka = bool(agent.get("ka_tile_id"))
+
+        # Count how many agent types are specified
+        agent_type_count = sum([has_endpoint, has_genie, has_ka])
+        if agent_type_count > 1:
+            return {
+                "error": f"Agent '{agent_name}' has multiple agent types. Provide only one of: 'endpoint_name', 'genie_space_id', or 'ka_tile_id'."
+            }
+        if agent_type_count == 0:
+            return {
+                "error": f"Agent '{agent_name}' must have one of: 'endpoint_name', 'genie_space_id', or 'ka_tile_id'"
+            }
+
         agent_config = {
-            "name": agent.get("name", ""),
-            "serving_endpoint_name": agent.get("endpoint_name", ""),
-            "description": agent.get("description", ""),
+            "name": agent_name,
+            "description": agent_description,
         }
+
+        if has_genie:
+            agent_config["agent_type"] = "genie"
+            agent_config["genie_space"] = {"id": agent.get("genie_space_id")}
+        elif has_ka:
+            # KA tiles are referenced via their serving endpoint
+            # Endpoint name uses the first segment of the tile_id
+            ka_tile_id = agent.get("ka_tile_id")
+            tile_id_prefix = ka_tile_id.split("-")[0]
+            agent_config["agent_type"] = "serving_endpoint"
+            agent_config["serving_endpoint"] = {"name": f"ka-{tile_id_prefix}-endpoint"}
+        else:
+            agent_config["agent_type"] = "serving_endpoint"
+            agent_config["serving_endpoint"] = {"name": agent.get("endpoint_name")}
+
         agent_list.append(agent_config)
 
     operation = "created"
@@ -599,6 +761,62 @@ def get_mas(tile_id: str) -> Dict[str, Any]:
         "agents": mas_data.get("agents", []),
         "examples_count": examples_count,
         "instructions": mas_data.get("instructions", ""),
+    }
+
+
+@mcp.tool
+def find_mas_by_name(name: str) -> Dict[str, Any]:
+    """
+    Find a Multi-Agent Supervisor by its name.
+
+    Use this to look up a MAS when you know the name but not the tile_id.
+
+    Args:
+        name: The name of the MAS to find (exact match)
+
+    Returns:
+        Dictionary with:
+        - found: True if a matching MAS was found
+        - tile_id: The tile ID (if found)
+        - name: The MAS name (if found)
+        - endpoint_status: Current status (if found)
+        - agents_count: Number of configured agents (if found)
+
+    Example:
+        >>> find_mas_by_name("Customer_Support_MAS")
+        {
+            "found": True,
+            "tile_id": "01xyz...",
+            "name": "Customer_Support_MAS",
+            "endpoint_status": "ONLINE",
+            "agents_count": 3
+        }
+    """
+    manager = _get_manager()
+    result = manager.mas_find_by_name(name)
+
+    if result is None:
+        return {"found": False, "name": name}
+
+    # Fetch full details to get endpoint status and agents
+    full_details = manager.mas_get(result.tile_id)
+    if full_details:
+        mas_data = full_details.get("multi_agent_supervisor", {})
+        status_data = mas_data.get("status", {})
+        return {
+            "found": True,
+            "tile_id": result.tile_id,
+            "name": result.name,
+            "endpoint_status": status_data.get("endpoint_status", "UNKNOWN"),
+            "agents_count": len(mas_data.get("agents", [])),
+        }
+
+    return {
+        "found": True,
+        "tile_id": result.tile_id,
+        "name": result.name,
+        "endpoint_status": "UNKNOWN",
+        "agents_count": 0,
     }
 
 
