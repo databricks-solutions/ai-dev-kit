@@ -16,9 +16,9 @@ from ..server import mcp
 @mcp.tool
 def execute_sql(
     sql_query: str,
-    warehouse_id: Optional[str] = None,
-    catalog: Optional[str] = None,
-    schema: Optional[str] = None,
+    warehouse_id: str = None,
+    catalog: str = None,
+    schema: str = None,
     timeout: int = 180,
 ) -> List[Dict[str, Any]]:
     """
@@ -48,9 +48,9 @@ def execute_sql(
 @mcp.tool
 def execute_sql_multi(
     sql_content: str,
-    warehouse_id: Optional[str] = None,
-    catalog: Optional[str] = None,
-    schema: Optional[str] = None,
+    warehouse_id: str = None,
+    catalog: str = None,
+    schema: str = None,
     timeout: int = 180,
     max_workers: int = 4,
 ) -> Dict[str, Any]:
@@ -109,9 +109,9 @@ def get_best_warehouse() -> Optional[str]:
 def get_table_details(
     catalog: str,
     schema: str,
-    table_names: Optional[List[str]] = None,
+    table_names: List[str] = None,
     table_stat_level: str = "SIMPLE",
-    warehouse_id: Optional[str] = None,
+    warehouse_id: str = None,
 ) -> Dict[str, Any]:
     """
     Get table schema and statistics for one or more tables.

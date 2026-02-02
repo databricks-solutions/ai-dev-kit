@@ -1,5 +1,5 @@
 """Pipeline tools - Manage Spark Declarative Pipelines (SDP)."""
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 
 from databricks_tools_core.spark_declarative_pipelines.pipelines import (
     create_pipeline as _create_pipeline,
@@ -24,7 +24,7 @@ def create_pipeline(
     catalog: str,
     schema: str,
     workspace_file_paths: List[str],
-    extra_settings: Optional[Dict[str, Any]] = None,
+    extra_settings: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
     Create a new Spark Declarative Pipeline (Unity Catalog, serverless by default).
@@ -71,12 +71,12 @@ def get_pipeline(pipeline_id: str) -> Dict[str, Any]:
 @mcp.tool
 def update_pipeline(
     pipeline_id: str,
-    name: Optional[str] = None,
-    root_path: Optional[str] = None,
-    catalog: Optional[str] = None,
-    schema: Optional[str] = None,
-    workspace_file_paths: Optional[List[str]] = None,
-    extra_settings: Optional[Dict[str, Any]] = None,
+    name: str = None,
+    root_path: str = None,
+    catalog: str = None,
+    schema: str = None,
+    workspace_file_paths: List[str] = None,
+    extra_settings: Dict[str, Any] = None,
 ) -> Dict[str, str]:
     """
     Update pipeline configuration.
@@ -125,9 +125,9 @@ def delete_pipeline(pipeline_id: str) -> Dict[str, str]:
 @mcp.tool
 def start_update(
     pipeline_id: str,
-    refresh_selection: Optional[List[str]] = None,
+    refresh_selection: List[str] = None,
     full_refresh: bool = False,
-    full_refresh_selection: Optional[List[str]] = None,
+    full_refresh_selection: List[str] = None,
     validate_only: bool = False,
 ) -> Dict[str, str]:
     """
@@ -216,7 +216,7 @@ def create_or_update_pipeline(
     wait_for_completion: bool = False,
     full_refresh: bool = True,
     timeout: int = 1800,
-    extra_settings: Optional[Dict[str, Any]] = None,
+    extra_settings: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
     Create a new pipeline or update an existing one with the same name.

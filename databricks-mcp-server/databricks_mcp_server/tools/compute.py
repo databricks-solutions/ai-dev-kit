@@ -44,8 +44,8 @@ def get_best_cluster() -> Dict[str, Any]:
 @mcp.tool
 def execute_databricks_command(
     code: str,
-    cluster_id: Optional[str] = None,
-    context_id: Optional[str] = None,
+    cluster_id: str = None,
+    context_id: str = None,
     language: str = "python",
     timeout: int = 120,
     destroy_context_on_completion: bool = False,
@@ -112,8 +112,8 @@ def execute_databricks_command(
 @mcp.tool
 def run_python_file_on_databricks(
     file_path: str,
-    cluster_id: Optional[str] = None,
-    context_id: Optional[str] = None,
+    cluster_id: str = None,
+    context_id: str = None,
     timeout: int = 600,
     destroy_context_on_completion: bool = False,
 ) -> Dict[str, Any]:

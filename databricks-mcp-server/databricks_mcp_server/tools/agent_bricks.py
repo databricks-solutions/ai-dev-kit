@@ -31,9 +31,9 @@ def _get_manager() -> AgentBricksManager:
 def create_or_update_ka(
     name: str,
     volume_path: str,
-    description: Optional[str] = None,
-    instructions: Optional[str] = None,
-    tile_id: Optional[str] = None,
+    description: str = None,
+    instructions: str = None,
+    tile_id: str = None,
     add_examples_from_volume: bool = True,
 ) -> Dict[str, Any]:
     """
@@ -217,10 +217,10 @@ def delete_ka(tile_id: str) -> Dict[str, Any]:
 def create_or_update_genie(
     display_name: str,
     table_identifiers: List[str],
-    warehouse_id: Optional[str] = None,
-    description: Optional[str] = None,
-    sample_questions: Optional[List[str]] = None,
-    space_id: Optional[str] = None,
+    warehouse_id: str = None,
+    description: str = None,
+    sample_questions: List[str] = None,
+    space_id: str = None,
 ) -> Dict[str, Any]:
     """
     Create or update a Genie Space for SQL-based data exploration.
@@ -411,10 +411,10 @@ def delete_genie(space_id: str) -> Dict[str, Any]:
 def create_or_update_mas(
     name: str,
     agents: List[Dict[str, str]],
-    description: Optional[str] = None,
-    instructions: Optional[str] = None,
-    tile_id: Optional[str] = None,
-    examples: Optional[List[Dict[str, str]]] = None,
+    description: str = None,
+    instructions: str = None,
+    tile_id: str = None,
+    examples: List[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Create or update a Multi-Agent Supervisor (MAS).

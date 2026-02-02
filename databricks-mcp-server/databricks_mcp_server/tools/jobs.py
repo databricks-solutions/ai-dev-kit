@@ -1,5 +1,5 @@
 """Jobs tools - Manage Databricks jobs and job runs."""
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from databricks_tools_core.jobs import (
     list_jobs as _list_jobs,
@@ -22,7 +22,7 @@ from ..server import mcp
 
 @mcp.tool
 def list_jobs(
-    name: Optional[str] = None,
+    name: str = None,
     limit: int = 25,
     expand_tasks: bool = False,
 ) -> List[Dict[str, Any]]:
@@ -55,7 +55,7 @@ def get_job(job_id: int) -> Dict[str, Any]:
 
 
 @mcp.tool
-def find_job_by_name(name: str) -> Optional[int]:
+def find_job_by_name(name: str) -> int | None:
     """
     Find a job by exact name and return its ID.
 
@@ -72,21 +72,21 @@ def find_job_by_name(name: str) -> Optional[int]:
 def create_job(
     name: str,
     tasks: List[Dict[str, Any]],
-    job_clusters: Optional[List[Dict[str, Any]]] = None,
-    environments: Optional[List[Dict[str, Any]]] = None,
-    tags: Optional[Dict[str, str]] = None,
-    timeout_seconds: Optional[int] = None,
+    job_clusters: List[Dict[str, Any]] = None,
+    environments: List[Dict[str, Any]] = None,
+    tags: Dict[str, str] = None,
+    timeout_seconds: int = None,
     max_concurrent_runs: int = 1,
-    email_notifications: Optional[Dict[str, Any]] = None,
-    webhook_notifications: Optional[Dict[str, Any]] = None,
-    notification_settings: Optional[Dict[str, Any]] = None,
-    schedule: Optional[Dict[str, Any]] = None,
-    queue: Optional[Dict[str, Any]] = None,
-    run_as: Optional[Dict[str, Any]] = None,
-    git_source: Optional[Dict[str, Any]] = None,
-    parameters: Optional[List[Dict[str, Any]]] = None,
-    health: Optional[Dict[str, Any]] = None,
-    deployment: Optional[Dict[str, Any]] = None,
+    email_notifications: Dict[str, Any] = None,
+    webhook_notifications: Dict[str, Any] = None,
+    notification_settings: Dict[str, Any] = None,
+    schedule: Dict[str, Any] = None,
+    queue: Dict[str, Any] = None,
+    run_as: Dict[str, Any] = None,
+    git_source: Dict[str, Any] = None,
+    parameters: List[Dict[str, Any]] = None,
+    health: Dict[str, Any] = None,
+    deployment: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
     Create a new Databricks job with serverless compute by default.
@@ -161,23 +161,23 @@ def create_job(
 @mcp.tool
 def update_job(
     job_id: int,
-    name: Optional[str] = None,
-    tasks: Optional[List[Dict[str, Any]]] = None,
-    job_clusters: Optional[List[Dict[str, Any]]] = None,
-    environments: Optional[List[Dict[str, Any]]] = None,
-    tags: Optional[Dict[str, str]] = None,
-    timeout_seconds: Optional[int] = None,
-    max_concurrent_runs: Optional[int] = None,
-    email_notifications: Optional[Dict[str, Any]] = None,
-    webhook_notifications: Optional[Dict[str, Any]] = None,
-    notification_settings: Optional[Dict[str, Any]] = None,
-    schedule: Optional[Dict[str, Any]] = None,
-    queue: Optional[Dict[str, Any]] = None,
-    run_as: Optional[Dict[str, Any]] = None,
-    git_source: Optional[Dict[str, Any]] = None,
-    parameters: Optional[List[Dict[str, Any]]] = None,
-    health: Optional[Dict[str, Any]] = None,
-    deployment: Optional[Dict[str, Any]] = None,
+    name: str = None,
+    tasks: List[Dict[str, Any]] = None,
+    job_clusters: List[Dict[str, Any]] = None,
+    environments: List[Dict[str, Any]] = None,
+    tags: Dict[str, str] = None,
+    timeout_seconds: int = None,
+    max_concurrent_runs: int = None,
+    email_notifications: Dict[str, Any] = None,
+    webhook_notifications: Dict[str, Any] = None,
+    notification_settings: Dict[str, Any] = None,
+    schedule: Dict[str, Any] = None,
+    queue: Dict[str, Any] = None,
+    run_as: Dict[str, Any] = None,
+    git_source: Dict[str, Any] = None,
+    parameters: List[Dict[str, Any]] = None,
+    health: Dict[str, Any] = None,
+    deployment: Dict[str, Any] = None,
 ) -> None:
     """
     Update an existing job's configuration.
@@ -241,16 +241,16 @@ def delete_job(job_id: int) -> None:
 @mcp.tool
 def run_job_now(
     job_id: int,
-    idempotency_token: Optional[str] = None,
-    jar_params: Optional[List[str]] = None,
-    notebook_params: Optional[Dict[str, str]] = None,
-    python_params: Optional[List[str]] = None,
-    spark_submit_params: Optional[List[str]] = None,
-    python_named_params: Optional[Dict[str, str]] = None,
-    pipeline_params: Optional[Dict[str, Any]] = None,
-    sql_params: Optional[Dict[str, str]] = None,
-    dbt_commands: Optional[List[str]] = None,
-    queue: Optional[Dict[str, Any]] = None,
+    idempotency_token: str = None,
+    jar_params: List[str] = None,
+    notebook_params: Dict[str, str] = None,
+    python_params: List[str] = None,
+    spark_submit_params: List[str] = None,
+    python_named_params: Dict[str, str] = None,
+    pipeline_params: Dict[str, Any] = None,
+    sql_params: Dict[str, str] = None,
+    dbt_commands: List[str] = None,
+    queue: Dict[str, Any] = None,
 ) -> int:
     """
     Trigger a job run immediately and return the run ID.
@@ -331,13 +331,13 @@ def cancel_run(run_id: int) -> None:
 
 @mcp.tool
 def list_runs(
-    job_id: Optional[int] = None,
+    job_id: int = None,
     active_only: bool = False,
     completed_only: bool = False,
     limit: int = 25,
     offset: int = 0,
-    start_time_from: Optional[int] = None,
-    start_time_to: Optional[int] = None,
+    start_time_from: int = None,
+    start_time_to: int = None,
 ) -> List[Dict[str, Any]]:
     """
     List job runs with optional filters.
