@@ -293,7 +293,7 @@ databricks bundle destroy -t prod --auto-approve
 | **Catalog doesn't exist** | Create catalog first or update variable |
 | **"admins" group error on jobs** | Cannot modify admins permissions on jobs |
 | **Volume permissions** | Use `grants` not `permissions` for volumes |
-| **Hardcoded catalog in dashboard** | Use dataset_catalog parameter (CLI v0.281.0+) or create environment-specific files |
+| **Hardcoded catalog in dashboard** | Use dataset_catalog parameter (CLI v0.281.0+), create environment-specific files, or parameterize JSON |
 | **App not starting after deploy** | Apps require `databricks bundle run <resource_key>` to start |
 | **App env vars not working** | Environment variables go in `app.yaml` (source dir), not databricks.yml |
 | **Wrong app source path** | Use `../` from resources/ dir if source is in project root |
