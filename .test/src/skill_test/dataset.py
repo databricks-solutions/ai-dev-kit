@@ -1,4 +1,5 @@
 """DatasetSource abstraction - YAML-only initially, UC interface defined for later."""
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Protocol
@@ -8,6 +9,7 @@ import yaml
 @dataclass
 class EvalRecord:
     """Standard evaluation record format (matches mlflow-evaluation patterns)."""
+
     id: str
     inputs: Dict[str, Any]
     outputs: Optional[Dict[str, Any]] = None  # Pre-computed for Pattern 2
@@ -35,6 +37,7 @@ class DatasetSource(Protocol):
 @dataclass
 class YAMLDatasetSource:
     """Load evaluation dataset from YAML file (Phase 1 implementation)."""
+
     yaml_path: Path
 
     def load(self) -> List[EvalRecord]:
@@ -44,13 +47,15 @@ class YAMLDatasetSource:
 
         records = []
         for case in data.get("test_cases", []):
-            records.append(EvalRecord(
-                id=case["id"],
-                inputs=case["inputs"],
-                outputs=case.get("outputs"),
-                expectations=case.get("expectations"),
-                metadata=case.get("metadata", {})
-            ))
+            records.append(
+                EvalRecord(
+                    id=case["id"],
+                    inputs=case["inputs"],
+                    outputs=case.get("outputs"),
+                    expectations=case.get("expectations"),
+                    metadata=case.get("metadata", {}),
+                )
+            )
         return records
 
     def save(self, records: List[EvalRecord]) -> None:
@@ -62,25 +67,25 @@ class YAMLDatasetSource:
                     "inputs": r.inputs,
                     "outputs": r.outputs,
                     "expectations": r.expectations,
-                    "metadata": r.metadata
+                    "metadata": r.metadata,
                 }
                 for r in records
             ]
         }
-        with open(self.yaml_path, 'w') as f:
+        with open(self.yaml_path, "w") as f:
             yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
 
 @dataclass
 class UCDatasetSource:
     """Load evaluation dataset from Unity Catalog (Phase 2 - stub only)."""
+
     uc_table_name: str
 
     def load(self) -> List[EvalRecord]:
         """Placeholder for UC integration."""
         raise NotImplementedError(
-            "UC datasets deferred to Phase 2. "
-            "Use YAMLDatasetSource for now."
+            "UC datasets deferred to Phase 2. Use YAMLDatasetSource for now."
         )
 
 

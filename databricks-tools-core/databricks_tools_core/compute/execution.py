@@ -4,6 +4,7 @@ Compute - Execution Context Operations
 Functions for executing code on Databricks clusters using execution contexts.
 Uses Databricks Command Execution API via SDK.
 """
+
 import datetime
 from typing import Optional, List, Dict, Any
 from databricks.sdk.service.compute import (
@@ -118,13 +119,17 @@ def list_clusters(
 
     def _add_cluster(cluster) -> bool:
         """Add cluster to list, return False if limit reached."""
-        clusters.append({
-            "cluster_id": cluster.cluster_id,
-            "cluster_name": cluster.cluster_name,
-            "state": cluster.state.value if cluster.state else None,
-            "creator_user_name": cluster.creator_user_name,
-            "cluster_source": cluster.cluster_source.value if cluster.cluster_source else None,
-        })
+        clusters.append(
+            {
+                "cluster_id": cluster.cluster_id,
+                "cluster_name": cluster.cluster_name,
+                "state": cluster.state.value if cluster.state else None,
+                "creator_user_name": cluster.creator_user_name,
+                "cluster_source": cluster.cluster_source.value
+                if cluster.cluster_source
+                else None,
+            }
+        )
         return limit is None or len(clusters) < limit
 
     # First, get running clusters (faster query)
@@ -174,10 +179,12 @@ def get_best_cluster() -> Optional[str]:
 
     running_clusters = []
     for cluster in w.clusters.list(filter_by=running_filter):
-        running_clusters.append({
-            "cluster_id": cluster.cluster_id,
-            "cluster_name": cluster.cluster_name or "",
-        })
+        running_clusters.append(
+            {
+                "cluster_id": cluster.cluster_id,
+                "cluster_name": cluster.cluster_name or "",
+            }
+        )
 
     if not running_clusters:
         return None
@@ -234,8 +241,7 @@ def create_context(cluster_id: str, language: str = "python") -> str:
 
     # SDK returns Wait object, need to wait for result
     result = w.command_execution.create(
-        cluster_id=cluster_id,
-        language=lang_enum
+        cluster_id=cluster_id, language=lang_enum
     ).result()  # Blocks until context is created
 
     return result.id
@@ -253,18 +259,11 @@ def destroy_context(cluster_id: str, context_id: str) -> None:
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    w.command_execution.destroy(
-        cluster_id=cluster_id,
-        context_id=context_id
-    )
+    w.command_execution.destroy(cluster_id=cluster_id, context_id=context_id)
 
 
 def _execute_on_context(
-    cluster_id: str,
-    context_id: str,
-    code: str,
-    language: str,
-    timeout: int
+    cluster_id: str, context_id: str, code: str, language: str, timeout: int
 ) -> ExecutionResult:
     """
     Internal function to execute code on an existing context.
@@ -288,14 +287,20 @@ def _execute_on_context(
             cluster_id=cluster_id,
             context_id=context_id,
             language=lang_enum,
-            command=code
+            command=code,
         ).result(timeout=datetime.timedelta(seconds=timeout))
 
         # Check result status (compare with enum values)
         if result.status == CommandStatus.FINISHED:
             # Check if there was an error in the results
-            if result.results and result.results.result_type and result.results.result_type.value == "error":
-                error_msg = result.results.cause if result.results.cause else "Unknown error"
+            if (
+                result.results
+                and result.results.result_type
+                and result.results.result_type.value == "error"
+            ):
+                error_msg = (
+                    result.results.cause if result.results.cause else "Unknown error"
+                )
                 return ExecutionResult(
                     success=False,
                     error=error_msg,
@@ -304,7 +309,8 @@ def _execute_on_context(
                     context_destroyed=False,
                 )
             output = (
-                result.results.data if result.results and result.results.data
+                result.results.data
+                if result.results and result.results.data
                 else "Success (no output)"
             )
             return ExecutionResult(
@@ -316,7 +322,8 @@ def _execute_on_context(
             )
         elif result.status in [CommandStatus.ERROR, CommandStatus.CANCELLED]:
             error_msg = (
-                result.results.cause if result.results and result.results.cause
+                result.results.cause
+                if result.results and result.results.cause
                 else "Unknown error"
             )
             return ExecutionResult(
@@ -401,7 +408,7 @@ def execute_databricks_command(
             context_id=context_id,
             code=code,
             language=language,
-            timeout=timeout
+            timeout=timeout,
         )
 
         # Destroy context if requested
@@ -415,7 +422,7 @@ def execute_databricks_command(
 
         return result
 
-    except Exception as e:
+    except Exception:
         # If we created the context and there's an error, clean up
         if context_created and destroy_context_on_completion:
             try:
@@ -473,24 +480,17 @@ def run_python_file_on_databricks(
     """
     # Read the file contents
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             code = f.read()
     except FileNotFoundError:
-        return ExecutionResult(
-            success=False,
-            error=f"File not found: {file_path}"
-        )
+        return ExecutionResult(success=False, error=f"File not found: {file_path}")
     except Exception as e:
         return ExecutionResult(
-            success=False,
-            error=f"Failed to read file {file_path}: {str(e)}"
+            success=False, error=f"Failed to read file {file_path}: {str(e)}"
         )
 
     if not code.strip():
-        return ExecutionResult(
-            success=False,
-            error=f"File is empty: {file_path}"
-        )
+        return ExecutionResult(success=False, error=f"File is empty: {file_path}")
 
     # Execute the code on Databricks
     return execute_databricks_command(

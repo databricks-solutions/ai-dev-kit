@@ -6,7 +6,6 @@ Requires a valid Databricks connection (via env vars or ~/.databrickscfg).
 """
 
 import logging
-import os
 from pathlib import Path
 import pytest
 from databricks.sdk import WorkspaceClient
@@ -15,6 +14,7 @@ from databricks.sdk import WorkspaceClient
 _env_file = Path(__file__).parent.parent / ".env.test"
 if _env_file.exists():
     from dotenv import load_dotenv
+
     load_dotenv(_env_file)
     logging.getLogger(__name__).info(f"Loaded environment from {_env_file}")
 
@@ -167,7 +167,7 @@ def test_tables(
     # Create customers table
     execute_sql(
         sql_query=f"""
-            CREATE OR REPLACE TABLE {tables['customers']} (
+            CREATE OR REPLACE TABLE {tables["customers"]} (
                 customer_id BIGINT,
                 name STRING,
                 email STRING,
@@ -184,7 +184,7 @@ def test_tables(
     # Insert customer data
     execute_sql(
         sql_query=f"""
-            INSERT INTO {tables['customers']} VALUES
+            INSERT INTO {tables["customers"]} VALUES
             (1, 'Alice Smith', 'alice@example.com', 'USA', '2024-01-15 10:30:00', true),
             (2, 'Bob Johnson', 'bob@example.com', 'Canada', '2024-02-20 14:45:00', true),
             (3, 'Charlie Brown', 'charlie@example.com', 'UK', '2024-03-10 09:00:00', false),
@@ -199,7 +199,7 @@ def test_tables(
     # Create orders table
     execute_sql(
         sql_query=f"""
-            CREATE OR REPLACE TABLE {tables['orders']} (
+            CREATE OR REPLACE TABLE {tables["orders"]} (
                 order_id BIGINT,
                 customer_id BIGINT,
                 amount DECIMAL(10, 2),
@@ -215,7 +215,7 @@ def test_tables(
     # Insert order data
     execute_sql(
         sql_query=f"""
-            INSERT INTO {tables['orders']} VALUES
+            INSERT INTO {tables["orders"]} VALUES
             (101, 1, 150.00, 'completed', '2024-06-01'),
             (102, 1, 75.50, 'completed', '2024-06-15'),
             (103, 2, 200.00, 'pending', '2024-06-20'),
@@ -233,7 +233,7 @@ def test_tables(
     # Create products table with various data types
     execute_sql(
         sql_query=f"""
-            CREATE OR REPLACE TABLE {tables['products']} (
+            CREATE OR REPLACE TABLE {tables["products"]} (
                 product_id BIGINT,
                 name STRING,
                 category STRING,
@@ -252,7 +252,7 @@ def test_tables(
     # Insert product data
     execute_sql(
         sql_query=f"""
-            INSERT INTO {tables['products']} VALUES
+            INSERT INTO {tables["products"]} VALUES
             (1, 'Laptop Pro', 'Electronics', 1299.99, 50, 4.5, ARRAY('tech', 'computer'), '2024-01-01 00:00:00'),
             (2, 'Wireless Mouse', 'Electronics', 29.99, 200, 4.2, ARRAY('tech', 'accessory'), '2024-01-15 00:00:00'),
             (3, 'Coffee Maker', 'Kitchen', 79.99, 75, 4.8, ARRAY('home', 'appliance'), '2024-02-01 00:00:00'),

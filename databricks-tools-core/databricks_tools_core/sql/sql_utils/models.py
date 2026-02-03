@@ -68,7 +68,9 @@ class VolumeFileInfo(BaseModel):
     modification_time: Optional[str] = None
 
 
-def _get_basic_column_details(column_details: Optional[Dict[str, ColumnDetail]]) -> Optional[Dict[str, ColumnDetail]]:
+def _get_basic_column_details(
+    column_details: Optional[Dict[str, ColumnDetail]],
+) -> Optional[Dict[str, ColumnDetail]]:
     """Return simplified column details with basic stats only.
 
     Removes heavy stats like histograms, stddev, percentiles.
@@ -87,7 +89,9 @@ def _get_basic_column_details(column_details: Optional[Dict[str, ColumnDetail]])
             min=col_detail.min,
             max=col_detail.max,
             avg=col_detail.avg,
-            null_count=col_detail.null_count if col_detail.null_count and col_detail.null_count > 0 else None,
+            null_count=col_detail.null_count
+            if col_detail.null_count and col_detail.null_count > 0
+            else None,
             total_count=col_detail.total_count,
             unique_count=col_detail.unique_count,
             # Exclude heavy stats

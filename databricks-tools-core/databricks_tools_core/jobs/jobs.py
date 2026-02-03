@@ -4,6 +4,7 @@ Jobs - Core Job CRUD Operations
 Functions for managing Databricks jobs using the Jobs API.
 Uses serverless compute by default for optimal performance and cost.
 """
+
 from typing import Optional, List, Dict, Any
 
 from databricks.sdk.service.jobs import (
@@ -47,9 +48,19 @@ def list_jobs(
 
         # Add additional info if available
         if job.settings:
-            job_dict["tags"] = job.settings.tags if hasattr(job.settings, 'tags') else None
-            job_dict["timeout_seconds"] = job.settings.timeout_seconds if hasattr(job.settings, 'timeout_seconds') else None
-            job_dict["max_concurrent_runs"] = job.settings.max_concurrent_runs if hasattr(job.settings, 'max_concurrent_runs') else None
+            job_dict["tags"] = (
+                job.settings.tags if hasattr(job.settings, "tags") else None
+            )
+            job_dict["timeout_seconds"] = (
+                job.settings.timeout_seconds
+                if hasattr(job.settings, "timeout_seconds")
+                else None
+            )
+            job_dict["max_concurrent_runs"] = (
+                job.settings.max_concurrent_runs
+                if hasattr(job.settings, "max_concurrent_runs")
+                else None
+            )
 
             # Include tasks if expanded
             if expand_tasks and job.settings.tasks:
@@ -203,7 +214,9 @@ def create_job(
             for env in environments:
                 if "spec" in env and "client" not in env["spec"]:
                     env["spec"]["client"] = "4"
-            kwargs["environments"] = [JobEnvironment.from_dict(env) for env in environments]
+            kwargs["environments"] = [
+                JobEnvironment.from_dict(env) for env in environments
+            ]
 
         # Add optional parameters
         if tags:
@@ -303,7 +316,9 @@ def update_job(
         current_job = w.jobs.get(job_id=job_id)
 
         # Start with current settings as dict
-        new_settings_dict = current_job.settings.as_dict() if current_job.settings else {}
+        new_settings_dict = (
+            current_job.settings.as_dict() if current_job.settings else {}
+        )
 
         # Update with provided parameters
         if name is not None:

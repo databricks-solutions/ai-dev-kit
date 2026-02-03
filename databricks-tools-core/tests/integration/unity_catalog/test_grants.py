@@ -40,7 +40,9 @@ class TestGetGrants:
             full_name=test_catalog,
         )
 
-        logger.info(f"Grants on catalog {test_catalog}: {len(result['assignments'])} assignments")
+        logger.info(
+            f"Grants on catalog {test_catalog}: {len(result['assignments'])} assignments"
+        )
         for a in result["assignments"]:
             logger.info(f"  - {a['principal']}: {a['privileges']}")
 
@@ -48,9 +50,7 @@ class TestGetGrants:
         assert result["full_name"] == test_catalog
         assert isinstance(result["assignments"], list)
 
-    def test_get_grants_on_schema(
-        self, test_catalog: str, uc_test_schema: str
-    ):
+    def test_get_grants_on_schema(self, test_catalog: str, uc_test_schema: str):
         """Should get grants on a schema."""
         full_name = f"{test_catalog}.{uc_test_schema}"
         result = get_grants(
@@ -58,7 +58,9 @@ class TestGetGrants:
             full_name=full_name,
         )
 
-        logger.info(f"Grants on schema {full_name}: {len(result['assignments'])} assignments")
+        logger.info(
+            f"Grants on schema {full_name}: {len(result['assignments'])} assignments"
+        )
         assert result["securable_type"] == "schema"
         assert isinstance(result["assignments"], list)
 
@@ -87,7 +89,9 @@ class TestGetEffectiveGrants:
             full_name=uc_test_table,
         )
 
-        logger.info(f"Effective grants on {uc_test_table}: {len(result['effective_assignments'])} assignments")
+        logger.info(
+            f"Effective grants on {uc_test_table}: {len(result['effective_assignments'])} assignments"
+        )
         for a in result["effective_assignments"][:3]:
             logger.info(f"  - {a['principal']}: {len(a['privileges'])} privileges")
 
@@ -99,9 +103,7 @@ class TestGetEffectiveGrants:
 class TestGrantRevoke:
     """Tests for granting and revoking privileges."""
 
-    def test_grant_and_revoke_on_schema(
-        self, test_catalog: str, uc_test_schema: str
-    ):
+    def test_grant_and_revoke_on_schema(self, test_catalog: str, uc_test_schema: str):
         """Should grant and then revoke SELECT on a schema."""
         full_name = f"{test_catalog}.{uc_test_schema}"
         principal = "account users"
@@ -140,9 +142,7 @@ class TestGrantRevoke:
         assert revoke_result["status"] == "revoked"
         logger.info(f"Revoke result: {revoke_result['status']}")
 
-    def test_grant_multiple_privileges(
-        self, test_catalog: str, uc_test_schema: str
-    ):
+    def test_grant_multiple_privileges(self, test_catalog: str, uc_test_schema: str):
         """Should grant multiple privileges at once."""
         full_name = f"{test_catalog}.{uc_test_schema}"
         principal = "account users"

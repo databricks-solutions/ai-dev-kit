@@ -4,6 +4,7 @@ Unity Catalog - Security Policy Operations
 Functions for managing row-level security (row filters) and column masking.
 All operations are SQL-based via execute_sql.
 """
+
 import re
 from typing import Any, Dict, List, Optional
 
@@ -17,9 +18,12 @@ def _validate_identifier(name: str) -> str:
     return name
 
 
-def _execute_uc_sql(sql_query: str, warehouse_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def _execute_uc_sql(
+    sql_query: str, warehouse_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
+
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
 
 
@@ -95,7 +99,12 @@ def set_row_filter(
 
     sql = f"ALTER TABLE {table_name} SET ROW FILTER {filter_function} ON ({cols_str})"
     _execute_uc_sql(sql, warehouse_id=warehouse_id)
-    return {"status": "row_filter_set", "table": table_name, "function": filter_function, "sql": sql}
+    return {
+        "status": "row_filter_set",
+        "table": table_name,
+        "function": filter_function,
+        "sql": sql,
+    }
 
 
 def drop_row_filter(
@@ -144,7 +153,13 @@ def set_column_mask(
 
     sql = f"ALTER TABLE {table_name} ALTER COLUMN `{column_name}` SET MASK {mask_function}"
     _execute_uc_sql(sql, warehouse_id=warehouse_id)
-    return {"status": "column_mask_set", "table": table_name, "column": column_name, "function": mask_function, "sql": sql}
+    return {
+        "status": "column_mask_set",
+        "table": table_name,
+        "column": column_name,
+        "function": mask_function,
+        "sql": sql,
+    }
 
 
 def drop_column_mask(
@@ -168,4 +183,9 @@ def drop_column_mask(
 
     sql = f"ALTER TABLE {table_name} ALTER COLUMN `{column_name}` DROP MASK"
     _execute_uc_sql(sql, warehouse_id=warehouse_id)
-    return {"status": "column_mask_dropped", "table": table_name, "column": column_name, "sql": sql}
+    return {
+        "status": "column_mask_dropped",
+        "table": table_name,
+        "column": column_name,
+        "sql": sql,
+    }

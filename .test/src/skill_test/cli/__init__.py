@@ -1,4 +1,5 @@
 """CLI commands module for /skill-test interactive workflow."""
+
 import sys
 from .commands import (
     CLIContext,
@@ -31,7 +32,7 @@ def main():
     """
     args = sys.argv[1:]
 
-    if not args or args[0] in ('-h', '--help'):
+    if not args or args[0] in ("-h", "--help"):
         print(__doc__)
         print("\nAvailable commands:")
         print("  run         Run evaluation against ground truth (default)")
@@ -66,6 +67,7 @@ def main():
 
     # Print result
     import json
+
     print(json.dumps(result, indent=2, default=str))
 
     # Exit with appropriate code

@@ -38,7 +38,9 @@ class TestCreateSecurityFunction:
         cleanup_functions,
     ):
         """Should create a row filter function."""
-        fn_name = f"{test_catalog}.{uc_test_schema}.{UC_TEST_PREFIX}_row_filter_{unique_name}"
+        fn_name = (
+            f"{test_catalog}.{uc_test_schema}.{UC_TEST_PREFIX}_row_filter_{unique_name}"
+        )
         cleanup_functions(fn_name)
 
         result = create_security_function(
@@ -64,7 +66,9 @@ class TestCreateSecurityFunction:
         cleanup_functions,
     ):
         """Should create a column mask function."""
-        fn_name = f"{test_catalog}.{uc_test_schema}.{UC_TEST_PREFIX}_col_mask_{unique_name}"
+        fn_name = (
+            f"{test_catalog}.{uc_test_schema}.{UC_TEST_PREFIX}_col_mask_{unique_name}"
+        )
         cleanup_functions(fn_name)
 
         result = create_security_function(

@@ -3,8 +3,14 @@ Unity Catalog - Table Operations
 
 Functions for managing tables in Unity Catalog.
 """
+
 from typing import List, Optional
-from databricks.sdk.service.catalog import TableInfo, ColumnInfo, TableType, DataSourceFormat
+from databricks.sdk.service.catalog import (
+    TableInfo,
+    ColumnInfo,
+    TableType,
+    DataSourceFormat,
+)
 
 from ..auth import get_workspace_client
 
@@ -24,10 +30,7 @@ def list_tables(catalog_name: str, schema_name: str) -> List[TableInfo]:
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    return list(w.tables.list(
-        catalog_name=catalog_name,
-        schema_name=schema_name
-    ))
+    return list(w.tables.list(catalog_name=catalog_name, schema_name=schema_name))
 
 
 def get_table(full_table_name: str) -> TableInfo:
@@ -58,7 +61,7 @@ def create_table(
     columns: List[ColumnInfo],
     table_type: TableType = TableType.MANAGED,
     comment: Optional[str] = None,
-    storage_location: Optional[str] = None
+    storage_location: Optional[str] = None,
 ) -> TableInfo:
     """
     Create a new table in Unity Catalog.
@@ -92,7 +95,7 @@ def create_table(
         "schema_name": schema_name,
         "table_type": table_type,
         "columns": columns,
-        "data_source_format": DataSourceFormat.DELTA
+        "data_source_format": DataSourceFormat.DELTA,
     }
 
     # Add storage_location - required for all tables, use default for MANAGED

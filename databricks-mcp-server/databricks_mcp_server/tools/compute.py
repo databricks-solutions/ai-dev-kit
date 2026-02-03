@@ -1,5 +1,6 @@
 """Compute tools - Execute code on Databricks clusters."""
-from typing import Dict, Any, List, Optional
+
+from typing import Dict, Any, List
 
 from databricks_tools_core.compute import (
     list_clusters as _list_clusters,
@@ -85,7 +86,7 @@ def execute_databricks_command(
         cluster_id = None
     if context_id == "":
         context_id = None
-    
+
     try:
         result = _execute_databricks_command(
             code=code,
@@ -150,7 +151,7 @@ def run_python_file_on_databricks(
         cluster_id = None
     if context_id == "":
         context_id = None
-    
+
     try:
         result = _run_python_file_on_databricks(
             file_path=file_path,

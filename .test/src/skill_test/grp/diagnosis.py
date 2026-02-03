@@ -1,4 +1,5 @@
 """Failure diagnosis - analyze errors and find relevant skill sections."""
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import List, Dict, Any
 @dataclass
 class SkillSection:
     """A relevant section from a skill file."""
+
     file_path: str
     section_name: str
     excerpt: str
@@ -17,6 +19,7 @@ class SkillSection:
 @dataclass
 class Diagnosis:
     """Complete diagnosis of a failure."""
+
     error: str
     code_block: str
     relevant_sections: List[SkillSection]
@@ -37,8 +40,8 @@ def extract_sections(file_path: Path) -> List[Dict[str, Any]]:
     sections = []
 
     # Split by headers
-    pattern = r'^(#{1,3})\s+(.+)$'
-    lines = content.split('\n')
+    pattern = r"^(#{1,3})\s+(.+)$"
+    lines = content.split("\n")
     current_section = None
     current_content = []
     current_line = 0
@@ -47,11 +50,13 @@ def extract_sections(file_path: Path) -> List[Dict[str, Any]]:
         match = re.match(pattern, line)
         if match:
             if current_section:
-                sections.append({
-                    "name": current_section,
-                    "content": '\n'.join(current_content),
-                    "line": current_line
-                })
+                sections.append(
+                    {
+                        "name": current_section,
+                        "content": "\n".join(current_content),
+                        "line": current_line,
+                    }
+                )
             current_section = match.group(2)
             current_content = []
             current_line = i + 1
@@ -59,19 +64,19 @@ def extract_sections(file_path: Path) -> List[Dict[str, Any]]:
             current_content.append(line)
 
     if current_section:
-        sections.append({
-            "name": current_section,
-            "content": '\n'.join(current_content),
-            "line": current_line
-        })
+        sections.append(
+            {
+                "name": current_section,
+                "content": "\n".join(current_content),
+                "line": current_line,
+            }
+        )
 
     return sections
 
 
 def find_relevant_sections(
-    error: str,
-    code_block: str,
-    skill_name: str
+    error: str, code_block: str, skill_name: str
 ) -> List[SkillSection]:
     """Find skill sections relevant to an error."""
     relevant = []
@@ -96,8 +101,7 @@ def find_relevant_sections(
 
             # Check if section is relevant
             relevance_score = sum(
-                1 for kw in keywords
-                if kw in section_lower or kw in name_lower
+                1 for kw in keywords if kw in section_lower or kw in name_lower
             )
 
             if relevance_score > 0:
@@ -112,21 +116,19 @@ def find_relevant_sections(
                 except ValueError:
                     rel_path = file_path
 
-                relevant.append(SkillSection(
-                    file_path=str(rel_path),
-                    section_name=section["name"],
-                    excerpt=excerpt.strip(),
-                    line_number=section["line"]
-                ))
+                relevant.append(
+                    SkillSection(
+                        file_path=str(rel_path),
+                        section_name=section["name"],
+                        excerpt=excerpt.strip(),
+                        line_number=section["line"],
+                    )
+                )
 
     return relevant[:5]  # Limit to top 5 relevant sections
 
 
-def analyze_failure(
-    error: str,
-    code_block: str,
-    skill_name: str
-) -> Diagnosis:
+def analyze_failure(error: str, code_block: str, skill_name: str) -> Diagnosis:
     """Analyze a failure and produce diagnosis."""
     relevant = find_relevant_sections(error, code_block, skill_name)
 
@@ -138,11 +140,13 @@ def analyze_failure(
     elif "import" in error.lower():
         suggested_action = "Verify import statements match documented patterns."
     elif "STREAMING TABLE" in code_block and "OR REFRESH" not in code_block:
-        suggested_action = "Update skill to emphasize 'CREATE OR REFRESH STREAMING TABLE' syntax."
+        suggested_action = (
+            "Update skill to emphasize 'CREATE OR REFRESH STREAMING TABLE' syntax."
+        )
 
     return Diagnosis(
         error=error,
         code_block=code_block,
         relevant_sections=relevant,
-        suggested_action=suggested_action
+        suggested_action=suggested_action,
     )

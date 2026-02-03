@@ -242,7 +242,7 @@ class TestListRuns:
         for i in range(3):
             run_id = run_job_now(job_id=job["job_id"])
             run_ids.append(run_id)
-            logger.info(f"Run {i+1} triggered: {run_id}")
+            logger.info(f"Run {i + 1} triggered: {run_id}")
             time.sleep(1)  # Small delay between runs
 
         # List runs for this job using our core function

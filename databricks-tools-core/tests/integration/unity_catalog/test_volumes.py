@@ -29,9 +29,7 @@ UC_TEST_PREFIX = "uc_test"
 class TestListVolumes:
     """Tests for listing volumes."""
 
-    def test_list_volumes(
-        self, test_catalog: str, uc_test_schema: str
-    ):
+    def test_list_volumes(self, test_catalog: str, uc_test_schema: str):
         """Should list volumes in schema (may be empty)."""
         volumes = list_volumes(
             catalog_name=test_catalog,

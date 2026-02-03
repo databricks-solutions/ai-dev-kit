@@ -19,6 +19,7 @@ class SQLExecutionError(Exception):
 
     Provides detailed error messages for LLM consumption.
     """
+
     pass
 
 
@@ -184,9 +185,7 @@ class SQLExecutor:
     def _cancel_statement(self, statement_id: str) -> None:
         """Attempt to cancel a running statement."""
         try:
-            self.client.statement_execution.cancel_execution(
-                statement_id=statement_id
-            )
+            self.client.statement_execution.cancel_execution(statement_id=statement_id)
             logger.debug(f"Canceled statement {statement_id}")
         except Exception as e:
             logger.warning(f"Failed to cancel statement {statement_id}: {e}")

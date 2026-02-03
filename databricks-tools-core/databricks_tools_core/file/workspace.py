@@ -4,6 +4,7 @@ File - Workspace File Operations
 Functions for uploading files and folders to Databricks Workspace.
 Uses Databricks Workspace API via SDK.
 """
+
 import io
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -20,6 +21,7 @@ from ..auth import get_workspace_client
 @dataclass
 class UploadResult:
     """Result from a single file upload"""
+
     local_path: str
     remote_path: str
     success: bool
@@ -29,6 +31,7 @@ class UploadResult:
 @dataclass
 class FolderUploadResult:
     """Result from uploading a folder"""
+
     local_folder: str
     remote_folder: str
     total_files: int
@@ -47,10 +50,7 @@ class FolderUploadResult:
 
 
 def _upload_single_file(
-    w: WorkspaceClient,
-    local_path: str,
-    remote_path: str,
-    overwrite: bool = True
+    w: WorkspaceClient, local_path: str, remote_path: str, overwrite: bool = True
 ) -> UploadResult:
     """
     Upload a single file to Databricks workspace.
@@ -65,7 +65,7 @@ def _upload_single_file(
         UploadResult with success status
     """
     try:
-        with open(local_path, 'rb') as f:
+        with open(local_path, "rb") as f:
             content = f.read()
 
         # Use workspace.upload with AUTO format to handle all file types
@@ -74,21 +74,16 @@ def _upload_single_file(
             path=remote_path,
             content=io.BytesIO(content),
             format=ImportFormat.AUTO,
-            overwrite=overwrite
+            overwrite=overwrite,
         )
 
         return UploadResult(
-            local_path=local_path,
-            remote_path=remote_path,
-            success=True
+            local_path=local_path, remote_path=remote_path, success=True
         )
 
     except Exception as e:
         return UploadResult(
-            local_path=local_path,
-            remote_path=remote_path,
-            success=False,
-            error=str(e)
+            local_path=local_path, remote_path=remote_path, success=False, error=str(e)
         )
 
 
@@ -108,7 +103,7 @@ def _collect_files(local_folder: str) -> List[tuple]:
     for dirpath, _, filenames in os.walk(local_folder):
         for filename in filenames:
             # Skip hidden files and __pycache__
-            if filename.startswith('.') or '__pycache__' in dirpath:
+            if filename.startswith(".") or "__pycache__" in dirpath:
                 continue
 
             local_path = os.path.join(dirpath, filename)
@@ -134,8 +129,7 @@ def _collect_directories(local_folder: str) -> List[str]:
     for dirpath, dirnames, _ in os.walk(local_folder):
         # Skip hidden directories and __pycache__
         dirnames[:] = [
-            d for d in dirnames
-            if not d.startswith('.') and d != '__pycache__'
+            d for d in dirnames if not d.startswith(".") and d != "__pycache__"
         ]
 
         for dirname in dirnames:
@@ -144,7 +138,7 @@ def _collect_directories(local_folder: str) -> List[str]:
             directories.add(rel_path)
             # Also add parent directories
             parent = Path(rel_path).parent
-            while str(parent) != '.':
+            while str(parent) != ".":
                 directories.add(str(parent))
                 parent = parent.parent
 
@@ -155,7 +149,7 @@ def upload_folder(
     local_folder: str,
     workspace_folder: str,
     max_workers: int = 10,
-    overwrite: bool = True
+    overwrite: bool = True,
 ) -> FolderUploadResult:
     """
     Upload an entire local folder to Databricks workspace.
@@ -195,7 +189,7 @@ def upload_folder(
         raise ValueError(f"Path is not a directory: {local_folder}")
 
     # Normalize workspace path (remove trailing slash)
-    workspace_folder = workspace_folder.rstrip('/')
+    workspace_folder = workspace_folder.rstrip("/")
 
     # Initialize client
     w = get_workspace_client()
@@ -226,7 +220,7 @@ def upload_folder(
             total_files=0,
             successful=0,
             failed=0,
-            results=[]
+            results=[],
         )
 
     # Upload files in parallel
@@ -241,11 +235,7 @@ def upload_folder(
             # Convert Windows paths to forward slashes for workspace
             remote_path = f"{workspace_folder}/{rel_path.replace(os.sep, '/')}"
             future = executor.submit(
-                _upload_single_file,
-                w,
-                local_path,
-                remote_path,
-                overwrite
+                _upload_single_file, w, local_path, remote_path, overwrite
             )
             future_to_file[future] = (local_path, remote_path)
 
@@ -264,14 +254,12 @@ def upload_folder(
         total_files=len(files),
         successful=successful,
         failed=failed,
-        results=results
+        results=results,
     )
 
 
 def upload_file(
-    local_path: str,
-    workspace_path: str,
-    overwrite: bool = True
+    local_path: str, workspace_path: str, overwrite: bool = True
 ) -> UploadResult:
     """
     Upload a single file to Databricks workspace.
@@ -299,7 +287,7 @@ def upload_file(
             local_path=local_path,
             remote_path=workspace_path,
             success=False,
-            error=f"Local file not found: {local_path}"
+            error=f"Local file not found: {local_path}",
         )
 
     if not os.path.isfile(local_path):
@@ -307,14 +295,14 @@ def upload_file(
             local_path=local_path,
             remote_path=workspace_path,
             success=False,
-            error=f"Path is not a file: {local_path}"
+            error=f"Path is not a file: {local_path}",
         )
 
     w = get_workspace_client()
 
     # Create parent directory if needed
     parent_dir = str(Path(workspace_path).parent)
-    if parent_dir != '/':
+    if parent_dir != "/":
         try:
             w.workspace.mkdirs(parent_dir)
         except Exception:

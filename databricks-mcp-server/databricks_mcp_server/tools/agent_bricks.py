@@ -355,7 +355,9 @@ def create_or_update_mas(
 
         agent_description = agent.get("description", "")
         if not agent_description:
-            return {"error": f"Agent '{agent_name}' is missing required 'description' field"}
+            return {
+                "error": f"Agent '{agent_name}' is missing required 'description' field"
+            }
 
         has_endpoint = bool(agent.get("endpoint_name"))
         has_genie = bool(agent.get("genie_space_id"))
@@ -432,7 +434,9 @@ def create_or_update_mas(
                 instructions=instructions,
             )
             response_tile_id = (
-                result.get("multi_agent_supervisor", {}).get("tile", {}).get("tile_id", "")
+                result.get("multi_agent_supervisor", {})
+                .get("tile", {})
+                .get("tile_id", "")
             )
 
     # Extract status

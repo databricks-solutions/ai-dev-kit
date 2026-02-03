@@ -13,7 +13,6 @@ from databricks_tools_core.sql import (
     get_table_details,
     TableStatLevel,
     TableSchemaResult,
-    TableInfo,
 )
 
 
@@ -21,9 +20,7 @@ from databricks_tools_core.sql import (
 class TestGetTableDetails:
     """Tests for get_table_details function."""
 
-    def test_get_all_tables(
-        self, warehouse_id, test_catalog, test_schema, test_tables
-    ):
+    def test_get_all_tables(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should list all tables when table_names is empty."""
         result = get_table_details(
             catalog=test_catalog,
@@ -245,9 +242,7 @@ class TestTableStatLevelSimple:
             assert col.median is None, f"Column {col_name} should not have median"
             assert col.q3 is None, f"Column {col_name} should not have q3"
 
-    def test_caching_works(
-        self, warehouse_id, test_catalog, test_schema, test_tables
-    ):
+    def test_caching_works(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Second call should use cache and be faster."""
         import time
 
@@ -260,7 +255,7 @@ class TestTableStatLevelSimple:
             table_stat_level=TableStatLevel.SIMPLE,
             warehouse_id=warehouse_id,
         )
-        first_time = time.time() - start
+        time.time() - start
 
         # Second call (should hit cache)
         start = time.time()

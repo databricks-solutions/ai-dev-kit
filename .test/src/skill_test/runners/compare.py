@@ -1,14 +1,16 @@
 """Version comparison for regression detection."""
+
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Optional, List
 from dataclasses import dataclass, asdict
 
 
 @dataclass
 class BaselineMetrics:
     """Baseline metrics for comparison."""
+
     skill_name: str
     run_id: str
     timestamp: str
@@ -21,6 +23,7 @@ class BaselineMetrics:
 @dataclass
 class ComparisonResult:
     """Result of comparing current metrics to baseline."""
+
     skill_name: str
     improved: List[str]
     regressed: List[str]
@@ -38,7 +41,7 @@ def save_baseline(
     test_count: int,
     baselines_dir: Path = None,
     git_commit: Optional[str] = None,
-    skill_version: Optional[str] = None
+    skill_version: Optional[str] = None,
 ) -> Path:
     """
     Save evaluation metrics as a baseline.
@@ -67,19 +70,18 @@ def save_baseline(
         metrics=metrics,
         test_count=test_count,
         git_commit=git_commit,
-        skill_version=skill_version
+        skill_version=skill_version,
     )
 
     baseline_path = baselines_dir / f"{skill_name}.json"
-    with open(baseline_path, 'w') as f:
+    with open(baseline_path, "w") as f:
         json.dump(asdict(baseline), f, indent=2)
 
     return baseline_path
 
 
 def load_baseline(
-    skill_name: str,
-    baselines_dir: Path = None
+    skill_name: str, baselines_dir: Path = None
 ) -> Optional[BaselineMetrics]:
     """
     Load baseline metrics for a skill.
@@ -104,7 +106,7 @@ def compare_baselines(
     skill_name: str,
     current_metrics: Dict[str, float],
     threshold: float = 0.05,
-    baselines_dir: Path = None
+    baselines_dir: Path = None,
 ) -> ComparisonResult:
     """
     Compare current metrics against baseline.
@@ -130,8 +132,10 @@ def compare_baselines(
             new_metrics=list(current_metrics.keys()),
             removed_metrics=[],
             passed_gates=True,
-            details={k: {"current": v, "baseline": None, "delta": None}
-                     for k, v in current_metrics.items()}
+            details={
+                k: {"current": v, "baseline": None, "delta": None}
+                for k, v in current_metrics.items()
+            },
         )
 
     improved = []
@@ -150,7 +154,7 @@ def compare_baselines(
             details[metric] = {
                 "current": current_value,
                 "baseline": None,
-                "delta": None
+                "delta": None,
             }
             continue
 
@@ -160,7 +164,7 @@ def compare_baselines(
         details[metric] = {
             "current": current_value,
             "baseline": baseline_value,
-            "delta": delta
+            "delta": delta,
         }
 
         if abs(delta) < threshold:
@@ -177,14 +181,11 @@ def compare_baselines(
             details[metric] = {
                 "current": None,
                 "baseline": baseline_metrics[metric],
-                "delta": None
+                "delta": None,
             }
 
     # Determine if quality gates pass (no regressions in critical metrics)
-    critical_metrics = [
-        "syntax_valid/score/mean",
-        "no_hallucinated_apis/score/mean"
-    ]
+    critical_metrics = ["syntax_valid/score/mean", "no_hallucinated_apis/score/mean"]
     passed_gates = not any(m in regressed for m in critical_metrics)
 
     return ComparisonResult(
@@ -195,17 +196,13 @@ def compare_baselines(
         new_metrics=new_metrics,
         removed_metrics=removed_metrics,
         passed_gates=passed_gates,
-        details=details
+        details=details,
     )
 
 
 def format_comparison_report(result: ComparisonResult) -> str:
     """Format comparison result as a human-readable report."""
-    lines = [
-        f"Comparison Report: {result.skill_name}",
-        "=" * 50,
-        ""
-    ]
+    lines = [f"Comparison Report: {result.skill_name}", "=" * 50, ""]
 
     if result.passed_gates:
         lines.append("Status: PASSED (no critical regressions)")
@@ -218,13 +215,17 @@ def format_comparison_report(result: ComparisonResult) -> str:
         lines.append(f"Improved ({len(result.improved)}):")
         for m in result.improved:
             d = result.details[m]
-            lines.append(f"  + {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})")
+            lines.append(
+                f"  + {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})"
+            )
 
     if result.regressed:
         lines.append(f"\nRegressed ({len(result.regressed)}):")
         for m in result.regressed:
             d = result.details[m]
-            lines.append(f"  - {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})")
+            lines.append(
+                f"  - {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})"
+            )
 
     if result.unchanged:
         lines.append(f"\nUnchanged ({len(result.unchanged)}):")

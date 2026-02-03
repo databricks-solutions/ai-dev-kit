@@ -121,7 +121,9 @@ def uploaded_pipeline_files(workspace_client, workspace_path: str):
         overwrite=True,
     )
 
-    assert result.success, f"Failed to upload pipeline files: {result.get_failed_uploads()}"
+    assert result.success, (
+        f"Failed to upload pipeline files: {result.get_failed_uploads()}"
+    )
     logger.info(f"Uploaded {result.successful} files successfully")
 
     yield workspace_path
@@ -172,7 +174,9 @@ class TestCreateOrUpdatePipeline:
         assert result.pipeline_id is not None, "Pipeline ID should be set"
         assert result.pipeline_name == pipeline_name
         assert result.created is True, "Pipeline should be newly created"
-        assert result.success is True, f"Pipeline run failed: {result.error_message}. Errors: {result.errors}"
+        assert result.success is True, (
+            f"Pipeline run failed: {result.error_message}. Errors: {result.errors}"
+        )
         assert result.state == "COMPLETED", f"Expected COMPLETED, got {result.state}"
         assert result.duration_seconds is not None
         assert result.duration_seconds > 0
@@ -211,7 +215,9 @@ class TestCreateOrUpdatePipeline:
         assert result.pipeline_id is not None
         assert result.pipeline_name == pipeline_name
         assert result.created is False, "Pipeline should be updated, not created"
-        assert result.success is True, f"Pipeline run failed: {result.error_message}. Errors: {result.errors}"
+        assert result.success is True, (
+            f"Pipeline run failed: {result.error_message}. Errors: {result.errors}"
+        )
         assert result.state == "COMPLETED", f"Expected COMPLETED, got {result.state}"
 
     def test_find_pipeline_by_name(self, clean_pipeline: str):
@@ -253,7 +259,9 @@ def clean_pipeline_extra(pipeline_name_extra: str):
     # Check if pipeline exists and delete it
     existing_id = find_pipeline_by_name(pipeline_name_extra)
     if existing_id:
-        logger.info(f"Cleaning up existing pipeline: {pipeline_name_extra} ({existing_id})")
+        logger.info(
+            f"Cleaning up existing pipeline: {pipeline_name_extra} ({existing_id})"
+        )
         try:
             delete_pipeline(existing_id)
             logger.info("Existing pipeline deleted")
@@ -318,14 +326,21 @@ class TestPipelineExtraSettings:
         assert result.pipeline_id is not None, "Pipeline ID should be set"
         assert result.pipeline_name == pipeline_name
         assert result.created is True, "Pipeline should be newly created"
-        assert result.success is True, f"Pipeline creation failed: {result.error_message}"
+        assert result.success is True, (
+            f"Pipeline creation failed: {result.error_message}"
+        )
 
         # Verify the extra settings were applied by fetching the pipeline
-        from databricks_tools_core.spark_declarative_pipelines.pipelines import get_pipeline
+        from databricks_tools_core.spark_declarative_pipelines.pipelines import (
+            get_pipeline,
+        )
+
         pipeline_details = get_pipeline(result.pipeline_id)
 
         # Check development mode is set
-        assert pipeline_details.spec.development is True, "Development mode should be True"
+        assert pipeline_details.spec.development is True, (
+            "Development mode should be True"
+        )
 
         # Check tags are set
         assert pipeline_details.spec.tags is not None, "Tags should be set"
@@ -368,7 +383,10 @@ class TestPipelineExtraSettings:
         assert result.success is True, f"Pipeline update failed: {result.error_message}"
 
         # Verify the updated settings
-        from databricks_tools_core.spark_declarative_pipelines.pipelines import get_pipeline
+        from databricks_tools_core.spark_declarative_pipelines.pipelines import (
+            get_pipeline,
+        )
+
         pipeline_details = get_pipeline(result.pipeline_id)
 
         assert pipeline_details.spec.tags.get("test") == "updated"
@@ -414,14 +432,22 @@ class TestPipelineExtraSettings:
         logger.info(f"Pipeline result: {result.to_dict()}")
 
         assert result.created is True, "Pipeline should be newly created"
-        assert result.success is True, f"Pipeline creation failed: {result.error_message}"
+        assert result.success is True, (
+            f"Pipeline creation failed: {result.error_message}"
+        )
 
         # Verify configuration
-        from databricks_tools_core.spark_declarative_pipelines.pipelines import get_pipeline
+        from databricks_tools_core.spark_declarative_pipelines.pipelines import (
+            get_pipeline,
+        )
+
         pipeline_details = get_pipeline(result.pipeline_id)
 
         assert pipeline_details.spec.configuration is not None
-        assert pipeline_details.spec.configuration.get("spark.sql.shuffle.partitions") == "10"
+        assert (
+            pipeline_details.spec.configuration.get("spark.sql.shuffle.partitions")
+            == "10"
+        )
 
     def test_delete_extra_settings_pipeline(self, clean_pipeline_extra: str):
         """Should delete the extra_settings test pipeline."""

@@ -30,20 +30,15 @@ def main() -> int:
     # Parse server.py for tool imports
     server_content = SERVER_PY.read_text()
 
-    # Look for: from .tools import module1, module2, ...
-    # This can span multiple lines, so we need to handle that
-    import_pattern = r"from \.tools import\s+(.+?)(?=\n(?:from|import|[a-zA-Z_]|\Z))"
-    import_match = re.search(import_pattern, server_content, re.DOTALL)
+    # Find all 'from .tools import X' statements (handles both single and multiple lines)
+    import_pattern = r"from \.tools import\s+([a-zA-Z_][a-zA-Z0-9_]*)"
+    import_matches = re.findall(import_pattern, server_content)
 
-    if not import_match:
+    if not import_matches:
         errors.append("No 'from .tools import ...' statement found in server.py")
     else:
-        # Parse the imported modules (handle multiline, comments, etc.)
-        import_text = import_match.group(1)
-        # Remove comments and clean up
-        import_text = re.sub(r"#.*", "", import_text)
-        # Split by comma and clean
-        imported = {m.strip() for m in import_text.replace("\n", ",").split(",") if m.strip()}
+        # Collect all imported modules
+        imported = set(import_matches)
 
         # Check for unregistered tools
         unregistered = tool_modules - imported

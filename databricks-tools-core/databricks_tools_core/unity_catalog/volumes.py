@@ -3,6 +3,7 @@ Unity Catalog - Volume Operations
 
 Functions for managing volumes in Unity Catalog.
 """
+
 from typing import Dict, List, Optional
 from databricks.sdk.service.catalog import VolumeInfo, VolumeType
 
@@ -24,10 +25,12 @@ def list_volumes(catalog_name: str, schema_name: str) -> List[VolumeInfo]:
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    return list(w.volumes.list(
-        catalog_name=catalog_name,
-        schema_name=schema_name,
-    ))
+    return list(
+        w.volumes.list(
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+        )
+    )
 
 
 def get_volume(full_volume_name: str) -> VolumeInfo:

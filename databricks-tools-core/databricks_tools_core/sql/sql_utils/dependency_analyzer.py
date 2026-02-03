@@ -36,7 +36,9 @@ class SQLDependencyAnalyzer:
         """
         self.dialect = dialect
         self.created_tables: Dict[str, int] = {}  # table_name -> query_index
-        self.query_dependencies: Dict[int, Set[str]] = {}  # query_index -> referenced tables
+        self.query_dependencies: Dict[
+            int, Set[str]
+        ] = {}  # query_index -> referenced tables
         self._linter = Linter(dialect=self.dialect)
 
     def parse_sql_content(self, sql_content: str) -> List[str]:
@@ -58,7 +60,8 @@ class SQLDependencyAnalyzer:
 
         queries: List[str] = []
         statements = [
-            s for s in (sqlglot.parse(cleaned, read=self.dialect) or [])
+            s
+            for s in (sqlglot.parse(cleaned, read=self.dialect) or [])
             if s is not None
         ]
 
@@ -93,7 +96,8 @@ class SQLDependencyAnalyzer:
         # Pass 1: Discover created objects and references
         for idx, query in enumerate(queries):
             exprs = [
-                e for e in (sqlglot.parse(query, read=self.dialect) or [])
+                e
+                for e in (sqlglot.parse(query, read=self.dialect) or [])
                 if e is not None
             ]
 
@@ -148,7 +152,9 @@ class SQLDependencyAnalyzer:
 
         # Topological sort into execution groups
         groups = self._topological_sort(len(queries), edges)
-        logger.info(f"Organized {len(queries)} queries into {len(groups)} execution groups")
+        logger.info(
+            f"Organized {len(queries)} queries into {len(groups)} execution groups"
+        )
         return groups
 
     def _strip_comments(self, sql: str) -> str:
@@ -272,14 +278,14 @@ class SQLDependencyAnalyzer:
             return None
         if isinstance(table_exp, exp.Table):
             name = table_exp.name or ""
-            return name.strip("`\"").lower() or None
+            return name.strip('`"').lower() or None
         if hasattr(table_exp, "name"):
             name = getattr(table_exp, "name")
             if isinstance(name, str):
-                return name.strip("`\"").lower() or None
+                return name.strip('`"').lower() or None
         if hasattr(table_exp, "this") and isinstance(table_exp.this, exp.Table):
             name = table_exp.this.name or ""
-            return name.strip("`\"").lower() or None
+            return name.strip('`"').lower() or None
         return None
 
     def _table_from_create(self, node: exp.Create) -> Optional[exp.Table]:

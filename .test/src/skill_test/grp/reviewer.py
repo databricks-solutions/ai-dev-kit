@@ -1,4 +1,5 @@
 """Human review interface for GRP candidates."""
+
 import os
 from datetime import datetime
 from pathlib import Path
@@ -41,7 +42,9 @@ def display_candidate(candidate: GRPCandidate) -> None:
     if candidate.execution_details:
         for i, detail in enumerate(candidate.execution_details):
             status = "PASS" if detail["success"] else "FAIL"
-            print(f"\n  Block {i+1} ({detail['language']}) at line {detail['line']}: {status}")
+            print(
+                f"\n  Block {i + 1} ({detail['language']}) at line {detail['line']}: {status}"
+            )
             if detail["error"]:
                 print(f"    Error: {detail['error']}")
 
@@ -79,36 +82,30 @@ def prompt_review_decision(candidate: GRPCandidate) -> ApprovalMetadata:
     while True:
         choice = input(f"\nYour decision [{reviewer}]: ").strip().lower()
 
-        if choice == 'a':
+        if choice == "a":
             return ApprovalMetadata(
-                approved=True,
-                reviewer=reviewer,
-                reason=None,
-                expectations_edited=False
+                approved=True, reviewer=reviewer, reason=None, expectations_edited=False
             )
-        elif choice == 'r':
+        elif choice == "r":
             reason = input("Rejection reason: ").strip()
             return ApprovalMetadata(
                 approved=False,
                 reviewer=reviewer,
                 reason=reason or "Rejected without reason",
-                expectations_edited=False
+                expectations_edited=False,
             )
-        elif choice == 's':
+        elif choice == "s":
             return ApprovalMetadata(
                 approved=False,
                 reviewer=reviewer,
                 reason="Skipped - pending",
-                expectations_edited=False
+                expectations_edited=False,
             )
-        elif choice == 'e':
+        elif choice == "e":
             # In a real implementation, this would open an editor
             print("Expectation editing not yet implemented - approving as-is")
             return ApprovalMetadata(
-                approved=True,
-                reviewer=reviewer,
-                reason=None,
-                expectations_edited=True
+                approved=True, reviewer=reviewer, reason=None, expectations_edited=True
             )
         else:
             print("Invalid choice. Please enter 'a', 'r', 's', or 'e'.")
@@ -131,7 +128,7 @@ def review_candidates_file(candidates_path: Path) -> Dict[str, int]:
     stats = {"approved": 0, "rejected": 0, "skipped": 0}
 
     for i, c_data in enumerate(pending):
-        print(f"\n[{i+1}/{len(pending)}]")
+        print(f"\n[{i + 1}/{len(pending)}]")
 
         # Convert dict to GRPCandidate for display
         diagnosis = None
@@ -145,11 +142,11 @@ def review_candidates_file(candidates_path: Path) -> Dict[str, int]:
                         file_path=s["file"],
                         section_name=s["section"],
                         excerpt=s["excerpt"],
-                        line_number=s["line"]
+                        line_number=s["line"],
                     )
                     for s in d.get("relevant_sections", [])
                 ],
-                suggested_action=d["suggested_action"]
+                suggested_action=d["suggested_action"],
             )
 
         candidate = GRPCandidate(
@@ -163,7 +160,9 @@ def review_candidates_file(candidates_path: Path) -> Dict[str, int]:
             execution_details=c_data.get("execution_details", []),
             diagnosis=diagnosis,
             status=c_data.get("status", "pending"),
-            created_at=datetime.fromisoformat(c_data["created_at"]) if c_data.get("created_at") else datetime.now()
+            created_at=datetime.fromisoformat(c_data["created_at"])
+            if c_data.get("created_at")
+            else datetime.now(),
         )
 
         approval = prompt_review_decision(candidate)
@@ -183,18 +182,14 @@ def review_candidates_file(candidates_path: Path) -> Dict[str, int]:
         c_data["review_notes"] = approval.reason or ""
 
     # Save updated candidates
-    with open(candidates_path, 'w') as f:
+    with open(candidates_path, "w") as f:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
     print(f"\nReview complete: {stats}")
     return stats
 
 
-def batch_approve(
-    candidates_path: Path,
-    filter_fn=None,
-    reviewer: str = None
-) -> int:
+def batch_approve(candidates_path: Path, filter_fn=None, reviewer: str = None) -> int:
     """
     Batch approve candidates matching a filter.
 
@@ -225,7 +220,7 @@ def batch_approve(
         c["review_notes"] = "Batch approved"
         approved += 1
 
-    with open(candidates_path, 'w') as f:
+    with open(candidates_path, "w") as f:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
     return approved

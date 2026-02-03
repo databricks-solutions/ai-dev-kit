@@ -3,6 +3,7 @@ Unity Catalog - Delta Sharing Operations
 
 Functions for managing shares, recipients, and providers.
 """
+
 from typing import Any, Dict, List, Optional
 
 from ..auth import get_workspace_client
@@ -92,8 +93,10 @@ def add_table_to_share(
         DatabricksError: If API request fails
     """
     from databricks.sdk.service.sharing import (
-        SharedDataObject, SharedDataObjectDataObjectType,
-        SharedDataObjectUpdate, SharedDataObjectUpdateAction,
+        SharedDataObject,
+        SharedDataObjectDataObjectType,
+        SharedDataObjectUpdate,
+        SharedDataObjectUpdateAction,
     )
 
     w = get_workspace_client()
@@ -104,7 +107,14 @@ def add_table_to_share(
     )
     if partition_spec:
         from databricks.sdk.service.sharing import Partition, PartitionValue
-        data_object.partitions = [Partition(values=[PartitionValue(name="partition", op="EQUAL", value=partition_spec)])]
+
+        data_object.partitions = [
+            Partition(
+                values=[
+                    PartitionValue(name="partition", op="EQUAL", value=partition_spec)
+                ]
+            )
+        ]
 
     result = w.shares.update(
         name=share_name,
@@ -136,8 +146,10 @@ def remove_table_from_share(
         DatabricksError: If API request fails
     """
     from databricks.sdk.service.sharing import (
-        SharedDataObject, SharedDataObjectDataObjectType,
-        SharedDataObjectUpdate, SharedDataObjectUpdateAction,
+        SharedDataObject,
+        SharedDataObjectDataObjectType,
+        SharedDataObjectUpdate,
+        SharedDataObjectUpdateAction,
     )
 
     w = get_workspace_client()
@@ -190,7 +202,7 @@ def grant_share_to_recipient(
     from databricks.sdk.service.catalog import Privilege, PermissionsChange
 
     w = get_workspace_client()
-    result = w.shares.update_permissions(
+    w.shares.update_permissions(
         name=share_name,
         changes=[
             PermissionsChange(
@@ -222,7 +234,7 @@ def revoke_share_from_recipient(
     from databricks.sdk.service.catalog import Privilege, PermissionsChange
 
     w = get_workspace_client()
-    result = w.shares.update_permissions(
+    w.shares.update_permissions(
         name=share_name,
         changes=[
             PermissionsChange(
@@ -306,6 +318,7 @@ def create_recipient(
         kwargs["comment"] = comment
     if ip_access_list is not None:
         from databricks.sdk.service.sharing import IpAccessList
+
         kwargs["ip_access_list"] = IpAccessList(allowed_ip_addresses=ip_access_list)
 
     result = w.recipients.create(**kwargs)

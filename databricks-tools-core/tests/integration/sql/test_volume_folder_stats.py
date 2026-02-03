@@ -22,7 +22,9 @@ from databricks_tools_core.sql import (
 class TestGetVolumeFolderDetailsParquet:
     """Tests for get_volume_folder_details with parquet format."""
 
-    def test_parquet_basic_info(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_parquet_basic_info(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """Should read parquet files and return basic info."""
         volume_path = f"{test_catalog}/{test_schema}/{test_volume}/parquet_data"
 
@@ -42,7 +44,9 @@ class TestGetVolumeFolderDetailsParquet:
         assert info.total_files >= 1
         assert info.total_rows == 5  # We have 5 rows in test data
 
-    def test_parquet_column_details(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_parquet_column_details(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """Should return column statistics for parquet data."""
         volume_path = f"{test_catalog}/{test_schema}/{test_volume}/parquet_data"
 
@@ -70,7 +74,9 @@ class TestGetVolumeFolderDetailsParquet:
         assert age_col.name == "age"
         assert age_col.total_count == 5
 
-    def test_parquet_numeric_stats(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_parquet_numeric_stats(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """Should compute min/max/avg for numeric columns."""
         volume_path = f"{test_catalog}/{test_schema}/{test_volume}/parquet_data"
 
@@ -101,7 +107,9 @@ class TestGetVolumeFolderDetailsParquet:
             assert salary_col.samples is not None
             assert len(salary_col.samples) > 0
 
-    def test_parquet_detailed_has_samples(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_parquet_detailed_has_samples(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """DETAILED level should include sample data."""
         volume_path = f"{test_catalog}/{test_schema}/{test_volume}/parquet_data"
 
@@ -123,7 +131,9 @@ class TestGetVolumeFolderDetailsParquet:
         assert "id" in first_row
         assert "name" in first_row
 
-    def test_parquet_stat_level_none(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_parquet_stat_level_none(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """NONE level should return schema without stats."""
         volume_path = f"{test_catalog}/{test_schema}/{test_volume}/parquet_data"
 
@@ -209,7 +219,9 @@ class TestGetVolumeFolderDetailsFile:
 class TestVolumeFolderPathFormats:
     """Tests for different volume path formats."""
 
-    def test_short_path_format(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_short_path_format(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """Should accept catalog/schema/volume/path format."""
         volume_path = f"{test_catalog}/{test_schema}/{test_volume}/parquet_data"
 
@@ -223,9 +235,13 @@ class TestVolumeFolderPathFormats:
         assert info.error is None
         assert "/Volumes/" in info.name
 
-    def test_full_volumes_path_format(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_full_volumes_path_format(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """Should accept /Volumes/catalog/schema/volume/path format."""
-        volume_path = f"/Volumes/{test_catalog}/{test_schema}/{test_volume}/parquet_data"
+        volume_path = (
+            f"/Volumes/{test_catalog}/{test_schema}/{test_volume}/parquet_data"
+        )
 
         result = get_volume_folder_details(
             volume_path=volume_path,
@@ -255,13 +271,18 @@ class TestVolumeFolderErrors:
         assert info.error is not None
         assert "not found" in info.error.lower() or "empty" in info.error.lower()
 
-    def test_empty_folder(self, workspace_client, test_catalog, test_schema, test_volume):
+    def test_empty_folder(
+        self, workspace_client, test_catalog, test_schema, test_volume
+    ):
         """Should handle empty folders gracefully."""
         # Create an empty folder by uploading and deleting a file
-        volume_path = f"/Volumes/{test_catalog}/{test_schema}/{test_volume}/empty_folder"
+        volume_path = (
+            f"/Volumes/{test_catalog}/{test_schema}/{test_volume}/empty_folder"
+        )
 
         # Upload a temp file to create the folder
         from io import BytesIO
+
         temp_path = f"{volume_path}/temp.txt"
         workspace_client.files.upload(temp_path, BytesIO(b"temp"), overwrite=True)
         workspace_client.files.delete(temp_path)
@@ -283,7 +304,9 @@ class TestVolumeFolderErrors:
 class TestVolumeFolderResultMethods:
     """Tests for TableSchemaResult methods with volume folder data."""
 
-    def test_keep_basic_stats(self, warehouse_id, test_catalog, test_schema, test_volume):
+    def test_keep_basic_stats(
+        self, warehouse_id, test_catalog, test_schema, test_volume
+    ):
         """keep_basic_stats() should remove heavy stats."""
         volume_path = f"{test_catalog}/{test_schema}/{test_volume}/parquet_data"
 

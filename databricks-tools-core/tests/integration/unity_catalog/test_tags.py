@@ -171,7 +171,7 @@ class TestSetComment:
         )
 
         assert result["status"] == "comment_set"
-        logger.info(f"Column comment set on salary")
+        logger.info("Column comment set on salary")
 
     def test_set_comment_column_without_name_raises(self, uc_test_table: str):
         """Should raise ValueError when column_name missing for column type."""
@@ -189,7 +189,9 @@ class TestSetComment:
 class TestQueryTags:
     """Tests for querying tags from information_schema."""
 
-    def test_query_table_tags(self, test_catalog: str, uc_test_table: str, warehouse_id: str):
+    def test_query_table_tags(
+        self, test_catalog: str, uc_test_table: str, warehouse_id: str
+    ):
         """Should query table tags from information_schema."""
         # Ensure tags exist
         set_tags(
@@ -212,7 +214,9 @@ class TestQueryTags:
         if len(results) > 0:
             assert "tag_name" in results[0] or "TAG_NAME" in str(results[0].keys())
 
-    def test_query_column_tags(self, test_catalog: str, uc_test_table: str, warehouse_id: str):
+    def test_query_column_tags(
+        self, test_catalog: str, uc_test_table: str, warehouse_id: str
+    ):
         """Should query column tags from information_schema."""
         # Ensure column tags exist
         set_tags(

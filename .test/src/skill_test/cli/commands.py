@@ -3,29 +3,24 @@
 This module provides commands for the /skill-test CLI skill. The actual MCP tools
 are injected via CLIContext at runtime by the skill handler.
 """
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable, Literal
+from typing import Dict, Any, Optional, List, Literal
 import yaml
 
 from ..grp.executor import (
     DatabricksExecutionConfig,
-    CodeBlocksExecutionResult,
     execute_code_blocks,
     execute_code_blocks_on_databricks,
-    extract_code_blocks,
     MCPExecuteCommand,
     MCPExecuteSQL,
     MCPGetBestWarehouse,
     MCPGetBestCluster,
 )
 from ..grp.pipeline import (
-    GRPCandidate,
-    GRPResult,
     generate_candidate,
-    save_candidates,
-    promote_approved,
 )
 from ..fixtures import (
     TestFixtureConfig,
@@ -34,7 +29,7 @@ from ..fixtures import (
     teardown_fixtures,
 )
 from ..fixtures.setup import MCPUploadFile
-from ..dataset import YAMLDatasetSource, EvalRecord
+from ..dataset import YAMLDatasetSource
 
 
 @dataclass
@@ -44,6 +39,7 @@ class CLIContext:
     The skill handler injects actual MCP tool functions at runtime.
     This allows the CLI commands to execute code on Databricks.
     """
+
     # MCP tools for Databricks execution
     mcp_execute_command: Optional[MCPExecuteCommand] = None
     mcp_execute_sql: Optional[MCPExecuteSQL] = None
@@ -53,7 +49,9 @@ class CLIContext:
 
     # Configuration
     base_path: Path = field(default_factory=lambda: Path(".test/skills"))
-    execution_config: DatabricksExecutionConfig = field(default_factory=DatabricksExecutionConfig)
+    execution_config: DatabricksExecutionConfig = field(
+        default_factory=DatabricksExecutionConfig
+    )
 
     def has_databricks_tools(self) -> bool:
         """Check if Databricks execution tools are available."""
@@ -63,6 +61,7 @@ class CLIContext:
 @dataclass
 class InteractiveResult:
     """Result of interactive test generation."""
+
     success: bool
     test_id: str
     skill_name: str
@@ -108,7 +107,7 @@ def run(
         return {
             "success": False,
             "error": f"No ground_truth.yaml found for skill '{skill_name}'",
-            "path": str(gt_path)
+            "path": str(gt_path),
         }
 
     source = YAMLDatasetSource(gt_path)
@@ -125,7 +124,11 @@ def run(
         response = record.outputs.get("response", "") if record.outputs else ""
 
         # Execute code blocks
-        if ctx.has_databricks_tools() and ctx.mcp_execute_command and ctx.mcp_execute_sql:
+        if (
+            ctx.has_databricks_tools()
+            and ctx.mcp_execute_command
+            and ctx.mcp_execute_sql
+        ):
             exec_result = execute_code_blocks_on_databricks(
                 response,
                 ctx.execution_config,
@@ -145,14 +148,16 @@ def run(
 
         test_passed = total_blocks == 0 or passed_blocks == total_blocks
 
-        results.append({
-            "id": record.id,
-            "passed": test_passed,
-            "total_blocks": total_blocks,
-            "passed_blocks": passed_blocks,
-            "execution_mode": execution_mode,
-            "details": details,
-        })
+        results.append(
+            {
+                "id": record.id,
+                "passed": test_passed,
+                "total_blocks": total_blocks,
+                "passed_blocks": passed_blocks,
+                "execution_mode": execution_mode,
+                "details": details,
+            }
+        )
 
         if test_passed:
             passed += 1
@@ -191,7 +196,7 @@ def regression(
             "success": False,
             "error": f"No baseline found for skill '{skill_name}'",
             "path": str(baseline_path),
-            "hint": "Run 'run' first and save as baseline"
+            "hint": "Run 'run' first and save as baseline",
         }
 
     with open(baseline_path) as f:
@@ -206,7 +211,9 @@ def regression(
     # Compare metrics
     baseline_metrics = baseline.get("metrics", {})
     current_metrics = {
-        "pass_rate": current["passed"] / current["total"] if current["total"] > 0 else 0,
+        "pass_rate": current["passed"] / current["total"]
+        if current["total"] > 0
+        else 0,
         "total_tests": current["total"],
         "passed_tests": current["passed"],
     }
@@ -218,19 +225,23 @@ def regression(
     current_pass_rate = current_metrics["pass_rate"]
 
     if current_pass_rate < baseline_pass_rate:
-        regressions.append({
-            "metric": "pass_rate",
-            "baseline": baseline_pass_rate,
-            "current": current_pass_rate,
-            "delta": current_pass_rate - baseline_pass_rate
-        })
+        regressions.append(
+            {
+                "metric": "pass_rate",
+                "baseline": baseline_pass_rate,
+                "current": current_pass_rate,
+                "delta": current_pass_rate - baseline_pass_rate,
+            }
+        )
     elif current_pass_rate > baseline_pass_rate:
-        improvements.append({
-            "metric": "pass_rate",
-            "baseline": baseline_pass_rate,
-            "current": current_pass_rate,
-            "delta": current_pass_rate - baseline_pass_rate
-        })
+        improvements.append(
+            {
+                "metric": "pass_rate",
+                "baseline": baseline_pass_rate,
+                "current": current_pass_rate,
+                "delta": current_pass_rate - baseline_pass_rate,
+            }
+        )
 
     return {
         "success": len(regressions) == 0,
@@ -265,7 +276,7 @@ def init(
         return {
             "success": False,
             "error": f"Skill '{skill_name}' already has test definitions",
-            "path": str(skill_dir)
+            "path": str(skill_dir),
         }
 
     # Create directory
@@ -281,85 +292,69 @@ def init(
         "test_cases": [
             {
                 "id": f"{skill_name}_001",
-                "inputs": {
-                    "prompt": "Example prompt for the skill"
-                },
+                "inputs": {"prompt": "Example prompt for the skill"},
                 "outputs": {
                     "response": "Example response from the skill",
-                    "execution_success": True
+                    "execution_success": True,
                 },
                 "expectations": {
                     "expected_facts": ["fact1", "fact2"],
                     "expected_patterns": [
                         {"pattern": "pattern_to_match", "min_count": 1}
                     ],
-                    "guidelines": ["Guideline for evaluation"]
+                    "guidelines": ["Guideline for evaluation"],
                 },
-                "metadata": {
-                    "category": "happy_path",
-                    "difficulty": "easy"
-                }
+                "metadata": {"category": "happy_path", "difficulty": "easy"},
             }
-        ]
+        ],
     }
 
     gt_path = skill_dir / "ground_truth.yaml"
-    with open(gt_path, 'w') as f:
+    with open(gt_path, "w") as f:
         yaml.dump(gt_template, f, default_flow_style=False, sort_keys=False)
 
     # Create empty candidates.yaml
-    candidates_template = {
-        "candidates": []
-    }
+    candidates_template = {"candidates": []}
     candidates_path = skill_dir / "candidates.yaml"
-    with open(candidates_path, 'w') as f:
+    with open(candidates_path, "w") as f:
         yaml.dump(candidates_template, f, default_flow_style=False, sort_keys=False)
 
     # Create manifest.yaml
     manifest_template = {
         "skill_name": skill_name,
         "description": f"Test cases for {skill_name} skill",
-        "triggers": [
-            f"{skill_name} related prompt"
-        ],
+        "triggers": [f"{skill_name} related prompt"],
         "scorers": {
             "enabled": [
                 "python_syntax",
                 "sql_syntax",
                 "pattern_adherence",
                 "no_hallucinated_apis",
-                "expected_facts_present"
+                "expected_facts_present",
             ],
-            "llm_scorers": [
-                "Safety",
-                "guidelines_from_expectations"
-            ],
+            "llm_scorers": ["Safety", "guidelines_from_expectations"],
             "default_guidelines": [
                 "Response must address the user's request completely",
                 "Code examples must follow documented best practices",
-                "Response must use modern APIs (not deprecated ones)"
-            ]
+                "Response must use modern APIs (not deprecated ones)",
+            ],
         },
         "quality_gates": {
             "syntax_valid": 1.0,
             "pattern_adherence": 0.9,
-            "execution_success": 0.8
-        }
+            "execution_success": 0.8,
+        },
     }
     manifest_path = skill_dir / "manifest.yaml"
-    with open(manifest_path, 'w') as f:
+    with open(manifest_path, "w") as f:
         yaml.dump(manifest_template, f, default_flow_style=False, sort_keys=False)
 
     return {
         "success": True,
         "skill_name": skill_name,
         "path": str(skill_dir),
-        "files_created": [
-            "ground_truth.yaml",
-            "candidates.yaml",
-            "manifest.yaml"
-        ],
-        "message": f"Initialized test scaffolding for '{skill_name}'"
+        "files_created": ["ground_truth.yaml", "candidates.yaml", "manifest.yaml"],
+        "message": f"Initialized test scaffolding for '{skill_name}'",
     }
 
 
@@ -383,7 +378,7 @@ def sync(
         "error": "UC sync not yet implemented (Phase 2)",
         "skill_name": skill_name,
         "direction": direction,
-        "hint": "Use YAML files directly for now"
+        "hint": "Use YAML files directly for now",
     }
 
 
@@ -435,11 +430,11 @@ def baseline(
                 "execution_mode": r.get("execution_mode", "unknown"),
             }
             for r in results.get("results", [])
-        ]
+        ],
     }
 
     baseline_path = baseline_dir / "baseline.yaml"
-    with open(baseline_path, 'w') as f:
+    with open(baseline_path, "w") as f:
         yaml.dump(baseline_data, f, default_flow_style=False, sort_keys=False)
 
     return {
@@ -447,7 +442,7 @@ def baseline(
         "skill_name": skill_name,
         "baseline_path": str(baseline_path),
         "metrics": baseline_data["metrics"],
-        "message": f"Baseline saved to {baseline_path}"
+        "message": f"Baseline saved to {baseline_path}",
     }
 
 
@@ -474,7 +469,7 @@ def mlflow_eval(
         return {
             "success": False,
             "error": f"Failed to import evaluate_skill: {e}",
-            "hint": "Ensure mlflow and required dependencies are installed"
+            "hint": "Ensure mlflow and required dependencies are installed",
         }
 
     try:
@@ -483,14 +478,14 @@ def mlflow_eval(
             "success": True,
             "skill_name": skill_name,
             "results": results,
-            "message": f"MLflow evaluation complete for '{skill_name}'"
+            "message": f"MLflow evaluation complete for '{skill_name}'",
         }
     except Exception as e:
         return {
             "success": False,
             "error": str(e),
             "skill_name": skill_name,
-            "hint": "Check MLflow configuration and ground_truth.yaml exists"
+            "hint": "Check MLflow configuration and ground_truth.yaml exists",
         }
 
 
@@ -525,10 +520,7 @@ def interactive(
     test_id = f"grp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     result = InteractiveResult(
-        success=False,
-        test_id=test_id,
-        skill_name=skill_name,
-        execution_mode="local"
+        success=False, test_id=test_id, skill_name=skill_name, execution_mode="local"
     )
 
     # 1. Set up fixtures if provided
@@ -591,14 +583,11 @@ def interactive(
         new_case = {
             "id": test_id,
             "inputs": {"prompt": prompt},
-            "outputs": {
-                "response": response,
-                "execution_success": True
-            },
+            "outputs": {"response": response, "execution_success": True},
             "expectations": {
                 "expected_facts": [],  # To be filled by reviewer
                 "expected_patterns": [],
-                "guidelines": []
+                "guidelines": [],
             },
             "metadata": {
                 "category": "happy_path",
@@ -606,9 +595,9 @@ def interactive(
                 "created_at": datetime.now().isoformat(),
                 "execution_verified": {
                     "mode": result.execution_mode,
-                    "verified_date": datetime.now().strftime("%Y-%m-%d")
-                }
-            }
+                    "verified_date": datetime.now().strftime("%Y-%m-%d"),
+                },
+            },
         }
 
         # Add fixture info if used
@@ -617,14 +606,19 @@ def interactive(
                 "catalog": fixture_config.catalog,
                 "schema": fixture_config.schema,
                 "volume": fixture_config.volume,
-                "files": [{"local_path": f.local_path, "volume_path": f.volume_path} for f in fixture_config.files],
-                "tables": [{"name": t.name, "ddl": t.ddl} for t in fixture_config.tables],
-                "cleanup_after": fixture_config.cleanup_after
+                "files": [
+                    {"local_path": f.local_path, "volume_path": f.volume_path}
+                    for f in fixture_config.files
+                ],
+                "tables": [
+                    {"name": t.name, "ddl": t.ddl} for t in fixture_config.tables
+                ],
+                "cleanup_after": fixture_config.cleanup_after,
             }
 
         gt_data["test_cases"].append(new_case)
 
-        with open(gt_path, 'w') as f:
+        with open(gt_path, "w") as f:
             yaml.dump(gt_data, f, default_flow_style=False, sort_keys=False)
 
         result.saved_to = "ground_truth.yaml"
@@ -669,12 +663,12 @@ def interactive(
             candidate_dict["diagnosis"] = {
                 "error": candidate.diagnosis.error,
                 "code_block": candidate.diagnosis.code_block,
-                "suggested_action": candidate.diagnosis.suggested_action
+                "suggested_action": candidate.diagnosis.suggested_action,
             }
 
         candidates_data["candidates"].append(candidate_dict)
 
-        with open(candidates_path, 'w') as f:
+        with open(candidates_path, "w") as f:
             yaml.dump(candidates_data, f, default_flow_style=False, sort_keys=False)
 
         result.saved_to = "candidates.yaml"
@@ -717,7 +711,7 @@ def scorers(
         return {
             "success": False,
             "error": f"No manifest found for skill '{skill_name}'",
-            "path": str(manifest_path)
+            "path": str(manifest_path),
         }
 
     with open(manifest_path) as f:
@@ -742,7 +736,7 @@ def scorers(
         "enabled_scorers": scorer_config.get("enabled", []),
         "llm_scorers": scorer_config.get("llm_scorers", []),
         "default_guidelines": scorer_config.get("default_guidelines", []),
-        "manifest_path": str(manifest_path)
+        "manifest_path": str(manifest_path),
     }
 
 
@@ -776,7 +770,7 @@ def scorers_update(
         return {
             "success": False,
             "error": f"No manifest found for skill '{skill_name}'",
-            "path": str(manifest_path)
+            "path": str(manifest_path),
         }
 
     with open(manifest_path) as f:
@@ -788,15 +782,16 @@ def scorers_update(
         if "evaluation" in manifest and "scorers" in manifest["evaluation"]:
             eval_scorers = manifest["evaluation"]["scorers"]
             manifest["scorers"] = {
-                "enabled": eval_scorers.get("tier1", []) + eval_scorers.get("tier2", []),
+                "enabled": eval_scorers.get("tier1", [])
+                + eval_scorers.get("tier2", []),
                 "llm_scorers": eval_scorers.get("tier3", []),
-                "default_guidelines": []
+                "default_guidelines": [],
             }
         else:
             manifest["scorers"] = {
                 "enabled": [],
                 "llm_scorers": [],
-                "default_guidelines": []
+                "default_guidelines": [],
             }
 
     scorer_config = manifest["scorers"]
@@ -853,7 +848,7 @@ def scorers_update(
                     changes.append(f"Removed guideline: {guideline[:50]}...")
 
     # Save updated manifest
-    with open(manifest_path, 'w') as f:
+    with open(manifest_path, "w") as f:
         yaml.dump(manifest, f, default_flow_style=False, sort_keys=False)
 
     return {
@@ -863,7 +858,7 @@ def scorers_update(
         "enabled_scorers": scorer_config["enabled"],
         "llm_scorers": scorer_config["llm_scorers"],
         "default_guidelines": scorer_config["default_guidelines"],
-        "manifest_path": str(manifest_path)
+        "manifest_path": str(manifest_path),
     }
 
 
@@ -891,7 +886,7 @@ def setup_test_fixtures(
         return FixtureResult(
             success=False,
             message=f"No ground_truth.yaml found for skill '{skill_name}'",
-            error="File not found"
+            error="File not found",
         )
 
     with open(gt_path) as f:
@@ -908,7 +903,7 @@ def setup_test_fixtures(
         return FixtureResult(
             success=False,
             message=f"Test case '{test_id}' not found",
-            error="Test case not found"
+            error="Test case not found",
         )
 
     # Check for fixtures
@@ -917,7 +912,7 @@ def setup_test_fixtures(
         return FixtureResult(
             success=True,
             message="No fixtures defined for this test case",
-            details={"test_id": test_id}
+            details={"test_id": test_id},
         )
 
     # Create fixture config
@@ -928,14 +923,14 @@ def setup_test_fixtures(
         return FixtureResult(
             success=False,
             message="MCP execute_sql tool required for fixture setup",
-            error="Missing MCP tool"
+            error="Missing MCP tool",
         )
 
     if not ctx.mcp_upload_file and fixture_config.files:
         return FixtureResult(
             success=False,
             message="MCP upload_file tool required for file fixtures",
-            error="Missing MCP tool"
+            error="Missing MCP tool",
         )
 
     # Set up fixtures

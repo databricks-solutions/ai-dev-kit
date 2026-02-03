@@ -50,7 +50,9 @@ def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
     # Extract state information
     state_info = {}
     if endpoint.state:
-        state_info["state"] = endpoint.state.ready.value if endpoint.state.ready else None
+        state_info["state"] = (
+            endpoint.state.ready.value if endpoint.state.ready else None
+        )
         state_info["config_update"] = (
             endpoint.state.config_update.value if endpoint.state.config_update else None
         )
@@ -68,7 +70,9 @@ def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
                 entity_info["deployment_state"] = (
                     entity.state.deployment.value if entity.state.deployment else None
                 )
-                entity_info["deployment_state_message"] = entity.state.deployment_state_message
+                entity_info["deployment_state_message"] = (
+                    entity.state.deployment_state_message
+                )
             served_entities.append(entity_info)
 
     # Check for pending config
@@ -202,7 +206,11 @@ def query_serving_endpoint(
 
     # If empty, return raw response as dict
     if not result:
-        result = response.as_dict() if hasattr(response, "as_dict") else {"raw": str(response)}
+        result = (
+            response.as_dict()
+            if hasattr(response, "as_dict")
+            else {"raw": str(response)}
+        )
 
     return result
 
@@ -242,12 +250,14 @@ def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
         if ep.config and ep.config.served_entities:
             served_count = len(ep.config.served_entities)
 
-        result.append({
-            "name": ep.name,
-            "state": state,
-            "creation_timestamp": ep.creation_timestamp,
-            "creator": ep.creator,
-            "served_entities_count": served_count,
-        })
+        result.append(
+            {
+                "name": ep.name,
+                "state": state,
+                "creation_timestamp": ep.creation_timestamp,
+                "creator": ep.creator,
+                "served_entities_count": served_count,
+            }
+        )
 
     return result

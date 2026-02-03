@@ -3,6 +3,7 @@ Jobs - Data Models and Enums
 
 Data classes and enums for job operations.
 """
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, List, Dict, Any
@@ -10,6 +11,7 @@ from typing import Optional, List, Dict, Any
 
 class JobStatus(Enum):
     """Job lifecycle status enum."""
+
     RUNNING = "RUNNING"
     QUEUED = "QUEUED"
     TERMINATED = "TERMINATED"
@@ -21,6 +23,7 @@ class JobStatus(Enum):
 
 class RunLifecycleState(Enum):
     """Run lifecycle state enum."""
+
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     TERMINATING = "TERMINATING"
@@ -34,6 +37,7 @@ class RunLifecycleState(Enum):
 
 class RunResultState(Enum):
     """Run result state enum."""
+
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     TIMEDOUT = "TIMEDOUT"
@@ -52,6 +56,7 @@ class JobRunResult:
     This dataclass provides comprehensive information about job runs
     to help LLMs understand what happened and take appropriate action.
     """
+
     # Job identification
     job_id: int
     run_id: int
@@ -101,7 +106,9 @@ class JobRunResult:
 class JobError(Exception):
     """Exception raised for job-related errors."""
 
-    def __init__(self, message: str, job_id: Optional[int] = None, run_id: Optional[int] = None):
+    def __init__(
+        self, message: str, job_id: Optional[int] = None, run_id: Optional[int] = None
+    ):
         self.job_id = job_id
         self.run_id = run_id
         super().__init__(message)

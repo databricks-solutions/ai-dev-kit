@@ -18,9 +18,7 @@ import pytest
 from databricks_tools_core.unity_catalog import (
     create_monitor,
     get_monitor,
-    run_monitor_refresh,
     list_monitor_refreshes,
-    delete_monitor,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,9 +59,11 @@ class TestMonitorCRUD:
             logger.info(f"Monitor fetched: {fetched}")
 
         except Exception as e:
-            if "FEATURE_NOT_ENABLED" in str(e).upper() or \
-               "not enabled" in str(e).lower() or \
-               "NOT_FOUND" in str(e).upper():
+            if (
+                "FEATURE_NOT_ENABLED" in str(e).upper()
+                or "not enabled" in str(e).lower()
+                or "NOT_FOUND" in str(e).upper()
+            ):
                 pytest.skip(f"Quality monitors not available: {e}")
             raise
 
@@ -92,9 +92,11 @@ class TestMonitorCRUD:
             logger.info(f"Monitor refreshes: {len(refreshes)}")
 
         except Exception as e:
-            if "FEATURE_NOT_ENABLED" in str(e).upper() or \
-               "not enabled" in str(e).lower() or \
-               "NOT_FOUND" in str(e).upper():
+            if (
+                "FEATURE_NOT_ENABLED" in str(e).upper()
+                or "not enabled" in str(e).lower()
+                or "NOT_FOUND" in str(e).upper()
+            ):
                 pytest.skip(f"Quality monitors not available: {e}")
             raise
 

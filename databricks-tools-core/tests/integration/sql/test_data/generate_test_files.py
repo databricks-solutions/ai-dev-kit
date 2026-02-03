@@ -6,7 +6,6 @@ Creates:
 - txt_files/: Simple text files
 """
 
-import os
 from pathlib import Path
 
 import pandas as pd

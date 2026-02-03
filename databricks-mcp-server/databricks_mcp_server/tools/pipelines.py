@@ -1,4 +1,5 @@
 """Pipeline tools - Manage Spark Declarative Pipelines (SDP)."""
+
 from typing import List, Dict, Any
 
 from databricks_tools_core.spark_declarative_pipelines.pipelines import (
@@ -65,7 +66,7 @@ def get_pipeline(pipeline_id: str) -> Dict[str, Any]:
         Dictionary with pipeline configuration and state.
     """
     result = _get_pipeline(pipeline_id=pipeline_id)
-    return result.as_dict() if hasattr(result, 'as_dict') else vars(result)
+    return result.as_dict() if hasattr(result, "as_dict") else vars(result)
 
 
 @mcp.tool
@@ -166,7 +167,7 @@ def get_update(pipeline_id: str, update_id: str) -> Dict[str, Any]:
         Dictionary with update status (QUEUED, RUNNING, COMPLETED, FAILED, etc.)
     """
     result = _get_update(pipeline_id=pipeline_id, update_id=update_id)
-    return result.as_dict() if hasattr(result, 'as_dict') else vars(result)
+    return result.as_dict() if hasattr(result, "as_dict") else vars(result)
 
 
 @mcp.tool
@@ -202,7 +203,7 @@ def get_pipeline_events(
         List of event dictionaries with error details.
     """
     events = _get_pipeline_events(pipeline_id=pipeline_id, max_results=max_results)
-    return [e.as_dict() if hasattr(e, 'as_dict') else vars(e) for e in events]
+    return [e.as_dict() if hasattr(e, "as_dict") else vars(e) for e in events]
 
 
 @mcp.tool

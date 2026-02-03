@@ -26,8 +26,8 @@ from typing import Optional
 from databricks.sdk import WorkspaceClient
 
 # Context variables for per-request authentication
-_host_ctx: ContextVar[Optional[str]] = ContextVar('databricks_host', default=None)
-_token_ctx: ContextVar[Optional[str]] = ContextVar('databricks_token', default=None)
+_host_ctx: ContextVar[Optional[str]] = ContextVar("databricks_host", default=None)
+_token_ctx: ContextVar[Optional[str]] = ContextVar("databricks_token", default=None)
 
 
 def set_databricks_auth(host: Optional[str], token: Optional[str]) -> None:

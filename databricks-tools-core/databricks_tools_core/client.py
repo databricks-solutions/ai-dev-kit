@@ -3,6 +3,7 @@ Databricks REST API Client
 
 Shared HTTP client for all Databricks API operations.
 """
+
 import os
 import configparser
 from pathlib import Path
@@ -13,7 +14,7 @@ import requests
 class FilesAPI:
     """Databricks Files API for Unity Catalog Volumes."""
 
-    def __init__(self, client: 'DatabricksClient'):
+    def __init__(self, client: "DatabricksClient"):
         self.client = client
 
     def create_directory(self, path: str) -> None:
@@ -41,8 +42,7 @@ class FilesAPI:
         """
         try:
             self.client.delete(
-                "/api/2.0/fs/directories",
-                params={"path": path, "recursive": "true"}
+                "/api/2.0/fs/directories", params={"path": path, "recursive": "true"}
             )
         except requests.HTTPError as e:
             if not ignore_missing or e.response.status_code != 404:
@@ -63,7 +63,7 @@ class FilesAPI:
         self.client.put(
             f"/api/2.0/fs/files{path}",
             data=data,
-            params={"overwrite": str(overwrite).lower()}
+            params={"overwrite": str(overwrite).lower()},
         )
 
 
@@ -74,7 +74,7 @@ class DatabricksClient:
         self,
         host: Optional[str] = None,
         token: Optional[str] = None,
-        profile: Optional[str] = None
+        profile: Optional[str] = None,
     ):
         """
         Initialize Databricks client.
@@ -164,7 +164,9 @@ class DatabricksClient:
 
         return host, token
 
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Make GET request to Databricks API.
 
@@ -183,7 +185,9 @@ class DatabricksClient:
         response.raise_for_status()
         return response.json()
 
-    def post(self, endpoint: str, json: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def post(
+        self, endpoint: str, json: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Make POST request to Databricks API.
 
@@ -202,7 +206,9 @@ class DatabricksClient:
         response.raise_for_status()
         return response.json()
 
-    def patch(self, endpoint: str, json: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def patch(
+        self, endpoint: str, json: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Make PATCH request to Databricks API.
 
@@ -226,7 +232,7 @@ class DatabricksClient:
         endpoint: str,
         json: Optional[Dict[str, Any]] = None,
         data: Optional[bytes] = None,
-        params: Optional[Dict[str, Any]] = None
+        params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Make PUT request to Databricks API.
@@ -262,7 +268,9 @@ class DatabricksClient:
 
         return response.json()
 
-    def delete(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def delete(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Make DELETE request to Databricks API.
 

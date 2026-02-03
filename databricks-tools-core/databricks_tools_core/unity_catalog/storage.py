@@ -3,6 +3,7 @@ Unity Catalog - Storage Operations
 
 Functions for managing storage credentials and external locations.
 """
+
 from typing import Any, Dict, List, Optional
 from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
@@ -175,9 +176,15 @@ def validate_storage_credential(
     return {
         "is_valid": result.is_dir if hasattr(result, "is_dir") else None,
         "results": [
-            {"operation": r.operation.value if r.operation else None, "result": r.result.value if r.result else None, "message": r.message}
+            {
+                "operation": r.operation.value if r.operation else None,
+                "result": r.result.value if r.result else None,
+                "message": r.message,
+            }
             for r in (result.results or [])
-        ] if hasattr(result, "results") and result.results else [],
+        ]
+        if hasattr(result, "results") and result.results
+        else [],
     }
 
 

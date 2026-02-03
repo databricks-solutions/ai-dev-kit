@@ -3,6 +3,7 @@ Unity Catalog - Catalog Operations
 
 Functions for managing catalogs in Unity Catalog.
 """
+
 from typing import Dict, List, Optional
 from databricks.sdk.service.catalog import CatalogInfo, IsolationMode
 

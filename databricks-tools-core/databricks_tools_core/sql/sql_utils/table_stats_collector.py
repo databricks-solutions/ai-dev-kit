@@ -46,7 +46,9 @@ def _get_table_lock(full_table_name: str) -> threading.Lock:
     return _table_locks[full_table_name]
 
 
-def _get_schema_cache(catalog: str, schema: str) -> Dict[str, Tuple[Optional[int], TableInfo]]:
+def _get_schema_cache(
+    catalog: str, schema: str
+) -> Dict[str, Tuple[Optional[int], TableInfo]]:
     """Get or create cache for a schema."""
     schema_key = f"{catalog}.{schema}"
     if schema_key not in _table_cache:
@@ -69,8 +71,11 @@ def _check_cache(
 
 
 def _update_cache(
-    catalog: str, schema: str, table_name: str,
-    updated_at_ms: Optional[int], table_info: TableInfo
+    catalog: str,
+    schema: str,
+    table_name: str,
+    updated_at_ms: Optional[int],
+    table_info: TableInfo,
 ) -> None:
     """Update cache with table info."""
     schema_cache = _get_schema_cache(catalog, schema)
@@ -108,10 +113,12 @@ class TableStatsCollector:
             List of table info dicts with 'name' and 'updated_at' keys
         """
         try:
-            tables = list(self.client.tables.list(
-                catalog_name=catalog,
-                schema_name=schema,
-            ))
+            tables = list(
+                self.client.tables.list(
+                    catalog_name=catalog,
+                    schema_name=schema,
+                )
+            )
             return [
                 {
                     "name": t.name,
@@ -206,7 +213,9 @@ class TableStatsCollector:
                     create_statement = create_statement[:using_pos].strip()
 
                 # Clean formatting
-                create_statement = create_statement.replace("\n", " ").replace("  ", " ").strip()
+                create_statement = (
+                    create_statement.replace("\n", " ").replace("  ", " ").strip()
+                )
 
             return create_statement
 
@@ -306,7 +315,9 @@ class TableStatsCollector:
                         data_type = "double"
                     else:
                         data_type = "string"
-                    describe_result.append({"col_name": col_name, "data_type": data_type})
+                    describe_result.append(
+                        {"col_name": col_name, "data_type": data_type}
+                    )
 
             # Step 2: Get row count
             count_result = self.executor.execute(
@@ -336,7 +347,6 @@ class TableStatsCollector:
                 # Determine column type
                 is_numeric = any(t in data_type for t in NUMERIC_TYPES)
                 is_timestamp = "timestamp" in data_type
-                is_date = "date" in data_type and "timestamp" not in data_type
                 is_array = "array" in data_type
                 is_boolean = "boolean" in data_type
                 is_id = any(p in col_name.lower() for p in ID_PATTERNS) and (
@@ -394,7 +404,9 @@ class TableStatsCollector:
                 ]
 
             # Step 5: Build column samples from sample data
-            column_samples = self._extract_column_samples(describe_result, sample_result)
+            column_samples = self._extract_column_samples(
+                describe_result, sample_result
+            )
 
             # Step 6: Parse stats results
             column_details = self._parse_stats_results(
@@ -407,14 +419,19 @@ class TableStatsCollector:
                     if column_types.get(col_name) == "categorical":
                         approx_unique = detail.unique_count or 0
                         if 0 < approx_unique < MAX_CATEGORICAL_VALUES:
-                            columns_needing_value_counts.append((col_name, "categorical"))
+                            columns_needing_value_counts.append(
+                                (col_name, "categorical")
+                            )
 
                 # Parse catalog.schema.table from fetch_value_counts_table
                 parts = fetch_value_counts_table.split(".")
                 if len(parts) == 3:
                     self._fetch_value_counts(
-                        parts[0], parts[1], parts[2],
-                        columns_needing_value_counts, column_details
+                        parts[0],
+                        parts[1],
+                        parts[2],
+                        columns_needing_value_counts,
+                        column_details,
                     )
 
             return column_details, total_rows, sample_result or []
@@ -424,7 +441,12 @@ class TableStatsCollector:
             return {}, 0, []
 
     def _build_column_stats_query(
-        self, col_name: str, escaped_col: str, data_type: str, col_type: str, base_ref: str
+        self,
+        col_name: str,
+        escaped_col: str,
+        data_type: str,
+        col_type: str,
+        base_ref: str,
     ) -> str:
         """Build stats query for a column based on its type."""
         if col_type == "array":
@@ -483,8 +505,8 @@ class TableStatsCollector:
                     COUNT(*) AS total_count,
                     SUM(CASE WHEN {escaped_col} IS NULL THEN 1 ELSE 0 END) AS null_count,
                     approx_count_distinct({escaped_col}) AS unique_count,
-                    {'CAST(MIN(' + escaped_col + ') AS STRING)' if col_type == 'date' else 'NULL'} AS min_val,
-                    {'CAST(MAX(' + escaped_col + ') AS STRING)' if col_type == 'date' else 'NULL'} AS max_val,
+                    {"CAST(MIN(" + escaped_col + ") AS STRING)" if col_type == "date" else "NULL"} AS min_val,
+                    {"CAST(MAX(" + escaped_col + ") AS STRING)" if col_type == "date" else "NULL"} AS max_val,
                     NULL AS mean_val, NULL AS stddev_val,
                     NULL AS q1_val, NULL AS median_val, NULL AS q3_val,
                     NULL AS histogram_data
@@ -535,9 +557,13 @@ class TableStatsCollector:
                 continue
 
             col_type = column_types.get(col_name, "categorical")
-            data_type = row.get("data_type", "unknown")
+            row.get("data_type", "unknown")
             samples = column_samples.get(col_name, [])
-            approx_unique = int(row.get("unique_count") or 0) if row.get("unique_count") is not None else None
+            approx_unique = (
+                int(row.get("unique_count") or 0)
+                if row.get("unique_count") is not None
+                else None
+            )
 
             # Parse histogram if present
             histogram_bins = None
@@ -599,7 +625,11 @@ class TableStatsCollector:
             else:
                 # boolean, id, categorical, date
                 final_type = col_type
-                if col_type == "categorical" and approx_unique and approx_unique >= MAX_CATEGORICAL_VALUES:
+                if (
+                    col_type == "categorical"
+                    and approx_unique
+                    and approx_unique >= MAX_CATEGORICAL_VALUES
+                ):
                     final_type = "string"
 
                 detail = ColumnDetail(
@@ -708,7 +738,9 @@ class TableStatsCollector:
                         catalog, schema, table_name
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to collect stats for {full_table_name}: {e}")
+                    logger.warning(
+                        f"Failed to collect stats for {full_table_name}: {e}"
+                    )
 
             table_info = TableInfo(
                 name=full_table_name,
@@ -759,7 +791,9 @@ class TableStatsCollector:
                     catalog, schema, table_name, updated_at_ms, comment, collect_stats
                 )
             except Exception as e:
-                logger.error(f"Failed to get info for {catalog}.{schema}.{table_name}: {e}")
+                logger.error(
+                    f"Failed to get info for {catalog}.{schema}.{table_name}: {e}"
+                )
                 return TableInfo(
                     name=f"{catalog}.{schema}.{table_name}",
                     ddl="",
@@ -770,19 +804,19 @@ class TableStatsCollector:
         max_workers = min(self.max_workers, len(tables))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_table = {
-                executor.submit(process_table, t): t for t in tables
-            }
+            future_to_table = {executor.submit(process_table, t): t for t in tables}
             for future in as_completed(future_to_table):
                 try:
                     results.append(future.result())
                 except Exception as e:
                     table = future_to_table[future]
                     logger.error(f"Unexpected error for {table['name']}: {e}")
-                    results.append(TableInfo(
-                        name=f"{catalog}.{schema}.{table['name']}",
-                        ddl="",
-                        error=str(e),
-                    ))
+                    results.append(
+                        TableInfo(
+                            name=f"{catalog}.{schema}.{table['name']}",
+                            ddl="",
+                            error=str(e),
+                        )
+                    )
 
         return results

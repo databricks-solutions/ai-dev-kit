@@ -4,6 +4,7 @@ Unity Catalog - Tag and Comment Operations
 Functions for managing tags and comments on UC objects.
 All operations are SQL-based via execute_sql.
 """
+
 import re
 from typing import Any, Dict, List, Optional
 
@@ -17,9 +18,12 @@ def _validate_identifier(name: str) -> str:
     return name
 
 
-def _execute_uc_sql(sql_query: str, warehouse_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def _execute_uc_sql(
+    sql_query: str, warehouse_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
+
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
 
 
@@ -57,7 +61,9 @@ def set_tags(
     else:
         obj_keyword = object_type.upper()
         if obj_keyword not in ("CATALOG", "SCHEMA", "TABLE"):
-            raise ValueError(f"object_type must be catalog, schema, table, or column. Got: {object_type}")
+            raise ValueError(
+                f"object_type must be catalog, schema, table, or column. Got: {object_type}"
+            )
         sql = f"ALTER {obj_keyword} {full_name} SET TAGS ({tag_pairs})"
 
     _execute_uc_sql(sql, warehouse_id=warehouse_id)
@@ -95,11 +101,18 @@ def unset_tags(
     else:
         obj_keyword = object_type.upper()
         if obj_keyword not in ("CATALOG", "SCHEMA", "TABLE"):
-            raise ValueError(f"object_type must be catalog, schema, table, or column. Got: {object_type}")
+            raise ValueError(
+                f"object_type must be catalog, schema, table, or column. Got: {object_type}"
+            )
         sql = f"ALTER {obj_keyword} {full_name} UNSET TAGS ({tag_keys})"
 
     _execute_uc_sql(sql, warehouse_id=warehouse_id)
-    return {"status": "tags_unset", "object": full_name, "tag_names": tag_names, "sql": sql}
+    return {
+        "status": "tags_unset",
+        "object": full_name,
+        "tag_names": tag_names,
+        "sql": sql,
+    }
 
 
 def set_comment(
@@ -133,7 +146,9 @@ def set_comment(
     else:
         obj_keyword = object_type.upper()
         if obj_keyword not in ("CATALOG", "SCHEMA", "TABLE"):
-            raise ValueError(f"object_type must be catalog, schema, table, or column. Got: {object_type}")
+            raise ValueError(
+                f"object_type must be catalog, schema, table, or column. Got: {object_type}"
+            )
         sql = f"COMMENT ON {obj_keyword} {full_name} IS '{escaped_comment}'"
 
     _execute_uc_sql(sql, warehouse_id=warehouse_id)

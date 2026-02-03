@@ -13,7 +13,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from databricks.sdk import WorkspaceClient
@@ -21,7 +21,6 @@ from databricks.sdk import WorkspaceClient
 from ..auth import get_workspace_client
 from .models import (
     EndpointStatus,
-    EvaluationRunDict,
     GenieIds,
     GenieListInstructionsResponseDict,
     GenieListQuestionsResponseDict,
@@ -212,7 +211,10 @@ class AgentBricksManager:
             for tile in resp.get("tiles", []):
                 if tile_type:
                     tile_type_value = tile.get("tile_type")
-                    if tile_type_value == tile_type.value or tile_type_value == tile_type.name:
+                    if (
+                        tile_type_value == tile_type.value
+                        or tile_type_value == tile_type.name
+                    ):
                         all_tiles.append(tile)
                 else:
                     all_tiles.append(tile)
@@ -267,7 +269,9 @@ class AgentBricksManager:
             resp = self._get("/api/2.0/data-rooms", params=params)
             for space in resp.get("data_rooms", []):
                 if space.get("display_name") == display_name:
-                    return GenieIds(space_id=space["space_id"], display_name=display_name)
+                    return GenieIds(
+                        space_id=space["space_id"], display_name=display_name
+                    )
             page_token = resp.get("next_page_token")
             if not page_token:
                 break
@@ -337,7 +341,9 @@ class AgentBricksManager:
         ka = self.ka_get(tile_id)
         if not ka:
             return None
-        return ka.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status")
+        return (
+            ka.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status")
+        )
 
     def ka_is_ready_for_update(self, tile_id: str) -> bool:
         """Check if a KA is ready to be updated (status is ONLINE)."""
@@ -355,7 +361,9 @@ class AgentBricksManager:
         start_time = time.time()
         while time.time() - start_time < timeout:
             if self.ka_is_ready_for_update(tile_id):
-                logger.info(f"KA {tile_id} is ready (status: {EndpointStatus.ONLINE.value})")
+                logger.info(
+                    f"KA {tile_id} is ready (status: {EndpointStatus.ONLINE.value})"
+                )
                 return True
             current_status = self.ka_get_endpoint_status(tile_id)
             logger.info(f"KA {tile_id} status: {current_status}, waiting...")
@@ -481,14 +489,19 @@ class AgentBricksManager:
 
     def ka_sync_sources(self, tile_id: str) -> None:
         """Trigger indexing/sync of all knowledge sources."""
-        self._post(f"/api/2.0/knowledge-assistants/{tile_id}/sync-knowledge-sources", {})
+        self._post(
+            f"/api/2.0/knowledge-assistants/{tile_id}/sync-knowledge-sources", {}
+        )
 
     def ka_reconcile_model(self, tile_id: str) -> None:
         """Reconcile KA to latest model."""
         self._patch(f"/api/2.0/knowledge-assistants/{tile_id}/reconcile-model", {})
 
     def ka_wait_until_ready(
-        self, tile_id: str, timeout_s: Optional[int] = None, poll_s: Optional[float] = None
+        self,
+        tile_id: str,
+        timeout_s: Optional[int] = None,
+        poll_s: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Wait until KA is ready (not in PROVISIONING state)."""
         timeout_s = timeout_s or self.default_timeout_s
@@ -497,7 +510,11 @@ class AgentBricksManager:
 
         while True:
             ka = self.ka_get(tile_id)
-            status = ka.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status")
+            status = (
+                ka.get("knowledge_assistant", {})
+                .get("status", {})
+                .get("endpoint_status")
+            )
             if status and status != "PROVISIONING":
                 return ka
             if time.time() >= deadline:
@@ -505,7 +522,10 @@ class AgentBricksManager:
             time.sleep(poll_s)
 
     def ka_wait_until_endpoint_online(
-        self, tile_id: str, timeout_s: Optional[int] = None, poll_s: Optional[float] = None
+        self,
+        tile_id: str,
+        timeout_s: Optional[int] = None,
+        poll_s: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Wait for endpoint_status==ONLINE."""
         timeout_s = timeout_s or self.default_timeout_s
@@ -518,7 +538,11 @@ class AgentBricksManager:
         while True:
             try:
                 ka = self.ka_get(tile_id)
-                status = ka.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status")
+                status = (
+                    ka.get("knowledge_assistant", {})
+                    .get("status", {})
+                    .get("endpoint_status")
+                )
 
                 if status != last_status:
                     elapsed = int(time.time() - start_time)
@@ -537,7 +561,9 @@ class AgentBricksManager:
             if time.time() >= deadline:
                 if ka:
                     return ka
-                raise TimeoutError(f"KA {tile_id} was not found within {timeout_s} seconds")
+                raise TimeoutError(
+                    f"KA {tile_id} was not found within {timeout_s} seconds"
+                )
             time.sleep(poll_s)
 
     # ========================================================================
@@ -560,7 +586,9 @@ class AgentBricksManager:
         params = {"page_size": page_size}
         if page_token:
             params["page_token"] = page_token
-        return self._get(f"/api/2.0/knowledge-assistants/{tile_id}/examples", params=params)
+        return self._get(
+            f"/api/2.0/knowledge-assistants/{tile_id}/examples", params=params
+        )
 
     def ka_delete_example(self, tile_id: str, example_id: str) -> None:
         """Delete an example from the KA."""
@@ -728,7 +756,11 @@ class AgentBricksManager:
         mas = self.mas_get(tile_id)
         if not mas:
             return None
-        return mas.get("multi_agent_supervisor", {}).get("status", {}).get("endpoint_status")
+        return (
+            mas.get("multi_agent_supervisor", {})
+            .get("status", {})
+            .get("endpoint_status")
+        )
 
     # ========================================================================
     # MAS Examples Management
@@ -741,7 +773,9 @@ class AgentBricksManager:
         payload = {"tile_id": tile_id, "question": question}
         if guidelines:
             payload["guidelines"] = guidelines
-        return self._post(f"/api/2.0/multi-agent-supervisors/{tile_id}/examples", payload)
+        return self._post(
+            f"/api/2.0/multi-agent-supervisors/{tile_id}/examples", payload
+        )
 
     def mas_list_examples(
         self, tile_id: str, page_size: int = 100, page_token: Optional[str] = None
@@ -750,7 +784,9 @@ class AgentBricksManager:
         params = {"page_size": page_size}
         if page_token:
             params["page_token"] = page_token
-        return self._get(f"/api/2.0/multi-agent-supervisors/{tile_id}/examples", params=params)
+        return self._get(
+            f"/api/2.0/multi-agent-supervisors/{tile_id}/examples", params=params
+        )
 
     def mas_update_example(
         self,
@@ -771,7 +807,9 @@ class AgentBricksManager:
 
     def mas_delete_example(self, tile_id: str, example_id: str) -> None:
         """Delete an example from the MAS."""
-        self._delete(f"/api/2.0/multi-agent-supervisors/{tile_id}/examples/{example_id}")
+        self._delete(
+            f"/api/2.0/multi-agent-supervisors/{tile_id}/examples/{example_id}"
+        )
 
     def mas_add_examples_batch(
         self, tile_id: str, questions: List[Dict[str, Any]]
@@ -792,7 +830,9 @@ class AgentBricksManager:
                 logger.info(f"Added MAS example: {question_text[:50]}...")
                 return example
             except Exception as e:
-                logger.error(f"Failed to add MAS example '{question_text[:50]}...': {e}")
+                logger.error(
+                    f"Failed to add MAS example '{question_text[:50]}...': {e}"
+                )
                 return None
 
         max_workers = min(2, len(questions))
@@ -854,7 +894,9 @@ class AgentBricksManager:
             Created Genie space data
         """
         if parent_folder_path and parent_folder_id:
-            raise ValueError("Cannot specify both parent_folder_path and parent_folder_id")
+            raise ValueError(
+                "Cannot specify both parent_folder_path and parent_folder_id"
+            )
 
         room_payload = {
             "display_name": display_name,
@@ -872,7 +914,9 @@ class AgentBricksManager:
                 try:
                     self.w.workspace.mkdirs(parent_folder_path)
                 except Exception as e:
-                    logger.warning(f"Could not create directory {parent_folder_path}: {e}")
+                    logger.warning(
+                        f"Could not create directory {parent_folder_path}: {e}"
+                    )
                     raise
 
             try:
@@ -962,7 +1006,9 @@ class AgentBricksManager:
             params={"question_type": question_type},
         )
 
-    def genie_list_instructions(self, space_id: str) -> GenieListInstructionsResponseDict:
+    def genie_list_instructions(
+        self, space_id: str
+    ) -> GenieListInstructionsResponseDict:
         """List all instructions for a Genie space."""
         return self._get(f"/api/2.0/data-rooms/{space_id}/instructions")
 
@@ -989,18 +1035,22 @@ class AgentBricksManager:
 
         # Delete existing
         for question_id in existing_ids:
-            actions.append({"action_type": "DELETE", "curated_question_id": question_id})
+            actions.append(
+                {"action_type": "DELETE", "curated_question_id": question_id}
+            )
 
         # Create new
         for question_text in questions:
-            actions.append({
-                "action_type": "CREATE",
-                "curated_question": {
-                    "data_room_id": space_id,
-                    "question_text": question_text,
-                    "question_type": "SAMPLE_QUESTION",
-                },
-            })
+            actions.append(
+                {
+                    "action_type": "CREATE",
+                    "curated_question": {
+                        "data_room_id": space_id,
+                        "question_text": question_text,
+                        "question_type": "SAMPLE_QUESTION",
+                    },
+                }
+            )
 
         return self._post(
             f"/api/2.0/data-rooms/{space_id}/curated-questions/batch-actions",
@@ -1049,15 +1099,23 @@ class AgentBricksManager:
             {"curated_question": curated_question, "data_space_id": space_id},
         )
 
-    def genie_add_sample_question(self, space_id: str, question_text: str) -> Dict[str, Any]:
+    def genie_add_sample_question(
+        self, space_id: str, question_text: str
+    ) -> Dict[str, Any]:
         """Add a single sample question."""
-        return self.genie_add_curated_question(space_id, question_text, "SAMPLE_QUESTION")
+        return self.genie_add_curated_question(
+            space_id, question_text, "SAMPLE_QUESTION"
+        )
 
     def genie_add_instruction(
         self, space_id: str, title: str, content: str, instruction_type: str
     ) -> Dict[str, Any]:
         """Add an instruction (low-level)."""
-        payload = {"title": title, "content": content, "instruction_type": instruction_type}
+        payload = {
+            "title": title,
+            "content": content,
+            "instruction_type": instruction_type,
+        }
         return self._post(f"/api/2.0/data-rooms/{space_id}/instructions", payload)
 
     def genie_add_text_instruction(
@@ -1072,7 +1130,9 @@ class AgentBricksManager:
         """Add a SQL query example instruction."""
         return self.genie_add_instruction(space_id, title, content, "SQL_INSTRUCTION")
 
-    def genie_add_sql_function(self, space_id: str, function_name: str) -> Dict[str, Any]:
+    def genie_add_sql_function(
+        self, space_id: str, function_name: str
+    ) -> Dict[str, Any]:
         """Add a SQL function (certified answer)."""
         return self.genie_add_instruction(
             space_id, "SQL Function", function_name, "CERTIFIED_ANSWER"
@@ -1145,7 +1205,9 @@ class AgentBricksManager:
                 results.append(result)
                 logger.info(f"Added benchmark: {bm['question_text'][:50]}...")
             except Exception as e:
-                logger.error(f"Failed to add benchmark '{bm['question_text'][:50]}...': {e}")
+                logger.error(
+                    f"Failed to add benchmark '{bm['question_text'][:50]}...': {e}"
+                )
         return results
 
     # ========================================================================
@@ -1159,7 +1221,9 @@ class AgentBricksManager:
         if response.status_code >= 400:
             try:
                 error_data = response.json()
-                error_msg = error_data.get("message", error_data.get("error", str(error_data)))
+                error_msg = error_data.get(
+                    "message", error_data.get("error", str(error_data))
+                )
                 detailed_error = f"{method} {path} failed: {error_msg}"
                 logger.error(
                     f"API Error: {detailed_error}\nFull response: {json.dumps(error_data, indent=2)}"
@@ -1167,9 +1231,7 @@ class AgentBricksManager:
                 raise Exception(detailed_error)
             except ValueError:
                 error_text = response.text
-                detailed_error = (
-                    f"{method} {path} failed with status {response.status_code}: {error_text}"
-                )
+                detailed_error = f"{method} {path} failed with status {response.status_code}: {error_text}"
                 logger.error(f"API Error: {detailed_error}")
                 raise Exception(detailed_error)
 
@@ -1229,10 +1291,24 @@ class AgentBricksManager:
                 return None
 
             # Sort by state (RUNNING first) and size (smaller first)
-            size_order = ['2X-Small', 'X-Small', 'Small', 'Medium', 'Large', 'X-Large', '2X-Large', '3X-Large', '4X-Large']
+            size_order = [
+                "2X-Small",
+                "X-Small",
+                "Small",
+                "Medium",
+                "Large",
+                "X-Large",
+                "2X-Large",
+                "3X-Large",
+                "4X-Large",
+            ]
 
             def sort_key(wh):
-                state_priority = 0 if wh.state.value == 'RUNNING' else (1 if wh.state.value == 'STARTING' else 2)
+                state_priority = (
+                    0
+                    if wh.state.value == "RUNNING"
+                    else (1 if wh.state.value == "STARTING" else 2)
+                )
                 try:
                     size_priority = size_order.index(wh.cluster_size)
                 except ValueError:
@@ -1268,22 +1344,26 @@ class AgentBricksManager:
             files = list(self.w.files.list_directory_contents(volume_path))
 
             for file_info in files:
-                if file_info.path and file_info.path.endswith('.json'):
+                if file_info.path and file_info.path.endswith(".json"):
                     try:
                         # Read the JSON file
                         response = self.w.files.download(file_info.path)
-                        content = response.read().decode('utf-8')
+                        content = response.read().decode("utf-8")
                         data = json.loads(content)
 
                         # Extract question and guideline if present
-                        if 'question' in data:
-                            example = {'question': data['question']}
-                            if 'guideline' in data:
-                                example['guideline'] = data['guideline']
+                        if "question" in data:
+                            example = {"question": data["question"]}
+                            if "guideline" in data:
+                                example["guideline"] = data["guideline"]
                             examples.append(example)
-                            logger.debug(f"Found example in {file_info.path}: {data['question'][:50]}...")
+                            logger.debug(
+                                f"Found example in {file_info.path}: {data['question'][:50]}..."
+                            )
                     except Exception as e:
-                        logger.warning(f"Failed to read JSON file {file_info.path}: {e}")
+                        logger.warning(
+                            f"Failed to read JSON file {file_info.path}: {e}"
+                        )
                         continue
 
             logger.info(f"Found {len(examples)} examples in {volume_path}")
@@ -1312,7 +1392,9 @@ class TileExampleQueue:
             poll_interval: Seconds between status checks (default: 30)
             max_attempts: Maximum poll attempts before giving up (default: 120 = 1 hour)
         """
-        self.queue: Dict[str, Tuple[AgentBricksManager, List[Dict[str, Any]], str, float, int]] = {}
+        self.queue: Dict[
+            str, Tuple[AgentBricksManager, List[Dict[str, Any]], str, float, int]
+        ] = {}
         self.lock = threading.Lock()
         self.running = False
         self.thread: Optional[threading.Thread] = None
@@ -1324,7 +1406,7 @@ class TileExampleQueue:
         tile_id: str,
         manager: AgentBricksManager,
         questions: List[Dict[str, Any]],
-        tile_type: str = 'KA',
+        tile_type: str = "KA",
     ) -> None:
         """Add a tile and its questions to the processing queue.
 
@@ -1337,8 +1419,8 @@ class TileExampleQueue:
         with self.lock:
             self.queue[tile_id] = (manager, questions, tile_type, time.time(), 0)
             logger.info(
-                f'Enqueued {len(questions)} examples for {tile_type} {tile_id} '
-                f'(will add when endpoint is ready)'
+                f"Enqueued {len(questions)} examples for {tile_type} {tile_id} "
+                f"(will add when endpoint is ready)"
             )
 
         # Start background thread if not running
@@ -1351,14 +1433,14 @@ class TileExampleQueue:
             self.running = True
             self.thread = threading.Thread(target=self._process_loop, daemon=True)
             self.thread.start()
-            logger.info('Started tile example queue background processor')
+            logger.info("Started tile example queue background processor")
 
     def stop(self) -> None:
         """Stop the background processing thread."""
         self.running = False
         if self.thread:
             self.thread.join(timeout=5)
-        logger.info('Stopped tile example queue background processor')
+        logger.info("Stopped tile example queue background processor")
 
     def _process_loop(self) -> None:
         """Background loop that checks tile status and adds examples when ready."""
@@ -1369,15 +1451,21 @@ class TileExampleQueue:
                     items_to_process = list(self.queue.items())
 
                 # Process each tile
-                for tile_id, (manager, questions, tile_type, enqueue_time, attempt_count) in items_to_process:
+                for tile_id, (
+                    manager,
+                    questions,
+                    tile_type,
+                    enqueue_time,
+                    attempt_count,
+                ) in items_to_process:
                     try:
                         # Check if max attempts exceeded
                         if attempt_count >= self.max_attempts:
                             elapsed_time = time.time() - enqueue_time
                             logger.error(
-                                f'{tile_type} {tile_id} exceeded max attempts ({self.max_attempts}). '
-                                f'Elapsed: {elapsed_time:.0f}s. Removing from queue. '
-                                f'Failed to add {len(questions)} examples.'
+                                f"{tile_type} {tile_id} exceeded max attempts ({self.max_attempts}). "
+                                f"Elapsed: {elapsed_time:.0f}s. Removing from queue. "
+                                f"Failed to add {len(questions)} examples."
                             )
                             with self.lock:
                                 self.queue.pop(tile_id, None)
@@ -1386,46 +1474,60 @@ class TileExampleQueue:
                         # Increment attempt count
                         with self.lock:
                             if tile_id in self.queue:
-                                self.queue[tile_id] = (manager, questions, tile_type, enqueue_time, attempt_count + 1)
+                                self.queue[tile_id] = (
+                                    manager,
+                                    questions,
+                                    tile_type,
+                                    enqueue_time,
+                                    attempt_count + 1,
+                                )
 
                         # Check endpoint status
-                        if tile_type == 'KA':
+                        if tile_type == "KA":
                             status = manager.ka_get_endpoint_status(tile_id)
-                        elif tile_type == 'MAS':
+                        elif tile_type == "MAS":
                             status = manager.mas_get_endpoint_status(tile_id)
                         else:
-                            logger.error(f'Unknown tile type: {tile_type}')
+                            logger.error(f"Unknown tile type: {tile_type}")
                             with self.lock:
                                 self.queue.pop(tile_id, None)
                             continue
 
-                        logger.debug(f'{tile_type} {tile_id} status: {status} (attempt {attempt_count + 1}/{self.max_attempts})')
+                        logger.debug(
+                            f"{tile_type} {tile_id} status: {status} (attempt {attempt_count + 1}/{self.max_attempts})"
+                        )
 
                         # Add examples if ONLINE
                         if status == EndpointStatus.ONLINE.value:
-                            logger.info(f'{tile_type} {tile_id} is ONLINE, adding {len(questions)} examples...')
+                            logger.info(
+                                f"{tile_type} {tile_id} is ONLINE, adding {len(questions)} examples..."
+                            )
 
-                            if tile_type == 'KA':
-                                created = manager.ka_add_examples_batch(tile_id, questions)
+                            if tile_type == "KA":
+                                created = manager.ka_add_examples_batch(
+                                    tile_id, questions
+                                )
                             else:
-                                created = manager.mas_add_examples_batch(tile_id, questions)
+                                created = manager.mas_add_examples_batch(
+                                    tile_id, questions
+                                )
 
                             elapsed_time = time.time() - enqueue_time
                             logger.info(
-                                f'Added {len(created)} examples to {tile_type} {tile_id} '
-                                f'after {attempt_count + 1} attempts ({elapsed_time:.0f}s)'
+                                f"Added {len(created)} examples to {tile_type} {tile_id} "
+                                f"after {attempt_count + 1} attempts ({elapsed_time:.0f}s)"
                             )
 
                             with self.lock:
                                 self.queue.pop(tile_id, None)
 
                     except Exception as e:
-                        logger.error(f'Error processing {tile_type} {tile_id}: {e}')
+                        logger.error(f"Error processing {tile_type} {tile_id}: {e}")
                         with self.lock:
                             self.queue.pop(tile_id, None)
 
             except Exception as e:
-                logger.error(f'Error in queue processor: {e}')
+                logger.error(f"Error in queue processor: {e}")
 
             time.sleep(self.poll_interval)
 

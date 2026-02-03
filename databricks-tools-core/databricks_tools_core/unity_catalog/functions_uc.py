@@ -5,6 +5,7 @@ Functions for managing UC functions (UDFs).
 Note: Creating functions requires SQL (CREATE FUNCTION statement).
 Use execute_sql or the security_policies module for function creation.
 """
+
 from typing import List
 from databricks.sdk.service.catalog import FunctionInfo
 
@@ -26,10 +27,12 @@ def list_functions(catalog_name: str, schema_name: str) -> List[FunctionInfo]:
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    return list(w.functions.list(
-        catalog_name=catalog_name,
-        schema_name=schema_name,
-    ))
+    return list(
+        w.functions.list(
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+        )
+    )
 
 
 def get_function(full_function_name: str) -> FunctionInfo:

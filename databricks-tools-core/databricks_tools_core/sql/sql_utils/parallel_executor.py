@@ -296,13 +296,15 @@ class SQLParallelExecutor:
             group_num = group_idx + 1
             ran = stopped_after_group is None or group_num <= stopped_after_group
 
-            groups_summary.append({
-                "group_number": group_num,
-                "group_size": len(group),
-                "query_indices": [i + 1 for i in group],  # 1-based for display
-                "is_parallel": len(group) > 1,
-                "status": "executed" if ran else "skipped",
-            })
+            groups_summary.append(
+                {
+                    "group_number": group_num,
+                    "group_size": len(group),
+                    "query_indices": [i + 1 for i in group],  # 1-based for display
+                    "is_parallel": len(group) > 1,
+                    "status": "executed" if ran else "skipped",
+                }
+            )
 
         return {
             "total_queries": sum(len(g) for g in execution_groups),

@@ -3,6 +3,7 @@ Unity Catalog - Grant Operations
 
 Functions for managing permissions on Unity Catalog securables.
 """
+
 from typing import Any, Dict, List, Optional
 from databricks.sdk.service.catalog import (
     Privilege,
@@ -19,9 +20,16 @@ def _parse_securable_type(securable_type: str) -> str:
     not a SecurableType enum instance.
     """
     valid_types = {
-        "catalog", "schema", "table", "volume", "function",
-        "storage_credential", "external_location", "connection",
-        "share", "metastore",
+        "catalog",
+        "schema",
+        "table",
+        "volume",
+        "function",
+        "storage_credential",
+        "external_location",
+        "connection",
+        "share",
+        "metastore",
     }
     key = securable_type.lower().replace("-", "_").replace(" ", "_")
     if key not in valid_types:
@@ -92,7 +100,10 @@ def grant_privileges(
         "principal": principal,
         "privileges": privileges,
         "assignments": [
-            {"principal": a.principal, "privileges": [p.value for p in (a.privileges or [])]}
+            {
+                "principal": a.principal,
+                "privileges": [p.value for p in (a.privileges or [])],
+            }
             for a in (result.privilege_assignments or [])
         ],
     }
@@ -142,7 +153,10 @@ def revoke_privileges(
         "principal": principal,
         "privileges": privileges,
         "assignments": [
-            {"principal": a.principal, "privileges": [p.value for p in (a.privileges or [])]}
+            {
+                "principal": a.principal,
+                "privileges": [p.value for p in (a.privileges or [])],
+            }
             for a in (result.privilege_assignments or [])
         ],
     }
@@ -180,7 +194,10 @@ def get_grants(
         "securable_type": securable_type,
         "full_name": full_name,
         "assignments": [
-            {"principal": a.principal, "privileges": [p.value for p in (a.privileges or [])]}
+            {
+                "principal": a.principal,
+                "privileges": [p.value for p in (a.privileges or [])],
+            }
             for a in (result.privilege_assignments or [])
         ],
     }
@@ -221,7 +238,13 @@ def get_effective_grants(
             {
                 "principal": a.principal,
                 "privileges": [
-                    {"privilege": p.privilege.value if p.privilege else None, "inherited_from_name": p.inherited_from_name, "inherited_from_type": p.inherited_from_type.value if p.inherited_from_type else None}
+                    {
+                        "privilege": p.privilege.value if p.privilege else None,
+                        "inherited_from_name": p.inherited_from_name,
+                        "inherited_from_type": p.inherited_from_type.value
+                        if p.inherited_from_type
+                        else None,
+                    }
                     for p in (a.privileges or [])
                 ],
             }

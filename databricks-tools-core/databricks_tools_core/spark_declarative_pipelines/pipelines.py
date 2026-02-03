@@ -4,6 +4,7 @@ Spark Declarative Pipelines - Pipeline Management
 Functions for managing SDP pipeline lifecycle using Databricks Pipelines API.
 All pipelines use Unity Catalog and serverless compute by default.
 """
+
 import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
@@ -37,16 +38,26 @@ _INVALID_SDK_FIELDS = {"pipeline_type"}
 
 # Fields that need conversion from dict to SDK objects
 _COMPLEX_FIELD_CONVERTERS = {
-    "libraries": lambda items: [PipelineLibrary.from_dict(item) for item in items] if items else None,
-    "clusters": lambda items: [PipelineCluster.from_dict(item) for item in items] if items else None,
+    "libraries": lambda items: (
+        [PipelineLibrary.from_dict(item) for item in items] if items else None
+    ),
+    "clusters": lambda items: (
+        [PipelineCluster.from_dict(item) for item in items] if items else None
+    ),
     "event_log": lambda item: EventLogSpec.from_dict(item) if item else None,
-    "notifications": lambda items: [Notifications.from_dict(item) for item in items] if items else None,
+    "notifications": lambda items: (
+        [Notifications.from_dict(item) for item in items] if items else None
+    ),
     "restart_window": lambda item: RestartWindow.from_dict(item) if item else None,
     "deployment": lambda item: PipelineDeployment.from_dict(item) if item else None,
     "filters": lambda item: Filters.from_dict(item) if item else None,
     "environment": lambda item: PipelinesEnvironment.from_dict(item) if item else None,
-    "gateway_definition": lambda item: IngestionGatewayPipelineDefinition.from_dict(item) if item else None,
-    "ingestion_definition": lambda item: IngestionPipelineDefinition.from_dict(item) if item else None,
+    "gateway_definition": lambda item: (
+        IngestionGatewayPipelineDefinition.from_dict(item) if item else None
+    ),
+    "ingestion_definition": lambda item: (
+        IngestionPipelineDefinition.from_dict(item) if item else None
+    ),
     "trigger": lambda item: PipelineTrigger.from_dict(item) if item else None,
     "run_as": lambda item: RunAs.from_dict(item) if item else None,
 }
@@ -112,8 +123,7 @@ RUNNING_STATES = {
 def _build_libraries(workspace_file_paths: List[str]) -> List[PipelineLibrary]:
     """Build PipelineLibrary list from file paths."""
     return [
-        PipelineLibrary(file=FileLibrary(path=path))
-        for path in workspace_file_paths
+        PipelineLibrary(file=FileLibrary(path=path)) for path in workspace_file_paths
     ]
 
 
@@ -132,8 +142,10 @@ def _extract_error_details(events: List[PipelineEvent]) -> List[Dict[str, Any]]:
                 exceptions = []
                 for exc in event.error.exceptions:
                     exc_detail = {
-                        "class_name": exc.class_name if hasattr(exc, 'class_name') else None,
-                        "message": exc.message if hasattr(exc, 'message') else str(exc),
+                        "class_name": exc.class_name
+                        if hasattr(exc, "class_name")
+                        else None,
+                        "message": exc.message if hasattr(exc, "message") else str(exc),
                     }
                     exceptions.append(exc_detail)
                 error_info["exceptions"] = exceptions
@@ -149,6 +161,7 @@ class PipelineRunResult:
     This dataclass provides comprehensive information about pipeline operations
     to help LLMs understand what happened and take appropriate action.
     """
+
     # Pipeline identification
     pipeline_id: str
     pipeline_name: str
@@ -354,7 +367,7 @@ def start_update(
     refresh_selection: Optional[List[str]] = None,
     full_refresh: bool = False,
     full_refresh_selection: Optional[List[str]] = None,
-    validate_only: bool = False
+    validate_only: bool = False,
 ) -> str:
     """
     Start a pipeline update or dry-run validation.
@@ -376,7 +389,7 @@ def start_update(
         refresh_selection=refresh_selection,
         full_refresh=full_refresh,
         full_refresh_selection=full_refresh_selection,
-        validate_only=validate_only
+        validate_only=validate_only,
     )
 
     return response.update_id
@@ -394,10 +407,7 @@ def get_update(pipeline_id: str, update_id: str) -> GetUpdateResponse:
         GetUpdateResponse with update status (QUEUED, RUNNING, COMPLETED, FAILED, etc.)
     """
     w = get_workspace_client()
-    return w.pipelines.get_update(
-        pipeline_id=pipeline_id,
-        update_id=update_id
-    )
+    return w.pipelines.get_update(pipeline_id=pipeline_id, update_id=update_id)
 
 
 def stop_pipeline(pipeline_id: str) -> None:
@@ -412,8 +422,7 @@ def stop_pipeline(pipeline_id: str) -> None:
 
 
 def get_pipeline_events(
-    pipeline_id: str,
-    max_results: int = 100
+    pipeline_id: str, max_results: int = 100
 ) -> List[PipelineEvent]:
     """
     Get pipeline events, issues, and error messages.
@@ -429,17 +438,13 @@ def get_pipeline_events(
     """
     w = get_workspace_client()
     events = w.pipelines.list_pipeline_events(
-        pipeline_id=pipeline_id,
-        max_results=max_results
+        pipeline_id=pipeline_id, max_results=max_results
     )
     return list(events)
 
 
 def wait_for_pipeline_update(
-    pipeline_id: str,
-    update_id: str,
-    timeout: int = 1800,
-    poll_interval: int = 5
+    pipeline_id: str, update_id: str, timeout: int = 1800, poll_interval: int = 5
 ) -> Dict[str, Any]:
     """
     Wait for a pipeline update to complete and return detailed results.
@@ -472,10 +477,7 @@ def wait_for_pipeline_update(
                 f"Check pipeline status in Databricks UI or call get_update(pipeline_id='{pipeline_id}', update_id='{update_id}')."
             )
 
-        response = w.pipelines.get_update(
-            pipeline_id=pipeline_id,
-            update_id=update_id
-        )
+        response = w.pipelines.get_update(pipeline_id=pipeline_id, update_id=update_id)
 
         update_info = response.update
         if not update_info:
@@ -611,7 +613,7 @@ def create_or_update_pipeline(
         created=created,
         success=True,
         message=f"Pipeline {'created' if created else 'updated'} successfully. "
-                f"Target: {catalog}.{schema}",
+        f"Target: {catalog}.{schema}",
     )
 
     # Step 3: Start run if requested
@@ -661,7 +663,9 @@ def create_or_update_pipeline(
                             error_msg = exc.get("message", error_msg)
                         result.error_message = error_msg
                     else:
-                        result.error_message = f"Pipeline failed with state: {result.state}"
+                        result.error_message = (
+                            f"Pipeline failed with state: {result.state}"
+                        )
 
                     result.message = (
                         f"Pipeline {'created' if created else 'updated'} but run failed. "

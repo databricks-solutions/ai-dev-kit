@@ -1,4 +1,5 @@
 """Skill routing scorer - evaluates Claude Code's skill selection."""
+
 from mlflow.genai.scorers import scorer
 from mlflow.entities import Feedback
 from typing import Dict, Any, Set
@@ -6,35 +7,59 @@ from typing import Dict, Any, Set
 # Skill trigger patterns (extracted from SKILL.md description fields)
 SKILL_TRIGGERS = {
     "spark-declarative-pipelines": [
-        "streaming table", "dlt", "delta live", "lakeflow",
-        "sdp", "ldp", "medallion", "bronze", "silver", "gold",
-        "cdc", "change data capture", "scd", "auto loader"
+        "streaming table",
+        "dlt",
+        "delta live",
+        "lakeflow",
+        "sdp",
+        "ldp",
+        "medallion",
+        "bronze",
+        "silver",
+        "gold",
+        "cdc",
+        "change data capture",
+        "scd",
+        "auto loader",
     ],
     "databricks-app-apx": [
-        "databricks app", "apx", "fastapi", "react", "full-stack app"
+        "databricks app",
+        "apx",
+        "fastapi",
+        "react",
+        "full-stack app",
     ],
-    "databricks-app-python": [
-        "python app", "streamlit", "dash", "flask", "gradio"
-    ],
-    "asset-bundles": [
-        "dabs", "databricks asset bundle", "deploy", "bundle.yaml"
-    ],
+    "databricks-app-python": ["python app", "streamlit", "dash", "flask", "gradio"],
+    "asset-bundles": ["dabs", "databricks asset bundle", "deploy", "bundle.yaml"],
     "databricks-python-sdk": [
-        "python sdk", "databricks-sdk", "workspaceclient",
-        "databricks connect", "rest api"
+        "python sdk",
+        "databricks-sdk",
+        "workspaceclient",
+        "databricks connect",
+        "rest api",
     ],
-    "databricks-jobs": [
-        "job", "workflow", "task", "schedule", "trigger"
-    ],
+    "databricks-jobs": ["job", "workflow", "task", "schedule", "trigger"],
     "synthetic-data-generation": [
-        "synthetic data", "fake data", "generate data", "mock data", "faker"
+        "synthetic data",
+        "fake data",
+        "generate data",
+        "mock data",
+        "faker",
     ],
     "mlflow-evaluation": [
-        "mlflow eval", "evaluate agent", "scorer", "genai.evaluate", "llm judge"
+        "mlflow eval",
+        "evaluate agent",
+        "scorer",
+        "genai.evaluate",
+        "llm judge",
     ],
     "agent-bricks": [
-        "agent brick", "knowledge assistant", "genie", "multi-agent", "supervisor"
-    ]
+        "agent brick",
+        "knowledge assistant",
+        "genie",
+        "multi-agent",
+        "supervisor",
+    ],
 }
 
 
@@ -54,8 +79,7 @@ def detect_skills_from_prompt(prompt: str) -> Set[str]:
 
 @scorer
 def skill_routing_accuracy(
-    inputs: Dict[str, Any],
-    expectations: Dict[str, Any]
+    inputs: Dict[str, Any], expectations: Dict[str, Any]
 ) -> Feedback:
     """
     Score skill routing accuracy.
@@ -74,7 +98,7 @@ def skill_routing_accuracy(
         return Feedback(
             name="routing_accuracy",
             value="yes",
-            rationale="Correctly identified no skill match"
+            rationale="Correctly identified no skill match",
         )
 
     # Expected none but got some
@@ -82,7 +106,7 @@ def skill_routing_accuracy(
         return Feedback(
             name="routing_accuracy",
             value="no",
-            rationale=f"Expected no skills but detected: {detected_skills}"
+            rationale=f"Expected no skills but detected: {detected_skills}",
         )
 
     # Expected some but got none
@@ -90,7 +114,7 @@ def skill_routing_accuracy(
         return Feedback(
             name="routing_accuracy",
             value="no",
-            rationale=f"Expected {expected_skills} but no skills detected"
+            rationale=f"Expected {expected_skills} but no skills detected",
         )
 
     # Check overlap
@@ -101,13 +125,13 @@ def skill_routing_accuracy(
             return Feedback(
                 name="routing_accuracy",
                 value="yes",
-                rationale=f"All expected skills detected: {detected_skills}"
+                rationale=f"All expected skills detected: {detected_skills}",
             )
         else:
             return Feedback(
                 name="routing_accuracy",
                 value="no",
-                rationale=f"Missing skills: {missing}. Detected: {detected_skills}"
+                rationale=f"Missing skills: {missing}. Detected: {detected_skills}",
             )
     else:
         # For single-skill: expected should be subset of detected
@@ -115,21 +139,18 @@ def skill_routing_accuracy(
             return Feedback(
                 name="routing_accuracy",
                 value="yes",
-                rationale=f"Expected skill(s) detected. Expected: {expected_skills}, Got: {detected_skills}"
+                rationale=f"Expected skill(s) detected. Expected: {expected_skills}, Got: {detected_skills}",
             )
         else:
             return Feedback(
                 name="routing_accuracy",
                 value="no",
-                rationale=f"Expected: {expected_skills}, Detected: {detected_skills}"
+                rationale=f"Expected: {expected_skills}, Detected: {detected_skills}",
             )
 
 
 @scorer
-def routing_precision(
-    inputs: Dict[str, Any],
-    expectations: Dict[str, Any]
-) -> Feedback:
+def routing_precision(inputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feedback:
     """Measure precision - avoid false positives (extra skills)."""
     prompt = inputs.get("prompt", "")
     expected_skills = set(expectations.get("expected_skills", []))
@@ -139,7 +160,7 @@ def routing_precision(
         return Feedback(
             name="routing_precision",
             value=1.0,
-            rationale="No skills detected (no false positives possible)"
+            rationale="No skills detected (no false positives possible)",
         )
 
     correct = expected_skills & detected_skills
@@ -148,15 +169,12 @@ def routing_precision(
     return Feedback(
         name="routing_precision",
         value=precision,
-        rationale=f"Precision: {len(correct)}/{len(detected_skills)}"
+        rationale=f"Precision: {len(correct)}/{len(detected_skills)}",
     )
 
 
 @scorer
-def routing_recall(
-    inputs: Dict[str, Any],
-    expectations: Dict[str, Any]
-) -> Feedback:
+def routing_recall(inputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feedback:
     """Measure recall - avoid false negatives (missing skills)."""
     prompt = inputs.get("prompt", "")
     expected_skills = set(expectations.get("expected_skills", []))
@@ -165,7 +183,7 @@ def routing_recall(
         return Feedback(
             name="routing_recall",
             value=1.0,
-            rationale="No expected skills (recall not applicable)"
+            rationale="No expected skills (recall not applicable)",
         )
 
     detected_skills = detect_skills_from_prompt(prompt)
@@ -175,5 +193,5 @@ def routing_recall(
     return Feedback(
         name="routing_recall",
         value=recall,
-        rationale=f"Recall: {len(correct)}/{len(expected_skills)}"
+        rationale=f"Recall: {len(correct)}/{len(expected_skills)}",
     )

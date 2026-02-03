@@ -120,7 +120,7 @@ def create_or_update_dashboard(
     - DO NOT use widgetType: "filter" - this is INVALID and will cause errors
     - DO NOT use associative_filter_predicate_group - causes SQL errors
     - ALWAYS include "frame": {"showTitle": true, "title": "..."} for filter widgets
-    
+
     Global Filters vs Page-Level Filters:
     - GLOBAL: Place on page with "pageType": "PAGE_TYPE_GLOBAL_FILTERS" - affects ALL pages
     - PAGE-LEVEL: Place on regular "PAGE_TYPE_CANVAS" page - affects ONLY that page

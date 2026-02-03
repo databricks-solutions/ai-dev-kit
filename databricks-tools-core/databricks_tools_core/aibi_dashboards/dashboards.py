@@ -7,7 +7,7 @@ The SDK/API still uses the 'lakeview' name internally.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from databricks.sdk.service.dashboards import Dashboard
 
@@ -42,7 +42,9 @@ def get_dashboard(dashboard_id: str) -> Dict[str, Any]:
         "path": dashboard.path,
         "create_time": dashboard.create_time,
         "update_time": dashboard.update_time,
-        "lifecycle_state": dashboard.lifecycle_state.value if dashboard.lifecycle_state else None,
+        "lifecycle_state": dashboard.lifecycle_state.value
+        if dashboard.lifecycle_state
+        else None,
         "serialized_dashboard": dashboard.serialized_dashboard,
     }
 
@@ -66,14 +68,18 @@ def list_dashboards(
 
     dashboards = []
     for dashboard in w.lakeview.list(page_size=page_size, page_token=page_token):
-        dashboards.append({
-            "dashboard_id": dashboard.dashboard_id,
-            "display_name": dashboard.display_name,
-            "warehouse_id": dashboard.warehouse_id,
-            "parent_path": dashboard.parent_path,
-            "path": dashboard.path,
-            "lifecycle_state": dashboard.lifecycle_state.value if dashboard.lifecycle_state else None,
-        })
+        dashboards.append(
+            {
+                "dashboard_id": dashboard.dashboard_id,
+                "display_name": dashboard.display_name,
+                "warehouse_id": dashboard.warehouse_id,
+                "parent_path": dashboard.parent_path,
+                "path": dashboard.path,
+                "lifecycle_state": dashboard.lifecycle_state.value
+                if dashboard.lifecycle_state
+                else None,
+            }
+        )
 
     return {"dashboards": dashboards}
 
@@ -222,7 +228,7 @@ def publish_dashboard(
     """
     w = get_workspace_client()
 
-    result = w.lakeview.publish(
+    w.lakeview.publish(
         dashboard_id=dashboard_id,
         warehouse_id=warehouse_id,
         embed_credentials=embed_credentials,
@@ -294,7 +300,9 @@ async def deploy_dashboard(
         # Check if dashboard already exists at path
         existing_dashboard_id = None
         try:
-            existing = await asyncio.to_thread(w.workspace.get_status, path=dashboard_path)
+            existing = await asyncio.to_thread(
+                w.workspace.get_status, path=dashboard_path
+            )
             existing_dashboard_id = existing.resource_id
         except ResourceDoesNotExist:
             pass
@@ -310,11 +318,15 @@ async def deploy_dashboard(
         if existing_dashboard_id:
             try:
                 logger.info(f"Updating existing dashboard: {dashboard_name}")
-                updated = w.lakeview.update(dashboard_id=existing_dashboard_id, dashboard=dashboard)
+                updated = w.lakeview.update(
+                    dashboard_id=existing_dashboard_id, dashboard=dashboard
+                )
                 dashboard_id = updated.dashboard_id
                 status = "updated"
             except Exception as e:
-                logger.warning(f"Failed to update dashboard {existing_dashboard_id}: {e}. Creating new.")
+                logger.warning(
+                    f"Failed to update dashboard {existing_dashboard_id}: {e}. Creating new."
+                )
                 created = w.lakeview.create(dashboard=dashboard)
                 dashboard_id = created.dashboard_id
                 status = "created"
@@ -407,11 +419,15 @@ def deploy_dashboard_sync(
         if existing_dashboard_id:
             try:
                 logger.info(f"Updating existing dashboard: {dashboard_name}")
-                updated = w.lakeview.update(dashboard_id=existing_dashboard_id, dashboard=dashboard)
+                updated = w.lakeview.update(
+                    dashboard_id=existing_dashboard_id, dashboard=dashboard
+                )
                 dashboard_id = updated.dashboard_id
                 status = "updated"
             except Exception as e:
-                logger.warning(f"Failed to update dashboard {existing_dashboard_id}: {e}. Creating new.")
+                logger.warning(
+                    f"Failed to update dashboard {existing_dashboard_id}: {e}. Creating new."
+                )
                 created = w.lakeview.create(dashboard=dashboard)
                 dashboard_id = created.dashboard_id
                 status = "created"
