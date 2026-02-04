@@ -15,115 +15,68 @@
 
 set -e
 
-# ─── Configuration ──────────────────────────────────────────────
-REPO_GIT_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
-REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
-AIDEVKIT_HOME="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
-REPO_DIR="$AIDEVKIT_HOME/repo"
-VENV_DIR="$AIDEVKIT_HOME/.venv"
+# Configuration
+REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
+RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
+INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
+REPO_DIR="$INSTALL_DIR/repo"
+VENV_DIR="$INSTALL_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
-MCP_SERVER_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
+MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 
-# ─── Colors ─────────────────────────────────────────────────────
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-DIM='\033[2m'
-NC='\033[0m'
+# Colors
+G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
-# ─── Defaults ───────────────────────────────────────────────────
-DATABRICKS_CONFIG_PROFILE="DEFAULT"
+# Defaults
+PROFILE="DEFAULT"
 SCOPE="project"
 INSTALL_MCP=true
 INSTALL_SKILLS=true
 FORCE=false
 IS_UPDATE=false
-NON_INTERACTIVE=false
-DETECTED_TOOLS=""
+SILENT=false
+TOOLS=""
 USER_TOOLS=""
 USER_MCP_PATH=""
-PKG_MANAGER=""
 
-# ─── All available skills ──────────────────────────────────────
-ALL_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+# Skills list
+SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
 
-# ─── Output helpers ─────────────────────────────────────────────
-info()    { echo -e "  ${BLUE}$*${NC}"; }
-success() { echo -e "  ${GREEN}✓${NC} $*"; }
-warn()    { echo -e "  ${YELLOW}!${NC} $*"; }
-err()     { echo -e "  ${RED}✗${NC} $*"; }
-step()    { echo -e "\n${BOLD}$*${NC}"; }
+# Output helpers
+msg()  { [ "$SILENT" = false ] && echo -e "  $*"; }
+ok()   { [ "$SILENT" = false ] && echo -e "  ${G}✓${N} $*"; }
+warn() { [ "$SILENT" = false ] && echo -e "  ${Y}!${N} $*"; }
+die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
+step() { [ "$SILENT" = false ] && echo -e "\n${B}$*${N}"; }
 
-# ─── Help ───────────────────────────────────────────────────────
-show_help() {
-    cat << 'EOF'
-Databricks AI Dev Kit - Unified Installer
-
-Installs skills, MCP server, and configuration for Claude Code, Cursor, and OpenAI Codex.
-
-USAGE
-  Install (auto-detects your tools):
-    curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
-
-  Update (same command, detects existing install):
-    curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
-
-OPTIONS
-  --profile, -p      Databricks config profile to use for MCP server (default: DEFAULT)
-  --global, -g       Install to user-level directories (available in all projects)
-  --skills-only      Install skills only, skip MCP server setup
-  --mcp-only         Install MCP server only, skip skills
-  --tools LIST       Comma-separated list of tools: claude,cursor,codex
-                     (default: interactive prompt with auto-detection)
-  --mcp-path PATH    Path for MCP server runtime (default: ~/.ai-dev-kit)
-  --non-interactive  Skip all prompts, use defaults and flags only
-  --force, -f        Overwrite instruction files (CLAUDE.md, .cursorrules, AGENTS.md)
-                     and re-install even if already up to date
-  --help, -h         Show this help message
-
-EXAMPLES
-  # Install everything, auto-detect tools
-  curl -sL .../install.sh | bash
-
-  # Install globally (all projects get skills + MCP)
-  curl -sL .../install.sh | bash -s -- --global
-
-  # Cursor user, skills only
-  curl -sL .../install.sh | bash -s -- --tools cursor --skills-only
-
-  # Force update everything
-  curl -sL .../install.sh | bash -s -- --force
-
-WHAT GETS INSTALLED
-  ~/.ai-dev-kit/           MCP server runtime (always)
-  .claude/skills/          Skills for Claude Code + Cursor
-  .cursor/skills/          Skills for Cursor (if Claude not detected)
-  .agents/skills/          Skills for OpenAI Codex
-  CLAUDE.md                Instructions for Claude Code
-  .cursorrules             Instructions for Cursor
-  AGENTS.md                Instructions for OpenAI Codex
-  .mcp.json                MCP config for Claude Code
-  .cursor/mcp.json         MCP config for Cursor
-  .codex/config.toml       MCP config for OpenAI Codex
-
-EOF
-}
-
-# ─── Argument parsing ───────────────────────────────────────────
+# Parse arguments
 while [ $# -gt 0 ]; do
     case $1 in
-        --profile|-p)    DATABRICKS_CONFIG_PROFILE="$2"; shift 2 ;;
-        --global|-g)     SCOPE="global"; shift ;;
-        --skills-only)   INSTALL_MCP=false; shift ;;
-        --mcp-only)      INSTALL_SKILLS=false; shift ;;
-        --tools)         USER_TOOLS="$2"; shift 2 ;;
-        --mcp-path)      USER_MCP_PATH="$2"; shift 2 ;;
-        --non-interactive) NON_INTERACTIVE=true; shift ;;
-        --force|-f)      FORCE=true; shift ;;
-        --help|-h)       show_help; exit 0 ;;
-        *)               err "Unknown option: $1"; echo "  Use --help for usage."; exit 1 ;;
+        -p|--profile)     PROFILE="$2"; shift 2 ;;
+        -g|--global)      SCOPE="global"; shift ;;
+        --skills-only)    INSTALL_MCP=false; shift ;;
+        --mcp-only)       INSTALL_SKILLS=false; shift ;;
+        --mcp-path)       USER_MCP_PATH="$2"; shift 2 ;;
+        --silent)         SILENT=true; shift ;;
+        --tools)          USER_TOOLS="$2"; shift 2 ;;
+        -f|--force)       FORCE=true; shift ;;
+        -h|--help)        
+            echo "Databricks AI Dev Kit Installer"
+            echo ""
+            echo "Usage: curl -sL .../install.sh | bash [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
+            echo "  -g, --global          Install globally for all projects"
+            echo "  --skills-only         Skip MCP server setup"
+            echo "  --mcp-only            Skip skills installation"
+            echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
+            echo "  --silent              Silent mode (no output except errors)"
+            echo "  --tools LIST          Comma-separated: claude,cursor,codex"
+            echo "  -f, --force           Force reinstall"
+            echo "  -h, --help            Show this help"
+            exit 0 ;;
+        *) die "Unknown option: $1 (use -h for help)" ;;
     esac
 done
 
@@ -136,7 +89,7 @@ prompt() {
     local default_value=$2
     local result=""
 
-    if [ "$NON_INTERACTIVE" = true ]; then
+    if [ "$SILENT" = true ]; then
         echo "$default_value"
         return
     fi
@@ -277,7 +230,7 @@ checkbox_select() {
 detect_tools() {
     # If provided via --tools flag, skip detection and prompts
     if [ -n "$USER_TOOLS" ]; then
-        DETECTED_TOOLS=$(echo "$USER_TOOLS" | tr ',' ' ')
+        TOOLS=$(echo "$USER_TOOLS" | tr ',' ' ')
         return
     fi
 
@@ -304,29 +257,29 @@ detect_tools() {
     fi
 
     # Interactive or fallback
-    if [ "$NON_INTERACTIVE" = false ] && [ -e /dev/tty ]; then
-        echo ""
-        echo -e "  ${BOLD}Select tools to install for:${NC}"
+    if [ "$SILENT" = false ] && [ -e /dev/tty ] && [ -t 0 ]; then
+        [ "$SILENT" = false ] && echo ""
+        [ "$SILENT" = false ] && echo -e "  ${B}Select tools to install for:${N}"
 
-        DETECTED_TOOLS=$(checkbox_select \
+        TOOLS=$(checkbox_select \
             "Claude Code|claude|${claude_state}|${claude_hint}" \
             "Cursor|cursor|${cursor_state}|${cursor_hint}" \
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
         )
     else
-        # Non-interactive: use detected defaults
+        # Silent: use detected defaults
         local tools=""
         [ "$has_claude" = true ] && tools="claude"
         [ "$has_cursor" = true ] && tools="${tools:+$tools }cursor"
         [ "$has_codex" = true ]  && tools="${tools:+$tools }codex"
         [ -z "$tools" ] && tools="claude"
-        DETECTED_TOOLS="$tools"
+        TOOLS="$tools"
     fi
 
     # Validate we have at least one
-    if [ -z "$DETECTED_TOOLS" ]; then
+    if [ -z "$TOOLS" ]; then
         warn "No tools selected, defaulting to Claude Code"
-        DETECTED_TOOLS="claude"
+        TOOLS="claude"
     fi
 }
 
@@ -334,594 +287,366 @@ detect_tools() {
 prompt_mcp_path() {
     # If provided via --mcp-path flag, skip prompt
     if [ -n "$USER_MCP_PATH" ]; then
-        AIDEVKIT_HOME="$USER_MCP_PATH"
-    elif [ "$NON_INTERACTIVE" = false ]; then
-        echo ""
-        echo -e "  ${BOLD}MCP server location${NC}"
-        echo -e "  ${DIM}The MCP server runtime (Python venv + source) will be installed here.${NC}"
-        echo -e "  ${DIM}Shared across all your projects — only the config files are per-project.${NC}"
-        echo ""
+        INSTALL_DIR="$USER_MCP_PATH"
+    elif [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+        [ "$SILENT" = false ] && echo ""
+        [ "$SILENT" = false ] && echo -e "  ${B}MCP server location${N}"
+        [ "$SILENT" = false ] && echo -e "  ${D}The MCP server runtime (Python venv + source) will be installed here.${N}"
+        [ "$SILENT" = false ] && echo -e "  ${D}Shared across all your projects — only the config files are per-project.${N}"
+        [ "$SILENT" = false ] && echo ""
 
         local selected
-        selected=$(prompt "Install path" "$AIDEVKIT_HOME")
+        selected=$(prompt "Install path" "$INSTALL_DIR")
 
         # Expand ~ to $HOME
-        AIDEVKIT_HOME="${selected/#\~/$HOME}"
+        INSTALL_DIR="${selected/#\~/$HOME}"
     fi
 
     # Update derived paths
-    REPO_DIR="$AIDEVKIT_HOME/repo"
-    VENV_DIR="$AIDEVKIT_HOME/.venv"
+    REPO_DIR="$INSTALL_DIR/repo"
+    VENV_DIR="$INSTALL_DIR/.venv"
     VENV_PYTHON="$VENV_DIR/bin/python"
-    MCP_SERVER_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
+    MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 }
 
-# ─── Prerequisites ──────────────────────────────────────────────
-check_prerequisites() {
-    local ok=true
-
-    if ! command -v git >/dev/null 2>&1; then
-        err "git is required but not installed"
-        ok=false
-    else
-        success "git"
-    fi
-
-    if command -v uv >/dev/null 2>&1; then
-        PKG_MANAGER="uv"
-        success "uv"
-    elif command -v pip3 >/dev/null 2>&1; then
-        PKG_MANAGER="pip3"
-        success "pip3 (uv recommended for faster installs: https://docs.astral.sh/uv)"
-    elif command -v pip >/dev/null 2>&1; then
-        PKG_MANAGER="pip"
-        success "pip (uv recommended for faster installs: https://docs.astral.sh/uv)"
-    else
-        if [ "$INSTALL_MCP" = true ]; then
-            err "Python package manager required for MCP server"
-            err "Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
-            ok=false
+# Check prerequisites
+check_deps() {
+    command -v git >/dev/null 2>&1 || die "git required"
+    ok "git"
+    
+    if [ "$INSTALL_MCP" = true ]; then
+        if command -v uv >/dev/null 2>&1; then
+            PKG="uv"
+        elif command -v pip3 >/dev/null 2>&1; then
+            PKG="pip3"
+        elif command -v pip >/dev/null 2>&1; then
+            PKG="pip"
+        else
+            die "Python package manager required. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
         fi
-    fi
-
-    if [ "$ok" = false ]; then
-        exit 1
+        ok "$PKG"
     fi
 }
 
-# ─── Version check ─────────────────────────────────────────────
+# Check if update needed
 check_version() {
-    local local_version="none"
-
-    # Check global version stamp
-    if [ -f "$AIDEVKIT_HOME/version" ]; then
-        local_version=$(cat "$AIDEVKIT_HOME/version")
-        IS_UPDATE=true
-    fi
-
-    # Check project version stamp
-    if [ "$SCOPE" = "project" ] && [ -f ".ai-dev-kit/version" ]; then
-        local_version=$(cat ".ai-dev-kit/version")
-        IS_UPDATE=true
-    fi
-
-    if [ "$IS_UPDATE" = true ]; then
-        local remote_version
-        remote_version=$(curl -sL "$REPO_RAW_URL/VERSION" 2>/dev/null || echo "unknown")
-
-        if [ "$local_version" = "$remote_version" ] && [ "$FORCE" != true ]; then
-            echo ""
-            success "Already up to date (v${local_version})"
-            echo ""
-            echo -e "  ${DIM}Run with --force to re-install anyway${NC}"
+    local ver_file="$INSTALL_DIR/version"
+    [ "$SCOPE" = "project" ] && ver_file=".ai-dev-kit/version"
+    
+    [ ! -f "$ver_file" ] && return
+    [ "$FORCE" = true ] && return
+    
+    local local_ver=$(cat "$ver_file")
+    # Use -f to fail on HTTP errors (like 404)
+    local remote_ver=$(curl -fsSL "$RAW_URL/VERSION" 2>/dev/null || echo "")
+    
+    # Validate remote version format (should not contain "404" or other error text)
+    if [ -n "$remote_ver" ] && [[ ! "$remote_ver" =~ (404|Not Found|error) ]]; then
+        if [ "$local_ver" = "$remote_ver" ]; then
+            ok "Already up to date (v${local_ver})"
+            msg "${D}Use --force to reinstall${N}"
             exit 0
         fi
-
-        if [ "$remote_version" != "unknown" ]; then
-            info "Updating v${local_version} → v${remote_version}"
-        fi
     fi
 }
 
-# ─── MCP server setup ──────────────────────────────────────────
-setup_mcp_server() {
+# Setup MCP server
+setup_mcp() {
     step "Setting up MCP server"
-
-    # Clone or update the repo
+    
+    # Clone or update repo
     if [ -d "$REPO_DIR/.git" ]; then
-        info "Updating repository..."
-        git -C "$REPO_DIR" pull --quiet 2>/dev/null || {
-            warn "git pull failed, re-cloning..."
+        git -C "$REPO_DIR" pull -q 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git clone --depth 1 --quiet "$REPO_GIT_URL" "$REPO_DIR"
+            git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
         }
-        success "Repository updated"
     else
-        info "Cloning repository..."
-        mkdir -p "$AIDEVKIT_HOME"
-        git clone --depth 1 --quiet "$REPO_GIT_URL" "$REPO_DIR"
-        success "Repository cloned"
+        mkdir -p "$INSTALL_DIR"
+        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
     fi
-
-    # Create venv and install packages
-    info "Installing Python dependencies..."
-
-    if [ "$PKG_MANAGER" = "uv" ]; then
-        if [ ! -d "$VENV_DIR" ]; then
-            uv venv --python 3.11 "$VENV_DIR" --quiet 2>/dev/null || uv venv "$VENV_DIR" --quiet
-        fi
-        uv pip install --python "$VENV_PYTHON" \
-            -e "$REPO_DIR/databricks-tools-core" \
-            -e "$REPO_DIR/databricks-mcp-server" \
-            --quiet
+    ok "Repository cloned"
+    
+    # Create venv and install
+    msg "Installing Python dependencies..."
+    if [ "$PKG" = "uv" ]; then
+        [ ! -d "$VENV_DIR" ] && uv venv --python 3.11 "$VENV_DIR" -q 2>/dev/null || uv venv "$VENV_DIR" -q
+        uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
     else
-        if [ ! -d "$VENV_DIR" ]; then
-            python3 -m venv "$VENV_DIR"
-        fi
-        "$VENV_PYTHON" -m pip install \
-            -e "$REPO_DIR/databricks-tools-core" \
-            -e "$REPO_DIR/databricks-mcp-server" \
-            --quiet
+        [ ! -d "$VENV_DIR" ] && python3 -m venv "$VENV_DIR"
+        "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
     fi
-
-    # Verify
-    if "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null; then
-        success "MCP server ready"
-    else
-        err "MCP server installation failed"
-        err "Try manually: cd $REPO_DIR && $PKG_MANAGER pip install -e databricks-tools-core -e databricks-mcp-server"
-        exit 1
-    fi
+    
+    "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
+    ok "MCP server ready"
 }
 
-# ─── Skills installation ───────────────────────────────────────
-install_skill() {
-    local skill_name=$1
-    local target_dir=$2
-    local skill_dir="$target_dir/$skill_name"
-    local source_dir="$REPO_DIR/databricks-skills/$skill_name"
-
-    if [ ! -d "$source_dir" ]; then
-        warn "Skill source not found: $skill_name"
-        return 1
-    fi
-
-    if [ ! -f "$source_dir/SKILL.md" ]; then
-        warn "SKILL.md missing for: $skill_name"
-        return 1
-    fi
-
-    # Create skill directory and copy all files
-    rm -rf "$skill_dir"
-    mkdir -p "$skill_dir"
-
-    # Copy everything from source, preserving directory structure
-    (cd "$source_dir" && find . -type f | while read -r file; do
-        local dest_dir
-        dest_dir=$(dirname "$skill_dir/$file")
-        mkdir -p "$dest_dir"
-        cp "$source_dir/$file" "$skill_dir/$file"
-    done)
-
-    return 0
-}
-
+# Install skills
 install_skills() {
     step "Installing skills"
-
+    
     local base_dir=$1
-    local skill_dirs=""
-    local has_claude=false
-    local installed=0
-    local total=0
-
-    # Determine which directories to install to
-    for tool in $DETECTED_TOOLS; do
+    local dirs=""
+    
+    # Determine target directories
+    for tool in $TOOLS; do
         case $tool in
-            claude)
-                has_claude=true
-                skill_dirs="$base_dir/.claude/skills"
-                ;;
-            cursor)
-                # Cursor reads .claude/skills/ too, only use .cursor/skills/ if no Claude
-                if [ "$has_claude" = false ] && ! echo "$DETECTED_TOOLS" | grep -q "claude"; then
-                    skill_dirs="$skill_dirs $base_dir/.cursor/skills"
-                fi
-                ;;
-            codex)
-                skill_dirs="$skill_dirs $base_dir/.agents/skills"
-                ;;
+            claude) dirs="$base_dir/.claude/skills" ;;
+            cursor) echo "$TOOLS" | grep -q claude || dirs="$dirs $base_dir/.cursor/skills" ;;
+            codex) dirs="$dirs $base_dir/.agents/skills" ;;
         esac
     done
-
-    # Trim and deduplicate
-    skill_dirs=$(echo "$skill_dirs" | xargs -n1 | sort -u | xargs)
-
-    for target_dir in $skill_dirs; do
-        info "Target: ${target_dir#$HOME/}"
-        mkdir -p "$target_dir"
-
-        for skill in $ALL_SKILLS; do
-            total=$((total + 1))
-            if install_skill "$skill" "$target_dir"; then
-                installed=$((installed + 1))
-            fi
+    
+    dirs=$(echo "$dirs" | xargs -n1 | sort -u | xargs)
+    
+    for dir in $dirs; do
+        mkdir -p "$dir"
+        for skill in $SKILLS; do
+            local src="$REPO_DIR/databricks-skills/$skill"
+            [ ! -d "$src" ] && continue
+            rm -rf "$dir/$skill"
+            cp -r "$src" "$dir/$skill"
         done
+        ok "Skills → ${dir#$HOME/}"
     done
-
-    success "$installed skills installed"
 }
 
-# ─── Instruction files ─────────────────────────────────────────
-generate_instruction_content() {
-    cat << 'CONTENT'
-# Databricks AI Dev Kit
+# Generate instruction files
+write_instructions() {
+    [ "$SCOPE" = "global" ] && return
+    
+    local base_dir=$1
+    local content='# Databricks AI Dev Kit
 
-You have access to Databricks tools and skills for data engineering, ML, and AI development.
+Databricks tools and skills for data engineering, ML, and AI development.
 
 ## MCP Tools
-
-Databricks MCP tools are available for direct operations: SQL execution, pipeline management,
-job orchestration, Unity Catalog governance, and more.
+SQL execution, pipelines, jobs, Unity Catalog, and more.
 
 ## Skills
-
-Load a skill for step-by-step guidance on specific topics:
-
 | Skill | Description |
 |-------|-------------|
-| `agent-bricks` | Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors |
+| `agent-bricks` | Knowledge Assistants, Multi-Agent Supervisors |
 | `aibi-dashboards` | AI/BI Dashboards |
 | `asset-bundles` | Databricks Asset Bundles (DABs) |
-| `databricks-app-apx` | Full-stack apps with APX (FastAPI + React) |
-| `databricks-app-python` | Python apps with Dash, Streamlit, Flask |
-| `databricks-config` | Profile authentication setup |
-| `databricks-docs` | Documentation reference |
-| `databricks-genie` | Genie Spaces via Conversation API |
-| `databricks-jobs` | Lakeflow Jobs and workflow orchestration |
-| `databricks-python-sdk` | Python SDK, Connect, CLI, and REST API |
-| `databricks-unity-catalog` | Unity Catalog governance and system tables |
-| `mlflow-evaluation` | MLflow evaluation, scoring, and trace analysis |
-| `model-serving` | Model Serving deployment and endpoints |
-| `spark-declarative-pipelines` | Spark Declarative Pipelines (SDP/LDP) |
-| `synthetic-data-generation` | Realistic test data generation |
-| `unstructured-pdf-generation` | Synthetic PDFs for RAG testing |
+| `databricks-app-*` | Apps with APX, Dash, Streamlit |
+| `databricks-genie` | Genie Spaces |
+| `databricks-jobs` | Lakeflow Jobs |
+| `databricks-python-sdk` | Python SDK, CLI, REST API |
+| `databricks-unity-catalog` | Unity Catalog |
+| `mlflow-evaluation` | MLflow evaluation |
+| `model-serving` | Model Serving |
+| `spark-declarative-pipelines` | SDP/LDP |
 
-## Quick Start
-
-1. Verify connection: "List my SQL warehouses"
-2. Load a skill for guidance on a specific topic
-3. Combine skills + MCP tools for complex workflows
-CONTENT
-}
-
-generate_instructions() {
-    step "Generating instruction files"
-
-    local base_dir=$1
-
-    for tool in $DETECTED_TOOLS; do
-        local file_path=""
-        local file_label=""
-
+Quick start: "List my SQL warehouses"
+'
+    
+    for tool in $TOOLS; do
         case $tool in
-            claude) file_path="$base_dir/CLAUDE.md";     file_label="CLAUDE.md" ;;
-            cursor) file_path="$base_dir/.cursorrules";   file_label=".cursorrules" ;;
-            codex)  file_path="$base_dir/AGENTS.md";      file_label="AGENTS.md" ;;
+            claude) 
+                [ -f "$base_dir/CLAUDE.md" ] && [ "$FORCE" != true ] || echo "$content" > "$base_dir/CLAUDE.md"
+                ;;
+            cursor) 
+                [ -f "$base_dir/.cursorrules" ] && [ "$FORCE" != true ] || echo "$content" > "$base_dir/.cursorrules"
+                ;;
+            codex) 
+                [ -f "$base_dir/AGENTS.md" ] && [ "$FORCE" != true ] || echo "$content" > "$base_dir/AGENTS.md"
+                ;;
         esac
-
-        if [ -z "$file_path" ]; then
-            continue
-        fi
-
-        if [ -f "$file_path" ] && [ "$FORCE" != true ]; then
-            warn "$file_label already exists (use --force to overwrite)"
-        else
-            generate_instruction_content > "$file_path"
-            success "Created $file_label"
-        fi
     done
+    ok "Instructions created"
 }
 
-# ─── MCP config generation ─────────────────────────────────────
+# Write MCP configs
 write_mcp_json() {
-    local file_path=$1
-    local label=$2
-
-    mkdir -p "$(dirname "$file_path")"
-
-    if [ -f "$file_path" ]; then
-        # File exists - check if we can safely merge using the venv python
-        if [ -f "$VENV_PYTHON" ]; then
-            local backup="${file_path}.bak"
-            cp "$file_path" "$backup"
-
-            if "$VENV_PYTHON" -c "
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+    
+    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
 import json, sys
-path = sys.argv[1]
-cmd = sys.argv[2]
-args = sys.argv[3]
 try:
-    with open(path) as f:
-        config = json.load(f)
-except (json.JSONDecodeError, ValueError):
-    config = {}
-config.setdefault('mcpServers', {})['databricks'] = {
-    'command': cmd,
-    'args': [args]
-}
-with open(path, 'w') as f:
-    json.dump(config, f, indent=2)
-    f.write('\n')
-" "$file_path" "$VENV_PYTHON" "$MCP_SERVER_ENTRY" 2>/dev/null; then
-                rm -f "$backup"
-                success "Updated $label (merged databricks server)"
-                return
-            else
-                # Merge failed, restore backup
-                mv "$backup" "$file_path"
-                warn "$label exists with other servers. Add manually:"
-                echo -e "    ${DIM}\"databricks\": { \"command\": \"$VENV_PYTHON\", \"args\": [\"$MCP_SERVER_ENTRY\"] }${NC}"
-                return
-            fi
-        else
-            warn "$label already exists. Add the databricks server manually:"
-            echo -e "    ${DIM}\"databricks\": { \"command\": \"$VENV_PYTHON\", \"args\": [\"$MCP_SERVER_ENTRY\"] }${NC}"
-            return
-        fi
+    with open('$path') as f: cfg = json.load(f)
+except: cfg = {}
+cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
     fi
-
-    # File doesn't exist - create it
-    cat > "$file_path" << EOF
+    
+    cat > "$path" << EOF
 {
   "mcpServers": {
     "databricks": {
       "command": "$VENV_PYTHON",
-      "args": ["$MCP_SERVER_ENTRY"],
-      "env": {
-        "DATABRICKS_CONFIG_PROFILE": "$DATABRICKS_CONFIG_PROFILE"
-      }
+      "args": ["$MCP_ENTRY"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
     }
   }
 }
 EOF
-    success "Created $label"
 }
 
 write_mcp_toml() {
-    local file_path=$1
-    local label=$2
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+    grep -q "mcp_servers.databricks" "$path" 2>/dev/null && return
+    cat >> "$path" << EOF
 
-    mkdir -p "$(dirname "$file_path")"
-
-    local toml_block="# Databricks MCP Server (ai-dev-kit)
 [mcp_servers.databricks]
-command = \"$VENV_PYTHON\"
-args = [\"$MCP_SERVER_ENTRY\"]"
+command = "$VENV_PYTHON"
+args = ["$MCP_ENTRY"]
+EOF
+}
 
-    if [ -f "$file_path" ]; then
-        if grep -q "mcp_servers.databricks" "$file_path" 2>/dev/null; then
-            # Already has a databricks entry - we could update it but safer to skip
-            warn "$label already has a databricks MCP entry"
-            return
-        else
-            # Append our section
-            echo "" >> "$file_path"
-            echo "$toml_block" >> "$file_path"
-            success "Updated $label (appended databricks server)"
-            return
+write_mcp_configs() {
+    step "Configuring MCP"
+    
+    local base_dir=$1
+    for tool in $TOOLS; do
+        case $tool in
+            claude)
+                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude/mcp.json" || write_mcp_json "$base_dir/.mcp.json"
+                ok "Claude MCP config"
+                ;;
+            cursor)
+                if [ "$SCOPE" = "global" ]; then
+                    warn "Cursor global: configure in Settings > MCP"
+                    msg "  Command: $VENV_PYTHON | Args: $MCP_ENTRY"
+                else
+                    write_mcp_json "$base_dir/.cursor/mcp.json"
+                    ok "Cursor MCP config"
+                fi
+                ;;
+            codex)
+                [ "$SCOPE" = "global" ] && write_mcp_toml "$HOME/.codex/config.toml" || write_mcp_toml "$base_dir/.codex/config.toml"
+                ok "Codex MCP config"
+                ;;
+        esac
+    done
+}
+
+# Save version
+save_version() {
+    # Use -f to fail on HTTP errors (like 404)
+    local ver=$(curl -fsSL "$RAW_URL/VERSION" 2>/dev/null || echo "dev")
+    # Validate version format
+    [[ "$ver" =~ (404|Not Found|error) ]] && ver="dev"
+    echo "$ver" > "$INSTALL_DIR/version"
+    [ "$SCOPE" = "project" ] && { mkdir -p ".ai-dev-kit"; echo "$ver" > ".ai-dev-kit/version"; }
+}
+
+# Print summary
+summary() {
+    if [ "$SILENT" = false ]; then
+        echo ""
+        echo -e "${G}${B}Installation complete!${N}"
+        echo "────────────────────────────────"
+        msg "Location: $INSTALL_DIR"
+        msg "Scope:    $SCOPE"
+        msg "Tools:    $(echo "$TOOLS" | tr ' ' ', ')"
+        echo ""
+        msg "${B}Next steps:${N}"
+        msg "1. Configure profile $PROFILE or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN".
+        msg "   Authenticate: ${B}${BL}databricks auth login --profile $PROFILE${N}"
+        msg "2. Open your project in your tool of choice"
+        msg "3. Try: \"List my SQL warehouses\""
+        echo ""
+    fi
+}
+
+# Prompt to run auth
+prompt_auth() {
+    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+        local run_auth
+        run_auth=$(prompt "Run authentication now? ${D}(y/n)${N}" "n")
+        if [ "$run_auth" = "y" ] || [ "$run_auth" = "Y" ] || [ "$run_auth" = "yes" ]; then
+            echo ""
+            msg "Running: ${B}${BL}databricks auth login --profile $PROFILE${N}"
+            echo ""
+            databricks auth login --profile "$PROFILE"
         fi
     fi
-
-    # File doesn't exist - create it
-    echo "$toml_block" > "$file_path"
-    success "Created $label"
 }
 
-generate_mcp_configs() {
-    step "Configuring MCP"
-
-    local base_dir=$1
-
-    for tool in $DETECTED_TOOLS; do
-        case $tool in
-            claude)
-                if [ "$SCOPE" = "global" ]; then
-                    write_mcp_json "$HOME/.claude/mcp.json" "~/.claude/mcp.json"
-                else
-                    write_mcp_json "$base_dir/.mcp.json" ".mcp.json"
-                fi
-                ;;
-            cursor)
-                if [ "$SCOPE" = "global" ]; then
-                    warn "Cursor: global MCP must be configured via Cursor Settings > MCP"
-                    info "  Command: $VENV_PYTHON"
-                    info "  Args:    $MCP_SERVER_ENTRY"
-                else
-                    write_mcp_json "$base_dir/.cursor/mcp.json" ".cursor/mcp.json"
-                fi
-                ;;
-            codex)
-                if [ "$SCOPE" = "global" ]; then
-                    write_mcp_toml "$HOME/.codex/config.toml" "~/.codex/config.toml"
-                else
-                    write_mcp_toml "$base_dir/.codex/config.toml" ".codex/config.toml"
-                fi
-                ;;
-        esac
-    done
-}
-
-# ─── Version stamp ──────────────────────────────────────────────
-write_version() {
-    local version
-    version=$(curl -sL "$REPO_RAW_URL/VERSION" 2>/dev/null || echo "dev")
-
-    # Global stamp
-    mkdir -p "$AIDEVKIT_HOME"
-    echo "$version" > "$AIDEVKIT_HOME/version"
-
-    # Project stamp
-    if [ "$SCOPE" = "project" ]; then
-        mkdir -p ".ai-dev-kit"
-        echo "$version" > ".ai-dev-kit/version"
-    fi
-}
-
-# ─── Summary ────────────────────────────────────────────────────
-print_summary() {
-    echo ""
-    echo -e "${GREEN}${BOLD}Installation complete!${NC}"
-    echo -e "────────────────────────────────────────"
-    echo ""
-
-    if [ "$INSTALL_MCP" = true ]; then
-        echo -e "  MCP server  ${DIM}$AIDEVKIT_HOME${NC}"
-    fi
-
-    if [ "$SCOPE" = "project" ]; then
-        echo -e "  Project     ${DIM}$(pwd)${NC}"
-    else
-        echo -e "  Scope       ${DIM}global (all projects)${NC}"
-    fi
-
-    echo -e "  Tools       ${GREEN}$(echo "$DETECTED_TOOLS" | tr ' ' ', ')${NC}"
-    echo ""
-
-    # Show what was installed per tool
-    for tool in $DETECTED_TOOLS; do
-        case $tool in
-            claude)
-                echo -e "  ${BOLD}Claude Code${NC}"
-                [ "$INSTALL_SKILLS" = true ] && echo -e "    Skills  .claude/skills/"
-                [ "$INSTALL_MCP" = true ] && {
-                    [ "$SCOPE" = "global" ] && echo -e "    MCP     ~/.claude/mcp.json" || echo -e "    MCP     .mcp.json"
-                }
-                ;;
-            cursor)
-                echo -e "  ${BOLD}Cursor${NC}"
-                if [ "$INSTALL_SKILLS" = true ]; then
-                    if echo "$DETECTED_TOOLS" | grep -q "claude"; then
-                        echo -e "    Skills  .claude/skills/ ${DIM}(shared with Claude)${NC}"
-                    else
-                        echo -e "    Skills  .cursor/skills/"
-                    fi
-                fi
-                [ "$INSTALL_MCP" = true ] && {
-                    [ "$SCOPE" = "global" ] && echo -e "    MCP     Configure in Cursor Settings > MCP" || echo -e "    MCP     .cursor/mcp.json"
-                }
-                ;;
-            codex)
-                echo -e "  ${BOLD}OpenAI Codex${NC}"
-                [ "$INSTALL_SKILLS" = true ] && echo -e "    Skills  .agents/skills/"
-                [ "$INSTALL_MCP" = true ] && {
-                    [ "$SCOPE" = "global" ] && echo -e "    MCP     ~/.codex/config.toml" || echo -e "    MCP     .codex/config.toml"
-                }
-                ;;
-        esac
-    done
-
-    echo ""
-    echo -e "${BOLD}Next steps${NC}"
-    echo "  1. Authenticate to selected profile $DATABRICKS_CONFIG_PROFILE or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN".
-    echo "     Run: databricks auth login --profile $DATABRICKS_CONFIG_PROFILE"
-    echo "  2. Open your project in your tool of choice"
-    echo "  3. Try: \"List my SQL warehouses\""
-    echo ""
-    echo -e "  ${DIM}To update later, run the same install command again.${NC}"
-    echo ""
-}
-
-# ─── Main ───────────────────────────────────────────────────────
+# Main
 main() {
-    echo ""
-    echo -e "${BOLD}  Databricks AI Dev Kit${NC}"
-    echo -e "  ────────────────────────────────────────"
-
-    # ── Step 1: Prerequisites ──
+    if [ "$SILENT" = false ]; then
+        echo ""
+        echo -e "${B}Databricks AI Dev Kit Installer${N}"
+        echo "────────────────────────────────"
+    fi
+    
+    # Check dependencies
     step "Checking prerequisites"
-    check_prerequisites
+    check_deps
 
     # ── Step 2: Interactive tool selection ──
     step "Selecting tools"
     detect_tools
-    echo ""
-    success "Selected: $(echo "$DETECTED_TOOLS" | tr ' ' ', ')"
+    ok "Selected: $(echo "$TOOLS" | tr ' ' ', ')"
 
     # ── Step 3: Interactive MCP path ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
-        success "MCP path: $AIDEVKIT_HOME"
+        ok "MCP path: $INSTALL_DIR"
     fi
 
     # ── Step 4: Confirm before proceeding ──
-    echo ""
-    echo -e "  ${BOLD}Summary${NC}"
-    echo -e "  ────────────────────────────────────"
-    echo -e "  Tools:       ${GREEN}$(echo "$DETECTED_TOOLS" | tr ' ' ', ')${NC}"
-    echo -e "  Scope:       ${GREEN}${SCOPE}${NC}"
-    [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${GREEN}${AIDEVKIT_HOME}${NC}"
-    [ "$INSTALL_SKILLS" = true ] && echo -e "  Skills:      ${GREEN}yes${NC}"
-    [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${GREEN}yes${NC}"
-    echo ""
+    if [ "$SILENT" = false ]; then
+        echo ""
+        echo -e "  ${B}Summary${N}"
+        echo -e "  ────────────────────────────────────"
+        echo -e "  Tools:       ${G}$(echo "$TOOLS" | tr ' ' ', ')${N}"
+        echo -e "  Scope:       ${G}${SCOPE}${N}"
+        [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${G}${INSTALL_DIR}${N}"
+        [ "$INSTALL_SKILLS" = true ] && echo -e "  Skills:      ${G}yes${N}"
+        [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
+        echo ""
+    fi
 
-    if [ "$NON_INTERACTIVE" = false ]; then
+    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
         local confirm
-        confirm=$(prompt "Proceed with installation? ${DIM}(y/n)${NC}" "y")
+        confirm=$(prompt "Proceed with installation? ${D}(y/n)${N}" "y")
         if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && [ "$confirm" != "yes" ]; then
             echo ""
-            info "Installation cancelled."
+            msg "Installation cancelled."
             exit 0
         fi
     fi
 
     # ── Step 5: Version check (may exit early if up to date) ──
     check_version
-
-    # ── Step 6: MCP server setup ──
-    if [ "$INSTALL_MCP" = true ]; then
-        setup_mcp_server
-    elif [ ! -d "$REPO_DIR/databricks-skills" ]; then
-        # Even for --skills-only, we need the repo for skill source files
-        step "Downloading skill sources"
-        mkdir -p "$AIDEVKIT_HOME"
-        if [ -d "$REPO_DIR/.git" ]; then
-            git -C "$REPO_DIR" pull --quiet 2>/dev/null || true
-            success "Repository updated"
-        else
-            git clone --depth 1 --quiet "$REPO_GIT_URL" "$REPO_DIR"
-            success "Repository cloned"
-        fi
-    fi
-
-    # ── Step 7: Determine base directory ──
+    
+    # Determine base directory
     local base_dir
-    if [ "$SCOPE" = "global" ]; then
-        base_dir="$HOME"
-    else
-        base_dir="$(pwd)"
-    fi
-
-    # ── Step 8: Install skills ──
-    if [ "$INSTALL_SKILLS" = true ]; then
-        install_skills "$base_dir"
-    fi
-
-    # ── Step 9: Generate instruction files (project-level only) ──
-    if [ "$INSTALL_SKILLS" = true ] && [ "$SCOPE" = "project" ]; then
-        generate_instructions "$base_dir"
-    fi
-
-    # ── Step 10: Generate MCP configs ──
+    [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+    
+    # Setup MCP server
     if [ "$INSTALL_MCP" = true ]; then
-        generate_mcp_configs "$base_dir"
+        setup_mcp
+    elif [ ! -d "$REPO_DIR" ]; then
+        step "Downloading sources"
+        mkdir -p "$INSTALL_DIR"
+        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+        ok "Repository cloned"
     fi
-
-    # ── Step 11: Version stamp ──
-    write_version
-
-    # ── Done ──
-    print_summary
+    
+    # Install skills
+    [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
+    
+    # Write instructions
+    [ "$INSTALL_SKILLS" = true ] && write_instructions "$base_dir"
+    
+    # Write MCP configs
+    [ "$INSTALL_MCP" = true ] && write_mcp_configs "$base_dir"
+    
+    # Save version
+    save_version
+    
+    # Done
+    summary
+    
+    # Prompt to run auth
+    prompt_auth
 }
 
-main
+main "$@"
