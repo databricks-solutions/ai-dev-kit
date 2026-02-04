@@ -6,6 +6,11 @@ with directory-scoped file permissions and Databricks tools.
 Databricks tools are loaded in-process from databricks-mcp-server using
 the SDK tool wrapper. Auth is handled via contextvars for multi-user support.
 
+MLflow Tracing:
+  This module integrates with MLflow for tracing Claude Code conversations.
+  Uses query() with a custom Stop hook for proper streaming + tracing.
+  See: https://mlflow.org/docs/latest/genai/tracing/integrations/listing/claude_code/
+
 NOTE: Fresh event loop workaround applied to fix claude-agent-sdk issue #462
 where subprocess transport fails in FastAPI/uvicorn contexts.
 See: https://github.com/anthropics/claude-agent-sdk-python/issues/462
@@ -24,7 +29,7 @@ from contextvars import copy_context
 from pathlib import Path
 from typing import AsyncIterator
 
-from claude_agent_sdk import ClaudeAgentOptions, query
+from claude_agent_sdk import ClaudeAgentOptions, query, HookMatcher
 from claude_agent_sdk.types import (
   AssistantMessage,
   ResultMessage,
@@ -64,38 +69,23 @@ _claude_settings = None
 
 
 def _load_claude_settings() -> dict:
-  """Load Claude settings from repository root .claude/settings.json.
-  
-  This ensures the agent gets Databricks auth settings (ANTHROPIC_AUTH_TOKEN,
-  ANTHROPIC_BASE_URL) even when running in project subdirectories.
-  
+  """Initialize Claude settings dictionary.
+
+  Previously loaded from .claude/settings.json, but now all auth settings
+  are injected dynamically from the user's Databricks credentials and
+  environment variables set in app.yaml.
+
   Returns:
-      Dictionary of environment variables from settings.json
+      Dictionary of environment variables to pass to Claude subprocess
   """
   global _claude_settings
-  
+
   if _claude_settings is not None:
     return _claude_settings
-  
-  # Navigate from server/services/agent.py up to ai-dev-kit/
-  repo_root = Path(__file__).parent.parent.parent.parent
-  settings_path = repo_root / ".claude" / "settings.json"
-  
-  if settings_path.exists():
-    try:
-      with open(settings_path) as f:
-        settings = json.load(f)
-        _claude_settings = settings.get("env", {})
-        logger.info(f"Loaded Claude settings from {settings_path}")
-        return _claude_settings
-    except Exception as e:
-      logger.warning(f"Failed to load Claude settings: {e}")
-      _claude_settings = {}
-      return _claude_settings
-  else:
-    logger.warning(f"Claude settings not found at {settings_path}")
-    _claude_settings = {}
-    return _claude_settings
+
+  # Start with empty dict - auth settings are added dynamically per-request
+  _claude_settings = {}
+  return _claude_settings
 
 
 def get_databricks_tools(force_reload: bool = False):
@@ -130,11 +120,97 @@ def get_project_directory(project_id: str) -> Path:
   return _ensure_project_directory(project_id)
 
 
-def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancelled_fn):
+def _get_mlflow_stop_hook(experiment_name: str | None = None):
+  """Get the MLflow Stop hook for tracing Claude Code conversations.
+
+  This hook processes the transcript after the conversation ends and
+  creates an MLflow trace. Works with query() function unlike autolog
+  which only works with ClaudeSDKClient.
+
+  Args:
+      experiment_name: Optional MLflow experiment name
+
+  Returns:
+      The async hook function, or None if MLflow is not available
+  """
+  try:
+    import mlflow
+    from mlflow.claude_code.tracing import process_transcript, setup_mlflow
+
+    # Set up MLflow tracking
+    mlflow.set_tracking_uri('databricks')
+    if experiment_name:
+      try:
+        mlflow.set_experiment(experiment_name)
+        logger.info(f'MLflow experiment set to: {experiment_name}')
+      except Exception as e:
+        logger.warning(f'Could not set MLflow experiment: {e}')
+
+    async def mlflow_stop_hook(input_data: dict, tool_use_id: str | None, context) -> dict:
+      """Process transcript and create MLflow trace when conversation ends."""
+      try:
+        session_id = input_data.get('session_id')
+        transcript_path = input_data.get('transcript_path')
+
+        logger.info(f'MLflow Stop hook triggered: session={session_id}')
+
+        # Ensure MLflow is set up (tracking URI and experiment)
+        setup_mlflow()
+
+        # Process transcript and create trace
+        trace = process_transcript(transcript_path, session_id)
+
+        if trace:
+          logger.info(f'MLflow trace created: {trace.info.trace_id}')
+
+          # Add requested model name as trace tags
+          # The trace captures the response model (e.g., claude-opus-4-5-20251101)
+          # but we want to also record the Databricks endpoint name we requested
+          try:
+            client = mlflow.MlflowClient()
+            trace_id = trace.info.trace_id
+            requested_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-5')
+            requested_model_mini = os.environ.get('ANTHROPIC_MODEL_MINI', 'databricks-claude-sonnet-4-5')
+            base_url = os.environ.get('ANTHROPIC_BASE_URL', '')
+
+            # Set tags to clarify the Databricks model endpoint used
+            client.set_trace_tag(trace_id, 'databricks.requested_model', requested_model)
+            client.set_trace_tag(trace_id, 'databricks.requested_model_mini', requested_model_mini)
+            if base_url:
+              client.set_trace_tag(trace_id, 'databricks.model_serving_endpoint', base_url)
+            client.set_trace_tag(trace_id, 'llm.provider', 'databricks-fmapi')
+
+            logger.info(f'Added Databricks model tags to trace {trace_id}: {requested_model}')
+          except Exception as tag_err:
+            logger.warning(f'Could not add model tags to trace: {tag_err}')
+        else:
+          logger.debug('MLflow trace creation returned None (possibly empty transcript)')
+
+        return {'continue': True}
+      except Exception as e:
+        logger.error(f'Error in MLflow Stop hook: {e}', exc_info=True)
+        # Return continue=True to not interrupt the conversation
+        return {'continue': True}
+
+    logger.info(f'MLflow tracing hook configured: {mlflow.get_tracking_uri()}')
+    return mlflow_stop_hook
+
+  except ImportError as e:
+    logger.debug(f'MLflow not available: {e}')
+    return None
+  except Exception as e:
+    logger.warning(f'Failed to create MLflow stop hook: {e}')
+    return None
+
+
+def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancelled_fn, mlflow_experiment=None):
   """Run agent in a fresh event loop (workaround for issue #462).
 
   This function runs in a separate thread with a fresh event loop to avoid
   the subprocess transport issues in FastAPI/uvicorn contexts.
+
+  Uses query() for proper streaming, with a custom MLflow Stop hook for tracing.
+  The Stop hook processes the transcript after the conversation ends.
 
   Args:
       message: User message to send to the agent
@@ -142,6 +218,7 @@ def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancell
       result_queue: Queue to send results back to the main thread
       context: Copy of contextvars context (for Databricks auth, etc.)
       is_cancelled_fn: Callable that returns True if the request has been cancelled
+      mlflow_experiment: Optional MLflow experiment name for tracing
 
   See: https://github.com/anthropics/claude-agent-sdk-python/issues/462
   """
@@ -150,7 +227,21 @@ def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancell
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
+    # Add MLflow Stop hook for tracing if experiment is configured
+    exp_name = mlflow_experiment or os.environ.get('MLFLOW_EXPERIMENT_NAME')
+    if exp_name:
+      mlflow_hook = _get_mlflow_stop_hook(exp_name)
+      if mlflow_hook:
+        # Add the hook to options
+        if options.hooks is None:
+          options.hooks = {}
+        if 'Stop' not in options.hooks:
+          options.hooks['Stop'] = []
+        options.hooks['Stop'].append(HookMatcher(hooks=[mlflow_hook]))
+        logger.info('MLflow Stop hook added to agent options')
+
     async def run_query():
+      """Run agent using query() for proper streaming."""
       # Create prompt generator in the fresh event loop context
       async def prompt_generator():
         yield {'type': 'user', 'message': {'role': 'user', 'content': message}}
@@ -202,7 +293,7 @@ async def stream_agent_response(
 ) -> AsyncIterator[dict]:
   """Stream Claude agent response with all event types.
 
-  Uses the simple query() function for stateless interactions.
+  Uses query() with custom MLflow Stop hook for tracing.
   Yields normalized event dicts for the frontend.
 
   Args:
@@ -257,6 +348,34 @@ async def stream_agent_response(
     # Load Claude settings for Databricks model serving authentication
     claude_env = _load_claude_settings()
 
+    # Log auth state for debugging
+    logger.info(f'Auth state: databricks_host={databricks_host}, token_present={databricks_token is not None and len(str(databricks_token)) > 0}')
+
+    # Ensure Databricks model serving endpoint is used
+    # Pass OAuth/PAT token for authentication with Databricks FMAPI
+    if databricks_host and databricks_token:
+      # Build the Anthropic base URL from Databricks host
+      # Format: https://<workspace>/serving-endpoints/anthropic
+      host = databricks_host.replace('https://', '').replace('http://', '').rstrip('/')
+      anthropic_base_url = f'https://{host}/serving-endpoints/anthropic'
+
+      # Set environment variables for Claude Code subprocess
+      # These ensure Claude Code uses Databricks model serving
+      # Note: Claude SDK uses ANTHROPIC_API_KEY for authentication
+      claude_env['ANTHROPIC_BASE_URL'] = anthropic_base_url
+      claude_env['ANTHROPIC_API_KEY'] = databricks_token
+      claude_env['ANTHROPIC_AUTH_TOKEN'] = databricks_token
+
+      # Set the model to use (required for Databricks FMAPI)
+      anthropic_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-5')
+      claude_env['ANTHROPIC_MODEL'] = anthropic_model
+
+      # Disable beta headers for Databricks FMAPI compatibility
+      claude_env['ANTHROPIC_CUSTOM_HEADERS'] = 'x-databricks-disable-beta-headers: true'
+
+      logger.info(f'Configured Databricks model serving: {anthropic_base_url} with model {anthropic_model}')
+      logger.info(f'Claude env vars: BASE_URL={claude_env.get("ANTHROPIC_BASE_URL")}, MODEL={claude_env.get("ANTHROPIC_MODEL")}')
+
     # Ensure stream timeout is set (1 hour to handle long tool sequences)
     stream_timeout = os.environ.get('CLAUDE_CODE_STREAM_CLOSE_TIMEOUT', '3600000')
     claude_env['CLAUDE_CODE_STREAM_CLOSE_TIMEOUT'] = stream_timeout
@@ -286,9 +405,13 @@ async def stream_agent_response(
     result_queue = queue.Queue()
     # Default to always-false if no cancellation function provided
     cancel_check = is_cancelled_fn if is_cancelled_fn else lambda: False
+
+    # Get MLflow experiment name from environment
+    mlflow_experiment = os.environ.get('MLFLOW_EXPERIMENT_NAME')
+
     agent_thread = threading.Thread(
       target=_run_agent_in_fresh_loop,
-      args=(message, options, result_queue, ctx, cancel_check),
+      args=(message, options, result_queue, ctx, cancel_check, mlflow_experiment),
       daemon=True
     )
     agent_thread.start()

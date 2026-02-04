@@ -116,15 +116,28 @@ if ! databricks auth describe &> /dev/null; then
   exit 1
 fi
 
-# Get workspace info
-WORKSPACE_HOST=$(databricks auth describe --output json 2>/dev/null | python3 -c "import sys, json; print(json.load(sys.stdin).get('host', ''))" 2>/dev/null || echo "")
+# Get workspace info (handle both old and new Databricks CLI JSON formats)
+WORKSPACE_HOST=$(databricks auth describe --output json 2>/dev/null | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+# New CLI format has host under details.host, old format has it at root
+host = data.get('host', '') or data.get('details', {}).get('host', '')
+print(host)
+" 2>/dev/null || echo "")
 if [ -z "$WORKSPACE_HOST" ]; then
   echo -e "${RED}Error: Could not determine Databricks workspace. Check your authentication.${NC}"
+  echo -e "${YELLOW}Tip: Try setting DATABRICKS_CONFIG_PROFILE=<profile-name> before running this script${NC}"
+  echo -e "${YELLOW}     Run 'databricks auth profiles' to see available profiles${NC}"
   exit 1
 fi
 
 # Get current user for workspace path
-CURRENT_USER=$(databricks current-user me --output json 2>/dev/null | python3 -c "import sys, json; print(json.load(sys.stdin).get('userName', ''))" 2>/dev/null || echo "")
+CURRENT_USER=$(databricks current-user me --output json 2>/dev/null | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+# Handle both formats
+print(data.get('userName', data.get('user_name', '')))
+" 2>/dev/null || echo "")
 if [ -z "$CURRENT_USER" ]; then
   echo -e "${RED}Error: Could not determine current user.${NC}"
   exit 1
@@ -183,8 +196,9 @@ cp -r server "$STAGING_DIR/"
 cp app.yaml "$STAGING_DIR/"
 cp requirements.txt "$STAGING_DIR/"
 
-# Copy frontend build
+# Copy frontend build (server expects it at client/out/)
 echo "  Copying frontend build..."
+mkdir -p "$STAGING_DIR/client"
 cp -r client/out "$STAGING_DIR/client/"
 
 # Copy packages (databricks-tools-core and databricks-mcp-server)
@@ -199,7 +213,7 @@ cp -r "$REPO_ROOT/databricks-tools-core/databricks_tools_core/"* "$STAGING_DIR/p
 mkdir -p "$STAGING_DIR/packages/databricks_mcp_server"
 cp -r "$REPO_ROOT/databricks-mcp-server/databricks_mcp_server/"* "$STAGING_DIR/packages/databricks_mcp_server/"
 
-# Copy skills
+# Copy skills (preserve directory structure)
 echo "  Copying skills..."
 mkdir -p "$STAGING_DIR/skills"
 SKILLS_DIR="$REPO_ROOT/databricks-skills"
@@ -208,7 +222,9 @@ if [ -d "$SKILLS_DIR" ]; then
     skill_name=$(basename "$skill_dir")
     # Skip template and non-skill directories
     if [ "$skill_name" != "TEMPLATE" ] && [ -f "$skill_dir/SKILL.md" ]; then
-      cp -r "$skill_dir" "$STAGING_DIR/skills/"
+      # Create skill directory and copy contents (cp -r dir/ copies contents, not dir itself)
+      mkdir -p "$STAGING_DIR/skills/$skill_name"
+      cp -r "$skill_dir"* "$STAGING_DIR/skills/$skill_name/"
     fi
   done
 fi

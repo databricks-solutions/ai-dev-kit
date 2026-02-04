@@ -88,14 +88,30 @@ def _resolve_hostname(hostname: str) -> Optional[str]:
     return None
 
 
+def _has_oauth_credentials() -> bool:
+    """Check if OAuth credentials (SP) are configured in environment."""
+    import os
+    return bool(os.environ.get('DATABRICKS_CLIENT_ID') and os.environ.get('DATABRICKS_CLIENT_SECRET'))
+
+
 def _get_workspace_client():
     """Get Databricks WorkspaceClient for token generation.
 
+    In Databricks Apps, explicitly uses OAuth M2M to avoid conflicts with other auth methods.
     Returns None if not running in a Databricks environment.
     """
     try:
+        import os
         from databricks.sdk import WorkspaceClient
 
+        if _has_oauth_credentials():
+            # Explicitly configure OAuth M2M to prevent auth conflicts
+            return WorkspaceClient(
+                host=os.environ.get('DATABRICKS_HOST', ''),
+                client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
+                client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+            )
+        # Development mode - use default SDK auth
         return WorkspaceClient()
     except Exception as e:
         logger.debug(f"Could not create WorkspaceClient: {e}")

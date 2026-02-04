@@ -20,10 +20,16 @@ Usage in functions:
         # ...
 """
 
+import os
 from contextvars import ContextVar
 from typing import Optional
 
 from databricks.sdk import WorkspaceClient
+
+
+def _has_oauth_credentials() -> bool:
+    """Check if OAuth credentials (SP) are configured in environment."""
+    return bool(os.environ.get('DATABRICKS_CLIENT_ID') and os.environ.get('DATABRICKS_CLIENT_SECRET'))
 
 # Context variables for per-request authentication
 _host_ctx: ContextVar[Optional[str]] = ContextVar('databricks_host', default=None)
@@ -58,9 +64,10 @@ def get_workspace_client() -> WorkspaceClient:
     """Get a WorkspaceClient using context auth or environment variables.
 
     Authentication priority:
-    1. Context variables (set via set_databricks_auth)
-    2. Environment variables (DATABRICKS_HOST, DATABRICKS_TOKEN)
-    3. Databricks config file (~/.databrickscfg)
+    1. If OAuth credentials exist in env, use explicit OAuth M2M auth (Databricks Apps)
+       - This explicitly sets auth_type to prevent conflicts with other auth methods
+    2. Context variables with explicit token (PAT auth for development)
+    3. Fall back to default authentication (env vars, config file)
 
     Returns:
         Configured WorkspaceClient instance
@@ -68,8 +75,26 @@ def get_workspace_client() -> WorkspaceClient:
     host = _host_ctx.get()
     token = _token_ctx.get()
 
+    # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M
+    # This prevents the SDK from detecting other auth methods like PAT or config file
+    if _has_oauth_credentials():
+        oauth_host = host or os.environ.get('DATABRICKS_HOST', '')
+        client_id = os.environ.get('DATABRICKS_CLIENT_ID', '')
+        client_secret = os.environ.get('DATABRICKS_CLIENT_SECRET', '')
+
+        # Explicitly configure OAuth M2M to prevent auth conflicts
+        return WorkspaceClient(
+            host=oauth_host,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
+    # Development mode: use explicit token if provided
     if host and token:
         return WorkspaceClient(host=host, token=token)
+
+    if host:
+        return WorkspaceClient(host=host)
 
     # Fall back to default authentication (env vars, config file)
     return WorkspaceClient()

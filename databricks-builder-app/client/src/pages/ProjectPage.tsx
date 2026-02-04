@@ -316,6 +316,7 @@ export default function ProjectPage() {
     try {
       let conversationId = currentConversation?.id;
       let fullText = '';
+      let receivedDeltas = false; // Track if we received streaming deltas
 
       await invokeAgent({
         projectId,
@@ -337,16 +338,26 @@ export default function ProjectPage() {
             // Token-by-token streaming - accumulate and display
             const text = event.text as string;
             fullText += text;
+            receivedDeltas = true;
+            console.log('[STREAM] text_delta received, fullText length:', fullText.length);
             setStreamingText(fullText);
           } else if (type === 'text') {
-            // Complete text block - only use if we haven't received any deltas
-            // (fallback for when streaming is disabled)
-            if (!fullText) {
+            // Complete text block - only use if we haven't received deltas
+            // When streaming is enabled, text_delta events contain the same content
+            // so we skip 'text' events to avoid duplication
+            console.log('[STREAM] text event received, receivedDeltas:', receivedDeltas, 'text length:', (event.text as string)?.length);
+            if (!receivedDeltas) {
               const text = event.text as string;
-              fullText = text;
-              setStreamingText(fullText);
+              if (text) {
+                // Add newline separator between text blocks for readability
+                if (fullText && !fullText.endsWith('\n')) {
+                  fullText += '\n\n';
+                }
+                fullText += text;
+                console.log('[STREAM] text accumulated, fullText length:', fullText.length);
+                setStreamingText(fullText);
+              }
             }
-            // If we already have fullText from deltas, ignore this to avoid duplication
           } else if (type === 'thinking' || type === 'thinking_delta') {
             // Handle both complete thinking blocks and streaming thinking deltas
             const thinking = (event.thinking as string) || '';
@@ -783,13 +794,40 @@ export default function ProjectPage() {
                 </div>
               ))}
 
-              {/* Activity section (thinking, tools) - shown above the loader */}
+              {/* Streaming response - show accumulated text as it arrives */}
+              {isStreaming && streamingText && (
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-lg px-3 py-2 shadow-sm bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50">
+                    <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ href, children }) => (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[var(--color-accent-primary)] underline hover:text-[var(--color-accent-secondary)]"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {streamingText}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Activity section (thinking, tools) - shown below streaming text */}
               {activityItems.length > 0 && (
                 <ActivitySection items={activityItems} isStreaming={isStreaming} />
               )}
 
-              {/* Fun loader with progress - shown while streaming (hides stream of consciousness) */}
-              {isStreaming && (
+              {/* Fun loader with progress - shown while streaming before text arrives */}
+              {isStreaming && !streamingText && (
                 <div className="flex justify-start">
                   <FunLoader todos={todos} className="py-2" />
                 </div>

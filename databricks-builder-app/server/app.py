@@ -126,12 +126,25 @@ app.include_router(agent_router, prefix=API_PREFIX, tags=['agent'])
 app.include_router(skills_router, prefix=API_PREFIX, tags=['skills'])
 
 # Production: Serve Vite static build
-build_path = Path('.') / 'client/out'
-if build_path.exists():
+# Check multiple possible locations for the frontend build
+_app_root = Path(__file__).parent.parent  # server/app.py -> app root
+_possible_build_paths = [
+  _app_root / 'client/out',  # Standard location relative to app root
+  Path('.') / 'client/out',  # Relative to working directory
+  Path('/app/python/source_code') / 'client/out',  # Databricks Apps location
+]
+
+build_path = None
+for path in _possible_build_paths:
+  if path.exists():
+    build_path = path
+    break
+
+if build_path:
   logger.info(f'Serving static files from {build_path}')
   app.mount('/', StaticFiles(directory=str(build_path), html=True), name='static')
 else:
   logger.warning(
-    f'Build directory {build_path} not found. '
+    f'Build directory not found in any of: {[str(p) for p in _possible_build_paths]}. '
     'In development, run Vite separately: cd client && npm run dev'
   )

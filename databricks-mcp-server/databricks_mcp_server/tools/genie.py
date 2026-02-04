@@ -1,11 +1,13 @@
 """Genie tools - Create, manage, and query Databricks Genie Spaces."""
 
+import os
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from databricks.sdk import WorkspaceClient
 
 from databricks_tools_core.agent_bricks import AgentBricksManager
+from databricks_tools_core.auth import get_workspace_client
 
 from ..server import mcp
 
@@ -45,7 +47,7 @@ def list_genie() -> List[Dict[str, Any]]:
         ]
     """
     try:
-        w = WorkspaceClient()
+        w = get_workspace_client()
         response = w.genie.list_spaces()
         result = []
         if response.spaces:
@@ -275,7 +277,7 @@ def ask_genie(
         {"question": "...", "status": "COMPLETED", "sql": "SELECT ...", "data": [[125430.50]], ...}
     """
     try:
-        w = WorkspaceClient()
+        w = get_workspace_client()
         result = w.genie.start_conversation_and_wait(
             space_id=space_id,
             content=question,
@@ -324,7 +326,7 @@ def ask_genie_followup(
         >>> ask_genie_followup(space_id, result["conversation_id"], "Break that down by region")
     """
     try:
-        w = WorkspaceClient()
+        w = get_workspace_client()
         result = w.genie.create_message_and_wait(
             space_id=space_id,
             conversation_id=conversation_id,
@@ -385,7 +387,7 @@ def _format_genie_response(
                 # Fetch actual data (columns and rows)
                 if attachment.attachment_id:
                     try:
-                        w = WorkspaceClient()
+                        w = get_workspace_client()
                         data_result = w.genie.get_message_query_result_by_attachment(
                             space_id=space_id,
                             conversation_id=genie_message.conversation_id,

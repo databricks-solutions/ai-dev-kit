@@ -2,12 +2,18 @@
 Databricks REST API Client
 
 Shared HTTP client for all Databricks API operations.
+Uses Databricks SDK for authentication to support both PAT and OAuth.
 """
 import os
-import configparser
-from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 import requests
+
+from databricks.sdk import WorkspaceClient
+
+
+def _has_oauth_credentials() -> bool:
+    """Check if OAuth credentials (SP) are configured in environment."""
+    return bool(os.environ.get('DATABRICKS_CLIENT_ID') and os.environ.get('DATABRICKS_CLIENT_SECRET'))
 
 
 class FilesAPI:
@@ -68,7 +74,10 @@ class FilesAPI:
 
 
 class DatabricksClient:
-    """Client for making requests to Databricks REST APIs"""
+    """Client for making requests to Databricks REST APIs.
+
+    Uses Databricks SDK for authentication to support both PAT and OAuth (SP credentials).
+    """
 
     def __init__(
         self,
@@ -79,90 +88,67 @@ class DatabricksClient:
         """
         Initialize Databricks client.
 
-        Authentication priority:
-        1. Explicit host/token parameters
-        2. DATABRICKS_HOST and DATABRICKS_TOKEN env vars
-        3. Profile from ~/.databrickscfg (use profile parameter or DATABRICKS_CONFIG_PROFILE env var)
+        Authentication priority (via Databricks SDK):
+        1. If OAuth credentials exist in env, use explicit OAuth M2M auth (Databricks Apps)
+        2. Explicit host/token parameters (PAT auth for development)
+        3. DATABRICKS_HOST and DATABRICKS_TOKEN env vars
+        4. Profile from ~/.databrickscfg
 
         Args:
             host: Databricks workspace URL
-            token: Databricks personal access token
+            token: Databricks personal access token (optional - uses SDK auth if not provided)
             profile: Profile name from ~/.databrickscfg (e.g., "ai-strat")
         """
-        # Try explicit parameters first
-        self.host = host
-        self.token = token
+        # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M
+        # This prevents the SDK from detecting other auth methods like PAT or config file
+        if _has_oauth_credentials():
+            oauth_host = host or os.environ.get('DATABRICKS_HOST', '')
+            client_id = os.environ.get('DATABRICKS_CLIENT_ID', '')
+            client_secret = os.environ.get('DATABRICKS_CLIENT_SECRET', '')
 
-        # Try environment variables
+            # Explicitly configure OAuth M2M to prevent auth conflicts
+            self._sdk_client = WorkspaceClient(
+                host=oauth_host,
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+        elif host and token:
+            # Development mode: explicit PAT auth
+            self._sdk_client = WorkspaceClient(host=host, token=token)
+        elif host:
+            # Host provided, use SDK default auth
+            self._sdk_client = WorkspaceClient(host=host)
+        elif profile:
+            # Use config profile
+            self._sdk_client = WorkspaceClient(profile=profile)
+        else:
+            # Use default SDK auth (env vars, config file)
+            self._sdk_client = WorkspaceClient()
+
+        # Get host from SDK config
+        self.host = self._sdk_client.config.host.rstrip("/") if self._sdk_client.config.host else ""
+
         if not self.host:
-            self.host = os.getenv("DATABRICKS_HOST", "")
-        if not self.token:
-            self.token = os.getenv("DATABRICKS_TOKEN", "")
-
-        # Try config profile if still missing
-        if not self.host or not self.token:
-            profile_name = profile or os.getenv("DATABRICKS_CONFIG_PROFILE")
-            if profile_name:
-                profile_host, profile_token = self._load_profile(profile_name)
-                if not self.host:
-                    self.host = profile_host
-                if not self.token:
-                    self.token = profile_token
-
-        # Strip trailing slash from host
-        self.host = self.host.rstrip("/") if self.host else ""
-
-        if not self.host or not self.token:
             raise ValueError(
-                "Databricks host and token must be provided via:\n"
-                "  1. Constructor parameters (host, token)\n"
-                "  2. Environment variables (DATABRICKS_HOST, DATABRICKS_TOKEN)\n"
+                "Databricks host must be provided via:\n"
+                "  1. Constructor parameters (host)\n"
+                "  2. Environment variables (DATABRICKS_HOST)\n"
                 "  3. Config profile (profile parameter or DATABRICKS_CONFIG_PROFILE env var)"
             )
 
-        self.headers = {"Authorization": f"Bearer {self.token}"}
+        # Store the authenticate function for getting fresh headers
+        self._authenticate: Callable[[], dict] = self._sdk_client.config.authenticate
 
         # Initialize Files API
         self.files = FilesAPI(self)
 
-    @staticmethod
-    def _load_profile(profile_name: str) -> tuple[str, str]:
+    @property
+    def headers(self) -> Dict[str, str]:
+        """Get authentication headers using SDK's authenticate method.
+
+        This generates fresh OAuth tokens when needed, avoiding token expiration issues.
         """
-        Load credentials from ~/.databrickscfg profile.
-
-        Args:
-            profile_name: Profile name (e.g., "ai-strat")
-
-        Returns:
-            Tuple of (host, token)
-
-        Raises:
-            ValueError: If profile not found or missing required fields
-        """
-        config_path = Path.home() / ".databrickscfg"
-        if not config_path.exists():
-            raise ValueError(f"Databricks config file not found: {config_path}")
-
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        if profile_name not in config:
-            available = ", ".join(config.sections())
-            raise ValueError(
-                f"Profile '{profile_name}' not found in {config_path}\n"
-                f"Available profiles: {available}"
-            )
-
-        profile = config[profile_name]
-        host = profile.get("host", "").strip()
-        token = profile.get("token", "").strip()
-
-        if not host or not token:
-            raise ValueError(
-                f"Profile '{profile_name}' is missing 'host' or 'token' field"
-            )
-
-        return host, token
+        return self._authenticate()
 
     def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """

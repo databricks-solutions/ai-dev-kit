@@ -10,8 +10,17 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Source skills directory (sibling to this app)
-SKILLS_SOURCE_DIR = Path(__file__).parent.parent.parent.parent / 'databricks-skills'
+# Source skills directory - check multiple locations
+# 1. Sibling to this app (local development): ../../databricks-skills
+# 2. Deployed location (Databricks Apps): ./skills at app root
+_DEV_SKILLS_DIR = Path(__file__).parent.parent.parent.parent / 'databricks-skills'
+_DEPLOYED_SKILLS_DIR = Path(__file__).parent.parent.parent / 'skills'
+
+# Use deployed location if it exists (skills are pre-copied), otherwise use dev location
+if _DEPLOYED_SKILLS_DIR.exists() and any(_DEPLOYED_SKILLS_DIR.iterdir()):
+  SKILLS_SOURCE_DIR = _DEPLOYED_SKILLS_DIR
+else:
+  SKILLS_SOURCE_DIR = _DEV_SKILLS_DIR
 
 # Local cache of skills within this app (copied on startup)
 APP_SKILLS_DIR = Path(__file__).parent.parent.parent / 'skills'

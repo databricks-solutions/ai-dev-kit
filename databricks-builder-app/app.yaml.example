@@ -90,7 +90,19 @@ env:
   # =============================================================================
   - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
     value: "3600000"
-  
+
+  # =============================================================================
+  # MLflow Tracing Configuration
+  # =============================================================================
+  # Enable MLflow tracing for Claude Code conversations
+  # Traces are automatically sent to your Databricks workspace
+  # See: https://docs.databricks.com/aws/en/mlflow3/genai/tracing/integrations/claude-code
+  - name: MLFLOW_TRACKING_URI
+    value: "databricks"
+  # Optional: Specify a custom experiment for traces
+  # - name: MLFLOW_EXPERIMENT_NAME
+  #   value: "/Users/your-email@company.com/claude-code-traces"
+
   # =============================================================================
   # Permission Configuration
   # =============================================================================

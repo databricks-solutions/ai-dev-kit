@@ -19,6 +19,10 @@ psycopg2-binary>=2.9.11
 claude-agent-sdk>=0.1.19
 anthropic>=0.42.0
 
+# MLflow for tracing Claude Code conversations
+# See: https://docs.databricks.com/aws/en/mlflow3/genai/tracing/integrations/claude-code
+mlflow[databricks]>=3.9.0
+
 # MCP
 mcp>=1.0.0
 fastmcp>=0.1.0

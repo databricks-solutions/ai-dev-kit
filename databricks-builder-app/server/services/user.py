@@ -27,6 +27,27 @@ def _is_local_development() -> bool:
   return os.getenv('ENV', 'development') == 'development'
 
 
+def _has_oauth_credentials() -> bool:
+  """Check if OAuth credentials (SP) are configured in environment."""
+  return bool(os.environ.get('DATABRICKS_CLIENT_ID') and os.environ.get('DATABRICKS_CLIENT_SECRET'))
+
+
+def _get_workspace_client() -> WorkspaceClient:
+  """Get a WorkspaceClient with proper auth handling.
+
+  In Databricks Apps, explicitly uses OAuth M2M to avoid conflicts with other auth methods.
+  """
+  if _has_oauth_credentials():
+    # Explicitly configure OAuth M2M to prevent auth conflicts
+    return WorkspaceClient(
+      host=os.environ.get('DATABRICKS_HOST', ''),
+      client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
+      client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+    )
+  # Development mode - use default SDK auth
+  return WorkspaceClient()
+
+
 async def get_current_user(request: Request) -> str:
   """Get the current user's email from the request.
 
@@ -60,28 +81,66 @@ async def get_current_user(request: Request) -> str:
 
 
 async def get_current_token(request: Request) -> str | None:
-  """Get the current user's Databricks access token.
+  """Get the current user's Databricks access token for workspace operations.
 
-  In production (Databricks Apps), returns None to use SP OAuth credentials.
-  Using user forwarded tokens conflicts with SP OAuth env vars.
+  In production (Databricks Apps), returns None to use SP OAuth credentials
+  from environment variables (set by Databricks Apps automatically).
   In development, uses DATABRICKS_TOKEN env var.
 
   Args:
       request: FastAPI Request object
 
   Returns:
-      Access token string, or None if not available
+      Access token string, or None to use default credentials
   """
-  # In production (Databricks Apps), use SP OAuth credentials from env vars
-  # Don't use forwarded user tokens as they conflict with SP OAuth
+  # In production, return None to let WorkspaceClient use SP OAuth from env
   if not _is_local_development():
-    logger.debug('Production mode: using SP OAuth credentials (not user token)')
+    logger.debug('Production mode: using SP OAuth credentials from environment')
     return None
 
   # Fall back to env var for development
   token = os.getenv('DATABRICKS_TOKEN')
   if token:
     logger.debug('Got token from DATABRICKS_TOKEN env var')
+    return token
+
+  return None
+
+
+async def get_fmapi_token(request: Request) -> str | None:
+  """Get a token for Databricks Foundation Model API (Claude endpoints).
+
+  In production (Databricks Apps), generates a fresh OAuth token using the
+  Service Principal credentials from environment variables.
+  In development, uses DATABRICKS_TOKEN env var.
+
+  Args:
+      request: FastAPI Request object
+
+  Returns:
+      Access token string for FMAPI authentication
+  """
+  # In production, generate OAuth token from SP credentials
+  if not _is_local_development():
+    try:
+      # Use helper that explicitly configures OAuth M2M to avoid auth conflicts
+      client = _get_workspace_client()
+      # Call the config's authenticate method to get a fresh token
+      headers = client.config.authenticate()
+      if headers and 'Authorization' in headers:
+        # Extract token from "Bearer <token>" format
+        auth_header = headers['Authorization']
+        if auth_header.startswith('Bearer '):
+          token = auth_header[7:]
+          logger.info(f'Got FMAPI token from SP OAuth (length: {len(token)})')
+          return token
+    except Exception as e:
+      logger.warning(f'Failed to get SP OAuth token: {e}')
+
+  # Fall back to env var for development
+  token = os.getenv('DATABRICKS_TOKEN')
+  if token:
+    logger.debug('Got FMAPI token from DATABRICKS_TOKEN env var')
     return token
 
   return None
@@ -109,8 +168,8 @@ async def _get_dev_user() -> str:
 def _fetch_user_from_workspace() -> str:
   """Synchronous helper to fetch user from WorkspaceClient."""
   try:
-    # WorkspaceClient will use DATABRICKS_HOST and DATABRICKS_TOKEN from env
-    client = WorkspaceClient()
+    # Use helper that properly handles OAuth vs PAT auth
+    client = _get_workspace_client()
     me = client.current_user.me()
 
     if not me.user_name:
@@ -146,7 +205,7 @@ def get_workspace_url() -> str:
 
   # Fall back to WorkspaceClient config (just reads from config, not a network call)
   try:
-    client = WorkspaceClient()
+    client = _get_workspace_client()
     _workspace_url_cache = client.config.host.rstrip('/')
     logger.debug(f'Got workspace URL from WorkspaceClient: {_workspace_url_cache}')
     return _workspace_url_cache

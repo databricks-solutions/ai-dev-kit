@@ -1,9 +1,11 @@
 """Configuration and user info endpoints."""
 
 import logging
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel
 
 from ..db import get_lakebase_project_id, is_postgres_configured, test_database_connection
 from ..services.system_prompt import get_system_prompt
@@ -58,3 +60,23 @@ async def get_system_prompt_endpoint(
     workspace_folder=workspace_folder,
   )
   return {'system_prompt': prompt}
+
+
+@router.get('/mlflow/status')
+async def mlflow_status_endpoint():
+  """Get MLflow tracing status and configuration.
+
+  Returns current MLflow tracing state including:
+  - Whether tracing is enabled (via MLFLOW_EXPERIMENT_NAME env var)
+  - Tracking URI
+  - Current experiment info
+  """
+  experiment_name = os.environ.get('MLFLOW_EXPERIMENT_NAME', '')
+  tracking_uri = os.environ.get('MLFLOW_TRACKING_URI', 'databricks')
+
+  return {
+    'enabled': bool(experiment_name),
+    'tracking_uri': tracking_uri,
+    'experiment_name': experiment_name,
+    'info': 'MLflow tracing is configured via environment variables in app.yaml',
+  }

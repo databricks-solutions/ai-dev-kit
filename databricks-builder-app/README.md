@@ -480,6 +480,275 @@ databricks-builder-app/
 | `/api/agent/invoke` | POST | Send message to agent (SSE stream) |
 | `/api/config/user` | GET | Get current user info |
 
+## Deploying to Databricks Apps
+
+This section covers deploying the Builder App to Databricks Apps platform for production use.
+
+### Prerequisites
+
+Before deploying, ensure you have:
+
+1. **Databricks CLI** installed and authenticated
+2. **Node.js 18+** for building the frontend
+3. **A Lakebase instance** in your Databricks workspace (for database persistence)
+4. Access to the **full repository** (not just this directory) since the app depends on sibling packages
+
+### Quick Deploy
+
+```bash
+# 1. Authenticate with Databricks CLI
+databricks auth login --host https://your-workspace.cloud.databricks.com
+
+# 2. Create the app (first time only)
+databricks apps create my-builder-app
+
+# 3. Add Lakebase as a resource (first time only)
+databricks apps add-resource my-builder-app \
+  --resource-type database \
+  --resource-name lakebase \
+  --database-instance <your-lakebase-instance-name>
+
+# 4. Configure app.yaml (copy and edit the example)
+cp app.yaml.example app.yaml
+# Edit app.yaml with your Lakebase instance name and other settings
+
+# 5. Deploy
+./scripts/deploy.sh my-builder-app
+```
+
+### Step-by-Step Deployment Guide
+
+#### 1. Install and Authenticate Databricks CLI
+
+```bash
+# Install Databricks CLI
+pip install databricks-cli
+
+# Authenticate (interactive browser login)
+databricks auth login --host https://your-workspace.cloud.databricks.com
+
+# Verify authentication
+databricks auth describe
+```
+
+If you have multiple profiles, set the profile before deploying:
+```bash
+export DATABRICKS_CONFIG_PROFILE=your-profile-name
+```
+
+#### 2. Create the Databricks App
+
+```bash
+# Create a new app
+databricks apps create my-builder-app
+
+# Verify it was created
+databricks apps get my-builder-app
+```
+
+#### 3. Create a Lakebase Instance
+
+The app requires a PostgreSQL database (Lakebase) for storing projects, conversations, and messages.
+
+1. Go to your Databricks workspace
+2. Navigate to **Catalog** → **Lakebase**
+3. Click **Create Instance**
+4. Note the instance name (e.g., `my-lakebase-instance`)
+
+#### 4. Add Lakebase as an App Resource
+
+```bash
+databricks apps add-resource my-builder-app \
+  --resource-type database \
+  --resource-name lakebase \
+  --database-instance <your-lakebase-instance-name>
+```
+
+This automatically configures the database connection environment variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`).
+
+#### 5. Configure app.yaml
+
+Copy the example configuration and customize it:
+
+```bash
+cp app.yaml.example app.yaml
+```
+
+Edit `app.yaml` with your settings:
+
+```yaml
+command:
+  - "uvicorn"
+  - "server.app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "$DATABRICKS_APP_PORT"
+
+env:
+  # Required: Your Lakebase instance name
+  - name: LAKEBASE_INSTANCE_NAME
+    value: "<your-lakebase-instance-name>"
+  - name: LAKEBASE_DATABASE_NAME
+    value: "databricks_postgres"
+
+  # Skills to enable (comma-separated)
+  - name: ENABLED_SKILLS
+    value: "agent-bricks,databricks-python-sdk,spark-declarative-pipelines"
+
+  # MLflow tracing (optional)
+  - name: MLFLOW_TRACKING_URI
+    value: "databricks"
+  # - name: MLFLOW_EXPERIMENT_NAME
+  #   value: "/Users/your-email@company.com/claude-code-traces"
+
+  # Other settings
+  - name: ENV
+    value: "production"
+  - name: PROJECTS_BASE_DIR
+    value: "./projects"
+```
+
+#### 6. Deploy the App
+
+Run the deploy script from the `databricks-builder-app` directory:
+
+```bash
+./scripts/deploy.sh my-builder-app
+```
+
+The deploy script will:
+1. Build the React frontend
+2. Package the server code
+3. Bundle sibling packages (`databricks-tools-core`, `databricks-mcp-server`)
+4. Copy skills from `databricks-skills/`
+5. Upload everything to your Databricks workspace
+6. Deploy the app
+
+**Skip frontend build** (if already built):
+```bash
+./scripts/deploy.sh my-builder-app --skip-build
+```
+
+#### 7. Grant Database Permissions
+
+After the first deployment, grant table permissions to the app's service principal:
+
+```sql
+-- Run this in a Databricks notebook or SQL editor
+-- Replace <service-principal-id> with your app's service principal
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public
+  TO `<service-principal-id>`;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public
+  TO `<service-principal-id>`;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO `<service-principal-id>`;
+```
+
+To find your app's service principal ID:
+```bash
+databricks apps get my-builder-app --output json | jq '.service_principal_id'
+```
+
+#### 8. Access Your App
+
+After successful deployment, the script will display your app URL:
+```
+App URL: https://my-builder-app-1234567890.aws.databricksapps.com
+```
+
+### Deployment Troubleshooting
+
+#### "Could not determine Databricks workspace"
+
+Your Databricks CLI authentication may be invalid or using the wrong profile:
+```bash
+# Check available profiles
+databricks auth profiles
+
+# Use a specific profile
+export DATABRICKS_CONFIG_PROFILE=your-valid-profile
+
+# Re-authenticate if needed
+databricks auth login --host https://your-workspace.cloud.databricks.com
+```
+
+#### "Build directory client/out not found"
+
+The frontend build is missing. The deploy script should build it automatically, but you can build manually:
+```bash
+cd client
+npm install
+npm run build
+cd ..
+```
+
+#### "Skill 'X' not found"
+
+Skills are copied from the sibling `databricks-skills/` directory. Ensure:
+1. You're running the deploy script from the full repository (not just this directory)
+2. The skill name in `ENABLED_SKILLS` matches a directory in `databricks-skills/`
+3. The skill directory contains a `SKILL.md` file
+
+#### "Permission denied for table projects" or Database Errors
+
+When using a shared Lakebase instance, you need to grant the app's service principal permissions on the tables:
+
+```bash
+# 1. Get your app's service principal ID
+databricks apps get my-builder-app --output json | python3 -c "import sys, json; print(json.load(sys.stdin)['service_principal_id'])"
+```
+
+2. Connect to your Lakebase instance via psql or a Databricks notebook, then run:
+
+```sql
+-- Replace <service-principal-id> with the ID from step 1
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "<service-principal-id>";
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "<service-principal-id>";
+GRANT USAGE ON SCHEMA public TO "<service-principal-id>";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "<service-principal-id>";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "<service-principal-id>";
+```
+
+Alternatively, if you have a fresh/private Lakebase instance, the app's migrations will create the tables with proper ownership automatically.
+
+#### App shows blank page or "Not Found"
+
+Check the app logs in Databricks:
+```bash
+databricks apps get-logs my-builder-app
+```
+
+Common causes:
+- Frontend files not properly deployed (check `client/out` exists in staging)
+- Database connection issues (verify Lakebase resource is added)
+- Python import errors (check logs for traceback)
+
+#### Redeploying After Changes
+
+```bash
+# Full redeploy (rebuilds frontend)
+./scripts/deploy.sh my-builder-app
+
+# Quick redeploy (skip frontend build)
+./scripts/deploy.sh my-builder-app --skip-build
+```
+
+### MLflow Tracing
+
+The app supports MLflow tracing for Claude Code conversations. To enable:
+
+1. Set `MLFLOW_TRACKING_URI=databricks` in `app.yaml`
+2. Optionally set `MLFLOW_EXPERIMENT_NAME` to a specific experiment path
+
+Traces will appear in your Databricks MLflow UI and include:
+- User prompts and Claude responses
+- Tool usage and results
+- Session metadata
+
+See the [Databricks MLflow Tracing documentation](https://docs.databricks.com/aws/en/mlflow3/genai/tracing/integrations/claude-code) for more details.
+
 ## Embedding in Other Apps
 
 If you want to embed the Databricks agent into your own application, see the integration example at:
