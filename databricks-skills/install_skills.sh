@@ -38,7 +38,7 @@ INSTALL_FROM_LOCAL=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # All available skills
-ALL_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+ALL_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
 
 # Get skill description
 get_skill_description() {
@@ -54,6 +54,7 @@ get_skill_description() {
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
         "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
+        "lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
         "mlflow-evaluation") echo "MLflow evaluation, scoring, and trace analysis" ;;
         "model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
