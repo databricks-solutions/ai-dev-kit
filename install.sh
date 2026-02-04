@@ -34,6 +34,7 @@ DIM='\033[2m'
 NC='\033[0m'
 
 # ─── Defaults ───────────────────────────────────────────────────
+DATABRICKS_CONFIG_PROFILE="DEFAULT"
 SCOPE="project"
 INSTALL_MCP=true
 INSTALL_SKILLS=true
@@ -70,6 +71,7 @@ USAGE
     curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
 
 OPTIONS
+  --profile, -p      Databricks config profile to use for MCP server (default: DEFAULT)
   --global, -g       Install to user-level directories (available in all projects)
   --skills-only      Install skills only, skip MCP server setup
   --mcp-only         Install MCP server only, skip skills
@@ -112,6 +114,7 @@ EOF
 # ─── Argument parsing ───────────────────────────────────────────
 while [ $# -gt 0 ]; do
     case $1 in
+        --profile|-p)    DATABRICKS_CONFIG_PROFILE="$2"; shift 2 ;;
         --global|-g)     SCOPE="global"; shift ;;
         --skills-only)   INSTALL_MCP=false; shift ;;
         --mcp-only)      INSTALL_SKILLS=false; shift ;;
@@ -674,7 +677,10 @@ with open(path, 'w') as f:
   "mcpServers": {
     "databricks": {
       "command": "$VENV_PYTHON",
-      "args": ["$MCP_SERVER_ENTRY"]
+      "args": ["$MCP_SERVER_ENTRY"],
+      "env": {
+        "DATABRICKS_CONFIG_PROFILE": "$DATABRICKS_CONFIG_PROFILE"
+      }
     }
   }
 }
@@ -817,8 +823,8 @@ print_summary() {
 
     echo ""
     echo -e "${BOLD}Next steps${NC}"
-    echo "  1. Set DATABRICKS_HOST and DATABRICKS_TOKEN"
-    echo "     (or run: databricks auth login --host <your-workspace-url>)"
+    echo "  1. Authenticate to selected profile $DATABRICKS_CONFIG_PROFILE or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN".
+    echo "     Run: databricks auth login --profile $DATABRICKS_CONFIG_PROFILE"
     echo "  2. Open your project in your tool of choice"
     echo "  3. Try: \"List my SQL warehouses\""
     echo ""
