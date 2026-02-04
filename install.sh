@@ -672,6 +672,8 @@ write_mcp_configs() {
                     write_mcp_json "$base_dir/.cursor/mcp.json"
                     ok "Cursor MCP config"
                 fi
+                warn "Cursor: MCP servers are disabled by default."
+                msg "  Enable in: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
                 ;;
             codex)
                 [ "$SCOPE" = "global" ] && write_mcp_toml "$HOME/.codex/config.toml" || write_mcp_toml "$base_dir/.codex/config.toml"
@@ -702,25 +704,62 @@ summary() {
         msg "Tools:    $(echo "$TOOLS" | tr ' ' ', ')"
         echo ""
         msg "${B}Next steps:${N}"
-        msg "1. Configure profile $PROFILE or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN".
-        msg "   Authenticate: ${B}${BL}databricks auth login --profile $PROFILE${N}"
-        msg "2. Open your project in your tool of choice"
-        msg "3. Try: \"List my SQL warehouses\""
+        local step=1
+        if echo "$TOOLS" | grep -q cursor; then
+            msg "${R}${step}. Enable MCP in Cursor: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
+            step=$((step + 1))
+        fi
+        msg "${step}. Open your project in your tool of choice"
+        step=$((step + 1))
+        msg "${step}. Try: \"List my SQL warehouses\""
         echo ""
     fi
 }
 
 # Prompt to run auth
 prompt_auth() {
-    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
-        local run_auth
-        run_auth=$(prompt "Run authentication now? ${D}(y/n)${N}" "n")
-        if [ "$run_auth" = "y" ] || [ "$run_auth" = "Y" ] || [ "$run_auth" = "yes" ]; then
-            echo ""
-            msg "Running: ${B}${BL}databricks auth login --profile $PROFILE${N}"
-            echo ""
-            databricks auth login --profile "$PROFILE"
-        fi
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    # Check if profile already has a token configured
+    local cfg_file="$HOME/.databrickscfg"
+    if [ -f "$cfg_file" ]; then
+        # Read the token value under the selected profile section
+        local in_profile=false
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^\[([a-zA-Z0-9_-]+)\]$ ]]; then
+                [ "${BASH_REMATCH[1]}" = "$PROFILE" ] && in_profile=true || in_profile=false
+            elif [ "$in_profile" = true ] && [[ "$line" =~ ^token[[:space:]]*= ]]; then
+                ok "Profile ${B}$PROFILE${N} already has a token configured — skipping auth"
+                return
+            fi
+        done < "$cfg_file"
+    fi
+
+    # Also skip if env vars are set
+    if [ -n "$DATABRICKS_TOKEN" ]; then
+        ok "DATABRICKS_TOKEN is set — skipping auth"
+        return
+    fi
+
+    # Databricks CLI is required for OAuth login
+    if ! command -v databricks >/dev/null 2>&1; then
+        warn "Databricks CLI not installed — cannot run OAuth login"
+        msg "  Install it, then run: ${B}${BL}databricks auth login --profile $PROFILE${N}"
+        return
+    fi
+
+    echo ""
+    msg "${B}Authentication${N}"
+    msg "This will run OAuth login for profile ${B}${BL}$PROFILE${N}"
+    msg "${D}A browser window will open for you to authenticate with your Databricks workspace.${N}"
+    echo ""
+    local run_auth
+    run_auth=$(prompt "Run ${B}databricks auth login --profile $PROFILE${N} now? ${D}(y/n)${N}" "y")
+    if [ "$run_auth" = "y" ] || [ "$run_auth" = "Y" ] || [ "$run_auth" = "yes" ]; then
+        echo ""
+        databricks auth login --profile "$PROFILE"
     fi
 }
 
