@@ -16,10 +16,20 @@ jobs:
           version: "latest"
       
       - name: Run ruff check
-        run: uvx ruff check databricks-tools-core/ databricks-mcp-server/ .test/src/
-      
+        run: |
+          uvx ruff check \
+            --select=E,F,B,UP,RUF,PIE \
+            --ignore=E401,E402,F403,B017 \
+            --line-length=120 \
+            --target-version=py311 \
+            databricks-tools-core/ databricks-mcp-server/ .test/src/
+
       - name: Check formatting
-        run: uvx ruff format --check databricks-tools-core/ databricks-mcp-server/ .test/src/
+        run: |
+          uvx ruff format --check \
+            --line-length=120 \
+            --target-version=py311 \
+            databricks-tools-core/ databricks-mcp-server/ .test/src/
 
   validate-skills:
     name: Validate Skills
