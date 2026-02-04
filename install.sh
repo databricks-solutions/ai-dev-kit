@@ -226,6 +226,89 @@ checkbox_select() {
     echo "$selected"
 }
 
+# Interactive single-select using arrow keys + enter + "Confirm" button
+# Outputs the selected value to stdout
+# Args: "Label|value|selected|hint" ...  (exactly one should have selected=on)
+radio_select() {
+    # Parse items
+    local -a labels=()
+    local -a values=()
+    local -a hints=()
+    local count=0
+    local selected=0
+
+    for item in "$@"; do
+        IFS='|' read -r label value state hint <<< "$item"
+        labels+=("$label")
+        values+=("$value")
+        hints+=("$hint")
+        [ "$state" = "on" ] && selected=$count
+        count=$((count + 1))
+    done
+
+    local cursor=0
+    local total_rows=$((count + 2))  # items + blank line + Confirm button
+
+    _radio_draw() {
+        local i
+        for i in $(seq 0 $((count - 1))); do
+            local dot="○"
+            local dot_color="\033[2m"
+            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
+            local arrow="  "
+            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
+            local hint_style="\033[2m"
+            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
+            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
+        done
+        printf "\033[2K\n" > /dev/tty
+        if [ "$cursor" = "$count" ]; then
+            printf "\033[2K  \033[0;34m❯\033[0m \033[1;32m[ Confirm ]\033[0m\n" > /dev/tty
+        else
+            printf "\033[2K    \033[2m[ Confirm ]\033[0m\n" > /dev/tty
+        fi
+    }
+
+    printf "\n  \033[2m↑/↓ navigate · space/enter select · enter on Confirm to finish\033[0m\n\n" > /dev/tty
+    printf "\033[?25l" > /dev/tty
+    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+
+    _radio_draw
+
+    while true; do
+        printf "\033[%dA" "$total_rows" > /dev/tty
+        _radio_draw
+
+        local key=""
+        IFS= read -rsn1 key < /dev/tty 2>/dev/null
+
+        if [ "$key" = $'\x1b' ]; then
+            local s1="" s2=""
+            read -rsn1 s1 < /dev/tty 2>/dev/null
+            read -rsn1 s2 < /dev/tty 2>/dev/null
+            if [ "$s1" = "[" ]; then
+                case "$s2" in
+                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
+                    B) [ "$cursor" -lt "$count" ] && cursor=$((cursor + 1)) ;;
+                esac
+            fi
+        elif [ "$key" = " " ] || [ "$key" = "" ]; then
+            if [ "$cursor" -lt "$count" ]; then
+                selected=$cursor
+            else
+                printf "\033[%dA" "$total_rows" > /dev/tty
+                _radio_draw
+                break
+            fi
+        fi
+    done
+
+    printf "\033[?25h" > /dev/tty
+    trap - EXIT
+
+    echo "${values[$selected]}"
+}
+
 # ─── Tool detection & selection ─────────────────────────────────
 detect_tools() {
     # If provided via --tools flag, skip detection and prompts
@@ -283,6 +366,63 @@ detect_tools() {
     fi
 }
 
+# ─── Databricks profile selection ─────────────────────────────
+prompt_profile() {
+    # If provided via --profile flag (non-default), skip prompt
+    if [ "$PROFILE" != "DEFAULT" ]; then
+        return
+    fi
+
+    # Skip in silent mode or non-interactive
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    # Detect existing profiles from ~/.databrickscfg
+    local cfg_file="$HOME/.databrickscfg"
+    local -a profiles=()
+
+    if [ -f "$cfg_file" ]; then
+        while IFS= read -r line; do
+            # Match [PROFILE_NAME] sections
+            if [[ "$line" =~ ^\[([a-zA-Z0-9_-]+)\]$ ]]; then
+                profiles+=("${BASH_REMATCH[1]}")
+            fi
+        done < "$cfg_file"
+    fi
+
+    echo ""
+    echo -e "  ${B}Select Databricks profile${N}"
+
+    if [ ${#profiles[@]} -gt 0 ] && [ -e /dev/tty ] && [ -t 0 ]; then
+        # Build radio items: "Label|value|on_or_off|hint"
+        local -a items=()
+        for p in "${profiles[@]}"; do
+            local state="off"
+            local hint=""
+            [ "$p" = "DEFAULT" ] && state="on" && hint="default"
+            items+=("${p}|${p}|${state}|${hint}")
+        done
+
+        # If no DEFAULT profile exists, pre-select the first one
+        local has_default=false
+        for p in "${profiles[@]}"; do
+            [ "$p" = "DEFAULT" ] && has_default=true
+        done
+        if [ "$has_default" = false ]; then
+            items[0]=$(echo "${items[0]}" | sed 's/|off|/|on|/')
+        fi
+
+        PROFILE=$(radio_select "${items[@]}")
+    else
+        echo -e "  ${D}No ~/.databrickscfg found. You can authenticate after install.${N}"
+        echo ""
+        local selected
+        selected=$(prompt "Profile name" "DEFAULT")
+        PROFILE="$selected"
+    fi
+}
+
 # ─── MCP path selection ────────────────────────────────────────
 prompt_mcp_path() {
     # If provided via --mcp-path flag, skip prompt
@@ -313,7 +453,14 @@ prompt_mcp_path() {
 check_deps() {
     command -v git >/dev/null 2>&1 || die "git required"
     ok "git"
-    
+
+    if command -v databricks >/dev/null 2>&1; then
+        ok "databricks CLI"
+    else
+        warn "Databricks CLI not found. Install: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}"
+        msg "${D}You can still install, but authentication will require the CLI later.${N}"
+    fi
+
     if [ "$INSTALL_MCP" = true ]; then
         if command -v uv >/dev/null 2>&1; then
             PKG="uv"
@@ -460,7 +607,13 @@ Quick start: "List my SQL warehouses"
 write_mcp_json() {
     local path=$1
     mkdir -p "$(dirname "$path")"
-    
+
+    # Backup existing file before any modifications
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
+
     if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
         "$VENV_PYTHON" -c "
 import json, sys
@@ -471,7 +624,7 @@ cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'ar
 with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 " 2>/dev/null && return
     fi
-    
+
     cat > "$path" << EOF
 {
   "mcpServers": {
@@ -489,6 +642,10 @@ write_mcp_toml() {
     local path=$1
     mkdir -p "$(dirname "$path")"
     grep -q "mcp_servers.databricks" "$path" 2>/dev/null && return
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
     cat >> "$path" << EOF
 
 [mcp_servers.databricks]
@@ -584,18 +741,24 @@ main() {
     detect_tools
     ok "Selected: $(echo "$TOOLS" | tr ' ' ', ')"
 
-    # ── Step 3: Interactive MCP path ──
+    # ── Step 3: Interactive profile selection ──
+    step "Databricks profile"
+    prompt_profile
+    ok "Profile: $PROFILE"
+
+    # ── Step 4: Interactive MCP path ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
         ok "MCP path: $INSTALL_DIR"
     fi
 
-    # ── Step 4: Confirm before proceeding ──
+    # ── Step 5: Confirm before proceeding ──
     if [ "$SILENT" = false ]; then
         echo ""
         echo -e "  ${B}Summary${N}"
         echo -e "  ────────────────────────────────────"
         echo -e "  Tools:       ${G}$(echo "$TOOLS" | tr ' ' ', ')${N}"
+        echo -e "  Profile:     ${G}${PROFILE}${N}"
         echo -e "  Scope:       ${G}${SCOPE}${N}"
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${G}${INSTALL_DIR}${N}"
         [ "$INSTALL_SKILLS" = true ] && echo -e "  Skills:      ${G}yes${N}"
@@ -613,7 +776,7 @@ main() {
         fi
     fi
 
-    # ── Step 5: Version check (may exit early if up to date) ──
+    # ── Step 6: Version check (may exit early if up to date) ──
     check_version
     
     # Determine base directory

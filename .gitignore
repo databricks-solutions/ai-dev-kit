@@ -1,3 +1,7 @@
+# Databricks AI Dev Kit
+.ai-dev-kit/
+version
+
 # Python
 __pycache__/
 *.py[cod]
