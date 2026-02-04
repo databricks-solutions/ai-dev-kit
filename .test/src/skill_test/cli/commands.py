@@ -6,26 +6,25 @@ are injected via CLIContext at runtime by the skill handler.
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable, Literal
+from typing import Dict, Any, Optional, List, Literal
 import yaml
 
 from ..grp.executor import (
     DatabricksExecutionConfig,
-    CodeBlocksExecutionResult,
     execute_code_blocks,
     execute_code_blocks_on_databricks,
-    extract_code_blocks,
     MCPExecuteCommand,
     MCPExecuteSQL,
     MCPGetBestWarehouse,
     MCPGetBestCluster,
 )
 from ..grp.pipeline import (
-    GRPCandidate,
-    GRPResult,
     generate_candidate,
-    save_candidates,
     promote_approved,
+)
+from ..grp.reviewer import (
+    review_candidates_file,
+    batch_approve,
 )
 from ..fixtures import (
     TestFixtureConfig,
@@ -34,7 +33,7 @@ from ..fixtures import (
     teardown_fixtures,
 )
 from ..fixtures.setup import MCPUploadFile
-from ..dataset import YAMLDatasetSource, EvalRecord
+from ..dataset import YAMLDatasetSource
 
 
 @dataclass
@@ -81,6 +80,12 @@ class InteractiveResult:
     # Output handling
     saved_to: Optional[str] = None  # "ground_truth.yaml" or "candidates.yaml"
     auto_approved: bool = False  # True if all blocks passed and auto-promoted
+
+    # Trace evaluation results (when capture_trace=True)
+    trace_source: Optional[str] = None  # "mlflow:{run_id}" or "local:{path}"
+    trace_results: Optional[List[Dict[str, Any]]] = None  # Scorer results
+    trace_mlflow_enabled: bool = False  # Whether MLflow autolog was enabled
+    trace_error: Optional[str] = None  # Error during trace capture
 
     # Errors
     error: Optional[str] = None
@@ -293,11 +298,16 @@ def init(
                     "expected_patterns": [
                         {"pattern": "pattern_to_match", "min_count": 1}
                     ],
-                    "guidelines": ["Guideline for evaluation"]
+                    "guidelines": ["Guideline for evaluation"],
+                    # Per-test trace expectations (override manifest defaults)
+                    # "tool_limits": {"mcp__databricks__create_pipeline": 1},
+                    # "expected_files": ["bronze_orders.sql"],
                 },
                 "metadata": {
                     "category": "happy_path",
-                    "difficulty": "easy"
+                    "difficulty": "easy",
+                    # Link to MLflow trace for this test
+                    # "trace_run_id": "abc123",
                 }
             }
         ]
@@ -338,7 +348,22 @@ def init(
                 "Response must address the user's request completely",
                 "Code examples must follow documented best practices",
                 "Response must use modern APIs (not deprecated ones)"
-            ]
+            ],
+            # Trace-based expectations for evaluating Claude Code session behavior
+            "trace_expectations": {
+                "tool_limits": {
+                    "Bash": 10,  # Max 10 bash commands
+                    "Read": 20,  # Example: max Read calls
+                },
+                "token_budget": {
+                    "max_total": 100000,  # Max total tokens per session
+                },
+                "required_tools": [
+                    "Read",  # Must read files before editing
+                ],
+                "banned_tools": [],  # Tools that should not be used
+                "expected_files": [],  # File patterns that should be created
+            }
         },
         "quality_gates": {
             "syntax_valid": 1.0,
@@ -494,6 +519,49 @@ def mlflow_eval(
         }
 
 
+def routing_eval(
+    ctx: CLIContext,  # Reserved for future use
+    run_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Run routing evaluation to test skill trigger detection.
+
+    Evaluates Claude Code's ability to route prompts to correct skills
+    using routing-specific scorers.
+
+    Args:
+        ctx: CLI context (reserved for future use)
+        run_name: Optional custom MLflow run name
+
+    Returns:
+        Dictionary with routing evaluation results
+    """
+    _ = ctx  # Reserved for future use
+    try:
+        from ..runners import evaluate_routing
+    except ImportError as e:
+        return {
+            "success": False,
+            "error": f"Failed to import evaluate_routing: {e}",
+            "hint": "Ensure mlflow and required dependencies are installed"
+        }
+
+    try:
+        results = evaluate_routing(run_name=run_name)
+        return {
+            "success": True,
+            "evaluation_type": "routing",
+            "results": results,
+            "message": "Routing evaluation complete"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "evaluation_type": "routing",
+            "hint": "Check MLflow configuration and _routing/ground_truth.yaml exists"
+        }
+
+
 def interactive(
     skill_name: str,
     prompt: str,
@@ -501,6 +569,7 @@ def interactive(
     ctx: CLIContext,
     fixture_config: Optional[TestFixtureConfig] = None,
     auto_approve_on_success: bool = True,
+    capture_trace: bool = False,
 ) -> InteractiveResult:
     """Interactive test generation with Databricks execution.
 
@@ -510,6 +579,7 @@ def interactive(
     3. If ALL blocks pass and auto_approve_on_success: save to ground_truth.yaml
     4. If ANY block fails: save to candidates.yaml for GRP review
     5. Optionally tear down fixtures
+    6. Optionally evaluate session trace (if capture_trace=True)
 
     Args:
         skill_name: Name of the skill being tested
@@ -518,6 +588,7 @@ def interactive(
         ctx: CLI context with MCP tools
         fixture_config: Optional fixture configuration for test setup
         auto_approve_on_success: If True, auto-save to ground_truth on success
+        capture_trace: If True, evaluate trace after execution (MLflow if configured, else local)
 
     Returns:
         InteractiveResult with execution details and outcome
@@ -693,6 +764,54 @@ def interactive(
         result.fixtures_teardown = teardown_result.success
         if result.fixture_details:
             result.fixture_details["teardown"] = teardown_result.details
+
+    # 5. Optionally evaluate trace
+    if capture_trace:
+        try:
+            from ..trace.source import get_trace_from_best_source, check_autolog_status
+            from ..scorers.trace import get_trace_scorers
+
+            status = check_autolog_status()
+            result.trace_mlflow_enabled = status.enabled
+
+            metrics, source = get_trace_from_best_source(skill_name)
+            result.trace_source = source
+
+            # Load trace expectations from manifest
+            manifest_path = ctx.base_path / skill_name / "manifest.yaml"
+            expectations = {}
+            if manifest_path.exists():
+                with open(manifest_path) as f:
+                    manifest = yaml.safe_load(f) or {}
+                # Look for trace_expectations in scorers section or at top level
+                if "scorers" in manifest and "trace_expectations" in manifest["scorers"]:
+                    expectations = manifest["scorers"]["trace_expectations"]
+                elif "trace_expectations" in manifest:
+                    expectations = manifest["trace_expectations"]
+
+            # Run trace scorers
+            trace_dict = metrics.to_dict()
+            trace_results = []
+            for scorer in get_trace_scorers():
+                try:
+                    feedback = scorer(trace=trace_dict, expectations=expectations)
+                    trace_results.append({
+                        "name": feedback.name,
+                        "value": feedback.value,
+                        "rationale": feedback.rationale,
+                    })
+                except Exception as e:
+                    scorer_name = getattr(scorer, "__name__", str(scorer))
+                    trace_results.append({
+                        "name": scorer_name,
+                        "value": "error",
+                        "rationale": str(e),
+                    })
+
+            result.trace_results = trace_results
+
+        except Exception as e:
+            result.trace_error = str(e)
 
     return result
 
@@ -946,3 +1065,380 @@ def setup_test_fixtures(
         ctx.mcp_get_best_warehouse,
         base_path=str(ctx.base_path.parent.parent),
     )
+
+
+def trace_eval(
+    skill_name: str,
+    ctx: CLIContext,
+    trace_path: Optional[str] = None,
+    run_id: Optional[str] = None,
+    trace_id: Optional[str] = None,
+    trace_dir: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Evaluate trace(s) against skill expectations.
+
+    Evaluates Claude Code session traces using trace-based scorers.
+    Traces can be provided via:
+    - Local JSONL file (--trace)
+    - MLflow run ID (--run-id)
+    - MLflow trace ID (--trace-id)
+    - Directory of trace files (--trace-dir)
+
+    Args:
+        skill_name: Name of the skill to evaluate against
+        ctx: CLI context
+        trace_path: Path to a local JSONL trace file
+        run_id: MLflow run ID containing the trace
+        trace_id: MLflow trace ID (e.g., "tr-...")
+        trace_dir: Directory containing multiple trace files
+
+    Returns:
+        Dictionary with evaluation results:
+        - success: True if all scorers passed
+        - skill_name: The skill evaluated
+        - trace_source: Where the trace came from
+        - metrics: TraceMetrics summary
+        - scorer_results: List of scorer results
+        - violations: List of any violations found
+    """
+    from ..trace.parser import parse_and_compute_metrics
+    from ..trace.mlflow_integration import get_trace_from_mlflow, get_trace_by_id
+    from ..scorers.trace import get_trace_scorers
+
+    # Validate inputs - must provide exactly one trace source
+    sources = [trace_path, run_id, trace_id, trace_dir]
+    provided = sum(1 for s in sources if s is not None)
+
+    if provided == 0:
+        return {
+            "success": False,
+            "error": "Must provide one of: --trace, --run-id, --trace-id, or --trace-dir",
+            "skill_name": skill_name,
+        }
+
+    if provided > 1:
+        return {
+            "success": False,
+            "error": "Provide only one of: --trace, --run-id, --trace-id, or --trace-dir",
+            "skill_name": skill_name,
+        }
+
+    # Load expectations from manifest
+    manifest_path = ctx.base_path / skill_name / "manifest.yaml"
+    expectations = {}
+
+    if manifest_path.exists():
+        with open(manifest_path) as f:
+            manifest = yaml.safe_load(f) or {}
+
+        # Look for trace_expectations in scorers section or at top level
+        if "scorers" in manifest and "trace_expectations" in manifest["scorers"]:
+            expectations = manifest["scorers"]["trace_expectations"]
+        elif "trace_expectations" in manifest:
+            expectations = manifest["trace_expectations"]
+
+    if not expectations:
+        return {
+            "success": False,
+            "error": f"No trace_expectations found in manifest for '{skill_name}'",
+            "skill_name": skill_name,
+            "manifest_path": str(manifest_path),
+            "hint": "Add trace_expectations section to manifest.yaml",
+        }
+
+    # Get trace metrics
+    traces_to_eval = []
+
+    if trace_path:
+        path = Path(trace_path).expanduser()
+        if not path.exists():
+            return {
+                "success": False,
+                "error": f"Trace file not found: {trace_path}",
+                "skill_name": skill_name,
+            }
+        try:
+            metrics = parse_and_compute_metrics(path)
+            traces_to_eval.append({"source": str(path), "metrics": metrics})
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to parse trace file: {e}",
+                "skill_name": skill_name,
+                "trace_path": trace_path,
+            }
+
+    elif run_id:
+        try:
+            metrics = get_trace_from_mlflow(run_id)
+            traces_to_eval.append({"source": f"mlflow:{run_id}", "metrics": metrics})
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to get trace from MLflow: {e}",
+                "skill_name": skill_name,
+                "run_id": run_id,
+            }
+
+    elif trace_id:
+        try:
+            metrics = get_trace_by_id(trace_id)
+            traces_to_eval.append({"source": f"mlflow-trace:{trace_id}", "metrics": metrics})
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to get trace by ID: {e}",
+                "skill_name": skill_name,
+                "trace_id": trace_id,
+            }
+
+    elif trace_dir:
+        dir_path = Path(trace_dir).expanduser()
+        if not dir_path.is_dir():
+            return {
+                "success": False,
+                "error": f"Trace directory not found: {trace_dir}",
+                "skill_name": skill_name,
+            }
+
+        for jsonl_file in dir_path.glob("*.jsonl"):
+            try:
+                metrics = parse_and_compute_metrics(jsonl_file)
+                traces_to_eval.append({"source": str(jsonl_file), "metrics": metrics})
+            except Exception as e:
+                # Log but continue with other files
+                traces_to_eval.append({
+                    "source": str(jsonl_file),
+                    "error": str(e),
+                    "metrics": None
+                })
+
+        if not traces_to_eval:
+            return {
+                "success": False,
+                "error": f"No .jsonl files found in directory: {trace_dir}",
+                "skill_name": skill_name,
+            }
+
+    # Run scorers on each trace
+    scorers = get_trace_scorers()
+    all_results = []
+    overall_success = True
+    all_violations = []
+
+    for trace_info in traces_to_eval:
+        if trace_info.get("error") or trace_info.get("metrics") is None:
+            all_results.append({
+                "source": trace_info["source"],
+                "success": False,
+                "error": trace_info.get("error", "No metrics available"),
+            })
+            overall_success = False
+            continue
+
+        metrics = trace_info["metrics"]
+        trace_dict = metrics.to_dict()
+
+        trace_results = {
+            "source": trace_info["source"],
+            "metrics_summary": {
+                "session_id": metrics.session_id,
+                "total_tokens": metrics.total_tokens,
+                "total_tool_calls": metrics.total_tool_calls,
+                "num_turns": metrics.num_turns,
+                "duration_seconds": metrics.duration_seconds,
+            },
+            "scorer_results": [],
+            "violations": [],
+        }
+
+        for scorer in scorers:
+            try:
+                # Call scorer with trace dict and expectations
+                result = scorer(trace=trace_dict, expectations=expectations)
+
+                scorer_result = {
+                    "name": result.name,
+                    "value": result.value,
+                    "rationale": result.rationale,
+                }
+                trace_results["scorer_results"].append(scorer_result)
+
+                # Track violations
+                if result.value == "no":
+                    trace_results["violations"].append({
+                        "scorer": result.name,
+                        "rationale": result.rationale,
+                    })
+                    all_violations.append({
+                        "source": trace_info["source"],
+                        "scorer": result.name,
+                        "rationale": result.rationale,
+                    })
+
+            except Exception as e:
+                trace_results["scorer_results"].append({
+                    "name": scorer.__name__ if hasattr(scorer, "__name__") else str(scorer),
+                    "value": "error",
+                    "rationale": str(e),
+                })
+
+        # Determine trace success (no violations)
+        trace_results["success"] = len(trace_results["violations"]) == 0
+        if not trace_results["success"]:
+            overall_success = False
+
+        all_results.append(trace_results)
+
+    return {
+        "success": overall_success,
+        "skill_name": skill_name,
+        "traces_evaluated": len(traces_to_eval),
+        "traces_passed": sum(1 for r in all_results if r.get("success", False)),
+        "traces_failed": sum(1 for r in all_results if not r.get("success", True)),
+        "expectations": expectations,
+        "results": all_results,
+        "all_violations": all_violations,
+        "message": (
+            f"Evaluated {len(traces_to_eval)} trace(s) against {skill_name} expectations. "
+            f"{sum(1 for r in all_results if r.get('success', False))} passed, "
+            f"{sum(1 for r in all_results if not r.get('success', True))} failed."
+        ),
+    }
+
+
+def review(
+    skill_name: str,
+    ctx: CLIContext,
+    batch: bool = False,
+    filter_success: bool = False,
+) -> Dict[str, Any]:
+    """Review pending candidates in candidates.yaml.
+
+    Opens an interactive review interface for pending candidates, allowing
+    the reviewer to approve, reject, skip, or edit each candidate. Approved
+    candidates are then promoted to ground_truth.yaml.
+
+    Args:
+        skill_name: Name of the skill to review candidates for
+        ctx: CLI context
+        batch: If True, batch approve all pending candidates without prompts
+        filter_success: If True (with batch), only approve candidates with
+            execution_success=True
+
+    Returns:
+        Dictionary with review results:
+        - success: True if review completed
+        - skill_name: The skill reviewed
+        - reviewed: Number of candidates reviewed
+        - approved: Number approved
+        - rejected: Number rejected
+        - skipped: Number skipped
+        - promoted: Number promoted to ground_truth.yaml
+    """
+    candidates_path = ctx.base_path / skill_name / "candidates.yaml"
+    ground_truth_path = ctx.base_path / skill_name / "ground_truth.yaml"
+
+    if not candidates_path.exists():
+        return {
+            "success": False,
+            "error": f"No candidates.yaml found for skill '{skill_name}'",
+            "path": str(candidates_path),
+            "hint": "Run 'add' first to generate candidates"
+        }
+
+    # Check if there are any pending candidates
+    with open(candidates_path) as f:
+        data = yaml.safe_load(f) or {"candidates": []}
+
+    pending = [c for c in data.get("candidates", []) if c.get("status") == "pending"]
+
+    if not pending:
+        return {
+            "success": True,
+            "skill_name": skill_name,
+            "message": "No pending candidates to review",
+            "reviewed": 0,
+            "approved": 0,
+            "rejected": 0,
+            "skipped": 0,
+            "promoted": 0
+        }
+
+    if batch:
+        # Batch approve mode
+        def success_filter(c):
+            return c.get("execution_success", False)
+
+        filter_fn = success_filter if filter_success else None
+
+        approved = batch_approve(candidates_path, filter_fn=filter_fn)
+
+        # Promote approved candidates
+        promoted = promote_approved(candidates_path, ground_truth_path)
+
+        return {
+            "success": True,
+            "skill_name": skill_name,
+            "mode": "batch",
+            "filter_success": filter_success,
+            "reviewed": approved,
+            "approved": approved,
+            "rejected": 0,
+            "skipped": len(pending) - approved,
+            "promoted": promoted,
+            "message": f"Batch approved {approved} candidates, promoted {promoted} to ground_truth.yaml"
+        }
+    else:
+        # Interactive review mode
+        stats = review_candidates_file(candidates_path)
+
+        # Promote approved candidates
+        promoted = promote_approved(candidates_path, ground_truth_path)
+
+        return {
+            "success": True,
+            "skill_name": skill_name,
+            "mode": "interactive",
+            "reviewed": stats["approved"] + stats["rejected"] + stats["skipped"],
+            "approved": stats["approved"],
+            "rejected": stats["rejected"],
+            "skipped": stats["skipped"],
+            "promoted": promoted,
+            "message": f"Reviewed {sum(stats.values())} candidates, promoted {promoted} to ground_truth.yaml"
+        }
+
+
+def list_traces(
+    experiment_name: str,
+    ctx: CLIContext,
+    limit: int = 10,
+) -> Dict[str, Any]:
+    """List available trace runs from MLflow.
+
+    Args:
+        experiment_name: MLflow experiment name/path
+        ctx: CLI context
+        limit: Maximum runs to return
+
+    Returns:
+        Dictionary with list of available trace runs
+    """
+    from ..trace.mlflow_integration import list_trace_runs
+
+    try:
+        runs = list_trace_runs(experiment_name, limit=limit)
+        return {
+            "success": True,
+            "experiment_name": experiment_name,
+            "runs": runs,
+            "count": len(runs),
+            "message": f"Found {len(runs)} trace runs in experiment",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "experiment_name": experiment_name,
+            "hint": "Check experiment name and MLflow connection",
+        }

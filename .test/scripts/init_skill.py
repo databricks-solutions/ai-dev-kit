@@ -10,21 +10,10 @@ Creates the directory structure and template files for testing a skill:
 - manifest.yaml (scorer configuration)
 """
 import sys
-import json
 import argparse
-from pathlib import Path
 
-
-def find_repo_root() -> Path:
-    """Find repo root by looking for .test/src/ directory."""
-    current = Path(__file__).resolve().parent
-    while current != current.parent:
-        if (current / ".test" / "src").exists():
-            return current
-        if (current / "src" / "skill_test").exists() and current.name == ".test":
-            return current.parent
-        current = current.parent
-    raise RuntimeError("Could not find repo root with .test/src/")
+# Import common utilities
+from _common import setup_path, create_cli_context, print_result, handle_error
 
 
 def main():
@@ -32,29 +21,17 @@ def main():
     parser.add_argument("skill_name", help="Name of skill to initialize")
     args = parser.parse_args()
 
-    # Add skill_test to Python path
-    repo_root = find_repo_root()
-    sys.path.insert(0, str(repo_root / ".test" / "src"))
+    setup_path()
 
     try:
-        from skill_test.cli import CLIContext, init
+        from skill_test.cli import init
 
-        # Create context
-        ctx = CLIContext(
-            base_path=repo_root / ".test" / "skills"
-        )
-
-        results = init(args.skill_name, ctx)
-        print(json.dumps(results, indent=2, default=str))
-        sys.exit(0 if results.get("success", False) else 1)
+        ctx = create_cli_context()
+        result = init(args.skill_name, ctx)
+        sys.exit(print_result(result))
 
     except Exception as e:
-        print(json.dumps({
-            "error": str(e),
-            "success": False,
-            "skill_name": args.skill_name
-        }, indent=2))
-        sys.exit(1)
+        sys.exit(handle_error(e, args.skill_name))
 
 
 if __name__ == "__main__":

@@ -4,295 +4,232 @@ Test Databricks skills with real execution on serverless compute.
 
 **Note:** This framework is for contributors only and is not distributed via install_skills.sh.
 
-## Prerequisites
+## Setup
 
 ```bash
 uv pip install -e ".test/[dev]"
+.test/install_skill_test.sh
 ```
 
 Requires a Databricks workspace with serverless SQL/compute enabled.
 
-## Installation
+---
 
-The skill-test skill must be installed to `.claude/skills/` for Claude Code to discover it:
+## New Skill Journey
 
-```bash
-# Sync skill files from .test/ to .claude/skills/skill-test/
-.test/install_skill_test.sh
-```
+Complete workflow for testing a skill from scratch (e.g., `mlflow-evaluation`).
 
-This copies:
-- `SKILL.md` - Skill instructions for Claude
-- `scripts/` - Wrapper scripts Claude executes
-- `references/` - YAML schemas and scorer documentation
-
-## Quick Start
-Start a new Claude Code session from within the project root folder - `ai-dev-kit`. Then run the desired steps below.
-
-### 1. Test an Existing Skill
+### 1. Initialize Test Scaffolding
 
 ```
-/skill-test spark-declarative-pipelines
-```
-
-This runs all test cases in `skills/spark-declarative-pipelines/ground_truth.yaml` and reports pass/fail for each code block.
-
-### 2. Add a New Test Case
-
-```
-/skill-test spark-declarative-pipelines add
+/skill-test <skill-name> init
 ```
 
 Claude will:
+1. Read the skill's SKILL.md documentation
+2. Generate `manifest.yaml` with appropriate scorers
+3. Create empty `ground_truth.yaml` and `candidates.yaml` templates
+4. Recommend test prompts based on documentation
+
+### 2. Add Test Cases
+
+```
+/skill-test <skill-name> add
+```
+
+Run this with the recommended prompts from init. Claude will:
 1. Ask for your test prompt
 2. Invoke the skill to generate a response
 3. Execute code blocks on Databricks
 4. Auto-save passing tests to `ground_truth.yaml`
 5. Save failing tests to `candidates.yaml` for review
 
-### 3. Create a Regression Baseline
+Repeat for each recommended prompt.
+
+### 3. Review Candidates
 
 ```
-/skill-test spark-declarative-pipelines baseline
+/skill-test <skill-name> review
 ```
 
-Saves current metrics to `baselines/spark-declarative-pipelines/baseline.yaml`.
+Review any tests that failed execution and were saved to candidates:
+1. Load pending tests from `candidates.yaml`
+2. Present each with prompt, response, and execution results
+3. Allow you to approve, reject, skip, or edit
+4. Promote approved candidates to `ground_truth.yaml`
 
-### 4. Check for Regressions
+For batch approval of successful tests:
+```
+/skill-test <skill-name> review --batch --filter-success
+```
+
+### 4. Configure Scorers (Optional)
 
 ```
-/skill-test spark-declarative-pipelines regression
+/skill-test <skill-name> scorers
+```
+
+View current scorer configuration. To update:
+
+```
+/skill-test <skill-name> scorers update --add-guideline "Must use CLUSTER BY"
+```
+
+Or edit `.test/skills/<skill-name>/manifest.yaml` directly to:
+- Add/remove scorers
+- Update default guidelines
+- Configure trace expectations
+
+### 5. Run Evaluation
+
+```
+/skill-test <skill-name> run
+```
+
+Executes code blocks on Databricks or locally (depends on SKILLS, MCP, etc.) and reports pass/fail for each test in `ground_truth.yaml`.
+
+**Note:** Requires test cases in ground_truth.yaml (from steps 2-3).
+
+### 6. MLflow Evaluation (Optional)
+
+```
+/skill-test <skill-name> mlflow
+```
+
+Runs full evaluation with LLM judges and logs results to MLflow. Provides deeper quality assessment beyond pass/fail execution.
+
+### 7. Save Baseline
+
+```
+/skill-test <skill-name> baseline
+```
+
+Saves current metrics to `baselines/<skill-name>/baseline.yaml`.
+
+### 8. Check Regressions
+
+After skill changes:
+```
+/skill-test <skill-name> regression
 ```
 
 Compares current pass rate against the saved baseline.
 
-### 5. Run MLflow Evaluation with LLM Judges
+---
 
-```
-/skill-test spark-declarative-pipelines mlflow
-```
+## Trace Evaluation (In Progress)
 
-Runs full evaluation with:
-- Deterministic scorers (syntax, patterns, facts)
-- LLM-based scorers (Safety, Guidelines)
-- Logs results to Databricks MLflow
+Capture Claude Code sessions and evaluate against skill expectations.
 
-### 6. View Scorer Configuration
+### Enable MLflow Tracing
 
-```
-/skill-test spark-declarative-pipelines scorers
-```
+```bash
+export DATABRICKS_CONFIG_PROFILE=aws-apps
+export MLFLOW_EXPERIMENT_NAME="/Users/<your-email>/Claude Code Skill Traces"
 
-Shows enabled scorers, LLM scorers, and default guidelines for the skill.
-
-### 7. Update Scorer Configuration
-
-```
-/skill-test spark-declarative-pipelines scorers update --add-guideline "Must use CLUSTER BY"
+pip install mlflow[databricks]
+mlflow autolog claude -u databricks -n "$MLFLOW_EXPERIMENT_NAME" .
 ```
 
-Modifies the manifest.yaml to add/remove scorers or update guidelines.
+### Evaluate Traces
 
-## Test a New Skill
+**Local trace file:**
+```
+/skill-test <skill-name> trace-eval --trace ~/.claude/projects/.../session.jsonl
+```
+
+**From MLflow run ID** (from `mlflow.search_runs`):
+```
+/skill-test <skill-name> trace-eval --run-id abc123
+```
+
+**From MLflow trace ID** (from `mlflow.get_trace`):
+```
+/skill-test <skill-name> trace-eval --trace-id tr-d416fccdab46e2dea6bad1d0bd8aaaa8
+```
+
+**List available traces:**
+```
+/skill-test <skill-name> list-traces --local
+/skill-test <skill-name> list-traces --experiment "$MLFLOW_EXPERIMENT_NAME"
+```
+
+### Configure Expectations
+
+In `manifest.yaml`:
+```yaml
+scorers:
+  trace_expectations:
+    tool_limits:
+      Bash: 15
+      mcp__databricks__execute_sql: 10
+    token_budget:
+      max_total: 150000
+    required_tools:
+      - Read
+    banned_tools:
+      - "DROP DATABASE"
+```
+
+---
+
+## Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `run` | Execute tests against ground truth (default) |
+| `init` | Generate test scaffolding from skill docs |
+| `add` | Add test cases interactively |
+| `review` | Review and promote candidates |
+| `baseline` | Save current results as baseline |
+| `regression` | Compare against baseline |
+| `mlflow` | Full evaluation with LLM judges |
+| `trace-eval` | Evaluate session traces |
+| `list-traces` | List available traces |
+| `scorers` | View/update scorer config |
+
+---
+
+## Files
 
 ```
-/skill-test my-new-skill init
-```
-
-Creates scaffolding:
-```
-skills/my-new-skill/
+.test/skills/<skill-name>/
+├── manifest.yaml       # Scorers, guidelines, trace expectations
 ├── ground_truth.yaml   # Verified test cases
-├── candidates.yaml     # Pending review
-└── manifest.yaml       # Skill metadata
+└── candidates.yaml     # Pending review
+
+.test/baselines/<skill-name>/
+└── baseline.yaml       # Regression baseline
 ```
+
+---
 
 ## Test Case Format
 
 ```yaml
 test_cases:
-  - id: "sdp_bronze_001"
+  - id: "eval_basic_001"
     inputs:
-      prompt: "Create a bronze ingestion pipeline for JSON files"
+      prompt: "Create a scorer for response length"
     outputs:
       response: |
-        ```sql
-        CREATE OR REFRESH STREAMING TABLE bronze_events
-        AS SELECT * FROM STREAM read_files('/data/events/*.json')
+        ```python
+        @scorer
+        def response_length(outputs):
+            return Feedback(name="length", value=len(outputs["response"]))
         ```
       execution_success: true
     expectations:
-      expected_facts:
-        - "STREAMING TABLE"
-      guidelines:
-        - "Must use modern SDP syntax"
+      expected_facts: ["@scorer", "Feedback"]
+      guidelines: ["Must use mlflow.genai.scorers"]
 ```
 
-## Directory Structure
+---
 
-```
-.test/                            # Source of truth
-├── SKILL.md                      # Skill instructions (synced to .claude/)
-├── install_skill_test.sh         # Sync script
-├── pyproject.toml                # Package config
-├── README.md                     # This file
-├── scripts/                      # Wrapper scripts (synced to .claude/)
-│   ├── mlflow_eval.py
-│   ├── run_eval.py
-│   ├── baseline.py
-│   ├── regression.py
-│   └── init_skill.py
-├── src/skill_test/               # Python package
-│   ├── cli/                      # CLI commands
-│   ├── fixtures/                 # Test fixture setup
-│   ├── grp/                      # Generate-Review-Promote pipeline
-│   ├── runners/                  # Evaluation runners
-│   └── scorers/                  # Evaluation scorers
-├── skills/                       # Test definitions per skill
-│   └── {skill-name}/
-│       ├── ground_truth.yaml     # Verified tests
-│       ├── candidates.yaml       # Pending review
-│       └── manifest.yaml         # Scorer configuration
-├── baselines/                    # Regression baselines
-├── references/                   # Documentation (synced to .claude/)
-│   ├── yaml-schemas.md
-│   └── scorers.md
-└── tests/                        # Unit tests
-```
-
-After running `install_skill_test.sh`:
-
-```
-.claude/skills/skill-test/        # Installed skill
-├── SKILL.md                      # Skill instructions
-├── scripts/                      # Wrapper scripts
-│   ├── mlflow_eval.py
-│   ├── run_eval.py
-│   ├── baseline.py
-│   ├── regression.py
-│   └── init_skill.py
-└── references/                   # Documentation
-    ├── yaml-schemas.md
-    └── scorers.md
-```
-
-## Subcommands
-
-| Command | Description |
-|---------|-------------|
-| `run` | Execute tests against ground truth (default) |
-| `add` | Interactively add a new test case |
-| `baseline` | Save current results as regression baseline |
-| `regression` | Compare against baseline |
-| `mlflow` | Run MLflow evaluation with LLM judges |
-| `scorers` | List configured scorers for a skill |
-| `scorers update` | Add/remove scorers or update default guidelines |
-| `init` | Create scaffolding for a new skill |
-| `sync` | Sync YAML to Unity Catalog (Phase 2 - not yet implemented) |
-
-### Subcommand Details
-
-#### `run` (default)
-```
-/skill-test spark-declarative-pipelines
-/skill-test spark-declarative-pipelines run
-```
-Executes code blocks from ground truth test cases and reports pass/fail. Uses Databricks serverless by default, falls back to local syntax validation if unavailable.
-
-#### `mlflow`
-```
-/skill-test spark-declarative-pipelines mlflow
-```
-Runs full MLflow evaluation including:
-- **Deterministic scorers**: `python_syntax`, `sql_syntax`, `pattern_adherence`, `no_hallucinated_apis`, `expected_facts_present`
-- **LLM scorers**: `Safety`, `guidelines_from_expectations`
-- Logs metrics and results to Databricks MLflow experiment
-
-#### `scorers`
-```
-/skill-test spark-declarative-pipelines scorers
-```
-Displays the scorer configuration from `manifest.yaml`:
-- Enabled deterministic scorers
-- LLM-based scorers
-- Default guidelines for evaluation
-
-#### `scorers update`
-```
-/skill-test spark-declarative-pipelines scorers update --add-guideline "Must include CLUSTER BY"
-/skill-test spark-declarative-pipelines scorers update --remove-scorer no_hallucinated_apis
-/skill-test spark-declarative-pipelines scorers update --add-scorer python_syntax
-```
-Modifies scorer configuration in `manifest.yaml`. Supports:
-- `--add-guideline` / `--remove-guideline`: Modify default guidelines
-- `--add-scorer` / `--remove-scorer`: Enable/disable scorers
-- `--set-guidelines`: Replace all guidelines
-
-#### `baseline`
-```
-/skill-test spark-declarative-pipelines baseline
-```
-Saves current evaluation metrics to `baselines/{skill}/baseline.yaml` for regression comparison.
-
-#### `regression`
-```
-/skill-test spark-declarative-pipelines regression
-```
-Compares current pass rate against saved baseline. Reports regressions (lower scores) and improvements (higher scores).
-
-#### `add`
-```
-/skill-test spark-declarative-pipelines add
-```
-Interactive workflow:
-1. Prompts for test input
-2. Invokes the skill to generate response
-3. Executes code blocks on Databricks
-4. Auto-saves passing tests to `ground_truth.yaml`
-5. Saves failing tests to `candidates.yaml` for GRP review
-
-#### `init`
-```
-/skill-test my-new-skill init
-```
-Creates test scaffolding for a new skill with template files.
-
-## Usage
-
-### Contributors (local development)
-
-```bash
-# One-time setup
-uv pip install -e ".test/[dev]"
-.test/install_skill_test.sh
-
-# Use Claude Code slash command
-/skill-test spark-declarative-pipelines run
-
-# Or run scripts directly
-uv run python .claude/skills/skill-test/scripts/run_eval.py spark-declarative-pipelines
-
-# Or Python CLI
-uv run skill-test spark-declarative-pipelines run
-uv run python -m skill_test spark-declarative-pipelines run
-```
-
-### CI/CD (GitHub Actions)
+## CI/CD
 
 ```bash
 uv pip install -e ".test/"
 uv run pytest .test/tests/
-uv run python .test/scripts/regression.py spark-declarative-pipelines
-```
-
-## Development Workflow
-
-1. **Edit** files in `.test/` (source of truth)
-2. **Sync** by running `.test/install_skill_test.sh`
-3. **Test** using `/skill-test` command in Claude Code
-
-To see what would be synced without making changes:
-
-```bash
-.test/install_skill_test.sh --dry-run
+uv run python .test/scripts/regression.py <skill-name>
 ```

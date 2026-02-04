@@ -15,6 +15,10 @@ from ..scorers.routing import (
     skill_routing_accuracy, routing_precision, routing_recall
 )
 from ..scorers.dynamic import guidelines_from_expectations, create_guidelines_scorer
+from ..scorers.trace import (
+    tool_count, token_budget, required_tools, banned_tools,
+    file_existence, tool_sequence, category_limits, get_trace_scorers
+)
 
 
 def setup_mlflow(config: SkillTestConfig) -> None:
@@ -76,6 +80,14 @@ def build_scorers(scorer_config: Dict[str, Any]) -> List:
         "skill_routing_accuracy": skill_routing_accuracy,
         "routing_precision": routing_precision,
         "routing_recall": routing_recall,
+        # Trace scorers
+        "tool_count": tool_count,
+        "token_budget": token_budget,
+        "required_tools": required_tools,
+        "banned_tools": banned_tools,
+        "file_existence": file_existence,
+        "tool_sequence": tool_sequence,
+        "category_limits": category_limits,
     }
 
     scorers = []

@@ -42,13 +42,27 @@ done
 # Files to copy (source:destination)
 FILES_TO_COPY=(
     "SKILL.md:SKILL.md"
-    "references/yaml-schemas.md:references/yaml-schemas.md"
+    # References
+    "references/python-api.md:references/python-api.md"
     "references/scorers.md:references/scorers.md"
-    "scripts/mlflow_eval.py:scripts/mlflow_eval.py"
-    "scripts/run_eval.py:scripts/run_eval.py"
+    "references/yaml-schemas.md:references/yaml-schemas.md"
+    "references/trace-eval.md:references/trace-eval.md"
+    "references/workflows.md:references/workflows.md"
+    # Scripts
+    "scripts/_common.py:scripts/_common.py"
+    "scripts/add.py:scripts/add.py"
     "scripts/baseline.py:scripts/baseline.py"
-    "scripts/regression.py:scripts/regression.py"
     "scripts/init_skill.py:scripts/init_skill.py"
+    "scripts/list_traces.py:scripts/list_traces.py"
+    "scripts/mlflow_eval.py:scripts/mlflow_eval.py"
+    "scripts/regression.py:scripts/regression.py"
+    "scripts/review.py:scripts/review.py"
+    "scripts/routing_eval.py:scripts/routing_eval.py"
+    "scripts/trace_eval.py:scripts/trace_eval.py"
+    "scripts/run_eval.py:scripts/run_eval.py"
+    "scripts/scorers.py:scripts/scorers.py"
+    "scripts/scorers_update.py:scripts/scorers_update.py"
+    "scripts/sync.py:scripts/sync.py"
 )
 
 echo "Skill-test installer"

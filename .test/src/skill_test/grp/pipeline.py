@@ -36,6 +36,9 @@ class GRPCandidate:
     fixed_by_commit: Optional[str] = None
     fix_description: Optional[str] = None
 
+    # Trace linkage (MLflow trace captured via mlflow autolog claude)
+    trace_run_id: Optional[str] = None
+
     # Metadata
     created_at: datetime = field(default_factory=datetime.now)
     source: str = "grp"
@@ -139,7 +142,8 @@ def save_candidates(
                 "reviewed_at": c.reviewed_at.isoformat() if c.reviewed_at else None,
                 "review_notes": c.review_notes,
                 "fixed_by_commit": c.fixed_by_commit,
-                "fix_description": c.fix_description
+                "fix_description": c.fix_description,
+                "trace_run_id": c.trace_run_id,  # Link to MLflow trace
             }
             for c in candidates
         ]
@@ -187,7 +191,8 @@ def promote_approved(
                     "approved_at": c.get("reviewed_at"),
                     "skill_version": c.get("skill_version"),
                     "fixed_by_commit": c.get("fixed_by_commit"),
-                    "fix_description": c.get("fix_description")
+                    "fix_description": c.get("fix_description"),
+                    "trace_run_id": c.get("trace_run_id"),  # Preserve MLflow trace link
                 }
             }
             gt_data["test_cases"].append(gt_case)

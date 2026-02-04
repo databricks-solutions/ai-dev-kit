@@ -11,6 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
     "mlflow[databricks]>=3.6.1",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]

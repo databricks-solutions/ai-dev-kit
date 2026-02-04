@@ -32,26 +32,71 @@ class DatabricksAuthConfig:
     in ~/.databrickscfg with OAuth credentials.
     """
     config_profile: str = field(
-        default_factory=lambda: os.getenv("DATABRICKS_CONFIG_PROFILE", "aws-apps")
+        default_factory=lambda: os.getenv("DATABRICKS_CONFIG_PROFILE", "DEFAULT")
     )
 
     def apply(self) -> None:
-        """Apply auth config by setting environment variable."""
+        """Apply auth config by setting environment variables for MLflow.
+
+        Reads the Databricks config profile and sets DATABRICKS_HOST
+        so MLflow can authenticate properly. Does NOT overwrite if
+        DATABRICKS_HOST is already set (e.g., from .env file).
+        """
         os.environ["DATABRICKS_CONFIG_PROFILE"] = self.config_profile
+
+        # Only set DATABRICKS_HOST if not already set (respect .env)
+        if os.getenv("DATABRICKS_HOST"):
+            return
+
+        # Set DATABRICKS_HOST from profile for MLflow
+        try:
+            from databricks.sdk import WorkspaceClient
+            w = WorkspaceClient(profile=self.config_profile)
+            os.environ["DATABRICKS_HOST"] = w.config.host
+        except Exception:
+            # Fallback: try to read from databrickscfg directly
+            import configparser
+            from pathlib import Path
+
+            cfg_path = Path.home() / ".databrickscfg"
+            if cfg_path.exists():
+                config = configparser.ConfigParser()
+                config.read(cfg_path)
+                if self.config_profile in config:
+                    host = config[self.config_profile].get("host")
+                    if host:
+                        os.environ["DATABRICKS_HOST"] = host
 
 
 @dataclass
 class MLflowConfig:
-    """MLflow configuration from environment variables."""
-    tracking_uri: str = field(
-        default_factory=lambda: os.getenv("MLFLOW_TRACKING_URI", "databricks")
-    )
+    """MLflow configuration from environment variables.
+
+    If DATABRICKS_CONFIG_PROFILE is set, uses databricks://<profile> as tracking URI.
+    This ensures MLflow uses the correct workspace from the profile.
+    """
+    tracking_uri: str = field(default_factory=lambda: _get_mlflow_tracking_uri())
     experiment_name: str = field(
         default_factory=lambda: os.getenv(
             "MLFLOW_EXPERIMENT_NAME",
             "/Shared/skill-tests"
         )
     )
+
+
+def _get_mlflow_tracking_uri() -> str:
+    """Determine MLflow tracking URI, respecting DATABRICKS_CONFIG_PROFILE."""
+    # If explicit tracking URI is set, use it
+    if os.getenv("MLFLOW_TRACKING_URI"):
+        return os.getenv("MLFLOW_TRACKING_URI")
+
+    # If profile is set, use databricks://<profile> to ensure correct workspace
+    profile = os.getenv("DATABRICKS_CONFIG_PROFILE")
+    if profile:
+        return f"databricks://{profile}"
+
+    # Default to databricks (uses DEFAULT profile)
+    return "databricks"
 
 
 @dataclass

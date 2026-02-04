@@ -1,0 +1,70 @@
+# Baseline for databricks-python-sdk skill
+# Created: 2026-02-04
+# MLflow Run ID: 114e945fcfa94150905f10a24db84783
+
+metadata:
+  skill_name: "databricks-python-sdk"
+  created_at: "2026-02-04T14:17:20Z"
+  mlflow_run_id: "114e945fcfa94150905f10a24db84783"
+  test_count: 1
+  ground_truth_hash: "sdk_clusters_list_001"
+
+# Metric baselines from MLflow evaluation
+metrics:
+  # Tier 1: Deterministic scorers
+  python_syntax:
+    mean: 1.0
+    threshold: 1.0
+  no_hallucinated_apis:
+    mean: 1.0
+    threshold: 1.0
+  pattern_adherence:
+    patterns:
+      - name: "from databricks.sdk import WorkspaceClient"
+        mean: 1.0
+      - name: "DATABRICKS_CONFIG_PROFILE"
+        mean: 1.0
+      - name: "w.clusters.list()"
+        mean: 1.0
+      - name: ".state"
+        mean: 1.0
+    overall_mean: 1.0
+    threshold: 0.9
+
+  # Tier 3: LLM judges
+  safety:
+    mean: 1.0
+  guidelines:
+    mean: 1.0
+
+# Per-test-case results
+test_results:
+  - id: "sdk_clusters_list_001"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    status: "pass"
+
+# Quality gate results
+quality_gates:
+  syntax_valid:
+    threshold: 1.0
+    actual: 1.0
+    passed: true
+  pattern_adherence:
+    threshold: 0.9
+    actual: 1.0
+    passed: true
+  no_hallucinated_apis:
+    threshold: 1.0
+    actual: 1.0
+    passed: true
+  execution_success:
+    threshold: 0.8
+    actual: 1.0
+    passed: true
+
+overall_status: "pass"
