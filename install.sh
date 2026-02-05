@@ -269,7 +269,7 @@ radio_select() {
         fi
     }
 
-    printf "\n  \033[2m↑/↓ navigate · space/enter select · enter on Confirm to finish\033[0m\n\n" > /dev/tty
+    printf "\n  \033[2m↑/↓ navigate · enter confirm · space preview\033[0m\n\n" > /dev/tty
     printf "\033[?25l" > /dev/tty
     trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
 
@@ -292,13 +292,18 @@ radio_select() {
                     B) [ "$cursor" -lt "$count" ] && cursor=$((cursor + 1)) ;;
                 esac
             fi
-        elif [ "$key" = " " ] || [ "$key" = "" ]; then
+        elif [ "$key" = "" ]; then
+            # Enter — select current item and confirm immediately
             if [ "$cursor" -lt "$count" ]; then
                 selected=$cursor
-            else
-                printf "\033[%dA" "$total_rows" > /dev/tty
-                _radio_draw
-                break
+            fi
+            printf "\033[%dA" "$total_rows" > /dev/tty
+            _radio_draw
+            break
+        elif [ "$key" = " " ]; then
+            # Space — select but keep browsing
+            if [ "$cursor" -lt "$count" ]; then
+                selected=$cursor
             fi
         fi
     done
