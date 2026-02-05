@@ -180,15 +180,14 @@ function Select-Checkbox {
     Write-Host "  Up/Down navigate, Space toggle, Enter on Confirm to finish" -ForegroundColor DarkGray
     Write-Host ""
 
-    $startTop = [Console]::CursorTop
     $totalRows = $count + 2  # items + blank + Confirm
 
     # Hide cursor
     try { [Console]::CursorVisible = $false } catch {}
 
-    # Draw function
+    # Draw function — uses relative cursor movement to handle terminal scroll
     $drawCheckbox = {
-        [Console]::SetCursorPosition(0, $startTop)
+        [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $totalRows))
         for ($j = 0; $j -lt $count; $j++) {
             $line = "  "
             if ($j -eq $cursor) {
@@ -321,13 +320,13 @@ function Select-Radio {
     Write-Host "  Up/Down navigate, Enter confirm" -ForegroundColor DarkGray
     Write-Host ""
 
-    $startTop = [Console]::CursorTop
     $totalRows = $count + 2  # items + blank + Confirm
 
     try { [Console]::CursorVisible = $false } catch {}
 
+    # Draw function — uses relative cursor movement to handle terminal scroll
     $drawRadio = {
-        [Console]::SetCursorPosition(0, $startTop)
+        [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $totalRows))
         for ($j = 0; $j -lt $count; $j++) {
             if ($j -eq $cursor) {
                 Write-Host "  " -NoNewline
