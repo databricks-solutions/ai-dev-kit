@@ -700,8 +700,8 @@ write_mcp_configs() {
                     warn "Copilot global: configure MCP in VS Code settings (Ctrl+Shift+P → 'MCP: Open User Configuration')"
                     msg "  Command: $VENV_PYTHON | Args: $MCP_ENTRY"
                 else
-                    write_copilot_mcp_json "$base_dir/mcp.json"
-                    ok "Copilot MCP config (mcp.json)"
+                    write_copilot_mcp_json "$base_dir/.vscode/mcp.json"
+                    ok "Copilot MCP config (.vscode/mcp.json)"
                 fi
                 ;;
             codex)

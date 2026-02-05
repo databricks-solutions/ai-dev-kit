@@ -846,8 +846,8 @@ function Write-McpConfigs {
                     Write-Warn "Copilot global: configure MCP in VS Code settings (Ctrl+Shift+P -> 'MCP: Open User Configuration')"
                     Write-Msg "  Command: $($script:VenvPython) | Args: $($script:McpEntry)"
                 } else {
-                    Write-CopilotMcpJson (Join-Path $BaseDir "mcp.json")
-                    Write-Ok "Copilot MCP config (mcp.json)"
+                    Write-CopilotMcpJson (Join-Path $BaseDir ".vscode\mcp.json")
+                    Write-Ok "Copilot MCP config (.vscode/mcp.json)"
                 }
             }
             "codex" {
