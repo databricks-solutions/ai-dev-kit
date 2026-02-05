@@ -516,7 +516,7 @@ setup_mcp() {
     # Create venv and install
     msg "Installing Python dependencies..."
     if [ "$PKG" = "uv" ]; then
-        [ ! -d "$VENV_DIR" ] && uv venv --python 3.11 "$VENV_DIR" -q 2>/dev/null || uv venv "$VENV_DIR" -q
+        uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || uv venv --allow-existing "$VENV_DIR" -q
         uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
     else
         [ ! -d "$VENV_DIR" ] && python3 -m venv "$VENV_DIR"
