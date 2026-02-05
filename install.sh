@@ -703,6 +703,8 @@ write_mcp_configs() {
                     write_copilot_mcp_json "$base_dir/.vscode/mcp.json"
                     ok "Copilot MCP config (.vscode/mcp.json)"
                 fi
+                warn "Copilot: MCP servers must be enabled manually."
+                msg "  In Copilot Chat, click ${B}Configure Tools${N} (bottom-right) and enable ${B}databricks${N}"
                 ;;
             codex)
                 [ "$SCOPE" = "global" ] && write_mcp_toml "$HOME/.codex/config.toml" || write_mcp_toml "$base_dir/.codex/config.toml"
@@ -742,7 +744,9 @@ summary() {
             step=$((step + 1))
         fi
         if echo "$TOOLS" | grep -q copilot; then
-            msg "${step}. In VS Code, use Copilot in ${B}Agent mode${N} to access Databricks skills and MCP tools"
+            msg "${step}. In Copilot Chat, click ${B}Configure Tools${N} (bottom-right) and enable ${B}databricks${N}"
+            step=$((step + 1))
+            msg "${step}. Use Copilot in ${B}Agent mode${N} to access Databricks skills and MCP tools"
             step=$((step + 1))
         fi
         msg "${step}. Open your project in your tool of choice"

@@ -849,6 +849,8 @@ function Write-McpConfigs {
                     Write-CopilotMcpJson (Join-Path $BaseDir ".vscode\mcp.json")
                     Write-Ok "Copilot MCP config (.vscode/mcp.json)"
                 }
+                Write-Warn "Copilot: MCP servers must be enabled manually."
+                Write-Msg "  In Copilot Chat, click 'Configure Tools' (bottom-right) and enable 'databricks'"
             }
             "codex" {
                 if ($script:Scope -eq "global") {
@@ -903,7 +905,9 @@ function Show-Summary {
         $step++
     }
     if ($script:Tools -match 'copilot') {
-        Write-Msg "$step. In VS Code, use Copilot in Agent mode to access Databricks skills and MCP tools"
+        Write-Msg "$step. In Copilot Chat, click 'Configure Tools' (bottom-right) and enable 'databricks'"
+        $step++
+        Write-Msg "$step. Use Copilot in Agent mode to access Databricks skills and MCP tools"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"
