@@ -557,52 +557,6 @@ install_skills() {
     done
 }
 
-# Generate instruction files
-write_instructions() {
-    [ "$SCOPE" = "global" ] && return
-    
-    local base_dir=$1
-    local content='# Databricks AI Dev Kit
-
-Databricks tools and skills for data engineering, ML, and AI development.
-
-## MCP Tools
-SQL execution, pipelines, jobs, Unity Catalog, and more.
-
-## Skills
-| Skill | Description |
-|-------|-------------|
-| `agent-bricks` | Knowledge Assistants, Multi-Agent Supervisors |
-| `aibi-dashboards` | AI/BI Dashboards |
-| `asset-bundles` | Databricks Asset Bundles (DABs) |
-| `databricks-app-*` | Apps with APX, Dash, Streamlit |
-| `databricks-genie` | Genie Spaces |
-| `databricks-jobs` | Lakeflow Jobs |
-| `databricks-python-sdk` | Python SDK, CLI, REST API |
-| `databricks-unity-catalog` | Unity Catalog |
-| `mlflow-evaluation` | MLflow evaluation |
-| `model-serving` | Model Serving |
-| `spark-declarative-pipelines` | SDP/LDP |
-
-Quick start: "List my SQL warehouses"
-'
-    
-    for tool in $TOOLS; do
-        case $tool in
-            claude) 
-                [ -f "$base_dir/CLAUDE.md" ] && [ "$FORCE" != true ] || echo "$content" > "$base_dir/CLAUDE.md"
-                ;;
-            cursor) 
-                [ -f "$base_dir/.cursorrules" ] && [ "$FORCE" != true ] || echo "$content" > "$base_dir/.cursorrules"
-                ;;
-            codex) 
-                [ -f "$base_dir/AGENTS.md" ] && [ "$FORCE" != true ] || echo "$content" > "$base_dir/AGENTS.md"
-                ;;
-        esac
-    done
-    ok "Instructions created"
-}
-
 # Write MCP configs
 write_mcp_json() {
     local path=$1
@@ -834,10 +788,7 @@ main() {
     
     # Install skills
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
-    
-    # Write instructions
-    [ "$INSTALL_SKILLS" = true ] && write_instructions "$base_dir"
-    
+
     # Write MCP configs
     [ "$INSTALL_MCP" = true ] && write_mcp_configs "$base_dir"
     
