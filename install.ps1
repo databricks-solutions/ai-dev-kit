@@ -67,7 +67,14 @@ if ($machinePath -or $userPath) {
 function Write-Msg  { param([string]$Text) if (-not $script:Silent) { Write-Host "  $Text" } }
 function Write-Ok   { param([string]$Text) if (-not $script:Silent) { Write-Host "  " -NoNewline; Write-Host "v" -ForegroundColor Green -NoNewline; Write-Host " $Text" } }
 function Write-Warn { param([string]$Text) if (-not $script:Silent) { Write-Host "  " -NoNewline; Write-Host "!" -ForegroundColor Yellow -NoNewline; Write-Host " $Text" } }
-function Write-Err  { param([string]$Text) Write-Host "  " -NoNewline; Write-Host "x" -ForegroundColor Red -NoNewline; Write-Host " $Text"; exit 1 }
+function Write-Err  {
+    param([string]$Text)
+    Write-Host "  " -NoNewline; Write-Host "x" -ForegroundColor Red -NoNewline; Write-Host " $Text"
+    Write-Host ""
+    Write-Host "  Press any key to exit..." -ForegroundColor DarkGray
+    try { $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") } catch {}
+    exit 1
+}
 function Write-Step { param([string]$Text) if (-not $script:Silent) { Write-Host ""; Write-Host "$Text" -ForegroundColor White } }
 
 # ─── Parse arguments ─────────────────────────────────────────
