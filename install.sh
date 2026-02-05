@@ -340,7 +340,7 @@ detect_tools() {
     fi
 
     # Interactive or fallback
-    if [ "$SILENT" = false ] && [ -e /dev/tty ] && [ -t 0 ]; then
+    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
         [ "$SILENT" = false ] && echo ""
         [ "$SILENT" = false ] && echo -e "  ${B}Select tools to install for:${N}"
 
@@ -394,7 +394,7 @@ prompt_profile() {
     echo ""
     echo -e "  ${B}Select Databricks profile${N}"
 
-    if [ ${#profiles[@]} -gt 0 ] && [ -e /dev/tty ] && [ -t 0 ]; then
+    if [ ${#profiles[@]} -gt 0 ] && [ -e /dev/tty ]; then
         # Build radio items: "Label|value|on_or_off|hint"
         local -a items=()
         for p in "${profiles[@]}"; do
