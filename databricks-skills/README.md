@@ -56,7 +56,8 @@ cp -r ai-dev-kit/databricks-skills/agent-bricks .claude/skills/
 - **spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
 - **databricks-jobs** - Multi-task workflows, triggers, schedules
 - **synthetic-data-generation** - Realistic test data with Faker
-
+- **zerobus-ingest** - Realistic test data generation and streaming via Zerobus
+- 
 ### 🚀 Development & Deployment
 - **asset-bundles** - DABs for multi-environment deployments
 - **databricks-app-apx** - Full-stack apps (FastAPI + React)
