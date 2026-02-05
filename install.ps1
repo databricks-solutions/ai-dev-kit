@@ -1,14 +1,14 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, and OpenAI Codex.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex
 #   .\install.ps1 -Global
 #   .\install.ps1 -SkillsOnly
 #   .\install.ps1 -McpOnly
-#   .\install.ps1 -Tools cursor,codex
+#   .\install.ps1 -Tools cursor,codex,copilot
 #   .\install.ps1 -Force
 #
 
@@ -36,14 +36,22 @@ $script:UserMcpPath  = ""
 $script:Pkg          = ""
 $script:ProfileProvided = $false
 
-# Skills list
+# Databricks skills (bundled in repo)
 $script:Skills = @(
     "agent-bricks", "aibi-dashboards", "asset-bundles", "databricks-app-apx",
     "databricks-app-python", "databricks-config", "databricks-docs", "databricks-genie",
     "databricks-jobs", "databricks-python-sdk", "databricks-unity-catalog",
-    "mlflow-evaluation", "model-serving", "spark-declarative-pipelines",
+    "lakebase-provisioned", "model-serving", "spark-declarative-pipelines",
     "synthetic-data-generation", "unstructured-pdf-generation"
 )
+
+# MLflow skills (fetched from mlflow/skills repo)
+$script:MlflowSkills = @(
+    "agent-evaluation", "analyze-mlflow-chat-session", "analyze-mlflow-trace",
+    "instrumenting-with-mlflow-tracing", "mlflow-onboarding", "querying-mlflow-metrics",
+    "retrieving-mlflow-traces", "searching-mlflow-docs"
+)
+$MlflowRawUrl = "https://raw.githubusercontent.com/mlflow/skills/main"
 
 # ─── Ensure tools are in PATH ────────────────────────────────
 # Chocolatey-installed tools may not be in PATH for SSH sessions
@@ -87,7 +95,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,codex"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
             return
@@ -397,17 +405,20 @@ function Invoke-DetectTools {
         return
     }
 
-    $hasClaude = $null -ne (Get-Command claude -ErrorAction SilentlyContinue)
-    $hasCursor = ($null -ne (Get-Command cursor -ErrorAction SilentlyContinue)) -or
-                 (Test-Path "$env:LOCALAPPDATA\Programs\cursor\Cursor.exe")
-    $hasCodex  = $null -ne (Get-Command codex -ErrorAction SilentlyContinue)
+    $hasClaude  = $null -ne (Get-Command claude -ErrorAction SilentlyContinue)
+    $hasCursor  = ($null -ne (Get-Command cursor -ErrorAction SilentlyContinue)) -or
+                  (Test-Path "$env:LOCALAPPDATA\Programs\cursor\Cursor.exe")
+    $hasCodex   = $null -ne (Get-Command codex -ErrorAction SilentlyContinue)
+    $hasCopilot = ($null -ne (Get-Command code -ErrorAction SilentlyContinue)) -or
+                  (Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe")
 
-    $claudeState = $hasClaude; $claudeHint = if ($hasClaude) { "detected" } else { "not found" }
-    $cursorState = $hasCursor; $cursorHint = if ($hasCursor) { "detected" } else { "not found" }
-    $codexState  = $hasCodex;  $codexHint  = if ($hasCodex)  { "detected" } else { "not found" }
+    $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
+    $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
+    $codexState   = $hasCodex;   $codexHint   = if ($hasCodex)   { "detected" } else { "not found" }
+    $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -418,9 +429,10 @@ function Invoke-DetectTools {
     }
 
     $items = @(
-        @{ Label = "Claude Code"; Value = "claude"; State = $claudeState; Hint = $claudeHint }
-        @{ Label = "Cursor";      Value = "cursor"; State = $cursorState; Hint = $cursorHint }
-        @{ Label = "OpenAI Codex"; Value = "codex";  State = $codexState;  Hint = $codexHint }
+        @{ Label = "Claude Code";    Value = "claude";  State = $claudeState;  Hint = $claudeHint }
+        @{ Label = "Cursor";         Value = "cursor";  State = $cursorState;  Hint = $cursorHint }
+        @{ Label = "GitHub Copilot"; Value = "copilot"; State = $copilotState; Hint = $copilotHint }
+        @{ Label = "OpenAI Codex";   Value = "codex";   State = $codexState;   Hint = $codexHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -623,7 +635,8 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".cursor\skills"
                 }
             }
-            "codex"  { $dirs += Join-Path $BaseDir ".agents\skills" }
+            "copilot" { $dirs += Join-Path $BaseDir ".github\skills" }
+            "codex"   { $dirs += Join-Path $BaseDir ".agents\skills" }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -632,6 +645,7 @@ function Install-Skills {
         if (-not (Test-Path $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
+        # Install Databricks skills from repo
         foreach ($skill in $script:Skills) {
             $src = Join-Path $script:RepoDir "databricks-skills\$skill"
             if (-not (Test-Path $src)) { continue }
@@ -640,7 +654,30 @@ function Install-Skills {
             Copy-Item -Recurse $src $dest
         }
         $shortDir = $dir -replace [regex]::Escape($env:USERPROFILE), '~'
-        Write-Ok "Skills -> $shortDir"
+        Write-Ok "Databricks skills -> $shortDir"
+
+        # Install MLflow skills from mlflow/skills repo
+        $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        foreach ($skill in $script:MlflowSkills) {
+            $destDir = Join-Path $dir $skill
+            if (-not (Test-Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            $url = "$MlflowRawUrl/$skill/SKILL.md"
+            try {
+                Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
+                # Try optional reference files
+                foreach ($ref in @("reference.md", "examples.md", "api.md")) {
+                    try {
+                        Invoke-WebRequest -Uri "$MlflowRawUrl/$skill/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
+                    } catch {}
+                }
+            } catch {
+                Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
+            }
+        }
+        $ErrorActionPreference = $prevEAP
+        Write-Ok "MLflow skills -> $shortDir"
     }
 }
 
@@ -687,6 +724,58 @@ function Write-McpJson {
         $json = @"
 {
   "mcpServers": {
+    "databricks": {
+      "command": "$pythonPath",
+      "args": ["$entryPath"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "$($script:Profile_)"}
+    }
+  }
+}
+"@
+        Set-Content -Path $Path -Value $json -Encoding UTF8
+    }
+}
+
+function Write-CopilotMcpJson {
+    param([string]$Path)
+
+    $dir = Split-Path $Path -Parent
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+
+    # Backup existing
+    if (Test-Path $Path) {
+        Copy-Item $Path "$Path.bak" -Force
+        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
+    }
+
+    # Try to merge with existing config
+    if ((Test-Path $Path) -and (Test-Path $script:VenvPython)) {
+        try {
+            $existing = Get-Content $Path -Raw | ConvertFrom-Json
+        } catch {
+            $existing = $null
+        }
+    }
+
+    if ($existing) {
+        if (-not $existing.servers) {
+            $existing | Add-Member -NotePropertyName "servers" -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+        $dbEntry = [PSCustomObject]@{
+            command = $script:VenvPython -replace '\\', '/'
+            args    = @($script:McpEntry -replace '\\', '/')
+            env     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
+        }
+        $existing.servers | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
+        $existing | ConvertTo-Json -Depth 10 | Set-Content $Path -Encoding UTF8
+    } else {
+        $pythonPath = $script:VenvPython -replace '\\', '/'
+        $entryPath  = $script:McpEntry -replace '\\', '/'
+        $json = @"
+{
+  "servers": {
     "databricks": {
       "command": "$pythonPath",
       "args": ["$entryPath"],
@@ -752,6 +841,15 @@ function Write-McpConfigs {
                 Write-Warn "Cursor: MCP servers are disabled by default."
                 Write-Msg "  Enable in: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
             }
+            "copilot" {
+                if ($script:Scope -eq "global") {
+                    Write-Warn "Copilot global: configure MCP in VS Code settings (Ctrl+Shift+P -> 'MCP: Open User Configuration')"
+                    Write-Msg "  Command: $($script:VenvPython) | Args: $($script:McpEntry)"
+                } else {
+                    Write-CopilotMcpJson (Join-Path $BaseDir "mcp.json")
+                    Write-Ok "Copilot MCP config (mcp.json)"
+                }
+            }
             "codex" {
                 if ($script:Scope -eq "global") {
                     Write-McpToml (Join-Path $env:USERPROFILE ".codex\config.toml")
@@ -802,6 +900,10 @@ function Show-Summary {
     $step++
     if ($script:Tools -match 'cursor') {
         Write-Msg "$step. Enable MCP in Cursor: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
+        $step++
+    }
+    if ($script:Tools -match 'copilot') {
+        Write-Msg "$step. In VS Code, use Copilot in Agent mode to access Databricks skills and MCP tools"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"

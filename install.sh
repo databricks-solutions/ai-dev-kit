@@ -2,14 +2,14 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, and OpenAI Codex.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
 #
 # Usage:
 #   curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
 #   curl -sL ... | bash -s -- --global
 #   curl -sL ... | bash -s -- --skills-only
 #   curl -sL ... | bash -s -- --mcp-only
-#   curl -sL ... | bash -s -- --tools cursor,codex
+#   curl -sL ... | bash -s -- --tools cursor,codex,copilot
 #   curl -sL ... | bash -s -- --force
 #
 
@@ -39,8 +39,12 @@ TOOLS=""
 USER_TOOLS=""
 USER_MCP_PATH=""
 
-# Skills list
-SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+# Databricks skills (bundled in repo)
+SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+
+# MLflow skills (fetched from mlflow/skills repo)
+MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
+MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 
 # Output helpers
 msg()  { [ "$SILENT" = false ] && echo -e "  $*"; }
@@ -72,7 +76,7 @@ while [ $# -gt 0 ]; do
             echo "  --mcp-only            Skip skills installation"
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
-            echo "  --tools LIST          Comma-separated: claude,cursor,codex"
+            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             exit 0 ;;
@@ -326,20 +330,23 @@ detect_tools() {
     local has_claude=false
     local has_cursor=false
     local has_codex=false
+    local has_copilot=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
     command -v codex >/dev/null 2>&1 && has_codex=true
+    { [ -d "/Applications/Visual Studio Code.app" ] || command -v code >/dev/null 2>&1; } && has_copilot=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found"
-    [ "$has_claude" = true ] && claude_state="on" && claude_hint="detected"
-    [ "$has_cursor" = true ] && cursor_state="on" && cursor_hint="detected"
-    [ "$has_codex" = true ]  && codex_state="on" && codex_hint="detected"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found"
+    [ "$has_claude" = true ]  && claude_state="on"  && claude_hint="detected"
+    [ "$has_cursor" = true ]  && cursor_state="on"  && cursor_hint="detected"
+    [ "$has_codex" = true ]   && codex_state="on"   && codex_hint="detected"
+    [ "$has_copilot" = true ] && copilot_state="on"  && copilot_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
@@ -352,14 +359,16 @@ detect_tools() {
         TOOLS=$(checkbox_select \
             "Claude Code|claude|${claude_state}|${claude_hint}" \
             "Cursor|cursor|${cursor_state}|${cursor_hint}" \
+            "GitHub Copilot|copilot|${copilot_state}|${copilot_hint}" \
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
         )
     else
         # Silent: use detected defaults
         local tools=""
-        [ "$has_claude" = true ] && tools="claude"
-        [ "$has_cursor" = true ] && tools="${tools:+$tools }cursor"
-        [ "$has_codex" = true ]  && tools="${tools:+$tools }codex"
+        [ "$has_claude" = true ]  && tools="claude"
+        [ "$has_cursor" = true ]  && tools="${tools:+$tools }cursor"
+        [ "$has_copilot" = true ] && tools="${tools:+$tools }copilot"
+        [ "$has_codex" = true ]   && tools="${tools:+$tools }codex"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -535,30 +544,48 @@ setup_mcp() {
 # Install skills
 install_skills() {
     step "Installing skills"
-    
+
     local base_dir=$1
     local dirs=""
-    
+
     # Determine target directories
     for tool in $TOOLS; do
         case $tool in
             claude) dirs="$base_dir/.claude/skills" ;;
             cursor) echo "$TOOLS" | grep -q claude || dirs="$dirs $base_dir/.cursor/skills" ;;
+            copilot) dirs="$dirs $base_dir/.github/skills" ;;
             codex) dirs="$dirs $base_dir/.agents/skills" ;;
         esac
     done
-    
+
     dirs=$(echo "$dirs" | xargs -n1 | sort -u | xargs)
-    
+
     for dir in $dirs; do
         mkdir -p "$dir"
+        # Install Databricks skills from repo
         for skill in $SKILLS; do
             local src="$REPO_DIR/databricks-skills/$skill"
             [ ! -d "$src" ] && continue
             rm -rf "$dir/$skill"
             cp -r "$src" "$dir/$skill"
         done
-        ok "Skills → ${dir#$HOME/}"
+        ok "Databricks skills → ${dir#$HOME/}"
+
+        # Install MLflow skills from mlflow/skills repo
+        for skill in $MLFLOW_SKILLS; do
+            local dest_dir="$dir/$skill"
+            mkdir -p "$dest_dir"
+            local url="$MLFLOW_RAW_URL/$skill/SKILL.md"
+            if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
+                # Try to fetch optional reference files
+                for ref in reference.md examples.md api.md; do
+                    curl -fsSL "$MLFLOW_RAW_URL/$skill/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
+                done
+            else
+                rm -rf "$dest_dir"
+            fi
+        done
+        ok "MLflow skills → ${dir#$HOME/}"
     done
 }
 
@@ -587,6 +614,40 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
     cat > "$path" << EOF
 {
   "mcpServers": {
+    "databricks": {
+      "command": "$VENV_PYTHON",
+      "args": ["$MCP_ENTRY"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
+    }
+  }
+}
+EOF
+}
+
+write_copilot_mcp_json() {
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+
+    # Backup existing file before any modifications
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
+
+    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
+import json, sys
+try:
+    with open('$path') as f: cfg = json.load(f)
+except: cfg = {}
+cfg.setdefault('servers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
+    fi
+
+    cat > "$path" << EOF
+{
+  "servers": {
     "databricks": {
       "command": "$VENV_PYTHON",
       "args": ["$MCP_ENTRY"],
@@ -634,6 +695,15 @@ write_mcp_configs() {
                 warn "Cursor: MCP servers are disabled by default."
                 msg "  Enable in: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
                 ;;
+            copilot)
+                if [ "$SCOPE" = "global" ]; then
+                    warn "Copilot global: configure MCP in VS Code settings (Ctrl+Shift+P → 'MCP: Open User Configuration')"
+                    msg "  Command: $VENV_PYTHON | Args: $MCP_ENTRY"
+                else
+                    write_copilot_mcp_json "$base_dir/mcp.json"
+                    ok "Copilot MCP config (mcp.json)"
+                fi
+                ;;
             codex)
                 [ "$SCOPE" = "global" ] && write_mcp_toml "$HOME/.codex/config.toml" || write_mcp_toml "$base_dir/.codex/config.toml"
                 ok "Codex MCP config"
@@ -669,6 +739,10 @@ summary() {
         step=$((step + 1))
         if echo "$TOOLS" | grep -q cursor; then
             msg "${R}${step}. Enable MCP in Cursor: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
+            step=$((step + 1))
+        fi
+        if echo "$TOOLS" | grep -q copilot; then
+            msg "${step}. In VS Code, use Copilot in ${B}Agent mode${N} to access Databricks skills and MCP tools"
             step=$((step + 1))
         fi
         msg "${step}. Open your project in your tool of choice"
