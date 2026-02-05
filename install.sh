@@ -664,6 +664,9 @@ summary() {
         echo ""
         msg "${B}Next steps:${N}"
         local step=1
+        msg "${step}. Configure profile $PROFILE or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN".
+        msg "   Authenticate: ${B}${BL}databricks auth login --profile $PROFILE${N}"
+        step=$((step + 1))
         if echo "$TOOLS" | grep -q cursor; then
             msg "${R}${step}. Enable MCP in Cursor: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
             step=$((step + 1))
