@@ -94,7 +94,7 @@ from databricks_tools_core.unity_catalog import (
 from ..server import mcp
 
 
-def _to_dict(obj: Any) -> Dict[str, Any]:
+def _to_dict(obj: Any) -> dict[str, Any]:
     """Convert SDK objects to serializable dicts."""
     if isinstance(obj, dict):
         return obj
@@ -105,7 +105,7 @@ def _to_dict(obj: Any) -> Dict[str, Any]:
     return vars(obj)
 
 
-def _to_dict_list(items: list) -> List[Dict[str, Any]]:
+def _to_dict_list(items: list) -> list[dict[str, Any]]:
     """Convert a list of SDK objects to serializable dicts."""
     return [_to_dict(item) for item in items]
 
@@ -129,10 +129,10 @@ def manage_uc_objects(
     volume_type: str = None,
     storage_location: str = None,
     new_name: str = None,
-    properties: Dict[str, str] = None,
+    properties: dict[str, str] = None,
     isolation_mode: str = None,
     force: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage Unity Catalog namespace objects: catalogs, schemas, volumes, functions.
 
@@ -228,8 +228,8 @@ def manage_uc_grants(
     securable_type: str,
     full_name: str,
     principal: str = None,
-    privileges: List[str] = None,
-) -> Dict[str, Any]:
+    privileges: list[str] = None,
+) -> dict[str, Any]:
     """
     Manage permissions on Unity Catalog securables.
 
@@ -286,7 +286,7 @@ def manage_uc_storage(
     owner: str = None,
     new_name: str = None,
     force: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage storage credentials and external locations.
 
@@ -354,15 +354,15 @@ def manage_uc_connections(
     action: str,
     name: str = None,
     connection_type: str = None,
-    options: Dict[str, str] = None,
+    options: dict[str, str] = None,
     comment: str = None,
     owner: str = None,
     new_name: str = None,
     connection_name: str = None,
     catalog_name: str = None,
-    catalog_options: Dict[str, str] = None,
+    catalog_options: dict[str, str] = None,
     warehouse_id: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage Lakehouse Federation foreign connections.
 
@@ -420,8 +420,8 @@ def manage_uc_tags(
     object_type: str = None,
     full_name: str = None,
     column_name: str = None,
-    tags: Dict[str, str] = None,
-    tag_names: List[str] = None,
+    tags: dict[str, str] = None,
+    tag_names: list[str] = None,
     comment_text: str = None,
     catalog_filter: str = None,
     tag_name_filter: str = None,
@@ -429,7 +429,7 @@ def manage_uc_tags(
     table_name_filter: str = None,
     limit: int = 100,
     warehouse_id: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage tags and comments on Unity Catalog objects.
 
@@ -485,7 +485,7 @@ def manage_uc_security_policies(
     table_name: str = None,
     column_name: str = None,
     filter_function: str = None,
-    filter_columns: List[str] = None,
+    filter_columns: list[str] = None,
     mask_function: str = None,
     function_name: str = None,
     function_body: str = None,
@@ -494,7 +494,7 @@ def manage_uc_security_policies(
     return_type: str = None,
     function_comment: str = None,
     warehouse_id: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage row-level security and column masking policies.
 
@@ -552,7 +552,7 @@ def manage_uc_monitors(
     schedule_cron: str = None,
     schedule_timezone: str = "UTC",
     assets_dir: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage Lakehouse quality monitors on tables.
 
@@ -607,11 +607,11 @@ def manage_uc_sharing(
     partition_spec: str = None,
     authentication_type: str = None,
     sharing_id: str = None,
-    ip_access_list: List[str] = None,
+    ip_access_list: list[str] = None,
     share_name: str = None,
     recipient_name: str = None,
     include_shared_data: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage Delta Sharing: shares, recipients, and providers.
 

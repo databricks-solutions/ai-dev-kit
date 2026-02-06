@@ -12,7 +12,7 @@ from databricks_tools_core.auth import get_workspace_client
 from ..server import mcp
 
 # Singleton manager instance for space management operations
-_manager: Optional[AgentBricksManager] = None
+_manager: AgentBricksManager | None = None
 
 
 def _get_manager() -> AgentBricksManager:
@@ -29,7 +29,7 @@ def _get_manager() -> AgentBricksManager:
 
 
 @mcp.tool
-def list_genie() -> List[Dict[str, Any]]:
+def list_genie() -> list[dict[str, Any]]:
     """
     List all Genie Spaces accessible to the current user.
 
@@ -65,12 +65,12 @@ def list_genie() -> List[Dict[str, Any]]:
 @mcp.tool
 def create_or_update_genie(
     display_name: str,
-    table_identifiers: List[str],
-    warehouse_id: Optional[str] = None,
-    description: Optional[str] = None,
-    sample_questions: Optional[List[str]] = None,
-    space_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    table_identifiers: list[str],
+    warehouse_id: str | None = None,
+    description: str | None = None,
+    sample_questions: list[str] | None = None,
+    space_id: str | None = None,
+) -> dict[str, Any]:
     """
     Create or update a Genie Space for SQL-based data exploration.
 
@@ -169,7 +169,7 @@ def create_or_update_genie(
 
 
 @mcp.tool
-def get_genie(space_id: str) -> Dict[str, Any]:
+def get_genie(space_id: str) -> dict[str, Any]:
     """
     Get a Genie Space by ID.
 
@@ -212,7 +212,7 @@ def get_genie(space_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def delete_genie(space_id: str) -> Dict[str, Any]:
+def delete_genie(space_id: str) -> dict[str, Any]:
     """
     Delete a Genie Space.
 
@@ -246,7 +246,7 @@ def ask_genie(
     space_id: str,
     question: str,
     timeout_seconds: int = 120,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Ask a natural language question to a Genie Space and get the answer.
 
@@ -304,7 +304,7 @@ def ask_genie_followup(
     conversation_id: str,
     question: str,
     timeout_seconds: int = 120,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Ask a follow-up question in an existing Genie conversation.
 
@@ -357,7 +357,7 @@ def ask_genie_followup(
 
 def _format_genie_response(
     question: str, genie_message: Any, space_id: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Format a Genie SDK response into a clean dictionary.
 
     Args:

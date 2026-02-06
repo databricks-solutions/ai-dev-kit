@@ -11,7 +11,7 @@ from databricks.sdk.service.catalog import FunctionInfo
 from ..auth import get_workspace_client
 
 
-def list_functions(catalog_name: str, schema_name: str) -> List[FunctionInfo]:
+def list_functions(catalog_name: str, schema_name: str) -> list[FunctionInfo]:
     """
     List all functions in a schema.
 

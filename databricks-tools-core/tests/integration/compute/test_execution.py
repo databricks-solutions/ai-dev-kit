@@ -61,7 +61,7 @@ class TestListClusters:
         """Should list running clusters quickly."""
         clusters = list_clusters(include_terminated=False)
 
-        print(f"\n=== List Running Clusters ===")
+        print("\n=== List Running Clusters ===")
         print(f"Found {len(clusters)} running clusters:")
         for c in clusters[:5]:
             print(f"  - {c['cluster_name']} ({c['cluster_id']}) - {c['state']}")
@@ -75,7 +75,7 @@ class TestListClusters:
         """Should respect limit parameter."""
         clusters = list_clusters(limit=5)
 
-        print(f"\n=== List Clusters (limit=5) ===")
+        print("\n=== List Clusters (limit=5) ===")
         print(f"Found {len(clusters)} clusters")
 
         assert isinstance(clusters, list)
@@ -90,7 +90,7 @@ class TestGetBestCluster:
         """Should return a running cluster ID or None."""
         cluster_id = get_best_cluster()
 
-        print(f"\n=== Get Best Cluster ===")
+        print("\n=== Get Best Cluster ===")
         print(f"Best cluster ID: {cluster_id}")
 
         # Result can be None if no running clusters
@@ -112,7 +112,7 @@ class TestExecuteDatabricksCommand:
             timeout=120
         )
 
-        print(f"\n=== Shared Context Execution ===")
+        print("\n=== Shared Context Execution ===")
         print(f"Success: {result.success}")
         print(f"Output: {result.output}")
 
@@ -130,7 +130,7 @@ class TestExecuteDatabricksCommand:
             timeout=120
         )
 
-        print(f"\n=== First Execution ===")
+        print("\n=== First Execution ===")
         print(f"Success: {result1.success}")
 
         assert result1.success, f"First execution failed: {result1.error}"
@@ -143,7 +143,7 @@ class TestExecuteDatabricksCommand:
             timeout=120
         )
 
-        print(f"\n=== Second Execution ===")
+        print("\n=== Second Execution ===")
         print(f"Success: {result2.success}")
         print(f"Output: {result2.output}")
 
@@ -159,7 +159,7 @@ class TestExecuteDatabricksCommand:
             timeout=120,
         )
 
-        print(f"\n=== SQL Execution ===")
+        print("\n=== SQL Execution ===")
         print(f"Success: {result.success}")
         print(f"Output: {result.output}")
 
@@ -174,7 +174,7 @@ class TestExecuteDatabricksCommand:
                 destroy_context_on_completion=True
             )
 
-            print(f"\n=== Destroy Context On Completion ===")
+            print("\n=== Destroy Context On Completion ===")
             print(f"Success: {result.success}")
             print(f"Context Destroyed: {result.context_destroyed}")
 
@@ -207,7 +207,7 @@ class TestRunPythonFileOnDatabricks:
                 timeout=120,
             )
 
-            print(f"\n=== File Execution Result ===")
+            print("\n=== File Execution Result ===")
             print(f"Success: {result.success}")
             print(f"Output: {result.output}")
 
@@ -238,7 +238,7 @@ print(f"Row count: {df.count()}")
                 timeout=120,
             )
 
-            print(f"\n=== Spark Execution Result ===")
+            print("\n=== Spark Execution Result ===")
             print(f"Success: {result.success}")
             print(f"Output: {result.output}")
 
@@ -265,7 +265,7 @@ print(f"Row count: {df.count()}")
                 timeout=120,
             )
 
-            print(f"\n=== Error Handling Result ===")
+            print("\n=== Error Handling Result ===")
             print(f"Success: {result.success}")
             print(f"Error: {result.error[:200] if result.error else None}...")
 
@@ -283,7 +283,7 @@ print(f"Row count: {df.count()}")
             timeout=120
         )
 
-        print(f"\n=== File Not Found Result ===")
+        print("\n=== File Not Found Result ===")
         print(f"Success: {result.success}")
         print(f"Error: {result.error}")
 

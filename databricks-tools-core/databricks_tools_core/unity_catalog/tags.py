@@ -17,7 +17,7 @@ def _validate_identifier(name: str) -> str:
     return name
 
 
-def _execute_uc_sql(sql_query: str, warehouse_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def _execute_uc_sql(sql_query: str, warehouse_id: str | None = None) -> list[dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
@@ -26,10 +26,10 @@ def _execute_uc_sql(sql_query: str, warehouse_id: Optional[str] = None) -> List[
 def set_tags(
     object_type: str,
     full_name: str,
-    tags: Dict[str, str],
-    column_name: Optional[str] = None,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    tags: dict[str, str],
+    column_name: str | None = None,
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Set tags on a UC object or column.
 
@@ -67,10 +67,10 @@ def set_tags(
 def unset_tags(
     object_type: str,
     full_name: str,
-    tag_names: List[str],
-    column_name: Optional[str] = None,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    tag_names: list[str],
+    column_name: str | None = None,
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Remove tags from a UC object or column.
 
@@ -106,9 +106,9 @@ def set_comment(
     object_type: str,
     full_name: str,
     comment_text: str,
-    column_name: Optional[str] = None,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    column_name: str | None = None,
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Set a comment on a UC object or column.
 
@@ -141,12 +141,12 @@ def set_comment(
 
 
 def query_table_tags(
-    catalog_filter: Optional[str] = None,
-    tag_name: Optional[str] = None,
-    tag_value: Optional[str] = None,
+    catalog_filter: str | None = None,
+    tag_name: str | None = None,
+    tag_value: str | None = None,
     limit: int = 100,
-    warehouse_id: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    warehouse_id: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Query tags on tables from system.information_schema.table_tags.
 
@@ -175,13 +175,13 @@ def query_table_tags(
 
 
 def query_column_tags(
-    catalog_filter: Optional[str] = None,
-    table_name: Optional[str] = None,
-    tag_name: Optional[str] = None,
-    tag_value: Optional[str] = None,
+    catalog_filter: str | None = None,
+    table_name: str | None = None,
+    tag_name: str | None = None,
+    tag_value: str | None = None,
     limit: int = 100,
-    warehouse_id: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    warehouse_id: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Query tags on columns from system.information_schema.column_tags.
 

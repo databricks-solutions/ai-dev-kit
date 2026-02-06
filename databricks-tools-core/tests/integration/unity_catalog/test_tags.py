@@ -171,7 +171,7 @@ class TestSetComment:
         )
 
         assert result["status"] == "comment_set"
-        logger.info(f"Column comment set on salary")
+        logger.info("Column comment set on salary")
 
     def test_set_comment_column_without_name_raises(self, uc_test_table: str):
         """Should raise ValueError when column_name missing for column type."""

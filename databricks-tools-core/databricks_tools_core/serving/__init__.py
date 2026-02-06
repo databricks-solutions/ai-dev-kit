@@ -12,6 +12,6 @@ from .endpoints import (
 
 __all__ = [
     "get_serving_endpoint_status",
-    "query_serving_endpoint",
     "list_serving_endpoints",
+    "query_serving_endpoint",
 ]

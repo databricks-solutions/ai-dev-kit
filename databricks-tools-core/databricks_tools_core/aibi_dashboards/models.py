@@ -13,12 +13,12 @@ class DashboardDeploymentResult:
 
     success: bool = False
     status: str = ""  # 'created' or 'updated'
-    dashboard_id: Optional[str] = None
-    path: Optional[str] = None
-    url: Optional[str] = None
-    error: Optional[str] = None
+    dashboard_id: str | None = None
+    path: str | None = None
+    url: str | None = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "success": self.success,

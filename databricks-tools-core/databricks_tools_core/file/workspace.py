@@ -23,7 +23,7 @@ class UploadResult:
     local_path: str
     remote_path: str
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -34,14 +34,14 @@ class FolderUploadResult:
     total_files: int
     successful: int
     failed: int
-    results: List[UploadResult] = field(default_factory=list)
+    results: list[UploadResult] = field(default_factory=list)
 
     @property
     def success(self) -> bool:
         """Returns True if all files were uploaded successfully"""
         return self.failed == 0
 
-    def get_failed_uploads(self) -> List[UploadResult]:
+    def get_failed_uploads(self) -> list[UploadResult]:
         """Returns list of failed uploads"""
         return [r for r in self.results if not r.success]
 
@@ -92,7 +92,7 @@ def _upload_single_file(
         )
 
 
-def _collect_files(local_folder: str) -> List[tuple]:
+def _collect_files(local_folder: str) -> list[tuple]:
     """
     Collect all files in a folder recursively.
 
@@ -118,7 +118,7 @@ def _collect_files(local_folder: str) -> List[tuple]:
     return files
 
 
-def _collect_directories(local_folder: str) -> List[str]:
+def _collect_directories(local_folder: str) -> list[str]:
     """
     Collect all directories in a folder recursively.
 

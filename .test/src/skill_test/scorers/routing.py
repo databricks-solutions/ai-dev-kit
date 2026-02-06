@@ -38,7 +38,7 @@ SKILL_TRIGGERS = {
 }
 
 
-def detect_skills_from_prompt(prompt: str) -> Set[str]:
+def detect_skills_from_prompt(prompt: str) -> set[str]:
     """Detect which skills a prompt should trigger."""
     prompt_lower = prompt.lower()
     detected = set()
@@ -54,8 +54,8 @@ def detect_skills_from_prompt(prompt: str) -> Set[str]:
 
 @scorer
 def skill_routing_accuracy(
-    inputs: Dict[str, Any],
-    expectations: Dict[str, Any]
+    inputs: dict[str, Any],
+    expectations: dict[str, Any]
 ) -> Feedback:
     """
     Score skill routing accuracy.
@@ -127,8 +127,8 @@ def skill_routing_accuracy(
 
 @scorer
 def routing_precision(
-    inputs: Dict[str, Any],
-    expectations: Dict[str, Any]
+    inputs: dict[str, Any],
+    expectations: dict[str, Any]
 ) -> Feedback:
     """Measure precision - avoid false positives (extra skills)."""
     prompt = inputs.get("prompt", "")
@@ -154,8 +154,8 @@ def routing_precision(
 
 @scorer
 def routing_recall(
-    inputs: Dict[str, Any],
-    expectations: Dict[str, Any]
+    inputs: dict[str, Any],
+    expectations: dict[str, Any]
 ) -> Feedback:
     """Measure recall - avoid false negatives (missing skills)."""
     prompt = inputs.get("prompt", "")

@@ -15,7 +15,7 @@ class QualityGate:
 @dataclass
 class QualityGates:
     """Quality thresholds that must pass for evaluation success."""
-    gates: List[QualityGate] = field(default_factory=lambda: [
+    gates: list[QualityGate] = field(default_factory=lambda: [
         QualityGate("syntax_valid/score/mean", 1.0),        # 100% - all code must parse
         QualityGate("pattern_adherence/score/mean", 0.90),  # 90% - follow patterns
         QualityGate("no_hallucinated_apis/score/mean", 1.0),# 100% - no fake APIs
@@ -107,8 +107,8 @@ class DatabricksExecutionSettings:
     explicitly need a specific cluster.
     """
     # Compute settings
-    cluster_id: Optional[str] = None  # Only set if user explicitly specifies
-    warehouse_id: Optional[str] = None  # Auto-detected if None
+    cluster_id: str | None = None  # Only set if user explicitly specifies
+    warehouse_id: str | None = None  # Auto-detected if None
     use_serverless: bool = True  # Default to serverless compute
 
     # Catalog/schema context

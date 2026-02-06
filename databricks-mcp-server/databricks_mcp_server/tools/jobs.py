@@ -25,7 +25,7 @@ def list_jobs(
     name: str = None,
     limit: int = 25,
     expand_tasks: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     List jobs in the workspace.
 
@@ -41,7 +41,7 @@ def list_jobs(
 
 
 @mcp.tool
-def get_job(job_id: int) -> Dict[str, Any]:
+def get_job(job_id: int) -> dict[str, Any]:
     """
     Get detailed job configuration.
 
@@ -71,23 +71,23 @@ def find_job_by_name(name: str) -> int | None:
 @mcp.tool
 def create_job(
     name: str,
-    tasks: List[Dict[str, Any]],
-    job_clusters: List[Dict[str, Any]] = None,
-    environments: List[Dict[str, Any]] = None,
-    tags: Dict[str, str] = None,
+    tasks: list[dict[str, Any]],
+    job_clusters: list[dict[str, Any]] = None,
+    environments: list[dict[str, Any]] = None,
+    tags: dict[str, str] = None,
     timeout_seconds: int = None,
     max_concurrent_runs: int = 1,
-    email_notifications: Dict[str, Any] = None,
-    webhook_notifications: Dict[str, Any] = None,
-    notification_settings: Dict[str, Any] = None,
-    schedule: Dict[str, Any] = None,
-    queue: Dict[str, Any] = None,
-    run_as: Dict[str, Any] = None,
-    git_source: Dict[str, Any] = None,
-    parameters: List[Dict[str, Any]] = None,
-    health: Dict[str, Any] = None,
-    deployment: Dict[str, Any] = None,
-) -> Dict[str, Any]:
+    email_notifications: dict[str, Any] = None,
+    webhook_notifications: dict[str, Any] = None,
+    notification_settings: dict[str, Any] = None,
+    schedule: dict[str, Any] = None,
+    queue: dict[str, Any] = None,
+    run_as: dict[str, Any] = None,
+    git_source: dict[str, Any] = None,
+    parameters: list[dict[str, Any]] = None,
+    health: dict[str, Any] = None,
+    deployment: dict[str, Any] = None,
+) -> dict[str, Any]:
     """
     Create a new Databricks job with serverless compute by default.
 
@@ -162,22 +162,22 @@ def create_job(
 def update_job(
     job_id: int,
     name: str = None,
-    tasks: List[Dict[str, Any]] = None,
-    job_clusters: List[Dict[str, Any]] = None,
-    environments: List[Dict[str, Any]] = None,
-    tags: Dict[str, str] = None,
+    tasks: list[dict[str, Any]] = None,
+    job_clusters: list[dict[str, Any]] = None,
+    environments: list[dict[str, Any]] = None,
+    tags: dict[str, str] = None,
     timeout_seconds: int = None,
     max_concurrent_runs: int = None,
-    email_notifications: Dict[str, Any] = None,
-    webhook_notifications: Dict[str, Any] = None,
-    notification_settings: Dict[str, Any] = None,
-    schedule: Dict[str, Any] = None,
-    queue: Dict[str, Any] = None,
-    run_as: Dict[str, Any] = None,
-    git_source: Dict[str, Any] = None,
-    parameters: List[Dict[str, Any]] = None,
-    health: Dict[str, Any] = None,
-    deployment: Dict[str, Any] = None,
+    email_notifications: dict[str, Any] = None,
+    webhook_notifications: dict[str, Any] = None,
+    notification_settings: dict[str, Any] = None,
+    schedule: dict[str, Any] = None,
+    queue: dict[str, Any] = None,
+    run_as: dict[str, Any] = None,
+    git_source: dict[str, Any] = None,
+    parameters: list[dict[str, Any]] = None,
+    health: dict[str, Any] = None,
+    deployment: dict[str, Any] = None,
 ) -> None:
     """
     Update an existing job's configuration.
@@ -242,15 +242,15 @@ def delete_job(job_id: int) -> None:
 def run_job_now(
     job_id: int,
     idempotency_token: str = None,
-    jar_params: List[str] = None,
-    notebook_params: Dict[str, str] = None,
-    python_params: List[str] = None,
-    spark_submit_params: List[str] = None,
-    python_named_params: Dict[str, str] = None,
-    pipeline_params: Dict[str, Any] = None,
-    sql_params: Dict[str, str] = None,
-    dbt_commands: List[str] = None,
-    queue: Dict[str, Any] = None,
+    jar_params: list[str] = None,
+    notebook_params: dict[str, str] = None,
+    python_params: list[str] = None,
+    spark_submit_params: list[str] = None,
+    python_named_params: dict[str, str] = None,
+    pipeline_params: dict[str, Any] = None,
+    sql_params: dict[str, str] = None,
+    dbt_commands: list[str] = None,
+    queue: dict[str, Any] = None,
 ) -> int:
     """
     Trigger a job run immediately and return the run ID.
@@ -291,7 +291,7 @@ def run_job_now(
 
 
 @mcp.tool
-def get_run(run_id: int) -> Dict[str, Any]:
+def get_run(run_id: int) -> dict[str, Any]:
     """
     Get detailed run status and information.
 
@@ -305,7 +305,7 @@ def get_run(run_id: int) -> Dict[str, Any]:
 
 
 @mcp.tool
-def get_run_output(run_id: int) -> Dict[str, Any]:
+def get_run_output(run_id: int) -> dict[str, Any]:
     """
     Get run output including logs and results.
 
@@ -338,7 +338,7 @@ def list_runs(
     offset: int = 0,
     start_time_from: int = None,
     start_time_to: int = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     List job runs with optional filters.
 
@@ -377,7 +377,7 @@ def wait_for_run(
     run_id: int,
     timeout: int = 3600,
     poll_interval: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Wait for a job run to complete and return detailed results.
 

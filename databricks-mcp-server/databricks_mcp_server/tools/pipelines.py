@@ -23,9 +23,9 @@ def create_pipeline(
     root_path: str,
     catalog: str,
     schema: str,
-    workspace_file_paths: List[str],
-    extra_settings: Dict[str, Any] = None,
-) -> Dict[str, Any]:
+    workspace_file_paths: list[str],
+    extra_settings: dict[str, Any] = None,
+) -> dict[str, Any]:
     """
     Create a new Spark Declarative Pipeline (Unity Catalog, serverless by default).
 
@@ -54,7 +54,7 @@ def create_pipeline(
 
 
 @mcp.tool
-def get_pipeline(pipeline_id: str) -> Dict[str, Any]:
+def get_pipeline(pipeline_id: str) -> dict[str, Any]:
     """
     Get pipeline details and configuration.
 
@@ -75,9 +75,9 @@ def update_pipeline(
     root_path: str = None,
     catalog: str = None,
     schema: str = None,
-    workspace_file_paths: List[str] = None,
-    extra_settings: Dict[str, Any] = None,
-) -> Dict[str, str]:
+    workspace_file_paths: list[str] = None,
+    extra_settings: dict[str, Any] = None,
+) -> dict[str, str]:
     """
     Update pipeline configuration.
 
@@ -108,7 +108,7 @@ def update_pipeline(
 
 
 @mcp.tool
-def delete_pipeline(pipeline_id: str) -> Dict[str, str]:
+def delete_pipeline(pipeline_id: str) -> dict[str, str]:
     """
     Delete a pipeline.
 
@@ -125,11 +125,11 @@ def delete_pipeline(pipeline_id: str) -> Dict[str, str]:
 @mcp.tool
 def start_update(
     pipeline_id: str,
-    refresh_selection: List[str] = None,
+    refresh_selection: list[str] = None,
     full_refresh: bool = False,
-    full_refresh_selection: List[str] = None,
+    full_refresh_selection: list[str] = None,
     validate_only: bool = False,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Start a pipeline update or dry-run validation.
 
@@ -154,7 +154,7 @@ def start_update(
 
 
 @mcp.tool
-def get_update(pipeline_id: str, update_id: str) -> Dict[str, Any]:
+def get_update(pipeline_id: str, update_id: str) -> dict[str, Any]:
     """
     Get pipeline update status and results.
 
@@ -170,7 +170,7 @@ def get_update(pipeline_id: str, update_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def stop_pipeline(pipeline_id: str) -> Dict[str, str]:
+def stop_pipeline(pipeline_id: str) -> dict[str, str]:
     """
     Stop a running pipeline.
 
@@ -188,7 +188,7 @@ def stop_pipeline(pipeline_id: str) -> Dict[str, str]:
 def get_pipeline_events(
     pipeline_id: str,
     max_results: int = 100,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Get pipeline events, issues, and error messages.
 
@@ -211,13 +211,13 @@ def create_or_update_pipeline(
     root_path: str,
     catalog: str,
     schema: str,
-    workspace_file_paths: List[str],
+    workspace_file_paths: list[str],
     start_run: bool = False,
     wait_for_completion: bool = False,
     full_refresh: bool = True,
     timeout: int = 1800,
-    extra_settings: Dict[str, Any] = None,
-) -> Dict[str, Any]:
+    extra_settings: dict[str, Any] = None,
+) -> dict[str, Any]:
     """
     Create a new pipeline or update an existing one with the same name.
 
@@ -297,7 +297,7 @@ def create_or_update_pipeline(
 
 
 @mcp.tool
-def find_pipeline_by_name(name: str) -> Dict[str, Any]:
+def find_pipeline_by_name(name: str) -> dict[str, Any]:
     """
     Find a pipeline by name and return its ID.
 

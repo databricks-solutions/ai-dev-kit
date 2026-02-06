@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import CatalogInfo, IsolationMode
 from ..auth import get_workspace_client
 
 
-def list_catalogs() -> List[CatalogInfo]:
+def list_catalogs() -> list[CatalogInfo]:
     """
     List all catalogs in Unity Catalog.
 
@@ -45,9 +45,9 @@ def get_catalog(catalog_name: str) -> CatalogInfo:
 
 def create_catalog(
     name: str,
-    comment: Optional[str] = None,
-    storage_root: Optional[str] = None,
-    properties: Optional[Dict[str, str]] = None,
+    comment: str | None = None,
+    storage_root: str | None = None,
+    properties: dict[str, str] | None = None,
 ) -> CatalogInfo:
     """
     Create a new catalog in Unity Catalog.
@@ -65,7 +65,7 @@ def create_catalog(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict = {"name": name}
+    kwargs: dict = {"name": name}
     if comment is not None:
         kwargs["comment"] = comment
     if storage_root is not None:
@@ -77,10 +77,10 @@ def create_catalog(
 
 def update_catalog(
     catalog_name: str,
-    new_name: Optional[str] = None,
-    comment: Optional[str] = None,
-    owner: Optional[str] = None,
-    isolation_mode: Optional[str] = None,
+    new_name: str | None = None,
+    comment: str | None = None,
+    owner: str | None = None,
+    isolation_mode: str | None = None,
 ) -> CatalogInfo:
     """
     Update an existing catalog in Unity Catalog.
@@ -103,7 +103,7 @@ def update_catalog(
         raise ValueError("At least one field must be provided to update")
 
     w = get_workspace_client()
-    kwargs: Dict = {"name": catalog_name}
+    kwargs: dict = {"name": catalog_name}
     if new_name is not None:
         kwargs["new_name"] = new_name
     if comment is not None:

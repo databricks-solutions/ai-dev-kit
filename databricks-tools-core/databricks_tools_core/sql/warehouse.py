@@ -14,7 +14,7 @@ from ..auth import get_workspace_client
 logger = logging.getLogger(__name__)
 
 
-def list_warehouses(limit: int = 20) -> List[Dict[str, Any]]:
+def list_warehouses(limit: int = 20) -> list[dict[str, Any]]:
     """
     List SQL warehouses, with online (RUNNING) warehouses first.
 
@@ -39,7 +39,7 @@ def list_warehouses(limit: int = 20) -> List[Dict[str, Any]]:
         warehouses = list(client.warehouses.list())
     except Exception as e:
         raise Exception(
-            f"Failed to list SQL warehouses: {str(e)}. "
+            f"Failed to list SQL warehouses: {e!s}. "
             f"Check that you have permission to view warehouses."
         )
 
@@ -66,7 +66,7 @@ def list_warehouses(limit: int = 20) -> List[Dict[str, Any]]:
     return result
 
 
-def get_best_warehouse() -> Optional[str]:
+def get_best_warehouse() -> str | None:
     """
     Select the best available SQL warehouse based on priority rules.
 
@@ -89,7 +89,7 @@ def get_best_warehouse() -> Optional[str]:
         warehouses = list(client.warehouses.list())
     except Exception as e:
         raise Exception(
-            f"Failed to list SQL warehouses: {str(e)}. "
+            f"Failed to list SQL warehouses: {e!s}. "
             f"Check that you have permission to view warehouses."
         )
 

@@ -19,13 +19,12 @@ class SQLExecutionError(Exception):
 
     Provides detailed error messages for LLM consumption.
     """
-    pass
 
 
 class SQLExecutor:
     """Execute SQL queries on Databricks SQL Warehouses."""
 
-    def __init__(self, warehouse_id: str, client: Optional[WorkspaceClient] = None):
+    def __init__(self, warehouse_id: str, client: WorkspaceClient | None = None):
         """
         Initialize the SQL executor.
 
@@ -47,11 +46,11 @@ class SQLExecutor:
     def execute(
         self,
         sql_query: str,
-        catalog: Optional[str] = None,
-        schema: Optional[str] = None,
-        row_limit: Optional[int] = None,
+        catalog: str | None = None,
+        schema: str | None = None,
+        row_limit: int | None = None,
         timeout: int = 180,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Execute a SQL query and return results as a list of dictionaries.
 
@@ -88,7 +87,7 @@ class SQLExecutor:
             response = self.client.statement_execution.execute_statement(**exec_params)
         except Exception as e:
             raise SQLExecutionError(
-                f"Failed to submit SQL query to warehouse '{self.warehouse_id}': {str(e)}. "
+                f"Failed to submit SQL query to warehouse '{self.warehouse_id}': {e!s}. "
                 f"Check that the warehouse exists and is accessible."
             )
 
@@ -106,7 +105,7 @@ class SQLExecutor:
                 )
             except Exception as e:
                 raise SQLExecutionError(
-                    f"Failed to check status of statement '{statement_id}': {str(e)}"
+                    f"Failed to check status of statement '{statement_id}': {e!s}"
                 )
 
             state = status.status.state
@@ -145,9 +144,9 @@ class SQLExecutor:
             f"Statement ID: {statement_id}"
         )
 
-    def _extract_results(self, response) -> List[Dict[str, Any]]:
+    def _extract_results(self, response) -> list[dict[str, Any]]:
         """Extract results from a successful statement response."""
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         if not response.result or not response.result.data_array:
             return results

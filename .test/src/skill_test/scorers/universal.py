@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 
 
 @scorer
-def python_syntax(outputs: Dict[str, Any]) -> Feedback:
+def python_syntax(outputs: dict[str, Any]) -> Feedback:
     """Check if Python code blocks have valid syntax."""
     response = outputs.get("response", "")
 
@@ -42,7 +42,7 @@ def python_syntax(outputs: Dict[str, Any]) -> Feedback:
 
 
 @scorer
-def sql_syntax(outputs: Dict[str, Any]) -> Feedback:
+def sql_syntax(outputs: dict[str, Any]) -> Feedback:
     """Basic SQL syntax validation (structural checks)."""
     response = outputs.get("response", "")
 
@@ -78,9 +78,9 @@ def sql_syntax(outputs: Dict[str, Any]) -> Feedback:
 
 @scorer
 def pattern_adherence(
-    outputs: Dict[str, Any],
-    expectations: Dict[str, Any]
-) -> List[Feedback]:
+    outputs: dict[str, Any],
+    expectations: dict[str, Any]
+) -> list[Feedback]:
     """Check for required patterns in response."""
     response = outputs.get("response", "")
     expected_patterns = expectations.get("expected_patterns", [])
@@ -116,7 +116,7 @@ def pattern_adherence(
 
 
 @scorer
-def no_hallucinated_apis(outputs: Dict[str, Any]) -> Feedback:
+def no_hallucinated_apis(outputs: dict[str, Any]) -> Feedback:
     """Check for common API hallucinations in Databricks context."""
     response = outputs.get("response", "")
 
@@ -148,8 +148,8 @@ def no_hallucinated_apis(outputs: Dict[str, Any]) -> Feedback:
 
 @scorer
 def expected_facts_present(
-    outputs: Dict[str, Any],
-    expectations: Dict[str, Any]
+    outputs: dict[str, Any],
+    expectations: dict[str, Any]
 ) -> Feedback:
     """Check if expected facts are mentioned in response."""
     response = outputs.get("response", "").lower()

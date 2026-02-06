@@ -35,10 +35,10 @@ class ExecutionResult:
     def __init__(
         self,
         success: bool,
-        output: Optional[str] = None,
-        error: Optional[str] = None,
-        cluster_id: Optional[str] = None,
-        context_id: Optional[str] = None,
+        output: str | None = None,
+        error: str | None = None,
+        cluster_id: str | None = None,
+        context_id: str | None = None,
         context_destroyed: bool = True,
     ):
         self.success = success
@@ -65,12 +65,12 @@ class ExecutionResult:
     def __repr__(self):
         if self.success:
             return (
-                f"ExecutionResult(success=True, output={repr(self.output)}, "
-                f"cluster_id={repr(self.cluster_id)}, context_id={repr(self.context_id)})"
+                f"ExecutionResult(success=True, output={self.output!r}, "
+                f"cluster_id={self.cluster_id!r}, context_id={self.context_id!r})"
             )
-        return f"ExecutionResult(success=False, error={repr(self.error)})"
+        return f"ExecutionResult(success=False, error={self.error!r})"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "success": self.success,
@@ -97,8 +97,8 @@ _LANGUAGE_MAP = {
 
 def list_clusters(
     include_terminated: bool = True,
-    limit: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
     """
     List user-created clusters in the workspace.
 
@@ -149,7 +149,7 @@ def list_clusters(
     return clusters
 
 
-def get_best_cluster() -> Optional[str]:
+def get_best_cluster() -> str | None:
     """
     Get the ID of the best available cluster for code execution.
 
@@ -199,7 +199,7 @@ def get_best_cluster() -> Optional[str]:
 class NoRunningClusterError(Exception):
     """Raised when no running cluster is available and none was specified."""
 
-    def __init__(self, available_clusters: List[Dict[str, str]]):
+    def __init__(self, available_clusters: list[dict[str, str]]):
         self.available_clusters = available_clusters
         cluster_list = "\n".join(
             f"  - {c['cluster_name']} ({c['cluster_id']}) - {c['state']}"
@@ -347,8 +347,8 @@ def _execute_on_context(
 
 def execute_databricks_command(
     code: str,
-    cluster_id: Optional[str] = None,
-    context_id: Optional[str] = None,
+    cluster_id: str | None = None,
+    context_id: str | None = None,
     language: str = "python",
     timeout: int = 120,
     destroy_context_on_completion: bool = False,
@@ -415,7 +415,7 @@ def execute_databricks_command(
 
         return result
 
-    except Exception as e:
+    except Exception:
         # If we created the context and there's an error, clean up
         if context_created and destroy_context_on_completion:
             try:
@@ -427,8 +427,8 @@ def execute_databricks_command(
 
 def run_python_file_on_databricks(
     file_path: str,
-    cluster_id: Optional[str] = None,
-    context_id: Optional[str] = None,
+    cluster_id: str | None = None,
+    context_id: str | None = None,
     timeout: int = 600,
     destroy_context_on_completion: bool = False,
 ) -> ExecutionResult:
@@ -473,7 +473,7 @@ def run_python_file_on_databricks(
     """
     # Read the file contents
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             code = f.read()
     except FileNotFoundError:
         return ExecutionResult(
@@ -483,7 +483,7 @@ def run_python_file_on_databricks(
     except Exception as e:
         return ExecutionResult(
             success=False,
-            error=f"Failed to read file {file_path}: {str(e)}"
+            error=f"Failed to read file {file_path}: {e!s}"
         )
 
     if not code.strip():

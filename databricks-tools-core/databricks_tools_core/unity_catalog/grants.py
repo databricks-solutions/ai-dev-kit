@@ -32,7 +32,7 @@ def _parse_securable_type(securable_type: str) -> str:
     return key
 
 
-def _parse_privileges(privileges: List[str]) -> List[Privilege]:
+def _parse_privileges(privileges: list[str]) -> list[Privilege]:
     """Parse privilege strings to SDK enum values."""
     result = []
     for p in privileges:
@@ -52,8 +52,8 @@ def grant_privileges(
     securable_type: str,
     full_name: str,
     principal: str,
-    privileges: List[str],
-) -> Dict[str, Any]:
+    privileges: list[str],
+) -> dict[str, Any]:
     """
     Grant privileges to a principal on a UC securable.
 
@@ -102,8 +102,8 @@ def revoke_privileges(
     securable_type: str,
     full_name: str,
     principal: str,
-    privileges: List[str],
-) -> Dict[str, Any]:
+    privileges: list[str],
+) -> dict[str, Any]:
     """
     Revoke privileges from a principal on a UC securable.
 
@@ -151,8 +151,8 @@ def revoke_privileges(
 def get_grants(
     securable_type: str,
     full_name: str,
-    principal: Optional[str] = None,
-) -> Dict[str, Any]:
+    principal: str | None = None,
+) -> dict[str, Any]:
     """
     Get current permission grants on a UC securable.
 
@@ -189,8 +189,8 @@ def get_grants(
 def get_effective_grants(
     securable_type: str,
     full_name: str,
-    principal: Optional[str] = None,
-) -> Dict[str, Any]:
+    principal: str | None = None,
+) -> dict[str, Any]:
     """
     Get effective (inherited + direct) permission grants on a UC securable.
 

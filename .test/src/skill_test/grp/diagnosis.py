@@ -19,11 +19,11 @@ class Diagnosis:
     """Complete diagnosis of a failure."""
     error: str
     code_block: str
-    relevant_sections: List[SkillSection]
+    relevant_sections: list[SkillSection]
     suggested_action: str
 
 
-def find_skill_files(skill_name: str, base_path: str = ".claude/skills") -> List[Path]:
+def find_skill_files(skill_name: str, base_path: str = ".claude/skills") -> list[Path]:
     """Find all markdown files for a skill."""
     skill_path = Path(base_path) / skill_name
     if not skill_path.exists():
@@ -31,7 +31,7 @@ def find_skill_files(skill_name: str, base_path: str = ".claude/skills") -> List
     return list(skill_path.glob("**/*.md"))
 
 
-def extract_sections(file_path: Path) -> List[Dict[str, Any]]:
+def extract_sections(file_path: Path) -> list[dict[str, Any]]:
     """Extract markdown sections from a file."""
     content = file_path.read_text()
     sections = []
@@ -72,7 +72,7 @@ def find_relevant_sections(
     error: str,
     code_block: str,
     skill_name: str
-) -> List[SkillSection]:
+) -> list[SkillSection]:
     """Find skill sections relevant to an error."""
     relevant = []
 

@@ -3,7 +3,8 @@ import ast
 import re
 import time
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Dict, Any, Callable, Protocol
+from typing import List, Tuple, Optional, Dict, Any, Protocol
+from collections.abc import Callable
 
 
 @dataclass
@@ -11,7 +12,7 @@ class ExecutionResult:
     """Result of code block execution."""
     success: bool
     output: str
-    error: Optional[str] = None
+    error: str | None = None
     execution_time_ms: float = 0
 
 
@@ -22,10 +23,10 @@ class DatabricksExecutionConfig:
     By default, uses serverless compute. Only specify cluster_id if you
     explicitly need a specific cluster.
     """
-    cluster_id: Optional[str] = None  # Only set if user explicitly specifies
-    warehouse_id: Optional[str] = None  # Auto-detected via MCP if None
+    cluster_id: str | None = None  # Only set if user explicitly specifies
+    warehouse_id: str | None = None  # Auto-detected via MCP if None
     use_serverless: bool = True  # Default to serverless compute
-    context_id: Optional[str] = None  # Session persistence for reuse
+    context_id: str | None = None  # Session persistence for reuse
     catalog: str = "main"
     schema: str = "skill_test"
     timeout: int = 120
@@ -34,9 +35,9 @@ class DatabricksExecutionConfig:
 @dataclass
 class DatabricksExecutionResult(ExecutionResult):
     """Extended result with Databricks-specific metadata."""
-    cluster_id: Optional[str] = None
-    warehouse_id: Optional[str] = None
-    context_id: Optional[str] = None  # For session reuse
+    cluster_id: str | None = None
+    warehouse_id: str | None = None
+    context_id: str | None = None  # For session reuse
     context_destroyed: bool = False
     execution_mode: str = "local"  # "databricks", "local", "dry_run"
 
@@ -49,7 +50,7 @@ class CodeBlock:
     line_number: int
 
 
-def extract_code_blocks(response: str) -> List[CodeBlock]:
+def extract_code_blocks(response: str) -> list[CodeBlock]:
     """Extract code blocks from markdown response."""
     pattern = r'```(\w+)\n(.*?)```'
     blocks = []
@@ -76,7 +77,7 @@ DATABRICKS_IMPORTS = {
 }
 
 
-def verify_python_syntax(code: str) -> Tuple[bool, Optional[str]]:
+def verify_python_syntax(code: str) -> tuple[bool, str | None]:
     """Verify Python code syntax without execution."""
     try:
         ast.parse(code)
@@ -178,7 +179,7 @@ def verify_sql_structure(code: str) -> ExecutionResult:
     )
 
 
-def execute_code_blocks(response: str) -> Tuple[int, int, List[Dict[str, Any]]]:
+def execute_code_blocks(response: str) -> tuple[int, int, list[dict[str, Any]]]:
     """
     Execute all code blocks in a response locally (syntax/import validation only).
 
@@ -221,12 +222,12 @@ class MCPExecuteCommand(Protocol):
     def __call__(
         self,
         code: str,
-        cluster_id: Optional[str] = None,
-        context_id: Optional[str] = None,
+        cluster_id: str | None = None,
+        context_id: str | None = None,
         language: str = "python",
         timeout: int = 120,
         destroy_context_on_completion: bool = False,
-    ) -> Dict[str, Any]: ...
+    ) -> dict[str, Any]: ...
 
 
 class MCPExecuteSQL(Protocol):
@@ -234,28 +235,28 @@ class MCPExecuteSQL(Protocol):
     def __call__(
         self,
         sql_query: str,
-        warehouse_id: Optional[str] = None,
-        catalog: Optional[str] = None,
-        schema: Optional[str] = None,
+        warehouse_id: str | None = None,
+        catalog: str | None = None,
+        schema: str | None = None,
         timeout: int = 180,
-    ) -> List[Dict[str, Any]]: ...
+    ) -> list[dict[str, Any]]: ...
 
 
 class MCPGetBestWarehouse(Protocol):
     """Protocol for MCP get_best_warehouse tool."""
-    def __call__(self) -> Optional[str]: ...
+    def __call__(self) -> str | None: ...
 
 
 class MCPGetBestCluster(Protocol):
     """Protocol for MCP get_best_cluster tool."""
-    def __call__(self) -> Dict[str, Any]: ...
+    def __call__(self) -> dict[str, Any]: ...
 
 
 def execute_python_on_databricks(
     code: str,
     config: DatabricksExecutionConfig,
     mcp_execute_command: MCPExecuteCommand,
-    mcp_get_best_cluster: Optional[MCPGetBestCluster] = None,
+    mcp_get_best_cluster: MCPGetBestCluster | None = None,
 ) -> DatabricksExecutionResult:
     """
     Execute Python code on Databricks via MCP tools.
@@ -343,7 +344,7 @@ def execute_sql_on_databricks(
     sql_code: str,
     config: DatabricksExecutionConfig,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
 ) -> DatabricksExecutionResult:
     """
     Execute SQL code on Databricks via MCP tools.
@@ -425,8 +426,8 @@ class CodeBlocksExecutionResult:
     """Result of executing multiple code blocks."""
     total_blocks: int
     passed_blocks: int
-    details: List[Dict[str, Any]]
-    context_id: Optional[str] = None  # For session reuse
+    details: list[dict[str, Any]]
+    context_id: str | None = None  # For session reuse
     execution_mode: str = "local"
 
 
@@ -435,8 +436,8 @@ def execute_code_blocks_on_databricks(
     config: DatabricksExecutionConfig,
     mcp_execute_command: MCPExecuteCommand,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
-    mcp_get_best_cluster: Optional[MCPGetBestCluster] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
+    mcp_get_best_cluster: MCPGetBestCluster | None = None,
 ) -> CodeBlocksExecutionResult:
     """
     Execute all code blocks in a response on Databricks.

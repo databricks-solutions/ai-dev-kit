@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 def execute_sql(
     sql_query: str,
-    warehouse_id: Optional[str] = None,
-    catalog: Optional[str] = None,
-    schema: Optional[str] = None,
+    warehouse_id: str | None = None,
+    catalog: str | None = None,
+    schema: str | None = None,
     timeout: int = 180,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Execute a SQL query on a Databricks SQL Warehouse.
 
@@ -69,12 +69,12 @@ def execute_sql(
 
 def execute_sql_multi(
     sql_content: str,
-    warehouse_id: Optional[str] = None,
-    catalog: Optional[str] = None,
-    schema: Optional[str] = None,
+    warehouse_id: str | None = None,
+    catalog: str | None = None,
+    schema: str | None = None,
     timeout: int = 180,
     max_workers: int = 4,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Execute multiple SQL statements with dependency-aware parallelism.
 

@@ -22,8 +22,8 @@ class VolumeFileInfo:
     name: str
     path: str
     is_directory: bool
-    file_size: Optional[int] = None
-    last_modified: Optional[str] = None
+    file_size: int | None = None
+    last_modified: str | None = None
 
 
 @dataclass
@@ -32,7 +32,7 @@ class VolumeUploadResult:
     local_path: str
     volume_path: str
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -41,10 +41,10 @@ class VolumeDownloadResult:
     volume_path: str
     local_path: str
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
-def list_volume_files(volume_path: str, max_results: Optional[int] = None) -> List[VolumeFileInfo]:
+def list_volume_files(volume_path: str, max_results: int | None = None) -> list[VolumeFileInfo]:
     """
     List files and directories in a volume path.
 

@@ -178,7 +178,7 @@ def _parse_mlflow_trace_row(trace_row: Any, run_id: str) -> TraceMetrics:
     if hasattr(trace_row, "spans"):
         spans = trace_row.spans or []
         tool_calls = []
-        tool_counts: Dict[str, int] = {}
+        tool_counts: dict[str, int] = {}
 
         for span in spans:
             if isinstance(span, dict):
@@ -206,8 +206,8 @@ def list_trace_runs(
     experiment_name: str,
     tracking_uri: str = "databricks",
     limit: int = 10,
-    filter_string: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    filter_string: str | None = None,
+) -> list[dict[str, Any]]:
     """List recent trace runs from an MLflow experiment.
 
     Args:
@@ -272,7 +272,7 @@ def list_trace_runs(
 def get_latest_trace_run(
     experiment_name: str,
     tracking_uri: str = "databricks",
-) -> Optional[str]:
+) -> str | None:
     """Get the most recent trace run_id from an MLflow experiment.
 
     Args:
@@ -361,7 +361,7 @@ def _parse_mlflow_trace(trace: Any) -> TraceMetrics:
 
     # Parse spans (tool calls, LLM calls, etc.)
     tool_calls = []
-    tool_counts: Dict[str, int] = {}
+    tool_counts: dict[str, int] = {}
 
     if trace.data and hasattr(trace.data, "spans"):
         for span in trace.data.spans:
@@ -388,7 +388,7 @@ def _parse_mlflow_trace(trace: Any) -> TraceMetrics:
 
 
 def get_trace_metrics(
-    source: Union[str, Path],
+    source: str | Path,
     tracking_uri: str = "databricks",
 ) -> TraceMetrics:
     """Get TraceMetrics from either a local file or MLflow run.

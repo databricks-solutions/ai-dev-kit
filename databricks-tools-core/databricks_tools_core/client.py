@@ -5,7 +5,8 @@ Shared HTTP client for all Databricks API operations.
 Uses Databricks SDK for authentication to support both PAT and OAuth.
 """
 import os
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
+from collections.abc import Callable
 import requests
 
 from databricks.sdk import WorkspaceClient
@@ -81,9 +82,9 @@ class DatabricksClient:
 
     def __init__(
         self,
-        host: Optional[str] = None,
-        token: Optional[str] = None,
-        profile: Optional[str] = None
+        host: str | None = None,
+        token: str | None = None,
+        profile: str | None = None
     ):
         """
         Initialize Databricks client.
@@ -143,14 +144,14 @@ class DatabricksClient:
         self.files = FilesAPI(self)
 
     @property
-    def headers(self) -> Dict[str, str]:
+    def headers(self) -> dict[str, str]:
         """Get authentication headers using SDK's authenticate method.
 
         This generates fresh OAuth tokens when needed, avoiding token expiration issues.
         """
         return self._authenticate()
 
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get(self, endpoint: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Make GET request to Databricks API.
 
@@ -169,7 +170,7 @@ class DatabricksClient:
         response.raise_for_status()
         return response.json()
 
-    def post(self, endpoint: str, json: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def post(self, endpoint: str, json: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Make POST request to Databricks API.
 
@@ -188,7 +189,7 @@ class DatabricksClient:
         response.raise_for_status()
         return response.json()
 
-    def patch(self, endpoint: str, json: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def patch(self, endpoint: str, json: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Make PATCH request to Databricks API.
 
@@ -210,10 +211,10 @@ class DatabricksClient:
     def put(
         self,
         endpoint: str,
-        json: Optional[Dict[str, Any]] = None,
-        data: Optional[bytes] = None,
-        params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        json: dict[str, Any] | None = None,
+        data: bytes | None = None,
+        params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Make PUT request to Databricks API.
 
@@ -248,7 +249,7 @@ class DatabricksClient:
 
         return response.json()
 
-    def delete(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def delete(self, endpoint: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Make DELETE request to Databricks API.
 

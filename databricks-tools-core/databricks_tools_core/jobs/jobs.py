@@ -18,10 +18,10 @@ from .models import JobError
 
 
 def list_jobs(
-    name: Optional[str] = None,
+    name: str | None = None,
     limit: int = 25,
     expand_tasks: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     List jobs in the workspace.
 
@@ -63,7 +63,7 @@ def list_jobs(
     return jobs
 
 
-def get_job(job_id: int) -> Dict[str, Any]:
+def get_job(job_id: int) -> dict[str, Any]:
     """
     Get detailed job configuration.
 
@@ -85,10 +85,10 @@ def get_job(job_id: int) -> Dict[str, Any]:
         return job.as_dict()
 
     except Exception as e:
-        raise JobError(f"Failed to get job {job_id}: {str(e)}", job_id=job_id)
+        raise JobError(f"Failed to get job {job_id}: {e!s}", job_id=job_id)
 
 
-def find_job_by_name(name: str) -> Optional[int]:
+def find_job_by_name(name: str) -> int | None:
     """
     Find a job by exact name and return its ID.
 
@@ -110,24 +110,24 @@ def find_job_by_name(name: str) -> Optional[int]:
 
 def create_job(
     name: str,
-    tasks: List[Dict[str, Any]],
-    job_clusters: Optional[List[Dict[str, Any]]] = None,
-    environments: Optional[List[Dict[str, Any]]] = None,
-    tags: Optional[Dict[str, str]] = None,
-    timeout_seconds: Optional[int] = None,
+    tasks: list[dict[str, Any]],
+    job_clusters: list[dict[str, Any]] | None = None,
+    environments: list[dict[str, Any]] | None = None,
+    tags: dict[str, str] | None = None,
+    timeout_seconds: int | None = None,
     max_concurrent_runs: int = 1,
-    email_notifications: Optional[Dict[str, Any]] = None,
-    webhook_notifications: Optional[Dict[str, Any]] = None,
-    notification_settings: Optional[Dict[str, Any]] = None,
-    schedule: Optional[Dict[str, Any]] = None,
-    queue: Optional[Dict[str, Any]] = None,
-    run_as: Optional[Dict[str, Any]] = None,
-    git_source: Optional[Dict[str, Any]] = None,
-    parameters: Optional[List[Dict[str, Any]]] = None,
-    health: Optional[Dict[str, Any]] = None,
-    deployment: Optional[Dict[str, Any]] = None,
+    email_notifications: dict[str, Any] | None = None,
+    webhook_notifications: dict[str, Any] | None = None,
+    notification_settings: dict[str, Any] | None = None,
+    schedule: dict[str, Any] | None = None,
+    queue: dict[str, Any] | None = None,
+    run_as: dict[str, Any] | None = None,
+    git_source: dict[str, Any] | None = None,
+    parameters: list[dict[str, Any]] | None = None,
+    health: dict[str, Any] | None = None,
+    deployment: dict[str, Any] | None = None,
     **extra_settings,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a new Databricks job with serverless compute by default.
 
@@ -183,7 +183,7 @@ def create_job(
 
     try:
         # Build kwargs for SDK call
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "name": name,
             "max_concurrent_runs": max_concurrent_runs,
         }
@@ -241,28 +241,28 @@ def create_job(
         return response.as_dict()
 
     except Exception as e:
-        raise JobError(f"Failed to create job '{name}': {str(e)}")
+        raise JobError(f"Failed to create job '{name}': {e!s}")
 
 
 def update_job(
     job_id: int,
-    name: Optional[str] = None,
-    tasks: Optional[List[Dict[str, Any]]] = None,
-    job_clusters: Optional[List[Dict[str, Any]]] = None,
-    environments: Optional[List[Dict[str, Any]]] = None,
-    tags: Optional[Dict[str, str]] = None,
-    timeout_seconds: Optional[int] = None,
-    max_concurrent_runs: Optional[int] = None,
-    email_notifications: Optional[Dict[str, Any]] = None,
-    webhook_notifications: Optional[Dict[str, Any]] = None,
-    notification_settings: Optional[Dict[str, Any]] = None,
-    schedule: Optional[Dict[str, Any]] = None,
-    queue: Optional[Dict[str, Any]] = None,
-    run_as: Optional[Dict[str, Any]] = None,
-    git_source: Optional[Dict[str, Any]] = None,
-    parameters: Optional[List[Dict[str, Any]]] = None,
-    health: Optional[Dict[str, Any]] = None,
-    deployment: Optional[Dict[str, Any]] = None,
+    name: str | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+    job_clusters: list[dict[str, Any]] | None = None,
+    environments: list[dict[str, Any]] | None = None,
+    tags: dict[str, str] | None = None,
+    timeout_seconds: int | None = None,
+    max_concurrent_runs: int | None = None,
+    email_notifications: dict[str, Any] | None = None,
+    webhook_notifications: dict[str, Any] | None = None,
+    notification_settings: dict[str, Any] | None = None,
+    schedule: dict[str, Any] | None = None,
+    queue: dict[str, Any] | None = None,
+    run_as: dict[str, Any] | None = None,
+    git_source: dict[str, Any] | None = None,
+    parameters: list[dict[str, Any]] | None = None,
+    health: dict[str, Any] | None = None,
+    deployment: dict[str, Any] | None = None,
     **extra_settings,
 ) -> None:
     """
@@ -351,7 +351,7 @@ def update_job(
         w.jobs.update(job_id=job_id, new_settings=new_settings)
 
     except Exception as e:
-        raise JobError(f"Failed to update job {job_id}: {str(e)}", job_id=job_id)
+        raise JobError(f"Failed to update job {job_id}: {e!s}", job_id=job_id)
 
 
 def delete_job(job_id: int) -> None:
@@ -369,4 +369,4 @@ def delete_job(job_id: int) -> None:
     try:
         w.jobs.delete(job_id=job_id)
     except Exception as e:
-        raise JobError(f"Failed to delete job {job_id}: {str(e)}", job_id=job_id)
+        raise JobError(f"Failed to delete job {job_id}: {e!s}", job_id=job_id)

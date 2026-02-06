@@ -83,8 +83,8 @@ class TileDict(TypedDict, total=False):
 
     tile_id: str
     name: str
-    description: Optional[str]
-    instructions: Optional[str]
+    description: str | None
+    instructions: str | None
     tile_type: str
     created_timestamp_ms: int
     last_updated_timestamp_ms: int
@@ -95,7 +95,7 @@ class KnowledgeSourceDict(TypedDict, total=False):
     """Knowledge source configuration for KA."""
 
     knowledge_source_id: str
-    files_source: Dict[str, Any]  # Contains: name, type, files: {path: ...}
+    files_source: dict[str, Any]  # Contains: name, type, files: {path: ...}
 
 
 class KnowledgeAssistantStatusDict(TypedDict):
@@ -108,7 +108,7 @@ class KnowledgeAssistantDict(TypedDict, total=False):
     """Complete Knowledge Assistant response."""
 
     tile: TileDict
-    knowledge_sources: List[KnowledgeSourceDict]
+    knowledge_sources: list[KnowledgeSourceDict]
     status: KnowledgeAssistantStatusDict
 
 
@@ -123,16 +123,16 @@ class KnowledgeAssistantExampleDict(TypedDict, total=False):
 
     example_id: str
     question: str
-    guidelines: List[str]
-    feedback_records: List[Dict[str, Any]]
+    guidelines: list[str]
+    feedback_records: list[dict[str, Any]]
 
 
 class KnowledgeAssistantListExamplesResponseDict(TypedDict, total=False):
     """List examples response."""
 
-    examples: List[KnowledgeAssistantExampleDict]
+    examples: list[KnowledgeAssistantExampleDict]
     tile_id: str
-    next_page_token: Optional[str]
+    next_page_token: str | None
 
 
 class BaseAgentDict(TypedDict, total=False):
@@ -141,10 +141,10 @@ class BaseAgentDict(TypedDict, total=False):
     name: str
     description: str
     agent_type: str  # genie, ka, app, etc.
-    genie_space: Optional[Dict[str, str]]  # {id: ...}
-    serving_endpoint: Optional[Dict[str, str]]  # {name: ...}
-    app: Optional[Dict[str, str]]  # {name: ...}
-    unity_catalog_function: Optional[Dict[str, Any]]
+    genie_space: dict[str, str] | None  # {id: ...}
+    serving_endpoint: dict[str, str] | None  # {name: ...}
+    app: dict[str, str] | None  # {name: ...}
+    unity_catalog_function: dict[str, Any] | None
 
 
 class MultiAgentSupervisorStatusDict(TypedDict):
@@ -157,7 +157,7 @@ class MultiAgentSupervisorDict(TypedDict, total=False):
     """Complete Multi-Agent Supervisor response."""
 
     tile: TileDict
-    agents: List[BaseAgentDict]
+    agents: list[BaseAgentDict]
     status: MultiAgentSupervisorStatusDict
 
 
@@ -172,16 +172,16 @@ class MultiAgentSupervisorExampleDict(TypedDict, total=False):
 
     example_id: str
     question: str
-    guidelines: List[str]
-    feedback_records: List[Dict[str, Any]]
+    guidelines: list[str]
+    feedback_records: list[dict[str, Any]]
 
 
 class MultiAgentSupervisorListExamplesResponseDict(TypedDict, total=False):
     """List examples response."""
 
-    examples: List[MultiAgentSupervisorExampleDict]
+    examples: list[MultiAgentSupervisorExampleDict]
     tile_id: str
-    next_page_token: Optional[str]
+    next_page_token: str | None
 
 
 class GenieSpaceDict(TypedDict, total=False):
@@ -193,15 +193,15 @@ class GenieSpaceDict(TypedDict, total=False):
     space_id: str
     id: str  # Same as space_id
     display_name: str
-    description: Optional[str]
+    description: str | None
     warehouse_id: str
-    table_identifiers: List[str]
+    table_identifiers: list[str]
     run_as_type: str  # VIEWER, OWNER, etc.
     created_timestamp: int
     last_updated_timestamp: int
     user_id: str
-    folder_node_internal_name: Optional[str]
-    sample_questions: Optional[List[str]]
+    folder_node_internal_name: str | None
+    sample_questions: list[str] | None
 
 
 class CuratedQuestionDict(TypedDict, total=False):
@@ -211,14 +211,14 @@ class CuratedQuestionDict(TypedDict, total=False):
     data_space_id: str
     question_text: str
     question_type: str  # SAMPLE_QUESTION, BENCHMARK
-    answer_text: Optional[str]
+    answer_text: str | None
     is_deprecated: bool
 
 
 class GenieListQuestionsResponseDict(TypedDict, total=False):
     """List curated questions response."""
 
-    curated_questions: List[CuratedQuestionDict]
+    curated_questions: list[CuratedQuestionDict]
 
 
 class InstructionDict(TypedDict, total=False):
@@ -233,7 +233,7 @@ class InstructionDict(TypedDict, total=False):
 class GenieListInstructionsResponseDict(TypedDict, total=False):
     """List instructions response."""
 
-    instructions: List[InstructionDict]
+    instructions: list[InstructionDict]
 
 
 class EvaluationRunDict(TypedDict, total=False):
@@ -241,7 +241,7 @@ class EvaluationRunDict(TypedDict, total=False):
 
     mlflow_run_id: str
     tile_id: str
-    name: Optional[str]
+    name: str | None
     created_timestamp_ms: int
     last_updated_timestamp_ms: int
 
@@ -249,5 +249,5 @@ class EvaluationRunDict(TypedDict, total=False):
 class ListEvaluationRunsResponseDict(TypedDict, total=False):
     """List evaluation runs response."""
 
-    evaluation_runs: List[EvaluationRunDict]
-    next_page_token: Optional[str]
+    evaluation_runs: list[EvaluationRunDict]
+    next_page_token: str | None

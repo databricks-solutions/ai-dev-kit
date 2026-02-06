@@ -21,23 +21,23 @@ class GRPCandidate:
     code_blocks_found: int = 0
     code_blocks_passed: int = 0
     execution_success: bool = False
-    execution_details: List[Dict[str, Any]] = field(default_factory=list)
+    execution_details: list[dict[str, Any]] = field(default_factory=list)
 
     # Diagnosis (if failed)
-    diagnosis: Optional[Diagnosis] = None
+    diagnosis: Diagnosis | None = None
 
     # Review status
     status: str = "pending"  # pending, approved, rejected
-    reviewer: Optional[str] = None
-    reviewed_at: Optional[datetime] = None
+    reviewer: str | None = None
+    reviewed_at: datetime | None = None
     review_notes: str = ""
 
     # Skill fix tracking
-    fixed_by_commit: Optional[str] = None
-    fix_description: Optional[str] = None
+    fixed_by_commit: str | None = None
+    fix_description: str | None = None
 
     # Trace linkage (MLflow trace captured via mlflow autolog claude)
-    trace_run_id: Optional[str] = None
+    trace_run_id: str | None = None
 
     # Metadata
     created_at: datetime = field(default_factory=datetime.now)
@@ -48,8 +48,8 @@ class GRPCandidate:
 class GRPResult:
     """Result of GRP pipeline execution."""
     status: Literal["promoted", "rejected", "skipped", "pending"]
-    case_id: Optional[str] = None
-    reason: Optional[str] = None
+    case_id: str | None = None
+    reason: str | None = None
 
 
 @dataclass
@@ -57,7 +57,7 @@ class ApprovalMetadata:
     """Metadata from human approval."""
     approved: bool
     reviewer: str
-    reason: Optional[str] = None
+    reason: str | None = None
     expectations_edited: bool = False
 
 
@@ -107,7 +107,7 @@ def generate_candidate(
 
 
 def save_candidates(
-    candidates: List[GRPCandidate],
+    candidates: list[GRPCandidate],
     output_path: Path
 ) -> None:
     """Save candidates to YAML for review."""

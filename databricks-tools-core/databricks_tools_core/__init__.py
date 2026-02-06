@@ -11,7 +11,7 @@ __version__ = "0.1.0"
 from .auth import get_workspace_client, set_databricks_auth, clear_databricks_auth
 
 __all__ = [
+    'clear_databricks_auth',
     'get_workspace_client',
     'set_databricks_auth',
-    'clear_databricks_auth',
 ]

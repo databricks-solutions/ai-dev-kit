@@ -12,7 +12,7 @@ from databricks.sdk.service.workspace import (
 from ..auth import get_workspace_client
 
 
-def list_files(path: str) -> List[ObjectInfo]:
+def list_files(path: str) -> list[ObjectInfo]:
     """
     List files and directories in a workspace path.
 

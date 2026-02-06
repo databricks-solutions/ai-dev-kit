@@ -13,7 +13,7 @@ from ..server import mcp
 
 
 @mcp.tool
-def list_clusters() -> List[Dict[str, Any]]:
+def list_clusters() -> list[dict[str, Any]]:
     """
     List all clusters in the workspace.
 
@@ -24,7 +24,7 @@ def list_clusters() -> List[Dict[str, Any]]:
 
 
 @mcp.tool
-def get_best_cluster() -> Dict[str, Any]:
+def get_best_cluster() -> dict[str, Any]:
     """
     Get the ID of the best available cluster for code execution.
 
@@ -49,7 +49,7 @@ def execute_databricks_command(
     language: str = "python",
     timeout: int = 120,
     destroy_context_on_completion: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Execute code on a Databricks cluster.
 
@@ -116,7 +116,7 @@ def run_python_file_on_databricks(
     context_id: str = None,
     timeout: int = 600,
     destroy_context_on_completion: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Read a local Python file and execute it on a Databricks cluster.
 

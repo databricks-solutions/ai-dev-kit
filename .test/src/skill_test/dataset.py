@@ -9,12 +9,12 @@ import yaml
 class EvalRecord:
     """Standard evaluation record format (matches mlflow-evaluation patterns)."""
     id: str
-    inputs: Dict[str, Any]
-    outputs: Optional[Dict[str, Any]] = None  # Pre-computed for Pattern 2
-    expectations: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    inputs: dict[str, Any]
+    outputs: dict[str, Any] | None = None  # Pre-computed for Pattern 2
+    expectations: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
-    def to_eval_dict(self) -> Dict[str, Any]:
+    def to_eval_dict(self) -> dict[str, Any]:
         """Convert to MLflow evaluation format."""
         result = {"inputs": self.inputs}
         if self.outputs:
@@ -27,7 +27,7 @@ class EvalRecord:
 class DatasetSource(Protocol):
     """Protocol for dataset sources - enables future UC integration."""
 
-    def load(self) -> List[EvalRecord]:
+    def load(self) -> list[EvalRecord]:
         """Load evaluation records."""
         ...
 
@@ -37,7 +37,7 @@ class YAMLDatasetSource:
     """Load evaluation dataset from YAML file (Phase 1 implementation)."""
     yaml_path: Path
 
-    def load(self) -> List[EvalRecord]:
+    def load(self) -> list[EvalRecord]:
         """Load records from YAML ground_truth.yaml file."""
         with open(self.yaml_path) as f:
             data = yaml.safe_load(f)
@@ -53,7 +53,7 @@ class YAMLDatasetSource:
             ))
         return records
 
-    def save(self, records: List[EvalRecord]) -> None:
+    def save(self, records: list[EvalRecord]) -> None:
         """Save records back to YAML file."""
         data = {
             "test_cases": [
@@ -76,7 +76,7 @@ class UCDatasetSource:
     """Load evaluation dataset from Unity Catalog (Phase 2 - stub only)."""
     uc_table_name: str
 
-    def load(self) -> List[EvalRecord]:
+    def load(self) -> list[EvalRecord]:
         """Placeholder for UC integration."""
         raise NotImplementedError(
             "UC datasets deferred to Phase 2. "

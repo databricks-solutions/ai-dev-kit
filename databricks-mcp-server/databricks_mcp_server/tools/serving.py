@@ -12,7 +12,7 @@ from ..server import mcp
 
 
 @mcp.tool
-def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
+def get_serving_endpoint_status(name: str) -> dict[str, Any]:
     """
     Get the status of a Model Serving endpoint.
 
@@ -47,12 +47,12 @@ def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
 @mcp.tool
 def query_serving_endpoint(
     name: str,
-    messages: Optional[List[Dict[str, str]]] = None,
-    inputs: Optional[Dict[str, Any]] = None,
-    dataframe_records: Optional[List[Dict[str, Any]]] = None,
-    max_tokens: Optional[int] = None,
-    temperature: Optional[float] = None,
-) -> Dict[str, Any]:
+    messages: list[dict[str, str]] | None = None,
+    inputs: dict[str, Any] | None = None,
+    dataframe_records: list[dict[str, Any]] | None = None,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+) -> dict[str, Any]:
     """
     Query a Model Serving endpoint.
 
@@ -106,7 +106,7 @@ def query_serving_endpoint(
 
 
 @mcp.tool
-def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
+def list_serving_endpoints(limit: int = 50) -> list[dict[str, Any]]:
     """
     List Model Serving endpoints in the workspace.
 

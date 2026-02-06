@@ -9,11 +9,11 @@ class MCPExecuteSQL(Protocol):
     def __call__(
         self,
         sql_query: str,
-        warehouse_id: Optional[str] = None,
-        catalog: Optional[str] = None,
-        schema: Optional[str] = None,
+        warehouse_id: str | None = None,
+        catalog: str | None = None,
+        schema: str | None = None,
         timeout: int = 180,
-    ) -> List[Dict[str, Any]]: ...
+    ) -> list[dict[str, Any]]: ...
 
 
 class MCPUploadFile(Protocol):
@@ -23,7 +23,7 @@ class MCPUploadFile(Protocol):
         local_path: str,
         workspace_path: str,
         overwrite: bool = True,
-    ) -> Dict[str, Any]: ...
+    ) -> dict[str, Any]: ...
 
 
 class MCPUploadFolder(Protocol):
@@ -34,12 +34,12 @@ class MCPUploadFolder(Protocol):
         workspace_folder: str,
         max_workers: int = 10,
         overwrite: bool = True,
-    ) -> Dict[str, Any]: ...
+    ) -> dict[str, Any]: ...
 
 
 class MCPGetBestWarehouse(Protocol):
     """Protocol for MCP get_best_warehouse tool."""
-    def __call__(self) -> Optional[str]: ...
+    def __call__(self) -> str | None: ...
 
 
 @dataclass
@@ -66,13 +66,13 @@ class TestFixtureConfig:
     catalog: str = "skill_test"
     schema: str = "test_schema"
     volume: str = "test_data"
-    files: List[FileMapping] = field(default_factory=list)
-    tables: List[TableDefinition] = field(default_factory=list)
+    files: list[FileMapping] = field(default_factory=list)
+    tables: list[TableDefinition] = field(default_factory=list)
     cleanup_after: bool = True  # Auto-cleanup after test
-    warehouse_id: Optional[str] = None  # Auto-detected if None
+    warehouse_id: str | None = None  # Auto-detected if None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TestFixtureConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "TestFixtureConfig":
         """Create config from dictionary (e.g., from YAML)."""
         files = []
         for f in data.get("files", []):
@@ -104,15 +104,15 @@ class FixtureResult:
     """Result of fixture setup/teardown operation."""
     success: bool
     message: str
-    error: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 def setup_test_catalog(
     catalog: str,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
-    warehouse_id: Optional[str] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
+    warehouse_id: str | None = None,
 ) -> FixtureResult:
     """Create catalog if it doesn't exist.
 
@@ -152,8 +152,8 @@ def setup_test_schema(
     catalog: str,
     schema: str,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
-    warehouse_id: Optional[str] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
+    warehouse_id: str | None = None,
 ) -> FixtureResult:
     """Create schema if it doesn't exist.
 
@@ -195,8 +195,8 @@ def setup_test_volume(
     schema: str,
     volume: str,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
-    warehouse_id: Optional[str] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
+    warehouse_id: str | None = None,
 ) -> FixtureResult:
     """Create volume for file storage.
 
@@ -247,12 +247,12 @@ def setup_test_volume(
 
 
 def upload_test_files(
-    files: List[FileMapping],
+    files: list[FileMapping],
     catalog: str,
     schema: str,
     volume: str,
     mcp_upload_file: MCPUploadFile,
-    base_path: Optional[str] = None,
+    base_path: str | None = None,
 ) -> FixtureResult:
     """Upload test files to UC volume.
 
@@ -315,8 +315,8 @@ def create_test_table(
     catalog: str,
     schema: str,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
-    warehouse_id: Optional[str] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
+    warehouse_id: str | None = None,
 ) -> FixtureResult:
     """Create a test table from DDL.
 
@@ -362,8 +362,8 @@ def setup_fixtures(
     config: TestFixtureConfig,
     mcp_execute_sql: MCPExecuteSQL,
     mcp_upload_file: MCPUploadFile,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
-    base_path: Optional[str] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
+    base_path: str | None = None,
 ) -> FixtureResult:
     """Set up all test fixtures from configuration.
 
@@ -477,7 +477,7 @@ def setup_fixtures(
 def teardown_fixtures(
     config: TestFixtureConfig,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None,
     drop_schema: bool = True,
     drop_catalog: bool = False,
 ) -> FixtureResult:

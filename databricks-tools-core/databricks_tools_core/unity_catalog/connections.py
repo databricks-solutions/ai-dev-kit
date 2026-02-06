@@ -19,13 +19,13 @@ def _validate_identifier(name: str) -> str:
     return name
 
 
-def _execute_uc_sql(sql_query: str, warehouse_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def _execute_uc_sql(sql_query: str, warehouse_id: str | None = None) -> list[dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
 
 
-def list_connections() -> List[ConnectionInfo]:
+def list_connections() -> list[ConnectionInfo]:
     """
     List all foreign connections.
 
@@ -59,8 +59,8 @@ def get_connection(name: str) -> ConnectionInfo:
 def create_connection(
     name: str,
     connection_type: str,
-    options: Dict[str, str],
-    comment: Optional[str] = None,
+    options: dict[str, str],
+    comment: str | None = None,
 ) -> ConnectionInfo:
     """
     Create a foreign connection for Lakehouse Federation.
@@ -87,7 +87,7 @@ def create_connection(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "name": name,
         "connection_type": ConnectionType(connection_type.upper()),
         "options": options,
@@ -99,9 +99,9 @@ def create_connection(
 
 def update_connection(
     name: str,
-    options: Optional[Dict[str, str]] = None,
-    new_name: Optional[str] = None,
-    owner: Optional[str] = None,
+    options: dict[str, str] | None = None,
+    new_name: str | None = None,
+    owner: str | None = None,
 ) -> ConnectionInfo:
     """
     Update a foreign connection.
@@ -119,7 +119,7 @@ def update_connection(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {"name": name}
+    kwargs: dict[str, Any] = {"name": name}
     if options is not None:
         kwargs["options"] = options
     if new_name is not None:
@@ -146,10 +146,10 @@ def delete_connection(name: str) -> None:
 def create_foreign_catalog(
     catalog_name: str,
     connection_name: str,
-    catalog_options: Optional[Dict[str, str]] = None,
-    comment: Optional[str] = None,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    catalog_options: dict[str, str] | None = None,
+    comment: str | None = None,
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Create a foreign catalog using a connection (Lakehouse Federation).
 

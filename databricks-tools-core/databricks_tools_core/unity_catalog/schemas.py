@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import SchemaInfo
 from ..auth import get_workspace_client
 
 
-def list_schemas(catalog_name: str) -> List[SchemaInfo]:
+def list_schemas(catalog_name: str) -> list[SchemaInfo]:
     """
     List all schemas in a catalog.
 
@@ -49,7 +49,7 @@ def get_schema(full_schema_name: str) -> SchemaInfo:
 def create_schema(
     catalog_name: str,
     schema_name: str,
-    comment: Optional[str] = None
+    comment: str | None = None
 ) -> SchemaInfo:
     """
     Create a new schema in Unity Catalog.
@@ -75,9 +75,9 @@ def create_schema(
 
 def update_schema(
     full_schema_name: str,
-    new_name: Optional[str] = None,
-    comment: Optional[str] = None,
-    owner: Optional[str] = None
+    new_name: str | None = None,
+    comment: str | None = None,
+    owner: str | None = None
 ) -> SchemaInfo:
     """
     Update an existing schema in Unity Catalog.

@@ -55,30 +55,30 @@ class JobRunResult:
     # Job identification
     job_id: int
     run_id: int
-    job_name: Optional[str] = None
+    job_name: str | None = None
 
     # Run status
-    lifecycle_state: Optional[str] = None
-    result_state: Optional[str] = None
+    lifecycle_state: str | None = None
+    result_state: str | None = None
     success: bool = False
 
     # Timing
-    duration_seconds: Optional[float] = None
-    start_time: Optional[int] = None  # epoch millis
-    end_time: Optional[int] = None  # epoch millis
+    duration_seconds: float | None = None
+    start_time: int | None = None  # epoch millis
+    end_time: int | None = None  # epoch millis
 
     # Run details
-    run_page_url: Optional[str] = None
-    state_message: Optional[str] = None
+    run_page_url: str | None = None
+    state_message: str | None = None
 
     # Error details (if failed)
-    error_message: Optional[str] = None
-    errors: List[Dict[str, Any]] = field(default_factory=list)
+    error_message: str | None = None
+    errors: list[dict[str, Any]] = field(default_factory=list)
 
     # Human-readable status
     message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "job_id": self.job_id,
@@ -101,7 +101,7 @@ class JobRunResult:
 class JobError(Exception):
     """Exception raised for job-related errors."""
 
-    def __init__(self, message: str, job_id: Optional[int] = None, run_id: Optional[int] = None):
+    def __init__(self, message: str, job_id: int | None = None, run_id: int | None = None):
         self.job_id = job_id
         self.run_id = run_id
         super().__init__(message)

@@ -30,16 +30,16 @@ SUCCESS_STATES = {
 
 def run_job_now(
     job_id: int,
-    idempotency_token: Optional[str] = None,
-    jar_params: Optional[List[str]] = None,
-    notebook_params: Optional[Dict[str, str]] = None,
-    python_params: Optional[List[str]] = None,
-    spark_submit_params: Optional[List[str]] = None,
-    python_named_params: Optional[Dict[str, str]] = None,
-    pipeline_params: Optional[Dict[str, Any]] = None,
-    sql_params: Optional[Dict[str, str]] = None,
-    dbt_commands: Optional[List[str]] = None,
-    queue: Optional[Dict[str, Any]] = None,
+    idempotency_token: str | None = None,
+    jar_params: list[str] | None = None,
+    notebook_params: dict[str, str] | None = None,
+    python_params: list[str] | None = None,
+    spark_submit_params: list[str] | None = None,
+    python_named_params: dict[str, str] | None = None,
+    pipeline_params: dict[str, Any] | None = None,
+    sql_params: dict[str, str] | None = None,
+    dbt_commands: list[str] | None = None,
+    queue: dict[str, Any] | None = None,
     **extra_params,
 ) -> int:
     """
@@ -73,7 +73,7 @@ def run_job_now(
 
     try:
         # Build kwargs for SDK call
-        kwargs: Dict[str, Any] = {"job_id": job_id}
+        kwargs: dict[str, Any] = {"job_id": job_id}
 
         # Add optional parameters
         if idempotency_token:
@@ -117,10 +117,10 @@ def run_job_now(
             raise JobError(f"Failed to extract run_id from response for job {job_id}", job_id=job_id)
 
     except Exception as e:
-        raise JobError(f"Failed to start run for job {job_id}: {str(e)}", job_id=job_id)
+        raise JobError(f"Failed to start run for job {job_id}: {e!s}", job_id=job_id)
 
 
-def get_run(run_id: int) -> Dict[str, Any]:
+def get_run(run_id: int) -> dict[str, Any]:
     """
     Get detailed run status and information.
 
@@ -142,10 +142,10 @@ def get_run(run_id: int) -> Dict[str, Any]:
         return run.as_dict()
 
     except Exception as e:
-        raise JobError(f"Failed to get run {run_id}: {str(e)}", run_id=run_id)
+        raise JobError(f"Failed to get run {run_id}: {e!s}", run_id=run_id)
 
 
-def get_run_output(run_id: int) -> Dict[str, Any]:
+def get_run_output(run_id: int) -> dict[str, Any]:
     """
     Get run output including logs and results.
 
@@ -167,7 +167,7 @@ def get_run_output(run_id: int) -> Dict[str, Any]:
         return output.as_dict()
 
     except Exception as e:
-        raise JobError(f"Failed to get output for run {run_id}: {str(e)}", run_id=run_id)
+        raise JobError(f"Failed to get output for run {run_id}: {e!s}", run_id=run_id)
 
 
 def cancel_run(run_id: int) -> None:
@@ -185,18 +185,18 @@ def cancel_run(run_id: int) -> None:
     try:
         w.jobs.cancel_run(run_id=run_id)
     except Exception as e:
-        raise JobError(f"Failed to cancel run {run_id}: {str(e)}", run_id=run_id)
+        raise JobError(f"Failed to cancel run {run_id}: {e!s}", run_id=run_id)
 
 
 def list_runs(
-    job_id: Optional[int] = None,
+    job_id: int | None = None,
     active_only: bool = False,
     completed_only: bool = False,
     limit: int = 25,
     offset: int = 0,
-    start_time_from: Optional[int] = None,
-    start_time_to: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+    start_time_from: int | None = None,
+    start_time_to: int | None = None,
+) -> list[dict[str, Any]]:
     """
     List job runs with optional filters.
 
@@ -242,7 +242,7 @@ def list_runs(
         return runs
 
     except Exception as e:
-        raise JobError(f"Failed to list runs: {str(e)}", job_id=job_id)
+        raise JobError(f"Failed to list runs: {e!s}", job_id=job_id)
 
 
 def wait_for_run(
@@ -371,6 +371,6 @@ def wait_for_run(
 
         except Exception as e:
             # If we can't get run status, raise error
-            raise JobError(f"Failed to get run status for {run_id}: {str(e)}", run_id=run_id)
+            raise JobError(f"Failed to get run status for {run_id}: {e!s}", run_id=run_id)
 
         time.sleep(poll_interval)

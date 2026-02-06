@@ -17,7 +17,7 @@ def _validate_identifier(name: str) -> str:
     return name
 
 
-def _execute_uc_sql(sql_query: str, warehouse_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def _execute_uc_sql(sql_query: str, warehouse_id: str | None = None) -> list[dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
@@ -29,9 +29,9 @@ def create_security_function(
     parameter_type: str,
     return_type: str,
     function_body: str,
-    comment: Optional[str] = None,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    comment: str | None = None,
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Create a SQL function for use as a row filter or column mask.
 
@@ -70,9 +70,9 @@ def create_security_function(
 def set_row_filter(
     table_name: str,
     filter_function: str,
-    filter_columns: List[str],
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    filter_columns: list[str],
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Apply a row filter function to a table.
 
@@ -100,8 +100,8 @@ def set_row_filter(
 
 def drop_row_filter(
     table_name: str,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Remove the row filter from a table.
 
@@ -122,8 +122,8 @@ def set_column_mask(
     table_name: str,
     column_name: str,
     mask_function: str,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Apply a column mask function to a specific column.
 
@@ -150,8 +150,8 @@ def set_column_mask(
 def drop_column_mask(
     table_name: str,
     column_name: str,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """
     Remove the column mask from a specific column.
 

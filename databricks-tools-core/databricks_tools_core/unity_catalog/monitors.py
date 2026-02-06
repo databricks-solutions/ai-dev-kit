@@ -12,12 +12,12 @@ def create_monitor(
     table_name: str,
     output_schema_name: str,
     monitor_type: str = "snapshot",
-    assets_dir: Optional[str] = None,
-    time_series_timestamp_col: Optional[str] = None,
-    time_series_granularities: Optional[List[str]] = None,
-    schedule_cron: Optional[str] = None,
+    assets_dir: str | None = None,
+    time_series_timestamp_col: str | None = None,
+    time_series_granularities: list[str] | None = None,
+    schedule_cron: str | None = None,
     schedule_timezone: str = "UTC",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a quality monitor on a table.
 
@@ -47,7 +47,7 @@ def create_monitor(
         safe_table = table_name.replace(".", "_")
         assets_dir = f"/Workspace/Users/{user.user_name}/databricks_lakehouse_monitoring/{safe_table}"
 
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "table_name": table_name,
         "output_schema_name": output_schema_name,
         "assets_dir": assets_dir,
@@ -85,7 +85,7 @@ def create_monitor(
     return result.as_dict() if hasattr(result, "as_dict") else vars(result)
 
 
-def get_monitor(table_name: str) -> Dict[str, Any]:
+def get_monitor(table_name: str) -> dict[str, Any]:
     """
     Get the quality monitor on a table.
 
@@ -103,7 +103,7 @@ def get_monitor(table_name: str) -> Dict[str, Any]:
     return result.as_dict() if hasattr(result, "as_dict") else vars(result)
 
 
-def run_monitor_refresh(table_name: str) -> Dict[str, Any]:
+def run_monitor_refresh(table_name: str) -> dict[str, Any]:
     """
     Trigger a refresh of a quality monitor.
 
@@ -121,7 +121,7 @@ def run_monitor_refresh(table_name: str) -> Dict[str, Any]:
     return result.as_dict() if hasattr(result, "as_dict") else vars(result)
 
 
-def list_monitor_refreshes(table_name: str) -> List[Dict[str, Any]]:
+def list_monitor_refreshes(table_name: str) -> list[dict[str, Any]]:
     """
     List refresh history for a quality monitor.
 

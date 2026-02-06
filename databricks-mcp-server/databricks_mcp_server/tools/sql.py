@@ -20,7 +20,7 @@ def execute_sql(
     catalog: str = None,
     schema: str = None,
     timeout: int = 180,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Execute a SQL query on a Databricks SQL Warehouse.
 
@@ -53,7 +53,7 @@ def execute_sql_multi(
     schema: str = None,
     timeout: int = 180,
     max_workers: int = 4,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Execute multiple SQL statements with dependency-aware parallelism.
 
@@ -82,7 +82,7 @@ def execute_sql_multi(
 
 
 @mcp.tool
-def list_warehouses() -> List[Dict[str, Any]]:
+def list_warehouses() -> list[dict[str, Any]]:
     """
     List all SQL warehouses in the workspace.
 
@@ -93,7 +93,7 @@ def list_warehouses() -> List[Dict[str, Any]]:
 
 
 @mcp.tool
-def get_best_warehouse() -> Optional[str]:
+def get_best_warehouse() -> str | None:
     """
     Get the ID of the best available SQL warehouse.
 
@@ -109,10 +109,10 @@ def get_best_warehouse() -> Optional[str]:
 def get_table_details(
     catalog: str,
     schema: str,
-    table_names: List[str] = None,
+    table_names: list[str] = None,
     table_stat_level: str = "SIMPLE",
     warehouse_id: str = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get table schema and statistics for one or more tables.
 

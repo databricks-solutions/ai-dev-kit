@@ -20,10 +20,10 @@ class AutologStatus:
     """MLflow autolog configuration status."""
 
     enabled: bool
-    tracking_uri: Optional[str] = None
-    experiment_name: Optional[str] = None
-    experiment_id: Optional[str] = None
-    error: Optional[str] = None
+    tracking_uri: str | None = None
+    experiment_name: str | None = None
+    experiment_id: str | None = None
+    error: str | None = None
 
 
 def check_autolog_status(directory: str = ".") -> AutologStatus:
@@ -82,7 +82,7 @@ def check_autolog_status(directory: str = ".") -> AutologStatus:
         return AutologStatus(enabled=False, error=str(e))
 
 
-def get_current_session_trace_path() -> Optional[Path]:
+def get_current_session_trace_path() -> Path | None:
     """Get the trace file path for the current Claude Code session.
 
     Claude Code stores session traces at:
@@ -130,9 +130,9 @@ def get_current_session_trace_path() -> Optional[Path]:
 
 def get_trace_from_best_source(
     skill_name: str,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     prefer_mlflow: bool = True,
-) -> Tuple[TraceMetrics, str]:
+) -> tuple[TraceMetrics, str]:
     """Get trace from the best available source.
 
     Priority:

@@ -27,7 +27,7 @@ def setup_mlflow(config: SkillTestConfig) -> None:
     mlflow.set_experiment(config.mlflow.experiment_name)
 
 
-def load_scorer_config(skill_name: str, base_path: Optional[Path] = None) -> Dict[str, Any]:
+def load_scorer_config(skill_name: str, base_path: Path | None = None) -> dict[str, Any]:
     """Load scorer configuration from skill manifest.
 
     Args:
@@ -60,7 +60,7 @@ def load_scorer_config(skill_name: str, base_path: Optional[Path] = None) -> Dic
     return {}
 
 
-def build_scorers(scorer_config: Dict[str, Any]) -> List:
+def build_scorers(scorer_config: dict[str, Any]) -> list:
     """Build scorer list from configuration.
 
     Args:
@@ -121,7 +121,7 @@ def build_scorers(scorer_config: Dict[str, Any]) -> List:
     return scorers
 
 
-def get_default_scorers() -> List:
+def get_default_scorers() -> list:
     """Get the default scorer list when no manifest config exists.
 
     Returns:
@@ -140,10 +140,10 @@ def get_default_scorers() -> List:
 
 def evaluate_skill(
     skill_name: str,
-    config: Optional[SkillTestConfig] = None,
-    run_name: Optional[str] = None,
-    filter_category: Optional[str] = None
-) -> Dict[str, Any]:
+    config: SkillTestConfig | None = None,
+    run_name: str | None = None,
+    filter_category: str | None = None
+) -> dict[str, Any]:
     """
     Evaluate a skill using pre-computed outputs (Pattern 2).
 
@@ -207,9 +207,9 @@ def evaluate_skill(
 
 
 def evaluate_routing(
-    config: Optional[SkillTestConfig] = None,
-    run_name: Optional[str] = None
-) -> Dict[str, Any]:
+    config: SkillTestConfig | None = None,
+    run_name: str | None = None
+) -> dict[str, Any]:
     """
     Evaluate skill routing accuracy.
 

@@ -113,7 +113,7 @@ class TestShareCRUD:
                 table_name=uc_test_table,
             )
             assert result is not None
-            logger.info(f"Table added to share")
+            logger.info("Table added to share")
 
             # Verify table is in share
             share = get_share(share_name, include_shared_data=True)
@@ -121,13 +121,13 @@ class TestShareCRUD:
             logger.info(f"Share has {len(objects)} objects")
 
             # Remove table
-            logger.info(f"Removing table from share")
+            logger.info("Removing table from share")
             remove_result = remove_table_from_share(
                 share_name=share_name,
                 table_name=uc_test_table,
             )
             assert remove_result is not None
-            logger.info(f"Table removed from share")
+            logger.info("Table removed from share")
 
         except Exception as e:
             if _is_sharing_error(e):
@@ -214,7 +214,7 @@ class TestSharePermissions:
             logger.info(f"Share granted: {grant_result}")
 
             # Revoke
-            logger.info(f"Revoking share from recipient")
+            logger.info("Revoking share from recipient")
             revoke_result = revoke_share_from_recipient(
                 share_name=share_name,
                 recipient_name=recipient_name,

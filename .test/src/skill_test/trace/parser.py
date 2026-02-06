@@ -18,7 +18,7 @@ from .models import (
 )
 
 
-def parse_timestamp(ts: Union[str, int, float, None]) -> Optional[datetime]:
+def parse_timestamp(ts: str | int | float | None) -> datetime | None:
     """Parse various timestamp formats to datetime.
 
     Args:
@@ -49,7 +49,7 @@ def parse_timestamp(ts: Union[str, int, float, None]) -> Optional[datetime]:
     return None
 
 
-def extract_tool_calls(content: List[Dict[str, Any]]) -> List[ToolCall]:
+def extract_tool_calls(content: list[dict[str, Any]]) -> list[ToolCall]:
     """Extract tool calls from message content array.
 
     Args:
@@ -72,8 +72,8 @@ def extract_tool_calls(content: List[Dict[str, Any]]) -> List[ToolCall]:
 
 
 def extract_file_operation(
-    tool_use_result: Union[Dict[str, Any], str, None], timestamp: Optional[datetime] = None
-) -> Optional[FileOperation]:
+    tool_use_result: dict[str, Any] | str | None, timestamp: datetime | None = None
+) -> FileOperation | None:
     """Extract file operation from toolUseResult.
 
     Args:
@@ -99,7 +99,7 @@ def extract_file_operation(
     return None
 
 
-def parse_entry(line: str) -> Optional[TranscriptEntry]:
+def parse_entry(line: str) -> TranscriptEntry | None:
     """Parse a single JSONL line into a TranscriptEntry.
 
     Args:
@@ -150,7 +150,7 @@ def parse_entry(line: str) -> Optional[TranscriptEntry]:
     return entry
 
 
-def parse_transcript(lines: List[str]) -> List[TranscriptEntry]:
+def parse_transcript(lines: list[str]) -> list[TranscriptEntry]:
     """Parse transcript JSONL lines into TranscriptEntry objects.
 
     Args:
@@ -170,7 +170,7 @@ def parse_transcript(lines: List[str]) -> List[TranscriptEntry]:
     return entries
 
 
-def parse_transcript_file(path: Union[str, Path]) -> List[TranscriptEntry]:
+def parse_transcript_file(path: str | Path) -> list[TranscriptEntry]:
     """Parse a transcript JSONL file.
 
     Args:
@@ -183,13 +183,13 @@ def parse_transcript_file(path: Union[str, Path]) -> List[TranscriptEntry]:
     if not path.exists():
         raise FileNotFoundError(f"Transcript file not found: {path}")
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         lines = f.readlines()
 
     return parse_transcript(lines)
 
 
-def link_tool_results(entries: List[TranscriptEntry]) -> None:
+def link_tool_results(entries: list[TranscriptEntry]) -> None:
     """Link tool results back to their tool calls.
 
     Modifies entries in place to populate tool_call.result fields.
@@ -198,7 +198,7 @@ def link_tool_results(entries: List[TranscriptEntry]) -> None:
         entries: List of TranscriptEntry objects
     """
     # Build mapping of tool_use_id to tool_call
-    tool_calls_by_id: Dict[str, ToolCall] = {}
+    tool_calls_by_id: dict[str, ToolCall] = {}
     for entry in entries:
         for tc in entry.tool_calls:
             tool_calls_by_id[tc.id] = tc
@@ -233,7 +233,7 @@ def link_tool_results(entries: List[TranscriptEntry]) -> None:
                         tc.success = "error" not in result_content.lower()
 
 
-def compute_metrics(entries: List[TranscriptEntry]) -> TraceMetrics:
+def compute_metrics(entries: list[TranscriptEntry]) -> TraceMetrics:
     """Compute aggregated metrics from transcript entries.
 
     Args:
@@ -253,10 +253,10 @@ def compute_metrics(entries: List[TranscriptEntry]) -> TraceMetrics:
 
     metrics = TraceMetrics(session_id=session_id)
 
-    tool_counts: Dict[str, int] = defaultdict(int)
-    category_counts: Dict[str, int] = defaultdict(int)
-    all_tool_calls: List[ToolCall] = []
-    file_operations: List[FileOperation] = []
+    tool_counts: dict[str, int] = defaultdict(int)
+    category_counts: dict[str, int] = defaultdict(int)
+    all_tool_calls: list[ToolCall] = []
+    file_operations: list[FileOperation] = []
 
     timestamps = []
 
@@ -321,7 +321,7 @@ def compute_metrics(entries: List[TranscriptEntry]) -> TraceMetrics:
     return metrics
 
 
-def parse_and_compute_metrics(path: Union[str, Path]) -> TraceMetrics:
+def parse_and_compute_metrics(path: str | Path) -> TraceMetrics:
     """Parse a transcript file and compute metrics in one step.
 
     Args:

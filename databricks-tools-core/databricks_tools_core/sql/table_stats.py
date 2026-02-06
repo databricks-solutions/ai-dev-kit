@@ -30,9 +30,9 @@ def _has_glob_pattern(name: str) -> bool:
 def get_table_details(
     catalog: str,
     schema: str,
-    table_names: Optional[List[str]] = None,
+    table_names: list[str] | None = None,
     table_stat_level: TableStatLevel = TableStatLevel.SIMPLE,
-    warehouse_id: Optional[str] = None,
+    warehouse_id: str | None = None,
 ) -> TableSchemaResult:
     """
     Get detailed information about tables in a schema.
@@ -174,7 +174,7 @@ def _parse_volume_path(volume_path: str) -> str:
     return f"/Volumes/{path}"
 
 
-def _list_volume_files(volume_path: str) -> tuple[List[VolumeFileInfo], int, Optional[str]]:
+def _list_volume_files(volume_path: str) -> tuple[list[VolumeFileInfo], int, str | None]:
     """
     List files in a volume folder using the Files API.
 
@@ -221,7 +221,7 @@ def get_volume_folder_details(
     volume_path: str,
     format: Literal["parquet", "csv", "json", "delta", "file"] = "parquet",
     table_stat_level: TableStatLevel = TableStatLevel.SIMPLE,
-    warehouse_id: Optional[str] = None,
+    warehouse_id: str | None = None,
 ) -> TableSchemaResult:
     """
     Get detailed information about data files in a Databricks Volume folder.
@@ -377,7 +377,7 @@ def get_volume_folder_details(
                 format=format,
                 total_files=total_files,
                 total_size_bytes=total_size,
-                error=f"Failed to read volume data: {str(e)}",
+                error=f"Failed to read volume data: {e!s}",
             ))
 
     # Use TableStatsCollector for full stats
@@ -422,5 +422,5 @@ def get_volume_folder_details(
             format=format,
             total_files=total_files,
             total_size_bytes=total_size,
-            error=f"Failed to read volume data: {str(e)}",
+            error=f"Failed to read volume data: {e!s}",
         ))

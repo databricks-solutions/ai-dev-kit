@@ -17,7 +17,7 @@ from ..auth import get_workspace_client
 # --- Storage Credentials ---
 
 
-def list_storage_credentials() -> List[StorageCredentialInfo]:
+def list_storage_credentials() -> list[StorageCredentialInfo]:
     """
     List all storage credentials.
 
@@ -50,9 +50,9 @@ def get_storage_credential(name: str) -> StorageCredentialInfo:
 
 def create_storage_credential(
     name: str,
-    comment: Optional[str] = None,
-    aws_iam_role_arn: Optional[str] = None,
-    azure_access_connector_id: Optional[str] = None,
+    comment: str | None = None,
+    aws_iam_role_arn: str | None = None,
+    azure_access_connector_id: str | None = None,
     read_only: bool = False,
 ) -> StorageCredentialInfo:
     """
@@ -81,7 +81,7 @@ def create_storage_credential(
         )
 
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {"name": name, "read_only": read_only}
+    kwargs: dict[str, Any] = {"name": name, "read_only": read_only}
     if comment is not None:
         kwargs["comment"] = comment
     if aws_iam_role_arn:
@@ -95,11 +95,11 @@ def create_storage_credential(
 
 def update_storage_credential(
     name: str,
-    new_name: Optional[str] = None,
-    comment: Optional[str] = None,
-    owner: Optional[str] = None,
-    aws_iam_role_arn: Optional[str] = None,
-    azure_access_connector_id: Optional[str] = None,
+    new_name: str | None = None,
+    comment: str | None = None,
+    owner: str | None = None,
+    aws_iam_role_arn: str | None = None,
+    azure_access_connector_id: str | None = None,
 ) -> StorageCredentialInfo:
     """
     Update a storage credential.
@@ -119,7 +119,7 @@ def update_storage_credential(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {"name": name}
+    kwargs: dict[str, Any] = {"name": name}
     if new_name is not None:
         kwargs["new_name"] = new_name
     if comment is not None:
@@ -152,8 +152,8 @@ def delete_storage_credential(name: str, force: bool = False) -> None:
 
 def validate_storage_credential(
     name: str,
-    url: Optional[str] = None,
-) -> Dict[str, Any]:
+    url: str | None = None,
+) -> dict[str, Any]:
     """
     Validate a storage credential against a cloud storage URL.
 
@@ -168,7 +168,7 @@ def validate_storage_credential(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {"storage_credential_name": name}
+    kwargs: dict[str, Any] = {"storage_credential_name": name}
     if url is not None:
         kwargs["url"] = url
     result = w.storage_credentials.validate(**kwargs)
@@ -184,7 +184,7 @@ def validate_storage_credential(
 # --- External Locations ---
 
 
-def list_external_locations() -> List[ExternalLocationInfo]:
+def list_external_locations() -> list[ExternalLocationInfo]:
     """
     List all external locations.
 
@@ -219,7 +219,7 @@ def create_external_location(
     name: str,
     url: str,
     credential_name: str,
-    comment: Optional[str] = None,
+    comment: str | None = None,
     read_only: bool = False,
 ) -> ExternalLocationInfo:
     """
@@ -239,7 +239,7 @@ def create_external_location(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "name": name,
         "url": url,
         "credential_name": credential_name,
@@ -252,12 +252,12 @@ def create_external_location(
 
 def update_external_location(
     name: str,
-    new_name: Optional[str] = None,
-    url: Optional[str] = None,
-    credential_name: Optional[str] = None,
-    comment: Optional[str] = None,
-    owner: Optional[str] = None,
-    read_only: Optional[bool] = None,
+    new_name: str | None = None,
+    url: str | None = None,
+    credential_name: str | None = None,
+    comment: str | None = None,
+    owner: str | None = None,
+    read_only: bool | None = None,
 ) -> ExternalLocationInfo:
     """
     Update an external location.
@@ -278,7 +278,7 @@ def update_external_location(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {"name": name}
+    kwargs: dict[str, Any] = {"name": name}
     if new_name is not None:
         kwargs["new_name"] = new_name
     if url is not None:

@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import VolumeInfo, VolumeType
 from ..auth import get_workspace_client
 
 
-def list_volumes(catalog_name: str, schema_name: str) -> List[VolumeInfo]:
+def list_volumes(catalog_name: str, schema_name: str) -> list[VolumeInfo]:
     """
     List all volumes in a schema.
 
@@ -56,8 +56,8 @@ def create_volume(
     schema_name: str,
     name: str,
     volume_type: str = "MANAGED",
-    comment: Optional[str] = None,
-    storage_location: Optional[str] = None,
+    comment: str | None = None,
+    storage_location: str | None = None,
 ) -> VolumeInfo:
     """
     Create a new volume in Unity Catalog.
@@ -82,7 +82,7 @@ def create_volume(
         raise ValueError("storage_location is required for EXTERNAL volumes")
 
     w = get_workspace_client()
-    kwargs: Dict = {
+    kwargs: dict = {
         "catalog_name": catalog_name,
         "schema_name": schema_name,
         "name": name,
@@ -97,9 +97,9 @@ def create_volume(
 
 def update_volume(
     full_volume_name: str,
-    new_name: Optional[str] = None,
-    comment: Optional[str] = None,
-    owner: Optional[str] = None,
+    new_name: str | None = None,
+    comment: str | None = None,
+    owner: str | None = None,
 ) -> VolumeInfo:
     """
     Update an existing volume.
@@ -121,7 +121,7 @@ def update_volume(
         raise ValueError("At least one field must be provided to update")
 
     w = get_workspace_client()
-    kwargs: Dict = {"name": full_volume_name}
+    kwargs: dict = {"name": full_volume_name}
     if new_name is not None:
         kwargs["new_name"] = new_name
     if comment is not None:

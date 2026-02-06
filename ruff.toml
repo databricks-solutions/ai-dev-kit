@@ -1,0 +1,76 @@
+# This is the root configuration file for Ruff.
+# Ruff is a Python linter and formatter. This configuration defines the rules
+# and settings that ensure consistent code style and quality throughout the monorepo.
+
+# Target Python 3.11+
+target-version = "py311"
+line-length = 120
+
+# The `lint` section controls linting rules.
+[lint]
+# Select the linter codes to enable. This includes common checks for style,
+# bugs, and security issues.
+select = [
+  "E",  # pycodestyle errors
+  "F",  # pyflakes
+  "I",  # isort
+  "B",  # flake8-bugbear
+  "N",  # pep8-naming
+  "UP", # pyupgrade
+  "D",  # pydocstyle
+
+  # Best practices
+  "RUF", # Ruff-specific rules
+  "PIE", # flake8-pie
+]
+
+ignore = [
+  "D203", # conflicts with D211 (blank line before class docstring)
+  "D213", # conflicts with D212 (summary on first line)
+  "E401",  # Multiple imports on one line
+  "E402",  # Module level import not at top of file
+  "F403",  # Star imports
+  "I001",  # Import block unsorted
+]
+
+# Exclude files or directories from linting.
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.pyc",
+    "*.pyo",
+    "*.pyd",
+    "*.egg-info",
+    "*.toml",
+    ".venv*",
+]
+
+# The `fix` section enables automatic fixes for supported rules.
+# [fix]
+# # Automatically apply all safe fixes.
+# # This helps with code quality and consistency across the monorepo.
+# # To run this, use `ruff check --fix .`
+# unsafe = true
+
+# The `format` section controls code formatting.
+[format]
+# Ruff can act as a code formatter. This ensures a consistent style.
+# Configure formatter to be compatible with Black
+quote-style = "double"
+line-ending = "auto"
+indent-style = "space"
+
+# Ruff is configured to check for the correct import order.
+[lint.isort]
+known-third-party = ["pyspark", "delta-spark", "pytest", "pytest-cov", "scikit-learn", "xgboost"]
+
+# The `D` checks are for docstring conventions. This helps maintain consistent
+# and clear documentation.
+[lint.pydocstyle]
+convention = "google"
+
+# Configure complexity checking
+[lint.mccabe]
+max-complexity = 10

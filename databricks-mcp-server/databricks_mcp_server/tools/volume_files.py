@@ -15,7 +15,7 @@ from ..server import mcp
 
 
 @mcp.tool
-def list_volume_files(volume_path: str, max_results: int = 500) -> Dict[str, Any]:
+def list_volume_files(volume_path: str, max_results: int = 500) -> dict[str, Any]:
     """
     List files and directories in a Unity Catalog volume path.
 
@@ -60,7 +60,7 @@ def upload_to_volume(
     local_path: str,
     volume_path: str,
     overwrite: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Upload a local file to a Unity Catalog volume.
 
@@ -90,7 +90,7 @@ def download_from_volume(
     volume_path: str,
     local_path: str,
     overwrite: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Download a file from a Unity Catalog volume to local path.
 
@@ -116,7 +116,7 @@ def download_from_volume(
 
 
 @mcp.tool
-def delete_volume_file(volume_path: str) -> Dict[str, Any]:
+def delete_volume_file(volume_path: str) -> dict[str, Any]:
     """
     Delete a file from a Unity Catalog volume.
 
@@ -134,7 +134,7 @@ def delete_volume_file(volume_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def delete_volume_directory(volume_path: str) -> Dict[str, Any]:
+def delete_volume_directory(volume_path: str) -> dict[str, Any]:
     """
     Delete an empty directory from a Unity Catalog volume.
 
@@ -154,7 +154,7 @@ def delete_volume_directory(volume_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def create_volume_directory(volume_path: str) -> Dict[str, Any]:
+def create_volume_directory(volume_path: str) -> dict[str, Any]:
     """
     Create a directory in a Unity Catalog volume.
 
@@ -175,7 +175,7 @@ def create_volume_directory(volume_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def get_volume_file_info(volume_path: str) -> Dict[str, Any]:
+def get_volume_file_info(volume_path: str) -> dict[str, Any]:
     """
     Get metadata for a file in a Unity Catalog volume.
 

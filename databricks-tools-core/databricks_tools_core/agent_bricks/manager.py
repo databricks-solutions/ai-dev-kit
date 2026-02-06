@@ -13,7 +13,8 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+from collections.abc import Callable
 
 import requests
 from databricks.sdk import WorkspaceClient
@@ -82,7 +83,7 @@ class AgentBricksManager:
 
     def __init__(
         self,
-        client: Optional[WorkspaceClient] = None,
+        client: WorkspaceClient | None = None,
         default_timeout_s: int = 600,
         default_poll_s: float = 2.0,
     ):
@@ -135,7 +136,7 @@ class AgentBricksManager:
         """Delete any tile (KA or MAS) by ID."""
         self._delete(f"/api/2.0/tiles/{tile_id}")
 
-    def share(self, tile_id: str, changes: List[Dict[str, Any]]) -> None:
+    def share(self, tile_id: str, changes: list[dict[str, Any]]) -> None:
         """Share a tile with specified permissions.
 
         Args:
@@ -183,8 +184,8 @@ class AgentBricksManager:
     # ========================================================================
 
     def list_all_agent_bricks(
-        self, tile_type: Optional[TileType] = None, page_size: int = 100
-    ) -> List[Dict[str, Any]]:
+        self, tile_type: TileType | None = None, page_size: int = 100
+    ) -> list[dict[str, Any]]:
         """List all agent bricks (tiles) in the workspace.
 
         Args:
@@ -223,7 +224,7 @@ class AgentBricksManager:
 
         return all_tiles
 
-    def find_by_name(self, name: str) -> Optional[KAIds]:
+    def find_by_name(self, name: str) -> KAIds | None:
         """Find a KA by exact display name."""
         filter_q = f"name_contains={name}&&tile_type=KA"
         page_token = None
@@ -240,7 +241,7 @@ class AgentBricksManager:
                 break
         return None
 
-    def mas_find_by_name(self, name: str) -> Optional[MASIds]:
+    def mas_find_by_name(self, name: str) -> MASIds | None:
         """Find a MAS by exact display name."""
         filter_q = f"name_contains={name}&&tile_type=MAS"
         page_token = None
@@ -257,7 +258,7 @@ class AgentBricksManager:
                 break
         return None
 
-    def genie_find_by_name(self, display_name: str) -> Optional[GenieIds]:
+    def genie_find_by_name(self, display_name: str) -> GenieIds | None:
         """Find a Genie space by exact display name."""
         page_token = None
         while True:
@@ -280,10 +281,10 @@ class AgentBricksManager:
     def ka_create(
         self,
         name: str,
-        knowledge_sources: List[Dict[str, Any]],
-        description: Optional[str] = None,
-        instructions: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        knowledge_sources: list[dict[str, Any]],
+        description: str | None = None,
+        instructions: str | None = None,
+    ) -> dict[str, Any]:
         """Create a Knowledge Assistant with specified knowledge sources.
 
         Args:
@@ -303,7 +304,7 @@ class AgentBricksManager:
             KA creation response with tile info
         """
         sanitized_name = self.sanitize_name(name)
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "name": sanitized_name,
             "knowledge_sources": knowledge_sources,
         }
@@ -315,7 +316,7 @@ class AgentBricksManager:
         logger.debug(f"Creating KA with payload: {payload}")
         return self._post("/api/2.0/knowledge-assistants", payload)
 
-    def ka_get(self, tile_id: str) -> Optional[KnowledgeAssistantResponseDict]:
+    def ka_get(self, tile_id: str) -> KnowledgeAssistantResponseDict | None:
         """Get KA by tile_id.
 
         Returns:
@@ -328,7 +329,7 @@ class AgentBricksManager:
                 return None
             raise
 
-    def ka_get_endpoint_status(self, tile_id: str) -> Optional[str]:
+    def ka_get_endpoint_status(self, tile_id: str) -> str | None:
         """Get the endpoint status of a Knowledge Assistant.
 
         Returns:
@@ -367,11 +368,11 @@ class AgentBricksManager:
     def ka_update(
         self,
         tile_id: str,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        instructions: Optional[str] = None,
-        knowledge_sources: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        name: str | None = None,
+        description: str | None = None,
+        instructions: str | None = None,
+        knowledge_sources: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Update KA metadata and/or knowledge sources.
 
         Args:
@@ -386,7 +387,7 @@ class AgentBricksManager:
         """
         # Update metadata if provided
         if name is not None or description is not None or instructions is not None:
-            body: Dict[str, Any] = {}
+            body: dict[str, Any] = {}
             if name is not None:
                 body["name"] = name
             if description is not None:
@@ -426,11 +427,11 @@ class AgentBricksManager:
     def ka_create_or_update(
         self,
         name: str,
-        knowledge_sources: List[Dict[str, Any]],
-        description: Optional[str] = None,
-        instructions: Optional[str] = None,
-        tile_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        knowledge_sources: list[dict[str, Any]],
+        description: str | None = None,
+        instructions: str | None = None,
+        tile_id: str | None = None,
+    ) -> dict[str, Any]:
         """Create or update a Knowledge Assistant.
 
         Args:
@@ -488,8 +489,8 @@ class AgentBricksManager:
         self._patch(f"/api/2.0/knowledge-assistants/{tile_id}/reconcile-model", {})
 
     def ka_wait_until_ready(
-        self, tile_id: str, timeout_s: Optional[int] = None, poll_s: Optional[float] = None
-    ) -> Dict[str, Any]:
+        self, tile_id: str, timeout_s: int | None = None, poll_s: float | None = None
+    ) -> dict[str, Any]:
         """Wait until KA is ready (not in PROVISIONING state)."""
         timeout_s = timeout_s or self.default_timeout_s
         poll_s = poll_s or self.default_poll_s
@@ -505,8 +506,8 @@ class AgentBricksManager:
             time.sleep(poll_s)
 
     def ka_wait_until_endpoint_online(
-        self, tile_id: str, timeout_s: Optional[int] = None, poll_s: Optional[float] = None
-    ) -> Dict[str, Any]:
+        self, tile_id: str, timeout_s: int | None = None, poll_s: float | None = None
+    ) -> dict[str, Any]:
         """Wait for endpoint_status==ONLINE."""
         timeout_s = timeout_s or self.default_timeout_s
         poll_s = poll_s or self.default_poll_s
@@ -545,8 +546,8 @@ class AgentBricksManager:
     # ========================================================================
 
     def ka_create_example(
-        self, tile_id: str, question: str, guidelines: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, tile_id: str, question: str, guidelines: list[str] | None = None
+    ) -> dict[str, Any]:
         """Create an example question for the KA."""
         payload = {"tile_id": tile_id, "question": question}
         if guidelines:
@@ -554,7 +555,7 @@ class AgentBricksManager:
         return self._post(f"/api/2.0/knowledge-assistants/{tile_id}/examples", payload)
 
     def ka_list_examples(
-        self, tile_id: str, page_size: int = 100, page_token: Optional[str] = None
+        self, tile_id: str, page_size: int = 100, page_token: str | None = None
     ) -> KnowledgeAssistantListExamplesResponseDict:
         """List all examples for a KA."""
         params = {"page_size": page_size}
@@ -567,8 +568,8 @@ class AgentBricksManager:
         self._delete(f"/api/2.0/knowledge-assistants/{tile_id}/examples/{example_id}")
 
     def ka_add_examples_batch(
-        self, tile_id: str, questions: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, tile_id: str, questions: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Add multiple example questions in parallel.
 
         Args:
@@ -580,7 +581,7 @@ class AgentBricksManager:
         """
         created_examples = []
 
-        def create_example(q: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        def create_example(q: dict[str, Any]) -> dict[str, Any] | None:
             question_text = q.get("question", "")
             guideline = q.get("guideline")
             guidelines = [guideline] if guideline else None
@@ -606,7 +607,7 @@ class AgentBricksManager:
         return created_examples
 
     def ka_list_evaluation_runs(
-        self, tile_id: str, page_size: int = 100, page_token: Optional[str] = None
+        self, tile_id: str, page_size: int = 100, page_token: str | None = None
     ) -> ListEvaluationRunsResponseDict:
         """List all evaluation runs for a KA."""
         params = {"page_size": page_size}
@@ -620,8 +621,8 @@ class AgentBricksManager:
 
     @staticmethod
     def ka_get_knowledge_sources_from_volumes(
-        volume_paths: List[Tuple[str, Optional[str]]],
-    ) -> List[Dict[str, Any]]:
+        volume_paths: list[tuple[str, str | None]],
+    ) -> list[dict[str, Any]]:
         """Convert volume paths to knowledge source dictionaries.
 
         Args:
@@ -662,10 +663,10 @@ class AgentBricksManager:
     def mas_create(
         self,
         name: str,
-        agents: List[Dict[str, Any]],
-        description: Optional[str] = None,
-        instructions: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        agents: list[dict[str, Any]],
+        description: str | None = None,
+        instructions: str | None = None,
+    ) -> dict[str, Any]:
         """Create a Multi-Agent Supervisor with specified agents.
 
         Args:
@@ -692,7 +693,7 @@ class AgentBricksManager:
         logger.info(f"Creating MAS with name={name}, {len(agents)} agents")
         return self._post("/api/2.0/multi-agent-supervisors", payload)
 
-    def mas_get(self, tile_id: str) -> Optional[MultiAgentSupervisorResponseDict]:
+    def mas_get(self, tile_id: str) -> MultiAgentSupervisorResponseDict | None:
         """Get MAS by tile_id."""
         try:
             return self._get(f"/api/2.0/multi-agent-supervisors/{tile_id}")
@@ -704,11 +705,11 @@ class AgentBricksManager:
     def mas_update(
         self,
         tile_id: str,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        instructions: Optional[str] = None,
-        agents: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        name: str | None = None,
+        description: str | None = None,
+        instructions: str | None = None,
+        agents: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Update a Multi-Agent Supervisor."""
         payload = {"tile_id": tile_id}
         if name:
@@ -723,7 +724,7 @@ class AgentBricksManager:
         logger.info(f"Updating MAS {tile_id}")
         return self._patch(f"/api/2.0/multi-agent-supervisors/{tile_id}", payload)
 
-    def mas_get_endpoint_status(self, tile_id: str) -> Optional[str]:
+    def mas_get_endpoint_status(self, tile_id: str) -> str | None:
         """Get the endpoint status of a MAS."""
         mas = self.mas_get(tile_id)
         if not mas:
@@ -735,8 +736,8 @@ class AgentBricksManager:
     # ========================================================================
 
     def mas_create_example(
-        self, tile_id: str, question: str, guidelines: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, tile_id: str, question: str, guidelines: list[str] | None = None
+    ) -> dict[str, Any]:
         """Create an example question for the MAS."""
         payload = {"tile_id": tile_id, "question": question}
         if guidelines:
@@ -744,7 +745,7 @@ class AgentBricksManager:
         return self._post(f"/api/2.0/multi-agent-supervisors/{tile_id}/examples", payload)
 
     def mas_list_examples(
-        self, tile_id: str, page_size: int = 100, page_token: Optional[str] = None
+        self, tile_id: str, page_size: int = 100, page_token: str | None = None
     ) -> MultiAgentSupervisorListExamplesResponseDict:
         """List all examples for a MAS."""
         params = {"page_size": page_size}
@@ -756,9 +757,9 @@ class AgentBricksManager:
         self,
         tile_id: str,
         example_id: str,
-        question: Optional[str] = None,
-        guidelines: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        question: str | None = None,
+        guidelines: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Update an example in a MAS."""
         payload = {"tile_id": tile_id, "example_id": example_id}
         if question:
@@ -774,12 +775,12 @@ class AgentBricksManager:
         self._delete(f"/api/2.0/multi-agent-supervisors/{tile_id}/examples/{example_id}")
 
     def mas_add_examples_batch(
-        self, tile_id: str, questions: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, tile_id: str, questions: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Add multiple example questions in parallel."""
         created_examples = []
 
-        def create_example(q: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        def create_example(q: dict[str, Any]) -> dict[str, Any] | None:
             question_text = q.get("question", "")
             guidelines = q.get("guideline")
             if guidelines and isinstance(guidelines, str):
@@ -806,7 +807,7 @@ class AgentBricksManager:
         return created_examples
 
     def mas_list_evaluation_runs(
-        self, tile_id: str, page_size: int = 100, page_token: Optional[str] = None
+        self, tile_id: str, page_size: int = 100, page_token: str | None = None
     ) -> ListEvaluationRunsResponseDict:
         """List all evaluation runs for a MAS."""
         params = {"page_size": page_size}
@@ -818,7 +819,7 @@ class AgentBricksManager:
     # Genie Space Operations
     # ========================================================================
 
-    def genie_get(self, space_id: str) -> Optional[GenieSpaceDict]:
+    def genie_get(self, space_id: str) -> GenieSpaceDict | None:
         """Get Genie space by ID."""
         try:
             return self._get(f"/api/2.0/data-rooms/{space_id}")
@@ -831,13 +832,13 @@ class AgentBricksManager:
         self,
         display_name: str,
         warehouse_id: str,
-        table_identifiers: List[str],
-        description: Optional[str] = None,
-        parent_folder_path: Optional[str] = None,
-        parent_folder_id: Optional[str] = None,
+        table_identifiers: list[str],
+        description: str | None = None,
+        parent_folder_path: str | None = None,
+        parent_folder_id: str | None = None,
         create_dir: bool = True,
         run_as_type: str = "VIEWER",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a Genie space.
 
         Args:
@@ -882,7 +883,7 @@ class AgentBricksManager:
                 parent_folder_id = folder_status["object_id"]
             except Exception as e:
                 raise ValueError(
-                    f"Failed to get folder ID for path '{parent_folder_path}': {str(e)}"
+                    f"Failed to get folder ID for path '{parent_folder_path}': {e!s}"
                 )
 
         if parent_folder_id:
@@ -893,12 +894,12 @@ class AgentBricksManager:
     def genie_update(
         self,
         space_id: str,
-        display_name: Optional[str] = None,
-        description: Optional[str] = None,
-        warehouse_id: Optional[str] = None,
-        table_identifiers: Optional[List[str]] = None,
-        sample_questions: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        display_name: str | None = None,
+        description: str | None = None,
+        warehouse_id: str | None = None,
+        table_identifiers: list[str] | None = None,
+        sample_questions: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Update a Genie space.
 
         Args:
@@ -967,8 +968,8 @@ class AgentBricksManager:
         return self._get(f"/api/2.0/data-rooms/{space_id}/instructions")
 
     def genie_update_sample_questions(
-        self, space_id: str, questions: List[str]
-    ) -> Dict[str, Any]:
+        self, space_id: str, questions: list[str]
+    ) -> dict[str, Any]:
         """Replace all sample questions for a Genie space.
 
         Args:
@@ -1008,8 +1009,8 @@ class AgentBricksManager:
         )
 
     def genie_add_sample_questions_batch(
-        self, space_id: str, questions: List[str]
-    ) -> Dict[str, Any]:
+        self, space_id: str, questions: list[str]
+    ) -> dict[str, Any]:
         """Add multiple sample questions (without replacing existing)."""
         actions = [
             {
@@ -1032,8 +1033,8 @@ class AgentBricksManager:
         space_id: str,
         question_text: str,
         question_type: str,
-        answer_text: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        answer_text: str | None = None,
+    ) -> dict[str, Any]:
         """Add a curated question (low-level)."""
         curated_question = {
             "data_space_id": space_id,
@@ -1049,38 +1050,38 @@ class AgentBricksManager:
             {"curated_question": curated_question, "data_space_id": space_id},
         )
 
-    def genie_add_sample_question(self, space_id: str, question_text: str) -> Dict[str, Any]:
+    def genie_add_sample_question(self, space_id: str, question_text: str) -> dict[str, Any]:
         """Add a single sample question."""
         return self.genie_add_curated_question(space_id, question_text, "SAMPLE_QUESTION")
 
     def genie_add_instruction(
         self, space_id: str, title: str, content: str, instruction_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add an instruction (low-level)."""
         payload = {"title": title, "content": content, "instruction_type": instruction_type}
         return self._post(f"/api/2.0/data-rooms/{space_id}/instructions", payload)
 
     def genie_add_text_instruction(
         self, space_id: str, content: str, title: str = "Notes"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add general text instruction/notes."""
         return self.genie_add_instruction(space_id, title, content, "TEXT_INSTRUCTION")
 
     def genie_add_sql_instruction(
         self, space_id: str, title: str, content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add a SQL query example instruction."""
         return self.genie_add_instruction(space_id, title, content, "SQL_INSTRUCTION")
 
-    def genie_add_sql_function(self, space_id: str, function_name: str) -> Dict[str, Any]:
+    def genie_add_sql_function(self, space_id: str, function_name: str) -> dict[str, Any]:
         """Add a SQL function (certified answer)."""
         return self.genie_add_instruction(
             space_id, "SQL Function", function_name, "CERTIFIED_ANSWER"
         )
 
     def genie_add_sql_instructions_batch(
-        self, space_id: str, sql_instructions: List[Dict[str, str]]
-    ) -> List[Dict[str, Any]]:
+        self, space_id: str, sql_instructions: list[dict[str, str]]
+    ) -> list[dict[str, Any]]:
         """Add multiple SQL instructions.
 
         Args:
@@ -1103,8 +1104,8 @@ class AgentBricksManager:
         return results
 
     def genie_add_sql_functions_batch(
-        self, space_id: str, function_names: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, space_id: str, function_names: list[str]
+    ) -> list[dict[str, Any]]:
         """Add multiple SQL functions (certified answers)."""
         results = []
         for func_name in function_names:
@@ -1118,15 +1119,15 @@ class AgentBricksManager:
 
     def genie_add_benchmark(
         self, space_id: str, question_text: str, answer_text: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add a benchmark question with expected answer."""
         return self.genie_add_curated_question(
             space_id, question_text, "BENCHMARK", answer_text
         )
 
     def genie_add_benchmarks_batch(
-        self, space_id: str, benchmarks: List[Dict[str, str]]
-    ) -> List[Dict[str, Any]]:
+        self, space_id: str, benchmarks: list[dict[str, str]]
+    ) -> list[dict[str, Any]]:
         """Add multiple benchmarks.
 
         Args:
@@ -1174,8 +1175,8 @@ class AgentBricksManager:
                 raise Exception(detailed_error)
 
     def _get(
-        self, path: str, params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         headers = self.w.config.authenticate()
         url = f"{self.w.config.host}{path}"
         response = requests.get(url, headers=headers, params=params or {}, timeout=20)
@@ -1184,8 +1185,8 @@ class AgentBricksManager:
         return response.json()
 
     def _post(
-        self, path: str, body: Dict[str, Any], timeout: int = 300
-    ) -> Dict[str, Any]:
+        self, path: str, body: dict[str, Any], timeout: int = 300
+    ) -> dict[str, Any]:
         headers = self.w.config.authenticate()
         headers["Content-Type"] = "application/json"
         url = f"{self.w.config.host}{path}"
@@ -1194,7 +1195,7 @@ class AgentBricksManager:
             self._handle_response_error(response, "POST", path)
         return response.json()
 
-    def _patch(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    def _patch(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         headers = self.w.config.authenticate()
         headers["Content-Type"] = "application/json"
         url = f"{self.w.config.host}{path}"
@@ -1203,7 +1204,7 @@ class AgentBricksManager:
             self._handle_response_error(response, "PATCH", path)
         return response.json()
 
-    def _delete(self, path: str) -> Dict[str, Any]:
+    def _delete(self, path: str) -> dict[str, Any]:
         headers = self.w.config.authenticate()
         url = f"{self.w.config.host}{path}"
         response = requests.delete(url, headers=headers, timeout=20)
@@ -1215,7 +1216,7 @@ class AgentBricksManager:
     # Warehouse Auto-Detection (for Genie)
     # ========================================================================
 
-    def get_best_warehouse_id(self) -> Optional[str]:
+    def get_best_warehouse_id(self) -> str | None:
         """Get the best available SQL warehouse ID for Genie spaces.
 
         Prioritizes running warehouses, then starting ones, preferring smaller sizes.
@@ -1249,7 +1250,7 @@ class AgentBricksManager:
     # Volume Scanning (for KA examples from PDF JSON files)
     # ========================================================================
 
-    def scan_volume_for_examples(self, volume_path: str) -> List[Dict[str, Any]]:
+    def scan_volume_for_examples(self, volume_path: str) -> list[dict[str, Any]]:
         """Scan a volume folder for JSON files containing question/guideline pairs.
 
         These JSON files are typically created by the PDF generation tool and contain:
@@ -1312,10 +1313,10 @@ class TileExampleQueue:
             poll_interval: Seconds between status checks (default: 30)
             max_attempts: Maximum poll attempts before giving up (default: 120 = 1 hour)
         """
-        self.queue: Dict[str, Tuple[AgentBricksManager, List[Dict[str, Any]], str, float, int]] = {}
+        self.queue: dict[str, tuple[AgentBricksManager, list[dict[str, Any]], str, float, int]] = {}
         self.lock = threading.Lock()
         self.running = False
-        self.thread: Optional[threading.Thread] = None
+        self.thread: threading.Thread | None = None
         self.poll_interval = poll_interval
         self.max_attempts = max_attempts
 
@@ -1323,7 +1324,7 @@ class TileExampleQueue:
         self,
         tile_id: str,
         manager: AgentBricksManager,
-        questions: List[Dict[str, Any]],
+        questions: list[dict[str, Any]],
         tile_type: str = 'KA',
     ) -> None:
         """Add a tile and its questions to the processing queue.
@@ -1431,7 +1432,7 @@ class TileExampleQueue:
 
 
 # Global singleton queue instance
-_tile_example_queue: Optional[TileExampleQueue] = None
+_tile_example_queue: TileExampleQueue | None = None
 _queue_lock = threading.Lock()
 
 

@@ -31,7 +31,7 @@ class TokenUsage:
         return self.cache_creation_input_tokens + self.cache_read_input_tokens
 
     @classmethod
-    def from_usage_dict(cls, usage: Dict[str, Any]) -> "TokenUsage":
+    def from_usage_dict(cls, usage: dict[str, Any]) -> "TokenUsage":
         """Create from transcript usage dictionary."""
         return cls(
             input_tokens=usage.get("input_tokens", 0),
@@ -50,10 +50,10 @@ class ToolCall:
 
     id: str  # e.g., "toolu_01S7qwmk3nEirzyaDwPHESzo"
     name: str  # e.g., "Write", "Read", "Bash", "mcp__databricks__execute_sql"
-    input: Dict[str, Any]  # Tool parameters
-    timestamp: Optional[datetime] = None
-    result: Optional[str] = None  # Populated from tool_result entry
-    success: Optional[bool] = None  # Determined from result content
+    input: dict[str, Any]  # Tool parameters
+    timestamp: datetime | None = None
+    result: str | None = None  # Populated from tool_result entry
+    success: bool | None = None  # Determined from result content
 
     @property
     def is_mcp_tool(self) -> bool:
@@ -94,8 +94,8 @@ class FileOperation:
 
     type: str  # "create", "edit", "read", etc.
     file_path: str
-    content: Optional[str] = None
-    timestamp: Optional[datetime] = None
+    content: str | None = None
+    timestamp: datetime | None = None
 
     @property
     def is_write(self) -> bool:
@@ -118,19 +118,19 @@ class TranscriptEntry:
     uuid: str
     type: str  # "user" or "assistant"
     timestamp: datetime
-    message: Dict[str, Any]
-    parent_uuid: Optional[str] = None
-    session_id: Optional[str] = None
-    cwd: Optional[str] = None
+    message: dict[str, Any]
+    parent_uuid: str | None = None
+    session_id: str | None = None
+    cwd: str | None = None
 
     # Populated for assistant entries
-    model: Optional[str] = None
-    usage: Optional[TokenUsage] = None
-    tool_calls: List[ToolCall] = field(default_factory=list)
+    model: str | None = None
+    usage: TokenUsage | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
     # Populated for tool result entries
-    tool_use_result: Optional[Dict[str, Any]] = None
-    source_tool_assistant_uuid: Optional[str] = None
+    tool_use_result: dict[str, Any] | None = None
+    source_tool_assistant_uuid: str | None = None
 
 
 @dataclass
@@ -141,8 +141,8 @@ class TraceMetrics:
     """
 
     session_id: str
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
 
     # Token metrics (aggregated across all turns)
     total_input_tokens: int = 0
@@ -152,26 +152,26 @@ class TraceMetrics:
 
     # Tool call metrics
     total_tool_calls: int = 0
-    tool_counts: Dict[str, int] = field(default_factory=dict)  # tool_name -> count
-    tool_category_counts: Dict[str, int] = field(
+    tool_counts: dict[str, int] = field(default_factory=dict)  # tool_name -> count
+    tool_category_counts: dict[str, int] = field(
         default_factory=dict
     )  # category -> count
 
     # All tool calls for detailed analysis
-    tool_calls: List[ToolCall] = field(default_factory=list)
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
     # File operations
-    files_created: List[str] = field(default_factory=list)
-    files_modified: List[str] = field(default_factory=list)
-    files_read: List[str] = field(default_factory=list)
-    file_operations: List[FileOperation] = field(default_factory=list)
+    files_created: list[str] = field(default_factory=list)
+    files_modified: list[str] = field(default_factory=list)
+    files_read: list[str] = field(default_factory=list)
+    file_operations: list[FileOperation] = field(default_factory=list)
 
     # Conversation metrics
     num_turns: int = 0  # Number of assistant responses
     num_user_messages: int = 0
 
     # Model info
-    model: Optional[str] = None
+    model: str | None = None
 
     @property
     def total_tokens(self) -> int:
@@ -179,7 +179,7 @@ class TraceMetrics:
         return self.total_input_tokens + self.total_output_tokens
 
     @property
-    def duration_seconds(self) -> Optional[float]:
+    def duration_seconds(self) -> float | None:
         """Session duration in seconds."""
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds()
@@ -197,19 +197,19 @@ class TraceMetrics:
         """Check if a tool was used."""
         return tool_name in self.tool_counts
 
-    def get_mcp_calls(self) -> List[ToolCall]:
+    def get_mcp_calls(self) -> list[ToolCall]:
         """Get all MCP tool calls."""
         return [tc for tc in self.tool_calls if tc.is_mcp_tool]
 
-    def get_bash_commands(self) -> List[ToolCall]:
+    def get_bash_commands(self) -> list[ToolCall]:
         """Get all Bash tool calls."""
         return [tc for tc in self.tool_calls if tc.is_bash]
 
-    def get_file_ops(self) -> List[ToolCall]:
+    def get_file_ops(self) -> list[ToolCall]:
         """Get all file operation tool calls."""
         return [tc for tc in self.tool_calls if tc.is_file_operation]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "session_id": self.session_id,

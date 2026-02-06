@@ -28,12 +28,12 @@ logger = logging.getLogger(__name__)
 
 # Module-level cache for table information
 # Key: "catalog.schema", Value: Dict[table_name, (updated_at_timestamp, TableInfo)]
-_table_cache: Dict[str, Dict[str, Tuple[Optional[int], TableInfo]]] = {}
+_table_cache: dict[str, dict[str, tuple[int | None, TableInfo]]] = {}
 _table_cache_lock = threading.Lock()
 
 # Locks per table to prevent duplicate fetches
 # Key: "catalog.schema.table", Value: threading.Lock
-_table_locks: Dict[str, threading.Lock] = {}
+_table_locks: dict[str, threading.Lock] = {}
 _table_locks_creation_lock = threading.Lock()
 
 
@@ -46,7 +46,7 @@ def _get_table_lock(full_table_name: str) -> threading.Lock:
     return _table_locks[full_table_name]
 
 
-def _get_schema_cache(catalog: str, schema: str) -> Dict[str, Tuple[Optional[int], TableInfo]]:
+def _get_schema_cache(catalog: str, schema: str) -> dict[str, tuple[int | None, TableInfo]]:
     """Get or create cache for a schema."""
     schema_key = f"{catalog}.{schema}"
     if schema_key not in _table_cache:
@@ -57,8 +57,8 @@ def _get_schema_cache(catalog: str, schema: str) -> Dict[str, Tuple[Optional[int
 
 
 def _check_cache(
-    catalog: str, schema: str, table_name: str, updated_at_ms: Optional[int]
-) -> Optional[TableInfo]:
+    catalog: str, schema: str, table_name: str, updated_at_ms: int | None
+) -> TableInfo | None:
     """Check if table info is in cache and still valid."""
     schema_cache = _get_schema_cache(catalog, schema)
     if table_name in schema_cache:
@@ -70,7 +70,7 @@ def _check_cache(
 
 def _update_cache(
     catalog: str, schema: str, table_name: str,
-    updated_at_ms: Optional[int], table_info: TableInfo
+    updated_at_ms: int | None, table_info: TableInfo
 ) -> None:
     """Update cache with table info."""
     schema_cache = _get_schema_cache(catalog, schema)
@@ -85,7 +85,7 @@ class TableStatsCollector:
         self,
         warehouse_id: str,
         max_workers: int = 10,
-        client: Optional[WorkspaceClient] = None,
+        client: WorkspaceClient | None = None,
     ):
         """
         Initialize the stats collector.
@@ -100,7 +100,7 @@ class TableStatsCollector:
         self.client = client or get_workspace_client()
         self.executor = SQLExecutor(warehouse_id=warehouse_id, client=self.client)
 
-    def list_tables(self, catalog: str, schema: str) -> List[Dict[str, Any]]:
+    def list_tables(self, catalog: str, schema: str) -> list[dict[str, Any]]:
         """
         List all tables in a schema.
 
@@ -123,13 +123,13 @@ class TableStatsCollector:
             ]
         except Exception as e:
             raise Exception(
-                f"Failed to list tables in {catalog}.{schema}: {str(e)}. "
+                f"Failed to list tables in {catalog}.{schema}: {e!s}. "
                 f"Check that the catalog and schema exist and you have access."
             )
 
     def filter_tables_by_patterns(
-        self, tables: List[Dict[str, Any]], patterns: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, tables: list[dict[str, Any]], patterns: list[str]
+    ) -> list[dict[str, Any]]:
         """
         Filter tables by glob patterns.
 
@@ -216,7 +216,7 @@ class TableStatsCollector:
 
     def collect_column_stats(
         self, catalog: str, schema: str, table_name: str
-    ) -> Tuple[Dict[str, ColumnDetail], int, List[Dict[str, Any]]]:
+    ) -> tuple[dict[str, ColumnDetail], int, list[dict[str, Any]]]:
         """
         Collect enhanced column statistics for a UC table.
 
@@ -234,7 +234,7 @@ class TableStatsCollector:
 
     def collect_volume_stats(
         self, volume_path: str, format: str
-    ) -> Tuple[Dict[str, ColumnDetail], int, List[Dict[str, Any]]]:
+    ) -> tuple[dict[str, ColumnDetail], int, list[dict[str, Any]]]:
         """
         Collect enhanced column statistics for volume folder data.
 
@@ -257,11 +257,11 @@ class TableStatsCollector:
     def _collect_stats_for_ref(
         self,
         table_ref: str,
-        catalog: Optional[str],
-        schema: Optional[str],
+        catalog: str | None,
+        schema: str | None,
         use_describe_table: bool,
-        fetch_value_counts_table: Optional[str],
-    ) -> Tuple[Dict[str, ColumnDetail], int, List[Dict[str, Any]]]:
+        fetch_value_counts_table: str | None,
+    ) -> tuple[dict[str, ColumnDetail], int, list[dict[str, Any]]]:
         """
         Internal method to collect column statistics for any table reference.
 
@@ -319,8 +319,8 @@ class TableStatsCollector:
 
             # Step 3: Build unified stats query
             union_queries = []
-            column_types: Dict[str, str] = {}
-            columns_needing_value_counts: List[Tuple[str, str]] = []
+            column_types: dict[str, str] = {}
+            columns_needing_value_counts: list[tuple[str, str]] = []
 
             base_ref = "base"
             base_cte = f"WITH {base_ref} AS (SELECT * FROM {table_ref})\n"
@@ -492,10 +492,10 @@ class TableStatsCollector:
             """
 
     def _extract_column_samples(
-        self, columns_info: List[Dict], sample_data: Optional[List[Dict]]
-    ) -> Dict[str, List[str]]:
+        self, columns_info: list[dict], sample_data: list[dict] | None
+    ) -> dict[str, list[str]]:
         """Extract sample values for each column."""
-        column_samples: Dict[str, List[str]] = {}
+        column_samples: dict[str, list[str]] = {}
         if not sample_data:
             return column_samples
 
@@ -522,12 +522,12 @@ class TableStatsCollector:
 
     def _parse_stats_results(
         self,
-        stats_result: List[Dict],
-        column_types: Dict[str, str],
-        column_samples: Dict[str, List[str]],
-    ) -> Dict[str, ColumnDetail]:
+        stats_result: list[dict],
+        column_types: dict[str, str],
+        column_samples: dict[str, list[str]],
+    ) -> dict[str, ColumnDetail]:
         """Parse stats query results into ColumnDetail objects."""
-        column_details: Dict[str, ColumnDetail] = {}
+        column_details: dict[str, ColumnDetail] = {}
 
         for row in stats_result:
             col_name = row.get("column_name")
@@ -622,8 +622,8 @@ class TableStatsCollector:
         catalog: str,
         schema: str,
         table_name: str,
-        columns: List[Tuple[str, str]],
-        column_details: Dict[str, ColumnDetail],
+        columns: list[tuple[str, str]],
+        column_details: dict[str, ColumnDetail],
     ) -> None:
         """Fetch exact value counts for small-cardinality columns."""
         full_table_name = f"{catalog}.{schema}.{table_name}"
@@ -665,8 +665,8 @@ class TableStatsCollector:
         catalog: str,
         schema: str,
         table_name: str,
-        updated_at_ms: Optional[int],
-        comment: Optional[str],
+        updated_at_ms: int | None,
+        comment: str | None,
         collect_stats: bool = True,
     ) -> TableInfo:
         """
@@ -730,9 +730,9 @@ class TableStatsCollector:
         self,
         catalog: str,
         schema: str,
-        tables: List[Dict[str, Any]],
+        tables: list[dict[str, Any]],
         collect_stats: bool = True,
-    ) -> List[TableInfo]:
+    ) -> list[TableInfo]:
         """
         Get info for multiple tables in parallel.
 
@@ -748,7 +748,7 @@ class TableStatsCollector:
         if not tables:
             return []
 
-        def process_table(table_info: Dict) -> TableInfo:
+        def process_table(table_info: dict) -> TableInfo:
             table_name = table_info["name"]
             updated_at = table_info.get("updated_at")
             updated_at_ms = int(updated_at) if updated_at else None

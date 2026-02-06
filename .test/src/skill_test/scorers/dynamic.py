@@ -6,9 +6,9 @@ from typing import Dict, Any, List
 
 @scorer
 def guidelines_from_expectations(
-    inputs: Dict[str, Any],
-    outputs: Dict[str, Any],
-    expectations: Dict[str, Any]
+    inputs: dict[str, Any],
+    outputs: dict[str, Any],
+    expectations: dict[str, Any]
 ) -> Feedback:
     """Dynamic Guidelines scorer that uses expectations.guidelines from YAML.
 
@@ -40,7 +40,7 @@ def guidelines_from_expectations(
 
 
 def create_guidelines_scorer(
-    guidelines: List[str],
+    guidelines: list[str],
     name: str = "skill_quality"
 ) -> Guidelines:
     """Factory to create a Guidelines scorer with specific guidelines.

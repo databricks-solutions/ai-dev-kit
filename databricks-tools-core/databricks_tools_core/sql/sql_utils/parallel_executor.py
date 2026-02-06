@@ -32,7 +32,7 @@ class SQLParallelExecutor:
         self,
         warehouse_id: str,
         max_workers: int = 4,
-        client: Optional[WorkspaceClient] = None,
+        client: WorkspaceClient | None = None,
     ):
         """
         Initialize the parallel executor.
@@ -51,10 +51,10 @@ class SQLParallelExecutor:
     def execute(
         self,
         sql_content: str,
-        catalog: Optional[str] = None,
-        schema: Optional[str] = None,
+        catalog: str | None = None,
+        schema: str | None = None,
         timeout: int = 180,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute multiple SQL statements with dependency-aware parallelism.
 
@@ -88,8 +88,8 @@ class SQLParallelExecutor:
         execution_groups = self.analyzer.analyze_dependencies(queries)
         logger.info(f"Found {len(execution_groups)} execution groups")
 
-        results: Dict[int, Dict[str, Any]] = {}
-        stopped_after_group: Optional[int] = None
+        results: dict[int, dict[str, Any]] = {}
+        stopped_after_group: int | None = None
 
         # Execute groups sequentially
         for group_idx, group in enumerate(execution_groups):
@@ -147,18 +147,18 @@ class SQLParallelExecutor:
 
     def _execute_group(
         self,
-        queries: List[str],
-        query_indices: List[int],
+        queries: list[str],
+        query_indices: list[int],
         group_num: int,
-        catalog: Optional[str],
-        schema: Optional[str],
+        catalog: str | None,
+        schema: str | None,
         timeout: int,
-    ) -> Dict[int, Dict[str, Any]]:
+    ) -> dict[int, dict[str, Any]]:
         """Execute a group of queries in parallel using ThreadPoolExecutor."""
-        results: Dict[int, Dict[str, Any]] = {}
+        results: dict[int, dict[str, Any]] = {}
         is_parallel = len(query_indices) > 1
 
-        def execute_single(query_idx: int) -> Dict[str, Any]:
+        def execute_single(query_idx: int) -> dict[str, Any]:
             query_text = queries[query_idx]
             query_preview = (
                 query_text[:100] + "..." if len(query_text) > 100 else query_text
@@ -232,7 +232,7 @@ class SQLParallelExecutor:
                     results[query_idx] = {
                         "query_index": query_idx,
                         "status": "error",
-                        "error": f"Unexpected execution error: {str(e)}",
+                        "error": f"Unexpected execution error: {e!s}",
                         "error_category": "UNEXPECTED_ERROR",
                         "suggestion": "Check the query syntax and try again",
                         "execution_time": 0,
@@ -285,12 +285,12 @@ class SQLParallelExecutor:
 
     def _build_summary(
         self,
-        execution_groups: List[List[int]],
-        stopped_after_group: Optional[int],
+        execution_groups: list[list[int]],
+        stopped_after_group: int | None,
         total_time: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build execution summary with group details."""
-        groups_summary: List[Dict[str, Any]] = []
+        groups_summary: list[dict[str, Any]] = []
 
         for group_idx, group in enumerate(execution_groups):
             group_num = group_idx + 1

@@ -33,7 +33,7 @@ def create_or_update_dashboard(
     serialized_dashboard: str,
     warehouse_id: str,
     publish: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create or update an AI/BI dashboard from JSON content.
 
     CRITICAL PRE-REQUISITES (DO NOT SKIP):
@@ -158,7 +158,7 @@ def create_or_update_dashboard(
 
 
 @mcp.tool
-def get_dashboard(dashboard_id: str) -> Dict[str, Any]:
+def get_dashboard(dashboard_id: str) -> dict[str, Any]:
     """Get AI/BI dashboard details by ID.
 
     Args:
@@ -187,7 +187,7 @@ def get_dashboard(dashboard_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def list_dashboards(page_size: int = 25) -> Dict[str, Any]:
+def list_dashboards(page_size: int = 25) -> dict[str, Any]:
     """List AI/BI dashboards in the workspace.
 
     Args:
@@ -210,7 +210,7 @@ def list_dashboards(page_size: int = 25) -> Dict[str, Any]:
 
 
 @mcp.tool
-def trash_dashboard(dashboard_id: str) -> Dict[str, str]:
+def trash_dashboard(dashboard_id: str) -> dict[str, str]:
     """Move an AI/BI dashboard to trash.
 
     Args:
@@ -235,7 +235,7 @@ def publish_dashboard(
     dashboard_id: str,
     warehouse_id: str,
     embed_credentials: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Publish an AI/BI dashboard to make it accessible to viewers.
 
     Publishing with embed_credentials=True allows users without direct
@@ -271,7 +271,7 @@ def publish_dashboard(
 
 
 @mcp.tool
-def unpublish_dashboard(dashboard_id: str) -> Dict[str, str]:
+def unpublish_dashboard(dashboard_id: str) -> dict[str, str]:
     """Unpublish an AI/BI dashboard.
 
     Args:

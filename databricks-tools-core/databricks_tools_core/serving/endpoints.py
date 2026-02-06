@@ -12,7 +12,7 @@ from ..auth import get_workspace_client
 logger = logging.getLogger(__name__)
 
 
-def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
+def get_serving_endpoint_status(name: str) -> dict[str, Any]:
     """
     Get the status of a Model Serving endpoint.
 
@@ -99,12 +99,12 @@ def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
 
 def query_serving_endpoint(
     name: str,
-    messages: Optional[List[Dict[str, str]]] = None,
-    inputs: Optional[Dict[str, Any]] = None,
-    dataframe_records: Optional[List[Dict[str, Any]]] = None,
-    max_tokens: Optional[int] = None,
-    temperature: Optional[float] = None,
-) -> Dict[str, Any]:
+    messages: list[dict[str, str]] | None = None,
+    inputs: dict[str, Any] | None = None,
+    dataframe_records: list[dict[str, Any]] | None = None,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+) -> dict[str, Any]:
     """
     Query a Model Serving endpoint.
 
@@ -133,7 +133,7 @@ def query_serving_endpoint(
     client = get_workspace_client()
 
     # Build query kwargs
-    query_kwargs: Dict[str, Any] = {"name": name}
+    query_kwargs: dict[str, Any] = {"name": name}
 
     if messages is not None:
         # Chat/Agent endpoint
@@ -168,7 +168,7 @@ def query_serving_endpoint(
         raise Exception(f"Failed to query endpoint '{name}': {error_msg}")
 
     # Convert response to dict
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
 
     # Handle chat response format
     if hasattr(response, "choices") and response.choices:
@@ -207,7 +207,7 @@ def query_serving_endpoint(
     return result
 
 
-def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
+def list_serving_endpoints(limit: int = 50) -> list[dict[str, Any]]:
     """
     List Model Serving endpoints in the workspace.
 
@@ -230,7 +230,7 @@ def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
     try:
         endpoints = list(client.serving_endpoints.list())
     except Exception as e:
-        raise Exception(f"Failed to list serving endpoints: {str(e)}")
+        raise Exception(f"Failed to list serving endpoints: {e!s}")
 
     result = []
     for ep in endpoints[:limit]:

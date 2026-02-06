@@ -44,11 +44,11 @@ class CLIContext:
     This allows the CLI commands to execute code on Databricks.
     """
     # MCP tools for Databricks execution
-    mcp_execute_command: Optional[MCPExecuteCommand] = None
-    mcp_execute_sql: Optional[MCPExecuteSQL] = None
-    mcp_upload_file: Optional[MCPUploadFile] = None
-    mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None
-    mcp_get_best_cluster: Optional[MCPGetBestCluster] = None
+    mcp_execute_command: MCPExecuteCommand | None = None
+    mcp_execute_sql: MCPExecuteSQL | None = None
+    mcp_upload_file: MCPUploadFile | None = None
+    mcp_get_best_warehouse: MCPGetBestWarehouse | None = None
+    mcp_get_best_cluster: MCPGetBestCluster | None = None
 
     # Configuration
     base_path: Path = field(default_factory=lambda: Path(".test/skills"))
@@ -70,33 +70,33 @@ class InteractiveResult:
     # Execution results
     total_blocks: int = 0
     passed_blocks: int = 0
-    execution_details: List[Dict[str, Any]] = field(default_factory=list)
+    execution_details: list[dict[str, Any]] = field(default_factory=list)
 
     # Fixture results
     fixtures_setup: bool = False
     fixtures_teardown: bool = False
-    fixture_details: Optional[Dict[str, Any]] = None
+    fixture_details: dict[str, Any] | None = None
 
     # Output handling
-    saved_to: Optional[str] = None  # "ground_truth.yaml" or "candidates.yaml"
+    saved_to: str | None = None  # "ground_truth.yaml" or "candidates.yaml"
     auto_approved: bool = False  # True if all blocks passed and auto-promoted
 
     # Trace evaluation results (when capture_trace=True)
-    trace_source: Optional[str] = None  # "mlflow:{run_id}" or "local:{path}"
-    trace_results: Optional[List[Dict[str, Any]]] = None  # Scorer results
+    trace_source: str | None = None  # "mlflow:{run_id}" or "local:{path}"
+    trace_results: list[dict[str, Any]] | None = None  # Scorer results
     trace_mlflow_enabled: bool = False  # Whether MLflow autolog was enabled
-    trace_error: Optional[str] = None  # Error during trace capture
+    trace_error: str | None = None  # Error during trace capture
 
     # Errors
-    error: Optional[str] = None
+    error: str | None = None
     message: str = ""
 
 
 def run(
     skill_name: str,
     ctx: CLIContext,
-    test_ids: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    test_ids: list[str] | None = None,
+) -> dict[str, Any]:
     """Run evaluation against ground truth for a skill.
 
     Args:
@@ -177,8 +177,8 @@ def run(
 def regression(
     skill_name: str,
     ctx: CLIContext,
-    baseline_run_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    baseline_run_id: str | None = None,
+) -> dict[str, Any]:
     """Compare current results against baseline.
 
     Args:
@@ -252,7 +252,7 @@ def regression(
 def init(
     skill_name: str,
     ctx: CLIContext,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Initialize test scaffolding for a new skill.
 
     Creates the directory structure and template files for testing a skill.
@@ -392,7 +392,7 @@ def sync(
     skill_name: str,
     ctx: CLIContext,
     direction: Literal["to_uc", "from_uc"] = "to_uc",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Sync YAML test definitions with Unity Catalog (stub for Phase 2).
 
     Args:
@@ -415,7 +415,7 @@ def sync(
 def baseline(
     skill_name: str,
     ctx: CLIContext,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Save current evaluation results as baseline for regression testing.
 
     Runs the evaluation and saves the metrics as a baseline that can be
@@ -479,7 +479,7 @@ def baseline(
 def mlflow_eval(
     skill_name: str,
     ctx: CLIContext,  # Reserved for future Databricks execution integration
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run MLflow evaluation with LLM judges.
 
     Executes the full MLflow evaluation pipeline including LLM-based scorers
@@ -521,8 +521,8 @@ def mlflow_eval(
 
 def routing_eval(
     ctx: CLIContext,  # Reserved for future use
-    run_name: Optional[str] = None,
-) -> Dict[str, Any]:
+    run_name: str | None = None,
+) -> dict[str, Any]:
     """Run routing evaluation to test skill trigger detection.
 
     Evaluates Claude Code's ability to route prompts to correct skills
@@ -567,7 +567,7 @@ def interactive(
     prompt: str,
     response: str,
     ctx: CLIContext,
-    fixture_config: Optional[TestFixtureConfig] = None,
+    fixture_config: TestFixtureConfig | None = None,
     auto_approve_on_success: bool = True,
     capture_trace: bool = False,
 ) -> InteractiveResult:
@@ -819,7 +819,7 @@ def interactive(
 def scorers(
     skill_name: str,
     ctx: CLIContext,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List configured scorers for a skill.
 
     Reads the manifest.yaml for the skill and returns the scorer configuration.
@@ -868,12 +868,12 @@ def scorers(
 def scorers_update(
     skill_name: str,
     ctx: CLIContext,
-    add_scorers: Optional[List[str]] = None,
-    remove_scorers: Optional[List[str]] = None,
-    add_guidelines: Optional[List[str]] = None,
-    remove_guidelines: Optional[List[str]] = None,
-    set_guidelines: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    add_scorers: list[str] | None = None,
+    remove_scorers: list[str] | None = None,
+    add_guidelines: list[str] | None = None,
+    remove_guidelines: list[str] | None = None,
+    set_guidelines: list[str] | None = None,
+) -> dict[str, Any]:
     """Update scorer configuration for a skill.
 
     Modifies the manifest.yaml to add/remove scorers or update default guidelines.
@@ -1070,11 +1070,11 @@ def setup_test_fixtures(
 def trace_eval(
     skill_name: str,
     ctx: CLIContext,
-    trace_path: Optional[str] = None,
-    run_id: Optional[str] = None,
-    trace_id: Optional[str] = None,
-    trace_dir: Optional[str] = None,
-) -> Dict[str, Any]:
+    trace_path: str | None = None,
+    run_id: str | None = None,
+    trace_id: str | None = None,
+    trace_dir: str | None = None,
+) -> dict[str, Any]:
     """Evaluate trace(s) against skill expectations.
 
     Evaluates Claude Code session traces using trace-based scorers.
@@ -1312,7 +1312,7 @@ def review(
     ctx: CLIContext,
     batch: bool = False,
     filter_success: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Review pending candidates in candidates.yaml.
 
     Opens an interactive review interface for pending candidates, allowing
@@ -1413,7 +1413,7 @@ def list_traces(
     experiment_name: str,
     ctx: CLIContext,
     limit: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List available trace runs from MLflow.
 
     Args:

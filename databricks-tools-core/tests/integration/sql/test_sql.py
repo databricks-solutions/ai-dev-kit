@@ -250,7 +250,7 @@ class TestExecuteSQLMulti:
     ):
         """Should return proper execution summary."""
         result = execute_sql_multi(
-            sql_content=f"""
+            sql_content="""
                 SELECT 1 as a;
                 SELECT 2 as b;
             """,

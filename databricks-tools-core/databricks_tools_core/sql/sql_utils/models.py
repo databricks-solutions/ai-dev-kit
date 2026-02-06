@@ -30,7 +30,7 @@ class HistogramBin(BaseModel):
 
     bin_center: float
     count: int
-    date_label: Optional[str] = None  # For timestamp histograms
+    date_label: str | None = None  # For timestamp histograms
 
 
 class ColumnDetail(BaseModel):
@@ -38,24 +38,24 @@ class ColumnDetail(BaseModel):
 
     name: str
     data_type: str
-    samples: Optional[List[Any]] = None  # Up to 3 distinct sample values
-    cardinality: Optional[int] = None  # count distinct for string columns
-    min: Optional[Union[str, float, int]] = None  # for numeric and timestamp
-    max: Optional[Union[str, float, int]] = None  # for numeric and timestamp
-    avg: Optional[float] = None  # for numeric columns only
-    null_count: Optional[int] = None
-    total_count: Optional[int] = None
+    samples: list[Any] | None = None  # Up to 3 distinct sample values
+    cardinality: int | None = None  # count distinct for string columns
+    min: str | float | int | None = None  # for numeric and timestamp
+    max: str | float | int | None = None  # for numeric and timestamp
+    avg: float | None = None  # for numeric columns only
+    null_count: int | None = None
+    total_count: int | None = None
     # Enhanced statistics (DETAILED level)
-    unique_count: Optional[int] = None
-    mean: Optional[float] = None  # alias for avg
-    stddev: Optional[float] = None
-    q1: Optional[float] = None  # 25th percentile
-    median: Optional[float] = None  # 50th percentile
-    q3: Optional[float] = None  # 75th percentile
-    min_date: Optional[str] = None  # for timestamp columns
-    max_date: Optional[str] = None  # for timestamp columns
-    histogram: Optional[List[HistogramBin]] = None  # histogram data
-    value_counts: Optional[Dict[str, int]] = None  # value counts for categorical
+    unique_count: int | None = None
+    mean: float | None = None  # alias for avg
+    stddev: float | None = None
+    q1: float | None = None  # 25th percentile
+    median: float | None = None  # 50th percentile
+    q3: float | None = None  # 75th percentile
+    min_date: str | None = None  # for timestamp columns
+    max_date: str | None = None  # for timestamp columns
+    histogram: list[HistogramBin] | None = None  # histogram data
+    value_counts: dict[str, int] | None = None  # value counts for categorical
 
 
 class VolumeFileInfo(BaseModel):
@@ -63,12 +63,12 @@ class VolumeFileInfo(BaseModel):
 
     name: str
     path: str
-    size_bytes: Optional[int] = None
+    size_bytes: int | None = None
     is_directory: bool = False
-    modification_time: Optional[str] = None
+    modification_time: str | None = None
 
 
-def _get_basic_column_details(column_details: Optional[Dict[str, ColumnDetail]]) -> Optional[Dict[str, ColumnDetail]]:
+def _get_basic_column_details(column_details: dict[str, ColumnDetail] | None) -> dict[str, ColumnDetail] | None:
     """Return simplified column details with basic stats only.
 
     Removes heavy stats like histograms, stddev, percentiles.
@@ -123,23 +123,23 @@ class DataSourceInfo(BaseModel):
     name: str  # Table name or volume path
 
     # Common fields
-    column_details: Optional[Dict[str, ColumnDetail]] = None
-    total_rows: Optional[int] = None
-    sample_data: Optional[List[Dict[str, Any]]] = None
-    error: Optional[str] = None
+    column_details: dict[str, ColumnDetail] | None = None
+    total_rows: int | None = None
+    sample_data: list[dict[str, Any]] | None = None
+    error: str | None = None
 
     # UC Table specific fields
-    comment: Optional[str] = None
-    ddl: Optional[str] = None
-    updated_at: Optional[int] = None  # Timestamp in epoch ms from Databricks
+    comment: str | None = None
+    ddl: str | None = None
+    updated_at: int | None = None  # Timestamp in epoch ms from Databricks
 
     # Volume folder specific fields
-    format: Optional[str] = None  # "parquet", "csv", "json", "delta", "file"
-    total_files: Optional[int] = None
-    total_size_bytes: Optional[int] = None
-    files: Optional[List["VolumeFileInfo"]] = None  # Only for format="file"
+    format: str | None = None  # "parquet", "csv", "json", "delta", "file"
+    total_files: int | None = None
+    total_size_bytes: int | None = None
+    files: list["VolumeFileInfo"] | None = None  # Only for format="file"
 
-    def get_basic_column_details(self) -> Optional[Dict[str, ColumnDetail]]:
+    def get_basic_column_details(self) -> dict[str, ColumnDetail] | None:
         """Return simplified column details with basic stats only."""
         return _get_basic_column_details(self.column_details)
 
@@ -159,7 +159,7 @@ class TableSchemaResult(BaseModel):
 
     catalog: str
     schema_name: str
-    tables: List[DataSourceInfo]  # List of tables or volume folders
+    tables: list[DataSourceInfo]  # List of tables or volume folders
 
     @property
     def table_count(self) -> int:

@@ -35,11 +35,11 @@ class SQLDependencyAnalyzer:
             dialect: SQL dialect for parsing (default: "databricks")
         """
         self.dialect = dialect
-        self.created_tables: Dict[str, int] = {}  # table_name -> query_index
-        self.query_dependencies: Dict[int, Set[str]] = {}  # query_index -> referenced tables
+        self.created_tables: dict[str, int] = {}  # table_name -> query_index
+        self.query_dependencies: dict[int, set[str]] = {}  # query_index -> referenced tables
         self._linter = Linter(dialect=self.dialect)
 
-    def parse_sql_content(self, sql_content: str) -> List[str]:
+    def parse_sql_content(self, sql_content: str) -> list[str]:
         """
         Parse SQL content into individual queries.
 
@@ -56,7 +56,7 @@ class SQLDependencyAnalyzer:
         """
         cleaned = self._strip_comments(sql_content)
 
-        queries: List[str] = []
+        queries: list[str] = []
         statements = [
             s for s in (sqlglot.parse(cleaned, read=self.dialect) or [])
             if s is not None
@@ -70,7 +70,7 @@ class SQLDependencyAnalyzer:
         logger.debug(f"Parsed {len(queries)} queries from SQL content")
         return queries
 
-    def analyze_dependencies(self, queries: List[str]) -> List[List[int]]:
+    def analyze_dependencies(self, queries: list[str]) -> list[list[int]]:
         """
         Analyze query dependencies and return execution groups.
 
@@ -97,8 +97,8 @@ class SQLDependencyAnalyzer:
                 if e is not None
             ]
 
-            created_here: Set[str] = set()
-            referenced_here: Set[str] = set()
+            created_here: set[str] = set()
+            referenced_here: set[str] = set()
 
             for root in exprs:
                 # Track CREATE statements
@@ -135,7 +135,7 @@ class SQLDependencyAnalyzer:
                 logger.debug(f"Query {idx} references: {sorted(referenced_here)}")
 
         # Pass 2: Build query-to-query dependency edges
-        edges: Dict[int, Set[int]] = {}
+        edges: dict[int, set[int]] = {}
         for query_idx, tables in self.query_dependencies.items():
             deps = set()
             for table in tables:
@@ -158,7 +158,7 @@ class SQLDependencyAnalyzer:
             if not parsed or not parsed.tree:
                 return sql
 
-            out_parts: List[str] = []
+            out_parts: list[str] = []
             for seg in parsed.tree.raw_segments:
                 if seg.is_type("comment"):
                     # Preserve newlines to maintain line boundaries
@@ -172,15 +172,15 @@ class SQLDependencyAnalyzer:
             return sql
 
     def _topological_sort(
-        self, num_queries: int, dependencies: Dict[int, Set[int]]
-    ) -> List[List[int]]:
+        self, num_queries: int, dependencies: dict[int, set[int]]
+    ) -> list[list[int]]:
         """
         Kahn's algorithm for levelized topological ordering.
 
         Returns groups where each group can be executed in parallel.
         """
         in_degree = [0] * num_queries
-        reverse_deps: Dict[int, Set[int]] = {i: set() for i in range(num_queries)}
+        reverse_deps: dict[int, set[int]] = {i: set() for i in range(num_queries)}
 
         for query, deps in dependencies.items():
             in_degree[query] = len(deps)
@@ -189,8 +189,8 @@ class SQLDependencyAnalyzer:
 
         # Start with queries that have no dependencies
         queue = [i for i in range(num_queries) if in_degree[i] == 0]
-        groups: List[List[int]] = []
-        visited: Set[int] = set()
+        groups: list[list[int]] = []
+        visited: set[int] = set()
 
         while queue:
             # All queries in current queue can run in parallel
@@ -215,7 +215,7 @@ class SQLDependencyAnalyzer:
 
         return groups
 
-    def _extract_referenced_tables(self, root: exp.Expression) -> Set[str]:
+    def _extract_referenced_tables(self, root: exp.Expression) -> set[str]:
         """
         Extract referenced tables from an AST node.
 
@@ -223,7 +223,7 @@ class SQLDependencyAnalyzer:
         - CTE names (WITH clause aliases)
         - The target table in CREATE/INSERT statements
         """
-        referenced: Set[str] = set()
+        referenced: set[str] = set()
         if root is None:
             return referenced
 
@@ -253,9 +253,9 @@ class SQLDependencyAnalyzer:
 
         return referenced
 
-    def _collect_cte_names(self, root: exp.Expression) -> Set[str]:
+    def _collect_cte_names(self, root: exp.Expression) -> set[str]:
         """Collect CTE names from WITH clause for exclusion."""
-        names: Set[str] = set()
+        names: set[str] = set()
         with_clause = root.args.get("with")
         if isinstance(with_clause, exp.With):
             for cte in with_clause.expressions or []:
@@ -266,7 +266,7 @@ class SQLDependencyAnalyzer:
                         names.add(ident.this.lower())
         return names
 
-    def _bare(self, table_exp: Optional[exp.Expression]) -> Optional[str]:
+    def _bare(self, table_exp: exp.Expression | None) -> str | None:
         """Extract bare table name (lowercase) from expression."""
         if table_exp is None:
             return None
@@ -274,7 +274,7 @@ class SQLDependencyAnalyzer:
             name = table_exp.name or ""
             return name.strip("`\"").lower() or None
         if hasattr(table_exp, "name"):
-            name = getattr(table_exp, "name")
+            name = table_exp.name
             if isinstance(name, str):
                 return name.strip("`\"").lower() or None
         if hasattr(table_exp, "this") and isinstance(table_exp.this, exp.Table):
@@ -282,7 +282,7 @@ class SQLDependencyAnalyzer:
             return name.strip("`\"").lower() or None
         return None
 
-    def _table_from_create(self, node: exp.Create) -> Optional[exp.Table]:
+    def _table_from_create(self, node: exp.Create) -> exp.Table | None:
         """Extract table from CREATE statement."""
         target = node.this
         if isinstance(target, exp.Table):
@@ -291,14 +291,14 @@ class SQLDependencyAnalyzer:
             return target.this
         return None
 
-    def _table_from_alter(self, node: exp.Alter) -> Optional[exp.Table]:
+    def _table_from_alter(self, node: exp.Alter) -> exp.Table | None:
         """Extract table from ALTER statement."""
         target = node.this
         if isinstance(target, exp.Table):
             return target
         return None
 
-    def _table_from_drop(self, node: exp.Drop) -> Optional[exp.Table]:
+    def _table_from_drop(self, node: exp.Drop) -> exp.Table | None:
         """Extract table from DROP statement."""
         target = node.this
         if isinstance(target, exp.Table):

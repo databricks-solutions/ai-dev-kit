@@ -17,8 +17,8 @@ from ..trace.models import TraceMetrics
 
 @scorer
 def tool_count(
-    trace: Dict[str, Any],
-    expectations: Dict[str, Any],
+    trace: dict[str, Any],
+    expectations: dict[str, Any],
 ) -> Feedback:
     """Check if tool usage is within specified limits.
 
@@ -67,8 +67,8 @@ def tool_count(
 
 @scorer
 def token_budget(
-    trace: Dict[str, Any],
-    expectations: Dict[str, Any],
+    trace: dict[str, Any],
+    expectations: dict[str, Any],
 ) -> Feedback:
     """Check if token usage is within budget.
 
@@ -128,8 +128,8 @@ def token_budget(
 
 @scorer
 def required_tools(
-    trace: Dict[str, Any],
-    expectations: Dict[str, Any],
+    trace: dict[str, Any],
+    expectations: dict[str, Any],
 ) -> Feedback:
     """Check if required tools were used.
 
@@ -172,8 +172,8 @@ def required_tools(
 
 @scorer
 def banned_tools(
-    trace: Dict[str, Any],
-    expectations: Dict[str, Any],
+    trace: dict[str, Any],
+    expectations: dict[str, Any],
 ) -> Feedback:
     """Check that banned tools were not used.
 
@@ -217,8 +217,8 @@ def banned_tools(
 
 @scorer
 def file_existence(
-    trace: Dict[str, Any],
-    expectations: Dict[str, Any],
+    trace: dict[str, Any],
+    expectations: dict[str, Any],
 ) -> Feedback:
     """Check if expected files were created.
 
@@ -275,8 +275,8 @@ def file_existence(
 
 @scorer
 def tool_sequence(
-    trace: Dict[str, Any],
-    expectations: Dict[str, Any],
+    trace: dict[str, Any],
+    expectations: dict[str, Any],
 ) -> Feedback:
     """Check if tools were used in expected order.
 
@@ -324,8 +324,8 @@ def tool_sequence(
 
 @scorer
 def category_limits(
-    trace: Dict[str, Any],
-    expectations: Dict[str, Any],
+    trace: dict[str, Any],
+    expectations: dict[str, Any],
 ) -> Feedback:
     """Check if tool category usage is within limits.
 
@@ -373,7 +373,7 @@ def category_limits(
 
 
 # Convenience function to get all trace scorers
-def get_trace_scorers() -> List:
+def get_trace_scorers() -> list:
     """Get list of all trace-based scorers."""
     return [
         tool_count,

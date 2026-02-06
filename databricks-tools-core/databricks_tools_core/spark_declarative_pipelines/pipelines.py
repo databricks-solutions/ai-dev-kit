@@ -52,7 +52,7 @@ _COMPLEX_FIELD_CONVERTERS = {
 }
 
 
-def _convert_extra_settings(extra_settings: Dict[str, Any]) -> Dict[str, Any]:
+def _convert_extra_settings(extra_settings: dict[str, Any]) -> dict[str, Any]:
     """
     Convert extra_settings dict to SDK-compatible kwargs.
 
@@ -109,7 +109,7 @@ RUNNING_STATES = {
 }
 
 
-def _build_libraries(workspace_file_paths: List[str]) -> List[PipelineLibrary]:
+def _build_libraries(workspace_file_paths: list[str]) -> list[PipelineLibrary]:
     """Build PipelineLibrary list from file paths."""
     return [
         PipelineLibrary(file=FileLibrary(path=path))
@@ -117,7 +117,7 @@ def _build_libraries(workspace_file_paths: List[str]) -> List[PipelineLibrary]:
     ]
 
 
-def _extract_error_details(events: List[PipelineEvent]) -> List[Dict[str, Any]]:
+def _extract_error_details(events: list[PipelineEvent]) -> list[dict[str, Any]]:
     """Extract error details from pipeline events for LLM consumption."""
     errors = []
     for event in events:
@@ -154,27 +154,27 @@ class PipelineRunResult:
     pipeline_name: str
 
     # Operation details
-    update_id: Optional[str] = None
-    state: Optional[str] = None
+    update_id: str | None = None
+    state: str | None = None
     success: bool = False
     created: bool = False  # True if pipeline was created, False if updated
 
     # Configuration (for context)
-    catalog: Optional[str] = None
-    schema: Optional[str] = None
-    root_path: Optional[str] = None
+    catalog: str | None = None
+    schema: str | None = None
+    root_path: str | None = None
 
     # Timing
-    duration_seconds: Optional[float] = None
+    duration_seconds: float | None = None
 
     # Error details (if failed)
-    error_message: Optional[str] = None
-    errors: List[Dict[str, Any]] = field(default_factory=list)
+    error_message: str | None = None
+    errors: list[dict[str, Any]] = field(default_factory=list)
 
     # Human-readable status
     message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "pipeline_id": self.pipeline_id,
@@ -193,7 +193,7 @@ class PipelineRunResult:
         }
 
 
-def find_pipeline_by_name(name: str) -> Optional[str]:
+def find_pipeline_by_name(name: str) -> str | None:
     """
     Find a pipeline by name and return its ID.
 
@@ -218,8 +218,8 @@ def create_pipeline(
     root_path: str,
     catalog: str,
     schema: str,
-    workspace_file_paths: List[str],
-    extra_settings: Optional[Dict[str, Any]] = None,
+    workspace_file_paths: list[str],
+    extra_settings: dict[str, Any] | None = None,
 ) -> CreatePipelineResponse:
     """
     Create a new Spark Declarative Pipeline (Unity Catalog, serverless by default).
@@ -247,7 +247,7 @@ def create_pipeline(
     libraries = _build_libraries(workspace_file_paths)
 
     # Start with converted extra_settings as base
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if extra_settings:
         kwargs = _convert_extra_settings(extra_settings)
 
@@ -286,12 +286,12 @@ def get_pipeline(pipeline_id: str) -> GetPipelineResponse:
 
 def update_pipeline(
     pipeline_id: str,
-    name: Optional[str] = None,
-    root_path: Optional[str] = None,
-    catalog: Optional[str] = None,
-    schema: Optional[str] = None,
-    workspace_file_paths: Optional[List[str]] = None,
-    extra_settings: Optional[Dict[str, Any]] = None,
+    name: str | None = None,
+    root_path: str | None = None,
+    catalog: str | None = None,
+    schema: str | None = None,
+    workspace_file_paths: list[str] | None = None,
+    extra_settings: dict[str, Any] | None = None,
 ) -> None:
     """
     Update pipeline configuration.
@@ -312,7 +312,7 @@ def update_pipeline(
     w = get_workspace_client()
 
     # Start with converted extra_settings as base
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if extra_settings:
         kwargs = _convert_extra_settings(extra_settings)
 
@@ -351,9 +351,9 @@ def delete_pipeline(pipeline_id: str) -> None:
 
 def start_update(
     pipeline_id: str,
-    refresh_selection: Optional[List[str]] = None,
+    refresh_selection: list[str] | None = None,
     full_refresh: bool = False,
-    full_refresh_selection: Optional[List[str]] = None,
+    full_refresh_selection: list[str] | None = None,
     validate_only: bool = False
 ) -> str:
     """
@@ -414,7 +414,7 @@ def stop_pipeline(pipeline_id: str) -> None:
 def get_pipeline_events(
     pipeline_id: str,
     max_results: int = 100
-) -> List[PipelineEvent]:
+) -> list[PipelineEvent]:
     """
     Get pipeline events, issues, and error messages.
 
@@ -440,7 +440,7 @@ def wait_for_pipeline_update(
     update_id: str,
     timeout: int = 1800,
     poll_interval: int = 5
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Wait for a pipeline update to complete and return detailed results.
 
@@ -508,12 +508,12 @@ def create_or_update_pipeline(
     root_path: str,
     catalog: str,
     schema: str,
-    workspace_file_paths: List[str],
+    workspace_file_paths: list[str],
     start_run: bool = False,
     wait_for_completion: bool = False,
     full_refresh: bool = True,
     timeout: int = 1800,
-    extra_settings: Optional[Dict[str, Any]] = None,
+    extra_settings: dict[str, Any] | None = None,
 ) -> PipelineRunResult:
     """
     Create a new pipeline or update an existing one with the same name.

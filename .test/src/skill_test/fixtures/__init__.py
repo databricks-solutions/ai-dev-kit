@@ -12,13 +12,13 @@ from .setup import (
 )
 
 __all__ = [
-    "TestFixtureConfig",
     "FixtureResult",
+    "TestFixtureConfig",
+    "create_test_table",
+    "setup_fixtures",
     "setup_test_catalog",
     "setup_test_schema",
     "setup_test_volume",
-    "upload_test_files",
-    "create_test_table",
-    "setup_fixtures",
     "teardown_fixtures",
+    "upload_test_files",
 ]

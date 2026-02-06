@@ -12,33 +12,33 @@ class BaselineMetrics:
     skill_name: str
     run_id: str
     timestamp: str
-    metrics: Dict[str, float]
+    metrics: dict[str, float]
     test_count: int
-    git_commit: Optional[str] = None
-    skill_version: Optional[str] = None
+    git_commit: str | None = None
+    skill_version: str | None = None
 
 
 @dataclass
 class ComparisonResult:
     """Result of comparing current metrics to baseline."""
     skill_name: str
-    improved: List[str]
-    regressed: List[str]
-    unchanged: List[str]
-    new_metrics: List[str]
-    removed_metrics: List[str]
+    improved: list[str]
+    regressed: list[str]
+    unchanged: list[str]
+    new_metrics: list[str]
+    removed_metrics: list[str]
     passed_gates: bool
-    details: Dict[str, Dict[str, float]]
+    details: dict[str, dict[str, float]]
 
 
 def save_baseline(
     skill_name: str,
     run_id: str,
-    metrics: Dict[str, float],
+    metrics: dict[str, float],
     test_count: int,
     baselines_dir: Path = None,
-    git_commit: Optional[str] = None,
-    skill_version: Optional[str] = None
+    git_commit: str | None = None,
+    skill_version: str | None = None
 ) -> Path:
     """
     Save evaluation metrics as a baseline.
@@ -80,7 +80,7 @@ def save_baseline(
 def load_baseline(
     skill_name: str,
     baselines_dir: Path = None
-) -> Optional[BaselineMetrics]:
+) -> BaselineMetrics | None:
     """
     Load baseline metrics for a skill.
 
@@ -102,7 +102,7 @@ def load_baseline(
 
 def compare_baselines(
     skill_name: str,
-    current_metrics: Dict[str, float],
+    current_metrics: dict[str, float],
     threshold: float = 0.05,
     baselines_dir: Path = None
 ) -> ComparisonResult:

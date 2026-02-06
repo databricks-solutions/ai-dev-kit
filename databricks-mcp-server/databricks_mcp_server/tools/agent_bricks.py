@@ -14,7 +14,7 @@ from databricks_tools_core.agent_bricks import (
 from ..server import mcp
 
 # Singleton manager instance
-_manager: Optional[AgentBricksManager] = None
+_manager: AgentBricksManager | None = None
 
 
 def _get_manager() -> AgentBricksManager:
@@ -38,7 +38,7 @@ def create_or_update_ka(
     instructions: str = None,
     tile_id: str = None,
     add_examples_from_volume: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create or update a Knowledge Assistant (KA) with document knowledge sources.
 
@@ -135,7 +135,7 @@ def create_or_update_ka(
 
 
 @mcp.tool
-def get_ka(tile_id: str) -> Dict[str, Any]:
+def get_ka(tile_id: str) -> dict[str, Any]:
     """
     Get a Knowledge Assistant by tile ID.
 
@@ -187,7 +187,7 @@ def get_ka(tile_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def find_ka_by_name(name: str) -> Dict[str, Any]:
+def find_ka_by_name(name: str) -> dict[str, Any]:
     """
     Find a Knowledge Assistant by its name.
 
@@ -243,7 +243,7 @@ def find_ka_by_name(name: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def delete_ka(tile_id: str) -> Dict[str, Any]:
+def delete_ka(tile_id: str) -> dict[str, Any]:
     """
     Delete a Knowledge Assistant.
 
@@ -275,12 +275,12 @@ def delete_ka(tile_id: str) -> Dict[str, Any]:
 @mcp.tool
 def create_or_update_mas(
     name: str,
-    agents: List[Dict[str, str]],
+    agents: list[dict[str, str]],
     description: str = None,
     instructions: str = None,
     tile_id: str = None,
-    examples: List[Dict[str, str]] = None,
-) -> Dict[str, Any]:
+    examples: list[dict[str, str]] = None,
+) -> dict[str, Any]:
     """
     Create or update a Multi-Agent Supervisor (MAS).
 
@@ -464,7 +464,7 @@ def create_or_update_mas(
 
 
 @mcp.tool
-def get_mas(tile_id: str) -> Dict[str, Any]:
+def get_mas(tile_id: str) -> dict[str, Any]:
     """
     Get a Multi-Agent Supervisor by tile ID.
 
@@ -516,7 +516,7 @@ def get_mas(tile_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def find_mas_by_name(name: str) -> Dict[str, Any]:
+def find_mas_by_name(name: str) -> dict[str, Any]:
     """
     Find a Multi-Agent Supervisor by its name.
 
@@ -572,7 +572,7 @@ def find_mas_by_name(name: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def delete_mas(tile_id: str) -> Dict[str, Any]:
+def delete_mas(tile_id: str) -> dict[str, Any]:
     """
     Delete a Multi-Agent Supervisor.
 

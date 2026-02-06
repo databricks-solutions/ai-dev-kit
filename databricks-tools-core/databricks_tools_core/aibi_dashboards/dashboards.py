@@ -17,7 +17,7 @@ from .models import DashboardDeploymentResult
 logger = logging.getLogger(__name__)
 
 
-def get_dashboard(dashboard_id: str) -> Dict[str, Any]:
+def get_dashboard(dashboard_id: str) -> dict[str, Any]:
     """Get dashboard details by ID.
 
     Args:
@@ -49,8 +49,8 @@ def get_dashboard(dashboard_id: str) -> Dict[str, Any]:
 
 def list_dashboards(
     page_size: int = 25,
-    page_token: Optional[str] = None,
-) -> Dict[str, Any]:
+    page_token: str | None = None,
+) -> dict[str, Any]:
     """List AI/BI dashboards in the workspace.
 
     Args:
@@ -78,7 +78,7 @@ def list_dashboards(
     return {"dashboards": dashboards}
 
 
-def find_dashboard_by_path(dashboard_path: str) -> Optional[str]:
+def find_dashboard_by_path(dashboard_path: str) -> str | None:
     """Find a dashboard by its workspace path and return its ID.
 
     Args:
@@ -106,7 +106,7 @@ def create_dashboard(
     parent_path: str,
     serialized_dashboard: str,
     warehouse_id: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a new AI/BI dashboard.
 
     Args:
@@ -144,10 +144,10 @@ def create_dashboard(
 
 def update_dashboard(
     dashboard_id: str,
-    display_name: Optional[str] = None,
-    serialized_dashboard: Optional[str] = None,
-    warehouse_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    display_name: str | None = None,
+    serialized_dashboard: str | None = None,
+    warehouse_id: str | None = None,
+) -> dict[str, Any]:
     """Update an existing AI/BI dashboard.
 
     Args:
@@ -182,7 +182,7 @@ def update_dashboard(
     }
 
 
-def trash_dashboard(dashboard_id: str) -> Dict[str, str]:
+def trash_dashboard(dashboard_id: str) -> dict[str, str]:
     """Move a dashboard to trash.
 
     Args:
@@ -205,7 +205,7 @@ def publish_dashboard(
     dashboard_id: str,
     warehouse_id: str,
     embed_credentials: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Publish a dashboard to make it accessible to viewers.
 
     Publishing with embed_credentials=True allows users without direct
@@ -238,7 +238,7 @@ def publish_dashboard(
     }
 
 
-def unpublish_dashboard(dashboard_id: str) -> Dict[str, str]:
+def unpublish_dashboard(dashboard_id: str) -> dict[str, str]:
     """Unpublish a dashboard.
 
     Args:
@@ -457,7 +457,7 @@ def create_or_update_dashboard(
     serialized_dashboard: str,
     warehouse_id: str,
     publish: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create or update a dashboard (synchronous version).
 
     This is a convenience function that:

@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import TableInfo, ColumnInfo, TableType, Dat
 from ..auth import get_workspace_client
 
 
-def list_tables(catalog_name: str, schema_name: str) -> List[TableInfo]:
+def list_tables(catalog_name: str, schema_name: str) -> list[TableInfo]:
     """
     List all tables in a schema.
 
@@ -55,10 +55,10 @@ def create_table(
     catalog_name: str,
     schema_name: str,
     table_name: str,
-    columns: List[ColumnInfo],
+    columns: list[ColumnInfo],
     table_type: TableType = TableType.MANAGED,
-    comment: Optional[str] = None,
-    storage_location: Optional[str] = None
+    comment: str | None = None,
+    storage_location: str | None = None
 ) -> TableInfo:
     """
     Create a new table in Unity Catalog.

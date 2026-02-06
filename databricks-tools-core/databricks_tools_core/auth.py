@@ -32,11 +32,11 @@ def _has_oauth_credentials() -> bool:
     return bool(os.environ.get('DATABRICKS_CLIENT_ID') and os.environ.get('DATABRICKS_CLIENT_SECRET'))
 
 # Context variables for per-request authentication
-_host_ctx: ContextVar[Optional[str]] = ContextVar('databricks_host', default=None)
-_token_ctx: ContextVar[Optional[str]] = ContextVar('databricks_token', default=None)
+_host_ctx: ContextVar[str | None] = ContextVar('databricks_host', default=None)
+_token_ctx: ContextVar[str | None] = ContextVar('databricks_token', default=None)
 
 
-def set_databricks_auth(host: Optional[str], token: Optional[str]) -> None:
+def set_databricks_auth(host: str | None, token: str | None) -> None:
     """Set Databricks authentication for the current async context.
 
     Call this at the start of a request to set per-user credentials.

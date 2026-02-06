@@ -15,7 +15,7 @@ def upload_folder(
     workspace_folder: str,
     max_workers: int = 10,
     overwrite: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Upload an entire local folder to Databricks workspace.
 
@@ -63,7 +63,7 @@ def upload_file(
     local_path: str,
     workspace_path: str,
     overwrite: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Upload a single file to Databricks workspace.
 

@@ -114,7 +114,7 @@ def prompt_review_decision(candidate: GRPCandidate) -> ApprovalMetadata:
             print("Invalid choice. Please enter 'a', 'r', 's', or 'e'.")
 
 
-def review_candidates_file(candidates_path: Path) -> Dict[str, int]:
+def review_candidates_file(candidates_path: Path) -> dict[str, int]:
     """
     Review all pending candidates in a file.
 

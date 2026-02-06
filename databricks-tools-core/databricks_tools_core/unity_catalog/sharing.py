@@ -11,7 +11,7 @@ from ..auth import get_workspace_client
 # --- Shares ---
 
 
-def list_shares() -> List[Dict[str, Any]]:
+def list_shares() -> list[dict[str, Any]]:
     """
     List all shares.
 
@@ -26,7 +26,7 @@ def list_shares() -> List[Dict[str, Any]]:
     return [s.as_dict() if hasattr(s, "as_dict") else vars(s) for s in shares]
 
 
-def get_share(name: str, include_shared_data: bool = True) -> Dict[str, Any]:
+def get_share(name: str, include_shared_data: bool = True) -> dict[str, Any]:
     """
     Get details of a share including its shared objects.
 
@@ -47,8 +47,8 @@ def get_share(name: str, include_shared_data: bool = True) -> Dict[str, Any]:
 
 def create_share(
     name: str,
-    comment: Optional[str] = None,
-) -> Dict[str, Any]:
+    comment: str | None = None,
+) -> dict[str, Any]:
     """
     Create a new share.
 
@@ -63,7 +63,7 @@ def create_share(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {"name": name}
+    kwargs: dict[str, Any] = {"name": name}
     if comment is not None:
         kwargs["comment"] = comment
     result = w.shares.create(**kwargs)
@@ -73,9 +73,9 @@ def create_share(
 def add_table_to_share(
     share_name: str,
     table_name: str,
-    shared_as: Optional[str] = None,
-    partition_spec: Optional[str] = None,
-) -> Dict[str, Any]:
+    shared_as: str | None = None,
+    partition_spec: str | None = None,
+) -> dict[str, Any]:
     """
     Add a table to a share.
 
@@ -121,7 +121,7 @@ def add_table_to_share(
 def remove_table_from_share(
     share_name: str,
     table_name: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Remove a table from a share.
 
@@ -173,7 +173,7 @@ def delete_share(name: str) -> None:
 def grant_share_to_recipient(
     share_name: str,
     recipient_name: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Grant SELECT permission on a share to a recipient.
 
@@ -205,7 +205,7 @@ def grant_share_to_recipient(
 def revoke_share_from_recipient(
     share_name: str,
     recipient_name: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Revoke SELECT permission on a share from a recipient.
 
@@ -237,7 +237,7 @@ def revoke_share_from_recipient(
 # --- Recipients ---
 
 
-def list_recipients() -> List[Dict[str, Any]]:
+def list_recipients() -> list[dict[str, Any]]:
     """
     List all sharing recipients.
 
@@ -252,7 +252,7 @@ def list_recipients() -> List[Dict[str, Any]]:
     return [r.as_dict() if hasattr(r, "as_dict") else vars(r) for r in recipients]
 
 
-def get_recipient(name: str) -> Dict[str, Any]:
+def get_recipient(name: str) -> dict[str, Any]:
     """
     Get a specific recipient.
 
@@ -273,10 +273,10 @@ def get_recipient(name: str) -> Dict[str, Any]:
 def create_recipient(
     name: str,
     authentication_type: str = "TOKEN",
-    sharing_id: Optional[str] = None,
-    comment: Optional[str] = None,
-    ip_access_list: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    sharing_id: str | None = None,
+    comment: str | None = None,
+    ip_access_list: list[str] | None = None,
+) -> dict[str, Any]:
     """
     Create a sharing recipient.
 
@@ -296,7 +296,7 @@ def create_recipient(
     from databricks.sdk.service.sharing import AuthenticationType
 
     w = get_workspace_client()
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "name": name,
         "authentication_type": AuthenticationType(authentication_type.upper()),
     }
@@ -312,7 +312,7 @@ def create_recipient(
     return result.as_dict() if hasattr(result, "as_dict") else vars(result)
 
 
-def rotate_recipient_token(name: str) -> Dict[str, Any]:
+def rotate_recipient_token(name: str) -> dict[str, Any]:
     """
     Rotate the authentication token for a recipient.
 
@@ -347,7 +347,7 @@ def delete_recipient(name: str) -> None:
 # --- Providers ---
 
 
-def list_providers() -> List[Dict[str, Any]]:
+def list_providers() -> list[dict[str, Any]]:
     """
     List all sharing providers.
 
@@ -362,7 +362,7 @@ def list_providers() -> List[Dict[str, Any]]:
     return [p.as_dict() if hasattr(p, "as_dict") else vars(p) for p in providers]
 
 
-def get_provider(name: str) -> Dict[str, Any]:
+def get_provider(name: str) -> dict[str, Any]:
     """
     Get a specific provider.
 
@@ -380,7 +380,7 @@ def get_provider(name: str) -> Dict[str, Any]:
     return result.as_dict() if hasattr(result, "as_dict") else vars(result)
 
 
-def list_provider_shares(name: str) -> List[Dict[str, Any]]:
+def list_provider_shares(name: str) -> list[dict[str, Any]]:
     """
     List shares available from a provider.
 
