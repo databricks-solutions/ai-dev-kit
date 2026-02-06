@@ -220,8 +220,7 @@ def link_tool_results(entries: list[TranscriptEntry]) -> None:
                 # Handle list content (multi-part results)
                 if isinstance(result_content, list):
                     result_content = "\n".join(
-                        str(p.get("text", p)) if isinstance(p, dict) else str(p)
-                        for p in result_content
+                        str(p.get("text", p)) if isinstance(p, dict) else str(p) for p in result_content
                     )
 
                 if tool_use_id and tool_use_id in tool_calls_by_id:
@@ -275,9 +274,7 @@ def compute_metrics(entries: list[TranscriptEntry]) -> TraceMetrics:
             if entry.usage:
                 metrics.total_input_tokens += entry.usage.input_tokens
                 metrics.total_output_tokens += entry.usage.output_tokens
-                metrics.total_cache_creation_tokens += (
-                    entry.usage.cache_creation_input_tokens
-                )
+                metrics.total_cache_creation_tokens += entry.usage.cache_creation_input_tokens
                 metrics.total_cache_read_tokens += entry.usage.cache_read_input_tokens
 
             # Collect tool calls
@@ -293,9 +290,7 @@ def compute_metrics(entries: list[TranscriptEntry]) -> TraceMetrics:
 
             # Extract file operations
             if entry.tool_use_result:
-                file_op = extract_file_operation(
-                    entry.tool_use_result, entry.timestamp
-                )
+                file_op = extract_file_operation(entry.tool_use_result, entry.timestamp)
                 if file_op:
                     file_operations.append(file_op)
                     if file_op.is_write:

@@ -62,7 +62,7 @@ dbutils.notebook.exit("success")
 
         # Import notebook (creates it if doesn't exist)
         # Content must be base64 encoded
-        content_b64 = base64.b64encode(notebook_content.encode('utf-8')).decode('utf-8')
+        content_b64 = base64.b64encode(notebook_content.encode("utf-8")).decode("utf-8")
         w.workspace.import_(
             path=notebook_path,
             format=ImportFormat.SOURCE,

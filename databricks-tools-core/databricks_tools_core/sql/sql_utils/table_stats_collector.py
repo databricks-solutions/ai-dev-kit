@@ -56,9 +56,7 @@ def _get_schema_cache(catalog: str, schema: str) -> dict[str, tuple[int | None, 
     return _table_cache[schema_key]
 
 
-def _check_cache(
-    catalog: str, schema: str, table_name: str, updated_at_ms: int | None
-) -> TableInfo | None:
+def _check_cache(catalog: str, schema: str, table_name: str, updated_at_ms: int | None) -> TableInfo | None:
     """Check if table info is in cache and still valid."""
     schema_cache = _get_schema_cache(catalog, schema)
     if table_name in schema_cache:
@@ -68,10 +66,7 @@ def _check_cache(
     return None
 
 
-def _update_cache(
-    catalog: str, schema: str, table_name: str,
-    updated_at_ms: int | None, table_info: TableInfo
-) -> None:
+def _update_cache(catalog: str, schema: str, table_name: str, updated_at_ms: int | None, table_info: TableInfo) -> None:
     """Update cache with table info."""
     schema_cache = _get_schema_cache(catalog, schema)
     with _table_cache_lock:
@@ -108,10 +103,12 @@ class TableStatsCollector:
             List of table info dicts with 'name' and 'updated_at' keys
         """
         try:
-            tables = list(self.client.tables.list(
-                catalog_name=catalog,
-                schema_name=schema,
-            ))
+            tables = list(
+                self.client.tables.list(
+                    catalog_name=catalog,
+                    schema_name=schema,
+                )
+            )
             return [
                 {
                     "name": t.name,
@@ -127,9 +124,7 @@ class TableStatsCollector:
                 f"Check that the catalog and schema exist and you have access."
             )
 
-    def filter_tables_by_patterns(
-        self, tables: list[dict[str, Any]], patterns: list[str]
-    ) -> list[dict[str, Any]]:
+    def filter_tables_by_patterns(self, tables: list[dict[str, Any]], patterns: list[str]) -> list[dict[str, Any]]:
         """
         Filter tables by glob patterns.
 
@@ -359,9 +354,7 @@ class TableStatsCollector:
                 column_types[col_name] = col_type
 
                 # Build query based on type
-                query = self._build_column_stats_query(
-                    col_name, escaped_col, data_type, col_type, base_ref
-                )
+                query = self._build_column_stats_query(col_name, escaped_col, data_type, col_type, base_ref)
                 union_queries.append(query)
 
                 if col_type == "boolean":
@@ -388,18 +381,13 @@ class TableStatsCollector:
             )
             # Filter out _rescued_data column from samples
             if sample_result:
-                sample_result = [
-                    {k: v for k, v in row.items() if k != "_rescued_data"}
-                    for row in sample_result
-                ]
+                sample_result = [{k: v for k, v in row.items() if k != "_rescued_data"} for row in sample_result]
 
             # Step 5: Build column samples from sample data
             column_samples = self._extract_column_samples(describe_result, sample_result)
 
             # Step 6: Parse stats results
-            column_details = self._parse_stats_results(
-                stats_result, column_types, column_samples
-            )
+            column_details = self._parse_stats_results(stats_result, column_types, column_samples)
 
             # Step 7: Get value counts for categorical columns (only for UC tables)
             if fetch_value_counts_table:
@@ -412,10 +400,7 @@ class TableStatsCollector:
                 # Parse catalog.schema.table from fetch_value_counts_table
                 parts = fetch_value_counts_table.split(".")
                 if len(parts) == 3:
-                    self._fetch_value_counts(
-                        parts[0], parts[1], parts[2],
-                        columns_needing_value_counts, column_details
-                    )
+                    self._fetch_value_counts(parts[0], parts[1], parts[2], columns_needing_value_counts, column_details)
 
             return column_details, total_rows, sample_result or []
 
@@ -483,17 +468,15 @@ class TableStatsCollector:
                     COUNT(*) AS total_count,
                     SUM(CASE WHEN {escaped_col} IS NULL THEN 1 ELSE 0 END) AS null_count,
                     approx_count_distinct({escaped_col}) AS unique_count,
-                    {'CAST(MIN(' + escaped_col + ') AS STRING)' if col_type == 'date' else 'NULL'} AS min_val,
-                    {'CAST(MAX(' + escaped_col + ') AS STRING)' if col_type == 'date' else 'NULL'} AS max_val,
+                    {"CAST(MIN(" + escaped_col + ") AS STRING)" if col_type == "date" else "NULL"} AS min_val,
+                    {"CAST(MAX(" + escaped_col + ") AS STRING)" if col_type == "date" else "NULL"} AS max_val,
                     NULL AS mean_val, NULL AS stddev_val,
                     NULL AS q1_val, NULL AS median_val, NULL AS q3_val,
                     NULL AS histogram_data
                 FROM {base_ref}
             """
 
-    def _extract_column_samples(
-        self, columns_info: list[dict], sample_data: list[dict] | None
-    ) -> dict[str, list[str]]:
+    def _extract_column_samples(self, columns_info: list[dict], sample_data: list[dict] | None) -> dict[str, list[str]]:
         """Extract sample values for each column."""
         column_samples: dict[str, list[str]] = {}
         if not sample_data:
@@ -651,10 +634,7 @@ class TableStatsCollector:
                 if result:
                     actual_count = len(result)
                     if actual_count <= MAX_CATEGORICAL_VALUES:
-                        value_counts = {
-                            str(row.get("value", "")): int(row.get("count") or 0)
-                            for row in result
-                        }
+                        value_counts = {str(row.get("value", "")): int(row.get("count") or 0) for row in result}
                         column_details[col_name].value_counts = value_counts
                         column_details[col_name].unique_count = actual_count
             except Exception as e:
@@ -704,9 +684,7 @@ class TableStatsCollector:
 
             if collect_stats:
                 try:
-                    column_details, total_rows, sample_data = self.collect_column_stats(
-                        catalog, schema, table_name
-                    )
+                    column_details, total_rows, sample_data = self.collect_column_stats(catalog, schema, table_name)
                 except Exception as e:
                     logger.warning(f"Failed to collect stats for {full_table_name}: {e}")
 
@@ -755,9 +733,7 @@ class TableStatsCollector:
             comment = table_info.get("comment")
 
             try:
-                return self.get_table_info(
-                    catalog, schema, table_name, updated_at_ms, comment, collect_stats
-                )
+                return self.get_table_info(catalog, schema, table_name, updated_at_ms, comment, collect_stats)
             except Exception as e:
                 logger.error(f"Failed to get info for {catalog}.{schema}.{table_name}: {e}")
                 return TableInfo(
@@ -770,19 +746,19 @@ class TableStatsCollector:
         max_workers = min(self.max_workers, len(tables))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_table = {
-                executor.submit(process_table, t): t for t in tables
-            }
+            future_to_table = {executor.submit(process_table, t): t for t in tables}
             for future in as_completed(future_to_table):
                 try:
                     results.append(future.result())
                 except Exception as e:
                     table = future_to_table[future]
                     logger.error(f"Unexpected error for {table['name']}: {e}")
-                    results.append(TableInfo(
-                        name=f"{catalog}.{schema}.{table['name']}",
-                        ddl="",
-                        error=str(e),
-                    ))
+                    results.append(
+                        TableInfo(
+                            name=f"{catalog}.{schema}.{table['name']}",
+                            ddl="",
+                            error=str(e),
+                        )
+                    )
 
         return results

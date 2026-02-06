@@ -3,6 +3,7 @@ Unity Catalog - Schema Operations
 
 Functions for managing schemas (databases) in Unity Catalog.
 """
+
 from typing import List, Optional
 from databricks.sdk.service.catalog import SchemaInfo
 
@@ -46,11 +47,7 @@ def get_schema(full_schema_name: str) -> SchemaInfo:
     return w.schemas.get(full_name=full_schema_name)
 
 
-def create_schema(
-    catalog_name: str,
-    schema_name: str,
-    comment: str | None = None
-) -> SchemaInfo:
+def create_schema(catalog_name: str, schema_name: str, comment: str | None = None) -> SchemaInfo:
     """
     Create a new schema in Unity Catalog.
 
@@ -66,18 +63,11 @@ def create_schema(
         DatabricksError: If API request fails
     """
     w = get_workspace_client()
-    return w.schemas.create(
-        name=schema_name,
-        catalog_name=catalog_name,
-        comment=comment
-    )
+    return w.schemas.create(name=schema_name, catalog_name=catalog_name, comment=comment)
 
 
 def update_schema(
-    full_schema_name: str,
-    new_name: str | None = None,
-    comment: str | None = None,
-    owner: str | None = None
+    full_schema_name: str, new_name: str | None = None, comment: str | None = None, owner: str | None = None
 ) -> SchemaInfo:
     """
     Update an existing schema in Unity Catalog.
@@ -99,12 +89,7 @@ def update_schema(
         raise ValueError("At least one field (new_name, comment, or owner) must be provided")
 
     w = get_workspace_client()
-    return w.schemas.update(
-        full_name=full_schema_name,
-        new_name=new_name,
-        comment=comment,
-        owner=owner
-    )
+    return w.schemas.update(full_name=full_schema_name, new_name=new_name, comment=comment, owner=owner)
 
 
 def delete_schema(full_schema_name: str) -> None:

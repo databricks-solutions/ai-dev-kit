@@ -40,9 +40,7 @@ class TestExecuteSQL:
         assert len(result) == 3
         assert all("id" in row and "letter" in row for row in result)
 
-    def test_select_from_test_table(
-        self, warehouse_id, test_catalog, test_schema, test_tables
-    ):
+    def test_select_from_test_table(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should query data from test tables."""
         result = execute_sql(
             sql_query=f"SELECT * FROM {test_tables['customers']} ORDER BY customer_id",
@@ -55,9 +53,7 @@ class TestExecuteSQL:
         assert result[0]["name"] == "Alice Smith"
         assert result[4]["name"] == "Eve Wilson"
 
-    def test_select_with_catalog_schema_context(
-        self, warehouse_id, test_catalog, test_schema, test_tables
-    ):
+    def test_select_with_catalog_schema_context(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should use catalog/schema context for unqualified table names."""
         result = execute_sql(
             sql_query="SELECT COUNT(*) as cnt FROM customers",
@@ -70,9 +66,7 @@ class TestExecuteSQL:
         count = int(result[0]["cnt"])
         assert count == 5
 
-    def test_aggregate_query(
-        self, warehouse_id, test_catalog, test_schema, test_tables
-    ):
+    def test_aggregate_query(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should handle aggregate functions."""
         result = execute_sql(
             sql_query=f"""
@@ -80,7 +74,7 @@ class TestExecuteSQL:
                     status,
                     COUNT(*) as order_count,
                     SUM(amount) as total_amount
-                FROM {test_tables['orders']}
+                FROM {test_tables["orders"]}
                 GROUP BY status
                 ORDER BY status
             """,
@@ -92,17 +86,15 @@ class TestExecuteSQL:
         assert "completed" in statuses
         assert "pending" in statuses
 
-    def test_join_query(
-        self, warehouse_id, test_catalog, test_schema, test_tables
-    ):
+    def test_join_query(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should handle JOIN operations."""
         result = execute_sql(
             sql_query=f"""
                 SELECT
                     c.name,
                     COUNT(o.order_id) as order_count
-                FROM {test_tables['customers']} c
-                LEFT JOIN {test_tables['orders']} o ON c.customer_id = o.customer_id
+                FROM {test_tables["customers"]} c
+                LEFT JOIN {test_tables["orders"]} o ON c.customer_id = o.customer_id
                 GROUP BY c.name
                 ORDER BY order_count DESC
             """,
@@ -131,8 +123,7 @@ class TestExecuteSQL:
                 warehouse_id=warehouse_id,
             )
 
-        assert "TABLE_OR_VIEW_NOT_FOUND" in str(exc_info.value).upper() or \
-               "NOT FOUND" in str(exc_info.value).upper()
+        assert "TABLE_OR_VIEW_NOT_FOUND" in str(exc_info.value).upper() or "NOT FOUND" in str(exc_info.value).upper()
 
     def test_syntax_error_raises_error(self, warehouse_id):
         """Should raise SQLExecutionError for syntax errors."""
@@ -150,9 +141,7 @@ class TestExecuteSQL:
 class TestExecuteSQLMulti:
     """Tests for execute_sql_multi function."""
 
-    def test_multiple_independent_statements(
-        self, warehouse_id, test_catalog, test_schema
-    ):
+    def test_multiple_independent_statements(self, warehouse_id, test_catalog, test_schema):
         """Should execute multiple independent statements."""
         result = execute_sql_multi(
             sql_content=f"""
@@ -176,9 +165,7 @@ class TestExecuteSQLMulti:
         assert len(results) == 4
         assert all(r["status"] == "success" for r in results.values())
 
-    def test_dependency_analysis(
-        self, warehouse_id, test_catalog, test_schema
-    ):
+    def test_dependency_analysis(self, warehouse_id, test_catalog, test_schema):
         """Should analyze dependencies and execute in correct order."""
         result = execute_sql_multi(
             sql_content=f"""
@@ -199,9 +186,7 @@ class TestExecuteSQLMulti:
         # All should succeed
         assert all(r["status"] == "success" for r in result["results"].values())
 
-    def test_parallel_execution_info(
-        self, warehouse_id, test_catalog, test_schema
-    ):
+    def test_parallel_execution_info(self, warehouse_id, test_catalog, test_schema):
         """Should indicate which queries ran in parallel."""
         result = execute_sql_multi(
             sql_content=f"""
@@ -223,9 +208,7 @@ class TestExecuteSQLMulti:
         assert first_group["group_size"] == 3
         assert first_group["is_parallel"] is True
 
-    def test_stops_on_error(
-        self, warehouse_id, test_catalog, test_schema
-    ):
+    def test_stops_on_error(self, warehouse_id, test_catalog, test_schema):
         """Should stop execution when a query fails."""
         result = execute_sql_multi(
             sql_content=f"""
@@ -245,9 +228,7 @@ class TestExecuteSQLMulti:
         has_error = any(r["status"] == "error" for r in result["results"].values())
         assert has_error
 
-    def test_execution_summary_structure(
-        self, warehouse_id, test_catalog, test_schema
-    ):
+    def test_execution_summary_structure(self, warehouse_id, test_catalog, test_schema):
         """Should return proper execution summary."""
         result = execute_sql_multi(
             sql_content="""
@@ -267,9 +248,7 @@ class TestExecuteSQLMulti:
         assert summary["total_queries"] == 2
         assert isinstance(summary["total_time"], float)
 
-    def test_result_contains_query_details(
-        self, warehouse_id, test_catalog, test_schema
-    ):
+    def test_result_contains_query_details(self, warehouse_id, test_catalog, test_schema):
         """Each result should contain query details."""
         result = execute_sql_multi(
             sql_content="SELECT 1 as num; SELECT 2 as num;",

@@ -39,10 +39,17 @@ UC_TEST_PREFIX = "uc_test"
 def _is_sharing_error(e: Exception) -> bool:
     """Check if error indicates sharing is not available."""
     msg = str(e).upper()
-    return any(kw in msg for kw in [
-        "FEATURE_NOT_ENABLED", "NOT_FOUND", "FORBIDDEN", "PERMISSION_DENIED",
-        "DELTA_SHARING", "NOT_AVAILABLE",
-    ])
+    return any(
+        kw in msg
+        for kw in [
+            "FEATURE_NOT_ENABLED",
+            "NOT_FOUND",
+            "FORBIDDEN",
+            "PERMISSION_DENIED",
+            "DELTA_SHARING",
+            "NOT_AVAILABLE",
+        ]
+    )
 
 
 @pytest.mark.integration
@@ -65,9 +72,7 @@ class TestListShares:
 class TestShareCRUD:
     """Tests for share create, get, delete lifecycle."""
 
-    def test_create_and_delete_share(
-        self, unique_name: str, cleanup_shares
-    ):
+    def test_create_and_delete_share(self, unique_name: str, cleanup_shares):
         """Should create and delete a share."""
         share_name = f"{UC_TEST_PREFIX}_share_{unique_name}"
 
@@ -139,9 +144,7 @@ class TestShareCRUD:
 class TestRecipientCRUD:
     """Tests for recipient create, get, delete lifecycle."""
 
-    def test_create_and_delete_recipient(
-        self, unique_name: str, cleanup_recipients
-    ):
+    def test_create_and_delete_recipient(self, unique_name: str, cleanup_recipients):
         """Should create and delete a sharing recipient."""
         recipient_name = f"{UC_TEST_PREFIX}_recipient_{unique_name}"
 

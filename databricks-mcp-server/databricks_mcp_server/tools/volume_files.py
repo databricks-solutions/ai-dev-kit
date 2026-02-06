@@ -1,4 +1,5 @@
 """Volume file tools - Manage files in Unity Catalog Volumes."""
+
 from typing import Dict, Any, List
 
 from databricks_tools_core.unity_catalog import (
@@ -51,7 +52,9 @@ def list_volume_files(volume_path: str, max_results: int = 500) -> dict[str, Any
         "files": files,
         "returned_count": len(files),
         "truncated": truncated,
-        "message": f"Results limited to {len(files)} items. Use a more specific path or subdirectory to see more files." if truncated else None,
+        "message": f"Results limited to {len(files)} items. Use a more specific path or subdirectory to see more files."
+        if truncated
+        else None,
     }
 
 

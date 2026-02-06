@@ -4,6 +4,7 @@ Databricks REST API Client
 Shared HTTP client for all Databricks API operations.
 Uses Databricks SDK for authentication to support both PAT and OAuth.
 """
+
 import os
 from typing import Dict, Any, Optional
 from collections.abc import Callable
@@ -14,13 +15,13 @@ from databricks.sdk import WorkspaceClient
 
 def _has_oauth_credentials() -> bool:
     """Check if OAuth credentials (SP) are configured in environment."""
-    return bool(os.environ.get('DATABRICKS_CLIENT_ID') and os.environ.get('DATABRICKS_CLIENT_SECRET'))
+    return bool(os.environ.get("DATABRICKS_CLIENT_ID") and os.environ.get("DATABRICKS_CLIENT_SECRET"))
 
 
 class FilesAPI:
     """Databricks Files API for Unity Catalog Volumes."""
 
-    def __init__(self, client: 'DatabricksClient'):
+    def __init__(self, client: "DatabricksClient"):
         self.client = client
 
     def create_directory(self, path: str) -> None:
@@ -47,10 +48,7 @@ class FilesAPI:
             requests.HTTPError: If request fails (unless ignore_missing=True for 404)
         """
         try:
-            self.client.delete(
-                "/api/2.0/fs/directories",
-                params={"path": path, "recursive": "true"}
-            )
+            self.client.delete("/api/2.0/fs/directories", params={"path": path, "recursive": "true"})
         except requests.HTTPError as e:
             if not ignore_missing or e.response.status_code != 404:
                 raise
@@ -67,11 +65,7 @@ class FilesAPI:
         Raises:
             requests.HTTPError: If request fails
         """
-        self.client.put(
-            f"/api/2.0/fs/files{path}",
-            data=data,
-            params={"overwrite": str(overwrite).lower()}
-        )
+        self.client.put(f"/api/2.0/fs/files{path}", data=data, params={"overwrite": str(overwrite).lower()})
 
 
 class DatabricksClient:
@@ -80,12 +74,7 @@ class DatabricksClient:
     Uses Databricks SDK for authentication to support both PAT and OAuth (SP credentials).
     """
 
-    def __init__(
-        self,
-        host: str | None = None,
-        token: str | None = None,
-        profile: str | None = None
-    ):
+    def __init__(self, host: str | None = None, token: str | None = None, profile: str | None = None):
         """
         Initialize Databricks client.
 
@@ -103,9 +92,9 @@ class DatabricksClient:
         # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M
         # This prevents the SDK from detecting other auth methods like PAT or config file
         if _has_oauth_credentials():
-            oauth_host = host or os.environ.get('DATABRICKS_HOST', '')
-            client_id = os.environ.get('DATABRICKS_CLIENT_ID', '')
-            client_secret = os.environ.get('DATABRICKS_CLIENT_SECRET', '')
+            oauth_host = host or os.environ.get("DATABRICKS_HOST", "")
+            client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
+            client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
 
             # Explicitly configure OAuth M2M to prevent auth conflicts
             self._sdk_client = WorkspaceClient(
@@ -213,7 +202,7 @@ class DatabricksClient:
         endpoint: str,
         json: dict[str, Any] | None = None,
         data: bytes | None = None,
-        params: dict[str, Any] | None = None
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Make PUT request to Databricks API.

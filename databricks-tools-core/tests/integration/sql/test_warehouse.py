@@ -46,9 +46,7 @@ class TestListWarehouses:
         # If we found a non-running warehouse, all before it should be running
         if first_non_running_idx is not None:
             for i in range(first_non_running_idx):
-                assert warehouses[i]["state"] == "RUNNING", (
-                    f"Warehouse at index {i} should be RUNNING"
-                )
+                assert warehouses[i]["state"] == "RUNNING", f"Warehouse at index {i} should be RUNNING"
 
     def test_list_warehouses_with_limit(self):
         """Should respect the limit parameter."""
@@ -79,9 +77,7 @@ class TestGetBestWarehouse:
         if warehouse_id is not None:
             warehouses = list_warehouses()
             warehouse_ids = [w["id"] for w in warehouses]
-            assert warehouse_id in warehouse_ids, (
-                f"Warehouse ID {warehouse_id} not found in list"
-            )
+            assert warehouse_id in warehouse_ids, f"Warehouse ID {warehouse_id} not found in list"
 
     def test_get_best_warehouse_prefers_running(self):
         """Should prefer running warehouses."""
@@ -94,6 +90,4 @@ class TestGetBestWarehouse:
             # If there are any running warehouses, selected should be running
             running_exists = any(w["state"] == "RUNNING" for w in warehouses)
             if running_exists:
-                assert selected["state"] == "RUNNING", (
-                    "Should select a running warehouse when available"
-                )
+                assert selected["state"] == "RUNNING", "Should select a running warehouse when available"

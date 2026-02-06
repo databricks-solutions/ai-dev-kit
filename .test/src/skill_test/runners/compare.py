@@ -1,4 +1,5 @@
 """Version comparison for regression detection."""
+
 import json
 from datetime import datetime
 from pathlib import Path
@@ -9,6 +10,7 @@ from dataclasses import dataclass, asdict
 @dataclass
 class BaselineMetrics:
     """Baseline metrics for comparison."""
+
     skill_name: str
     run_id: str
     timestamp: str
@@ -21,6 +23,7 @@ class BaselineMetrics:
 @dataclass
 class ComparisonResult:
     """Result of comparing current metrics to baseline."""
+
     skill_name: str
     improved: list[str]
     regressed: list[str]
@@ -38,7 +41,7 @@ def save_baseline(
     test_count: int,
     baselines_dir: Path = None,
     git_commit: str | None = None,
-    skill_version: str | None = None
+    skill_version: str | None = None,
 ) -> Path:
     """
     Save evaluation metrics as a baseline.
@@ -67,20 +70,17 @@ def save_baseline(
         metrics=metrics,
         test_count=test_count,
         git_commit=git_commit,
-        skill_version=skill_version
+        skill_version=skill_version,
     )
 
     baseline_path = baselines_dir / f"{skill_name}.json"
-    with open(baseline_path, 'w') as f:
+    with open(baseline_path, "w") as f:
         json.dump(asdict(baseline), f, indent=2)
 
     return baseline_path
 
 
-def load_baseline(
-    skill_name: str,
-    baselines_dir: Path = None
-) -> BaselineMetrics | None:
+def load_baseline(skill_name: str, baselines_dir: Path = None) -> BaselineMetrics | None:
     """
     Load baseline metrics for a skill.
 
@@ -101,10 +101,7 @@ def load_baseline(
 
 
 def compare_baselines(
-    skill_name: str,
-    current_metrics: dict[str, float],
-    threshold: float = 0.05,
-    baselines_dir: Path = None
+    skill_name: str, current_metrics: dict[str, float], threshold: float = 0.05, baselines_dir: Path = None
 ) -> ComparisonResult:
     """
     Compare current metrics against baseline.
@@ -130,8 +127,7 @@ def compare_baselines(
             new_metrics=list(current_metrics.keys()),
             removed_metrics=[],
             passed_gates=True,
-            details={k: {"current": v, "baseline": None, "delta": None}
-                     for k, v in current_metrics.items()}
+            details={k: {"current": v, "baseline": None, "delta": None} for k, v in current_metrics.items()},
         )
 
     improved = []
@@ -147,21 +143,13 @@ def compare_baselines(
     for metric, current_value in current_metrics.items():
         if metric not in baseline_metrics:
             new_metrics.append(metric)
-            details[metric] = {
-                "current": current_value,
-                "baseline": None,
-                "delta": None
-            }
+            details[metric] = {"current": current_value, "baseline": None, "delta": None}
             continue
 
         baseline_value = baseline_metrics[metric]
         delta = current_value - baseline_value
 
-        details[metric] = {
-            "current": current_value,
-            "baseline": baseline_value,
-            "delta": delta
-        }
+        details[metric] = {"current": current_value, "baseline": baseline_value, "delta": delta}
 
         if abs(delta) < threshold:
             unchanged.append(metric)
@@ -174,17 +162,10 @@ def compare_baselines(
     for metric in baseline_metrics:
         if metric not in current_metrics:
             removed_metrics.append(metric)
-            details[metric] = {
-                "current": None,
-                "baseline": baseline_metrics[metric],
-                "delta": None
-            }
+            details[metric] = {"current": None, "baseline": baseline_metrics[metric], "delta": None}
 
     # Determine if quality gates pass (no regressions in critical metrics)
-    critical_metrics = [
-        "syntax_valid/score/mean",
-        "no_hallucinated_apis/score/mean"
-    ]
+    critical_metrics = ["syntax_valid/score/mean", "no_hallucinated_apis/score/mean"]
     passed_gates = not any(m in regressed for m in critical_metrics)
 
     return ComparisonResult(
@@ -195,17 +176,13 @@ def compare_baselines(
         new_metrics=new_metrics,
         removed_metrics=removed_metrics,
         passed_gates=passed_gates,
-        details=details
+        details=details,
     )
 
 
 def format_comparison_report(result: ComparisonResult) -> str:
     """Format comparison result as a human-readable report."""
-    lines = [
-        f"Comparison Report: {result.skill_name}",
-        "=" * 50,
-        ""
-    ]
+    lines = [f"Comparison Report: {result.skill_name}", "=" * 50, ""]
 
     if result.passed_gates:
         lines.append("Status: PASSED (no critical regressions)")

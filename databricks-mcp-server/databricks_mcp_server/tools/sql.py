@@ -1,4 +1,5 @@
 """SQL tools - Execute SQL queries and get table information."""
+
 from typing import Any, Dict, List, Optional
 
 from databricks_tools_core.sql import (
@@ -140,4 +141,4 @@ def get_table_details(
         warehouse_id=warehouse_id,
     )
     # Convert to dict for JSON serialization
-    return result.model_dump() if hasattr(result, 'model_dump') else result
+    return result.model_dump() if hasattr(result, "model_dump") else result

@@ -1,4 +1,5 @@
 """Test fixtures module for setting up Databricks test infrastructure."""
+
 from .setup import (
     TestFixtureConfig,
     FixtureResult,

@@ -153,9 +153,7 @@ class TraceMetrics:
     # Tool call metrics
     total_tool_calls: int = 0
     tool_counts: dict[str, int] = field(default_factory=dict)  # tool_name -> count
-    tool_category_counts: dict[str, int] = field(
-        default_factory=dict
-    )  # category -> count
+    tool_category_counts: dict[str, int] = field(default_factory=dict)  # category -> count
 
     # All tool calls for detailed analysis
     tool_calls: list[ToolCall] = field(default_factory=list)

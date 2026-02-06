@@ -242,7 +242,7 @@ class TestListRuns:
         for i in range(3):
             run_id = run_job_now(job_id=job["job_id"])
             run_ids.append(run_id)
-            logger.info(f"Run {i+1} triggered: {run_id}")
+            logger.info(f"Run {i + 1} triggered: {run_id}")
             time.sleep(1)  # Small delay between runs
 
         # List runs for this job using our core function
@@ -324,10 +324,7 @@ class TestWaitForRun:
         # Wait for run using our core function (timeout after 5 minutes)
         result = wait_for_run(run_id=run_id, timeout=300, poll_interval=10)
 
-        logger.info(
-            f"Run completed: lifecycle={result.lifecycle_state}, "
-            f"result={result.result_state}"
-        )
+        logger.info(f"Run completed: lifecycle={result.lifecycle_state}, result={result.result_state}")
 
         # Verify completion using our JobRunResult model
         # lifecycle_state is stored as string in JobRunResult
@@ -369,10 +366,7 @@ class TestWaitForRun:
         # Wait for run using our core function
         result = wait_for_run(run_id=run_id, timeout=300, poll_interval=10)
 
-        logger.info(
-            f"Canceled run completed: lifecycle={result.lifecycle_state}, "
-            f"result={result.result_state}"
-        )
+        logger.info(f"Canceled run completed: lifecycle={result.lifecycle_state}, result={result.result_state}")
 
         # Verify completion (states stored as strings in JobRunResult)
         assert result.lifecycle_state == RunLifecycleState.TERMINATED.value

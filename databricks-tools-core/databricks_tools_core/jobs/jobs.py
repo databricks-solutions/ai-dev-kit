@@ -4,6 +4,7 @@ Jobs - Core Job CRUD Operations
 Functions for managing Databricks jobs using the Jobs API.
 Uses serverless compute by default for optimal performance and cost.
 """
+
 from typing import Optional, List, Dict, Any
 
 from databricks.sdk.service.jobs import (
@@ -47,9 +48,13 @@ def list_jobs(
 
         # Add additional info if available
         if job.settings:
-            job_dict["tags"] = job.settings.tags if hasattr(job.settings, 'tags') else None
-            job_dict["timeout_seconds"] = job.settings.timeout_seconds if hasattr(job.settings, 'timeout_seconds') else None
-            job_dict["max_concurrent_runs"] = job.settings.max_concurrent_runs if hasattr(job.settings, 'max_concurrent_runs') else None
+            job_dict["tags"] = job.settings.tags if hasattr(job.settings, "tags") else None
+            job_dict["timeout_seconds"] = (
+                job.settings.timeout_seconds if hasattr(job.settings, "timeout_seconds") else None
+            )
+            job_dict["max_concurrent_runs"] = (
+                job.settings.max_concurrent_runs if hasattr(job.settings, "max_concurrent_runs") else None
+            )
 
             # Include tasks if expanded
             if expand_tasks and job.settings.tasks:

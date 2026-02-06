@@ -52,11 +52,13 @@ def list_genie() -> list[dict[str, Any]]:
         result = []
         if response.spaces:
             for space in response.spaces:
-                result.append({
-                    "space_id": space.space_id,
-                    "title": space.title or "",
-                    "description": space.description or "",
-                })
+                result.append(
+                    {
+                        "space_id": space.space_id,
+                        "title": space.title or "",
+                        "description": space.description or "",
+                    }
+                )
         return result
     except Exception as e:
         return [{"error": str(e)}]
@@ -110,9 +112,7 @@ def create_or_update_genie(
     if warehouse_id is None:
         warehouse_id = manager.get_best_warehouse_id()
         if warehouse_id is None:
-            return {
-                "error": "No SQL warehouses available. Please provide a warehouse_id or create a warehouse."
-            }
+            return {"error": "No SQL warehouses available. Please provide a warehouse_id or create a warehouse."}
 
     operation = "created"
 
@@ -197,9 +197,7 @@ def get_genie(space_id: str) -> dict[str, Any]:
 
     # Get sample questions
     questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
-    sample_questions = [
-        q.get("question_text", "") for q in questions_response.get("curated_questions", [])
-    ]
+    sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
 
     return {
         "space_id": result.get("space_id", space_id),
@@ -355,9 +353,7 @@ def ask_genie_followup(
 # ============================================================================
 
 
-def _format_genie_response(
-    question: str, genie_message: Any, space_id: str
-) -> dict[str, Any]:
+def _format_genie_response(question: str, genie_message: Any, space_id: str) -> dict[str, Any]:
     """Format a Genie SDK response into a clean dictionary.
 
     Args:

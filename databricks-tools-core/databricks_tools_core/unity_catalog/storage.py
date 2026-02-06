@@ -3,6 +3,7 @@ Unity Catalog - Storage Operations
 
 Functions for managing storage credentials and external locations.
 """
+
 from typing import Any, Dict, List, Optional
 from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
@@ -76,9 +77,7 @@ def create_storage_credential(
         DatabricksError: If API request fails
     """
     if not aws_iam_role_arn and not azure_access_connector_id:
-        raise ValueError(
-            "Provide aws_iam_role_arn (AWS) or azure_access_connector_id (Azure)"
-        )
+        raise ValueError("Provide aws_iam_role_arn (AWS) or azure_access_connector_id (Azure)")
 
     w = get_workspace_client()
     kwargs: dict[str, Any] = {"name": name, "read_only": read_only}
@@ -87,9 +86,7 @@ def create_storage_credential(
     if aws_iam_role_arn:
         kwargs["aws_iam_role"] = AwsIamRoleRequest(role_arn=aws_iam_role_arn)
     if azure_access_connector_id:
-        kwargs["azure_managed_identity"] = AzureManagedIdentityRequest(
-            access_connector_id=azure_access_connector_id
-        )
+        kwargs["azure_managed_identity"] = AzureManagedIdentityRequest(access_connector_id=azure_access_connector_id)
     return w.storage_credentials.create(**kwargs)
 
 
@@ -129,9 +126,7 @@ def update_storage_credential(
     if aws_iam_role_arn:
         kwargs["aws_iam_role"] = AwsIamRoleRequest(role_arn=aws_iam_role_arn)
     if azure_access_connector_id:
-        kwargs["azure_managed_identity"] = AzureManagedIdentityRequest(
-            access_connector_id=azure_access_connector_id
-        )
+        kwargs["azure_managed_identity"] = AzureManagedIdentityRequest(access_connector_id=azure_access_connector_id)
     return w.storage_credentials.update(**kwargs)
 
 
@@ -175,9 +170,15 @@ def validate_storage_credential(
     return {
         "is_valid": result.is_dir if hasattr(result, "is_dir") else None,
         "results": [
-            {"operation": r.operation.value if r.operation else None, "result": r.result.value if r.result else None, "message": r.message}
+            {
+                "operation": r.operation.value if r.operation else None,
+                "result": r.result.value if r.result else None,
+                "message": r.message,
+            }
             for r in (result.results or [])
-        ] if hasattr(result, "results") and result.results else [],
+        ]
+        if hasattr(result, "results") and result.results
+        else [],
     }
 
 

@@ -1,4 +1,5 @@
 """Execute code blocks from skill responses to verify they work."""
+
 import ast
 import re
 import time
@@ -10,6 +11,7 @@ from collections.abc import Callable
 @dataclass
 class ExecutionResult:
     """Result of code block execution."""
+
     success: bool
     output: str
     error: str | None = None
@@ -23,6 +25,7 @@ class DatabricksExecutionConfig:
     By default, uses serverless compute. Only specify cluster_id if you
     explicitly need a specific cluster.
     """
+
     cluster_id: str | None = None  # Only set if user explicitly specifies
     warehouse_id: str | None = None  # Auto-detected via MCP if None
     use_serverless: bool = True  # Default to serverless compute
@@ -35,6 +38,7 @@ class DatabricksExecutionConfig:
 @dataclass
 class DatabricksExecutionResult(ExecutionResult):
     """Extended result with Databricks-specific metadata."""
+
     cluster_id: str | None = None
     warehouse_id: str | None = None
     context_id: str | None = None  # For session reuse
@@ -45,6 +49,7 @@ class DatabricksExecutionResult(ExecutionResult):
 @dataclass
 class CodeBlock:
     """Extracted code block with metadata."""
+
     language: str
     code: str
     line_number: int
@@ -52,13 +57,13 @@ class CodeBlock:
 
 def extract_code_blocks(response: str) -> list[CodeBlock]:
     """Extract code blocks from markdown response."""
-    pattern = r'```(\w+)\n(.*?)```'
+    pattern = r"```(\w+)\n(.*?)```"
     blocks = []
 
     for match in re.finditer(pattern, response, re.DOTALL):
         language = match.group(1).lower()
         code = match.group(2)
-        line_number = response[:match.start()].count('\n') + 1
+        line_number = response[: match.start()].count("\n") + 1
         blocks.append(CodeBlock(language, code, line_number))
 
     return blocks
@@ -86,11 +91,7 @@ def verify_python_syntax(code: str) -> tuple[bool, str | None]:
         return False, f"Line {e.lineno}: {e.msg}"
 
 
-def execute_python_block(
-    code: str,
-    timeout_seconds: int = 30,
-    verify_imports: bool = True
-) -> ExecutionResult:
+def execute_python_block(code: str, timeout_seconds: int = 30, verify_imports: bool = True) -> ExecutionResult:
     """
     Execute Python code block.
 
@@ -106,7 +107,7 @@ def execute_python_block(
             success=False,
             output="",
             error=f"Syntax error: {syntax_error}",
-            execution_time_ms=(time.time() - start_time) * 1000
+            execution_time_ms=(time.time() - start_time) * 1000,
         )
 
     # Verify imports resolve
@@ -117,10 +118,10 @@ def execute_python_block(
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     for alias in node.names:
-                        imports.append(alias.name.split('.')[0])
+                        imports.append(alias.name.split(".")[0])
                 elif isinstance(node, ast.ImportFrom):
                     if node.module:
-                        imports.append(node.module.split('.')[0])
+                        imports.append(node.module.split(".")[0])
 
             for imp in imports:
                 # Skip Databricks-specific imports that aren't available locally
@@ -133,21 +134,21 @@ def execute_python_block(
                         success=False,
                         output="",
                         error=f"Import error: {e}",
-                        execution_time_ms=(time.time() - start_time) * 1000
+                        execution_time_ms=(time.time() - start_time) * 1000,
                     )
         except Exception as e:
             return ExecutionResult(
                 success=False,
                 output="",
                 error=f"Import analysis failed: {e}",
-                execution_time_ms=(time.time() - start_time) * 1000
+                execution_time_ms=(time.time() - start_time) * 1000,
             )
 
     return ExecutionResult(
         success=True,
         output="Syntax valid, imports resolved",
         error=None,
-        execution_time_ms=(time.time() - start_time) * 1000
+        execution_time_ms=(time.time() - start_time) * 1000,
     )
 
 
@@ -162,21 +163,13 @@ def verify_sql_structure(code: str) -> ExecutionResult:
         issues.append("No recognizable SQL statement found")
 
     # Check balanced constructs
-    if code.count('(') != code.count(')'):
+    if code.count("(") != code.count(")"):
         issues.append("Unbalanced parentheses")
 
     if issues:
-        return ExecutionResult(
-            success=False,
-            output="",
-            error="; ".join(issues)
-        )
+        return ExecutionResult(success=False, output="", error="; ".join(issues))
 
-    return ExecutionResult(
-        success=True,
-        output="SQL structure valid",
-        error=None
-    )
+    return ExecutionResult(success=True, output="SQL structure valid", error=None)
 
 
 def execute_code_blocks(response: str) -> tuple[int, int, list[dict[str, Any]]]:
@@ -198,14 +191,16 @@ def execute_code_blocks(response: str) -> tuple[int, int, list[dict[str, Any]]]:
             # Skip unknown languages
             continue
 
-        details.append({
-            "language": block.language,
-            "line": block.line_number,
-            "success": result.success,
-            "output": result.output,
-            "error": result.error,
-            "execution_time_ms": result.execution_time_ms
-        })
+        details.append(
+            {
+                "language": block.language,
+                "line": block.line_number,
+                "success": result.success,
+                "output": result.output,
+                "error": result.error,
+                "execution_time_ms": result.execution_time_ms,
+            }
+        )
 
         if result.success:
             passed += 1
@@ -217,8 +212,10 @@ def execute_code_blocks(response: str) -> tuple[int, int, list[dict[str, Any]]]:
 # Databricks Execution Functions (via MCP tools)
 # =============================================================================
 
+
 class MCPExecuteCommand(Protocol):
     """Protocol for MCP execute_databricks_command tool."""
+
     def __call__(
         self,
         code: str,
@@ -232,6 +229,7 @@ class MCPExecuteCommand(Protocol):
 
 class MCPExecuteSQL(Protocol):
     """Protocol for MCP execute_sql tool."""
+
     def __call__(
         self,
         sql_query: str,
@@ -244,11 +242,13 @@ class MCPExecuteSQL(Protocol):
 
 class MCPGetBestWarehouse(Protocol):
     """Protocol for MCP get_best_warehouse tool."""
+
     def __call__(self) -> str | None: ...
 
 
 class MCPGetBestCluster(Protocol):
     """Protocol for MCP get_best_cluster tool."""
+
     def __call__(self) -> dict[str, Any]: ...
 
 
@@ -283,7 +283,7 @@ def execute_python_on_databricks(
             output="",
             error=f"Syntax error: {syntax_error}",
             execution_time_ms=(time.time() - start_time) * 1000,
-            execution_mode="local"
+            execution_mode="local",
         )
 
     # Determine cluster to use (serverless is default, so cluster_id may be None)
@@ -299,7 +299,7 @@ def execute_python_on_databricks(
                 output="",
                 error=f"Failed to find cluster: {e}",
                 execution_time_ms=(time.time() - start_time) * 1000,
-                execution_mode="local"
+                execution_mode="local",
             )
 
     # Execute on Databricks
@@ -327,7 +327,7 @@ def execute_python_on_databricks(
             cluster_id=actual_cluster_id,
             context_id=context_id,
             context_destroyed=result.get("context_destroyed", False),
-            execution_mode="databricks"
+            execution_mode="databricks",
         )
 
     except Exception as e:
@@ -336,7 +336,7 @@ def execute_python_on_databricks(
             output="",
             error=f"Databricks execution failed: {e}",
             execution_time_ms=(time.time() - start_time) * 1000,
-            execution_mode="local"
+            execution_mode="local",
         )
 
 
@@ -370,7 +370,7 @@ def execute_sql_on_databricks(
             output="",
             error=local_result.error,
             execution_time_ms=(time.time() - start_time) * 1000,
-            execution_mode="local"
+            execution_mode="local",
         )
 
     # Determine warehouse to use
@@ -384,7 +384,7 @@ def execute_sql_on_databricks(
                 output="",
                 error=f"Failed to find warehouse: {e}",
                 execution_time_ms=(time.time() - start_time) * 1000,
-                execution_mode="local"
+                execution_mode="local",
             )
 
     # Execute on Databricks
@@ -406,7 +406,7 @@ def execute_sql_on_databricks(
             error=None,
             execution_time_ms=(time.time() - start_time) * 1000,
             warehouse_id=warehouse_id,
-            execution_mode="databricks"
+            execution_mode="databricks",
         )
 
     except Exception as e:
@@ -417,13 +417,14 @@ def execute_sql_on_databricks(
             error=f"SQL execution failed: {error_msg}",
             execution_time_ms=(time.time() - start_time) * 1000,
             warehouse_id=warehouse_id,
-            execution_mode="databricks"
+            execution_mode="databricks",
         )
 
 
 @dataclass
 class CodeBlocksExecutionResult:
     """Result of executing multiple code blocks."""
+
     total_blocks: int
     passed_blocks: int
     details: list[dict[str, Any]]
@@ -496,18 +497,20 @@ def execute_code_blocks_on_databricks(
             # Skip unknown languages
             continue
 
-        details.append({
-            "language": block.language,
-            "line": block.line_number,
-            "success": result.success,
-            "output": result.output,
-            "error": result.error,
-            "execution_time_ms": result.execution_time_ms,
-            "execution_mode": result.execution_mode,
-            "cluster_id": result.cluster_id,
-            "warehouse_id": result.warehouse_id,
-            "context_id": result.context_id,
-        })
+        details.append(
+            {
+                "language": block.language,
+                "line": block.line_number,
+                "success": result.success,
+                "output": result.output,
+                "error": result.error,
+                "execution_time_ms": result.execution_time_ms,
+                "execution_mode": result.execution_mode,
+                "cluster_id": result.cluster_id,
+                "warehouse_id": result.warehouse_id,
+                "context_id": result.context_id,
+            }
+        )
 
         if result.success:
             passed += 1
@@ -517,5 +520,5 @@ def execute_code_blocks_on_databricks(
         passed_blocks=passed,
         details=details,
         context_id=current_context_id,
-        execution_mode="databricks" if any(d.get("execution_mode") == "databricks" for d in details) else "local"
+        execution_mode="databricks" if any(d.get("execution_mode") == "databricks" for d in details) else "local",
     )

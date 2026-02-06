@@ -6,6 +6,7 @@ Uses Databricks Files API via SDK (w.files).
 
 Volume paths use the format: /Volumes/<catalog>/<schema>/<volume>/<path>
 """
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,7 @@ from ..auth import get_workspace_client
 @dataclass
 class VolumeFileInfo:
     """Information about a file or directory in a volume."""
+
     name: str
     path: str
     is_directory: bool
@@ -29,6 +31,7 @@ class VolumeFileInfo:
 @dataclass
 class VolumeUploadResult:
     """Result from uploading a file to a volume."""
+
     local_path: str
     volume_path: str
     success: bool
@@ -38,6 +41,7 @@ class VolumeUploadResult:
 @dataclass
 class VolumeDownloadResult:
     """Result from downloading a file from a volume."""
+
     volume_path: str
     local_path: str
     success: bool
@@ -66,18 +70,20 @@ def list_volume_files(volume_path: str, max_results: int | None = None) -> list[
     w = get_workspace_client()
 
     # Ensure path ends with / for directory listing
-    if not volume_path.endswith('/'):
-        volume_path = volume_path + '/'
+    if not volume_path.endswith("/"):
+        volume_path = volume_path + "/"
 
     results = []
     for entry in w.files.list_directory_contents(volume_path):
-        results.append(VolumeFileInfo(
-            name=entry.name,
-            path=entry.path,
-            is_directory=entry.is_directory,
-            file_size=entry.file_size,
-            last_modified=entry.last_modified.isoformat() if entry.last_modified else None
-        ))
+        results.append(
+            VolumeFileInfo(
+                name=entry.name,
+                path=entry.path,
+                is_directory=entry.is_directory,
+                file_size=entry.file_size,
+                last_modified=entry.last_modified.isoformat() if entry.last_modified else None,
+            )
+        )
         # Early exit if we've hit the limit
         if max_results is not None and len(results) >= max_results:
             break
@@ -85,11 +91,7 @@ def list_volume_files(volume_path: str, max_results: int | None = None) -> list[
     return results
 
 
-def upload_to_volume(
-    local_path: str,
-    volume_path: str,
-    overwrite: bool = True
-) -> VolumeUploadResult:
+def upload_to_volume(local_path: str, volume_path: str, overwrite: bool = True) -> VolumeUploadResult:
     """
     Upload a local file to a Unity Catalog volume.
 
@@ -111,50 +113,27 @@ def upload_to_volume(
     """
     if not os.path.exists(local_path):
         return VolumeUploadResult(
-            local_path=local_path,
-            volume_path=volume_path,
-            success=False,
-            error=f"Local file not found: {local_path}"
+            local_path=local_path, volume_path=volume_path, success=False, error=f"Local file not found: {local_path}"
         )
 
     if not os.path.isfile(local_path):
         return VolumeUploadResult(
-            local_path=local_path,
-            volume_path=volume_path,
-            success=False,
-            error=f"Path is not a file: {local_path}"
+            local_path=local_path, volume_path=volume_path, success=False, error=f"Path is not a file: {local_path}"
         )
 
     try:
         w = get_workspace_client()
 
         # Use upload_from for direct file-to-volume upload
-        w.files.upload_from(
-            file_path=volume_path,
-            source_path=local_path,
-            overwrite=overwrite
-        )
+        w.files.upload_from(file_path=volume_path, source_path=local_path, overwrite=overwrite)
 
-        return VolumeUploadResult(
-            local_path=local_path,
-            volume_path=volume_path,
-            success=True
-        )
+        return VolumeUploadResult(local_path=local_path, volume_path=volume_path, success=True)
 
     except Exception as e:
-        return VolumeUploadResult(
-            local_path=local_path,
-            volume_path=volume_path,
-            success=False,
-            error=str(e)
-        )
+        return VolumeUploadResult(local_path=local_path, volume_path=volume_path, success=False, error=str(e))
 
 
-def download_from_volume(
-    volume_path: str,
-    local_path: str,
-    overwrite: bool = True
-) -> VolumeDownloadResult:
+def download_from_volume(volume_path: str, local_path: str, overwrite: bool = True) -> VolumeDownloadResult:
     """
     Download a file from a Unity Catalog volume to local path.
 
@@ -180,7 +159,7 @@ def download_from_volume(
             volume_path=volume_path,
             local_path=local_path,
             success=False,
-            error=f"Local file already exists: {local_path}"
+            error=f"Local file already exists: {local_path}",
         )
 
     try:
@@ -192,25 +171,12 @@ def download_from_volume(
             os.makedirs(parent_dir)
 
         # Use download_to for direct volume-to-file download
-        w.files.download_to(
-            file_path=volume_path,
-            destination=local_path,
-            overwrite=overwrite
-        )
+        w.files.download_to(file_path=volume_path, destination=local_path, overwrite=overwrite)
 
-        return VolumeDownloadResult(
-            volume_path=volume_path,
-            local_path=local_path,
-            success=True
-        )
+        return VolumeDownloadResult(volume_path=volume_path, local_path=local_path, success=True)
 
     except Exception as e:
-        return VolumeDownloadResult(
-            volume_path=volume_path,
-            local_path=local_path,
-            success=False,
-            error=str(e)
-        )
+        return VolumeDownloadResult(volume_path=volume_path, local_path=local_path, success=False, error=str(e))
 
 
 def delete_volume_file(volume_path: str) -> None:
@@ -291,5 +257,5 @@ def get_volume_file_metadata(volume_path: str) -> VolumeFileInfo:
         path=volume_path,
         is_directory=False,
         file_size=metadata.content_length,
-        last_modified=metadata.last_modified.isoformat() if metadata.last_modified else None
+        last_modified=metadata.last_modified.isoformat() if metadata.last_modified else None,
     )

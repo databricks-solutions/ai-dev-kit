@@ -94,10 +94,7 @@ class SQLParallelExecutor:
         # Execute groups sequentially
         for group_idx, group in enumerate(execution_groups):
             group_num = group_idx + 1
-            logger.info(
-                f"Executing group {group_num}/{len(execution_groups)} "
-                f"with {len(group)} queries"
-            )
+            logger.info(f"Executing group {group_num}/{len(execution_groups)} with {len(group)} queries")
 
             # Log query previews
             for query_idx in group:
@@ -125,8 +122,7 @@ class SQLParallelExecutor:
             if error_in_group:
                 stopped_after_group = group_num
                 logger.warning(
-                    f"Stopping execution after group {group_num} due to errors; "
-                    f"subsequent groups will be skipped."
+                    f"Stopping execution after group {group_num} due to errors; subsequent groups will be skipped."
                 )
                 break
 
@@ -160,9 +156,7 @@ class SQLParallelExecutor:
 
         def execute_single(query_idx: int) -> dict[str, Any]:
             query_text = queries[query_idx]
-            query_preview = (
-                query_text[:100] + "..." if len(query_text) > 100 else query_text
-            )
+            query_preview = query_text[:100] + "..." if len(query_text) > 100 else query_text
             query_preview = query_preview.replace("\n", " ").replace("  ", " ")
 
             try:
@@ -178,9 +172,7 @@ class SQLParallelExecutor:
 
                 dt = round(time.time() - t0, 2)
                 row_count = len(result_data) if result_data else 0
-                logger.info(
-                    f"Query {query_idx + 1} completed ({dt}s, {row_count} rows)"
-                )
+                logger.info(f"Query {query_idx + 1} completed ({dt}s, {row_count} rows)")
 
                 return {
                     "query_index": query_idx,
@@ -198,9 +190,7 @@ class SQLParallelExecutor:
                 error_str = str(e)
                 error_category, suggestion = self._categorize_error(error_str)
 
-                logger.error(
-                    f"Query {query_idx + 1} failed: {error_category} - {error_str}"
-                )
+                logger.error(f"Query {query_idx + 1} failed: {error_category} - {error_str}")
 
                 return {
                     "query_index": query_idx,
@@ -219,9 +209,7 @@ class SQLParallelExecutor:
         max_workers = min(self.max_workers, len(query_indices))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_idx = {
-                executor.submit(execute_single, idx): idx for idx in query_indices
-            }
+            future_to_idx = {executor.submit(execute_single, idx): idx for idx in query_indices}
 
             for future in as_completed(future_to_idx):
                 query_idx = future_to_idx[future]
@@ -296,13 +284,15 @@ class SQLParallelExecutor:
             group_num = group_idx + 1
             ran = stopped_after_group is None or group_num <= stopped_after_group
 
-            groups_summary.append({
-                "group_number": group_num,
-                "group_size": len(group),
-                "query_indices": [i + 1 for i in group],  # 1-based for display
-                "is_parallel": len(group) > 1,
-                "status": "executed" if ran else "skipped",
-            })
+            groups_summary.append(
+                {
+                    "group_number": group_num,
+                    "group_size": len(group),
+                    "query_indices": [i + 1 for i in group],  # 1-based for display
+                    "is_parallel": len(group) > 1,
+                    "status": "executed" if ran else "skipped",
+                }
+            )
 
         return {
             "total_queries": sum(len(g) for g in execution_groups),

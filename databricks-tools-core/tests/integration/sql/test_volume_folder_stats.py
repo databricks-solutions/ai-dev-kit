@@ -262,6 +262,7 @@ class TestVolumeFolderErrors:
 
         # Upload a temp file to create the folder
         from io import BytesIO
+
         temp_path = f"{volume_path}/temp.txt"
         workspace_client.files.upload(temp_path, BytesIO(b"temp"), overwrite=True)
         workspace_client.files.delete(temp_path)

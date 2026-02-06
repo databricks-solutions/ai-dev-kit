@@ -55,9 +55,7 @@ class TestSetTags:
         assert result["status"] == "tags_set"
         logger.info(f"Column tags set: {result['tags']}")
 
-    def test_set_tags_on_schema(
-        self, test_catalog: str, uc_test_schema: str, warehouse_id: str
-    ):
+    def test_set_tags_on_schema(self, test_catalog: str, uc_test_schema: str, warehouse_id: str):
         """Should set tags on a schema."""
         full_name = f"{test_catalog}.{uc_test_schema}"
         # Use unique prefixed tag names to avoid workspace governed tag policies

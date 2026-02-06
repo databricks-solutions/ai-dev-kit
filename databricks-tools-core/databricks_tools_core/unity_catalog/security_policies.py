@@ -4,6 +4,7 @@ Unity Catalog - Security Policy Operations
 Functions for managing row-level security (row filters) and column masking.
 All operations are SQL-based via execute_sql.
 """
+
 import re
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +21,7 @@ def _validate_identifier(name: str) -> str:
 def _execute_uc_sql(sql_query: str, warehouse_id: str | None = None) -> list[dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
+
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
 
 
@@ -144,7 +146,13 @@ def set_column_mask(
 
     sql = f"ALTER TABLE {table_name} ALTER COLUMN `{column_name}` SET MASK {mask_function}"
     _execute_uc_sql(sql, warehouse_id=warehouse_id)
-    return {"status": "column_mask_set", "table": table_name, "column": column_name, "function": mask_function, "sql": sql}
+    return {
+        "status": "column_mask_set",
+        "table": table_name,
+        "column": column_name,
+        "function": mask_function,
+        "sql": sql,
+    }
 
 
 def drop_column_mask(

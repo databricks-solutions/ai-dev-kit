@@ -1,4 +1,5 @@
 """File tools - Upload files and folders to Databricks workspace."""
+
 from typing import Dict, Any
 
 from databricks_tools_core.file import (
@@ -51,10 +52,9 @@ def upload_folder(
         "successful": result.successful,
         "failed": result.failed,
         "success": result.success,
-        "failed_uploads": [
-            {"local_path": r.local_path, "error": r.error}
-            for r in result.get_failed_uploads()
-        ] if result.failed > 0 else [],
+        "failed_uploads": [{"local_path": r.local_path, "error": r.error} for r in result.get_failed_uploads()]
+        if result.failed > 0
+        else [],
     }
 
 

@@ -1,4 +1,5 @@
 """Dynamic scorers that use test case expectations from YAML config."""
+
 from mlflow.genai.scorers import scorer, Guidelines
 from mlflow.entities import Feedback
 from typing import Dict, Any, List
@@ -6,9 +7,7 @@ from typing import Dict, Any, List
 
 @scorer
 def guidelines_from_expectations(
-    inputs: dict[str, Any],
-    outputs: dict[str, Any],
-    expectations: dict[str, Any]
+    inputs: dict[str, Any], outputs: dict[str, Any], expectations: dict[str, Any]
 ) -> Feedback:
     """Dynamic Guidelines scorer that uses expectations.guidelines from YAML.
 
@@ -26,11 +25,7 @@ def guidelines_from_expectations(
     guidelines = expectations.get("guidelines", [])
 
     if not guidelines:
-        return Feedback(
-            name="guidelines",
-            value="skip",
-            rationale="No guidelines defined in expectations"
-        )
+        return Feedback(name="guidelines", value="skip", rationale="No guidelines defined in expectations")
 
     # Create a Guidelines instance with the test-specific guidelines
     judge = Guidelines(name="guidelines", guidelines=guidelines)
@@ -39,10 +34,7 @@ def guidelines_from_expectations(
     return judge(inputs=inputs, outputs=outputs)
 
 
-def create_guidelines_scorer(
-    guidelines: list[str],
-    name: str = "skill_quality"
-) -> Guidelines:
+def create_guidelines_scorer(guidelines: list[str], name: str = "skill_quality") -> Guidelines:
     """Factory to create a Guidelines scorer with specific guidelines.
 
     Use this when you want to create a Guidelines scorer with fixed

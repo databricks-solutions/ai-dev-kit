@@ -112,8 +112,7 @@ def get_table_details(
             # Filter by patterns
             tables_to_fetch = collector.filter_tables_by_patterns(all_tables, table_names)
             logger.debug(
-                f"Filtered {len(all_tables)} tables to {len(tables_to_fetch)} "
-                f"matching patterns: {table_names}"
+                f"Filtered {len(all_tables)} tables to {len(tables_to_fetch)} matching patterns: {table_names}"
             )
         else:
             tables_to_fetch = all_tables
@@ -130,9 +129,7 @@ def get_table_details(
     collect_stats = table_stat_level != TableStatLevel.NONE
 
     # Fetch table info (with or without stats)
-    logger.info(
-        f"Fetching {len(tables_to_fetch)} tables with stat_level={table_stat_level.value}"
-    )
+    logger.info(f"Fetching {len(tables_to_fetch)} tables with stat_level={table_stat_level.value}")
     table_infos = collector.get_tables_info_parallel(
         catalog=catalog,
         schema=schema,
@@ -192,7 +189,9 @@ def _list_volume_files(volume_path: str) -> tuple[list[VolumeFileInfo], int, str
                 path=entry.path,
                 size_bytes=getattr(entry, "file_size", None),
                 is_directory=entry.is_directory,
-                modification_time=str(getattr(entry, "last_modified", None)) if hasattr(entry, "last_modified") else None,
+                modification_time=str(getattr(entry, "last_modified", None))
+                if hasattr(entry, "last_modified")
+                else None,
             )
             files.append(file_info)
             if file_info.size_bytes:
@@ -203,7 +202,11 @@ def _list_volume_files(volume_path: str) -> tuple[list[VolumeFileInfo], int, str
     except Exception as e:
         error_msg = str(e)
         if "NOT_FOUND" in error_msg or "404" in error_msg:
-            return [], 0, f"Volume path not found: {volume_path}. Check that the catalog, schema, volume, and path exist."
+            return (
+                [],
+                0,
+                f"Volume path not found: {volume_path}. Check that the catalog, schema, volume, and path exist.",
+            )
         return [], 0, f"Failed to list volume path: {volume_path}. Error: {error_msg}"
 
 
@@ -276,19 +279,23 @@ def get_volume_folder_details(
     files, total_size, error = _list_volume_files(full_path)
 
     if error:
-        return _make_result(DataSourceInfo(
-            name=full_path,
-            format=format,
-            error=error,
-        ))
+        return _make_result(
+            DataSourceInfo(
+                name=full_path,
+                format=format,
+                error=error,
+            )
+        )
 
     if not files:
-        return _make_result(DataSourceInfo(
-            name=full_path,
-            format=format,
-            total_files=0,
-            error=f"Volume path exists but is empty: {full_path}",
-        ))
+        return _make_result(
+            DataSourceInfo(
+                name=full_path,
+                format=format,
+                total_files=0,
+                error=f"Volume path exists but is empty: {full_path}",
+            )
+        )
 
     # Count data files (not directories)
     data_files = [f for f in files if not f.is_directory]
@@ -297,13 +304,15 @@ def get_volume_folder_details(
 
     # Step 2: For format="file", just return file listing
     if format == "file":
-        return _make_result(DataSourceInfo(
-            name=full_path,
-            format=format,
-            total_files=len(files),
-            total_size_bytes=total_size,
-            files=files,
-        ))
+        return _make_result(
+            DataSourceInfo(
+                name=full_path,
+                format=format,
+                total_files=len(files),
+                total_size_bytes=total_size,
+                files=files,
+            )
+        )
 
     # Step 3: For data formats, use TableStatsCollector to read and compute stats
     # Auto-select warehouse if not provided
@@ -324,6 +333,7 @@ def get_volume_folder_details(
     if not collect_stats:
         # Just get schema without stats - use a simple query
         from .sql_utils.executor import SQLExecutor
+
         executor = SQLExecutor(warehouse_id=warehouse_id)
         volume_ref = f"read_files('{full_path}', format => '{format}')"
 
@@ -333,13 +343,15 @@ def get_volume_folder_details(
             sample_result = executor.execute(sql_query=sample_query, timeout=60)
 
             if not sample_result:
-                return _make_result(DataSourceInfo(
-                    name=full_path,
-                    format=format,
-                    total_files=total_files,
-                    total_size_bytes=total_size,
-                    error="Failed to read volume data - no data returned",
-                ))
+                return _make_result(
+                    DataSourceInfo(
+                        name=full_path,
+                        format=format,
+                        total_files=total_files,
+                        total_size_bytes=total_size,
+                        error="Failed to read volume data - no data returned",
+                    )
+                )
 
             # Get row count
             count_result = executor.execute(
@@ -363,22 +375,26 @@ def get_volume_folder_details(
                     data_type = "string"
                 column_details[col_name] = ColumnDetail(name=col_name, data_type=data_type)
 
-            return _make_result(DataSourceInfo(
-                name=full_path,
-                format=format,
-                total_files=total_files,
-                total_size_bytes=total_size,
-                total_rows=total_rows,
-                column_details=column_details,
-            ))
+            return _make_result(
+                DataSourceInfo(
+                    name=full_path,
+                    format=format,
+                    total_files=total_files,
+                    total_size_bytes=total_size,
+                    total_rows=total_rows,
+                    column_details=column_details,
+                )
+            )
         except Exception as e:
-            return _make_result(DataSourceInfo(
-                name=full_path,
-                format=format,
-                total_files=total_files,
-                total_size_bytes=total_size,
-                error=f"Failed to read volume data: {e!s}",
-            ))
+            return _make_result(
+                DataSourceInfo(
+                    name=full_path,
+                    format=format,
+                    total_files=total_files,
+                    total_size_bytes=total_size,
+                    error=f"Failed to read volume data: {e!s}",
+                )
+            )
 
     # Use TableStatsCollector for full stats
     collector = TableStatsCollector(warehouse_id=warehouse_id)
@@ -390,13 +406,15 @@ def get_volume_folder_details(
         )
 
         if not column_details:
-            return _make_result(DataSourceInfo(
-                name=full_path,
-                format=format,
-                total_files=total_files,
-                total_size_bytes=total_size,
-                error="Failed to collect volume stats - no columns found",
-            ))
+            return _make_result(
+                DataSourceInfo(
+                    name=full_path,
+                    format=format,
+                    total_files=total_files,
+                    total_size_bytes=total_size,
+                    error="Failed to collect volume stats - no columns found",
+                )
+            )
 
         volume_info = DataSourceInfo(
             name=full_path,
@@ -417,10 +435,12 @@ def get_volume_folder_details(
             return result
 
     except Exception as e:
-        return _make_result(DataSourceInfo(
-            name=full_path,
-            format=format,
-            total_files=total_files,
-            total_size_bytes=total_size,
-            error=f"Failed to read volume data: {e!s}",
-        ))
+        return _make_result(
+            DataSourceInfo(
+                name=full_path,
+                format=format,
+                total_files=total_files,
+                total_size_bytes=total_size,
+                error=f"Failed to read volume data: {e!s}",
+            )
+        )

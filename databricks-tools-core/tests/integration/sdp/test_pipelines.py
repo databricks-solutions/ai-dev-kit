@@ -322,6 +322,7 @@ class TestPipelineExtraSettings:
 
         # Verify the extra settings were applied by fetching the pipeline
         from databricks_tools_core.spark_declarative_pipelines.pipelines import get_pipeline
+
         pipeline_details = get_pipeline(result.pipeline_id)
 
         # Check development mode is set
@@ -369,6 +370,7 @@ class TestPipelineExtraSettings:
 
         # Verify the updated settings
         from databricks_tools_core.spark_declarative_pipelines.pipelines import get_pipeline
+
         pipeline_details = get_pipeline(result.pipeline_id)
 
         assert pipeline_details.spec.tags.get("test") == "updated"
@@ -418,6 +420,7 @@ class TestPipelineExtraSettings:
 
         # Verify configuration
         from databricks_tools_core.spark_declarative_pipelines.pipelines import get_pipeline
+
         pipeline_details = get_pipeline(result.pipeline_id)
 
         assert pipeline_details.spec.configuration is not None

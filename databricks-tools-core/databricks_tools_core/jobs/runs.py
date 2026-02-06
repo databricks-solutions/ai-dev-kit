@@ -3,6 +3,7 @@ Jobs - Run Operations
 
 Functions for triggering and monitoring job runs.
 """
+
 import time
 from typing import Optional, List, Dict, Any
 
@@ -105,15 +106,15 @@ def run_job_now(
 
         # Extract run_id from response
         # The Wait object has a response attribute that contains the Run
-        if hasattr(response, 'response') and hasattr(response.response, 'run_id'):
+        if hasattr(response, "response") and hasattr(response.response, "run_id"):
             return response.response.run_id
-        elif hasattr(response, 'run_id'):
+        elif hasattr(response, "run_id"):
             return response.run_id
         else:
             # Fallback: try to get it from as_dict()
-            response_dict = response.as_dict() if hasattr(response, 'as_dict') else {}
-            if 'run_id' in response_dict:
-                return response_dict['run_id']
+            response_dict = response.as_dict() if hasattr(response, "as_dict") else {}
+            if "run_id" in response_dict:
+                return response_dict["run_id"]
             raise JobError(f"Failed to extract run_id from response for job {job_id}", job_id=job_id)
 
     except Exception as e:
@@ -340,13 +341,12 @@ def wait_for_run(
 
                 # Build message
                 if success:
-                    result.message = (
-                        f"Job run {run_id} completed successfully in {duration}s. "
-                        f"View: {run.run_page_url}"
-                    )
+                    result.message = f"Job run {run_id} completed successfully in {duration}s. View: {run.run_page_url}"
                 else:
                     # Extract error details
-                    error_message = state_message or f"Run failed with state: {result_state.value if result_state else 'UNKNOWN'}"
+                    error_message = (
+                        state_message or f"Run failed with state: {result_state.value if result_state else 'UNKNOWN'}"
+                    )
                     result.error_message = error_message
 
                     # Try to get output for more details

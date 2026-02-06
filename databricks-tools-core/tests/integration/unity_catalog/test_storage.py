@@ -111,8 +111,10 @@ class TestCreateStorageCredentialValidation:
                 name="test_bad_credential",
             )
 
-        assert "aws_iam_role_arn" in str(exc_info.value).lower() or \
-               "azure_access_connector_id" in str(exc_info.value).lower()
+        assert (
+            "aws_iam_role_arn" in str(exc_info.value).lower()
+            or "azure_access_connector_id" in str(exc_info.value).lower()
+        )
 
 
 @pytest.mark.integration

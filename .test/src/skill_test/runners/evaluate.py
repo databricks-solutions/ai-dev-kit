@@ -1,4 +1,5 @@
 """Main evaluation runner with MLflow integration."""
+
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 import yaml
@@ -8,16 +9,23 @@ from mlflow.genai.scorers import Guidelines, Safety
 from ..config import SkillTestConfig
 from ..dataset import get_dataset_source
 from ..scorers.universal import (
-    python_syntax, sql_syntax, pattern_adherence,
-    no_hallucinated_apis, expected_facts_present
+    python_syntax,
+    sql_syntax,
+    pattern_adherence,
+    no_hallucinated_apis,
+    expected_facts_present,
 )
-from ..scorers.routing import (
-    skill_routing_accuracy, routing_precision, routing_recall
-)
+from ..scorers.routing import skill_routing_accuracy, routing_precision, routing_recall
 from ..scorers.dynamic import guidelines_from_expectations, create_guidelines_scorer
 from ..scorers.trace import (
-    tool_count, token_budget, required_tools, banned_tools,
-    file_existence, tool_sequence, category_limits, get_trace_scorers
+    tool_count,
+    token_budget,
+    required_tools,
+    banned_tools,
+    file_existence,
+    tool_sequence,
+    category_limits,
+    get_trace_scorers,
 )
 
 
@@ -105,11 +113,14 @@ def build_scorers(scorer_config: dict[str, Any]) -> list:
             scorers.append(guidelines_from_expectations)
         elif name == "Guidelines":
             # Use default guidelines from manifest, or fallback defaults
-            default_guidelines = scorer_config.get("default_guidelines", [
-                "Response must address the user's request completely",
-                "Code examples must follow documented best practices",
-                "Response must use modern APIs (not deprecated ones)"
-            ])
+            default_guidelines = scorer_config.get(
+                "default_guidelines",
+                [
+                    "Response must address the user's request completely",
+                    "Code examples must follow documented best practices",
+                    "Response must use modern APIs (not deprecated ones)",
+                ],
+            )
             scorers.append(create_guidelines_scorer(default_guidelines, "skill_quality"))
         elif name.startswith("Guidelines:"):
             # Custom named guidelines: "Guidelines:my_name"
@@ -142,7 +153,7 @@ def evaluate_skill(
     skill_name: str,
     config: SkillTestConfig | None = None,
     run_name: str | None = None,
-    filter_category: str | None = None
+    filter_category: str | None = None,
 ) -> dict[str, Any]:
     """
     Evaluate a skill using pre-computed outputs (Pattern 2).
@@ -167,10 +178,7 @@ def evaluate_skill(
 
     # Filter if requested
     if filter_category:
-        records = [
-            r for r in records
-            if r.metadata and r.metadata.get("category") == filter_category
-        ]
+        records = [r for r in records if r.metadata and r.metadata.get("category") == filter_category]
 
     # Convert to MLflow format (Pattern 2: pre-computed outputs)
     eval_data = [r.to_eval_dict() for r in records]
@@ -186,30 +194,22 @@ def evaluate_skill(
 
     # Run evaluation
     with mlflow.start_run(run_name=run_name or f"{skill_name}_eval"):
-        mlflow.set_tags({
-            "skill_name": skill_name,
-            "test_count": len(eval_data),
-            "filter_category": filter_category or "all"
-        })
+        mlflow.set_tags(
+            {"skill_name": skill_name, "test_count": len(eval_data), "filter_category": filter_category or "all"}
+        )
 
         # No predict_fn - using pre-computed outputs
-        results = mlflow.genai.evaluate(
-            data=eval_data,
-            scorers=scorers
-        )
+        results = mlflow.genai.evaluate(data=eval_data, scorers=scorers)
 
         return {
             "run_id": mlflow.active_run().info.run_id,
             "metrics": results.metrics,
             "skill_name": skill_name,
-            "test_count": len(eval_data)
+            "test_count": len(eval_data),
         }
 
 
-def evaluate_routing(
-    config: SkillTestConfig | None = None,
-    run_name: str | None = None
-) -> dict[str, Any]:
+def evaluate_routing(config: SkillTestConfig | None = None, run_name: str | None = None) -> dict[str, Any]:
     """
     Evaluate skill routing accuracy.
 
@@ -226,34 +226,20 @@ def evaluate_routing(
 
     # Convert to MLflow format
     eval_data = [
-        {
-            "inputs": {"prompt": r.inputs.get("prompt", "")},
-            "expectations": r.expectations or {}
-        }
-        for r in records
+        {"inputs": {"prompt": r.inputs.get("prompt", "")}, "expectations": r.expectations or {}} for r in records
     ]
 
     # Routing-specific scorers
-    scorers = [
-        skill_routing_accuracy,
-        routing_precision,
-        routing_recall
-    ]
+    scorers = [skill_routing_accuracy, routing_precision, routing_recall]
 
     with mlflow.start_run(run_name=run_name or "routing_eval"):
-        mlflow.set_tags({
-            "evaluation_type": "routing",
-            "test_count": len(eval_data)
-        })
+        mlflow.set_tags({"evaluation_type": "routing", "test_count": len(eval_data)})
 
-        results = mlflow.genai.evaluate(
-            data=eval_data,
-            scorers=scorers
-        )
+        results = mlflow.genai.evaluate(data=eval_data, scorers=scorers)
 
         return {
             "run_id": mlflow.active_run().info.run_id,
             "metrics": results.metrics,
             "evaluation_type": "routing",
-            "test_count": len(eval_data)
+            "test_count": len(eval_data),
         }

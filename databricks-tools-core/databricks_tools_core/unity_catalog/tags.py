@@ -4,6 +4,7 @@ Unity Catalog - Tag and Comment Operations
 Functions for managing tags and comments on UC objects.
 All operations are SQL-based via execute_sql.
 """
+
 import re
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +21,7 @@ def _validate_identifier(name: str) -> str:
 def _execute_uc_sql(sql_query: str, warehouse_id: str | None = None) -> list[dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
+
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
 
 

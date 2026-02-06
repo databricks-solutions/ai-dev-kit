@@ -46,9 +46,9 @@ class TestListCatalogs:
         catalog_names = [c.name for c in catalogs]
 
         # Most workspaces have a 'main' catalog
-        assert any(
-            name in catalog_names for name in ["main", "hive_metastore"]
-        ), f"Expected 'main' or 'hive_metastore' in catalogs: {catalog_names[:10]}"
+        assert any(name in catalog_names for name in ["main", "hive_metastore"]), (
+            f"Expected 'main' or 'hive_metastore' in catalogs: {catalog_names[:10]}"
+        )
 
 
 @pytest.mark.integration

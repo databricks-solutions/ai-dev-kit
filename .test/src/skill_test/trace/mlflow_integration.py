@@ -68,8 +68,7 @@ def get_trace_from_mlflow(
         import mlflow
     except ImportError as e:
         raise ImportError(
-            "mlflow is required for MLflow integration. "
-            "Install with: pip install mlflow[databricks]"
+            "mlflow is required for MLflow integration. Install with: pip install mlflow[databricks]"
         ) from e
 
     _configure_mlflow(tracking_uri)
@@ -86,18 +85,13 @@ def get_trace_from_mlflow(
     artifact_path = None
     for name in artifact_names:
         try:
-            artifact_path = mlflow.artifacts.download_artifacts(
-                run_id=run_id, artifact_path=name
-            )
+            artifact_path = mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path=name)
             break
         except Exception:
             continue
 
     if artifact_path is None:
-        raise FileNotFoundError(
-            f"No trace artifact found in run '{run_id}'. "
-            f"Looked for: {artifact_names}"
-        )
+        raise FileNotFoundError(f"No trace artifact found in run '{run_id}'. Looked for: {artifact_names}")
 
     return parse_and_compute_metrics(artifact_path)
 
@@ -127,8 +121,7 @@ def get_trace_from_mlflow_traces(
         import mlflow
     except ImportError as e:
         raise ImportError(
-            "mlflow is required for MLflow integration. "
-            "Install with: pip install mlflow[databricks]"
+            "mlflow is required for MLflow integration. Install with: pip install mlflow[databricks]"
         ) from e
 
     _configure_mlflow(tracking_uri)
@@ -227,8 +220,7 @@ def list_trace_runs(
         import mlflow
     except ImportError as e:
         raise ImportError(
-            "mlflow is required for MLflow integration. "
-            "Install with: pip install mlflow[databricks]"
+            "mlflow is required for MLflow integration. Install with: pip install mlflow[databricks]"
         ) from e
 
     _configure_mlflow(tracking_uri)
@@ -241,9 +233,7 @@ def list_trace_runs(
             order_by=["start_time DESC"],
         )
     except Exception as e:
-        raise ValueError(
-            f"Failed to search runs in experiment '{experiment_name}': {e}"
-        ) from e
+        raise ValueError(f"Failed to search runs in experiment '{experiment_name}': {e}") from e
 
     if runs.empty:
         return []
@@ -317,8 +307,7 @@ def get_trace_by_id(
         import mlflow
     except ImportError as e:
         raise ImportError(
-            "mlflow is required for MLflow integration. "
-            "Install with: pip install mlflow[databricks]"
+            "mlflow is required for MLflow integration. Install with: pip install mlflow[databricks]"
         ) from e
 
     _configure_mlflow(tracking_uri)
@@ -408,12 +397,8 @@ def get_trace_metrics(
     """
     # Check if source looks like a file path
     if isinstance(source, Path) or (
-        isinstance(source, str) and (
-            source.endswith(".jsonl")
-            or source.startswith("/")
-            or source.startswith("~")
-            or source.startswith(".")
-        )
+        isinstance(source, str)
+        and (source.endswith(".jsonl") or source.startswith("/") or source.startswith("~") or source.startswith("."))
     ):
         path = Path(source).expanduser()
         if not path.exists():

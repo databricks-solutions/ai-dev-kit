@@ -69,7 +69,7 @@ class TestListClusters:
         assert isinstance(clusters, list)
         # All should be running/pending states
         for c in clusters:
-            assert c['state'] in ['RUNNING', 'PENDING', 'RESIZING', 'RESTARTING']
+            assert c["state"] in ["RUNNING", "PENDING", "RESIZING", "RESTARTING"]
 
     def test_list_clusters_with_limit(self):
         """Should respect limit parameter."""
@@ -109,7 +109,7 @@ class TestExecuteDatabricksCommand:
             code='print("Hello from shared context!")',
             cluster_id=shared_context["cluster_id"],
             context_id=shared_context["context_id"],
-            timeout=120
+            timeout=120,
         )
 
         print("\n=== Shared Context Execution ===")
@@ -127,7 +127,7 @@ class TestExecuteDatabricksCommand:
             code='test_var = 42\nprint(f"Set test_var = {test_var}")',
             cluster_id=shared_context["cluster_id"],
             context_id=shared_context["context_id"],
-            timeout=120
+            timeout=120,
         )
 
         print("\n=== First Execution ===")
@@ -140,7 +140,7 @@ class TestExecuteDatabricksCommand:
             code='print(f"test_var is still {test_var}")',
             cluster_id=shared_context["cluster_id"],
             context_id=shared_context["context_id"],
-            timeout=120
+            timeout=120,
         )
 
         print("\n=== Second Execution ===")
@@ -153,9 +153,9 @@ class TestExecuteDatabricksCommand:
     def test_sql_execution(self, shared_context):
         """Should execute SQL queries."""
         result = execute_databricks_command(
-            code='SELECT 1 + 1 as result',
+            code="SELECT 1 + 1 as result",
             cluster_id=shared_context["cluster_id"],
-            language='sql',
+            language="sql",
             timeout=120,
         )
 
@@ -169,9 +169,7 @@ class TestExecuteDatabricksCommand:
         """Should destroy context when requested."""
         try:
             result = execute_databricks_command(
-                code='print("Destroying context after this")',
-                timeout=120,
-                destroy_context_on_completion=True
+                code='print("Destroying context after this")', timeout=120, destroy_context_on_completion=True
             )
 
             print("\n=== Destroy Context On Completion ===")
@@ -194,7 +192,7 @@ class TestRunPythonFileOnDatabricks:
         """Should execute a simple Python file."""
         code = 'print("Hello from file!")\nprint(2 + 2)'
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             f.flush()
             temp_path = f.name
@@ -225,7 +223,7 @@ spark = SparkSession.builder.getOrCreate()
 df = spark.range(5)
 print(f"Row count: {df.count()}")
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             f.flush()
             temp_path = f.name
@@ -252,7 +250,7 @@ print(f"Row count: {df.count()}")
         """Should capture Python errors with details."""
         code = "x = 1 / 0  # This will raise ZeroDivisionError"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(code)
             f.flush()
             temp_path = f.name
@@ -278,10 +276,7 @@ print(f"Row count: {df.count()}")
 
     def test_file_not_found(self):
         """Should handle missing file gracefully (no cluster needed)."""
-        result = run_python_file_on_databricks(
-            file_path="/nonexistent/path/to/file.py",
-            timeout=120
-        )
+        result = run_python_file_on_databricks(file_path="/nonexistent/path/to/file.py", timeout=120)
 
         print("\n=== File Not Found Result ===")
         print(f"Success: {result.success}")

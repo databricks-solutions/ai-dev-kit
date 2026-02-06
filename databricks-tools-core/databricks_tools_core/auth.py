@@ -29,11 +29,12 @@ from databricks.sdk import WorkspaceClient
 
 def _has_oauth_credentials() -> bool:
     """Check if OAuth credentials (SP) are configured in environment."""
-    return bool(os.environ.get('DATABRICKS_CLIENT_ID') and os.environ.get('DATABRICKS_CLIENT_SECRET'))
+    return bool(os.environ.get("DATABRICKS_CLIENT_ID") and os.environ.get("DATABRICKS_CLIENT_SECRET"))
+
 
 # Context variables for per-request authentication
-_host_ctx: ContextVar[str | None] = ContextVar('databricks_host', default=None)
-_token_ctx: ContextVar[str | None] = ContextVar('databricks_token', default=None)
+_host_ctx: ContextVar[str | None] = ContextVar("databricks_host", default=None)
+_token_ctx: ContextVar[str | None] = ContextVar("databricks_token", default=None)
 
 
 def set_databricks_auth(host: str | None, token: str | None) -> None:
@@ -78,9 +79,9 @@ def get_workspace_client() -> WorkspaceClient:
     # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M
     # This prevents the SDK from detecting other auth methods like PAT or config file
     if _has_oauth_credentials():
-        oauth_host = host or os.environ.get('DATABRICKS_HOST', '')
-        client_id = os.environ.get('DATABRICKS_CLIENT_ID', '')
-        client_secret = os.environ.get('DATABRICKS_CLIENT_SECRET', '')
+        oauth_host = host or os.environ.get("DATABRICKS_HOST", "")
+        client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
+        client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
 
         # Explicitly configure OAuth M2M to prevent auth conflicts
         return WorkspaceClient(

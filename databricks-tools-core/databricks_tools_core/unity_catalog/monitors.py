@@ -3,6 +3,7 @@ Unity Catalog - Quality Monitor Operations
 
 Functions for managing Lakehouse Monitors (data quality monitors).
 """
+
 from typing import Any, Dict, List, Optional
 
 from ..auth import get_workspace_client
@@ -56,26 +57,27 @@ def create_monitor(
     # Configure monitor type (exactly one is required by the API)
     if monitor_type == "snapshot":
         from databricks.sdk.service.catalog import MonitorSnapshot
+
         kwargs["snapshot"] = MonitorSnapshot()
     elif monitor_type == "time_series":
         if not time_series_timestamp_col:
             raise ValueError("time_series_timestamp_col is required for time_series monitors")
         from databricks.sdk.service.catalog import MonitorTimeSeries
+
         kwargs["time_series"] = MonitorTimeSeries(
             timestamp_col=time_series_timestamp_col,
             granularities=time_series_granularities or ["1 day"],
         )
     elif monitor_type == "inference":
         from databricks.sdk.service.catalog import MonitorInferenceLog
+
         kwargs["inference_log"] = MonitorInferenceLog()
     else:
-        raise ValueError(
-            f"Invalid monitor_type: '{monitor_type}'. "
-            f"Valid types: snapshot, time_series, inference"
-        )
+        raise ValueError(f"Invalid monitor_type: '{monitor_type}'. Valid types: snapshot, time_series, inference")
 
     if schedule_cron is not None:
         from databricks.sdk.service.catalog import MonitorCronSchedule
+
         kwargs["schedule"] = MonitorCronSchedule(
             quartz_cron_expression=schedule_cron,
             timezone_id=schedule_timezone,

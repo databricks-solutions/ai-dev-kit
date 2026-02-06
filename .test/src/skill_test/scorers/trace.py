@@ -253,9 +253,7 @@ def file_existence(
     missing = []
     for pattern in expected:
         # Check if any written file matches the pattern
-        matched = any(
-            fnmatch.fnmatch(f, pattern) or pattern in f for f in all_written
-        )
+        matched = any(fnmatch.fnmatch(f, pattern) or pattern in f for f in all_written)
         if not matched:
             missing.append(pattern)
 

@@ -3,6 +3,7 @@ Unity Catalog - Connection Operations
 
 Functions for managing Lakehouse Federation foreign connections.
 """
+
 import re
 from typing import Any, Dict, List, Optional
 from databricks.sdk.service.catalog import ConnectionInfo, ConnectionType
@@ -22,6 +23,7 @@ def _validate_identifier(name: str) -> str:
 def _execute_uc_sql(sql_query: str, warehouse_id: str | None = None) -> list[dict[str, Any]]:
     """Execute SQL using the existing execute_sql infrastructure."""
     from ..sql.sql import execute_sql
+
     return execute_sql(sql_query=sql_query, warehouse_id=warehouse_id)
 
 

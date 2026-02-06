@@ -66,14 +66,16 @@ def list_dashboards(
 
     dashboards = []
     for dashboard in w.lakeview.list(page_size=page_size, page_token=page_token):
-        dashboards.append({
-            "dashboard_id": dashboard.dashboard_id,
-            "display_name": dashboard.display_name,
-            "warehouse_id": dashboard.warehouse_id,
-            "parent_path": dashboard.parent_path,
-            "path": dashboard.path,
-            "lifecycle_state": dashboard.lifecycle_state.value if dashboard.lifecycle_state else None,
-        })
+        dashboards.append(
+            {
+                "dashboard_id": dashboard.dashboard_id,
+                "display_name": dashboard.display_name,
+                "warehouse_id": dashboard.warehouse_id,
+                "parent_path": dashboard.parent_path,
+                "path": dashboard.path,
+                "lifecycle_state": dashboard.lifecycle_state.value if dashboard.lifecycle_state else None,
+            }
+        )
 
     return {"dashboards": dashboards}
 

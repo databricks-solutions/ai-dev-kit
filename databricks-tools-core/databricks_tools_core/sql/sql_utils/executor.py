@@ -100,13 +100,9 @@ class SQLExecutor:
 
         while elapsed < timeout:
             try:
-                status = self.client.statement_execution.get_statement(
-                    statement_id=statement_id
-                )
+                status = self.client.statement_execution.get_statement(statement_id=statement_id)
             except Exception as e:
-                raise SQLExecutionError(
-                    f"Failed to check status of statement '{statement_id}': {e!s}"
-                )
+                raise SQLExecutionError(f"Failed to check status of statement '{statement_id}': {e!s}")
 
             state = status.status.state
 
@@ -116,21 +112,14 @@ class SQLExecutor:
             if state == StatementState.FAILED:
                 error_msg = self._get_error_message(status)
                 raise SQLExecutionError(
-                    f"SQL query failed: {error_msg}\n"
-                    f"Query: {sql_query[:500]}{'...' if len(sql_query) > 500 else ''}"
+                    f"SQL query failed: {error_msg}\nQuery: {sql_query[:500]}{'...' if len(sql_query) > 500 else ''}"
                 )
 
             if state == StatementState.CANCELED:
-                raise SQLExecutionError(
-                    f"SQL query was canceled before completion. "
-                    f"Statement ID: {statement_id}"
-                )
+                raise SQLExecutionError(f"SQL query was canceled before completion. Statement ID: {statement_id}")
 
             if state == StatementState.CLOSED:
-                raise SQLExecutionError(
-                    f"SQL statement was closed unexpectedly. "
-                    f"Statement ID: {statement_id}"
-                )
+                raise SQLExecutionError(f"SQL statement was closed unexpectedly. Statement ID: {statement_id}")
 
             # Still running, wait and poll again
             time.sleep(poll_interval)
@@ -153,11 +142,7 @@ class SQLExecutor:
 
         # Get column names from manifest
         columns = None
-        if (
-            response.manifest
-            and response.manifest.schema
-            and response.manifest.schema.columns
-        ):
+        if response.manifest and response.manifest.schema and response.manifest.schema.columns:
             columns = [col.name for col in response.manifest.schema.columns]
 
         # Convert rows to dicts
@@ -183,9 +168,7 @@ class SQLExecutor:
     def _cancel_statement(self, statement_id: str) -> None:
         """Attempt to cancel a running statement."""
         try:
-            self.client.statement_execution.cancel_execution(
-                statement_id=statement_id
-            )
+            self.client.statement_execution.cancel_execution(statement_id=statement_id)
             logger.debug(f"Canceled statement {statement_id}")
         except Exception as e:
             logger.warning(f"Failed to cancel statement {statement_id}: {e}")

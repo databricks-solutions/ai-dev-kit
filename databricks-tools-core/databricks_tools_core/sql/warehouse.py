@@ -38,10 +38,7 @@ def list_warehouses(limit: int = 20) -> list[dict[str, Any]]:
     try:
         warehouses = list(client.warehouses.list())
     except Exception as e:
-        raise Exception(
-            f"Failed to list SQL warehouses: {e!s}. "
-            f"Check that you have permission to view warehouses."
-        )
+        raise Exception(f"Failed to list SQL warehouses: {e!s}. Check that you have permission to view warehouses.")
 
     # Sort: RUNNING first, then by name
     def sort_key(w):
@@ -54,14 +51,16 @@ def list_warehouses(limit: int = 20) -> list[dict[str, Any]]:
     # Convert to dicts and limit
     result = []
     for w in warehouses[:limit]:
-        result.append({
-            "id": w.id,
-            "name": w.name,
-            "state": w.state.value if w.state else None,
-            "cluster_size": w.cluster_size,
-            "auto_stop_mins": w.auto_stop_mins,
-            "creator_name": w.creator_name,
-        })
+        result.append(
+            {
+                "id": w.id,
+                "name": w.name,
+                "state": w.state.value if w.state else None,
+                "cluster_size": w.cluster_size,
+                "auto_stop_mins": w.auto_stop_mins,
+                "creator_name": w.creator_name,
+            }
+        )
 
     return result
 
@@ -88,10 +87,7 @@ def get_best_warehouse() -> str | None:
     try:
         warehouses = list(client.warehouses.list())
     except Exception as e:
-        raise Exception(
-            f"Failed to list SQL warehouses: {e!s}. "
-            f"Check that you have permission to view warehouses."
-        )
+        raise Exception(f"Failed to list SQL warehouses: {e!s}. Check that you have permission to view warehouses.")
 
     if not warehouses:
         logger.warning("No SQL warehouses found in workspace")
@@ -99,10 +95,10 @@ def get_best_warehouse() -> str | None:
 
     # Categorize warehouses
     standard_shared = []  # Specific shared endpoint names
-    online_shared = []    # Running + 'shared' in name
-    online_other = []     # Running, no 'shared'
-    offline_shared = []   # Stopped + 'shared' in name
-    offline_other = []    # Stopped, no 'shared'
+    online_shared = []  # Running + 'shared' in name
+    online_other = []  # Running, no 'shared'
+    offline_shared = []  # Stopped + 'shared' in name
+    offline_other = []  # Stopped, no 'shared'
 
     for warehouse in warehouses:
         is_running = warehouse.state == State.RUNNING

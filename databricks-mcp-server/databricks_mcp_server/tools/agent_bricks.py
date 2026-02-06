@@ -226,9 +226,7 @@ def find_ka_by_name(name: str) -> dict[str, Any]:
     endpoint_status = "UNKNOWN"
     if full_details:
         endpoint_status = (
-            full_details.get("knowledge_assistant", {})
-            .get("status", {})
-            .get("endpoint_status", "UNKNOWN")
+            full_details.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status", "UNKNOWN")
         )
 
     # Endpoint name uses only the first segment of the tile_id (before the first hyphen)
@@ -431,9 +429,7 @@ def create_or_update_mas(
                 description=description,
                 instructions=instructions,
             )
-            response_tile_id = (
-                result.get("multi_agent_supervisor", {}).get("tile", {}).get("tile_id", "")
-            )
+            response_tile_id = result.get("multi_agent_supervisor", {}).get("tile", {}).get("tile_id", "")
 
     # Extract status
     mas_data = result.get("multi_agent_supervisor", {})

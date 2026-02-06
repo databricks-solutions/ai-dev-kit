@@ -51,9 +51,7 @@ def get_serving_endpoint_status(name: str) -> dict[str, Any]:
     state_info = {}
     if endpoint.state:
         state_info["state"] = endpoint.state.ready.value if endpoint.state.ready else None
-        state_info["config_update"] = (
-            endpoint.state.config_update.value if endpoint.state.config_update else None
-        )
+        state_info["config_update"] = endpoint.state.config_update.value if endpoint.state.config_update else None
 
     # Extract served entities status
     served_entities = []
@@ -65,9 +63,7 @@ def get_serving_endpoint_status(name: str) -> dict[str, Any]:
                 "entity_version": entity.entity_version,
             }
             if entity.state:
-                entity_info["deployment_state"] = (
-                    entity.state.deployment.value if entity.state.deployment else None
-                )
+                entity_info["deployment_state"] = entity.state.deployment.value if entity.state.deployment else None
                 entity_info["deployment_state_message"] = entity.state.deployment_state_message
             served_entities.append(entity_info)
 
@@ -161,10 +157,7 @@ def query_serving_endpoint(
         if "RESOURCE_DOES_NOT_EXIST" in error_msg:
             raise Exception(f"Endpoint '{name}' not found")
         if "NOT_READY" in error_msg or "PENDING" in error_msg:
-            raise Exception(
-                f"Endpoint '{name}' is not ready. "
-                f"Check status with get_serving_endpoint_status('{name}')"
-            )
+            raise Exception(f"Endpoint '{name}' is not ready. Check status with get_serving_endpoint_status('{name}')")
         raise Exception(f"Failed to query endpoint '{name}': {error_msg}")
 
     # Convert response to dict
@@ -242,12 +235,14 @@ def list_serving_endpoints(limit: int = 50) -> list[dict[str, Any]]:
         if ep.config and ep.config.served_entities:
             served_count = len(ep.config.served_entities)
 
-        result.append({
-            "name": ep.name,
-            "state": state,
-            "creation_timestamp": ep.creation_timestamp,
-            "creator": ep.creator,
-            "served_entities_count": served_count,
-        })
+        result.append(
+            {
+                "name": ep.name,
+                "state": state,
+                "creation_timestamp": ep.creation_timestamp,
+                "creator": ep.creator,
+                "served_entities_count": served_count,
+            }
+        )
 
     return result
