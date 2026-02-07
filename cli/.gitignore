@@ -1,7 +1,9 @@
 # Build output
 dist/
-build/
+
+# Ignore .exe files except in releases/
 *.exe
+!releases/**/*.exe
 
 # Go
 *.test
