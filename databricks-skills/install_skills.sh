@@ -19,6 +19,9 @@
 #   ./install_skills.sh --local sdp        # Install specific skill from local directory
 #   ./install_skills.sh --global           # Install all skills globally
 #   ./install_skills.sh --global sdp       # Install specific skill globally
+#   ./install_skills.sh --agents           # Install all skills to .agents/skills/
+#   ./install_skills.sh --agents sdp       # Install specific skill to .agents/skills/
+#   ./install_skills.sh --global --agents  # Install all skills to ~/.agents/skills/
 #   ./install_skills.sh --list             # List available skills
 #   ./install_skills.sh --help             # Show help
 #
@@ -38,10 +41,11 @@ REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/
 SKILLS_DIR=".claude/skills"
 INSTALL_FROM_LOCAL=false
 INSTALL_GLOBAL=false
+INSTALL_AGENTS=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # All available skills
-ALL_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-jobs databricks-python-sdk databricks-unity-catalog mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+ALL_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned mlflow-evaluation model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
 
 # Get skill description
 get_skill_description() {
@@ -53,9 +57,11 @@ get_skill_description() {
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
         "databricks-config") echo "Profile authentication setup for Databricks" ;;
         "databricks-docs") echo "Documentation reference via llms.txt" ;;
+        "databricks-genie") echo "Databricks Genie - SQL exploration and natural language querying" ;;
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
         "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
+        "lakebase-provisioned") echo "Lakebase Provisioned - managed data platform provisioning" ;;
         "mlflow-evaluation") echo "MLflow evaluation, scoring, and trace analysis" ;;
         "model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
@@ -91,21 +97,25 @@ show_help() {
     echo "  ./install_skills.sh [options] [skill1 skill2 ...]"
     echo ""
     echo "Options:"
-    echo "  --help, -h     Show this help message"
-    echo "  --list, -l     List all available skills"
-    echo "  --all, -a      Install all skills (default if no skills specified)"
-    echo "  --local        Install from local files instead of downloading"
-    echo "  --global, -g   Install to ~/.claude/skills/ (available in all projects)"
+    echo "  --help, -h       Show this help message"
+    echo "  --list, -l       List all available skills"
+    echo "  --all, -a        Install all skills (default if no skills specified)"
+    echo "  --local          Install from local files instead of downloading"
+    echo "  --global, -g     Install to ~/.claude/skills/ (available in all projects)"
+    echo "  --agents, -ag    Install to .agents/skills/ (multi-agent project directory)"
     echo ""
     echo "Examples:"
-    echo "  ./install_skills.sh                    # Install all skills from URL"
-    echo "  ./install_skills.sh sdp                # Install only SDP skill from URL"
-    echo "  ./install_skills.sh sdp asset-bundles    # Install specific skills from URL"
-    echo "  ./install_skills.sh --local            # Install all skills from local directory"
-    echo "  ./install_skills.sh --local sdp        # Install SDP skill from local directory"
-    echo "  ./install_skills.sh --global           # Install all skills globally"
-    echo "  ./install_skills.sh --global sdp       # Install specific skill globally"
-    echo "  ./install_skills.sh --list             # List available skills"
+    echo "  ./install_skills.sh                         # Install all skills from URL"
+    echo "  ./install_skills.sh sdp                     # Install only SDP skill from URL"
+    echo "  ./install_skills.sh sdp asset-bundles       # Install specific skills from URL"
+    echo "  ./install_skills.sh --local                 # Install all skills from local directory"
+    echo "  ./install_skills.sh --local sdp             # Install SDP skill from local directory"
+    echo "  ./install_skills.sh --global                # Install all skills globally"
+    echo "  ./install_skills.sh --global sdp            # Install specific skill globally"
+    echo "  ./install_skills.sh --agents                # Install all skills to .agents/skills/"
+    echo "  ./install_skills.sh --agents sdp            # Install specific skill to .agents/skills/"
+    echo "  ./install_skills.sh --global --agents       # Install to ~/.agents/skills/ (global agents)"
+    echo "  ./install_skills.sh --list                  # List available skills"
     echo ""
     echo "Available skills:"
     for skill in $ALL_SKILLS; do
@@ -252,6 +262,10 @@ while [ $# -gt 0 ]; do
             INSTALL_GLOBAL=true
             shift
             ;;
+        --agents|-ag)
+            INSTALL_AGENTS=true
+            shift
+            ;;
         -*)
             echo -e "${RED}Unknown option: $1${NC}"
             echo "Use --help for usage information."
@@ -277,9 +291,16 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# If --global, install to user's global skills directory
-if [ "$INSTALL_GLOBAL" = true ]; then
+# Determine SKILLS_DIR based on --global and --agents flags
+if [ "$INSTALL_GLOBAL" = true ] && [ "$INSTALL_AGENTS" = true ]; then
+    # Global agents directory: ~/.agents/skills/
+    SKILLS_DIR="$HOME/.agents/skills"
+elif [ "$INSTALL_GLOBAL" = true ]; then
+    # Global skills directory: ~/.claude/skills/
     SKILLS_DIR="$HOME/.claude/skills"
+elif [ "$INSTALL_AGENTS" = true ]; then
+    # Project agents directory: .agents/skills/
+    SKILLS_DIR=".agents/skills"
 fi
 
 # If no skills specified, install all
