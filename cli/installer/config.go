@@ -179,6 +179,8 @@ func (c *Config) GetSkillsDir(tool string) string {
 		return filepath.Join(c.BaseDir, ".github", "skills")
 	case "codex":
 		return filepath.Join(c.BaseDir, ".agents", "skills")
+	case "gemini":
+		return filepath.Join(c.BaseDir, ".gemini", "skills")
 	default:
 		return ""
 	}
@@ -208,6 +210,11 @@ func (c *Config) GetMCPConfigPath(tool string) string {
 			return filepath.Join(homeDir, ".codex", "config.toml")
 		}
 		return filepath.Join(c.BaseDir, ".codex", "config.toml")
+	case "gemini":
+		if c.Scope == "global" {
+			return filepath.Join(homeDir, ".gemini", "settings.json")
+		}
+		return filepath.Join(c.BaseDir, ".gemini", "settings.json")
 	default:
 		return ""
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/databricks-solutions/ai-dev-kit/cli/installer"
+	"github.com/databricks-solutions/ai-dev-kit/cli/signal"
 	"github.com/databricks-solutions/ai-dev-kit/cli/ui"
 	"github.com/spf13/cobra"
 )
@@ -66,6 +67,7 @@ func runUninstall(cmd *cobra.Command, args []string) {
 		{"Cursor", filepath.Join(cwd, ".cursor", "skills")},
 		{"Copilot", filepath.Join(cwd, ".github", "skills")},
 		{"Codex", filepath.Join(cwd, ".agents", "skills")},
+		{"Gemini", filepath.Join(cwd, ".gemini", "skills")},
 	}
 
 	for _, sd := range skillsDirs {
@@ -87,6 +89,7 @@ func runUninstall(cmd *cobra.Command, args []string) {
 		{"Cursor", filepath.Join(cwd, ".cursor", "mcp.json")},
 		{"Copilot", filepath.Join(cwd, ".vscode", "mcp.json")},
 		{"Codex", filepath.Join(cwd, ".codex", "config.toml")},
+		{"Gemini", filepath.Join(cwd, ".gemini", "settings.json")},
 	}
 
 	for _, mc := range mcpConfigs {
@@ -131,6 +134,7 @@ func runUninstall(cmd *cobra.Command, args []string) {
 		}{
 			{"Claude", filepath.Join(homeDir, ".claude", "mcp.json")},
 			{"Codex", filepath.Join(homeDir, ".codex", "config.toml")},
+			{"Gemini", filepath.Join(homeDir, ".gemini", "settings.json")},
 		}
 
 		for _, gc := range globalConfigs {
@@ -188,6 +192,14 @@ func runUninstall(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// Check for interrupt after confirmation
+	if signal.IsInterrupted() {
+		fmt.Println()
+		fmt.Println(ui.RenderWarning("Uninstall cancelled by user"))
+		os.Exit(130)
+		return
+	}
+
 	fmt.Println()
 	fmt.Println(ui.RenderStep("Removing items"))
 	fmt.Println()
@@ -195,6 +207,13 @@ func runUninstall(cmd *cobra.Command, args []string) {
 	// Remove project items
 	var errors []string
 	for _, item := range projectItems {
+		// Check for interrupt before each removal
+		if signal.IsInterrupted() {
+			fmt.Println()
+			fmt.Println(ui.RenderWarning("Uninstall cancelled by user"))
+			os.Exit(130)
+			return
+		}
 		if err := removeItem(item); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", item.name, err))
 			fmt.Printf("  %s %s\n", ui.ErrorStyle.Render("✗"), item.name)
@@ -205,6 +224,13 @@ func runUninstall(cmd *cobra.Command, args []string) {
 
 	// Remove global items
 	for _, item := range globalItems {
+		// Check for interrupt before each removal
+		if signal.IsInterrupted() {
+			fmt.Println()
+			fmt.Println(ui.RenderWarning("Uninstall cancelled by user"))
+			os.Exit(130)
+			return
+		}
 		if err := removeItem(item); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", item.name, err))
 			fmt.Printf("  %s %s\n", ui.ErrorStyle.Render("✗"), item.name)

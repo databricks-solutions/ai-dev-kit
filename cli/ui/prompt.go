@@ -15,6 +15,7 @@ type PromptModel struct {
 	Default     string
 	textInput   textinput.Model
 	finished    bool
+	cancelled   bool
 	value       string
 }
 
@@ -48,6 +49,7 @@ func (m PromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
+			m.cancelled = true
 			return m, tea.Quit
 
 		case "enter":
@@ -105,6 +107,11 @@ func (m PromptModel) IsFinished() bool {
 	return m.finished
 }
 
+// IsCancelled returns whether input was cancelled
+func (m PromptModel) IsCancelled() bool {
+	return m.cancelled
+}
+
 // RunPrompt runs the text input interactively and returns the value
 func RunPrompt(title, description, defaultValue string) (string, error) {
 	model := NewPrompt(title, description, defaultValue)
@@ -116,6 +123,9 @@ func RunPrompt(title, description, defaultValue string) (string, error) {
 	}
 
 	result := finalModel.(PromptModel)
+	if result.IsCancelled() {
+		return "", ErrUserCancelled
+	}
 	return result.Value(), nil
 }
 

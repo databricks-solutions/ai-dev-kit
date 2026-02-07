@@ -141,6 +141,7 @@ func TestGetSkillsDir(t *testing.T) {
 		{"cursor", filepath.Join("/project", ".cursor", "skills")},
 		{"copilot", filepath.Join("/project", ".github", "skills")},
 		{"codex", filepath.Join("/project", ".agents", "skills")},
+		{"gemini", filepath.Join("/project", ".gemini", "skills")},
 		{"unknown", ""},
 	}
 
@@ -168,6 +169,7 @@ func TestGetMCPConfigPath(t *testing.T) {
 		{"cursor", filepath.Join("/project", ".cursor", "mcp.json")},
 		{"copilot", filepath.Join("/project", ".vscode", "mcp.json")},
 		{"codex", filepath.Join("/project", ".codex", "config.toml")},
+		{"gemini", filepath.Join("/project", ".gemini", "settings.json")},
 		{"unknown", ""},
 	}
 
@@ -187,6 +189,13 @@ func TestGetMCPConfigPath(t *testing.T) {
 	}
 	if got := cfg.GetMCPConfigPath("copilot"); got != "" {
 		t.Errorf("Copilot global should return empty, got %s", got)
+	}
+
+	// Test Gemini global scope - should return path
+	homeDir := getHomeDir()
+	expectedGeminiGlobal := filepath.Join(homeDir, ".gemini", "settings.json")
+	if got := cfg.GetMCPConfigPath("gemini"); got != expectedGeminiGlobal {
+		t.Errorf("Gemini global should return %s, got %s", expectedGeminiGlobal, got)
 	}
 }
 

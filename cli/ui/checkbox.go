@@ -18,10 +18,11 @@ type CheckboxItem struct {
 
 // CheckboxModel is a bubbletea model for multi-select checkboxes
 type CheckboxModel struct {
-	Title    string
-	Items    []CheckboxItem
-	cursor   int
-	finished bool
+	Title     string
+	Items     []CheckboxItem
+	cursor    int
+	finished  bool
+	cancelled bool
 }
 
 // NewCheckbox creates a new checkbox selection model
@@ -45,6 +46,7 @@ func (m CheckboxModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			m.cancelled = true
 			return m, tea.Quit
 
 		case "up", "k":
@@ -131,6 +133,11 @@ func (m CheckboxModel) IsFinished() bool {
 	return m.finished
 }
 
+// IsCancelled returns whether the selection was cancelled
+func (m CheckboxModel) IsCancelled() bool {
+	return m.cancelled
+}
+
 // RunCheckbox runs the checkbox interactively and returns selected values
 func RunCheckbox(title string, items []CheckboxItem) ([]string, error) {
 	model := NewCheckbox(title, items)
@@ -142,6 +149,9 @@ func RunCheckbox(title string, items []CheckboxItem) ([]string, error) {
 	}
 
 	result := finalModel.(CheckboxModel)
+	if result.IsCancelled() {
+		return nil, ErrUserCancelled
+	}
 	return result.Selected(), nil
 }
 

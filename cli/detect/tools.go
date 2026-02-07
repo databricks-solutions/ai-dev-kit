@@ -23,6 +23,7 @@ func DetectTools() []Tool {
 		{Name: "Cursor", Value: "cursor", Detected: false, Hint: "not found"},
 		{Name: "GitHub Copilot", Value: "copilot", Detected: false, Hint: "not found"},
 		{Name: "OpenAI Codex", Value: "codex", Detected: false, Hint: "not found"},
+		{Name: "Google Gemini", Value: "gemini", Detected: false, Hint: "not found"},
 	}
 
 	// Check Claude
@@ -47,6 +48,12 @@ func DetectTools() []Tool {
 	if commandExists("codex") {
 		tools[3].Detected = true
 		tools[3].Hint = "detected"
+	}
+
+	// Check Gemini
+	if commandExists("gemini") {
+		tools[4].Detected = true
+		tools[4].Hint = "detected"
 	}
 
 	// If nothing detected, default Claude to true

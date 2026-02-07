@@ -65,6 +65,8 @@ func getSkillsDirectories(cfg *Config) []string {
 			dir = cfg.GetSkillsDir("copilot")
 		case "codex":
 			dir = cfg.GetSkillsDir("codex")
+		case "gemini":
+			dir = cfg.GetSkillsDir("gemini")
 		}
 
 		if dir != "" && !dirMap[dir] {
@@ -227,6 +229,8 @@ func SkillsDirectoryDescription(tools []string, baseDir string) string {
 			dirs = append(dirs, ".github/skills")
 		case "codex":
 			dirs = append(dirs, ".agents/skills")
+		case "gemini":
+			dirs = append(dirs, ".gemini/skills")
 		}
 	}
 

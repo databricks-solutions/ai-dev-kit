@@ -7,6 +7,7 @@ import (
 
 	"github.com/databricks-solutions/ai-dev-kit/cli/detect"
 	"github.com/databricks-solutions/ai-dev-kit/cli/installer"
+	"github.com/databricks-solutions/ai-dev-kit/cli/signal"
 	"github.com/databricks-solutions/ai-dev-kit/cli/ui"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,7 @@ var installCmd = &cobra.Command{
 	Short: "Install the Databricks AI Dev Kit",
 	Long: `Install the Databricks AI Dev Kit including:
   • MCP tools for AI assistant integration with Databricks
-  • Databricks skills for Claude, Cursor, Copilot, and Codex
+  • Databricks skills for Claude, Cursor, Copilot, Codex, and Gemini
   • Tool-specific configuration files
 
 The installer auto-detects installed tools and guides you through
@@ -41,7 +42,7 @@ func init() {
 	installCmd.Flags().BoolVar(&flagSkillsOnly, "skills-only", false, "Skip MCP tools setup")
 	installCmd.Flags().BoolVar(&flagMCPOnly, "mcp-only", false, "Skip skills installation")
 	installCmd.Flags().StringVar(&flagMCPPath, "mcp-path", "", "Custom MCP installation path")
-	installCmd.Flags().StringVar(&flagTools, "tools", "", "Comma-separated tools: claude,cursor,copilot,codex")
+	installCmd.Flags().StringVar(&flagTools, "tools", "", "Comma-separated tools: claude,cursor,copilot,codex,gemini")
 	installCmd.Flags().BoolVarP(&flagForce, "force", "f", false, "Force reinstall")
 	installCmd.Flags().BoolVar(&flagSilent, "silent", false, "Silent mode (no interactive prompts)")
 }
@@ -78,44 +79,64 @@ func runInstall(cmd *cobra.Command, args []string) {
 	if !cfg.Silent && !flagSkillsOnly && !flagMCPOnly {
 		installMCP, installSkills, err := selectInstallMode()
 		if err != nil {
-			fmt.Println(ui.RenderError(err.Error()))
-			os.Exit(1)
+			handleInstallError(err, cfg.Silent)
+			return
 		}
 		cfg.InstallMCP = installMCP
 		cfg.InstallSkills = installSkills
+	}
+
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
 	}
 
 	// Step 1: Check dependencies
 	printStep("Checking prerequisites", cfg.Silent)
 	deps, pkgMgr, err := installer.CheckDependencies(cfg.InstallMCP)
 	if err != nil {
-		fmt.Println(ui.RenderError(err.Error()))
-		os.Exit(1)
+		handleInstallError(err, cfg.Silent)
+		return
 	}
 	installer.PrintDependencyStatus(deps, pkgMgr, cfg.Silent)
+
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
+	}
 
 	// Step 2: Tool selection
 	printStep("Selecting tools", cfg.Silent)
 	tools, err := selectTools(cfg)
 	if err != nil {
-		fmt.Println(ui.RenderError(err.Error()))
-		os.Exit(1)
+		handleInstallError(err, cfg.Silent)
+		return
 	}
 	cfg.Tools = tools
 	if !cfg.Silent {
 		fmt.Println(ui.RenderSuccess("Selected: " + strings.Join(tools, ", ")))
 	}
 
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
+	}
+
 	// Step 3: Profile selection
 	printStep("Databricks profile", cfg.Silent)
 	profile, err := selectProfile(cfg)
 	if err != nil {
-		fmt.Println(ui.RenderError(err.Error()))
-		os.Exit(1)
+		handleInstallError(err, cfg.Silent)
+		return
 	}
 	cfg.Profile = profile
 	if !cfg.Silent {
 		fmt.Println(ui.RenderSuccess("Profile: " + profile))
+	}
+
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
 	}
 
 	// Step 4: MCP path selection (if installing MCP)
@@ -123,8 +144,8 @@ func runInstall(cmd *cobra.Command, args []string) {
 		printStep("MCP tools location", cfg.Silent)
 		mcpPath, err := selectMCPPath(cfg)
 		if err != nil {
-			fmt.Println(ui.RenderError(err.Error()))
-			os.Exit(1)
+			handleInstallError(err, cfg.Silent)
+			return
 		}
 		cfg.SetInstallDir(mcpPath)
 		if !cfg.Silent {
@@ -132,17 +153,27 @@ func runInstall(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
+	}
+
 	// Step 5: Confirmation
 	if !cfg.Silent {
 		confirmed, err := showSummary(cfg)
 		if err != nil {
-			fmt.Println(ui.RenderError(err.Error()))
-			os.Exit(1)
+			handleInstallError(err, cfg.Silent)
+			return
 		}
 		if !confirmed {
 			fmt.Println("\n  Installation cancelled.")
 			os.Exit(0)
 		}
+	}
+
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
 	}
 
 	// Step 6: Version check
@@ -157,38 +188,59 @@ func runInstall(cmd *cobra.Command, args []string) {
 	if cfg.InstallMCP {
 		printStep("Setting up MCP tools", cfg.Silent)
 
+		// Check for interrupt before long operation
+		if checkInterrupt(cfg.Silent) {
+			return
+		}
+
 		// Clone repository
 		fmt.Println("  Cloning repository...")
 		if err := installer.SetupMCPServer(cfg, pkgMgr); err != nil {
-			fmt.Println(ui.RenderError(err.Error()))
-			os.Exit(1)
+			handleInstallError(err, cfg.Silent)
+			return
 		}
 		fmt.Println(ui.RenderSuccess("MCP tools ready"))
 	} else if !pathExists(cfg.RepoDir) {
 		// Need to clone repo for skills even if not installing MCP
 		printStep("Downloading sources", cfg.Silent)
+
+		// Check for interrupt before long operation
+		if checkInterrupt(cfg.Silent) {
+			return
+		}
+
 		if err := installer.RunGitClone(installer.RepoURL, cfg.RepoDir); err != nil {
-			fmt.Println(ui.RenderError(err.Error()))
-			os.Exit(1)
+			handleInstallError(err, cfg.Silent)
+			return
 		}
 		fmt.Println(ui.RenderSuccess("Repository cloned"))
+	}
+
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
 	}
 
 	// Step 8: Install skills
 	if cfg.InstallSkills {
 		printStep("Installing skills", cfg.Silent)
 		if err := installer.InstallSkills(cfg); err != nil {
-			fmt.Println(ui.RenderError(err.Error()))
-			os.Exit(1)
+			handleInstallError(err, cfg.Silent)
+			return
 		}
+	}
+
+	// Check for interrupt
+	if checkInterrupt(cfg.Silent) {
+		return
 	}
 
 	// Step 9: Write MCP configs
 	if cfg.InstallMCP {
 		printStep("Configuring MCP", cfg.Silent)
 		if err := installer.WriteMCPConfigs(cfg); err != nil {
-			fmt.Println(ui.RenderError(err.Error()))
-			os.Exit(1)
+			handleInstallError(err, cfg.Silent)
+			return
 		}
 
 		// Print tool-specific configs
@@ -211,6 +263,34 @@ func runInstall(cmd *cobra.Command, args []string) {
 	if !cfg.Silent {
 		promptAuth(cfg)
 	}
+}
+
+// checkInterrupt checks if an interrupt signal was received and handles graceful shutdown
+func checkInterrupt(silent bool) bool {
+	if signal.IsInterrupted() {
+		if !silent {
+			fmt.Println()
+			fmt.Println(ui.RenderWarning("Installation cancelled by user"))
+			fmt.Println("  " + ui.DimStyle.Render("No changes have been applied. Run 'aidevkit install' to try again."))
+		}
+		os.Exit(130) // Standard exit code for SIGINT
+		return true
+	}
+	return false
+}
+
+// handleInstallError handles errors during installation, with special handling for interrupts
+func handleInstallError(err error, silent bool) {
+	if signal.IsInterruptError(err) || signal.IsInterrupted() || ui.IsUserCancelled(err) {
+		if !silent {
+			fmt.Println()
+			fmt.Println(ui.RenderWarning("Installation cancelled by user"))
+		}
+		os.Exit(130)
+		return
+	}
+	fmt.Println(ui.RenderError(err.Error()))
+	os.Exit(1)
 }
 
 // selectTools handles tool selection via flags or interactive UI
@@ -465,6 +545,8 @@ func toolDisplayName(tool string) string {
 		return "Copilot"
 	case "codex":
 		return "Codex"
+	case "gemini":
+		return "Gemini"
 	default:
 		return tool
 	}

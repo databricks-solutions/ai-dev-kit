@@ -203,3 +203,26 @@ func TestWrapErrorDefaultMessage(t *testing.T) {
 	}
 }
 
+func TestUserCancelledError(t *testing.T) {
+	err := &UserCancelledError{}
+	expected := "operation cancelled by user"
+	if err.Error() != expected {
+		t.Errorf("Expected '%s', got '%s'", expected, err.Error())
+	}
+}
+
+func TestIsUserCancelled(t *testing.T) {
+	if !IsUserCancelled(ErrUserCancelled) {
+		t.Error("Should recognize ErrUserCancelled")
+	}
+
+	if !IsUserCancelled(&UserCancelledError{}) {
+		t.Error("Should recognize new UserCancelledError")
+	}
+
+	regularErr := errors.New("some error")
+	if IsUserCancelled(regularErr) {
+		t.Error("Should not recognize regular error as user cancelled")
+	}
+}
+

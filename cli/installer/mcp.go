@@ -158,6 +158,8 @@ func writeMCPConfig(cfg *Config, tool string) error {
 		return writeCopilotMCPJSON(cfg)
 	case "codex":
 		return writeMCPTOML(cfg)
+	case "gemini":
+		return writeGeminiMCPJSON(cfg)
 	}
 	return nil
 }
@@ -323,6 +325,59 @@ args = ["%s"]
 
 	_, err = f.WriteString(tomlBlock)
 	return err
+}
+
+// writeGeminiMCPJSON writes the MCP JSON config file for Gemini CLI (settings.json)
+func writeGeminiMCPJSON(cfg *Config) error {
+	configPath := cfg.GetMCPConfigPath("gemini")
+	if configPath == "" {
+		return nil
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+
+	// Backup existing file
+	if pathExists(configPath) {
+		backupPath := configPath + ".bak"
+		if err := copyFile(configPath, backupPath); err == nil {
+			fmt.Println("  " + ui.DimStyle.Render(fmt.Sprintf("Backed up %s → %s.bak", filepath.Base(configPath), filepath.Base(configPath))))
+		}
+	}
+
+	// Read existing config or create new
+	var config MCPConfig
+	if pathExists(configPath) {
+		data, err := os.ReadFile(configPath)
+		if err == nil {
+			if err := json.Unmarshal(data, &config); err != nil {
+				fmt.Println(ui.RenderWarning(fmt.Sprintf("Warning: could not parse existing %s, creating new config", filepath.Base(configPath))))
+			}
+		}
+	}
+	if config.MCPServers == nil {
+		config.MCPServers = make(map[string]MCPServerConfig)
+	}
+
+	// Add/update databricks server config
+	pythonPath := toForwardSlash(cfg.VenvPython)
+	mcpEntry := toForwardSlash(cfg.McpEntry)
+
+	config.MCPServers["databricks"] = MCPServerConfig{
+		Command: pythonPath,
+		Args:    []string{mcpEntry},
+		Env:     map[string]string{"DATABRICKS_CONFIG_PROFILE": cfg.Profile},
+	}
+
+	// Write config
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configPath, append(data, '\n'), 0644)
 }
 
 // PrintMCPInstructions prints tool-specific MCP instructions

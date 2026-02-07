@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/databricks-solutions/ai-dev-kit/cli/signal"
 	"github.com/databricks-solutions/ai-dev-kit/cli/ui"
 	"github.com/spf13/cobra"
 )
@@ -96,6 +97,14 @@ func runUpdate(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Check for interrupt before proceeding with download
+	if signal.IsInterrupted() {
+		fmt.Println()
+		fmt.Println(ui.RenderWarning("Update cancelled by user"))
+		os.Exit(130)
+		return
+	}
+
 	// Determine platform and binary name
 	binaryName, err := getBinaryName()
 	if err != nil {
@@ -149,6 +158,15 @@ func runUpdate(cmd *cobra.Command, args []string) {
 			fmt.Println(ui.RenderError(fmt.Sprintf("Failed to set permissions: %v", err)))
 			os.Exit(1)
 		}
+	}
+
+	// Check for interrupt before replacing binary
+	if signal.IsInterrupted() {
+		fmt.Println()
+		fmt.Println(ui.RenderWarning("Update cancelled by user"))
+		fmt.Println("  " + ui.DimStyle.Render("No changes were made to your installation."))
+		os.Exit(130)
+		return
 	}
 
 	// Replace current binary

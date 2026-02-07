@@ -8,7 +8,7 @@
 
 ## Overview
 
-AI-Driven Development (vibe coding) on Databricks just got a whole lot better. The **AI Dev Kit** gives your AI coding assistant (Claude Code, Cursor, Windsurf, etc.) the trusted sources it needs to build faster and smarter on Databricks.
+AI-Driven Development (vibe coding) on Databricks just got a whole lot better. The **AI Dev Kit** gives your AI coding assistant (Claude Code, Cursor, Gemini, Windsurf, etc.) the trusted sources it needs to build faster and smarter on Databricks.
 
 <p align="center">
   <img src="databricks-tools-core/docs/architecture.svg" alt="Architecture" width="700">
@@ -83,7 +83,7 @@ Then run:
 ```
 
 The CLI will guide you through:
-- Selecting which tools to configure (Claude, Cursor, Copilot, Codex)
+- Selecting which tools to configure (Claude, Cursor, Copilot, Codex, Gemini)
 - Choosing your Databricks profile
 - Installing MCP tools and/or skills
 - Note: Cursor and Copilot require updating settings manually after install

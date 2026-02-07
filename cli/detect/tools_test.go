@@ -66,9 +66,9 @@ func TestFilterSelected_Empty(t *testing.T) {
 func TestDetectTools(t *testing.T) {
 	tools := DetectTools()
 
-	// Should always return 4 tools
-	if len(tools) != 4 {
-		t.Errorf("Expected 4 tools, got %d", len(tools))
+	// Should always return 5 tools
+	if len(tools) != 5 {
+		t.Errorf("Expected 5 tools, got %d", len(tools))
 	}
 
 	// Verify expected tool values
@@ -77,6 +77,7 @@ func TestDetectTools(t *testing.T) {
 		"cursor":  false,
 		"copilot": false,
 		"codex":   false,
+		"gemini":  false,
 	}
 
 	for _, tool := range tools {

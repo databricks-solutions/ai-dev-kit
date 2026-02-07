@@ -17,12 +17,18 @@
 //	make release                  # Cross-compile all platforms
 package main
 
-import "github.com/databricks-solutions/ai-dev-kit/cli/cmd"
+import (
+	"github.com/databricks-solutions/ai-dev-kit/cli/cmd"
+	"github.com/databricks-solutions/ai-dev-kit/cli/signal"
+)
 
 // Version is set at build time via -ldflags
 var Version = "dev"
 
 func main() {
+	// Setup signal handling for graceful shutdown
+	signal.Setup()
+
 	// Set version from build-time variable
 	cmd.Version = Version
 	cmd.Execute()

@@ -72,6 +72,22 @@ func (e *CLIError) WithSuggestion(suggestion string) *CLIError {
 
 // Common errors with helpful context
 
+// ErrUserCancelled is returned when the user cancels an operation (Ctrl+C)
+var ErrUserCancelled = &UserCancelledError{}
+
+// UserCancelledError represents a user-initiated cancellation
+type UserCancelledError struct{}
+
+func (e *UserCancelledError) Error() string {
+	return "operation cancelled by user"
+}
+
+// IsUserCancelled checks if an error is a user cancellation
+func IsUserCancelled(err error) bool {
+	_, ok := err.(*UserCancelledError)
+	return ok
+}
+
 // ErrGitNotFound returns an error for missing git
 func ErrGitNotFound() *CLIError {
 	return NewCLIError("Git is not installed").

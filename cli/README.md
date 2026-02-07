@@ -1,6 +1,6 @@
 # Databricks AI Dev Kit CLI
 
-A cross-platform CLI for installing and managing the Databricks AI Dev Kit. Supports Claude Code, Cursor, GitHub Copilot, and OpenAI Codex.
+A cross-platform CLI for installing and managing the Databricks AI Dev Kit. Supports Claude Code, Cursor, GitHub Copilot, OpenAI Codex, and Google Gemini.
 
 ## Installation
 
@@ -43,7 +43,7 @@ Flags:
       --skills-only      Skip MCP server setup
       --mcp-only         Skip skills installation
       --mcp-path string  Custom MCP installation path
-      --tools string     Comma-separated: claude,cursor,copilot,codex
+      --tools string     Comma-separated: claude,cursor,copilot,codex,gemini
   -f, --force            Force reinstall
       --silent           Non-interactive mode
 ```
@@ -52,7 +52,7 @@ Flags:
 ```bash
 aidevkit install                          # Interactive installation
 aidevkit install --silent                 # Non-interactive with defaults
-aidevkit install --tools cursor,copilot   # Specific tools only
+aidevkit install --tools cursor,gemini    # Specific tools only
 aidevkit install --global --profile PROD  # Global install with custom profile
 ```
 

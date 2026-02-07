@@ -17,11 +17,12 @@ type RadioItem struct {
 
 // RadioModel is a bubbletea model for single-select radio buttons
 type RadioModel struct {
-	Title    string
-	Items    []RadioItem
-	cursor   int
-	selected int
-	finished bool
+	Title     string
+	Items     []RadioItem
+	cursor    int
+	selected  int
+	finished  bool
+	cancelled bool
 }
 
 // NewRadio creates a new radio selection model
@@ -54,6 +55,7 @@ func (m RadioModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			m.cancelled = true
 			return m, tea.Quit
 
 		case "up", "k":
@@ -140,6 +142,11 @@ func (m RadioModel) IsFinished() bool {
 	return m.finished
 }
 
+// IsCancelled returns whether the selection was cancelled
+func (m RadioModel) IsCancelled() bool {
+	return m.cancelled
+}
+
 // RunRadio runs the radio selector interactively and returns the selected value
 func RunRadio(title string, items []RadioItem) (string, error) {
 	model := NewRadio(title, items)
@@ -151,6 +158,9 @@ func RunRadio(title string, items []RadioItem) (string, error) {
 	}
 
 	result := finalModel.(RadioModel)
+	if result.IsCancelled() {
+		return "", ErrUserCancelled
+	}
 	return result.SelectedValue(), nil
 }
 
