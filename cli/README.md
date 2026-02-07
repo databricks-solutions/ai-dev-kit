@@ -25,9 +25,10 @@ chmod +x aidevkit
 
 | Command | Description |
 |---------|-------------|
-| `aidevkit install` | Install the AI Dev Kit (MCP server + skills) |
+| `aidevkit install` | Install the AI Dev Kit (MCP tools + skills) |
 | `aidevkit uninstall` | Remove installed components |
 | `aidevkit update` | Update CLI to the latest version |
+| `aidevkit launch` | Launch standalone projects (starter kit, builder app) |
 | `aidevkit status` | Show installation status |
 | `aidevkit doctor` | Diagnose installation issues |
 | `aidevkit version` | Print version information |
@@ -74,6 +75,55 @@ aidevkit update [flags]
 Flags:
   -c, --check   Only check for updates, don't install
   -f, --force   Force update even if on latest version
+```
+
+### launch
+
+Launch standalone AI Dev Kit projects. These are separate from the main install flow.
+
+```bash
+aidevkit launch starter [flags]   # Launch AI Dev Project (Starter Kit)
+aidevkit launch builder [flags]   # Launch Visual Builder App
+```
+
+#### launch starter
+
+Set up the AI Dev Project template - a sandbox for experimenting with Databricks skills and MCP tools.
+
+```bash
+aidevkit launch starter [flags]
+
+Flags:
+      --copy-to string   Copy project to a new directory before setup
+  -p, --profile string   Databricks profile to use
+```
+
+**Examples:**
+```bash
+aidevkit launch starter                                    # Run in-place
+aidevkit launch starter --copy-to ~/projects/my-project    # Copy to new location
+aidevkit launch starter --profile PROD                     # Use specific profile
+```
+
+#### launch builder
+
+Launch the Visual Builder App - a web application with Claude Code agent interface and Databricks tools integration.
+
+```bash
+aidevkit launch builder [flags]
+
+Flags:
+      --copy-to string    Copy project to a new directory
+      --deploy string     Deploy to Databricks Apps with this app name
+      --skip-build        Skip frontend build when deploying
+```
+
+**Examples:**
+```bash
+aidevkit launch builder                              # Start dev servers (localhost:3000 + :8000)
+aidevkit launch builder --copy-to ~/my-builder       # Copy for customization
+aidevkit launch builder --deploy my-app              # Deploy to Databricks Apps
+aidevkit launch builder --deploy my-app --skip-build # Deploy without rebuilding
 ```
 
 ---

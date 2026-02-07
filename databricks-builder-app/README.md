@@ -213,7 +213,22 @@ projects/
   - Unity Catalog enabled (recommended)
 - PostgreSQL database (Lakebase) for project persistence
 
-### Quick Start
+### Quick Start with CLI (Recommended)
+
+The easiest way to run the Builder App is using the AI Dev Kit CLI:
+
+```bash
+# Start development servers (backend + frontend)
+aidevkit launch builder
+
+# Or copy to a standalone directory for customization
+aidevkit launch builder --copy-to ~/projects/my-builder
+
+# Deploy directly to Databricks Apps
+aidevkit launch builder --deploy my-builder-app
+```
+
+### Alternative: Manual Setup
 
 #### 1. Clone and Install Dependencies
 
@@ -493,7 +508,24 @@ Before deploying, ensure you have:
 3. **A Lakebase instance** in your Databricks workspace (for database persistence)
 4. Access to the **full repository** (not just this directory) since the app depends on sibling packages
 
-### Quick Deploy
+### Quick Deploy with CLI
+
+The easiest way to deploy is using the AI Dev Kit CLI:
+
+```bash
+# Deploy to Databricks Apps (builds frontend automatically)
+aidevkit launch builder --deploy my-builder-app
+
+# Skip frontend build if already built
+aidevkit launch builder --deploy my-builder-app --skip-build
+```
+
+**Note:** Before first deployment, you still need to:
+1. Create the app: `databricks apps create my-builder-app`
+2. Add Lakebase resource (see step 3 below)
+3. Configure `app.yaml`
+
+### Alternative: Manual Deploy
 
 ```bash
 # 1. Authenticate with Databricks CLI
@@ -727,11 +759,18 @@ Common causes:
 
 #### Redeploying After Changes
 
+Using the CLI:
 ```bash
 # Full redeploy (rebuilds frontend)
-./scripts/deploy.sh my-builder-app
+aidevkit launch builder --deploy my-builder-app
 
 # Quick redeploy (skip frontend build)
+aidevkit launch builder --deploy my-builder-app --skip-build
+```
+
+Or using the script directly:
+```bash
+./scripts/deploy.sh my-builder-app
 ./scripts/deploy.sh my-builder-app --skip-build
 ```
 

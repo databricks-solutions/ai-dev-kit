@@ -36,8 +36,8 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 | Adventure | Best For | Start Here |
 |-----------|----------|------------|
 | :star: [**Install ai-dev-kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | `aidevkit install` |
-| [**Starter Project**](#starter-kit) | Starter project for Claude Code + full Databricks integration | `ai-dev-project/` |
-| [**Visual Builder**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
+| [**Starter Project**](#starter-kit) | Starter project for Claude Code + full Databricks integration | `aidevkit launch starter` |
+| [**Visual Builder**](#visual-builder-app) | Web-based UI for Databricks development | `aidevkit launch builder` |
 | [**Skills Only**](#skills-only) | Teaching your AI Databricks patterns (no actions) | `aidevkit install --skills-only` |
 | [**MCP Tools Only**](#mcp-tools-only) | Just executable actions (no guidance) | `aidevkit install --mcp-only` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
@@ -91,12 +91,16 @@ The CLI will guide you through:
 
 ### Starter Kit
 
-If you prefer to clone the repo and start building, use the starter project.:
+A sandbox project for experimenting with Databricks skills and MCP tools:
 
 ```bash
-git clone https://github.com/databricks-solutions/ai-dev-kit.git
-cd ai-dev-kit/ai-dev-project
-./setup.sh
+# Run in-place (from within the repo)
+aidevkit launch starter
+
+# Or copy to a new standalone project
+aidevkit launch starter --copy-to ~/projects/my-databricks-project
+
+# Then start coding
 claude
 ```
 
@@ -107,10 +111,14 @@ This installs skills + MCP tools and opens Claude Code ready to build on Databri
 Full-stack web application with chat UI for Databricks development:
 
 ```bash
-cd ai-dev-kit/databricks-builder-app
-./setup.sh
-# Follow instructions to start the app
+# Start development servers (React frontend + FastAPI backend)
+aidevkit launch builder
+
+# Or deploy to Databricks Apps
+aidevkit launch builder --deploy my-builder-app
 ```
+
+Access at http://localhost:3000 (frontend) and http://localhost:8000 (backend).
 
 ### Skills Only
 

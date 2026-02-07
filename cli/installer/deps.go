@@ -167,3 +167,129 @@ func RunDatabricksAuth(profile string) error {
 	return cmd.Run()
 }
 
+// CheckBuilderDependencies verifies dependencies for the builder app
+func CheckBuilderDependencies() ([]Dependency, *PythonPackageManager, error) {
+	deps := []Dependency{
+		{
+			Name:     "node",
+			Command:  "node",
+			Required: true,
+			HelpText: getNodeInstallHelp(),
+		},
+		{
+			Name:     "npm",
+			Command:  "npm",
+			Required: true,
+			HelpText: "npm is usually installed with Node.js",
+		},
+		{
+			Name:     "databricks",
+			Command:  "databricks",
+			Required: false,
+			HelpText: getDatabricksInstallHelp(),
+		},
+	}
+
+	// Check each dependency
+	for i := range deps {
+		deps[i].Found = commandExists(deps[i].Command)
+	}
+
+	// Check for Python package manager (required for backend)
+	pkgMgr := detectPythonPackageManager()
+	if pkgMgr == nil {
+		return deps, nil, fmt.Errorf("Python package manager required. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh")
+	}
+
+	// Check for required dependencies
+	var missing []string
+	for _, dep := range deps {
+		if dep.Required && !dep.Found {
+			missing = append(missing, dep.Name)
+		}
+	}
+
+	if len(missing) > 0 {
+		return deps, pkgMgr, fmt.Errorf("required dependencies not found: %s", strings.Join(missing, ", "))
+	}
+
+	return deps, pkgMgr, nil
+}
+
+// CheckDeployDependencies verifies dependencies for deploying to Databricks Apps
+func CheckDeployDependencies() ([]Dependency, error) {
+	deps := []Dependency{
+		{
+			Name:     "databricks",
+			Command:  "databricks",
+			Required: true,
+			HelpText: getDatabricksInstallHelp(),
+		},
+		{
+			Name:     "node",
+			Command:  "node",
+			Required: true,
+			HelpText: getNodeInstallHelp(),
+		},
+		{
+			Name:     "npm",
+			Command:  "npm",
+			Required: true,
+			HelpText: "npm is usually installed with Node.js",
+		},
+	}
+
+	// Check each dependency
+	for i := range deps {
+		deps[i].Found = commandExists(deps[i].Command)
+	}
+
+	// Check for required dependencies
+	var missing []string
+	for _, dep := range deps {
+		if dep.Required && !dep.Found {
+			missing = append(missing, dep.Name)
+		}
+	}
+
+	if len(missing) > 0 {
+		return deps, fmt.Errorf("required dependencies not found: %s", strings.Join(missing, ", "))
+	}
+
+	return deps, nil
+}
+
+// getNodeInstallHelp returns platform-specific Node.js installation instructions
+func getNodeInstallHelp() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "Install with: brew install node or download from https://nodejs.org"
+	case "windows":
+		return "Install with: winget install OpenJS.NodeJS or download from https://nodejs.org"
+	case "linux":
+		return "Install with: apt install nodejs or download from https://nodejs.org"
+	default:
+		return "Install Node.js from https://nodejs.org"
+	}
+}
+
+// GetNodeVersion returns the installed Node.js version
+func GetNodeVersion() (string, error) {
+	cmd := exec.Command("node", "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// GetNpmVersion returns the installed npm version
+func GetNpmVersion() (string, error) {
+	cmd := exec.Command("npm", "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+

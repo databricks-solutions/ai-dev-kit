@@ -54,6 +54,7 @@ func init() {
 
 	// Commands
 	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(launchCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 

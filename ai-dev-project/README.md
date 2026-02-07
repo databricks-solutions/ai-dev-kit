@@ -10,12 +10,19 @@ A template for creating a new project configured with Databricks AI Dev Kit for 
 
 ## Quick Start
 
-### 1. Setup
+### 1. Setup with CLI (Recommended)
 
-Make scripts executable and install dependencies.
+The easiest way to set up this project is using the AI Dev Kit CLI:
+
 ```bash
-chmod +x setup.sh cleanup.sh
-./setup.sh
+# Run setup in-place (from within the ai-dev-kit repository)
+aidevkit launch starter
+
+# Or copy to a new standalone project directory
+aidevkit launch starter --copy-to ~/projects/my-databricks-project
+
+# Specify a Databricks profile
+aidevkit launch starter --profile my-workspace
 ```
 
 This will:
@@ -24,6 +31,15 @@ This will:
 - Install Databricks skills to `.claude/skills/`
 - Setup MCP server config for this project in `.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor)
 - Create `CLAUDE.md` with project context
+
+### Alternative: Manual Setup
+
+If you prefer to run the setup script directly:
+
+```bash
+chmod +x setup.sh cleanup.sh
+./setup.sh
+```
 
 ### 2. Configure Databricks Credentials
 
