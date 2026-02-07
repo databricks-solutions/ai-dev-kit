@@ -35,11 +35,11 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 
 | Adventure | Best For | Start Here |
 |-----------|----------|------------|
-| :star: [**Install ai-dev-kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | Quick Start (install)
+| :star: [**Install ai-dev-kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | `aidevkit install` |
 | [**Starter Project**](#starter-kit) | Starter project for Claude Code + full Databricks integration | `ai-dev-project/` |
 | [**Visual Builder**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
-| [**Skills Only**](#skills-only) | Teaching your AI Databricks patterns (no actions) | Install skills |
-| [**MCP Tools Only**](#mcp-tools-only) | Just executable actions (no guidance) | Register MCP server |
+| [**Skills Only**](#skills-only) | Teaching your AI Databricks patterns (no actions) | `aidevkit install --skills-only` |
+| [**MCP Tools Only**](#mcp-tools-only) | Just executable actions (no guidance) | `aidevkit install --mcp-only` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
 
 ---
@@ -48,7 +48,6 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 
 ### Prerequisites
 
-- [uv](https://github.com/astral-sh/uv) - Python package manager
 - [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) - Command line interface for Databricks
 - AI coding environment
   - [Claude Code](https://claude.ai/code)
@@ -59,17 +58,35 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.  
 _Note: Project configuration files can be re-used in other projects. You find these configs under .claude or .cursor_
 
-#### Mac / Linux
-1. Open terminal
-2. Navigate to a local project directory (the root folder you will open with Cursor or Claude Code)
-3. Run `curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash`
-4. Respond to interactive prompts and follow next steps. 
-   - Note: Cursor and Co-pilot require updating settings manually after install.
+#### One-Line Install (Mac / Linux / Windows)
 
-#### Windows (Powershell)
-1. Open powershell terminal (requires `git` installed)
-2. Navigate to a local project directory (the root folder you will open with Cursor or Claude Code)
-3. Run `irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex`
+Using [uv](https://github.com/astral-sh/uv) (recommended):
+```bash
+curl -LsSf https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.py | uv run -
+```
+
+#### Download Binary
+
+Or clone the repo and use the pre-built binaries from `cli/build/`:
+
+| Platform | Binary |
+|----------|--------|
+| macOS (Intel + Apple Silicon) | `cli/build/macos/aidevkit` |
+| Linux x64 | `cli/build/linux/amd64/aidevkit` |
+| Linux ARM64 | `cli/build/linux/arm64/aidevkit` |
+| Windows x64 | `cli/build/windows/amd64/aidevkit.exe` |
+
+Then run:
+```bash
+./cli/build/macos/aidevkit install   # macOS
+./cli/build/linux/amd64/aidevkit install   # Linux
+```
+
+The CLI will guide you through:
+- Selecting which tools to configure (Claude, Cursor, Copilot, Codex)
+- Choosing your Databricks profile
+- Installing MCP tools and/or skills
+- Note: Cursor and Copilot require updating settings manually after install
 
 
 ### Starter Kit
@@ -100,8 +117,7 @@ cd ai-dev-kit/databricks-builder-app
 Just want to teach your AI assistant Databricks patterns?
 
 ```bash
-cd ai-dev-kit
-./databricks-skills/install_skills.sh
+aidevkit install --skills-only
 ```
 
 Skills include: Spark Declarative Pipelines, Asset Bundles, MLflow Evaluation, Model Serving, Synthetic Data Generation, and [more](databricks-skills/).
@@ -111,14 +127,7 @@ Skills include: Spark Declarative Pipelines, Asset Bundles, MLflow Evaluation, M
 Just want executable Databricks actions?
 
 ```bash
-cd ai-dev-kit
-./databricks-mcp-server/setup.sh
-
-# Register with Claude Code
-claude mcp add-json databricks "{
-  \"command\": \"$(pwd)/.venv/bin/python\",
-  \"args\": [\"$(pwd)/run_server.py\"]
-}"
+aidevkit install --mcp-only
 ```
 
 ### Core Library
@@ -139,8 +148,9 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 
 | Component | Description |
 |-----------|-------------|
+| [`cli/`](cli/) | Cross-platform installer CLI for Mac, Linux, and Windows |
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
-| [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
+| [`databricks-mcp-server/`](databricks-mcp-server/) | MCP tools exposing 50+ actions for AI assistants |
 | [`databricks-skills/`](databricks-skills/) | 15 markdown skills teaching Databricks patterns |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 | [`ai-dev-project/`](ai-dev-project/) | Starter template for new projects |
