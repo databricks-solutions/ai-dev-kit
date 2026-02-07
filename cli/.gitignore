@@ -1,0 +1,11 @@
+# Build output
+dist/
+build/
+*.exe
+
+# Go
+*.test
+*.out
+coverage.txt
+
+coverage/
