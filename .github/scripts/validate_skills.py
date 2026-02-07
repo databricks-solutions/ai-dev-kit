@@ -29,6 +29,15 @@ def parse_frontmatter(content: str) -> dict | None:
     return None
 
 
+def get_databricks_skills_from_script() -> set[str]:
+    """Parse DATABRICKS_SKILLS list from install_skills.sh (local skills)."""
+    content = INSTALL_SCRIPT.read_text()
+    match = re.search(r'DATABRICKS_SKILLS="([^"]+)"', content)
+    if match:
+        return set(match.group(1).split())
+    return set()
+
+
 def get_all_skills_from_script() -> set[str]:
     """Parse ALL_SKILLS list from install_skills.sh."""
     content = INSTALL_SCRIPT.read_text()
@@ -48,8 +57,9 @@ def main() -> int:
         if d.is_dir() and d.name not in SKIP_DIRS and not d.name.startswith(".")
     }
 
-    # Get skills registered in install script
-    registered_skills = get_all_skills_from_script()
+    # Get skills registered in install script (only local Databricks skills)
+    # MLflow skills are fetched from external repo, not validated locally
+    registered_skills = get_databricks_skills_from_script()
 
     # Validate each skill directory
     for skill_dir in sorted(SKILLS_DIR.iterdir()):
