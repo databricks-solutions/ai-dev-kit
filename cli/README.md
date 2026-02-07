@@ -4,21 +4,33 @@ A cross-platform CLI for installing and managing the Databricks AI Dev Kit. Supp
 
 ## Installation
 
-Download the latest binary for your platform from [GitHub Releases](https://github.com/databricks-solutions/ai-dev-kit/releases) or use the bootstrap script:
+Pre-built binaries are available in the `cli/build/` folder, or use the bootstrap script:
 
 ```bash
 # Using uv (recommended)
 curl -LsSf https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.py | uv run -
+```
 
-# Or download directly
-# macOS (Intel + Apple Silicon)
-curl -LO https://github.com/databricks-solutions/ai-dev-kit/releases/latest/download/macos/aidevkit
+### Download Binary
 
-# Linux (amd64)
-curl -LO https://github.com/databricks-solutions/ai-dev-kit/releases/latest/download/linux/amd64/aidevkit
+Clone the repo and use the pre-built binaries:
 
-# Make executable
-chmod +x aidevkit
+| Platform | Binary |
+|----------|--------|
+| macOS (Intel + Apple Silicon) | `cli/build/macos/aidevkit` |
+| Linux x64 | `cli/build/linux/amd64/aidevkit` |
+| Linux ARM64 | `cli/build/linux/arm64/aidevkit` |
+| Windows x64 | `cli/build/windows/amd64/aidevkit.exe` |
+| Windows ARM64 | `cli/build/windows/arm64/aidevkit.exe` |
+
+```bash
+# Clone the repo
+git clone https://github.com/databricks-solutions/ai-dev-kit.git
+cd ai-dev-kit
+
+# Make executable and run (macOS example)
+chmod +x cli/build/macos/aidevkit
+./cli/build/macos/aidevkit install
 ```
 
 ## Commands
