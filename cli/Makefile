@@ -173,7 +173,7 @@ build-windows:
 # Production Build
 # -----------------------------------------------------------------------------
 
-## build-all: Build production binaries for all platforms (linux/mac/windows)
+## build-all: Build production binaries for all platforms (linux/mac/windows) → releases/
 build-all:
 	@echo "Building production binaries for all platforms..."
 	@echo "Version: $(VERSION)"
@@ -181,50 +181,50 @@ build-all:
 		--build-arg VERSION=$(VERSION) \
 		-t $(IMAGE_NAME)-cross -f Dockerfile .
 	$(CONTAINER_RUNTIME) create --name $(IMAGE_NAME)-extract $(IMAGE_NAME)-cross 2>/dev/null || true
-	rm -rf build/
-	mkdir -p build/.tmp
-	$(CONTAINER_RUNTIME) cp $(IMAGE_NAME)-extract:/out/. build/.tmp/
+	rm -rf releases/
+	mkdir -p releases/.tmp
+	$(CONTAINER_RUNTIME) cp $(IMAGE_NAME)-extract:/out/. releases/.tmp/
 	$(CONTAINER_RUNTIME) rm $(IMAGE_NAME)-extract
 	@echo ""
 	@# Create directory structure: platform/architecture/aidevkit
 	@echo "Organizing binaries into platform/architecture structure..."
-	@mkdir -p build/linux/amd64 build/linux/arm64
-	@mkdir -p build/windows/amd64 build/windows/arm64
-	@mkdir -p build/macos
+	@mkdir -p releases/linux/amd64 releases/linux/arm64
+	@mkdir -p releases/windows/amd64 releases/windows/arm64
+	@mkdir -p releases/macos
 	@# Move Linux binaries
-	@mv build/.tmp/aidevkit-linux-amd64 build/linux/amd64/aidevkit
-	@mv build/.tmp/aidevkit-linux-arm64 build/linux/arm64/aidevkit
+	@mv releases/.tmp/aidevkit-linux-amd64 releases/linux/amd64/aidevkit
+	@mv releases/.tmp/aidevkit-linux-arm64 releases/linux/arm64/aidevkit
 	@# Move Windows binaries
-	@mv build/.tmp/aidevkit-windows-amd64.exe build/windows/amd64/aidevkit.exe
-	@mv build/.tmp/aidevkit-windows-arm64.exe build/windows/arm64/aidevkit.exe
+	@mv releases/.tmp/aidevkit-windows-amd64.exe releases/windows/amd64/aidevkit.exe
+	@mv releases/.tmp/aidevkit-windows-arm64.exe releases/windows/arm64/aidevkit.exe
 	@# Create macOS universal binary (requires running on macOS with lipo)
 	@if command -v lipo >/dev/null 2>&1; then \
 		echo "Creating macOS universal binary..."; \
-		lipo -create -output build/macos/aidevkit \
-			build/.tmp/aidevkit-darwin-arm64 \
-			build/.tmp/aidevkit-darwin-amd64; \
+		lipo -create -output releases/macos/aidevkit \
+			releases/.tmp/aidevkit-darwin-arm64 \
+			releases/.tmp/aidevkit-darwin-amd64; \
 		echo "  ✓ Universal binary: macos/aidevkit (Intel + Apple Silicon)"; \
 	else \
 		echo "  Note: lipo not available (not on macOS) - creating separate architecture folders"; \
-		mkdir -p build/macos/amd64 build/macos/arm64; \
-		mv build/.tmp/aidevkit-darwin-amd64 build/macos/amd64/aidevkit; \
-		mv build/.tmp/aidevkit-darwin-arm64 build/macos/arm64/aidevkit; \
+		mkdir -p releases/macos/amd64 releases/macos/arm64; \
+		mv releases/.tmp/aidevkit-darwin-amd64 releases/macos/amd64/aidevkit; \
+		mv releases/.tmp/aidevkit-darwin-arm64 releases/macos/arm64/aidevkit; \
 	fi
-	@rm -rf build/.tmp
+	@rm -rf releases/.tmp
 	@echo ""
 	@echo "=== Production Build Complete ==="
 	@echo ""
 	@echo "Directory structure:"
-	@find build -type f -name "aidevkit*" | sort
+	@find releases -type f -name "aidevkit*" | sort
 	@echo ""
 	@echo "File sizes:"
-	@find build -type f -name "aidevkit*" -exec ls -lh {} \; | awk '{print "  " $$NF ": " $$5}'
+	@find releases -type f -name "aidevkit*" -exec ls -lh {} \; | awk '{print "  " $$NF ": " $$5}'
 	@echo ""
 	@echo "Generating checksums..."
-	@find build -type f -name "aidevkit*" -exec shasum -a 256 {} \; > build/checksums.txt
-	@echo "Checksums saved to build/checksums.txt"
+	@find releases -type f -name "aidevkit*" -exec shasum -a 256 {} \; > releases/checksums.txt
+	@echo "Checksums saved to releases/checksums.txt"
 	@echo ""
-	@cat build/checksums.txt
+	@cat releases/checksums.txt
 
 # -----------------------------------------------------------------------------
 # Release
@@ -249,7 +249,7 @@ release:
 
 ## clean: Remove built artifacts and containers
 clean:
-	rm -rf dist/ build/ coverage/
+	rm -rf dist/ coverage/
 	-$(CONTAINER_RUNTIME) rm -f $(IMAGE_NAME)-extract 2>/dev/null
 	-$(CONTAINER_RUNTIME) rmi -f $(IMAGE_NAME)-dev $(IMAGE_NAME)-build $(IMAGE_NAME)-cross $(IMAGE_NAME) 2>/dev/null
 
