@@ -67,19 +67,19 @@ curl -LsSf https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/mai
 
 #### Download Binary
 
-Or clone the repo and use the pre-built binaries from `cli/build/`:
+Or clone the repo and use the pre-built binaries from `cli/releases/`:
 
 | Platform | Binary |
 |----------|--------|
-| macOS (Intel + Apple Silicon) | `cli/build/macos/aidevkit` |
-| Linux x64 | `cli/build/linux/amd64/aidevkit` |
-| Linux ARM64 | `cli/build/linux/arm64/aidevkit` |
-| Windows x64 | `cli/build/windows/amd64/aidevkit.exe` |
+| macOS (Intel + Apple Silicon) | `cli/releases/macos/aidevkit` |
+| Linux x64 | `cli/releases/linux/amd64/aidevkit` |
+| Linux ARM64 | `cli/releases/linux/arm64/aidevkit` |
+| Windows x64 | `cli/releases/windows/amd64/aidevkit.exe` |
 
 Then run:
 ```bash
-./cli/build/macos/aidevkit install   # macOS
-./cli/build/linux/amd64/aidevkit install   # Linux
+./cli/releases/macos/aidevkit install   # macOS
+./cli/releases/linux/amd64/aidevkit install   # Linux
 ```
 
 The CLI will guide you through:

@@ -27,9 +27,9 @@ import tempfile
 from pathlib import Path
 
 
-# GitHub raw URL for cli/build binaries
+# GitHub raw URL for cli/releases binaries
 GITHUB_REPO = "databricks-solutions/ai-dev-kit"
-RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/cli/build"
+RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/cli/releases"
 
 
 def get_platform_info() -> tuple[str, str]:
