@@ -19,6 +19,9 @@
 #   ./install_skills.sh --local                      # Install Databricks skills from local directory
 #   ./install_skills.sh --list                       # List available skills
 #   ./install_skills.sh --help                       # Show help
+#   ./install_skills.sh --global                     # Install to ~/.claude/skills (Claude global config)
+#   ./install_skills.sh --agents                     # Install to .agents/skills (multi-agent project)
+#   ./install_skills.sh --global --agents            # Install to ~/.agents/skills (global agents config)
 #
 
 set -e
@@ -35,6 +38,8 @@ REPO_URL="https://github.com/databricks-solutions/ai-dev-kit"
 REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
 SKILLS_DIR=".claude/skills"
 INSTALL_FROM_LOCAL=false
+INSTALL_GLOBAL=false
+INSTALL_AGENTS=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # MLflow skills configuration
@@ -146,6 +151,8 @@ show_help() {
     echo "  --all, -a               Install all skills (default if no skills specified)"
     echo "  --local                 Install from local files instead of downloading"
     echo "  --mlflow-version <ref>  Pin MLflow skills to specific version/branch/tag (default: main)"
+    echo "  --global                Install to Claude global config (~/.claude/skills)"
+    echo "  --agents                Install to .agents/skills (multi-agent); with --global: ~/.agents/skills"
     echo ""
     echo "Examples:"
     echo "  ./install_skills.sh                          # Install all skills"
@@ -155,6 +162,9 @@ show_help() {
     echo "  ./install_skills.sh --mlflow-version v1.0.0  # Pin MLflow skills version"
     echo "  ./install_skills.sh --local                  # Install all from local directory"
     echo "  ./install_skills.sh --list                   # List available skills"
+    echo "  ./install_skills.sh --global                 # Install to ~/.claude/skills"
+    echo "  ./install_skills.sh --agents                 # Install to .agents/skills"
+    echo "  ./install_skills.sh --global --agents       # Install to ~/.agents/skills"
     echo ""
     echo -e "${GREEN}Databricks Skills:${NC}"
     for skill in $DATABRICKS_SKILLS; do
@@ -360,6 +370,14 @@ while [ $# -gt 0 ]; do
             INSTALL_FROM_LOCAL=true
             shift
             ;;
+        --global)
+            INSTALL_GLOBAL=true
+            shift
+            ;;
+        --agents)
+            INSTALL_AGENTS=true
+            shift
+            ;;
         --mlflow-version)
             if [ -z "$2" ] || [ "${2:0:1}" = "-" ]; then
                 echo -e "${RED}Error: --mlflow-version requires a version/ref argument${NC}"
@@ -398,14 +416,23 @@ if [ -z "$SKILLS_TO_INSTALL" ]; then
     SKILLS_TO_INSTALL="$ALL_SKILLS"
 fi
 
+# Set SKILLS_DIR based on --global and --agents
+if [ "$INSTALL_AGENTS" = true ] && [ "$INSTALL_GLOBAL" = true ]; then
+    SKILLS_DIR="${HOME}/.agents/skills"
+elif [ "$INSTALL_GLOBAL" = true ]; then
+    SKILLS_DIR="${HOME}/.claude/skills"
+elif [ "$INSTALL_AGENTS" = true ]; then
+    SKILLS_DIR=".agents/skills"
+fi
+
 # Header
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║        Databricks Skills Installer for Claude Code         ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check if we're in a git repo or project directory
-if [ ! -d ".git" ] && [ ! -f "pyproject.toml" ] && [ ! -f "package.json" ] && [ ! -f "databricks.yml" ]; then
+# Check if we're in a git repo or project directory (skip when installing globally)
+if [ "$INSTALL_GLOBAL" = false ] && [ ! -d ".git" ] && [ ! -f "pyproject.toml" ] && [ ! -f "package.json" ] && [ ! -f "databricks.yml" ]; then
     echo -e "${YELLOW}Warning: This doesn't look like a project root directory.${NC}"
     echo -e "Current directory: $(pwd)"
     read -p "Continue anyway? (y/N): " confirm
