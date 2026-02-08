@@ -43,7 +43,8 @@ Use --check to only check for updates without installing.`,
 func init() {
 	updateCmd.Flags().BoolVarP(&updateForce, "force", "f", false, "Force update even if already on latest version")
 	updateCmd.Flags().BoolVarP(&updateCheck, "check", "c", false, "Only check for updates, don't install")
-	rootCmd.AddCommand(updateCmd)
+	// TODO: Re-enable once update infrastructure is ready (VERSION file + release URL)
+	// rootCmd.AddCommand(updateCmd)
 }
 
 func runUpdate(cmd *cobra.Command, args []string) {
