@@ -22,6 +22,8 @@
 #   ./install_skills.sh --global                     # Install to ~/.claude/skills (Claude global config)
 #   ./install_skills.sh --agents                     # Install to .agents/skills (multi-agent project)
 #   ./install_skills.sh --global --agents            # Install to ~/.agents/skills (global agents config)
+#   ./install_skills.sh --cursor                     # Install to .cursor/skills (Cursor IDE)
+#   ./install_skills.sh --cursor --global            # Install to ~/.cursor/skills (Cursor global)
 #
 
 set -e
@@ -40,6 +42,7 @@ SKILLS_DIR=".claude/skills"
 INSTALL_FROM_LOCAL=false
 INSTALL_GLOBAL=false
 INSTALL_AGENTS=false
+INSTALL_CURSOR=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # MLflow skills configuration
@@ -153,6 +156,7 @@ show_help() {
     echo "  --mlflow-version <ref>  Pin MLflow skills to specific version/branch/tag (default: main)"
     echo "  --global                Install to Claude global config (~/.claude/skills)"
     echo "  --agents                Install to .agents/skills (multi-agent); with --global: ~/.agents/skills"
+    echo "  --cursor                Install to .cursor/skills (Cursor IDE); with --global: ~/.cursor/skills"
     echo ""
     echo "Examples:"
     echo "  ./install_skills.sh                          # Install all skills"
@@ -165,6 +169,8 @@ show_help() {
     echo "  ./install_skills.sh --global                 # Install to ~/.claude/skills"
     echo "  ./install_skills.sh --agents                 # Install to .agents/skills"
     echo "  ./install_skills.sh --global --agents       # Install to ~/.agents/skills"
+    echo "  ./install_skills.sh --cursor                # Install to .cursor/skills"
+    echo "  ./install_skills.sh --cursor --global       # Install to ~/.cursor/skills"
     echo ""
     echo -e "${GREEN}Databricks Skills:${NC}"
     for skill in $DATABRICKS_SKILLS; do
@@ -378,6 +384,10 @@ while [ $# -gt 0 ]; do
             INSTALL_AGENTS=true
             shift
             ;;
+        --cursor)
+            INSTALL_CURSOR=true
+            shift
+            ;;
         --mlflow-version)
             if [ -z "$2" ] || [ "${2:0:1}" = "-" ]; then
                 echo -e "${RED}Error: --mlflow-version requires a version/ref argument${NC}"
@@ -416,8 +426,12 @@ if [ -z "$SKILLS_TO_INSTALL" ]; then
     SKILLS_TO_INSTALL="$ALL_SKILLS"
 fi
 
-# Set SKILLS_DIR based on --global and --agents
-if [ "$INSTALL_AGENTS" = true ] && [ "$INSTALL_GLOBAL" = true ]; then
+# Set SKILLS_DIR based on --cursor, --agents, and --global
+if [ "$INSTALL_CURSOR" = true ] && [ "$INSTALL_GLOBAL" = true ]; then
+    SKILLS_DIR="${HOME}/.cursor/skills"
+elif [ "$INSTALL_CURSOR" = true ]; then
+    SKILLS_DIR=".cursor/skills"
+elif [ "$INSTALL_AGENTS" = true ] && [ "$INSTALL_GLOBAL" = true ]; then
     SKILLS_DIR="${HOME}/.agents/skills"
 elif [ "$INSTALL_GLOBAL" = true ]; then
     SKILLS_DIR="${HOME}/.claude/skills"
