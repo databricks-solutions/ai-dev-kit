@@ -94,7 +94,11 @@ def get_lakebase_catalog(name: str) -> Dict[str, Any]:
         catalog = client.database.get_database_catalog(name=name)
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "name": name,
                 "status": "NOT_FOUND",
@@ -143,7 +147,11 @@ def delete_lakebase_catalog(name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "name": name,
                 "status": "NOT_FOUND",

@@ -90,7 +90,9 @@ def create_synced_table(
                 "status": "ALREADY_EXISTS",
                 "error": f"Synced table '{target_table_name}' already exists",
             }
-        raise Exception(f"Failed to create synced table '{target_table_name}': {error_msg}")
+        raise Exception(
+            f"Failed to create synced table '{target_table_name}': {error_msg}"
+        )
 
 
 def get_synced_table(
@@ -115,7 +117,11 @@ def get_synced_table(
         table = client.database.get_synced_database_table(name=table_name)
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "table_name": table_name,
                 "status": "NOT_FOUND",
@@ -129,11 +135,17 @@ def get_synced_table(
         result["instance_name"] = table.database_instance_name
 
     if hasattr(table, "spec") and table.spec:
-        if hasattr(table.spec, "source_table_full_name") and table.spec.source_table_full_name:
+        if (
+            hasattr(table.spec, "source_table_full_name")
+            and table.spec.source_table_full_name
+        ):
             result["source_table_name"] = table.spec.source_table_full_name
         if hasattr(table.spec, "scheduling_policy") and table.spec.scheduling_policy:
             result["scheduling_policy"] = str(table.spec.scheduling_policy.value)
-        if hasattr(table.spec, "primary_key_columns") and table.spec.primary_key_columns:
+        if (
+            hasattr(table.spec, "primary_key_columns")
+            and table.spec.primary_key_columns
+        ):
             result["primary_key_columns"] = table.spec.primary_key_columns
 
     if hasattr(table, "status") and table.status:
@@ -173,7 +185,11 @@ def delete_synced_table(
         }
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "table_name": table_name,
                 "status": "NOT_FOUND",

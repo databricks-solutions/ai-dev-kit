@@ -58,15 +58,25 @@ def create_lakebase_instance(
         }
 
         if instance:
-            if hasattr(instance, "state") and instance.state:
-                result["state"] = str(instance.state)
-            if hasattr(instance, "read_write_dns") and instance.read_write_dns:
-                result["read_write_dns"] = instance.read_write_dns
+            try:
+                if instance.state:
+                    result["state"] = str(instance.state)
+            except (KeyError, AttributeError):
+                pass
+            try:
+                if instance.read_write_dns:
+                    result["read_write_dns"] = instance.read_write_dns
+            except (KeyError, AttributeError):
+                pass
 
         return result
     except Exception as e:
         error_msg = str(e)
-        if "ALREADY_EXISTS" in error_msg or "already exists" in error_msg.lower():
+        if (
+            "ALREADY_EXISTS" in error_msg
+            or "already exists" in error_msg.lower()
+            or "not unique" in error_msg.lower()
+        ):
             return {
                 "name": name,
                 "status": "ALREADY_EXISTS",
@@ -101,7 +111,11 @@ def get_lakebase_instance(name: str) -> Dict[str, Any]:
         instance = client.database.get_database_instance(name=name)
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "name": name,
                 "state": "NOT_FOUND",
@@ -111,29 +125,29 @@ def get_lakebase_instance(name: str) -> Dict[str, Any]:
 
     result: Dict[str, Any] = {"name": instance.name}
 
-    if hasattr(instance, "state") and instance.state:
-        result["state"] = str(instance.state)
+    # Use try/except for SDK response objects where hasattr is unreliable
+    for attr, key, transform in [
+        ("state", "state", str),
+        ("capacity", "capacity", str),
+        ("read_write_dns", "read_write_dns", None),
+        ("read_only_dns", "read_only_dns", None),
+        ("creator", "creator", None),
+        ("creation_time", "creation_time", str),
+        ("uid", "uid", None),
+    ]:
+        try:
+            val = getattr(instance, attr)
+            if val is not None:
+                result[key] = transform(val) if transform else val
+        except (KeyError, AttributeError):
+            pass
 
-    if hasattr(instance, "capacity") and instance.capacity:
-        result["capacity"] = str(instance.capacity)
-
-    if hasattr(instance, "read_write_dns") and instance.read_write_dns:
-        result["read_write_dns"] = instance.read_write_dns
-
-    if hasattr(instance, "read_only_dns") and instance.read_only_dns:
-        result["read_only_dns"] = instance.read_only_dns
-
-    if hasattr(instance, "stopped") and instance.stopped is not None:
-        result["stopped"] = instance.stopped
-
-    if hasattr(instance, "creator") and instance.creator:
-        result["creator"] = instance.creator
-
-    if hasattr(instance, "creation_time") and instance.creation_time:
-        result["creation_time"] = str(instance.creation_time)
-
-    if hasattr(instance, "uid") and instance.uid:
-        result["uid"] = instance.uid
+    # stopped can be False, so check explicitly
+    try:
+        if instance.stopped is not None:
+            result["stopped"] = instance.stopped
+    except (KeyError, AttributeError):
+        pass
 
     return result
 
@@ -164,17 +178,23 @@ def list_lakebase_instances() -> List[Dict[str, Any]]:
     for inst in instances:
         entry: Dict[str, Any] = {"name": inst.name}
 
-        if hasattr(inst, "state") and inst.state:
-            entry["state"] = str(inst.state)
+        for attr, key, transform in [
+            ("state", "state", str),
+            ("capacity", "capacity", str),
+            ("read_write_dns", "read_write_dns", None),
+        ]:
+            try:
+                val = getattr(inst, attr)
+                if val is not None:
+                    entry[key] = transform(val) if transform else val
+            except (KeyError, AttributeError):
+                pass
 
-        if hasattr(inst, "capacity") and inst.capacity:
-            entry["capacity"] = str(inst.capacity)
-
-        if hasattr(inst, "stopped") and inst.stopped is not None:
-            entry["stopped"] = inst.stopped
-
-        if hasattr(inst, "read_write_dns") and inst.read_write_dns:
-            entry["read_write_dns"] = inst.read_write_dns
+        try:
+            if inst.stopped is not None:
+                entry["stopped"] = inst.stopped
+        except (KeyError, AttributeError):
+            pass
 
         result.append(entry)
 
@@ -271,7 +291,11 @@ def delete_lakebase_instance(
         }
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "name": name,
                 "status": "NOT_FOUND",
@@ -319,7 +343,9 @@ def generate_lakebase_credential(
         if hasattr(cred, "expiration_time") and cred.expiration_time:
             result["expiration_time"] = str(cred.expiration_time)
 
-        result["message"] = "Token generated. Valid for ~1 hour. Use as password with sslmode=require."
+        result["message"] = (
+            "Token generated. Valid for ~1 hour. Use as password with sslmode=require."
+        )
 
         return result
     except Exception as e:

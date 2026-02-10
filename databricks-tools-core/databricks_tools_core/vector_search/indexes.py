@@ -87,18 +87,22 @@ def create_vs_index(
 
             if "embedding_source_columns" in spec:
                 ds_kwargs["embedding_source_columns"] = [
-                    EmbeddingSourceColumn(**col) for col in spec["embedding_source_columns"]
+                    EmbeddingSourceColumn(**col)
+                    for col in spec["embedding_source_columns"]
                 ]
 
             if "embedding_vector_columns" in spec:
                 ds_kwargs["embedding_vector_columns"] = [
-                    EmbeddingVectorColumn(**col) for col in spec["embedding_vector_columns"]
+                    EmbeddingVectorColumn(**col)
+                    for col in spec["embedding_vector_columns"]
                 ]
 
             if "columns_to_sync" in spec:
                 ds_kwargs["columns_to_sync"] = spec["columns_to_sync"]
 
-            kwargs["delta_sync_vector_index_spec"] = DeltaSyncVectorIndexSpecRequest(**ds_kwargs)
+            kwargs["delta_sync_vector_index_spec"] = DeltaSyncVectorIndexSpecRequest(
+                **ds_kwargs
+            )
 
         elif index_type == "DIRECT_ACCESS" and direct_access_index_spec:
             spec = direct_access_index_spec
@@ -106,7 +110,8 @@ def create_vs_index(
 
             if "embedding_vector_columns" in spec:
                 da_kwargs["embedding_vector_columns"] = [
-                    EmbeddingVectorColumn(**col) for col in spec["embedding_vector_columns"]
+                    EmbeddingVectorColumn(**col)
+                    for col in spec["embedding_vector_columns"]
                 ]
 
             if "schema_json" in spec:
@@ -116,11 +121,15 @@ def create_vs_index(
                 da_kwargs["embedding_source_columns"] = [
                     EmbeddingSourceColumn(
                         name="__query__",
-                        embedding_model_endpoint_name=spec["embedding_model_endpoint_name"],
+                        embedding_model_endpoint_name=spec[
+                            "embedding_model_endpoint_name"
+                        ],
                     )
                 ]
 
-            kwargs["direct_access_index_spec"] = DirectAccessVectorIndexSpec(**da_kwargs)
+            kwargs["direct_access_index_spec"] = DirectAccessVectorIndexSpec(
+                **da_kwargs
+            )
 
         client.vector_search_indexes.create_index(**kwargs)
 
@@ -169,13 +178,19 @@ def get_vs_index(index_name: str) -> Dict[str, Any]:
         index = client.vector_search_indexes.get_index(index_name=index_name)
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "name": index_name,
                 "state": "NOT_FOUND",
                 "error": f"Index '{index_name}' not found",
             }
-        raise Exception(f"Failed to get vector search index '{index_name}': {error_msg}")
+        raise Exception(
+            f"Failed to get vector search index '{index_name}': {error_msg}"
+        )
 
     result: Dict[str, Any] = {
         "name": index.name,
@@ -230,21 +245,42 @@ def list_vs_indexes(endpoint_name: str) -> List[Dict[str, Any]]:
             endpoint_name=endpoint_name,
         )
     except Exception as e:
-        raise Exception(f"Failed to list indexes on endpoint '{endpoint_name}': {str(e)}")
+        raise Exception(
+            f"Failed to list indexes on endpoint '{endpoint_name}': {str(e)}"
+        )
 
     result = []
-    indexes = response.vector_indexes if response and response.vector_indexes else []
+    # SDK may return an object with .vector_indexes or a generator directly
+    if hasattr(response, "vector_indexes") and response.vector_indexes:
+        indexes = response.vector_indexes
+    elif response:
+        indexes = list(response)
+    else:
+        indexes = []
     for idx in indexes:
         entry: Dict[str, Any] = {
             "name": idx.name,
-            "primary_key": idx.primary_key,
         }
 
-        if idx.index_type:
-            entry["index_type"] = idx.index_type.value
+        # primary_key may not exist on MiniVectorIndex
+        try:
+            if idx.primary_key:
+                entry["primary_key"] = idx.primary_key
+        except (AttributeError, KeyError):
+            pass
 
-        if idx.status and idx.status.ready is not None:
-            entry["state"] = "ONLINE" if idx.status.ready else "NOT_READY"
+        try:
+            if idx.index_type:
+                entry["index_type"] = idx.index_type.value
+        except (AttributeError, KeyError):
+            pass
+
+        # status may not exist on MiniVectorIndex (from generator response)
+        try:
+            if idx.status and idx.status.ready is not None:
+                entry["state"] = "ONLINE" if idx.status.ready else "NOT_READY"
+        except (AttributeError, KeyError):
+            pass
 
         result.append(entry)
 
@@ -276,13 +312,19 @@ def delete_vs_index(index_name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg:
+        if (
+            "not found" in error_msg.lower()
+            or "does not exist" in error_msg.lower()
+            or "404" in error_msg
+        ):
             return {
                 "name": index_name,
                 "status": "NOT_FOUND",
                 "error": f"Index '{index_name}' not found",
             }
-        raise Exception(f"Failed to delete vector search index '{index_name}': {error_msg}")
+        raise Exception(
+            f"Failed to delete vector search index '{index_name}': {error_msg}"
+        )
 
 
 def sync_vs_index(index_name: str) -> Dict[str, Any]:
@@ -384,9 +426,14 @@ def query_vs_index(
 
     result: Dict[str, Any] = {}
 
+    # Column names from manifest (SDK doesn't put them on result directly)
+    try:
+        if response.manifest and response.manifest.columns:
+            result["columns"] = [c.name for c in response.manifest.columns]
+    except (AttributeError, KeyError):
+        pass
+
     if response.result:
-        if response.result.column_names:
-            result["columns"] = response.result.column_names
         if response.result.data_array:
             result["data"] = response.result.data_array
             result["num_results"] = len(response.result.data_array)
@@ -428,7 +475,9 @@ def upsert_vs_data(
 
     try:
         # Parse to validate JSON and count records
-        records = json.loads(inputs_json) if isinstance(inputs_json, str) else inputs_json
+        records = (
+            json.loads(inputs_json) if isinstance(inputs_json, str) else inputs_json
+        )
         num_records = len(records) if isinstance(records, list) else 1
 
         response = client.vector_search_indexes.upsert_data_vector_index(
@@ -443,7 +492,11 @@ def upsert_vs_data(
         }
 
         if response and response.status:
-            result["status"] = response.status.value if hasattr(response.status, "value") else str(response.status)
+            result["status"] = (
+                response.status.value
+                if hasattr(response.status, "value")
+                else str(response.status)
+            )
 
         return result
     except Exception as e:
@@ -485,7 +538,11 @@ def delete_vs_data(
         }
 
         if response and response.status:
-            result["status"] = response.status.value if hasattr(response.status, "value") else str(response.status)
+            result["status"] = (
+                response.status.value
+                if hasattr(response.status, "value")
+                else str(response.status)
+            )
 
         return result
     except Exception as e:
@@ -526,13 +583,48 @@ def scan_vs_index(
 
     result: Dict[str, Any] = {}
 
-    if response.result:
-        if response.result.column_names:
-            result["columns"] = response.result.column_names
-        if response.result.data_array:
-            result["data"] = response.result.data_array
-            result["num_results"] = len(response.result.data_array)
+    # ScanVectorIndexResponse has .data (list of entries) and .last_primary_key
+    # not .result like QueryVectorIndexResponse
+    try:
+        data = response.data
+        if data:
+            # data is a list of Struct/dict objects
+            if isinstance(data, list) and len(data) > 0:
+                # Extract column names from first entry
+                first = data[0]
+                if hasattr(first, "as_dict"):
+                    rows = [d.as_dict() for d in data]
+                elif isinstance(first, dict):
+                    rows = data
+                else:
+                    rows = data
+
+                if rows and isinstance(rows[0], dict):
+                    result["columns"] = list(rows[0].keys())
+                result["data"] = rows
+                result["num_results"] = len(rows)
+            else:
+                result["data"] = []
+                result["num_results"] = 0
         else:
+            result["data"] = []
+            result["num_results"] = 0
+    except (AttributeError, KeyError):
+        # Fallback: try the old .result pattern in case SDK changes
+        try:
+            if response.result:
+                if (
+                    hasattr(response.result, "column_names")
+                    and response.result.column_names
+                ):
+                    result["columns"] = response.result.column_names
+                if response.result.data_array:
+                    result["data"] = response.result.data_array
+                    result["num_results"] = len(response.result.data_array)
+                else:
+                    result["data"] = []
+                    result["num_results"] = 0
+        except (AttributeError, KeyError):
             result["data"] = []
             result["num_results"] = 0
 
