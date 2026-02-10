@@ -61,9 +61,7 @@ def create_vs_endpoint(
                 "status": "ALREADY_EXISTS",
                 "error": f"Endpoint '{name}' already exists",
             }
-        raise Exception(
-            f"Failed to create vector search endpoint '{name}': {error_msg}"
-        )
+        raise Exception(f"Failed to create vector search endpoint '{name}': {error_msg}")
 
 
 def get_vs_endpoint(name: str) -> Dict[str, Any]:
@@ -92,11 +90,7 @@ def get_vs_endpoint(name: str) -> Dict[str, Any]:
         endpoint = client.vector_search_endpoints.get_endpoint(endpoint_name=name)
     except Exception as e:
         error_msg = str(e)
-        if (
-            "not found" in error_msg.lower()
-            or "does not exist" in error_msg.lower()
-            or "404" in error_msg
-        ):
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": name,
                 "state": "NOT_FOUND",
@@ -206,16 +200,10 @@ def delete_vs_endpoint(name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         error_msg = str(e)
-        if (
-            "not found" in error_msg.lower()
-            or "does not exist" in error_msg.lower()
-            or "404" in error_msg
-        ):
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": name,
                 "status": "NOT_FOUND",
                 "error": f"Endpoint '{name}' not found",
             }
-        raise Exception(
-            f"Failed to delete vector search endpoint '{name}': {error_msg}"
-        )
+        raise Exception(f"Failed to delete vector search endpoint '{name}': {error_msg}")

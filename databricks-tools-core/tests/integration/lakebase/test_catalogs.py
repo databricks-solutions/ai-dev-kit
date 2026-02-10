@@ -26,9 +26,7 @@ logger = logging.getLogger(__name__)
 class TestCreateCatalog:
     """Tests for registering a Lakebase instance as a UC catalog."""
 
-    def test_create_catalog(
-        self, lakebase_instance_name: str, unique_name, cleanup_catalogs
-    ):
+    def test_create_catalog(self, lakebase_instance_name: str, unique_name, cleanup_catalogs):
         """Should register a Lakebase instance as a UC catalog."""
         catalog_name = f"lb_test_cat_{unique_name}"
         cleanup_catalogs(catalog_name)
@@ -51,9 +49,7 @@ class TestCreateCatalog:
         assert result["instance_name"] == lakebase_instance_name
         assert result["status"] in ("created", "ALREADY_EXISTS")
 
-    def test_create_duplicate_catalog(
-        self, lakebase_instance_name: str, unique_name, cleanup_catalogs
-    ):
+    def test_create_duplicate_catalog(self, lakebase_instance_name: str, unique_name, cleanup_catalogs):
         """Should return ALREADY_EXISTS for duplicate catalog."""
         catalog_name = f"lb_test_cat_dup_{unique_name}"
         cleanup_catalogs(catalog_name)
@@ -84,9 +80,7 @@ class TestCreateCatalog:
 class TestGetCatalog:
     """Tests for getting Lakebase catalog details."""
 
-    def test_get_catalog(
-        self, lakebase_instance_name: str, unique_name, cleanup_catalogs
-    ):
+    def test_get_catalog(self, lakebase_instance_name: str, unique_name, cleanup_catalogs):
         """Should return catalog details."""
         catalog_name = f"lb_test_cat_get_{unique_name}"
         cleanup_catalogs(catalog_name)
@@ -124,9 +118,7 @@ class TestGetCatalog:
 class TestDeleteCatalog:
     """Tests for deleting Lakebase catalogs."""
 
-    def test_delete_catalog(
-        self, lakebase_instance_name: str, unique_name, cleanup_catalogs
-    ):
+    def test_delete_catalog(self, lakebase_instance_name: str, unique_name, cleanup_catalogs):
         """Should delete a Lakebase catalog."""
         catalog_name = f"lb_test_cat_del_{unique_name}"
         # Don't register for cleanup since we're testing delete

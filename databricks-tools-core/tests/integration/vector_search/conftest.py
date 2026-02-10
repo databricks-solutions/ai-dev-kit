@@ -131,9 +131,7 @@ def vs_direct_index_name(vs_endpoint_name, test_catalog, test_schema):
     )
 
     suffix = str(uuid.uuid4())[:8]
-    index_name = VS_INDEX_NAME_TEMPLATE.format(
-        catalog=test_catalog, schema=test_schema, suffix=suffix
-    )
+    index_name = VS_INDEX_NAME_TEMPLATE.format(catalog=test_catalog, schema=test_schema, suffix=suffix)
     logger.info(f"Creating Direct Access index: {index_name}")
 
     # Check if it already exists

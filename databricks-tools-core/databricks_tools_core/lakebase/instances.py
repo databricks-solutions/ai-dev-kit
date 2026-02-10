@@ -72,11 +72,7 @@ def create_lakebase_instance(
         return result
     except Exception as e:
         error_msg = str(e)
-        if (
-            "ALREADY_EXISTS" in error_msg
-            or "already exists" in error_msg.lower()
-            or "not unique" in error_msg.lower()
-        ):
+        if "ALREADY_EXISTS" in error_msg or "already exists" in error_msg.lower() or "not unique" in error_msg.lower():
             return {
                 "name": name,
                 "status": "ALREADY_EXISTS",
@@ -111,11 +107,7 @@ def get_lakebase_instance(name: str) -> Dict[str, Any]:
         instance = client.database.get_database_instance(name=name)
     except Exception as e:
         error_msg = str(e)
-        if (
-            "not found" in error_msg.lower()
-            or "does not exist" in error_msg.lower()
-            or "404" in error_msg
-        ):
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": name,
                 "state": "NOT_FOUND",
@@ -291,11 +283,7 @@ def delete_lakebase_instance(
         }
     except Exception as e:
         error_msg = str(e)
-        if (
-            "not found" in error_msg.lower()
-            or "does not exist" in error_msg.lower()
-            or "404" in error_msg
-        ):
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": name,
                 "status": "NOT_FOUND",
@@ -343,9 +331,7 @@ def generate_lakebase_credential(
         if hasattr(cred, "expiration_time") and cred.expiration_time:
             result["expiration_time"] = str(cred.expiration_time)
 
-        result["message"] = (
-            "Token generated. Valid for ~1 hour. Use as password with sslmode=require."
-        )
+        result["message"] = "Token generated. Valid for ~1 hour. Use as password with sslmode=require."
 
         return result
     except Exception as e:

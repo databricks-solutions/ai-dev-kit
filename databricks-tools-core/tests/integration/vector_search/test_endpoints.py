@@ -61,9 +61,7 @@ class TestListEndpoints:
 
         # Find our test endpoint
         names = [ep["name"] for ep in endpoints]
-        assert vs_endpoint_name in names, (
-            f"Test endpoint '{vs_endpoint_name}' not found in: {names}"
-        )
+        assert vs_endpoint_name in names, f"Test endpoint '{vs_endpoint_name}' not found in: {names}"
 
 
 @pytest.mark.integration

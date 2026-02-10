@@ -32,9 +32,7 @@ EMBEDDING_DIM = 8
 class TestCreateIndex:
     """Tests for creating indexes."""
 
-    def test_create_direct_access_index(
-        self, vs_endpoint_name: str, test_catalog, test_schema, cleanup_indexes
-    ):
+    def test_create_direct_access_index(self, vs_endpoint_name: str, test_catalog, test_schema, cleanup_indexes):
         """Should create a Direct Access index."""
         suffix = uuid.uuid4().hex[:8]
         index_name = f"{test_catalog}.{test_schema}.vs_idx_create_{suffix}"
@@ -69,9 +67,7 @@ class TestCreateIndex:
         assert result["index_type"] == "DIRECT_ACCESS"
         assert result["status"] in ("CREATING", "ALREADY_EXISTS")
 
-    def test_create_duplicate_index(
-        self, vs_endpoint_name: str, vs_direct_index_name: str
-    ):
+    def test_create_duplicate_index(self, vs_endpoint_name: str, vs_direct_index_name: str):
         """Should return ALREADY_EXISTS for duplicate index."""
         result = create_vs_index(
             name=vs_direct_index_name,
@@ -135,9 +131,7 @@ class TestListIndexes:
         assert len(indexes) > 0
 
         names = [idx["name"] for idx in indexes]
-        assert vs_direct_index_name in names, (
-            f"Test index '{vs_direct_index_name}' not in: {names}"
-        )
+        assert vs_direct_index_name in names, f"Test index '{vs_direct_index_name}' not in: {names}"
 
 
 @pytest.mark.integration

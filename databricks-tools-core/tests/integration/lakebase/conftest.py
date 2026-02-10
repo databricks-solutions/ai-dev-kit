@@ -67,9 +67,7 @@ def lakebase_instance_name():
     # Check if it already exists (from a previous failed run)
     existing = get_lakebase_instance(name)
     if existing.get("state") != "NOT_FOUND":
-        logger.info(
-            f"Instance '{name}' already exists (state: {existing.get('state')}), reusing"
-        )
+        logger.info(f"Instance '{name}' already exists (state: {existing.get('state')}), reusing")
         # If it's stopped, we still proceed - tests that need it running will handle it
     else:
         result = create_lakebase_instance(

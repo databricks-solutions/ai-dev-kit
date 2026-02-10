@@ -35,11 +35,7 @@ def _create_catalog_or_skip(catalog_name: str, instance_name: str):
         )
     except Exception as e:
         err = str(e)
-        if (
-            "CREATE CATALOG" in err
-            or "permission" in err.lower()
-            or "storage root" in err.lower()
-        ):
+        if "CREATE CATALOG" in err or "permission" in err.lower() or "storage root" in err.lower():
             pytest.skip(f"Cannot create catalog on this metastore: {err[:120]}")
         raise
 
@@ -122,9 +118,7 @@ class TestGetSyncedTable:
 
     def test_get_synced_table_not_found(self):
         """Should return NOT_FOUND for non-existent synced table."""
-        result = get_synced_table(
-            "nonexistent_cat.nonexistent_schema.nonexistent_table"
-        )
+        result = get_synced_table("nonexistent_cat.nonexistent_schema.nonexistent_table")
 
         assert result["status"] == "NOT_FOUND"
         assert "error" in result
@@ -168,9 +162,7 @@ class TestDeleteSyncedTable:
 
     def test_delete_synced_table_not_found(self):
         """Should return NOT_FOUND for non-existent synced table."""
-        result = delete_synced_table(
-            "nonexistent_cat.nonexistent_schema.nonexistent_table"
-        )
+        result = delete_synced_table("nonexistent_cat.nonexistent_schema.nonexistent_table")
 
         assert result["status"] == "NOT_FOUND"
         assert "error" in result

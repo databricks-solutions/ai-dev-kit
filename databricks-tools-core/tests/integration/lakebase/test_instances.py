@@ -41,9 +41,7 @@ class TestGetInstance:
         assert "state" in result
         # Instance should be ready (state string varies by SDK)
         state = result["state"].upper()
-        assert any(s in state for s in ("RUNNING", "AVAILABLE", "ACTIVE")), (
-            f"Unexpected state: {result['state']}"
-        )
+        assert any(s in state for s in ("RUNNING", "AVAILABLE", "ACTIVE")), f"Unexpected state: {result['state']}"
         assert "capacity" in result
 
     def test_get_instance_not_found(self):
@@ -68,9 +66,7 @@ class TestListInstances:
         assert len(instances) > 0
 
         names = [inst["name"] for inst in instances]
-        assert lakebase_instance_name in names, (
-            f"Test instance '{lakebase_instance_name}' not in: {names}"
-        )
+        assert lakebase_instance_name in names, f"Test instance '{lakebase_instance_name}' not in: {names}"
 
 
 @pytest.mark.integration
