@@ -311,20 +311,24 @@ export default function ProjectPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Set default schema from user email if not already set
+  // Set default schema from user email once when first available
+  const schemaDefaultApplied = useRef(false);
   useEffect(() => {
-    if (userDefaultSchema && !defaultSchema) {
+    if (userDefaultSchema && !schemaDefaultApplied.current && !defaultSchema) {
       setDefaultSchema(userDefaultSchema);
+      schemaDefaultApplied.current = true;
     }
-  }, [userDefaultSchema, defaultSchema]);
+  }, [userDefaultSchema]);
 
-  // Set default workspace folder from user email and project name if not already set
+  // Set default workspace folder from user email and project name once when first available
+  const folderDefaultApplied = useRef(false);
   useEffect(() => {
-    if (user && project?.name && !workspaceFolder) {
+    if (user && project?.name && !folderDefaultApplied.current && !workspaceFolder) {
       const projectFolder = sanitizeForSchema(project.name);
       setWorkspaceFolder(`/Workspace/Users/${user}/ai_dev_kit/${projectFolder}`);
+      folderDefaultApplied.current = true;
     }
-  }, [user, project?.name, workspaceFolder]);
+  }, [user, project?.name]);
 
   // Select a conversation
   const handleSelectConversation = async (conversationId: string) => {
@@ -1001,6 +1005,7 @@ export default function ProjectPage() {
             defaultCatalog,
             defaultSchema,
             workspaceFolder,
+            projectId,
           }}
           onClose={() => setSkillsExplorerOpen(false)}
         />

@@ -2,6 +2,19 @@
 
 from .skills_manager import get_available_skills
 
+# Mapping of user request patterns to skill names for the selection guide.
+# Only entries whose skill is enabled will be included in the prompt.
+_SKILL_GUIDE_ENTRIES = [
+  ('Generate data, synthetic data, fake data, test data', 'synthetic-data-generation'),
+  ('Pipeline, ETL, bronze/silver/gold, data transformation', 'spark-declarative-pipelines'),
+  ('Dashboard, visualization, BI, charts', 'aibi-dashboards'),
+  ('Job, workflow, schedule, automation', 'databricks-jobs'),
+  ('SDK, API, Databricks client', 'databricks-python-sdk'),
+  ('Unity Catalog, tables, volumes, schemas', 'databricks-unity-catalog'),
+  ('Agent, chatbot, AI assistant', 'agent-bricks'),
+  ('App deployment, web app', 'databricks-app-python'),
+]
+
 
 def get_system_prompt(
   cluster_id: str | None = None,
@@ -10,6 +23,7 @@ def get_system_prompt(
   warehouse_id: str | None = None,
   workspace_folder: str | None = None,
   workspace_url: str | None = None,
+  enabled_skills: list[str] | None = None,
 ) -> str:
   """Generate the system prompt for the Claude agent.
 
@@ -22,13 +36,17 @@ def get_system_prompt(
       warehouse_id: Optional Databricks SQL warehouse ID for queries
       workspace_folder: Optional workspace folder for file uploads
       workspace_url: Optional Databricks workspace URL for generating resource links
+      enabled_skills: Optional list of enabled skill names. None means all skills.
 
   Returns:
       System prompt string
   """
-  skills = get_available_skills()
+  skills = get_available_skills(enabled_skills=enabled_skills)
+  enabled_skill_names = {s['name'] for s in skills}
 
+  # Build skills section — only if there are enabled skills
   skills_section = ''
+  skill_workflow_section = ''
   if skills:
     skill_list = '\n'.join(f"  - **{s['name']}**: {s['description']}" for s in skills)
     skills_section = f"""
@@ -41,6 +59,51 @@ Do NOT proceed with ANY task until you have loaded the appropriate skill.
 
 Use the `Skill` tool to load skills. Available skills:
 {skill_list}
+
+**IMPORTANT: You may ONLY use the skills listed above. Do NOT attempt to load or use any other skill.**
+"""
+
+    # Build the skill selection guide — only include entries for enabled skills
+    guide_rows = []
+    for request_pattern, skill_name in _SKILL_GUIDE_ENTRIES:
+      if skill_name in enabled_skill_names:
+        guide_rows.append(f'| {request_pattern} | `{skill_name}` |')
+
+    skill_guide = ''
+    if guide_rows:
+      rows_str = '\n'.join(guide_rows)
+      skill_guide = f"""
+### Skill Selection Guide
+
+| User Request | Skill to Load |
+|--------------|---------------|
+{rows_str}
+"""
+
+    skill_workflow_section = f"""
+## Workflow
+
+1. **IMMEDIATELY load the relevant skill** - This is NON-NEGOTIABLE. Load the skill FIRST before any other action
+2. **Propose a brief plan** (2-4 lines) before creating resources
+3. **Use MCP tools** for all Databricks operations
+4. **Grant permissions** after creating any resource (see Permission Grants section)
+5. **Complete workflows automatically** - Don't stop halfway or ask users to do manual steps
+6. **Verify results** - Use `get_table_details` to confirm data was written correctly
+7. **Provide resource links** - Always include clickable URLs for created resources
+{skill_guide}"""
+  else:
+    # No skills enabled — tell the agent not to use the Skill tool
+    skill_workflow_section = """
+## Workflow
+
+1. **Propose a brief plan** (2-4 lines) before creating resources
+2. **Use MCP tools** for all Databricks operations
+3. **Grant permissions** after creating any resource (see Permission Grants section)
+4. **Complete workflows automatically** - Don't stop halfway or ask users to do manual steps
+5. **Verify results** - Use `get_table_details` to confirm data was written correctly
+6. **Provide resource links** - Always include clickable URLs for created resources
+
+**NOTE: No skills are enabled for this project. Do NOT use the Skill tool.**
 """
 
   cluster_section = ''
@@ -222,26 +285,4 @@ CREATE SCHEMA my_catalog.new_schema;
 GRANT ALL PRIVILEGES ON SCHEMA my_catalog.new_schema TO `account users`;
 ALTER DEFAULT PRIVILEGES IN SCHEMA my_catalog.new_schema GRANT ALL ON TABLES TO `account users`;
 
-## Workflow
-
-1. **IMMEDIATELY load the relevant skill** - This is NON-NEGOTIABLE. Load the skill FIRST before any other action
-2. **Propose a brief plan** (2-4 lines) before creating resources
-3. **Use MCP tools** for all Databricks operations
-4. **Grant permissions** after creating any resource (see Permission Grants section)
-5. **Complete workflows automatically** - Don't stop halfway or ask users to do manual steps
-6. **Verify results** - Use `get_table_details` to confirm data was written correctly
-7. **Provide resource links** - Always include clickable URLs for created resources
-
-### Skill Selection Guide
-
-| User Request | Skill to Load |
-|--------------|---------------|
-| Generate data, synthetic data, fake data, test data | `synthetic-data-generation` |
-| Pipeline, ETL, bronze/silver/gold, data transformation | `spark-declarative-pipelines` |
-| Dashboard, visualization, BI, charts | `aibi-dashboards` |
-| Job, workflow, schedule, automation | `databricks-jobs` |
-| SDK, API, Databricks client | `databricks-python-sdk` |
-| Unity Catalog, tables, volumes, schemas | `databricks-unity-catalog` |
-| Agent, chatbot, AI assistant | `agent-bricks` |
-| App deployment, web app | `databricks-app-python` |
-"""
+{skill_workflow_section}"""

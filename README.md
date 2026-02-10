@@ -75,8 +75,9 @@ Full-stack web application with chat UI for Databricks development:
 
 ```bash
 cd ai-dev-kit/databricks-builder-app
-./setup.sh
-# Follow instructions to start the app
+cp .env.example .env.local
+# Edit .env.local with your DATABRICKS_HOST and DATABRICKS_TOKEN
+./scripts/start_dev.sh
 ```
 
 ### Skills Only
@@ -125,7 +126,7 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 15 markdown skills teaching Databricks patterns |
+| [`databricks-skills/`](databricks-skills/) | 17+ markdown skills teaching Databricks patterns |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 | [`ai-dev-project/`](ai-dev-project/) | Starter template for new projects |
 
