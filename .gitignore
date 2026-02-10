@@ -1,5 +1,6 @@
 # Databricks AI Dev Kit
 .ai-dev-kit/
+.claude/
 
 
 # Python
@@ -53,6 +54,9 @@ Thumbs.db
 *conf*.json
 *.secret
 credentials.json
+
+# Resource tracking manifest (created by MCP server)
+.databricks-resources.json
 
 # Test coverage
 .coverage

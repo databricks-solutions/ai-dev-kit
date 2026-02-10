@@ -6,8 +6,10 @@ Consolidated MCP tools for Unity Catalog operations.
 tags, security policies, monitors, and sharing.
 """
 
+import logging
 from typing import Any, Dict, List
 
+from databricks_tools_core.identity import get_default_tags
 from databricks_tools_core.unity_catalog import (
     # Catalogs
     list_catalogs as _list_catalogs,
@@ -92,7 +94,40 @@ from databricks_tools_core.unity_catalog import (
     list_provider_shares as _list_provider_shares,
 )
 
+from ..manifest import register_deleter
 from ..server import mcp
+
+logger = logging.getLogger(__name__)
+
+
+def _delete_catalog_resource(resource_id: str) -> None:
+    _delete_catalog(catalog_name=resource_id, force=True)
+
+
+def _delete_schema_resource(resource_id: str) -> None:
+    _delete_schema(full_schema_name=resource_id)
+
+
+def _delete_volume_resource(resource_id: str) -> None:
+    _delete_volume(full_volume_name=resource_id)
+
+
+register_deleter("catalog", _delete_catalog_resource)
+register_deleter("schema", _delete_schema_resource)
+register_deleter("volume", _delete_volume_resource)
+
+
+def _auto_tag(object_type: str, full_name: str) -> None:
+    """Best-effort: apply default tags to a newly created UC object.
+
+    Tags are set individually so that a tag-policy violation on one key
+    does not prevent the remaining tags from being applied.
+    """
+    for key, value in get_default_tags().items():
+        try:
+            _set_tags(object_type=object_type, full_name=full_name, tags={key: value})
+        except Exception:
+            logger.warning("Failed to set tag %s=%s on %s '%s'", key, value, object_type, full_name, exc_info=True)
 
 
 def _to_dict(obj: Any) -> Dict[str, Any]:
@@ -168,9 +203,26 @@ def manage_uc_objects(
 
     if otype == "catalog":
         if action == "create":
-            return _to_dict(
-                _create_catalog(name=name, comment=comment, storage_root=storage_root, properties=properties)
+            result = _to_dict(
+                _create_catalog(
+                    name=name,
+                    comment=comment,
+                    storage_root=storage_root,
+                    properties=properties,
+                )
             )
+            _auto_tag("catalog", name)
+            try:
+                from ..manifest import track_resource
+
+                track_resource(
+                    resource_type="catalog",
+                    name=name,
+                    resource_id=result.get("name", name),
+                )
+            except Exception:
+                pass
+            return result
         elif action == "get":
             return _to_dict(_get_catalog(catalog_name=full_name or name))
         elif action == "list":
@@ -187,24 +239,52 @@ def manage_uc_objects(
             )
         elif action == "delete":
             _delete_catalog(catalog_name=full_name or name, force=force)
+            try:
+                from ..manifest import remove_resource
+
+                remove_resource(resource_type="catalog", resource_id=full_name or name)
+            except Exception:
+                pass
             return {"status": "deleted", "catalog": full_name or name}
 
     elif otype == "schema":
         if action == "create":
-            return _to_dict(_create_schema(catalog_name=catalog_name, schema_name=name, comment=comment))
+            result = _to_dict(_create_schema(catalog_name=catalog_name, schema_name=name, comment=comment))
+            _auto_tag("schema", f"{catalog_name}.{name}")
+            try:
+                from ..manifest import track_resource
+
+                full_schema = result.get("full_name") or f"{catalog_name}.{name}"
+                track_resource(resource_type="schema", name=full_schema, resource_id=full_schema)
+            except Exception:
+                logger.warning("Failed to track schema in manifest", exc_info=True)
+            return result
         elif action == "get":
             return _to_dict(_get_schema(full_schema_name=full_name))
         elif action == "list":
             return {"items": _to_dict_list(_list_schemas(catalog_name=catalog_name))}
         elif action == "update":
-            return _to_dict(_update_schema(full_schema_name=full_name, new_name=new_name, comment=comment, owner=owner))
+            return _to_dict(
+                _update_schema(
+                    full_schema_name=full_name,
+                    new_name=new_name,
+                    comment=comment,
+                    owner=owner,
+                )
+            )
         elif action == "delete":
             _delete_schema(full_schema_name=full_name)
+            try:
+                from ..manifest import remove_resource
+
+                remove_resource(resource_type="schema", resource_id=full_name)
+            except Exception:
+                pass
             return {"status": "deleted", "schema": full_name}
 
     elif otype == "volume":
         if action == "create":
-            return _to_dict(
+            result = _to_dict(
                 _create_volume(
                     catalog_name=catalog_name,
                     schema_name=schema_name,
@@ -214,14 +294,36 @@ def manage_uc_objects(
                     storage_location=storage_location,
                 )
             )
+            _auto_tag("volume", f"{catalog_name}.{schema_name}.{name}")
+            try:
+                from ..manifest import track_resource
+
+                full_vol = result.get("full_name") or f"{catalog_name}.{schema_name}.{name}"
+                track_resource(resource_type="volume", name=full_vol, resource_id=full_vol)
+            except Exception:
+                pass
+            return result
         elif action == "get":
             return _to_dict(_get_volume(full_volume_name=full_name))
         elif action == "list":
             return {"items": _to_dict_list(_list_volumes(catalog_name=catalog_name, schema_name=schema_name))}
         elif action == "update":
-            return _to_dict(_update_volume(full_volume_name=full_name, new_name=new_name, comment=comment, owner=owner))
+            return _to_dict(
+                _update_volume(
+                    full_volume_name=full_name,
+                    new_name=new_name,
+                    comment=comment,
+                    owner=owner,
+                )
+            )
         elif action == "delete":
             _delete_volume(full_volume_name=full_name)
+            try:
+                from ..manifest import remove_resource
+
+                remove_resource(resource_type="volume", resource_id=full_name)
+            except Exception:
+                pass
             return {"status": "deleted", "volume": full_name}
 
     elif otype == "function":
@@ -281,11 +383,17 @@ def manage_uc_grants(
 
     if act == "grant":
         return _grant_privileges(
-            securable_type=securable_type, full_name=full_name, principal=principal, privileges=privileges
+            securable_type=securable_type,
+            full_name=full_name,
+            principal=principal,
+            privileges=privileges,
         )
     elif act == "revoke":
         return _revoke_privileges(
-            securable_type=securable_type, full_name=full_name, principal=principal, privileges=privileges
+            securable_type=securable_type,
+            full_name=full_name,
+            principal=principal,
+            privileges=privileges,
         )
     elif act == "get":
         return _get_grants(securable_type=securable_type, full_name=full_name, principal=principal)
@@ -377,7 +485,11 @@ def manage_uc_storage(
         if action == "create":
             return _to_dict(
                 _create_external_location(
-                    name=name, url=url, credential_name=credential_name, comment=comment, read_only=read_only
+                    name=name,
+                    url=url,
+                    credential_name=credential_name,
+                    comment=comment,
+                    read_only=read_only,
                 )
             )
         elif action == "get":
@@ -453,7 +565,12 @@ def manage_uc_connections(
 
     if act == "create":
         return _to_dict(
-            _create_connection(name=name, connection_type=connection_type, options=options, comment=comment)
+            _create_connection(
+                name=name,
+                connection_type=connection_type,
+                options=options,
+                comment=comment,
+            )
         )
     elif act == "get":
         return _to_dict(_get_connection(name=name))
@@ -529,7 +646,11 @@ def manage_uc_tags(
 
     if act == "set_tags":
         return _set_tags(
-            object_type=object_type, full_name=full_name, tags=tags, column_name=column_name, warehouse_id=warehouse_id
+            object_type=object_type,
+            full_name=full_name,
+            tags=tags,
+            column_name=column_name,
+            warehouse_id=warehouse_id,
         )
     elif act == "unset_tags":
         return _unset_tags(
@@ -634,7 +755,10 @@ def manage_uc_security_policies(
         return _drop_row_filter(table_name=table_name, warehouse_id=warehouse_id)
     elif act == "set_column_mask":
         return _set_column_mask(
-            table_name=table_name, column_name=column_name, mask_function=mask_function, warehouse_id=warehouse_id
+            table_name=table_name,
+            column_name=column_name,
+            mask_function=mask_function,
+            warehouse_id=warehouse_id,
         )
     elif act == "drop_column_mask":
         return _drop_column_mask(table_name=table_name, column_name=column_name, warehouse_id=warehouse_id)
@@ -772,7 +896,10 @@ def manage_uc_sharing(
             return {"status": "deleted", "share": name}
         elif act == "add_table":
             return _add_table_to_share(
-                share_name=name or share_name, table_name=table_name, shared_as=shared_as, partition_spec=partition_spec
+                share_name=name or share_name,
+                table_name=table_name,
+                shared_as=shared_as,
+                partition_spec=partition_spec,
             )
         elif act == "remove_table":
             return _remove_table_from_share(share_name=name or share_name, table_name=table_name)

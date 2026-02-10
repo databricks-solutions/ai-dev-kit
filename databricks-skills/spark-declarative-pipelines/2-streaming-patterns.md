@@ -128,7 +128,7 @@ GROUP BY CAST(order_timestamp AS DATE);
 
 ### Handling Out-of-Order with SCD2
 
-Use SEQUENCE BY with event timestamp:
+Use SEQUENCE BY with event timestamp. **Clause order matters**: put `APPLY AS DELETE WHEN` before `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that actually exist in the source (omit `_rescued_data` unless the bronze table uses rescue data). Omit `TRACK HISTORY ON *` if it causes parse errors; the default is equivalent.
 
 ```sql
 CREATE OR REFRESH STREAMING TABLE silver_customers_history;
@@ -137,11 +137,10 @@ CREATE FLOW customers_scd2_flow AS
 AUTO CDC INTO silver_customers_history
 FROM stream(bronze_customer_cdc)
 KEYS (customer_id)
-SEQUENCE BY event_timestamp  -- Handles out-of-order
 APPLY AS DELETE WHEN operation = "DELETE"
-COLUMNS * EXCEPT (operation, _rescued_data)
-STORED AS SCD TYPE 2
-TRACK HISTORY ON *;
+SEQUENCE BY event_timestamp  -- Handles out-of-order
+COLUMNS * EXCEPT (operation, _ingested_at, _source_file)
+STORED AS SCD TYPE 2;
 ```
 
 ---

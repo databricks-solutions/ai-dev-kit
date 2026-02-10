@@ -96,7 +96,7 @@ dlt.apply_changes(
 )
 ```
 
-**SDP SQL**:
+**SDP SQL** (clause order: APPLY AS DELETE WHEN before SEQUENCE BY; only EXCEPT columns that exist in source; omit TRACK HISTORY ON * if it causes parse errors):
 ```sql
 CREATE OR REFRESH STREAMING TABLE customers_history;
 
@@ -104,10 +104,10 @@ CREATE FLOW customers_scd2_flow AS
 AUTO CDC INTO customers_history
 FROM stream(customers_cdc_clean)
 KEYS (customer_id)
+APPLY AS DELETE WHEN operation = "DELETE"
 SEQUENCE BY event_timestamp
-COLUMNS * EXCEPT (_rescued_data)
-STORED AS SCD TYPE 2
-TRACK HISTORY ON *;
+COLUMNS * EXCEPT (operation, _ingested_at, _source_file)
+STORED AS SCD TYPE 2;
 ```
 
 ### Joins

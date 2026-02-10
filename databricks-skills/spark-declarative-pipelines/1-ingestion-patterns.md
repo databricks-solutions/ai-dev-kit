@@ -8,7 +8,7 @@ Covers data ingestion patterns for Spark Declarative Pipelines including Auto Lo
 
 ## Auto Loader (Cloud Files)
 
-Auto Loader incrementally processes new data files as they arrive in cloud storage.
+Auto Loader incrementally processes new data files as they arrive in cloud storage. In a streaming table query you **must use the `STREAM` keyword with `read_files`**; `read_files` then leverages Auto Loader. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables).
 
 ### Basic Pattern
 
@@ -19,10 +19,26 @@ SELECT
   current_timestamp() AS _ingested_at,
   _metadata.file_path AS source_file,
   _metadata.file_modification_time AS file_timestamp
-FROM read_files(
+FROM STREAM read_files(
   '/mnt/raw/orders/',
   format => 'json',
   schemaHints => 'order_id STRING, amount DECIMAL(10,2)'
+);
+```
+
+### Bronze feeding AUTO CDC
+
+If the bronze table feeds a downstream **AUTO CDC** flow (e.g. `FROM stream(bronze_orders_cdc)`), use **`FROM STREAM read_files(...)`** so the source is streaming. Otherwise you may get: *"Cannot create a streaming table append once flow from a batch query."* Same requirement as above: in a streaming table query you must use the `STREAM` keyword with `read_files`.
+
+```sql
+CREATE OR REPLACE STREAMING TABLE bronze_orders_cdc AS
+SELECT ...,
+  current_timestamp() AS _ingested_at,
+  _metadata.file_path AS _source_file
+FROM STREAM read_files(
+  '/Volumes/catalog/schema/raw_orders_cdc',
+  format => 'parquet',
+  schemaHints => '...'
 );
 ```
 
@@ -33,12 +49,12 @@ CREATE OR REPLACE STREAMING TABLE bronze_customers AS
 SELECT
   *,
   current_timestamp() AS _ingested_at
-FROM stream(read_files(
+FROM STREAM read_files(
   '/mnt/raw/customers/',
   format => 'json',
   schemaHints => 'customer_id STRING, email STRING',
   mode => 'PERMISSIVE'  -- Handles schema changes gracefully
-));
+);
 ```
 
 ### File Formats

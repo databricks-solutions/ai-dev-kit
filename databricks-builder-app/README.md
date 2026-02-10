@@ -206,7 +206,7 @@ projects/
 
 - Python 3.11+
 - Node.js 18+
-- [uv](https://github.com/astral-sh/uv) package manager (or pip)
+- [uv](https://github.com/astral-sh/uv) package manager
 - Databricks workspace with:
   - SQL warehouse (for SQL queries)
   - Cluster (for Python/PySpark execution)
@@ -215,73 +215,78 @@ projects/
 
 ### Quick Start
 
-#### 1. Clone and Install Dependencies
+#### 1. Run the Setup Script
+
+From the repository root:
 
 ```bash
-# Navigate to the app directory
 cd databricks-builder-app
-
-# Install backend dependencies
-uv sync
-# OR with pip: pip install -e .
-
-# Install sibling packages (from repo root)
-cd ..
-uv pip install -e databricks-tools-core -e databricks-mcp-server
-# OR: pip install -e databricks-tools-core -e databricks-mcp-server
-
-# Install frontend dependencies
-cd databricks-builder-app/client
-npm install
-cd ..
+./scripts/setup.sh
 ```
 
-#### 2. Configure Environment Variables
+This will:
 
-Create `.env.local` in the `databricks-builder-app` directory:
+- Verify prerequisites (uv, Node.js, npm)
+- Create a `.env` file from `.env.example` (if one doesn't already exist)
+- Install backend Python dependencies via `uv sync`
+- Install sibling packages (`databricks-tools-core`, `databricks-mcp-server`)
+- Install frontend Node.js dependencies
+
+#### 2. Configure Your `.env` File
+
+> **You must do this before running the app.** The setup script creates a `.env` file from `.env.example`, but all values are placeholders. Open `.env` and fill in your actual values.
+
+The `.env` file is gitignored and will never be committed. At a minimum, you need to set these:
 
 ```bash
-# Copy example
-cp .env.example .env.local
-```
-
-Edit `.env.local` with your configuration:
-
-```bash
-# Databricks Configuration (for local development)
+# Required: Your Databricks workspace
 DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
-DATABRICKS_TOKEN=dapi...  # Your personal access token
+DATABRICKS_TOKEN=dapi...
 
-# PostgreSQL Database (Lakebase) - Required for persistence
+# Required: Database for project persistence (pick ONE option)
+# Option A — Static connection URL (simplest for local dev):
 LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
-LAKEBASE_PROJECT_ID=your-lakebase-project-id
 
-# Projects directory (where agent works)
-PROJECTS_BASE_DIR=./projects
-
-# Environment mode
-ENV=development
-
-# Skills to load (comma-separated)
-ENABLED_SKILLS=spark-declarative-pipelines,synthetic-data-generation
+# Option B — Dynamic OAuth via Databricks SDK:
+# LAKEBASE_INSTANCE_NAME=your-lakebase-instance
+# LAKEBASE_DATABASE_NAME=databricks_postgres
 ```
+
+See `.env.example` for the full list of available settings including LLM provider, skills configuration, and MLflow tracing.
 
 **Getting your Databricks token:**
 1. Go to your Databricks workspace
 2. Click your username → User Settings
-3. Go to Access Tokens → Generate New Token
+3. Go to Developer → Access Tokens → Generate New Token
 4. Copy the token value
 
-#### 3. Configure Claude Settings (Optional - for Databricks Model Serving)
-
-If you're routing Claude API calls through Databricks Model Serving instead of directly to Anthropic, create `.claude/settings.json` in the **repository root** (not in the app directory):
+#### 3. Start the Development Servers
 
 ```bash
-# From repo root
-mkdir -p .claude
+./scripts/start_dev.sh
 ```
 
-Create `.claude/settings.json`:
+This starts both the backend and frontend in one terminal.
+
+You can also start them separately if you prefer:
+
+```bash
+# Terminal 1 — Backend
+uvicorn server.app:app --reload --port 8000 --reload-dir server
+
+# Terminal 2 — Frontend
+cd client && npm run dev
+```
+
+#### 4. Access the App
+
+- **Frontend**: <http://localhost:3000>
+- **Backend API**: <http://localhost:8000>
+- **API Docs**: <http://localhost:8000/docs>
+
+#### 5. (Optional) Configure Claude via Databricks Model Serving
+
+If you're routing Claude API calls through Databricks Model Serving instead of directly to Anthropic, create `.claude/settings.json` in the **repository root** (not in the app directory):
 
 ```json
 {
@@ -295,41 +300,11 @@ Create `.claude/settings.json`:
 }
 ```
 
-**Notes:**
-- `ANTHROPIC_AUTH_TOKEN` should be a Databricks Personal Access Token (PAT), not an Anthropic API key
+Notes:
+
+- `ANTHROPIC_AUTH_TOKEN` should be a Databricks PAT, not an Anthropic API key
 - `ANTHROPIC_BASE_URL` should point to your Databricks Model Serving endpoint
-- If this file doesn't exist, the app will use your Anthropic API key from the environment
-
-**⚠️ Important:** Add `.claude/settings.json` to `.gitignore` - it contains credentials!
-
-#### 4. Start the Development Servers
-
-**Option A: Use the start script (recommended)**
-
-```bash
-./scripts/start_dev.sh
-```
-
-This starts both backend and frontend in one terminal.
-
-**Option B: Start separately**
-
-Terminal 1 (Backend):
-```bash
-uvicorn server.app:app --reload --port 8000 --reload-dir server
-```
-
-Terminal 2 (Frontend):
-```bash
-cd client
-npm run dev
-```
-
-#### 5. Access the App
-
-- **Frontend**: http://localhost:3000
-- **Backend**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- If this file doesn't exist, the app uses your `ANTHROPIC_API_KEY` from `.env`
 
 ### Configuration Details
 

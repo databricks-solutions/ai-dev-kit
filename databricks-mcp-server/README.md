@@ -245,6 +245,18 @@ def my_function(arg1: str, arg2: int = 10) -> dict:
     return _my_function(arg1=arg1, arg2=arg2)
 ```
 
+## Usage Tracking via Audit Logs
+
+All API calls made through the MCP server are tagged with a custom `User-Agent` header:
+
+```
+databricks-ai-dev-kit/0.1.0 databricks-sdk-py/... project/<auto-detected-repo-name>
+```
+
+The project name is auto-detected from the git remote URL (no configuration needed). This makes every call filterable in the `system.access.audit` system table.
+
+> **Note:** Audit log entries may take 2–10 minutes to appear. The workspace must have Unity Catalog enabled to query `system.access.audit`.
+
 ## License
 
 © Databricks, Inc. See [LICENSE.md](../LICENSE.md).

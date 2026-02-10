@@ -91,20 +91,28 @@ Full-stack web application with chat UI for Databricks development:
 
 ```bash
 cd ai-dev-kit/databricks-builder-app
-./setup.sh
+./scripts/setup.sh
 # Follow instructions to start the app
 ```
 
 ### Skills Only
 
-Just want to teach your AI assistant Databricks patterns?
+Just want to teach your local AI assistant Databricks patterns?
 
 ```bash
 cd ai-dev-kit
 ./databricks-skills/install_skills.sh
 ```
 
+Just want to teach your workspace AI assistant Databricks patterns?
+```bash
+cd ai-dev-kit
+./databricks-skills/install_to_dbx_assistant.sh --profile <databricks cli profile>
+```
+
 Skills include: Spark Declarative Pipelines, Asset Bundles, MLflow Evaluation, Model Serving, Synthetic Data Generation, and [more](databricks-skills/).
+
+
 
 ### MCP Tools Only
 
@@ -190,6 +198,9 @@ The source in this project is provided subject to the [Databricks License](https
 
 ---
 
-## Acknowledgments
+<details>
+<summary><strong>Acknowledgments</strong></summary>
 
 MCP Databricks Command Execution API from [databricks-exec-code](https://github.com/databricks-solutions/databricks-exec-code-mcp) by Natyra Bajraktari and Henryk Borzymowski.
+
+</details>
