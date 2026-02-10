@@ -91,7 +91,7 @@ Full-stack web application with chat UI for Databricks development:
 
 ```bash
 cd ai-dev-kit/databricks-builder-app
-./setup.sh
+./scripts/setup.sh
 # Follow instructions to start the app
 ```
 
@@ -190,6 +190,9 @@ The source in this project is provided subject to the [Databricks License](https
 
 ---
 
-## Acknowledgments
+<details>
+<summary><strong>Acknowledgments</strong></summary>
 
 MCP Databricks Command Execution API from [databricks-exec-code](https://github.com/databricks-solutions/databricks-exec-code-mcp) by Natyra Bajraktari and Henryk Borzymowski.
+
+</details>

@@ -17,6 +17,7 @@ __pycache__/
 .venv/
 
 # Environment
+.env
 .env.local
 app.yaml
 
