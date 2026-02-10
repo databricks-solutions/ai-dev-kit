@@ -97,14 +97,22 @@ cd ai-dev-kit/databricks-builder-app
 
 ### Skills Only
 
-Just want to teach your AI assistant Databricks patterns?
+Just want to teach your local AI assistant Databricks patterns?
 
 ```bash
 cd ai-dev-kit
 ./databricks-skills/install_skills.sh
 ```
 
+Just want to teach your workspace AI assistant Databricks patterns?
+```bash
+cd ai-dev-kit
+./databricks-skills/install_to_dbx_assistant.sh --profile <databricks cli profile>
+```
+
 Skills include: Spark Declarative Pipelines, Asset Bundles, MLflow Evaluation, Model Serving, Synthetic Data Generation, and [more](databricks-skills/).
+
+
 
 ### MCP Tools Only
 
