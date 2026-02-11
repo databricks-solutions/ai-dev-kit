@@ -80,6 +80,73 @@ test_cases:
       difficulty: "easy"
       reasoning: "Mentions 'genai.evaluate' - MLflow evaluation trigger"
 
+  # Single-skill routing - UC FGAC Governance
+  - id: "routing_fgac_001"
+    inputs:
+      prompt: "Create an FGAC column mask policy for SSN columns"
+    expectations:
+      expected_skills: ["databricks-unity-catalog"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'FGAC' and 'column mask policy' - UC FGAC governance"
+
+  - id: "routing_fgac_002"
+    inputs:
+      prompt: "How do I apply governed tags to columns for PII classification?"
+    expectations:
+      expected_skills: ["databricks-unity-catalog"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'governed tags' and 'PII classification' - UC FGAC governance"
+
+  - id: "routing_fgac_003"
+    inputs:
+      prompt: "Write a masking UDF that hides email addresses and bind it to a policy"
+    expectations:
+      expected_skills: ["databricks-unity-catalog"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "medium"
+      reasoning: "Mentions 'masking UDF' and 'policy' - UC FGAC governance"
+
+  - id: "routing_fgac_004"
+    inputs:
+      prompt: "List all FGAC policies on my catalog using the Python SDK"
+    expectations:
+      expected_skills: ["databricks-unity-catalog"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "medium"
+      reasoning: "Mentions 'FGAC policies' - UC FGAC governance over generic SDK skill"
+
+  - id: "routing_fgac_005"
+    inputs:
+      prompt: "Create a row filter policy to hide EU data from the US team"
+    expectations:
+      expected_skills: ["databricks-unity-catalog"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'row filter policy' - UC FGAC governance"
+
+  - id: "routing_fgac_006"
+    inputs:
+      prompt: "How do I use CREATE POLICY with hasTagValue to mask credit card columns?"
+    expectations:
+      expected_skills: ["databricks-unity-catalog"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "medium"
+      reasoning: "Mentions 'CREATE POLICY' and 'hasTagValue' - UC FGAC governance"
+
   # Multi-skill routing
   - id: "routing_multi_001"
     inputs:
@@ -119,6 +186,17 @@ test_cases:
       category: "multi_skill"
       difficulty: "hard"
       reasoning: "Combines 'medallion' (SDP) with 'Genie space' (agent-bricks)"
+
+  - id: "routing_multi_004"
+    inputs:
+      prompt: "Set up FGAC policies for PII masking and query the audit logs to verify who accessed the masked columns"
+    expectations:
+      expected_skills: ["databricks-unity-catalog"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "hard"
+      reasoning: "Both FGAC policies and audit logs are in databricks-unity-catalog"
 
   # No skill match
   - id: "routing_no_match_001"

@@ -414,7 +414,7 @@ for doc in results.result.data_array:
     print(doc)
 ```
 
-### ABAC Policies
+### FGAC Policies
 **Doc:** https://docs.databricks.com/data-governance/unity-catalog/abac/policies
 
 ```python
@@ -434,26 +434,100 @@ policy = w.policies.get_policy(
 )
 
 # Create column mask policy (ALWAYS include gov_admin in except_principals)
-from databricks.sdk.service.catalog import ColumnMask, MatchColumns
-created = w.policies.create_policy(
-    name="mask_pii_ssn",
-    policy_type="COLUMN_MASK",
-    on_securable_type="SCHEMA",
-    on_securable_fullname="my_catalog.my_schema",
-    for_securable_type="TABLE",
-    to_principals=["analysts"],
-    except_principals=["gov_admin"],
-    column_mask=ColumnMask(function_name="my_catalog.my_schema.mask_ssn"),
-    match_columns=[MatchColumns(tag_name="pii_type", tag_value="ssn")],
+# on_securable_type sets scope: CATALOG (all tables), SCHEMA (schema tables), TABLE (single table)
+# for_securable_type is always TABLE
+from databricks.sdk.service.catalog import (
+    ColumnMaskOptions, MatchColumn, PolicyInfo, PolicyType, RowFilterOptions, SecurableType,
 )
 
-# Update policy principals
+# Catalog-level column mask — applies to all tables in catalog
+policy_info = PolicyInfo(
+    name="mask_pii_catalog",
+    policy_type=PolicyType.POLICY_TYPE_COLUMN_MASK,
+    on_securable_type=SecurableType.CATALOG,
+    on_securable_fullname="my_catalog",
+    for_securable_type=SecurableType.TABLE,
+    to_principals=["analysts"],
+    except_principals=["gov_admin"],
+    column_mask=ColumnMaskOptions(
+        function_name="my_catalog.my_schema.mask_ssn",
+        on_column="masked_col",
+    ),
+    match_columns=[
+        MatchColumn(alias="masked_col", condition="hasTagValue('pii_type', 'ssn')"),
+    ],
+)
+created = w.policies.create_policy(policy_info=policy_info)
+
+# Schema-level column mask — applies to all tables in schema
+policy_info = PolicyInfo(
+    name="mask_pii_schema",
+    policy_type=PolicyType.POLICY_TYPE_COLUMN_MASK,
+    on_securable_type=SecurableType.SCHEMA,
+    on_securable_fullname="my_catalog.my_schema",
+    for_securable_type=SecurableType.TABLE,
+    to_principals=["analysts"],
+    except_principals=["gov_admin"],
+    column_mask=ColumnMaskOptions(
+        function_name="my_catalog.my_schema.mask_ssn",
+        on_column="masked_col",
+    ),
+    match_columns=[
+        MatchColumn(alias="masked_col", condition="hasTagValue('pii_type', 'ssn')"),
+    ],
+)
+created = w.policies.create_policy(policy_info=policy_info)
+
+# Table-level column mask — applies to a single table
+policy_info = PolicyInfo(
+    name="mask_pii_table",
+    policy_type=PolicyType.POLICY_TYPE_COLUMN_MASK,
+    on_securable_type=SecurableType.TABLE,
+    on_securable_fullname="my_catalog.my_schema.my_table",
+    for_securable_type=SecurableType.TABLE,
+    to_principals=["analysts"],
+    except_principals=["gov_admin"],
+    column_mask=ColumnMaskOptions(
+        function_name="my_catalog.my_schema.mask_ssn",
+        on_column="masked_col",
+    ),
+    match_columns=[
+        MatchColumn(alias="masked_col", condition="hasTagValue('pii_type', 'ssn')"),
+    ],
+)
+created = w.policies.create_policy(policy_info=policy_info)
+
+# Row filter — same three levels apply (CATALOG, SCHEMA, TABLE)
+policy_info = PolicyInfo(
+    name="filter_eu_data",
+    policy_type=PolicyType.POLICY_TYPE_ROW_FILTER,
+    on_securable_type=SecurableType.SCHEMA,
+    on_securable_fullname="my_catalog.my_schema",
+    for_securable_type=SecurableType.TABLE,
+    to_principals=["us_team"],
+    except_principals=["gov_admin"],
+    row_filter=RowFilterOptions(
+        function_name="my_catalog.my_schema.is_not_eu_region",
+    ),
+    match_columns=[
+        MatchColumn(alias="filter_col", condition="hasTagValue('region', 'eu')"),
+    ],
+)
+created = w.policies.create_policy(policy_info=policy_info)
+
+# Update policy principals (only principals and comment can be updated)
+update_info = PolicyInfo(
+    to_principals=["analysts", "new_team"],
+    except_principals=["gov_admin"],
+    for_securable_type=SecurableType.TABLE,
+    policy_type=PolicyType.POLICY_TYPE_COLUMN_MASK,
+)
 w.policies.update_policy(
     name="mask_pii_ssn",
     on_securable_type="SCHEMA",
     on_securable_fullname="my_catalog.my_schema",
-    to_principals=["analysts", "new_team"],
-    except_principals=["gov_admin"],
+    policy_info=update_info,
+    update_mask="to_principals,except_principals",
 )
 
 # Delete policy
