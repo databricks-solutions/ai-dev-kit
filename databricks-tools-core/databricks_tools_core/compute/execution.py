@@ -306,15 +306,14 @@ class NoRunningClusterError(Exception):
             best = self.startable_clusters[0]
             suggestions.append(
                 f"ASK THE USER: \"I found your terminated cluster '{best['cluster_name']}'. "
-                f"Would you like me to start it? (It typically takes 3-8 minutes to start.)\". "
+                f'Would you like me to start it? (It typically takes 3-8 minutes to start.)". '
                 f"If they approve, call start_cluster(cluster_id='{best['cluster_id']}'), "
                 f"then poll with get_cluster_status() until it's RUNNING, then retry."
             )
             # Show additional options if there are more
             for c in self.startable_clusters[1:3]:
                 suggestions.append(
-                    f"Alternative cluster: '{c['cluster_name']}' "
-                    f"(cluster_id='{c['cluster_id']}', state={c['state']})"
+                    f"Alternative cluster: '{c['cluster_name']}' (cluster_id='{c['cluster_id']}', state={c['state']})"
                 )
 
         # Suggestion 2: use execute_sql for SQL workloads
@@ -324,9 +323,7 @@ class NoRunningClusterError(Exception):
         )
 
         # Suggestion 3: ask for shared access
-        suggestions.append(
-            "Ask a workspace admin for access to a shared cluster."
-        )
+        suggestions.append("Ask a workspace admin for access to a shared cluster.")
 
         return suggestions
 
@@ -336,12 +333,10 @@ class NoRunningClusterError(Exception):
 
         if self.startable_clusters:
             cluster_list = "\n".join(
-                f"  - {c['cluster_name']} ({c['cluster_id']}) - {c['state']}"
-                for c in self.startable_clusters[:10]
+                f"  - {c['cluster_name']} ({c['cluster_id']}) - {c['state']}" for c in self.startable_clusters[:10]
             )
             message += (
-                f"\n\nYou have {len(self.startable_clusters)} terminated cluster(s) you could start:\n"
-                f"{cluster_list}"
+                f"\n\nYou have {len(self.startable_clusters)} terminated cluster(s) you could start:\n{cluster_list}"
             )
 
         if self.skipped_clusters:
@@ -399,8 +394,7 @@ def start_cluster(cluster_id: str) -> Dict[str, Any]:
             "cluster_name": cluster_name,
             "state": current_state,
             "message": (
-                f"Cluster '{cluster_name}' is in state {current_state}. "
-                f"It may already be starting or resizing."
+                f"Cluster '{cluster_name}' is in state {current_state}. It may already be starting or resizing."
             ),
         }
 
@@ -442,10 +436,7 @@ def get_cluster_status(cluster_id: str) -> Dict[str, Any]:
     if state == "RUNNING":
         message = f"Cluster '{cluster_name}' is running and ready for use."
     elif state in ("PENDING", "RESTARTING", "RESIZING"):
-        message = (
-            f"Cluster '{cluster_name}' is {state.lower()}. "
-            f"Please wait and check again in 30-60 seconds."
-        )
+        message = f"Cluster '{cluster_name}' is {state.lower()}. Please wait and check again in 30-60 seconds."
     elif state == "TERMINATED":
         message = f"Cluster '{cluster_name}' is terminated."
     elif state == "TERMINATING":
@@ -627,10 +618,7 @@ def execute_databricks_command(
 
             # Find terminated clusters the user could start, preferring user-owned
             current_user = get_current_username()
-            terminated = [
-                c for c in available_clusters
-                if c.get("state") in ("TERMINATED", "ERROR")
-            ]
+            terminated = [c for c in available_clusters if c.get("state") in ("TERMINATED", "ERROR")]
             if current_user:
                 user_lower = current_user.lower()
                 user_owned = [c for c in terminated if (c.get("creator_user_name") or "").lower() == user_lower]

@@ -1193,10 +1193,7 @@ class AgentBricksManager:
                 except ValueError:
                     size_priority = 99
                 # Soft preference: user-owned warehouses sort first (0) within same tier
-                owner_priority = 0 if (
-                    current_user
-                    and (wh.creator_name or "").lower() == current_user.lower()
-                ) else 1
+                owner_priority = 0 if (current_user and (wh.creator_name or "").lower() == current_user.lower()) else 1
                 return (state_priority, size_priority, owner_priority)
 
             warehouses_sorted = sorted(warehouses, key=sort_key)
