@@ -350,7 +350,10 @@ def delete_endpoint(name: str, max_retries: int = 6, retry_delay: int = 10) -> D
                     "error": f"Endpoint '{name}' not found",
                 }
             if ("reconciliation" in error_msg.lower() or "aborted" in error_msg.lower()) and attempt < max_retries:
-                logger.info(f"Endpoint reconciliation in progress, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                logger.info(
+                    f"Endpoint reconciliation in progress, retrying in {retry_delay}s "
+                    f"(attempt {attempt + 1}/{max_retries})"
+                )
                 time.sleep(retry_delay)
                 continue
             raise Exception(f"Failed to delete endpoint '{name}': {error_msg}")
