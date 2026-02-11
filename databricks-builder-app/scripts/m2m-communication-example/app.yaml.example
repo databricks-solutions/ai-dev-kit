@@ -1,0 +1,21 @@
+# Databricks Apps configuration for the M2M Communication Example
+#
+# This app demonstrates app-to-app communication by calling the
+# Builder App's agent API using M2M OAuth authentication.
+#
+# Prerequisites:
+#   1. Deploy the Builder App first
+#   2. Grant this app's service principal CAN USE on the Builder App
+#   3. Update BUILDER_APP_URL below with the actual URL
+
+command:
+  - "uvicorn"
+  - "app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "$DATABRICKS_APP_PORT"
+
+env:
+  - name: BUILDER_APP_URL
+    value: "https://<workspace>.cloud.databricks.com/apps/<builder-app-name>"
