@@ -31,5 +31,6 @@ from .tools import (  # noqa: F401, E402
     manifest,
     vector_search,
     lakebase,
+    lakebase_autoscale,
     user,
 )
