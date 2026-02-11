@@ -10,6 +10,10 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+BOLD='\033[1m'
+
+# Minimum required Databricks CLI version
+MIN_CLI_VERSION="0.278.0"
 
 # Script directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -106,8 +110,21 @@ echo -e "${YELLOW}[1/6] Checking prerequisites...${NC}"
 
 # Check Databricks CLI
 if ! command -v databricks &> /dev/null; then
-  echo -e "${RED}Error: Databricks CLI not found. Install with: pip install databricks-cli${NC}"
+  echo -e "${RED}Error: Databricks CLI not found. Install with: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${NC}"
   exit 1
+fi
+
+# Check Databricks CLI version
+cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+if [ -n "$cli_version" ]; then
+  if printf '%s\n%s' "$MIN_CLI_VERSION" "$cli_version" | sort -V -C; then
+    echo -e "  ${GREEN}✓${NC} Databricks CLI v${cli_version}"
+  else
+    echo -e "  ${YELLOW}Warning: Databricks CLI v${cli_version} is outdated (minimum: v${MIN_CLI_VERSION})${NC}"
+    echo -e "  ${BOLD}Upgrade:${NC} curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh"
+  fi
+else
+  echo -e "  ${YELLOW}Warning: Could not determine Databricks CLI version${NC}"
 fi
 
 # Check if authenticated

@@ -24,6 +24,10 @@ VENV_DIR="$INSTALL_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
 MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 
+# Minimum required versions
+MIN_CLI_VERSION="0.278.0"
+MIN_SDK_VERSION="0.81.0"
+
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
@@ -463,13 +467,54 @@ prompt_mcp_path() {
     MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 }
 
+# Compare semantic versions (returns 0 if $1 >= $2)
+version_gte() {
+    printf '%s\n%s' "$2" "$1" | sort -V -C
+}
+
+# Check Databricks CLI version meets minimum requirement
+check_cli_version() {
+    local cli_version
+    cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+
+    if [ -z "$cli_version" ]; then
+        warn "Could not determine Databricks CLI version"
+        return
+    fi
+
+    if version_gte "$cli_version" "$MIN_CLI_VERSION"; then
+        ok "Databricks CLI v${cli_version}"
+    else
+        warn "Databricks CLI v${cli_version} is outdated (minimum: v${MIN_CLI_VERSION})"
+        msg "  ${B}Upgrade:${N} curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh"
+    fi
+}
+
+# Check Databricks SDK version in the MCP venv
+check_sdk_version() {
+    local sdk_version
+    sdk_version=$("$VENV_PYTHON" -c "from databricks.sdk.version import __version__; print(__version__)" 2>/dev/null)
+
+    if [ -z "$sdk_version" ]; then
+        warn "Could not determine Databricks SDK version"
+        return
+    fi
+
+    if version_gte "$sdk_version" "$MIN_SDK_VERSION"; then
+        ok "Databricks SDK v${sdk_version}"
+    else
+        warn "Databricks SDK v${sdk_version} is outdated (minimum: v${MIN_SDK_VERSION})"
+        msg "  ${B}Upgrade:${N} $VENV_PYTHON -m pip install --upgrade databricks-sdk"
+    fi
+}
+
 # Check prerequisites
 check_deps() {
     command -v git >/dev/null 2>&1 || die "git required"
     ok "git"
 
     if command -v databricks >/dev/null 2>&1; then
-        ok "databricks CLI"
+        check_cli_version
     else
         warn "Databricks CLI not found. Install: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}"
         msg "${D}You can still install, but authentication will require the CLI later.${N}"
@@ -539,6 +584,7 @@ setup_mcp() {
     
     "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
     ok "MCP server ready"
+    check_sdk_version
 }
 
 # Install skills
