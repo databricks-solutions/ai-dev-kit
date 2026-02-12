@@ -8,6 +8,8 @@
 #   2. Grant this app's service principal CAN USE on the Builder App
 #   3. Update BUILDER_APP_URL below with the actual URL
 
+# The command to start the app. This is specific to this example app and
+# must match the entrypoint module. No changes needed unless you rename app.py.
 command:
   - "uvicorn"
   - "app:app"
