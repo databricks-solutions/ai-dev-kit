@@ -64,6 +64,8 @@ def _validate_approval_token(approval_token: str, current_params: dict) -> None:
 
     Raises ValueError if the token is invalid, expired, or params don't match.
     """
+    params = dict(current_params)  # work on a copy to avoid mutating caller's dict
+
     try:
         signature, b64_payload = approval_token.split(":", 1)
     except (ValueError, AttributeError):
@@ -90,13 +92,13 @@ def _validate_approval_token(approval_token: str, current_params: dict) -> None:
     # Map preview action to mutation action
     action_map = {"CREATE": "create", "UPDATE": "update", "DELETE": "delete"}
     token_action = token_data.pop("action", None)
-    current_action = current_params.pop("action", None)
+    current_action = params.pop("action", None)
     if token_action and current_action:
         if action_map.get(token_action) != current_action:
             raise ValueError("Invalid or expired approval token")
 
     # Compare remaining params
-    clean_current = {k: v for k, v in current_params.items() if v is not None}
+    clean_current = {k: v for k, v in params.items() if v is not None}
     if token_data != clean_current:
         raise ValueError("Invalid or expired approval token")
 
