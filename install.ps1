@@ -44,6 +44,7 @@ $MinSdkVersion = "0.85.0"
 # ─── Defaults ─────────────────────────────────────────────────
 $script:Profile_     = "DEFAULT"
 $script:Scope        = "project"
+$script:ScopeExplicit = $false  # Track if --global was explicitly passed
 $script:InstallMcp   = $true
 $script:InstallSkills = $true
 $script:Force        = $false
@@ -100,7 +101,7 @@ $i = 0
 while ($i -lt $args.Count) {
     switch ($args[$i]) {
         { $_ -in "-p", "--profile" }  { $script:Profile_ = $args[$i + 1]; $script:ProfileProvided = $true; $i += 2 }
-        { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $i++ }
+        { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $script:ScopeExplicit = $true; $i++ }
         { $_ -in "--skills-only", "-SkillsOnly" } { $script:InstallMcp = $false; $i++ }
         { $_ -in "--mcp-only", "-McpOnly" }    { $script:InstallSkills = $false; $i++ }
         { $_ -in "--mcp-path", "-McpPath" }    { $script:UserMcpPath = $args[$i + 1]; $i += 2 }
@@ -984,6 +985,34 @@ function Show-Summary {
     Write-Host ""
 }
 
+# ─── Scope prompt ─────────────────────────────────────────────
+function Invoke-PromptScope {
+    if ($script:Silent) { return }
+
+    Write-Host ""
+    Write-Msg "Installation Scope"
+    Write-Host "  Choose where to install the AI Dev Kit:" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  1. Project" -NoNewline -ForegroundColor White
+    Write-Host " - Install in current directory (.cursor/ and .claude/)" -ForegroundColor Gray
+    Write-Host "     Use this if you want configuration specific to this project" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  2. Global" -NoNewline -ForegroundColor White
+    Write-Host "  - Install in home directory (~/.cursor/ and ~/.claude/)" -ForegroundColor Gray
+    Write-Host "     Use this to share configuration across all your projects" -ForegroundColor DarkGray
+    Write-Host ""
+
+    $scopeChoice = Read-Prompt -PromptText "Choose installation scope (1=Project, 2=Global)" -Default "1"
+    
+    if ($scopeChoice -in @("2", "global", "Global")) {
+        $script:Scope = "global"
+        Write-Ok "Global installation selected"
+    } else {
+        $script:Scope = "project"
+        Write-Ok "Project installation selected"
+    }
+}
+
 # ─── Auth prompt ──────────────────────────────────────────────
 function Invoke-PromptAuth {
     if ($script:Silent) { return }
@@ -1048,6 +1077,11 @@ function Invoke-Main {
     Write-Step "Databricks profile"
     Invoke-PromptProfile
     Write-Ok "Profile: $($script:Profile_)"
+
+    # Scope selection
+    if (-not $script:ScopeExplicit) {
+        Invoke-PromptScope
+    }
 
     # MCP path
     if ($script:InstallMcp) {
@@ -1121,11 +1155,11 @@ function Invoke-Main {
     # Save version
     Save-Version
 
-    # Summary
-    Show-Summary
-
     # Auth prompt
     Invoke-PromptAuth
+
+    # Summary
+    Show-Summary
 }
 
 Invoke-Main

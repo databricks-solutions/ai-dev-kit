@@ -32,6 +32,7 @@ set -e
 # Defaults (can be overridden by environment variables or command-line arguments)
 PROFILE="${DEVKIT_PROFILE:-DEFAULT}"
 SCOPE="${DEVKIT_SCOPE:-project}"
+SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
 BRANCH="${DEVKIT_BRANCH:-main}"
 FORCE="${DEVKIT_FORCE:-false}"
 IS_UPDATE=false
@@ -43,6 +44,9 @@ USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
 [ "$SILENT" = "true" ] || [ "$SILENT" = "1" ] && SILENT=true || SILENT=false
+
+# Check if scope was explicitly set via env var
+[ -n "${DEVKIT_SCOPE:-}" ] && SCOPE_EXPLICIT=true
 
 # Installation mode defaults
 INSTALL_MCP=true
@@ -73,7 +77,7 @@ step() { [ "$SILENT" = false ] && echo -e "\n${B}$*${N}"; }
 while [ $# -gt 0 ]; do
     case $1 in
         -p|--profile)     PROFILE="$2"; shift 2 ;;
-        -g|--global)      SCOPE="global"; shift ;;
+        -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
         -b|--branch)      BRANCH="$2"; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; shift ;;
@@ -841,6 +845,35 @@ summary() {
     fi
 }
 
+# Prompt for installation scope
+prompt_scope() {
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    echo ""
+    msg "${B}Installation Scope${N}"
+    msg "${D}Choose where to install the AI Dev Kit:${N}"
+    msg ""
+    msg "  ${B}1. Project${N} - Install in current directory (.cursor/ and .claude/)"
+    msg "     ${D}Use this if you want configuration specific to this project${N}"
+    msg ""
+    msg "  ${B}2. Global${N}  - Install in home directory (~/.cursor/ and ~/.claude/)"
+    msg "     ${D}Use this to share configuration across all your projects${N}"
+    echo ""
+    
+    local scope_choice
+    scope_choice=$(prompt "Choose installation scope ${D}(1=Project, 2=Global)${N}" "1")
+    
+    if [ "$scope_choice" = "2" ] || [ "$scope_choice" = "global" ] || [ "$scope_choice" = "Global" ]; then
+        SCOPE="global"
+        ok "Global installation selected"
+    else
+        SCOPE="project"
+        ok "Project installation selected"
+    fi
+}
+
 # Prompt to run auth
 prompt_auth() {
     if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
@@ -910,6 +943,11 @@ main() {
     prompt_profile
     ok "Profile: $PROFILE"
 
+    # ── Step 3.5: Interactive scope selection ──
+    if [ "$SCOPE_EXPLICIT" = false ]; then
+        prompt_scope
+    fi
+
     # ── Step 4: Interactive MCP path ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
@@ -966,11 +1004,11 @@ main() {
     # Save version
     save_version
     
-    # Done
-    summary
-    
     # Prompt to run auth
     prompt_auth
+    
+    # Done
+    summary
 }
 
 main "$@"
