@@ -24,7 +24,7 @@ from zerobus.sdk.shared import (
 
 ---
 
-## JSON Ingestion (Quick Start)
+<!-- ## JSON Ingestion (Quick Start)
 
 JSON is the simplest path. Pass Python dicts whose keys match the target table column names.
 
@@ -53,12 +53,13 @@ try:
         ack.wait_for_ack()  # Block until durably written
 finally:
     stream.close()
-```
+``` -->
 
 ---
 
 ## Protobuf Ingestion
 
+You must always use Protobuf
 For type-safe production workloads, use Protobuf. First generate and compile your `.proto` (see [4-protobuf-schema.md](4-protobuf-schema.md)), then:
 
 ```python

@@ -37,14 +37,44 @@ Zerobus Ingest is a serverless connector that enables direct, record-by-record d
 | Schema generation from UC table | Any | Protobuf | [4-protobuf-schema.md](4-protobuf-schema.md) |
 | Retry / reconnection logic | Any | Any | [5-operations-and-limits.md](5-operations-and-limits.md) |
 
+If not speficfied, default to python.
+
+---
+
+## Common Libraries
+
+These libraries are essential for ZeroBus data ingestion:
+
+- **databricks-sdk>=0.85.0**: Databricks workspace client for authentication and metadata
+- **databricks-zerobus-ingest-sdk>=0.2.0**: ZeroBus SDK for high-performance streaming ingestion
+- **grpcio-tools**
+These are typically NOT pre-installed on Databricks. Install them using `execute_databricks_command` tool:
+- `code`: "%pip install databricks-sdk>=VERSION databricks-zerobus-ingest-sdk>=VERSION"
+
+Save the returned `cluster_id` and `context_id` for subsequent calls.
+
+Smart Installation Approach
+
+# Check protobuf version first, then install compatible 
+grpcio-tools
+import google.protobuf
+runtime_version = google.protobuf.__version__
+print(f"Runtime protobuf version: {runtime_version}")
+
+if runtime_version.startswith("5.26") or
+runtime_version.startswith("5.29"):
+    %pip install grpcio-tools==1.62.0
+else:
+    %pip install grpcio-tools  # Use latest for newer protobuf 
+versions
 ---
 
 ## Prerequisites
 
-Before writing a Zerobus client, you need:
+You must never execute the skill without confirming the below objects are valid: 
 
 1. **A Unity Catalog managed Delta table** to ingest into
-2. **A service principal** with `MODIFY` and `SELECT` on the target table
+2. **A service principal id and secret** with `MODIFY` and `SELECT` on the target table
 3. **The Zerobus server endpoint** for your workspace region
 4. **The Zerobus Ingest SDK** installed for your target language
 
@@ -73,7 +103,7 @@ finally:
 
 ---
 
-## Reference Files
+## Detailed guides
 
 | Topic | File | When to Read |
 |-------|------|--------------|
@@ -85,13 +115,76 @@ finally:
 
 ---
 
-## Workflow
+You must always follow all the steps in the Workslfow
 
-1. **Setting up a new Zerobus client?** -> Read [1-setup-and-authentication.md](1-setup-and-authentication.md)
-2. **Building a Python producer?** -> Read [2-python-client.md](2-python-client.md)
-3. **Building in Java/Go/TypeScript/Rust?** -> Read [3-multilanguage-clients.md](3-multilanguage-clients.md)
-4. **Need type-safe Protobuf ingestion?** -> Read [4-protobuf-schema.md](4-protobuf-schema.md)
-5. **Production hardening / understanding limits?** -> Read [5-operations-and-limits.md](5-operations-and-limits.md)
+## Workflow
+0. **Display the plan of your execution**
+1. **Determinate the type of client**
+2. **Get schema** Always use 4-protobuf-schema.md. Execute using the `run_python_file_on_databricks` MCP tool
+3. **Write Python code to a local file follow the instructions in the relevant guide to ingest with zerobus** in the project (e.g., `scripts/zerobus_ingest.py`). 
+4. **Execute on Databricks** using the `run_python_file_on_databricks` MCP tool
+5. **If execution fails**: Edit the local file to fix the error, then re-execute
+6. **Reuse the context** for follow-up executions by passing the returned `cluster_id` and `context_id`
+
+---
+
+## Important
+- Never install local packages 
+- Always validate MCP server requirement before execution
+
+---
+
+### Context Reuse Pattern
+
+The first execution auto-selects a running cluster and creates an execution context. **Reuse this context for follow-up calls** - it's much faster (~1s vs ~15s) and shares variables/imports:
+
+**First execution** - use `run_python_file_on_databricks` tool:
+- `file_path`: "scripts/zerobus_ingest.py"
+
+Returns: `{ success, output, error, cluster_id, context_id, ... }`
+
+Save `cluster_id` and `context_id` for follow-up calls.
+
+**If execution fails:**
+1. Read the error from the result
+2. Edit the local Python file to fix the issue
+3. Re-execute with same context using `run_python_file_on_databricks` tool:
+   - `file_path`: "scripts/zerobus_ingest.py"
+   - `cluster_id`: "<saved_cluster_id>"
+   - `context_id`: "<saved_context_id>"
+
+**Follow-up executions** reuse the context (faster, shares state):
+- `file_path`: "scripts/validate_ingestion.py"
+- `cluster_id`: "<saved_cluster_id>"
+- `context_id`: "<saved_context_id>"
+
+### Handling Failures
+
+When execution fails:
+1. Read the error from the result
+2. **Edit the local Python file** to fix the issue
+3. Re-execute using the same `cluster_id` and `context_id` (faster, keeps installed libraries)
+4. If the context is corrupted, omit `context_id` to create a fresh one
+
+---
+
+### Installing Libraries
+
+Databricks provides Spark, pandas, numpy, and common data libraries by default. **Only install a library if you get an import error.**
+
+Use `execute_databricks_command` tool:
+- `code`: "%pip install databricks-zerobus-ingest-sdk>=0.2.0"
+- `cluster_id`: "<cluster_id>"
+- `context_id`: "<context_id>"
+
+The library is immediately available in the same context.
+
+**Note:** Keeping the same `context_id` means installed libraries persist across calls.
+
+## 🚨 Critical Learning: Timestamp Format Fix
+
+**BREAKTHROUGH**: ZeroBus requires **timestamp fields as Unix integer timestamps**, NOT string timestamps.
+The timestamp generation must use microseconds for Databricks.
 
 ---
 
