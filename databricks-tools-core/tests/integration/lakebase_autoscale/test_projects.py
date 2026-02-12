@@ -37,9 +37,7 @@ class TestListProjects:
         """The test project should appear in the list."""
         projects = list_projects()
         names = [p["name"] for p in projects]
-        assert lakebase_project_name in names, (
-            f"Test project '{lakebase_project_name}' not found in: {names}"
-        )
+        assert lakebase_project_name in names, f"Test project '{lakebase_project_name}' not found in: {names}"
 
 
 class TestGetProject:

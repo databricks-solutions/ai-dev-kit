@@ -78,9 +78,7 @@ class TestBranchLifecycle:
     """Test branch create, update, and delete lifecycle."""
 
     @pytest.mark.slow
-    def test_create_and_delete_branch(
-        self, lakebase_project_name, cleanup_branches, unique_name
-    ):
+    def test_create_and_delete_branch(self, lakebase_project_name, cleanup_branches, unique_name):
         """Create a branch from production and then delete it."""
         branch_id = f"test-br-{unique_name}"
         branch_full_name = f"{lakebase_project_name}/branches/{branch_id}"
@@ -107,9 +105,7 @@ class TestBranchLifecycle:
         assert del_result["status"] == "deleted"
 
     @pytest.mark.slow
-    def test_create_branch_no_expiry(
-        self, lakebase_project_name, cleanup_branches, unique_name
-    ):
+    def test_create_branch_no_expiry(self, lakebase_project_name, cleanup_branches, unique_name):
         """Create a permanent branch (no expiry)."""
         branch_id = f"test-perm-{unique_name}"
         branch_full_name = f"{lakebase_project_name}/branches/{branch_id}"
@@ -131,9 +127,7 @@ class TestBranchLifecycle:
         assert branch.get("expire_time") is None or "expire_time" not in branch
 
     @pytest.mark.slow
-    def test_protect_and_unprotect_branch(
-        self, lakebase_project_name, cleanup_branches, unique_name
-    ):
+    def test_protect_and_unprotect_branch(self, lakebase_project_name, cleanup_branches, unique_name):
         """Create a branch, protect it, then unprotect it."""
         branch_id = f"test-prot-{unique_name}"
         branch_full_name = f"{lakebase_project_name}/branches/{branch_id}"

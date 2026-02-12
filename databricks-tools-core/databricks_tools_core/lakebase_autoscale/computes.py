@@ -62,6 +62,7 @@ def create_endpoint(
             spec_kwargs["autoscaling_limit_max_cu"] = autoscaling_limit_max_cu
         if scale_to_zero_seconds is not None:
             from databricks.sdk.service.postgres import Duration
+
             spec_kwargs["suspend_timeout_duration"] = Duration(seconds=scale_to_zero_seconds)
 
         operation = client.postgres.create_endpoint(
@@ -258,6 +259,7 @@ def update_endpoint(
 
         if scale_to_zero_seconds is not None:
             from databricks.sdk.service.postgres import Duration
+
             spec_kwargs["suspend_timeout_duration"] = Duration(seconds=scale_to_zero_seconds)
             update_fields.append("spec.suspend_timeout_duration")
 

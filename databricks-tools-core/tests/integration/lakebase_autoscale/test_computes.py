@@ -55,11 +55,7 @@ class TestListEndpoints:
     def test_default_endpoint_is_read_write(self, lakebase_default_branch):
         """The default endpoint should be read-write."""
         endpoints = list_endpoints(lakebase_default_branch)
-        rw_endpoints = [
-            ep
-            for ep in endpoints
-            if "READ_WRITE" in ep.get("endpoint_type", "")
-        ]
+        rw_endpoints = [ep for ep in endpoints if "READ_WRITE" in ep.get("endpoint_type", "")]
         assert len(rw_endpoints) > 0, "Expected a read-write endpoint on production"
 
 
