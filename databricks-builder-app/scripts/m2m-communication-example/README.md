@@ -164,6 +164,32 @@ export DATABRICKS_TOKEN=dapi...
 
 The client sends it as `Authorization: Bearer <pat>`. The builder app resolves the PAT to your user identity the same way.
 
+### Cross-Workspace (Optional)
+
+By default this app authenticates to a builder app on the **same workspace** using the auto-provisioned SP. To call a builder app on a **different workspace**, set these env vars in `app.yaml`:
+
+**Option A -- PAT / token:**
+
+```yaml
+- name: BUILDER_DATABRICKS_HOST
+  value: "https://other-workspace.cloud.databricks.com"
+- name: BUILDER_DATABRICKS_TOKEN
+  value: "<pat-for-remote-workspace>"
+```
+
+**Option B -- SP credentials (recommended for production):**
+
+```yaml
+- name: BUILDER_DATABRICKS_HOST
+  value: "https://other-workspace.cloud.databricks.com"
+- name: BUILDER_DATABRICKS_CLIENT_ID
+  value: "<sp-client-id>"
+- name: BUILDER_DATABRICKS_CLIENT_SECRET
+  value: "<sp-client-secret>"
+```
+
+The SP must exist on the **target** workspace and have permissions to call the builder app. When these env vars are not set, the default same-workspace auto-auth is used.
+
 ## Troubleshooting
 
 ### "Failed to invoke agent" / 403

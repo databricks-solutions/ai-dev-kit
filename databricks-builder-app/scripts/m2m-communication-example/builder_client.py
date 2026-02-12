@@ -43,18 +43,19 @@ class BuilderClient:
   async def _get_auth_headers(self) -> dict[str, str]:
     """Get authorization headers for requests to the builder app.
 
-    In Databricks Apps runtime (no explicit token), uses the SDK's
-    authenticate() method which generates Bearer tokens from the calling
-    app's auto-provisioned service principal.
+    Auth priority:
+      1. Explicit token (constructor param or DATABRICKS_TOKEN env var)
+      2. Remote workspace credentials (BUILDER_DATABRICKS_HOST + token or SP creds)
+      3. Same-workspace auto-auth via WorkspaceClient().config.authenticate()
 
     Returns:
         Dict with Authorization header.
     """
-    # Local dev / explicit token path
+    # 1. Local dev / explicit token path
     if self._explicit_token:
       return {'Authorization': f'Bearer {self._explicit_token}'}
 
-    # Databricks Apps runtime — use WorkspaceClient M2M OAuth
+    # Check cached headers (applies to both remote and same-workspace paths)
     now = time.time()
     if self._auth_headers_cache and now < self._auth_expires_at:
       return self._auth_headers_cache
@@ -62,6 +63,31 @@ class BuilderClient:
     # Import here to avoid hard dependency when using explicit token
     from databricks.sdk import WorkspaceClient
 
+    # 2. Remote workspace credentials (for cross-workspace calls)
+    remote_host = os.environ.get('BUILDER_DATABRICKS_HOST')
+    if remote_host:
+      remote_token = os.environ.get('BUILDER_DATABRICKS_TOKEN')
+      client_id = os.environ.get('BUILDER_DATABRICKS_CLIENT_ID')
+      client_secret = os.environ.get('BUILDER_DATABRICKS_CLIENT_SECRET')
+
+      if remote_token:
+        # Static token — no caching needed, return directly
+        logger.info('Using BUILDER_DATABRICKS_TOKEN for remote workspace auth')
+        return {'Authorization': f'Bearer {remote_token}'}
+      elif client_id and client_secret:
+        # SP credentials for the remote workspace — generate OAuth token
+        logger.info(f'Refreshing auth via SP credentials for {remote_host}')
+        client = WorkspaceClient(
+          host=remote_host,
+          client_id=client_id,
+          client_secret=client_secret,
+        )
+        headers = client.config.authenticate()
+        self._auth_headers_cache = headers
+        self._auth_expires_at = now + 3000
+        return headers
+
+    # 3. Same-workspace auto-auth (default)
     logger.info('Refreshing auth headers via WorkspaceClient.config.authenticate()')
     client = WorkspaceClient()
     headers = client.config.authenticate()

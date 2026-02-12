@@ -27,6 +27,7 @@ _workspace_url_cache: Optional[str] = None
 # Cache for Bearer token -> user identity (keyed on token hash, 5-min TTL)
 _bearer_user_cache: dict[str, tuple[str, float]] = {}
 _BEARER_CACHE_TTL = 300  # 5 minutes
+_BEARER_CACHE_MAX_SIZE = 100  # Max unique tokens to cache
 
 
 def _is_local_development() -> bool:
@@ -202,6 +203,11 @@ async def _resolve_bearer_user(token: str) -> str:
 
   # Resolve identity via Databricks API (run sync SDK call in thread pool)
   identity = await asyncio.to_thread(_fetch_bearer_identity, token)
+
+  # Evict oldest entries if cache is full
+  if len(_bearer_user_cache) >= _BEARER_CACHE_MAX_SIZE:
+    oldest_key = min(_bearer_user_cache, key=lambda k: _bearer_user_cache[k][1])
+    del _bearer_user_cache[oldest_key]
 
   # Cache the result
   _bearer_user_cache[token_hash] = (identity, time.time())

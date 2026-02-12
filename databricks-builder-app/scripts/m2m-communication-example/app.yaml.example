@@ -19,3 +19,21 @@ command:
 env:
   - name: BUILDER_APP_URL
     value: "https://<workspace>.cloud.databricks.com/apps/<builder-app-name>"
+
+  # Optional: Cross-workspace configuration
+  # Set these to call a builder app on a different workspace.
+  # If not set, the app uses same-workspace auto-auth (default).
+  #
+  # Option A: Use a PAT or token for the remote workspace
+  # - name: BUILDER_DATABRICKS_HOST
+  #   value: "https://other-workspace.cloud.databricks.com"
+  # - name: BUILDER_DATABRICKS_TOKEN
+  #   value: "<pat-for-remote-workspace>"
+  #
+  # Option B: Use SP credentials (more production-appropriate)
+  # - name: BUILDER_DATABRICKS_HOST
+  #   value: "https://other-workspace.cloud.databricks.com"
+  # - name: BUILDER_DATABRICKS_CLIENT_ID
+  #   value: "<sp-client-id>"
+  # - name: BUILDER_DATABRICKS_CLIENT_SECRET
+  #   value: "<sp-client-secret>"
