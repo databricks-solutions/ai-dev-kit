@@ -463,6 +463,9 @@ prompt_profile() {
             [ "$p" = "DEFAULT" ] && state="on" && hint="default"
             items+=("${p}|${p}|${state}|${hint}")
         done
+        
+        # Add custom profile option at the end
+        items+=("Custom profile name...|__CUSTOM__|off|Enter a custom profile name")
 
         # If no DEFAULT profile exists, pre-select the first one
         local has_default=false
@@ -473,7 +476,18 @@ prompt_profile() {
             items[0]=$(echo "${items[0]}" | sed 's/|off|/|on|/')
         fi
 
-        PROFILE=$(radio_select "${items[@]}")
+        local selected_profile
+        selected_profile=$(radio_select "${items[@]}")
+        
+        # If custom was selected, prompt for name
+        if [ "$selected_profile" = "__CUSTOM__" ]; then
+            echo ""
+            local custom_name
+            custom_name=$(prompt "Enter profile name" "DEFAULT")
+            PROFILE="$custom_name"
+        else
+            PROFILE="$selected_profile"
+        fi
     else
         echo -e "  ${D}No ~/.databrickscfg found. You can authenticate after install.${N}"
         echo ""

@@ -510,11 +510,23 @@ function Invoke-PromptProfile {
             if ($p -eq "DEFAULT") { $sel = $true; $hint = "default" }
             $items += @{ Label = $p; Value = $p; Selected = $sel; Hint = $hint }
         }
-        if (-not $hasDefault -and $items.Count -gt 0) {
+        
+        # Add custom profile option at the end
+        $items += @{ Label = "Custom profile name..."; Value = "__CUSTOM__"; Selected = $false; Hint = "Enter a custom profile name" }
+        
+        if (-not $hasDefault -and $items.Count -gt 1) {
             $items[0].Selected = $true
         }
 
-        $script:Profile_ = Select-Radio -Items $items
+        $selectedProfile = Select-Radio -Items $items
+        
+        # If custom was selected, prompt for name
+        if ($selectedProfile -eq "__CUSTOM__") {
+            Write-Host ""
+            $script:Profile_ = Read-Prompt -PromptText "Enter profile name" -Default "DEFAULT"
+        } else {
+            $script:Profile_ = $selectedProfile
+        }
     } else {
         Write-Host "  No ~/.databrickscfg found. You can authenticate after install." -ForegroundColor DarkGray
         Write-Host ""
