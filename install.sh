@@ -657,7 +657,7 @@ install_skills() {
             claude) dirs="$base_dir/.claude/skills" ;;
             cursor) echo "$TOOLS" | grep -q claude || dirs="$dirs $base_dir/.cursor/skills" ;;
             copilot) dirs="$dirs $base_dir/.github/skills" ;;
-            codex) dirs="$dirs $base_dir/.agents/skills" ;;
+            codex) dirs="$dirs $base_dir/.codex/skills" ;;
         esac
     done
 
@@ -868,7 +868,7 @@ prompt_scope() {
     # Simple radio selector without Confirm button
     local -a labels=("Project" "Global")
     local -a values=("project" "global")
-    local -a hints=("Install in current directory (.cursor/ and .claude/)" "Install in home directory (~/.cursor/ and ~/.claude/)")
+    local -a hints=("Install in current directory (.cursor/, .claude/, and .codex/)" "Install in home directory (~/.cursor/, ~/.claude/, and ~/.codex/)")
     local count=2
     local selected=0
     local cursor=0

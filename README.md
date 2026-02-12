@@ -51,11 +51,12 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 - AI coding environment
   - [Claude Code](https://claude.ai/code)
   - [Cursor](https://cursor.com)
+  - [OpenAI Codex](https://developers.openai.com/codex)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.  
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude or .cursor_
+_Note: Project configuration files can be re-used in other projects. You can find these configs under `.claude`, `.cursor`, `.codex`, or `.vscode` depending on tool selection._
 
 #### Mac / Linux
 
@@ -83,7 +84,13 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 **Install for specific tools only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools codex
+```
+
+**Install Codex globally**
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools codex --global
 ```
 
 </details>
@@ -123,7 +130,13 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 **Install for specific tools only**
 
 ```powershell
-.\install.ps1 -Tools cursor
+.\install.ps1 -Tools codex
+```
+
+**Install Codex globally**
+
+```powershell
+.\install.ps1 -Tools codex -Global
 ```
 
 </details>

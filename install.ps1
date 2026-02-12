@@ -717,7 +717,7 @@ function Install-Skills {
                 }
             }
             "copilot" { $dirs += Join-Path $BaseDir ".github\skills" }
-            "codex"   { $dirs += Join-Path $BaseDir ".agents\skills" }
+            "codex"   { $dirs += Join-Path $BaseDir ".codex\skills" }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1003,7 +1003,7 @@ function Invoke-PromptScope {
     
     $labels = @("Project", "Global")
     $values = @("project", "global")
-    $hints = @("Install in current directory (.cursor/ and .claude/)", "Install in home directory (~/.cursor/ and ~/.claude/)")
+    $hints = @("Install in current directory (.cursor/, .claude/, and .codex/)", "Install in home directory (~/.cursor/, ~/.claude/, and ~/.codex/)")
     $count = 2
     $selected = 0
     $cursor = 0
@@ -1013,8 +1013,8 @@ function Invoke-PromptScope {
     if (-not $isInteractive) {
         # Fallback: numbered list
         Write-Host ""
-        Write-Host "  1. (*) Project  Install in current directory (.cursor/ and .claude/)"
-        Write-Host "  2. ( ) Global   Install in home directory (~/.cursor/ and ~/.claude/)"
+        Write-Host "  1. (*) Project  Install in current directory (.cursor/, .claude/, and .codex/)"
+        Write-Host "  2. ( ) Global   Install in home directory (~/.cursor/, ~/.claude/, and ~/.codex/)"
         Write-Host ""
         Write-Host "  Enter number to select (or press Enter for default): " -NoNewline
         $input_ = Read-Host
