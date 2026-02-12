@@ -4,17 +4,27 @@
 #
 # Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
 #
-# Usage (with environment variables - cleaner):
-#   curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
-#   DEVKIT_PROFILE=dev_profile DEVKIT_TOOLS=cursor curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
-#   DEVKIT_SILENT=true DEVKIT_FORCE=true curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
+# Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
-# Usage (with command-line flags):
-#   curl -sL ... | bash -s -- --global
-#   curl -sL ... | bash -s -- --skills-only
-#   curl -sL ... | bash -s -- --mcp-only
-#   curl -sL ... | bash -s -- --tools cursor,codex,copilot
-#   curl -sL ... | bash -s -- --force
+# Examples:
+#   # Basic installation (project scoped, prompts for inputs)
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+#
+#   # Global installation with force reinstall
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --global --force
+#
+#   # Specify profile and force reinstall
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --profile DEFAULT --force
+#
+#   # Install for specific tools only
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,codex,copilot
+#
+#   # Skills only (skip MCP server)
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-only
+#
+# Alternative: Use environment variables
+#   DEVKIT_TOOLS=cursor curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
+#   DEVKIT_FORCE=true DEVKIT_PROFILE=DEFAULT curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
 #
 
 set -e

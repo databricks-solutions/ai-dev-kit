@@ -3,13 +3,27 @@
 #
 # Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
 #
-# Usage:
+# Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
+#        .\install.ps1 [OPTIONS]
+#
+# Examples:
+#   # Basic installation (uses DEFAULT profile, project scope)
 #   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex
-#   .\install.ps1 -Global
+#
+#   # Download and run with options
+#   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
+#
+#   # Global installation with force reinstall
+#   .\install.ps1 -Global -Force
+#
+#   # Specify profile and force reinstall
+#   .\install.ps1 -Profile DEFAULT -Force
+#
+#   # Install for specific tools only
+#   .\install.ps1 -Tools cursor
+#
+#   # Skills only (skip MCP server)
 #   .\install.ps1 -SkillsOnly
-#   .\install.ps1 -McpOnly
-#   .\install.ps1 -Tools cursor,codex,copilot
-#   .\install.ps1 -Force
 #
 
 $ErrorActionPreference = "Stop"
@@ -96,7 +110,7 @@ while ($i -lt $args.Count) {
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
             Write-Host ""
-            Write-Host "Usage: irm .../install.ps1 | iex"
+            Write-Host "Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1"
             Write-Host "       .\install.ps1 [OPTIONS]"
             Write-Host ""
             Write-Host "Options:"
@@ -109,6 +123,17 @@ while ($i -lt $args.Count) {
             Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
+            Write-Host ""
+            Write-Host "Examples:"
+            Write-Host "  # Basic installation"
+            Write-Host "  irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex"
+            Write-Host ""
+            Write-Host "  # Download and run with options"
+            Write-Host "  irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1"
+            Write-Host "  .\install.ps1 -Global -Force"
+            Write-Host ""
+            Write-Host "  # Specify profile and force reinstall"
+            Write-Host "  .\install.ps1 -Profile DEFAULT -Force"
             return
         }
         default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
