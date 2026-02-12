@@ -468,9 +468,17 @@ class TestApprovalTokenEnforcement:
                 tag_name="pii",
             )
 
-    def test_create_with_invalid_token_raises(self):
+    def test_create_with_invalid_token_raises_value_error(self):
         """create_fgac_policy with an invalid token should raise ValueError."""
-        with pytest.raises((ValueError, PermissionError)):
+        with pytest.raises(ValueError, match="Invalid or expired approval token"):
+            # Call the token validator directly to isolate from admin group check
+            from databricks_tools_core.unity_catalog.fgac_policies import _validate_approval_token
+
+            _validate_approval_token("garbage", {"action": "create"})
+
+    def test_create_without_admin_group_raises_permission_error(self):
+        """create_fgac_policy should raise PermissionError if user is not in admin group."""
+        with pytest.raises(PermissionError, match="not a member of admin group"):
             create_fgac_policy(
                 policy_name="test_bad_token",
                 policy_type="COLUMN_MASK",
