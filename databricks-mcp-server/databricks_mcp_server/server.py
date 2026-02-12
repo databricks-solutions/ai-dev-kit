@@ -33,4 +33,5 @@ from .tools import (  # noqa: F401, E402
     lakebase,
     lakebase_autoscale,
     user,
+    fgac_policies,
 )

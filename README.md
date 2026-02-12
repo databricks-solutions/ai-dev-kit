@@ -21,7 +21,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 - **Spark Declarative Pipelines** (streaming tables, CDC, SCD Type 2, Auto Loader)
 - **Databricks Jobs** (scheduled workflows, multi-task DAGs)
 - **AI/BI Dashboards** (visualizations, KPIs, analytics)
-- **Unity Catalog** (tables, volumes, governance)
+- **Unity Catalog** (tables, volumes, governance, FGAC column masks & row filters)
 - **Genie Spaces** (natural language data exploration)
 - **Knowledge Assistants** (RAG-based document Q&A)
 - **MLflow Experiments** (evaluation, scoring, traces)

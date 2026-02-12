@@ -5,7 +5,6 @@ Provides hybrid trace source selection:
 2. Local fallback (~/.claude/projects/{hash}/*.jsonl)
 """
 
-import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path

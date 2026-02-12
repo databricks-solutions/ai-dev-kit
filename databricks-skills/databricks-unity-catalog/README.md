@@ -1,10 +1,10 @@
 # Databricks Unity Catalog
 
-Unity Catalog system tables and volumes -- query audit logs, lineage, billing, and manage volume file operations.
+Unity Catalog system tables, volumes, access controls (ACLs), and FGAC policy governance (column masks, row filters, governed tags).
 
 ## Overview
 
-This skill provides guidance for working with Unity Catalog system tables and volumes. It activates when users query system tables (audit, lineage, billing, compute, jobs, query history), perform volume file operations (upload, download, list files), or need to understand governance and access controls. The skill covers the `system` catalog schemas, SQL grant patterns, and MCP tool integration for both system table queries and volume management.
+This skill provides guidance for working with Unity Catalog system tables, volumes, access controls, and Fine-Grained Access Control (FGAC) policies. It activates when users query system tables (audit, lineage, billing, compute, jobs, query history), perform volume file operations (upload, download, list files), manage UC permissions (GRANT/REVOKE), or manage FGAC policies (column masks, row filters, governed tags, masking UDFs).
 
 ## What's Included
 
@@ -12,7 +12,11 @@ This skill provides guidance for working with Unity Catalog system tables and vo
 databricks-unity-catalog/
 ├── SKILL.md
 ├── 5-system-tables.md
-└── 6-volumes.md
+├── 6-volumes.md
+├── 7-fgac-overview.md
+├── 8-fgac-sql-generation.md
+├── 9-fgac-sdk-and-tools.md
+└── 10-uc-acls.md
 ```
 
 ## Key Topics
@@ -36,6 +40,9 @@ databricks-unity-catalog/
 - Tracking table dependencies and column-level lineage
 - Reviewing job execution history and query performance
 - Setting up governance and access controls for system data
+- Managing FGAC policies: column masks, row filters, governed tags
+- Analyzing FGAC coverage gaps and policy quotas
+- Granting and revoking UC permissions (ACLs)
 
 ## Related Skills
 

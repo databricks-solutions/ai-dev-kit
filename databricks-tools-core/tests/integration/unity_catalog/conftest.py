@@ -230,3 +230,39 @@ def cleanup_functions():
             delete_function(fn_name, force=True)
         except Exception as e:
             logger.warning(f"Failed to cleanup function {fn_name}: {e}")
+
+
+@pytest.fixture(scope="function")
+def cleanup_policies():
+    """
+    Track and cleanup FGAC policies created during tests.
+
+    Usage:
+        def test_create_policy(cleanup_policies):
+            create_fgac_policy(...)
+            cleanup_policies((policy_name, securable_type, securable_fullname))
+    """
+    from databricks_tools_core.auth import get_workspace_client
+
+    policies_to_cleanup = []
+
+    def register(policy_tuple: tuple):
+        """Register a policy for cleanup. Tuple: (name, securable_type, securable_fullname)."""
+        if policy_tuple not in policies_to_cleanup:
+            policies_to_cleanup.append(policy_tuple)
+            logger.info(f"Registered policy for cleanup: {policy_tuple[0]}")
+
+    yield register
+
+    # Use SDK directly to bypass approval token guardrails during cleanup
+    w = get_workspace_client()
+    for name, stype, sfullname in policies_to_cleanup:
+        try:
+            logger.info(f"Cleaning up policy: {name}")
+            w.policies.delete_policy(
+                on_securable_type=stype,
+                on_securable_fullname=sfullname,
+                name=name,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to cleanup policy {name}: {e}")

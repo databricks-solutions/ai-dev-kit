@@ -112,6 +112,24 @@ from .security_policies import (
     drop_column_mask,
 )
 
+# FGAC policies
+from .fgac_policies import (
+    list_fgac_policies,
+    get_fgac_policy,
+    get_table_policies,
+    get_masking_functions,
+    get_column_tags_api,
+    get_schema_info,
+    get_catalog_info,
+    list_table_policies_in_schema,
+    analyze_fgac_coverage,
+    check_policy_quota,
+    preview_policy_changes,
+    create_fgac_policy,
+    update_fgac_policy,
+    delete_fgac_policy,
+)
+
 # Quality monitors
 from .monitors import (
     create_monitor,
@@ -226,6 +244,21 @@ __all__ = [
     "drop_row_filter",
     "set_column_mask",
     "drop_column_mask",
+    # FGAC policies
+    "list_fgac_policies",
+    "get_fgac_policy",
+    "get_table_policies",
+    "get_masking_functions",
+    "get_column_tags_api",
+    "get_schema_info",
+    "get_catalog_info",
+    "list_table_policies_in_schema",
+    "analyze_fgac_coverage",
+    "check_policy_quota",
+    "preview_policy_changes",
+    "create_fgac_policy",
+    "update_fgac_policy",
+    "delete_fgac_policy",
     # Quality monitors
     "create_monitor",
     "get_monitor",

@@ -172,6 +172,14 @@ Claude now has both:
 | `publish_dashboard` | Publish a dashboard to make it accessible |
 | `unpublish_dashboard` | Unpublish a dashboard |
 
+### Unity Catalog FGAC Governance
+
+| Tool | Description |
+|------|-------------|
+| `manage_uc_fgac_policies` | Unified tool for FGAC policy governance — dispatches to discovery, analysis, preview, and management actions via the `action` parameter |
+
+**Actions:** `list_fgac_policies`, `get_fgac_policy`, `get_table_policies`, `get_masking_functions`, `get_column_tags_api`, `get_schema_info`, `get_catalog_info`, `list_table_policies_in_schema`, `analyze_fgac_coverage`, `check_policy_quota`, `preview_policy_changes`, `create_fgac_policy`, `update_fgac_policy`, `delete_fgac_policy`
+
 ### Model Serving
 
 | Tool | Description |
@@ -204,6 +212,7 @@ Claude now has both:
 │  tools/pipelines.py ────────┤                               │
 │  tools/agent_bricks.py ─────┤                               │
 │  tools/aibi_dashboards.py ──┤                               │
+│  tools/fgac_policies.py ────┤                               │
 │  tools/serving.py ──────────┘                               │
 └──────────────────────────────┬──────────────────────────────┘
                                │ Python imports
