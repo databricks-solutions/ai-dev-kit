@@ -978,9 +978,6 @@ function Show-Summary {
     Write-Host ""
     Write-Msg "Next steps:"
     $step = 1
-    Write-Msg "$step. Configure profile $($script:Profile_) or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN."
-    Write-Msg "   Authenticate: databricks auth login --profile $($script:Profile_)"
-    $step++
     if ($script:Tools -match 'cursor') {
         Write-Msg "$step. Enable MCP in Cursor: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
         $step++
