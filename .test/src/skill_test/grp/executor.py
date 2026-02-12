@@ -156,7 +156,10 @@ def verify_sql_structure(code: str) -> ExecutionResult:
     issues = []
 
     # Check for valid SQL statements
-    statements = ["SELECT", "CREATE", "INSERT", "UPDATE", "DELETE", "WITH", "MERGE"]
+    statements = [
+        "SELECT", "CREATE", "INSERT", "UPDATE", "DELETE", "WITH", "MERGE",
+        "ALTER", "DROP", "GRANT", "REVOKE", "SET", "SHOW", "DESCRIBE", "MATCH",
+    ]
     has_statement = any(stmt in code.upper() for stmt in statements)
     if not has_statement:
         issues.append("No recognizable SQL statement found")

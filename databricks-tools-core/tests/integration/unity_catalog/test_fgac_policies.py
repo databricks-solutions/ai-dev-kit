@@ -128,7 +128,8 @@ class TestListFgacPolicies:
 
         assert result["success"] is True
         for p in result["policies"]:
-            assert p.get("policy_type") == "COLUMN_MASK"
+            # SDK returns POLICY_TYPE_COLUMN_MASK; accept both forms
+            assert p.get("policy_type") in ("COLUMN_MASK", "POLICY_TYPE_COLUMN_MASK")
         logger.info(f"Found {result['policy_count']} COLUMN_MASK policies")
 
     def test_list_policies_without_inherited(self, test_catalog: str):
@@ -662,6 +663,8 @@ class TestApprovalTokenEnforcement:
 
     def test_create_without_admin_group_raises_permission_error(self):
         """create_fgac_policy should raise PermissionError if user is not in admin group."""
+        import databricks_tools_core.unity_catalog.fgac_policies as fgac_mod
+
         # Get a valid token via preview so we pass token validation
         preview = preview_policy_changes(
             action="CREATE",
@@ -673,17 +676,23 @@ class TestApprovalTokenEnforcement:
             function_name="cat.sch.fn",
             tag_name="pii",
         )
-        with pytest.raises(PermissionError, match="not a member of admin group"):
-            create_fgac_policy(
-                policy_name="test_admin_check",
-                policy_type="COLUMN_MASK",
-                securable_type="SCHEMA",
-                securable_fullname="cat.sch",
-                function_name="cat.sch.fn",
-                to_principals=["analysts"],
-                tag_name="pii",
-                approval_token=preview["approval_token"],
-            )
+        # Temporarily set admin group to a non-existent group so the check fails
+        original = fgac_mod._ADMIN_GROUP
+        try:
+            fgac_mod._ADMIN_GROUP = "nonexistent_group_xyz_12345"
+            with pytest.raises(PermissionError, match="not a member of admin group"):
+                create_fgac_policy(
+                    policy_name="test_admin_check",
+                    policy_type="COLUMN_MASK",
+                    securable_type="SCHEMA",
+                    securable_fullname="cat.sch",
+                    function_name="cat.sch.fn",
+                    to_principals=["analysts"],
+                    tag_name="pii",
+                    approval_token=preview["approval_token"],
+                )
+        finally:
+            fgac_mod._ADMIN_GROUP = original
 
     def test_preview_returns_approval_token(self):
         """preview_policy_changes should return an approval_token."""

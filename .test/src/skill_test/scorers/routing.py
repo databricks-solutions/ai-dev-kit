@@ -30,6 +30,27 @@ SKILL_TRIGGERS = {
     "synthetic-data-generation": ["synthetic data", "fake data", "generate data", "mock data", "faker"],
     "mlflow-evaluation": ["mlflow eval", "evaluate agent", "scorer", "genai.evaluate", "llm judge"],
     "agent-bricks": ["agent brick", "knowledge assistant", "genie", "multi-agent", "supervisor"],
+    "databricks-unity-catalog": [
+        "fgac",
+        "column mask",
+        "row filter",
+        "governed tag",
+        "masking udf",
+        "create policy",
+        "drop policy",
+        "hastagvalue",
+        "hastag",
+        "pii classification",
+        "grant select",
+        "grant use",
+        "revoke",
+        "permissions",
+        "acl",
+        "access control",
+        "read-only access",
+        "ownership",
+        "owner to",
+    ],
 }
 
 
