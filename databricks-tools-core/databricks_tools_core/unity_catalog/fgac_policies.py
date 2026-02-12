@@ -638,9 +638,10 @@ def create_fgac_policy(
     Returns:
         Dict with creation status and policy details
     """
-    _check_admin_group()
     ptype = _validate_policy_type(policy_type)
     stype = _validate_securable_type(securable_type)
+    _validate_identifier(securable_fullname)
+    _validate_identifier(function_name)
     current_params = {
         "action": "create",
         "policy_name": policy_name,
@@ -658,9 +659,7 @@ def create_fgac_policy(
     if comment:
         current_params["comment"] = comment
     _validate_approval_token(approval_token, current_params)
-
-    _validate_identifier(securable_fullname)
-    _validate_identifier(function_name)
+    _check_admin_group()
 
     from databricks.sdk.service.catalog import (
         ColumnMaskOptions,
@@ -746,8 +745,8 @@ def update_fgac_policy(
     Returns:
         Dict with update status and applied changes
     """
-    _check_admin_group()
     stype = _validate_securable_type(securable_type)
+    _validate_identifier(securable_fullname)
     current_params = {
         "action": "update",
         "policy_name": policy_name,
@@ -761,8 +760,7 @@ def update_fgac_policy(
     if comment is not None:
         current_params["comment"] = comment
     _validate_approval_token(approval_token, current_params)
-
-    _validate_identifier(securable_fullname)
+    _check_admin_group()
 
     from databricks.sdk.service.catalog import PolicyInfo
 
@@ -840,7 +838,6 @@ def delete_fgac_policy(
     Returns:
         Dict with deletion status
     """
-    _check_admin_group()
     stype = _validate_securable_type(securable_type)
     _validate_identifier(securable_fullname)
     current_params = {
@@ -850,6 +847,7 @@ def delete_fgac_policy(
         "securable_fullname": securable_fullname,
     }
     _validate_approval_token(approval_token, current_params)
+    _check_admin_group()
 
     w = get_workspace_client()
     w.policies.delete_policy(

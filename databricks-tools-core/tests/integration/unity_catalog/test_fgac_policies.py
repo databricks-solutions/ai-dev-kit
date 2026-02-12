@@ -469,16 +469,8 @@ class TestApprovalTokenEnforcement:
             )
 
     def test_create_with_invalid_token_raises_value_error(self):
-        """create_fgac_policy with an invalid token should raise ValueError."""
+        """create_fgac_policy with an invalid token should raise ValueError before admin check."""
         with pytest.raises(ValueError, match="Invalid or expired approval token"):
-            # Call the token validator directly to isolate from admin group check
-            from databricks_tools_core.unity_catalog.fgac_policies import _validate_approval_token
-
-            _validate_approval_token("garbage", {"action": "create"})
-
-    def test_create_without_admin_group_raises_permission_error(self):
-        """create_fgac_policy should raise PermissionError if user is not in admin group."""
-        with pytest.raises(PermissionError, match="not a member of admin group"):
             create_fgac_policy(
                 policy_name="test_bad_token",
                 policy_type="COLUMN_MASK",
@@ -488,6 +480,31 @@ class TestApprovalTokenEnforcement:
                 to_principals=["analysts"],
                 tag_name="pii",
                 approval_token="garbage",
+            )
+
+    def test_create_without_admin_group_raises_permission_error(self):
+        """create_fgac_policy should raise PermissionError if user is not in admin group."""
+        # Get a valid token via preview so we pass token validation
+        preview = preview_policy_changes(
+            action="CREATE",
+            policy_name="test_admin_check",
+            securable_type="SCHEMA",
+            securable_fullname="cat.sch",
+            policy_type="COLUMN_MASK",
+            to_principals=["analysts"],
+            function_name="cat.sch.fn",
+            tag_name="pii",
+        )
+        with pytest.raises(PermissionError, match="not a member of admin group"):
+            create_fgac_policy(
+                policy_name="test_admin_check",
+                policy_type="COLUMN_MASK",
+                securable_type="SCHEMA",
+                securable_fullname="cat.sch",
+                function_name="cat.sch.fn",
+                to_principals=["analysts"],
+                tag_name="pii",
+                approval_token=preview["approval_token"],
             )
 
     def test_preview_returns_approval_token(self):
