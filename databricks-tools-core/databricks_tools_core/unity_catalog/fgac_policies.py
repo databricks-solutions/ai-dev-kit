@@ -33,7 +33,7 @@ _VALID_SECURABLE_TYPES = {"CATALOG", "SCHEMA", "TABLE"}
 _VALID_POLICY_TYPES = {"COLUMN_MASK", "ROW_FILTER"}
 _POLICY_QUOTAS = {"CATALOG": 10, "SCHEMA": 10, "TABLE": 5}
 
-_APPROVAL_SECRET = os.environ.get("FGAC_APPROVAL_SECRET", "fgac-default-dev-secret")
+_APPROVAL_SECRET = os.environ.get("FGAC_APPROVAL_SECRET") or os.urandom(32).hex()
 _ADMIN_GROUP = os.environ.get("FGAC_ADMIN_GROUP", "admins")
 _TOKEN_TTL_SECONDS = 600  # 10 minutes
 
