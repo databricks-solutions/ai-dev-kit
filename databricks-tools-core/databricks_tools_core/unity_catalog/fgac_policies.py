@@ -36,6 +36,8 @@ _POLICY_QUOTAS = {"CATALOG": 10, "SCHEMA": 10, "TABLE": 5}
 _APPROVAL_SECRET = os.environ.get("FGAC_APPROVAL_SECRET", "fgac-default-dev-secret")
 _ADMIN_GROUP = os.environ.get("FGAC_ADMIN_GROUP", "admins")
 _TOKEN_TTL_SECONDS = 600  # 10 minutes
+
+
 def _generate_approval_token(params: dict) -> str:
     """Generate an HMAC-based approval token binding preview params to a timestamp."""
     clean_params = {k: v for k, v in params.items() if v is not None}
@@ -215,9 +217,11 @@ def list_fgac_policies(
         # SDK returns POLICY_TYPE_COLUMN_MASK / POLICY_TYPE_ROW_FILTER
         sdk_ptype = f"POLICY_TYPE_{ptype}"
         policies = [
-            p for p in policies
+            p
+            for p in policies
             if str(getattr(p, "policy_type", "")) in (ptype, sdk_ptype)
-            or (p.as_dict() if hasattr(p, "as_dict") else {}).get("policy_type") in (ptype, sdk_ptype)
+            or (p.as_dict() if hasattr(p, "as_dict") else {}).get("policy_type")
+            in (ptype, sdk_ptype)
         ]
 
     policy_dicts = [_policy_to_dict(p) for p in policies]
@@ -303,20 +307,24 @@ def get_table_policies(
                 if fn and fn not in mask_functions:
                     mask_functions.append(fn)
 
-            column_masks.append({
-                "column_name": col.get("name"),
-                "column_type": col.get("type_name"),
-                "mask_functions": mask_functions,
-            })
+            column_masks.append(
+                {
+                    "column_name": col.get("name"),
+                    "column_type": col.get("type_name"),
+                    "mask_functions": mask_functions,
+                }
+            )
 
     row_filters = []
     row_filters_data = result.get("row_filters", {})
     if row_filters_data:
         for rf in row_filters_data.get("row_filters", []):
-            row_filters.append({
-                "function_name": rf.get("function_name"),
-                "input_column_names": rf.get("input_column_names", []),
-            })
+            row_filters.append(
+                {
+                    "function_name": rf.get("function_name"),
+                    "input_column_names": rf.get("input_column_names", []),
+                }
+            )
 
     return {
         "success": True,
@@ -351,13 +359,15 @@ def get_masking_functions(
 
     func_list = []
     for f in functions:
-        func_list.append({
-            "name": f.name,
-            "full_name": f.full_name,
-            "return_type": str(f.data_type) if f.data_type else None,
-            "comment": getattr(f, "comment", None),
-            "is_deterministic": getattr(f, "is_deterministic", None),
-        })
+        func_list.append(
+            {
+                "name": f.name,
+                "full_name": f.full_name,
+                "return_type": str(f.data_type) if f.data_type else None,
+                "comment": getattr(f, "comment", None),
+                "is_deterministic": getattr(f, "is_deterministic", None),
+            }
+        )
 
     return {
         "success": True,
@@ -402,7 +412,8 @@ def check_policy_quota(
 
     # Count only direct policies (not inherited)
     direct = [
-        p for p in existing
+        p
+        for p in existing
         if getattr(p, "on_securable_fullname", None) == securable_fullname
     ]
 
@@ -460,7 +471,9 @@ def preview_policy_changes(
     """
     action = action.upper()
     if action not in ("CREATE", "UPDATE", "DELETE"):
-        raise ValueError(f"Invalid action: '{action}'. Must be CREATE, UPDATE, or DELETE")
+        raise ValueError(
+            f"Invalid action: '{action}'. Must be CREATE, UPDATE, or DELETE"
+        )
 
     stype = _validate_securable_type(securable_type)
     _validate_identifier(securable_fullname)
@@ -480,7 +493,8 @@ def preview_policy_changes(
             raise ValueError("to_principals is required for CREATE action")
 
         tag_match = (
-            f"hasTagValue('{tag_name}', '{tag_value}')" if tag_value
+            f"hasTagValue('{tag_name}', '{tag_value}')"
+            if tag_value
             else f"hasTag('{tag_name}')"
         )
 
@@ -564,7 +578,9 @@ def preview_policy_changes(
             "securable": f"{stype} {securable_fullname}",
             "equivalent_sql": equivalent_sql,
         }
-        warnings.append("This action is irreversible. The policy will be permanently removed.")
+        warnings.append(
+            "This action is irreversible. The policy will be permanently removed."
+        )
 
     # Generate approval token binding these params
     token_params = {
@@ -676,7 +692,8 @@ def create_fgac_policy(
 
     # Build tag match condition
     tag_condition = (
-        f"hasTagValue('{tag_name}', '{tag_value}')" if tag_value
+        f"hasTagValue('{tag_name}', '{tag_value}')"
+        if tag_value
         else f"hasTag('{tag_name}')"
     )
     alias = "masked_col" if ptype == "COLUMN_MASK" else "filter_col"
