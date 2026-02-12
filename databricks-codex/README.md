@@ -210,6 +210,10 @@ new_id = manager.fork_session(
 ## Testing
 
 ```bash
+# Export Databricks env vars in your shell for integration tests
+export DATABRICKS_HOST="https://<your-workspace-host>"
+export DATABRICKS_TOKEN="<your-pat>"
+
 # Run unit tests
 pytest tests/ -v --ignore=tests/integration
 

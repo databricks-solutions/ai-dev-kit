@@ -18,6 +18,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "integration: marks tests as integration tests (require Codex + Databricks)"
     )
+    config.addinivalue_line(
+        "markers", "databricks_codex_itest: databricks-codex-itest label for asset-creation tests"
+    )
 
 
 @pytest.fixture(scope="session")
@@ -55,27 +58,32 @@ def codex_authenticated(codex_installed):
 
 @pytest.fixture(scope="session")
 def databricks_connected():
-    """Verify Databricks connection."""
-    # Check environment variables first
+    """Verify Databricks connection from shell environment variables only."""
     host = os.environ.get("DATABRICKS_HOST")
     token = os.environ.get("DATABRICKS_TOKEN")
 
-    if host and token:
-        logger.info(f"Databricks configured via environment: {host}")
-        return {"host": host, "token": token}
+    if not host or not token:
+        pytest.skip("Set DATABRICKS_HOST and DATABRICKS_TOKEN in shell environment")
 
-    # Try SDK
     try:
         from databricks.sdk import WorkspaceClient
+        from databricks.sdk import config as sdk_config
 
-        client = WorkspaceClient()
+        # Keep fixture-level connectivity checks fast and explicit.
+        cfg = sdk_config.Config(
+            host=host,
+            token=token,
+            http_timeout_seconds=10,
+            retry_timeout_seconds=20,
+        )
+        client = WorkspaceClient(config=cfg)
         user = client.current_user.me()
-        logger.info(f"Databricks connected as: {user.user_name}")
-        return {"host": client.config.host, "client": client}
+        logger.info(f"Databricks connected via environment as: {user.user_name}")
+        return {"host": client.config.host, "token": token, "client": client}
     except ImportError:
         pytest.skip("databricks-sdk not installed")
     except Exception as e:
-        pytest.skip(f"Databricks not configured: {e}")
+        pytest.skip(f"Databricks env configured but not reachable: {e}")
 
 
 @pytest.fixture(scope="session")
