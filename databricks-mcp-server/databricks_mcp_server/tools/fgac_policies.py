@@ -5,7 +5,7 @@ Consolidated MCP tool for managing Fine-Grained Access Control (FGAC) policies.
 Dispatches to core functions in databricks-tools-core based on the action parameter.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from databricks_tools_core.unity_catalog import (
     list_fgac_policies as _list_fgac_policies,
@@ -54,12 +54,15 @@ def manage_uc_fgac_policies(
     - list: List policies on a securable. Params: securable_type, securable_fullname, include_inherited, policy_type
     - get: Get a specific policy. Params: policy_name, securable_type, securable_fullname
     - get_table_policies: Get column masks and row filters on a table. Params: catalog, schema, table
-    - get_masking_functions: List masking UDFs in a schema. Params: catalog, schema (or udf_catalog, udf_schema to discover UDFs in a different catalog/schema)
+    - get_masking_functions: List masking UDFs in a schema. Params: catalog, schema
+        (or udf_catalog, udf_schema for UDFs in a different catalog/schema)
     - check_quota: Check policy quota on a securable. Params: securable_type, securable_fullname
-    - preview: Preview policy changes without executing. Params: preview_action ("CREATE"/"UPDATE"/"DELETE"),
-        policy_name, securable_type, securable_fullname, plus policy_type/function_name/tag_name/to_principals for CREATE
-    - create: Create an FGAC policy. Params: policy_name, policy_type ("COLUMN_MASK"/"ROW_FILTER"),
-        securable_type, securable_fullname, function_name, to_principals, tag_name, tag_value, except_principals, comment,
+    - preview: Preview policy changes without executing. Params: preview_action
+        ("CREATE"/"UPDATE"/"DELETE"), policy_name, securable_type, securable_fullname,
+        plus policy_type/function_name/tag_name/to_principals for CREATE
+    - create: Create an FGAC policy. Params: policy_name,
+        policy_type ("COLUMN_MASK"/"ROW_FILTER"), securable_type, securable_fullname,
+        function_name, to_principals, tag_name, tag_value, except_principals, comment,
         approval_token (required, from preview)
     - update: Update policy principals or comment. Params: policy_name, securable_type, securable_fullname,
         to_principals, except_principals, comment, approval_token (required, from preview)

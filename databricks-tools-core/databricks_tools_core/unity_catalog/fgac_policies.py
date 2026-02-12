@@ -553,7 +553,8 @@ def preview_policy_changes(
             "securable": f"{stype} {securable_fullname}",
             "changes": changes,
             "equivalent_sql": f"-- UPDATE via SDK: w.policies.update_policy(name='{policy_name}', ...)",
-            "note": "update_policy only modifies principals and comment. To change UDF, tags, or scope, drop and recreate.",
+            "note": "update_policy only modifies principals and comment. "
+            "To change UDF, tags, or scope, drop and recreate.",
         }
 
     else:  # DELETE
