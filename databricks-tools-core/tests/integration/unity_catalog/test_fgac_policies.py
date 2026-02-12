@@ -33,6 +33,11 @@ from databricks_tools_core.unity_catalog.fgac_policies import (
     get_fgac_policy,
     get_table_policies,
     get_masking_functions,
+    get_column_tags_api,
+    get_schema_info,
+    get_catalog_info,
+    list_table_policies_in_schema,
+    analyze_fgac_coverage,
     check_policy_quota,
     preview_policy_changes,
     create_fgac_policy,
@@ -171,6 +176,148 @@ class TestGetMaskingFunctions:
         expected_name = f"{UC_TEST_PREFIX}_mask_{unique_name}"
         assert expected_name in func_names, f"Expected {expected_name} in {func_names}"
         logger.info(f"Found {result['function_count']} functions in schema")
+
+
+# ---------------------------------------------------------------------------
+# Analysis & Discovery tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestGetColumnTagsApi:
+    """Tests for get_column_tags_api."""
+
+    def test_get_column_tags_api(
+        self,
+        test_catalog: str,
+        uc_test_schema: str,
+        uc_test_table: str,
+        unique_name: str,
+        warehouse_id: str,
+    ):
+        """Should return column tags for a table."""
+        parts = uc_test_table.split(".")
+        tag_key = f"uc_test_tag_{unique_name}"
+
+        # Tag a column so there's something to find
+        set_tags(
+            object_type="column",
+            full_name=uc_test_table,
+            column_name="email",
+            tags={tag_key: "test_val"},
+            warehouse_id=warehouse_id,
+        )
+
+        result = get_column_tags_api(
+            catalog=parts[0],
+            schema=parts[1],
+            table=parts[2],
+        )
+
+        assert result["success"] is True
+        assert result["table"] == uc_test_table
+        assert isinstance(result["tags"], list)
+        logger.info(f"Found {len(result['tags'])} column tags on {uc_test_table}")
+
+
+@pytest.mark.integration
+class TestGetSchemaInfo:
+    """Tests for get_schema_info."""
+
+    def test_get_schema_info(self, test_catalog: str, uc_test_schema: str):
+        """Should return schema metadata."""
+        result = get_schema_info(
+            catalog=test_catalog,
+            schema=uc_test_schema,
+        )
+
+        assert result["success"] is True
+        assert result["schema"]["name"] == uc_test_schema
+        assert result["schema"]["catalog_name"] == test_catalog
+        assert result["schema"]["full_name"] == f"{test_catalog}.{uc_test_schema}"
+        assert "owner" in result["schema"]
+        logger.info(f"Schema info: {result['schema']['full_name']} owned by {result['schema']['owner']}")
+
+
+@pytest.mark.integration
+class TestGetCatalogInfo:
+    """Tests for get_catalog_info."""
+
+    def test_get_catalog_info(self, test_catalog: str):
+        """Should return catalog metadata."""
+        result = get_catalog_info(catalog=test_catalog)
+
+        assert result["success"] is True
+        assert result["catalog"]["name"] == test_catalog
+        assert "owner" in result["catalog"]
+        logger.info(f"Catalog info: {result['catalog']['name']} owned by {result['catalog']['owner']}")
+
+
+@pytest.mark.integration
+class TestListTablePoliciesInSchema:
+    """Tests for list_table_policies_in_schema."""
+
+    def test_list_table_policies_in_schema(self, test_catalog: str, uc_test_schema: str, uc_test_table: str):
+        """Should list tables with their policies."""
+        result = list_table_policies_in_schema(
+            catalog=test_catalog,
+            schema=uc_test_schema,
+        )
+
+        assert result["success"] is True
+        assert result["catalog"] == test_catalog
+        assert result["schema"] == uc_test_schema
+        assert isinstance(result["tables"], list)
+        assert result["table_count"] > 0
+
+        # Each table should have column_masks and row_filters keys
+        for t in result["tables"]:
+            assert "table" in t
+            assert "column_masks" in t
+            assert "row_filters" in t
+        logger.info(f"Found {result['table_count']} tables in {test_catalog}.{uc_test_schema}")
+
+
+@pytest.mark.integration
+class TestAnalyzeFgacCoverage:
+    """Tests for analyze_fgac_coverage."""
+
+    def test_analyze_coverage_schema_scope(self, test_catalog: str, uc_test_schema: str, uc_test_table: str):
+        """Should return coverage analysis for a schema."""
+        result = analyze_fgac_coverage(
+            catalog=test_catalog,
+            schema=uc_test_schema,
+        )
+
+        assert result["success"] is True
+        assert result["scope"] == f"SCHEMA {test_catalog}.{uc_test_schema}"
+
+        summary = result["summary"]
+        assert isinstance(summary["tables_scanned"], int)
+        assert isinstance(summary["tagged_columns"], int)
+        assert isinstance(summary["existing_policies"], int)
+        assert isinstance(summary["available_udfs"], int)
+        assert isinstance(summary["covered_tags"], list)
+        assert isinstance(summary["uncovered_tags"], list)
+        assert isinstance(result["gaps"], list)
+        assert isinstance(result["existing_policies"], list)
+        assert isinstance(result["available_udfs"], list)
+        logger.info(
+            f"Coverage analysis: {summary['tables_scanned']} tables, "
+            f"{summary['tagged_columns']} tagged cols, "
+            f"{summary['existing_policies']} policies, "
+            f"{len(result['gaps'])} gaps"
+        )
+
+    def test_analyze_coverage_catalog_scope(self, test_catalog: str, uc_test_schema: str, uc_test_table: str):
+        """Should return coverage analysis for an entire catalog."""
+        result = analyze_fgac_coverage(catalog=test_catalog)
+
+        assert result["success"] is True
+        assert result["scope"] == f"CATALOG {test_catalog}"
+        assert isinstance(result["summary"]["tables_scanned"], int)
+        assert isinstance(result["gaps"], list)
+        logger.info(f"Catalog coverage: {result['summary']['tables_scanned']} tables scanned")
 
 
 # ---------------------------------------------------------------------------

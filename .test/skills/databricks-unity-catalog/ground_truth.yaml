@@ -820,3 +820,187 @@ test_cases:
       difficulty: "medium"
       source: "manual"
       tags: ["error", "invalid-sql", "show-policies", "edge-case"]
+
+  # ============================================================================
+  # MCP Tool — Analyze FGAC Coverage
+  # ============================================================================
+  - id: "fgac_mcp_analyze_coverage_001"
+    inputs:
+      prompt: "Analyze FGAC policy coverage for the prod.finance schema and identify gaps"
+    outputs:
+      response: |
+        Here's how to analyze FGAC policy coverage and identify gaps:
+
+        **Step 1: Run coverage analysis**
+
+        ```
+        analyze_fgac_coverage(
+            catalog="prod",
+            schema="finance"
+        )
+        ```
+
+        This returns:
+        - `summary` — tables scanned, tagged columns, existing policies, available UDFs
+        - `covered_tags` — tag/value pairs already covered by policies
+        - `uncovered_tags` — tag/value pairs with tagged columns but no policy
+        - `gaps` — detailed list of uncovered tags with affected columns and suggestions
+        - `existing_policies` — current FGAC policies
+        - `available_udfs` — masking functions available in the schema
+
+        **Step 2: Review gaps**
+
+        Each gap entry identifies:
+        - The uncovered `tag_name` and `tag_value`
+        - Which `columns` (table + column) have that tag but no policy
+        - A `suggestion` for what kind of policy to create
+
+        **Step 3: For each gap, create policies using the human-in-the-loop workflow**
+
+        ```
+        result = preview_policy_changes(
+            action="CREATE",
+            policy_name="mask_email_finance",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance",
+            policy_type="COLUMN_MASK",
+            function_name="prod.finance.mask_email",
+            to_principals=["analysts"],
+            tag_name="pii_type",
+            tag_value="email"
+        )
+
+        # After human approval:
+        create_fgac_policy(
+            ...,
+            approval_token=result["approval_token"]
+        )
+        ```
+
+        You can also analyze an entire catalog by omitting the schema:
+        ```
+        analyze_fgac_coverage(catalog="prod")
+        ```
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "analyze_fgac_coverage"
+        - "gaps"
+        - "uncovered_tags"
+        - "covered_tags"
+        - "summary"
+      expected_patterns:
+        - pattern: "analyze_fgac_coverage\\("
+          min_count: 1
+          description: "coverage analysis tool"
+        - pattern: "gaps"
+          min_count: 1
+          description: "identifies coverage gaps"
+        - pattern: "uncovered_tags"
+          min_count: 1
+          description: "uncovered tags in output"
+        - pattern: "preview_policy_changes\\("
+          min_count: 1
+          description: "follows up with human-in-the-loop workflow"
+      guidelines:
+        - "Must use analyze_fgac_coverage as the primary analysis tool"
+        - "Must explain the output structure (summary, gaps, covered/uncovered tags)"
+        - "Must show follow-up with human-in-the-loop workflow to create policies for gaps"
+        - "Should mention catalog-level analysis option"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["mcp", "analyze-coverage", "gap-analysis", "discovery"]
+
+  # ============================================================================
+  # MCP Tool — Discovery: Column Tags, Schema Info, Table Policies
+  # ============================================================================
+  - id: "fgac_mcp_discovery_tools_001"
+    inputs:
+      prompt: "Discover the current FGAC state of prod.finance — what tags exist, what policies are applied, and what UDFs are available"
+    outputs:
+      response: |
+        Here's how to discover the full FGAC state of a schema using MCP tools:
+
+        **1. Get schema metadata**
+
+        ```
+        get_schema_info(catalog="prod", schema="finance")
+        ```
+        Returns: schema name, owner, comment, creation/update timestamps.
+
+        **2. Get catalog metadata**
+
+        ```
+        get_catalog_info(catalog="prod")
+        ```
+        Returns: catalog name, owner, comment, creation/update timestamps.
+
+        **3. List all tables with their current policies**
+
+        ```
+        list_table_policies_in_schema(catalog="prod", schema="finance")
+        ```
+        Returns: each table with its `column_masks` and `row_filters`.
+
+        **4. Check column tags on a specific table**
+
+        ```
+        get_column_tags_api(catalog="prod", schema="finance", table="customers")
+        ```
+        Returns: column-level tags (tag_name, tag_value, column_name) for the table.
+
+        **5. List available masking UDFs**
+
+        ```
+        get_masking_functions(catalog="prod", schema="finance")
+        ```
+        Returns: functions with name, full_name, return_type, comment.
+
+        **6. List existing FGAC policies**
+
+        ```
+        list_fgac_policies(
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance"
+        )
+        ```
+        Returns: all policies on the schema with their configuration.
+
+        Or use `analyze_fgac_coverage(catalog="prod", schema="finance")` to get a combined analysis with gap detection in a single call.
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "get_schema_info"
+        - "get_column_tags_api"
+        - "list_table_policies_in_schema"
+        - "get_masking_functions"
+        - "list_fgac_policies"
+      expected_patterns:
+        - pattern: "get_schema_info\\("
+          min_count: 1
+          description: "schema metadata discovery"
+        - pattern: "get_column_tags_api\\("
+          min_count: 1
+          description: "column tag discovery"
+        - pattern: "list_table_policies_in_schema\\("
+          min_count: 1
+          description: "schema-wide policy discovery"
+        - pattern: "get_masking_functions\\("
+          min_count: 1
+          description: "UDF discovery"
+        - pattern: "list_fgac_policies\\("
+          min_count: 1
+          description: "policy listing"
+      guidelines:
+        - "Must show get_schema_info or get_catalog_info for metadata"
+        - "Must use get_column_tags_api to discover column tags"
+        - "Must use list_table_policies_in_schema for schema-wide policy view"
+        - "Must include get_masking_functions for UDF discovery"
+        - "Should mention analyze_fgac_coverage as a combined alternative"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["mcp", "discovery", "column-tags", "schema-info", "table-policies"]

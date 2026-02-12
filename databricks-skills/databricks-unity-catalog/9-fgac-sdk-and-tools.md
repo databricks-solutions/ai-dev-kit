@@ -210,7 +210,7 @@ get_masking_functions(
 
 #### `get_column_tags_api`
 
-Get column-level tags via the Tags API.
+Get column-level tags for a table via the Tags API (queries `system.information_schema.column_tags`).
 
 ```python
 get_column_tags_api(
@@ -220,13 +220,68 @@ get_column_tags_api(
 )
 ```
 
-#### `get_schema_info` / `get_catalog_info`
+**Returns:**
+```json
+{
+  "success": true,
+  "table": "my_catalog.my_schema.my_table",
+  "tags": [
+    {
+      "catalog_name": "my_catalog",
+      "schema_name": "my_schema",
+      "table_name": "my_table",
+      "column_name": "ssn",
+      "tag_name": "pii_type",
+      "tag_value": "ssn"
+    }
+  ]
+}
+```
 
-Get schema or catalog metadata via Unity Catalog API.
+#### `get_schema_info`
+
+Get schema metadata via Unity Catalog API.
 
 ```python
 get_schema_info(catalog: str, schema: str)
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "schema": {
+    "name": "my_schema",
+    "full_name": "my_catalog.my_schema",
+    "catalog_name": "my_catalog",
+    "owner": "admin_user",
+    "comment": "Production finance schema",
+    "created_at": 1700000000000,
+    "updated_at": 1700100000000
+  }
+}
+```
+
+#### `get_catalog_info`
+
+Get catalog metadata via Unity Catalog API.
+
+```python
 get_catalog_info(catalog: str)
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "catalog": {
+    "name": "my_catalog",
+    "owner": "admin_user",
+    "comment": "Production catalog",
+    "created_at": 1700000000000,
+    "updated_at": 1700100000000
+  }
+}
 ```
 
 #### `list_table_policies_in_schema`
@@ -238,6 +293,67 @@ list_table_policies_in_schema(
     catalog: str,
     schema: str,
 )
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "table_count": 3,
+  "tables": [
+    {
+      "table": "customers",
+      "column_masks": [
+        {"column_name": "ssn", "column_type": "STRING", "mask_functions": ["my_catalog.my_schema.mask_ssn"]}
+      ],
+      "row_filters": []
+    },
+    {
+      "table": "orders",
+      "column_masks": [],
+      "row_filters": []
+    }
+  ]
+}
+```
+
+#### `analyze_fgac_coverage`
+
+Analyze FGAC policy coverage for a catalog or schema. Identifies tagged columns that lack policy coverage and suggests actions.
+
+```python
+analyze_fgac_coverage(
+    catalog: str,
+    schema: str = None,  # Optional; omit to analyze entire catalog
+)
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "scope": "SCHEMA my_catalog.my_schema",
+  "summary": {
+    "tables_scanned": 10,
+    "tagged_columns": 5,
+    "existing_policies": 2,
+    "available_udfs": 3,
+    "covered_tags": ["pii_type:ssn"],
+    "uncovered_tags": ["pii_type:email"]
+  },
+  "gaps": [
+    {
+      "tag_name": "pii_type",
+      "tag_value": "email",
+      "columns": [{"table": "my_catalog.my_schema.customers", "column": "email"}],
+      "suggestion": "No policy covers this tag. Consider creating a COLUMN_MASK policy."
+    }
+  ],
+  "existing_policies": [{"name": "mask_pii_ssn", "policy_type": "COLUMN_MASK", "...": "..."}],
+  "available_udfs": [{"name": "mask_ssn", "full_name": "my_catalog.my_schema.mask_ssn", "...": "..."}]
+}
 ```
 
 ### Preview Tool (Human-in-the-Loop Gate)
@@ -391,6 +507,8 @@ Complete workflow using MCP tools:
 ```
 Step 1: ANALYZE
 ─────────────────────────────────
+→ analyze_fgac_coverage(catalog="prod", schema="finance")
+  # Or analyze individual components:
 → list_fgac_policies(securable_type="SCHEMA", securable_fullname="prod.finance")
 → get_column_tags_api(catalog="prod", schema="finance", table="customers")
 → get_masking_functions(catalog="prod", schema="finance")
@@ -400,7 +518,7 @@ Step 1: ANALYZE
 
 Step 2: RECOMMEND
 ─────────────────────────────────
-→ Agent generates policy recommendations based on discovered tags and UDFs
+→ Agent generates policy recommendations based on coverage gaps and available UDFs
 
 Step 3: PREVIEW (returns approval_token)
 ─────────────────────────────────

@@ -383,6 +383,301 @@ def get_masking_functions(
 
 
 # ---------------------------------------------------------------------------
+# Analysis & Discovery
+# ---------------------------------------------------------------------------
+
+
+def get_column_tags_api(
+    catalog: str,
+    schema: str,
+    table: str,
+) -> Dict[str, Any]:
+    """
+    Get column-level tags for a table via the Tags API.
+
+    Queries system.information_schema.column_tags to return governed and
+    metadata tags applied to columns on the specified table.
+
+    Args:
+        catalog: Catalog name
+        schema: Schema name
+        table: Table name
+
+    Returns:
+        Dict with table name and list of column tag entries
+    """
+    _validate_identifier(catalog)
+    _validate_identifier(schema)
+    _validate_identifier(table)
+
+    from .tags import query_column_tags
+
+    tags = query_column_tags(catalog_filter=catalog, table_name=table)
+    # Filter to the specific schema (query_column_tags filters by catalog and table but not schema)
+    tags = [t for t in tags if t.get("schema_name") == schema]
+
+    return {
+        "success": True,
+        "table": f"{catalog}.{schema}.{table}",
+        "tags": tags,
+    }
+
+
+def get_schema_info(
+    catalog: str,
+    schema: str,
+) -> Dict[str, Any]:
+    """
+    Get schema metadata via the Unity Catalog API.
+
+    Args:
+        catalog: Catalog name
+        schema: Schema name
+
+    Returns:
+        Dict with serialized schema metadata
+    """
+    _validate_identifier(catalog)
+    _validate_identifier(schema)
+
+    from .schemas import get_schema
+
+    schema_obj = get_schema(f"{catalog}.{schema}")
+    return {
+        "success": True,
+        "schema": {
+            "name": schema_obj.name,
+            "full_name": schema_obj.full_name,
+            "catalog_name": schema_obj.catalog_name,
+            "owner": schema_obj.owner,
+            "comment": schema_obj.comment,
+            "created_at": schema_obj.created_at,
+            "updated_at": schema_obj.updated_at,
+        },
+    }
+
+
+def get_catalog_info(
+    catalog: str,
+) -> Dict[str, Any]:
+    """
+    Get catalog metadata via the Unity Catalog API.
+
+    Args:
+        catalog: Catalog name
+
+    Returns:
+        Dict with serialized catalog metadata
+    """
+    _validate_identifier(catalog)
+
+    from .catalogs import get_catalog
+
+    catalog_obj = get_catalog(catalog)
+    return {
+        "success": True,
+        "catalog": {
+            "name": catalog_obj.name,
+            "owner": catalog_obj.owner,
+            "comment": catalog_obj.comment,
+            "created_at": catalog_obj.created_at,
+            "updated_at": catalog_obj.updated_at,
+        },
+    }
+
+
+def list_table_policies_in_schema(
+    catalog: str,
+    schema: str,
+) -> Dict[str, Any]:
+    """
+    List all tables in a schema with their column masks and row filters.
+
+    Enumerates tables in the schema and calls get_table_policies() on each.
+
+    Args:
+        catalog: Catalog name
+        schema: Schema name
+
+    Returns:
+        Dict with table count and per-table policy details
+    """
+    _validate_identifier(catalog)
+    _validate_identifier(schema)
+
+    from .tables import list_tables
+
+    tables = list_tables(catalog_name=catalog, schema_name=schema)
+    table_results = []
+    for t in tables:
+        try:
+            policies = get_table_policies(catalog=catalog, schema=schema, table=t.name)
+            table_results.append(
+                {
+                    "table": t.name,
+                    "column_masks": policies.get("column_masks", []),
+                    "row_filters": policies.get("row_filters", []),
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get policies for table {t.name}: {e}")
+            table_results.append(
+                {
+                    "table": t.name,
+                    "column_masks": [],
+                    "row_filters": [],
+                    "error": str(e),
+                }
+            )
+
+    return {
+        "success": True,
+        "catalog": catalog,
+        "schema": schema,
+        "table_count": len(table_results),
+        "tables": table_results,
+    }
+
+
+def analyze_fgac_coverage(
+    catalog: str,
+    schema: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Analyze FGAC policy coverage for a catalog or schema.
+
+    Examines tagged columns, existing policies, and available masking UDFs
+    to identify gaps where tagged columns lack policy coverage. Useful for
+    the "analyze this catalog/schema and suggest FGAC policies" workflow.
+
+    Args:
+        catalog: Catalog name
+        schema: Optional schema name. If omitted, analyzes all schemas in the catalog.
+
+    Returns:
+        Dict with coverage summary, gaps, existing policies, and available UDFs
+    """
+    _validate_identifier(catalog)
+    if schema:
+        _validate_identifier(schema)
+
+    from .schemas import list_schemas
+    from .tables import list_tables
+    from .tags import query_column_tags
+
+    # Determine schemas to scan
+    if schema:
+        schema_names = [schema]
+        scope = f"SCHEMA {catalog}.{schema}"
+    else:
+        schema_objs = list_schemas(catalog)
+        schema_names = [s.name for s in schema_objs if s.name != "information_schema"]
+        scope = f"CATALOG {catalog}"
+
+    # 1. Enumerate tables across schemas
+    all_tables = []
+    for s in schema_names:
+        try:
+            tables = list_tables(catalog_name=catalog, schema_name=s)
+            all_tables.extend(tables)
+        except Exception as e:
+            logger.warning(f"Failed to list tables in {catalog}.{s}: {e}")
+
+    # 2. Query column tags
+    tagged_columns = query_column_tags(catalog_filter=catalog)
+    if schema:
+        tagged_columns = [t for t in tagged_columns if t.get("schema_name") == schema]
+
+    # 3. List existing FGAC policies
+    securable_type = "SCHEMA" if schema else "CATALOG"
+    securable_fullname = f"{catalog}.{schema}" if schema else catalog
+    policies_result = list_fgac_policies(
+        securable_type=securable_type,
+        securable_fullname=securable_fullname,
+        include_inherited=True,
+    )
+    existing_policies = policies_result.get("policies", [])
+
+    # 4. List masking UDFs across scanned schemas
+    all_udfs = []
+    for s in schema_names:
+        try:
+            udfs_result = get_masking_functions(catalog=catalog, schema=s)
+            all_udfs.extend(udfs_result.get("functions", []))
+        except Exception as e:
+            logger.warning(f"Failed to list UDFs in {catalog}.{s}: {e}")
+
+    # 5. Cross-reference: determine which tag/value pairs are covered by policies
+    covered_tags = set()
+    for p in existing_policies:
+        for mc in p.get("match_columns") or []:
+            condition = mc.get("condition", "")
+            # Parse hasTagValue('key', 'value') or hasTag('key')
+            if "hasTagValue" in condition:
+                parts = condition.replace("hasTagValue(", "").rstrip(")").replace("'", "").split(", ")
+                if len(parts) == 2:
+                    covered_tags.add(f"{parts[0]}:{parts[1]}")
+            elif "hasTag" in condition:
+                tag = condition.replace("hasTag(", "").rstrip(")").replace("'", "")
+                covered_tags.add(tag)
+
+    # Build tag -> columns mapping for uncovered tags
+    tag_columns: Dict[str, List[Dict[str, str]]] = {}
+    for tc in tagged_columns:
+        tag_key = f"{tc.get('tag_name')}:{tc.get('tag_value')}" if tc.get("tag_value") else tc.get("tag_name", "")
+        if tag_key not in covered_tags:
+            tag_columns.setdefault(tag_key, []).append(
+                {
+                    "table": f"{tc.get('catalog_name')}.{tc.get('schema_name')}.{tc.get('table_name')}",
+                    "column": tc.get("column_name", ""),
+                }
+            )
+
+    # Build unique tag keys for summary
+    all_tag_keys = set()
+    for tc in tagged_columns:
+        tag_key = f"{tc.get('tag_name')}:{tc.get('tag_value')}" if tc.get("tag_value") else tc.get("tag_name", "")
+        all_tag_keys.add(tag_key)
+
+    uncovered_tags = all_tag_keys - covered_tags
+
+    # Build gaps
+    gaps = []
+    for tag_key in sorted(uncovered_tags):
+        if ":" in tag_key:
+            t_name, t_value = tag_key.split(":", 1)
+        else:
+            t_name, t_value = tag_key, None
+
+        columns = tag_columns.get(tag_key, [])
+        suggestion = "No policy covers this tag. Consider creating a COLUMN_MASK policy."
+        gaps.append(
+            {
+                "tag_name": t_name,
+                "tag_value": t_value,
+                "columns": columns,
+                "suggestion": suggestion,
+            }
+        )
+
+    return {
+        "success": True,
+        "scope": scope,
+        "summary": {
+            "tables_scanned": len(all_tables),
+            "tagged_columns": len(tagged_columns),
+            "existing_policies": len(existing_policies),
+            "available_udfs": len(all_udfs),
+            "covered_tags": sorted(covered_tags),
+            "uncovered_tags": sorted(uncovered_tags),
+        },
+        "gaps": gaps,
+        "existing_policies": existing_policies,
+        "available_udfs": all_udfs,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Quota checking
 # ---------------------------------------------------------------------------
 

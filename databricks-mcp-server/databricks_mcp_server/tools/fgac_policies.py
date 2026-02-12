@@ -12,6 +12,11 @@ from databricks_tools_core.unity_catalog import (
     get_fgac_policy as _get_fgac_policy,
     get_table_policies as _get_table_policies,
     get_masking_functions as _get_masking_functions,
+    get_column_tags_api as _get_column_tags_api,
+    get_schema_info as _get_schema_info,
+    get_catalog_info as _get_catalog_info,
+    list_table_policies_in_schema as _list_table_policies_in_schema,
+    analyze_fgac_coverage as _analyze_fgac_coverage,
     check_policy_quota as _check_policy_quota,
     preview_policy_changes as _preview_policy_changes,
     create_fgac_policy as _create_fgac_policy,
@@ -56,6 +61,11 @@ def manage_uc_fgac_policies(
     - get_table_policies: Get column masks and row filters on a table. Params: catalog, schema, table
     - get_masking_functions: List masking UDFs in a schema. Params: catalog, schema
         (or udf_catalog, udf_schema for UDFs in a different catalog/schema)
+    - get_column_tags: Get column-level tags for a table. Params: catalog, schema, table
+    - get_schema_info: Get schema metadata. Params: catalog, schema
+    - get_catalog_info: Get catalog metadata. Params: catalog
+    - list_table_policies_in_schema: List all tables in a schema with their policies. Params: catalog, schema
+    - analyze_coverage: Analyze FGAC policy coverage gaps. Params: catalog, schema (optional)
     - check_quota: Check policy quota on a securable. Params: securable_type, securable_fullname
     - preview: Preview policy changes without executing. Params: preview_action
         ("CREATE"/"UPDATE"/"DELETE"), policy_name, securable_type, securable_fullname,
@@ -119,6 +129,31 @@ def manage_uc_fgac_policies(
             catalog=udf_catalog or catalog,
             schema=udf_schema or schema,
         )
+    elif act == "get_column_tags":
+        return _get_column_tags_api(
+            catalog=catalog,
+            schema=schema,
+            table=table,
+        )
+    elif act == "get_schema_info":
+        return _get_schema_info(
+            catalog=catalog,
+            schema=schema,
+        )
+    elif act == "get_catalog_info":
+        return _get_catalog_info(
+            catalog=catalog,
+        )
+    elif act == "list_table_policies_in_schema":
+        return _list_table_policies_in_schema(
+            catalog=catalog,
+            schema=schema,
+        )
+    elif act == "analyze_coverage":
+        return _analyze_fgac_coverage(
+            catalog=catalog,
+            schema=schema,
+        )
     elif act == "check_quota":
         return _check_policy_quota(
             securable_type=securable_type,
@@ -174,5 +209,6 @@ def manage_uc_fgac_policies(
 
     raise ValueError(
         f"Invalid action: '{action}'. Valid actions: list, get, get_table_policies, "
-        f"get_masking_functions, check_quota, preview, create, update, delete"
+        f"get_masking_functions, get_column_tags, get_schema_info, get_catalog_info, "
+        f"list_table_policies_in_schema, analyze_coverage, check_quota, preview, create, update, delete"
     )
