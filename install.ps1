@@ -23,6 +23,10 @@ $VenvDir   = Join-Path $InstallDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $McpEntry  = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
 
+# Minimum required versions
+$MinCliVersion = "0.278.0"
+$MinSdkVersion = "0.85.0"
+
 # ─── Defaults ─────────────────────────────────────────────────
 $script:Profile_     = "DEFAULT"
 $script:Scope        = "project"
@@ -524,7 +528,22 @@ function Test-Dependencies {
 
     # Databricks CLI
     if (Get-Command databricks -ErrorAction SilentlyContinue) {
-        Write-Ok "databricks CLI"
+        try {
+            $cliOutput = & databricks --version 2>&1
+            if ($cliOutput -match '(\d+\.\d+\.\d+)') {
+                $cliVersion = $Matches[1]
+                if ([version]$cliVersion -ge [version]$MinCliVersion) {
+                    Write-Ok "Databricks CLI v$cliVersion"
+                } else {
+                    Write-Warn "Databricks CLI v$cliVersion is outdated (minimum: v$MinCliVersion)"
+                    Write-Msg "  Upgrade: winget upgrade Databricks.DatabricksCLI"
+                }
+            } else {
+                Write-Warn "Could not determine Databricks CLI version"
+            }
+        } catch {
+            Write-Warn "Could not determine Databricks CLI version"
+        }
     } else {
         Write-Warn "Databricks CLI not found. Install: winget install Databricks.DatabricksCLI"
         Write-Msg "You can still install, but authentication will require the CLI later."
@@ -624,6 +643,24 @@ function Install-McpServer {
 
     $ErrorActionPreference = $prevEAP
     Write-Ok "MCP server ready"
+
+    # Check Databricks SDK version
+    try {
+        $sdkOutput = & $script:VenvPython -c "from databricks.sdk.version import __version__; print(__version__)" 2>&1
+        if ($sdkOutput -match '(\d+\.\d+\.\d+)') {
+            $sdkVersion = $Matches[1]
+            if ([version]$sdkVersion -ge [version]$MinSdkVersion) {
+                Write-Ok "Databricks SDK v$sdkVersion"
+            } else {
+                Write-Warn "Databricks SDK v$sdkVersion is outdated (minimum: v$MinSdkVersion)"
+                Write-Msg "  Upgrade: $($script:VenvPython) -m pip install --upgrade databricks-sdk"
+            }
+        } else {
+            Write-Warn "Could not determine Databricks SDK version"
+        }
+    } catch {
+        Write-Warn "Could not determine Databricks SDK version"
+    }
 }
 
 # ─── Install skills ──────────────────────────────────────────
