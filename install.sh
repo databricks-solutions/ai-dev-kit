@@ -852,26 +852,66 @@ prompt_scope() {
     fi
 
     echo ""
-    msg "${B}Installation Scope${N}"
-    msg "${D}Choose where to install the AI Dev Kit:${N}"
-    msg ""
-    msg "  ${B}1. Project${N} - Install in current directory (.cursor/ and .claude/)"
-    msg "     ${D}Use this if you want configuration specific to this project${N}"
-    msg ""
-    msg "  ${B}2. Global${N}  - Install in home directory (~/.cursor/ and ~/.claude/)"
-    msg "     ${D}Use this to share configuration across all your projects${N}"
-    echo ""
+    echo -e "  ${B}Select installation scope${N}"
     
-    local scope_choice
-    scope_choice=$(prompt "Choose installation scope ${D}(1=Project, 2=Global)${N}" "1")
+    # Simple radio selector without Confirm button
+    local -a labels=("Project" "Global")
+    local -a values=("project" "global")
+    local -a hints=("Install in current directory (.cursor/ and .claude/)" "Install in home directory (~/.cursor/ and ~/.claude/)")
+    local count=2
+    local selected=0
+    local cursor=0
     
-    if [ "$scope_choice" = "2" ] || [ "$scope_choice" = "global" ] || [ "$scope_choice" = "Global" ]; then
-        SCOPE="global"
-        ok "Global installation selected"
-    else
-        SCOPE="project"
-        ok "Project installation selected"
-    fi
+    _scope_draw() {
+        for i in 0 1; do
+            local dot="○"
+            local dot_color="\033[2m"
+            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
+            local arrow="  "
+            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
+            local hint_style="\033[2m"
+            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
+            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
+        done
+    }
+    
+    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
+    printf "\033[?25l" > /dev/tty
+    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+    
+    _scope_draw
+    
+    while true; do
+        printf "\033[%dA" "$count" > /dev/tty
+        _scope_draw
+        
+        local key=""
+        IFS= read -rsn1 key < /dev/tty 2>/dev/null
+        
+        if [ "$key" = $'\x1b' ]; then
+            local s1="" s2=""
+            read -rsn1 s1 < /dev/tty 2>/dev/null
+            read -rsn1 s2 < /dev/tty 2>/dev/null
+            if [ "$s1" = "[" ]; then
+                case "$s2" in
+                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
+                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
+                esac
+            fi
+        elif [ "$key" = "" ]; then
+            selected=$cursor
+            printf "\033[%dA" "$count" > /dev/tty
+            _scope_draw
+            break
+        elif [ "$key" = " " ]; then
+            selected=$cursor
+        fi
+    done
+    
+    printf "\033[?25h" > /dev/tty
+    trap - EXIT
+    
+    SCOPE="${values[$selected]}"
 }
 
 # Prompt to run auth
@@ -946,6 +986,7 @@ main() {
     # ── Step 3.5: Interactive scope selection ──
     if [ "$SCOPE_EXPLICIT" = false ]; then
         prompt_scope
+        ok "Scope: $SCOPE"
     fi
 
     # ── Step 4: Interactive MCP path ──

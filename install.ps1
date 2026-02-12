@@ -990,27 +990,95 @@ function Invoke-PromptScope {
     if ($script:Silent) { return }
 
     Write-Host ""
-    Write-Msg "Installation Scope"
-    Write-Host "  Choose where to install the AI Dev Kit:" -ForegroundColor DarkGray
-    Write-Host ""
-    Write-Host "  1. Project" -NoNewline -ForegroundColor White
-    Write-Host " - Install in current directory (.cursor/ and .claude/)" -ForegroundColor Gray
-    Write-Host "     Use this if you want configuration specific to this project" -ForegroundColor DarkGray
-    Write-Host ""
-    Write-Host "  2. Global" -NoNewline -ForegroundColor White
-    Write-Host "  - Install in home directory (~/.cursor/ and ~/.claude/)" -ForegroundColor Gray
-    Write-Host "     Use this to share configuration across all your projects" -ForegroundColor DarkGray
-    Write-Host ""
-
-    $scopeChoice = Read-Prompt -PromptText "Choose installation scope (1=Project, 2=Global)" -Default "1"
+    Write-Host "  Select installation scope" -ForegroundColor White
     
-    if ($scopeChoice -in @("2", "global", "Global")) {
-        $script:Scope = "global"
-        Write-Ok "Global installation selected"
-    } else {
-        $script:Scope = "project"
-        Write-Ok "Project installation selected"
+    $labels = @("Project", "Global")
+    $values = @("project", "global")
+    $hints = @("Install in current directory (.cursor/ and .claude/)", "Install in home directory (~/.cursor/ and ~/.claude/)")
+    $count = 2
+    $selected = 0
+    $cursor = 0
+    
+    $isInteractive = Test-Interactive
+    
+    if (-not $isInteractive) {
+        # Fallback: numbered list
+        Write-Host ""
+        Write-Host "  1. (*) Project  Install in current directory (.cursor/ and .claude/)"
+        Write-Host "  2. ( ) Global   Install in home directory (~/.cursor/ and ~/.claude/)"
+        Write-Host ""
+        Write-Host "  Enter number to select (or press Enter for default): " -NoNewline
+        $input_ = Read-Host
+        if (-not [string]::IsNullOrWhiteSpace($input_) -and $input_ -eq "2") {
+            $selected = 1
+        }
+        $script:Scope = $values[$selected]
+        return
     }
+    
+    # Interactive mode
+    Write-Host ""
+    Write-Host "  Up/Down navigate, Enter select" -ForegroundColor DarkGray
+    Write-Host ""
+    
+    $totalRows = $count
+    
+    try { [Console]::CursorVisible = $false } catch {}
+    
+    $drawScope = {
+        [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $totalRows))
+        for ($j = 0; $j -lt $count; $j++) {
+            if ($j -eq $cursor) {
+                Write-Host "  " -NoNewline
+                Write-Host ">" -ForegroundColor Blue -NoNewline
+                Write-Host " " -NoNewline
+            } else {
+                Write-Host "    " -NoNewline
+            }
+            if ($j -eq $selected) {
+                Write-Host "(*)" -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host "( )" -ForegroundColor DarkGray -NoNewline
+            }
+            $padLabel = $labels[$j].PadRight(20)
+            Write-Host " $padLabel " -NoNewline
+            if ($j -eq $selected) {
+                Write-Host $hints[$j] -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host $hints[$j] -ForegroundColor DarkGray -NoNewline
+            }
+            $pos = [Console]::CursorLeft
+            $remaining = [Console]::WindowWidth - $pos - 1
+            if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+            Write-Host ""
+        }
+    }
+    
+    # Reserve lines
+    for ($j = 0; $j -lt $totalRows; $j++) { Write-Host "" }
+    & $drawScope
+    
+    while ($true) {
+        $key = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        
+        switch ($key.VirtualKeyCode) {
+            38 { if ($cursor -gt 0) { $cursor-- } }
+            40 { if ($cursor -lt 1) { $cursor++ } }
+            32 { $selected = $cursor }
+            13 {
+                $selected = $cursor
+                & $drawScope
+                break
+            }
+        }
+        if ($key.VirtualKeyCode -eq 13) { break }
+        
+        & $drawScope
+    }
+    
+    try { [Console]::CursorVisible = $true } catch {}
+    
+    $script:Scope = $values[$selected]
 }
 
 # ─── Auth prompt ──────────────────────────────────────────────
@@ -1081,6 +1149,7 @@ function Invoke-Main {
     # Scope selection
     if (-not $script:ScopeExplicit) {
         Invoke-PromptScope
+        Write-Ok "Scope: $($script:Scope)"
     }
 
     # MCP path
