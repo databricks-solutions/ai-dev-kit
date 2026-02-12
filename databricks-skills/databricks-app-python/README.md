@@ -1,157 +1,59 @@
 # Databricks Python App Skill
 
-Claude Agent skill for building Python-based Databricks applications with various frameworks.
-
-## Structure
-
-```
-databricks-app-python/
-├── SKILL.md           # Main skill file with core patterns
-├── dash.md            # Dash framework specific guide
-├── streamlit.md       # Streamlit guide (coming soon)
-├── flask.md           # Flask guide (coming soon)
-└── README.md          # This file
-```
+Builds Python-based Databricks applications using Dash, Streamlit, Gradio, Flask, FastAPI, or Reflex.
 
 ## Overview
 
-This skill provides comprehensive guidance for building Python applications for Databricks, including:
+This skill guides you through building Python applications for Databricks Apps, covering framework selection, OAuth authorization (app and user auth), app resources, data connectivity (SQL warehouse, Lakebase, model serving), and deployment. It activates when users request a Python web app, dashboard, ML demo, or REST API for Databricks. For full code examples, see the [Databricks Apps Cookbook](https://apps-cookbook.dev/).
 
-### Core Components (SKILL.md)
-- Architecture patterns
-- Pydantic data models
-- Mock and real backend patterns
-- Databricks connectivity
-- Unity Catalog integration
-- Environment configuration
-- Best practices
+## What's Included
 
-### Framework-Specific Guides
-
-#### Dash (dash.md)
-- Complete Dash application structure
-- Component patterns (cards, tables, charts, modals)
-- Callback patterns and best practices
-- Plotly chart examples
-- Bootstrap styling
-- Common pitfalls and solutions
-
-#### Coming Soon
-- **streamlit.md** - Streamlit patterns for rapid prototyping
-- **flask.md** - Flask patterns for custom web apps
-- **gradio.md** - Gradio for ML model interfaces
-
-## Usage
-
-When user requests a Python app for Databricks:
-
-1. **SKILL.md** provides the foundation:
-   - Data model design
-   - Backend architecture (mock + real)
-   - Databricks connectivity patterns
-   - Database setup
-
-2. **Framework-specific file** provides implementation:
-   - UI component patterns
-   - Framework-specific callbacks/routing
-   - Styling and theming
-   - Deployment configuration
-
-## Design Philosophy
-
-### Separation of Concerns
-- **Core patterns** (SKILL.md) - Framework-agnostic
-- **Framework details** (dash.md, etc.) - Implementation specifics
-
-### Progressive Complexity
-- Start with mock backend (rapid development)
-- Add real backend (production ready)
-- Scale with Unity Catalog
-
-### Consistent Architecture
-All apps follow same pattern:
 ```
-models.py           → Data definitions
-backend_mock.py     → Sample data
-backend_real.py     → Databricks SQL
-{framework}_app.py  → UI implementation
-setup_database.py   → Schema initialization
+databricks-app-python/
+├── SKILL.md               # Main skill: rules, framework selector, routing, architecture, issues
+├── README.md              # This file
+├── 1-authorization.md     # OAuth: app auth, user auth (OBO), scopes, per-framework examples
+├── 2-app-resources.md     # Resource types, valueFrom, communication strategies
+├── 3-frameworks.md        # All frameworks: Dash, Streamlit, Gradio, Flask, FastAPI, Reflex
+├── 4-deployment.md        # CLI, DABs, app.yaml, post-deployment verification
+├── 5-lakebase.md          # Lakebase (PostgreSQL) connectivity patterns
+└── 6-mcp-approach.md      # MCP tools for app lifecycle management
 ```
 
-## Example Applications
+## Key Topics
 
-### Order Management (Dash)
-Location: `/example-app-dash/`
+- Framework selection (Dash, Streamlit, Gradio, Flask, FastAPI, Reflex)
+- OAuth authorization: app auth (service principal) and user auth (on-behalf-of)
+- App resources: SQL warehouse, Lakebase, model serving, secrets, volumes
+- `valueFrom` pattern in app.yaml for portable resource configuration
+- SQL warehouse connectivity via `databricks-sql-connector`
+- Lakebase (PostgreSQL) connectivity via `psycopg2` / `asyncpg`
+- Model serving endpoint integration for AI/ML inference
+- Deployment via Databricks CLI and Asset Bundles (DABs)
+- MCP tools for programmatic app lifecycle management
 
-Features:
-- Dashboard with statistics and charts
-- Filterable orders table
-- Customer and product management
-- Order details modal
-- Mock and real backend support
+## When to Use
 
-To run:
-```bash
-cd example-app-dash
-uv pip install -r requirements.txt
-USE_MOCK_BACKEND=true uv run python dash_app.py
-```
-
-## Adding New Frameworks
-
-To add support for a new framework:
-
-1. Create `{framework}.md` in this directory
-2. Follow the structure of `dash.md`:
-   - When to use
-   - Dependencies
-   - Project structure
-   - Component patterns
-   - Best practices
-   - Common pitfalls
-   - Example code
-
-3. Update `SKILL.md` to reference new framework
-4. Create example app in `/example-app-{framework}/`
-
-## Contributing
-
-When updating this skill:
-
-1. **SKILL.md changes**: Update if affecting all frameworks
-   - New backend patterns
-   - Database connectivity
-   - Environment configuration
-   - Pydantic model patterns
-
-2. **Framework-specific changes**: Update individual files
-   - New component patterns
-   - Framework version updates
-   - Best practices
-   - Bug fixes
-
-3. Keep example apps in sync with documentation
-
-## Testing
-
-Before committing changes:
-
-1. Test example apps run without errors
-2. Verify all code examples are syntactically correct
-3. Check cross-references between files work
-4. Ensure new patterns follow existing conventions
+- User requests a "Databricks app", "Python app", or "dashboard"
+- User mentions Streamlit, Dash, Gradio, Flask, FastAPI, or Reflex
+- Building data visualization or analytics dashboards
+- Building ML model demos or chat interfaces
+- Building REST APIs backed by Databricks data
+- Connecting apps to SQL warehouse, Lakebase, or model serving
+- Do NOT use if user specifies APX, React, or Node.js (use databricks-app-apx instead)
 
 ## Related Skills
 
-- **databricks-app-apx** - APX framework (FastAPI + React)
-- **databricks-dev** - General Databricks development
-- **python-dev** - Python development standards
-- **asset-bundles** - Databricks Asset Bundles
+- [Databricks Apps (APX)](../databricks-app-apx/) — full-stack apps with FastAPI + React
+- [Asset Bundles](../asset-bundles/) — deploying apps via DABs
+- [Databricks Python SDK](../databricks-python-sdk/) — backend SDK integration
+- [Lakebase Provisioned](../lakebase-provisioned/) — adding persistent PostgreSQL state
+- [Model Serving](../model-serving/) — serving ML models for app integration
 
-## Support
+## Resources
 
-For issues or questions:
-1. Check framework-specific documentation
-2. Review example applications
-3. Consult Databricks documentation
-4. Check framework-specific communities
+- [Databricks Apps Cookbook](https://apps-cookbook.dev/) — ready-to-use code snippets
+- [Databricks Apps Documentation](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/)
+- [Authorization](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/auth)
+- [Resources](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/resources)
+- [System Environment](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/system-env)

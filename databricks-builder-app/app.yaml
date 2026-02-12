@@ -110,7 +110,7 @@ env:
     value: "databricks"
   - name: MLFLOW_REGISTRY_URI
     value: "databricks-uc"
-  # Optional: Specify a custom experiment for traces
+  # Optional: Default MLflow experiment for traces (can be overridden per-session in the UI)
   - name: MLFLOW_EXPERIMENT_NAME
     value: "/Users/austin.choi@databricks.com/claude-code-traces"
 

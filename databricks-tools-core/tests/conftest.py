@@ -19,10 +19,10 @@ if _env_file.exists():
     load_dotenv(_env_file)
     logging.getLogger(__name__).info(f"Loaded environment from {_env_file}")
 
-# Test catalog and schema names
-TEST_CATALOG = "ai_dev_kit_test"
-TEST_SCHEMA = "test_schema"
-TEST_VOLUME = "test_volume"
+# Test catalog and schema names (configurable via env vars)
+TEST_CATALOG = os.environ.get("TEST_CATALOG", "ai_dev_kit_test")
+TEST_SCHEMA = os.environ.get("TEST_SCHEMA", "test_schema")
+TEST_VOLUME = os.environ.get("TEST_VOLUME", "test_volume")
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent / "integration" / "sql" / "test_data"

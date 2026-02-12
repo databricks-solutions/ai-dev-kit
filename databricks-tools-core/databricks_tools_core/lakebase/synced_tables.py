@@ -115,7 +115,7 @@ def get_synced_table(
         table = client.database.get_synced_database_table(name=table_name)
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "table_name": table_name,
                 "status": "NOT_FOUND",
@@ -173,7 +173,7 @@ def delete_synced_table(
         }
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg or "NOT_FOUND" in error_msg:
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "table_name": table_name,
                 "status": "NOT_FOUND",

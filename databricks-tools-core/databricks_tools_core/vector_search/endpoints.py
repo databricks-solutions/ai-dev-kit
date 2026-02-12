@@ -90,7 +90,7 @@ def get_vs_endpoint(name: str) -> Dict[str, Any]:
         endpoint = client.vector_search_endpoints.get_endpoint(endpoint_name=name)
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg:
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": name,
                 "state": "NOT_FOUND",
@@ -148,7 +148,11 @@ def list_vs_endpoints() -> List[Dict[str, Any]]:
         raise Exception(f"Failed to list vector search endpoints: {str(e)}")
 
     result = []
-    endpoints = response.endpoints if response and response.endpoints else []
+    # SDK may return a generator or an object with .endpoints attribute
+    if hasattr(response, "endpoints"):
+        endpoints = response.endpoints if response.endpoints else []
+    else:
+        endpoints = list(response) if response else []
     for ep in endpoints:
         entry: Dict[str, Any] = {"name": ep.name}
 
@@ -196,7 +200,7 @@ def delete_vs_endpoint(name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg:
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": name,
                 "status": "NOT_FOUND",

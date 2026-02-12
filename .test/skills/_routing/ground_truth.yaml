@@ -120,6 +120,139 @@ test_cases:
       difficulty: "hard"
       reasoning: "Combines 'medallion' (SDP) with 'Genie space' (agent-bricks)"
 
+  # Single-skill routing - Databricks App APX
+  - id: "routing_apx_001"
+    inputs:
+      prompt: "Build an APX app with a FastAPI React frontend"
+    expectations:
+      expected_skills: ["databricks-app-apx"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'APX' and 'FastAPI React' - clear APX trigger"
+
+  - id: "routing_apx_002"
+    inputs:
+      prompt: "Create a full-stack app with APX"
+    expectations:
+      expected_skills: ["databricks-app-apx"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'APX' and 'full-stack app' - APX triggers"
+
+  # Single-skill routing - Databricks App Python
+  - id: "routing_app_python_001"
+    inputs:
+      prompt: "Create a Streamlit app that shows sales data"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Streamlit' - Python app trigger"
+
+  - id: "routing_app_python_002"
+    inputs:
+      prompt: "Build a Dash app with interactive charts"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Dash' - Python app trigger"
+
+  - id: "routing_app_python_003"
+    inputs:
+      prompt: "Create a Gradio app for testing my ML model"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Gradio' - Python app trigger"
+
+  - id: "routing_app_python_004"
+    inputs:
+      prompt: "Build a FastAPI app that serves data from a warehouse"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'FastAPI' - Python app trigger"
+
+  - id: "routing_app_python_005"
+    inputs:
+      prompt: "Create a Reflex app for managing inventory"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Reflex' - Python app trigger"
+
+  # Multi-skill routing - Apps + other skills
+  - id: "routing_multi_app_dabs_001"
+    inputs:
+      prompt: "Build a Dash app and deploy it using DABs"
+    expectations:
+      expected_skills:
+        - "databricks-app-python"
+        - "asset-bundles"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'Dash' (app-python) with 'DABs' (asset bundles)"
+
+  - id: "routing_multi_app_lakebase_001"
+    inputs:
+      prompt: "Create a Streamlit app that stores data in Lakebase"
+    expectations:
+      expected_skills:
+        - "databricks-app-python"
+        - "lakebase-provisioned"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'Streamlit' (app-python) with 'Lakebase' (lakebase-provisioned)"
+
+  - id: "routing_multi_app_serving_001"
+    inputs:
+      prompt: "Build a Gradio app that queries a model serving endpoint"
+    expectations:
+      expected_skills:
+        - "databricks-app-python"
+        - "model-serving"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'Gradio' (app-python) with 'model serving' (model-serving)"
+
+  # Edge case - FastAPI React matches both APX and Python app
+  - id: "routing_multi_fastapi_react_001"
+    inputs:
+      prompt: "Create a FastAPI React app for my dashboard"
+    expectations:
+      expected_skills:
+        - "databricks-app-apx"
+        - "databricks-app-python"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "'fastapi react' triggers APX, bare 'fastapi' also triggers app-python. Router picks best fit."
+
   # No skill match
   - id: "routing_no_match_001"
     inputs:

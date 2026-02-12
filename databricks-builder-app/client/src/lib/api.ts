@@ -113,10 +113,12 @@ export interface InvokeAgentParams {
   defaultSchema?: string | null;
   warehouseId?: string | null;
   workspaceFolder?: string | null;
+  mlflowExperimentName?: string | null;
   signal?: AbortSignal;
   onEvent: (event: Record<string, unknown>) => void;
   onError: (error: Error) => void;
   onDone: () => void | Promise<void>;
+  onExecutionId?: (executionId: string) => void;
 }
 
 export async function invokeAgent(params: InvokeAgentParams): Promise<void> {
@@ -129,10 +131,12 @@ export async function invokeAgent(params: InvokeAgentParams): Promise<void> {
     defaultSchema,
     warehouseId,
     workspaceFolder,
+    mlflowExperimentName,
     signal,
     onEvent,
     onError,
     onDone,
+    onExecutionId,
   } = params;
 
   const res = await request<{ execution_id: string; conversation_id: string }>('/invoke_agent', {
@@ -146,8 +150,11 @@ export async function invokeAgent(params: InvokeAgentParams): Promise<void> {
       default_schema: defaultSchema ?? null,
       warehouse_id: warehouseId ?? null,
       workspace_folder: workspaceFolder ?? null,
+      mlflow_experiment_name: mlflowExperimentName ?? null,
     },
   });
+
+  onExecutionId?.(res.execution_id);
 
   await streamProgress({
     executionId: res.execution_id,
@@ -216,32 +223,33 @@ async function streamProgress(params: {
   while (true) {
     if (signal?.aborted) return;
 
-    const res = await fetch(`${API_BASE}/stream_progress/${executionId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ last_event_timestamp: lastTs }),
-      signal,
-    });
-
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      const message = (errBody.detail ?? res.statusText) as string;
-      onError(new Error(typeof message === 'string' ? message : JSON.stringify(message)));
-      return;
-    }
-
-    const reader = res.body?.getReader();
-    if (!reader) {
-      onError(new Error('No response body'));
-      return;
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
     let shouldReconnect = false;
 
     try {
+      const res = await fetch(`${API_BASE}/stream_progress/${executionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ last_event_timestamp: lastTs }),
+        signal,
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const message = (errBody.detail ?? res.statusText) as string;
+        onError(new Error(typeof message === 'string' ? message : JSON.stringify(message)));
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        onError(new Error('No response body'));
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
       while (true) {
         if (signal?.aborted) return;
         const { done, value } = await reader.read();
@@ -288,6 +296,14 @@ async function streamProgress(params: {
   }
 }
 
+// --- Stop execution ---
+
+export async function stopExecution(executionId: string): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>(`/stop_stream/${executionId}`, {
+    method: 'POST',
+  });
+}
+
 // --- Executions ---
 
 export async function fetchExecutions(
@@ -316,6 +332,7 @@ export interface FetchSystemPromptParams {
   defaultCatalog?: string | null;
   defaultSchema?: string | null;
   workspaceFolder?: string | null;
+  projectId?: string | null;
 }
 
 export async function fetchSkillsTree(projectId: string): Promise<SkillTreeNode[]> {
@@ -342,8 +359,25 @@ export async function fetchSystemPrompt(params: FetchSystemPromptParams): Promis
   if (params.defaultCatalog != null) q.set('default_catalog', params.defaultCatalog);
   if (params.defaultSchema != null) q.set('default_schema', params.defaultSchema);
   if (params.workspaceFolder != null) q.set('workspace_folder', params.workspaceFolder);
-  const data = await request<{ system_prompt: string }>(`/system_prompt?${q.toString()}`);
+  if (params.projectId != null) q.set('project_id', params.projectId);
+  const data = await request<{ system_prompt: string }>(`/config/system_prompt?${q.toString()}`);
   return data.system_prompt ?? '';
+}
+
+export async function fetchAvailableSkills(
+  projectId: string
+): Promise<{ skills: { name: string; description: string; enabled: boolean }[]; all_enabled: boolean; enabled_count: number; total_count: number }> {
+  return request(`/projects/${projectId}/skills/available`);
+}
+
+export async function updateEnabledSkills(
+  projectId: string,
+  enabledSkills: string[] | null
+): Promise<void> {
+  await request(`/projects/${projectId}/skills/enabled`, {
+    method: 'PUT',
+    body: { enabled_skills: enabledSkills },
+  });
 }
 
 export async function reloadProjectSkills(projectId: string): Promise<void> {

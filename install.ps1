@@ -3,13 +3,27 @@
 #
 # Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
 #
-# Usage:
+# Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
+#        .\install.ps1 [OPTIONS]
+#
+# Examples:
+#   # Basic installation (uses DEFAULT profile, project scope)
 #   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex
-#   .\install.ps1 -Global
+#
+#   # Download and run with options
+#   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
+#
+#   # Global installation with force reinstall
+#   .\install.ps1 -Global -Force
+#
+#   # Specify profile and force reinstall
+#   .\install.ps1 -Profile DEFAULT -Force
+#
+#   # Install for specific tools only
+#   .\install.ps1 -Tools cursor
+#
+#   # Skills only (skip MCP server)
 #   .\install.ps1 -SkillsOnly
-#   .\install.ps1 -McpOnly
-#   .\install.ps1 -Tools cursor,codex,copilot
-#   .\install.ps1 -Force
 #
 
 $ErrorActionPreference = "Stop"
@@ -23,9 +37,14 @@ $VenvDir   = Join-Path $InstallDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $McpEntry  = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
 
+# Minimum required versions
+$MinCliVersion = "0.278.0"
+$MinSdkVersion = "0.85.0"
+
 # ─── Defaults ─────────────────────────────────────────────────
 $script:Profile_     = "DEFAULT"
 $script:Scope        = "project"
+$script:ScopeExplicit = $false  # Track if --global was explicitly passed
 $script:InstallMcp   = $true
 $script:InstallSkills = $true
 $script:Force        = $false
@@ -39,7 +58,7 @@ $script:ProfileProvided = $false
 # Databricks skills (bundled in repo)
 $script:Skills = @(
     "agent-bricks", "aibi-dashboards", "asset-bundles", "databricks-app-apx",
-    "databricks-app-python", "databricks-config", "databricks-docs", "databricks-genie",
+    "databricks-app-python", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-jobs", "databricks-python-sdk", "databricks-unity-catalog",
     "lakebase-provisioned", "model-serving", "spark-declarative-pipelines",
     "synthetic-data-generation", "unstructured-pdf-generation"
@@ -82,7 +101,7 @@ $i = 0
 while ($i -lt $args.Count) {
     switch ($args[$i]) {
         { $_ -in "-p", "--profile" }  { $script:Profile_ = $args[$i + 1]; $script:ProfileProvided = $true; $i += 2 }
-        { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $i++ }
+        { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $script:ScopeExplicit = $true; $i++ }
         { $_ -in "--skills-only", "-SkillsOnly" } { $script:InstallMcp = $false; $i++ }
         { $_ -in "--mcp-only", "-McpOnly" }    { $script:InstallSkills = $false; $i++ }
         { $_ -in "--mcp-path", "-McpPath" }    { $script:UserMcpPath = $args[$i + 1]; $i += 2 }
@@ -92,7 +111,7 @@ while ($i -lt $args.Count) {
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
             Write-Host ""
-            Write-Host "Usage: irm .../install.ps1 | iex"
+            Write-Host "Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1"
             Write-Host "       .\install.ps1 [OPTIONS]"
             Write-Host ""
             Write-Host "Options:"
@@ -105,6 +124,17 @@ while ($i -lt $args.Count) {
             Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
+            Write-Host ""
+            Write-Host "Examples:"
+            Write-Host "  # Basic installation"
+            Write-Host "  irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex"
+            Write-Host ""
+            Write-Host "  # Download and run with options"
+            Write-Host "  irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1"
+            Write-Host "  .\install.ps1 -Global -Force"
+            Write-Host ""
+            Write-Host "  # Specify profile and force reinstall"
+            Write-Host "  .\install.ps1 -Profile DEFAULT -Force"
             return
         }
         default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
@@ -480,11 +510,23 @@ function Invoke-PromptProfile {
             if ($p -eq "DEFAULT") { $sel = $true; $hint = "default" }
             $items += @{ Label = $p; Value = $p; Selected = $sel; Hint = $hint }
         }
-        if (-not $hasDefault -and $items.Count -gt 0) {
+        
+        # Add custom profile option at the end
+        $items += @{ Label = "Custom profile name..."; Value = "__CUSTOM__"; Selected = $false; Hint = "Enter a custom profile name" }
+        
+        if (-not $hasDefault -and $items.Count -gt 1) {
             $items[0].Selected = $true
         }
 
-        $script:Profile_ = Select-Radio -Items $items
+        $selectedProfile = Select-Radio -Items $items
+        
+        # If custom was selected, prompt for name
+        if ($selectedProfile -eq "__CUSTOM__") {
+            Write-Host ""
+            $script:Profile_ = Read-Prompt -PromptText "Enter profile name" -Default "DEFAULT"
+        } else {
+            $script:Profile_ = $selectedProfile
+        }
     } else {
         Write-Host "  No ~/.databrickscfg found. You can authenticate after install." -ForegroundColor DarkGray
         Write-Host ""
@@ -524,7 +566,22 @@ function Test-Dependencies {
 
     # Databricks CLI
     if (Get-Command databricks -ErrorAction SilentlyContinue) {
-        Write-Ok "databricks CLI"
+        try {
+            $cliOutput = & databricks --version 2>&1
+            if ($cliOutput -match '(\d+\.\d+\.\d+)') {
+                $cliVersion = $Matches[1]
+                if ([version]$cliVersion -ge [version]$MinCliVersion) {
+                    Write-Ok "Databricks CLI v$cliVersion"
+                } else {
+                    Write-Warn "Databricks CLI v$cliVersion is outdated (minimum: v$MinCliVersion)"
+                    Write-Msg "  Upgrade: winget upgrade Databricks.DatabricksCLI"
+                }
+            } else {
+                Write-Warn "Could not determine Databricks CLI version"
+            }
+        } catch {
+            Write-Warn "Could not determine Databricks CLI version"
+        }
     } else {
         Write-Warn "Databricks CLI not found. Install: winget install Databricks.DatabricksCLI"
         Write-Msg "You can still install, but authentication will require the CLI later."
@@ -624,6 +681,24 @@ function Install-McpServer {
 
     $ErrorActionPreference = $prevEAP
     Write-Ok "MCP server ready"
+
+    # Check Databricks SDK version
+    try {
+        $sdkOutput = & $script:VenvPython -c "from databricks.sdk.version import __version__; print(__version__)" 2>&1
+        if ($sdkOutput -match '(\d+\.\d+\.\d+)') {
+            $sdkVersion = $Matches[1]
+            if ([version]$sdkVersion -ge [version]$MinSdkVersion) {
+                Write-Ok "Databricks SDK v$sdkVersion"
+            } else {
+                Write-Warn "Databricks SDK v$sdkVersion is outdated (minimum: v$MinSdkVersion)"
+                Write-Msg "  Upgrade: $($script:VenvPython) -m pip install --upgrade databricks-sdk"
+            }
+        } else {
+            Write-Warn "Could not determine Databricks SDK version"
+        }
+    } catch {
+        Write-Warn "Could not determine Databricks SDK version"
+    }
 }
 
 # ─── Install skills ──────────────────────────────────────────
@@ -903,9 +978,6 @@ function Show-Summary {
     Write-Host ""
     Write-Msg "Next steps:"
     $step = 1
-    Write-Msg "$step. Configure profile $($script:Profile_) or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN."
-    Write-Msg "   Authenticate: databricks auth login --profile $($script:Profile_)"
-    $step++
     if ($script:Tools -match 'cursor') {
         Write-Msg "$step. Enable MCP in Cursor: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
         $step++
@@ -920,6 +992,102 @@ function Show-Summary {
     $step++
     Write-Msg "$step. Try: `"List my SQL warehouses`""
     Write-Host ""
+}
+
+# ─── Scope prompt ─────────────────────────────────────────────
+function Invoke-PromptScope {
+    if ($script:Silent) { return }
+
+    Write-Host ""
+    Write-Host "  Select installation scope" -ForegroundColor White
+    
+    $labels = @("Project", "Global")
+    $values = @("project", "global")
+    $hints = @("Install in current directory (.cursor/ and .claude/)", "Install in home directory (~/.cursor/ and ~/.claude/)")
+    $count = 2
+    $selected = 0
+    $cursor = 0
+    
+    $isInteractive = Test-Interactive
+    
+    if (-not $isInteractive) {
+        # Fallback: numbered list
+        Write-Host ""
+        Write-Host "  1. (*) Project  Install in current directory (.cursor/ and .claude/)"
+        Write-Host "  2. ( ) Global   Install in home directory (~/.cursor/ and ~/.claude/)"
+        Write-Host ""
+        Write-Host "  Enter number to select (or press Enter for default): " -NoNewline
+        $input_ = Read-Host
+        if (-not [string]::IsNullOrWhiteSpace($input_) -and $input_ -eq "2") {
+            $selected = 1
+        }
+        $script:Scope = $values[$selected]
+        return
+    }
+    
+    # Interactive mode
+    Write-Host ""
+    Write-Host "  Up/Down navigate, Enter select" -ForegroundColor DarkGray
+    Write-Host ""
+    
+    $totalRows = $count
+    
+    try { [Console]::CursorVisible = $false } catch {}
+    
+    $drawScope = {
+        [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $totalRows))
+        for ($j = 0; $j -lt $count; $j++) {
+            if ($j -eq $cursor) {
+                Write-Host "  " -NoNewline
+                Write-Host ">" -ForegroundColor Blue -NoNewline
+                Write-Host " " -NoNewline
+            } else {
+                Write-Host "    " -NoNewline
+            }
+            if ($j -eq $selected) {
+                Write-Host "(*)" -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host "( )" -ForegroundColor DarkGray -NoNewline
+            }
+            $padLabel = $labels[$j].PadRight(20)
+            Write-Host " $padLabel " -NoNewline
+            if ($j -eq $selected) {
+                Write-Host $hints[$j] -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host $hints[$j] -ForegroundColor DarkGray -NoNewline
+            }
+            $pos = [Console]::CursorLeft
+            $remaining = [Console]::WindowWidth - $pos - 1
+            if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+            Write-Host ""
+        }
+    }
+    
+    # Reserve lines
+    for ($j = 0; $j -lt $totalRows; $j++) { Write-Host "" }
+    & $drawScope
+    
+    while ($true) {
+        $key = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        
+        switch ($key.VirtualKeyCode) {
+            38 { if ($cursor -gt 0) { $cursor-- } }
+            40 { if ($cursor -lt 1) { $cursor++ } }
+            32 { $selected = $cursor }
+            13 {
+                $selected = $cursor
+                & $drawScope
+                break
+            }
+        }
+        if ($key.VirtualKeyCode -eq 13) { break }
+        
+        & $drawScope
+    }
+    
+    try { [Console]::CursorVisible = $true } catch {}
+    
+    $script:Scope = $values[$selected]
 }
 
 # ─── Auth prompt ──────────────────────────────────────────────
@@ -986,6 +1154,12 @@ function Invoke-Main {
     Write-Step "Databricks profile"
     Invoke-PromptProfile
     Write-Ok "Profile: $($script:Profile_)"
+
+    # Scope selection
+    if (-not $script:ScopeExplicit) {
+        Invoke-PromptScope
+        Write-Ok "Scope: $($script:Scope)"
+    }
 
     # MCP path
     if ($script:InstallMcp) {
@@ -1059,11 +1233,11 @@ function Invoke-Main {
     # Save version
     Save-Version
 
-    # Summary
-    Show-Summary
-
     # Auth prompt
     Invoke-PromptAuth
+
+    # Summary
+    Show-Summary
 }
 
 Invoke-Main

@@ -1,0 +1,36 @@
+skill:
+  name: "databricks-app-python"
+  source_path: "databricks-skills/databricks-app-python"
+  description: "Python Databricks Apps: Dash, Streamlit, Gradio, Flask, FastAPI, Reflex"
+
+evaluation:
+  datasets:
+    - path: ground_truth.yaml
+      type: yaml
+
+# Scorer configuration
+scorers:
+  # Built-in deterministic scorers to enable
+  enabled:
+    - python_syntax
+    - pattern_adherence
+    - no_hallucinated_apis
+    - expected_facts_present
+
+  # LLM-based scorers
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations  # Dynamic from YAML expectations.guidelines
+
+  # Default guidelines (used when test case has no guidelines)
+  default_guidelines:
+    - "Response must address the user's request completely"
+    - "Code examples must follow documented best practices"
+    - "Must use SDK Config() for auth (never hardcode tokens)"
+    - "Must use app.yaml valueFrom for resources (never hardcode IDs)"
+    - "Dash apps must use dash-bootstrap-components"
+
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+  execution_success: 0.8

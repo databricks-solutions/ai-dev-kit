@@ -12,24 +12,24 @@
   --color-text-primary: #18181B;
   --color-text-muted: #71717A;
 
-  /* ACCENT/BRAND COLOR */
-  --color-accent-primary: #2075b6;
-  --color-accent-secondary: #4eb4f4;
+  /* ACCENT/BRAND COLOR - Databricks Brand */
+  --color-accent-primary: #FF3621;
+  --color-accent-secondary: #FF5F46;
 
   /* BACKGROUND COLORS */
   --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #FAFAFA;
-  --color-bg-tertiary: #F4F4F5;
+  --color-bg-secondary: #F9F7F4;
+  --color-bg-tertiary: #F0EDEA;
   --color-bg-elevated: #FFFFFF;
 
   /* BORDER */
-  --color-border: #E4E4E7;
+  --color-border: #E0DCD8;
 
   /* STATUS COLORS */
-  --color-success: #22C55E;
+  --color-success: #00A972;
   --color-error: #EF4444;
-  --color-info: #2c76af;
-  --color-warning: #F59E0B;
+  --color-info: #1B3139;
+  --color-warning: #FFAB00;
   --color-destructive: #EF4444;
 
   /* TAILWIND COMPATIBILITY */
@@ -53,9 +53,9 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
 
-  /* FONTS */
-  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* FONTS - Databricks Brand */
+  --font-body: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
@@ -65,17 +65,17 @@
   --color-text-primary: #E4E4E7;
   --color-text-muted: #A1A1AA;
 
-  --color-accent-primary: #66abd6;
-  --color-accent-secondary: #2c76af;
+  --color-accent-primary: #FF5F46;
+  --color-accent-secondary: #FF3621;
 
-  --color-bg-primary: #131315;
-  --color-bg-secondary: #0d0d0d;
-  --color-bg-tertiary: #1a1a1c;
-  --color-bg-elevated: #1f1f21;
+  --color-bg-primary: #1B2026;
+  --color-bg-secondary: #141A1F;
+  --color-bg-tertiary: #1F272E;
+  --color-bg-elevated: #243038;
 
-  --color-border: #27272A;
+  --color-border: #2E3A42;
 
-  --color-primary-foreground: #1a1a1a;
+  --color-primary-foreground: #FFFFFF;
 }
 
 @layer base {

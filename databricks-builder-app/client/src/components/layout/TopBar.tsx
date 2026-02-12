@@ -19,18 +19,16 @@ export function TopBar({ projectName }: TopBarProps) {
         <div className="flex items-center gap-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[var(--color-accent-primary)] flex items-center justify-center">
+            <div className="w-8 h-8 flex items-center justify-center">
               <svg
-                className="w-5 h-5 text-white"
+                className="w-7 h-7"
+                viewBox="33 0 28 31"
                 fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                  d="M59.7279 12.5153L47.2039 19.6185L33.8814 12.0502L33.251 12.3884V17.885L47.2039 25.8339L59.7279 18.7306V21.648L47.2039 28.7513L33.8814 21.1829L33.251 21.5212V22.4514L47.2039 30.4002L61.1989 22.4514V16.9548L60.5685 16.6165L47.2039 24.1849L34.7219 17.0816V14.2065L47.2039 21.2675L61.1989 13.3186V7.9066L60.4844 7.52607L47.2039 15.0521L35.3943 8.32941L47.2039 1.64897L56.9541 7.14554L57.8367 6.68044V6.00394L47.2039 0L33.251 7.9066V8.75223L47.2039 16.7011L59.7279 9.59785V12.5153Z"
+                  fill="#FF3621"
                 />
               </svg>
             </div>

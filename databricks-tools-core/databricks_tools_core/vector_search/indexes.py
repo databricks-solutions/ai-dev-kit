@@ -169,7 +169,7 @@ def get_vs_index(index_name: str) -> Dict[str, Any]:
         index = client.vector_search_indexes.get_index(index_name=index_name)
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg:
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": index_name,
                 "state": "NOT_FOUND",
@@ -233,18 +233,37 @@ def list_vs_indexes(endpoint_name: str) -> List[Dict[str, Any]]:
         raise Exception(f"Failed to list indexes on endpoint '{endpoint_name}': {str(e)}")
 
     result = []
-    indexes = response.vector_indexes if response and response.vector_indexes else []
+    # SDK may return an object with .vector_indexes or a generator directly
+    if hasattr(response, "vector_indexes") and response.vector_indexes:
+        indexes = response.vector_indexes
+    elif response:
+        indexes = list(response)
+    else:
+        indexes = []
     for idx in indexes:
         entry: Dict[str, Any] = {
             "name": idx.name,
-            "primary_key": idx.primary_key,
         }
 
-        if idx.index_type:
-            entry["index_type"] = idx.index_type.value
+        # primary_key may not exist on MiniVectorIndex
+        try:
+            if idx.primary_key:
+                entry["primary_key"] = idx.primary_key
+        except (AttributeError, KeyError):
+            pass
 
-        if idx.status and idx.status.ready is not None:
-            entry["state"] = "ONLINE" if idx.status.ready else "NOT_READY"
+        try:
+            if idx.index_type:
+                entry["index_type"] = idx.index_type.value
+        except (AttributeError, KeyError):
+            pass
+
+        # status may not exist on MiniVectorIndex (from generator response)
+        try:
+            if idx.status and idx.status.ready is not None:
+                entry["state"] = "ONLINE" if idx.status.ready else "NOT_READY"
+        except (AttributeError, KeyError):
+            pass
 
         result.append(entry)
 
@@ -276,7 +295,7 @@ def delete_vs_index(index_name: str) -> Dict[str, Any]:
         }
     except Exception as e:
         error_msg = str(e)
-        if "RESOURCE_DOES_NOT_EXIST" in error_msg or "404" in error_msg:
+        if "not found" in error_msg.lower() or "does not exist" in error_msg.lower() or "404" in error_msg:
             return {
                 "name": index_name,
                 "status": "NOT_FOUND",
@@ -384,9 +403,14 @@ def query_vs_index(
 
     result: Dict[str, Any] = {}
 
+    # Column names from manifest (SDK doesn't put them on result directly)
+    try:
+        if response.manifest and response.manifest.columns:
+            result["columns"] = [c.name for c in response.manifest.columns]
+    except (AttributeError, KeyError):
+        pass
+
     if response.result:
-        if response.result.column_names:
-            result["columns"] = response.result.column_names
         if response.result.data_array:
             result["data"] = response.result.data_array
             result["num_results"] = len(response.result.data_array)
@@ -526,13 +550,45 @@ def scan_vs_index(
 
     result: Dict[str, Any] = {}
 
-    if response.result:
-        if response.result.column_names:
-            result["columns"] = response.result.column_names
-        if response.result.data_array:
-            result["data"] = response.result.data_array
-            result["num_results"] = len(response.result.data_array)
+    # ScanVectorIndexResponse has .data (list of entries) and .last_primary_key
+    # not .result like QueryVectorIndexResponse
+    try:
+        data = response.data
+        if data:
+            # data is a list of Struct/dict objects
+            if isinstance(data, list) and len(data) > 0:
+                # Extract column names from first entry
+                first = data[0]
+                if hasattr(first, "as_dict"):
+                    rows = [d.as_dict() for d in data]
+                elif isinstance(first, dict):
+                    rows = data
+                else:
+                    rows = data
+
+                if rows and isinstance(rows[0], dict):
+                    result["columns"] = list(rows[0].keys())
+                result["data"] = rows
+                result["num_results"] = len(rows)
+            else:
+                result["data"] = []
+                result["num_results"] = 0
         else:
+            result["data"] = []
+            result["num_results"] = 0
+    except (AttributeError, KeyError):
+        # Fallback: try the old .result pattern in case SDK changes
+        try:
+            if response.result:
+                if hasattr(response.result, "column_names") and response.result.column_names:
+                    result["columns"] = response.result.column_names
+                if response.result.data_array:
+                    result["data"] = response.result.data_array
+                    result["num_results"] = len(response.result.data_array)
+                else:
+                    result["data"] = []
+                    result["num_results"] = 0
+        except (AttributeError, KeyError):
             result["data"] = []
             result["num_results"] = 0
 

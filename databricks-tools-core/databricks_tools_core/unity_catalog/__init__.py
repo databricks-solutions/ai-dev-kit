@@ -121,6 +121,16 @@ from .monitors import (
     delete_monitor,
 )
 
+# Metric Views
+from .metric_views import (
+    create_metric_view,
+    alter_metric_view,
+    drop_metric_view,
+    describe_metric_view,
+    query_metric_view,
+    grant_metric_view,
+)
+
 # Delta Sharing
 from .sharing import (
     list_shares,
@@ -222,6 +232,13 @@ __all__ = [
     "run_monitor_refresh",
     "list_monitor_refreshes",
     "delete_monitor",
+    # Metric Views
+    "create_metric_view",
+    "alter_metric_view",
+    "drop_metric_view",
+    "describe_metric_view",
+    "query_metric_view",
+    "grant_metric_view",
     # Sharing
     "list_shares",
     "get_share",

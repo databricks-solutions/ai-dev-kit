@@ -23,6 +23,7 @@ Usage in functions:
         # ...
 """
 
+import logging
 import os
 from contextvars import ContextVar
 from typing import Optional
@@ -30,6 +31,12 @@ from typing import Optional
 from databricks.sdk import WorkspaceClient
 
 from .identity import PRODUCT_NAME, PRODUCT_VERSION, tag_client
+
+logger = logging.getLogger(__name__)
+
+# Cached current username — only fetched once per process
+_current_username: Optional[str] = None
+_current_username_fetched: bool = False
 
 
 def _has_oauth_credentials() -> bool:
@@ -110,3 +117,27 @@ def get_workspace_client() -> WorkspaceClient:
 
     # Fall back to default authentication (env vars, config file)
     return tag_client(WorkspaceClient(**product_kwargs))
+
+
+def get_current_username() -> Optional[str]:
+    """Get the current authenticated user's username (email).
+
+    Cached after first successful call — the authenticated user doesn't
+    change mid-session. Returns None if the API call fails, allowing
+    callers to degrade gracefully (e.g., skip user-based filtering).
+
+    Returns:
+        Username string (typically an email), or None on failure.
+    """
+    global _current_username, _current_username_fetched
+    if _current_username_fetched:
+        return _current_username
+    try:
+        w = get_workspace_client()
+        _current_username = w.current_user.me().user_name
+        _current_username_fetched = True
+        return _current_username
+    except Exception as e:
+        logger.debug(f"Failed to fetch current username: {e}")
+        _current_username_fetched = True
+        return None

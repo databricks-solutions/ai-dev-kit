@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search"
+DATABRICKS_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -60,15 +60,18 @@ get_skill_description() {
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
         "databricks-config") echo "Profile authentication setup for Databricks" ;;
+        "databricks-dbsql") echo "Databricks SQL - SQL scripting, MVs, geospatial, AI functions, federation" ;;
         "databricks-docs") echo "Documentation reference via llms.txt" ;;
         "databricks-genie") echo "Genie Spaces - create, curate, and query via Conversation API" ;;
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
         "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
+        "lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
         "lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
+        "metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
         "model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
-        "spark-structured-streaming") echo "Spark Structured Streaming - real-time data processing" ;;
+        "spark-structured-streaming") echo "Spark Structured Streaming patterns and best practices" ;;
         "synthetic-data-generation") echo "Synthetic test data generation" ;;
         "unstructured-pdf-generation") echo "Generate synthetic PDFs for RAG" ;;
         "vector-search") echo "Vector Search - endpoints, indexes, and queries for RAG" ;;
@@ -97,7 +100,9 @@ get_skill_extra_files() {
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
         "databricks-unity-catalog") echo "5-system-tables.md" ;;
+        "lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
+        "metric-views") echo "yaml-reference.md patterns.md" ;;
         "mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
         "model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
         "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;

@@ -41,6 +41,30 @@ def load_databricks_tools():
         - server_config: McpSdkServerConfig for ClaudeAgentOptions.mcp_servers
         - tool_names: List of tool names in mcp__databricks__* format
     """
+    sdk_tools, tool_names = _get_all_sdk_tools()
+
+    logger.info(f'Loaded {len(sdk_tools)} Databricks tools: {[n.split("__")[-1] for n in tool_names]}')
+
+    server = create_sdk_mcp_server(name='databricks', tools=sdk_tools)
+    return server, tool_names
+
+
+# Cached SDK tools (loaded once, reused for filtered server creation)
+_all_sdk_tools = None
+_all_tool_names = None
+
+
+def _get_all_sdk_tools():
+    """Load and cache all SDK tool wrappers.
+
+    Returns:
+        Tuple of (sdk_tools, tool_names)
+    """
+    global _all_sdk_tools, _all_tool_names
+
+    if _all_sdk_tools is not None:
+        return _all_sdk_tools, _all_tool_names
+
     # Import triggers @mcp.tool registration
     from databricks_mcp_server.server import mcp
     from databricks_mcp_server.tools import sql, compute, file, pipelines  # noqa: F401
@@ -62,10 +86,41 @@ def load_databricks_tools():
     sdk_tools.append(_create_list_operations_tool())
     tool_names.append('mcp__databricks__list_operations')
 
-    logger.info(f'Loaded {len(sdk_tools)} Databricks tools: {[n.split("__")[-1] for n in tool_names]}')
+    _all_sdk_tools = sdk_tools
+    _all_tool_names = tool_names
+    return sdk_tools, tool_names
 
-    server = create_sdk_mcp_server(name='databricks', tools=sdk_tools)
-    return server, tool_names
+
+def create_filtered_databricks_server(allowed_tool_names: list[str]):
+    """Create an MCP server with only the specified tools.
+
+    Used to restrict which Databricks tools the agent can access based on
+    which skills are enabled.
+
+    Args:
+        allowed_tool_names: List of tool names in mcp__databricks__* format
+
+    Returns:
+        Tuple of (server_config, filtered_tool_names)
+    """
+    all_sdk_tools, all_tool_names = _get_all_sdk_tools()
+
+    allowed_set = set(allowed_tool_names)
+    filtered_tools = []
+    filtered_names = []
+
+    for sdk_tool, tool_name in zip(all_sdk_tools, all_tool_names):
+        if tool_name in allowed_set:
+            filtered_tools.append(sdk_tool)
+            filtered_names.append(tool_name)
+
+    logger.info(
+        f'Created filtered Databricks server: {len(filtered_names)}/{len(all_tool_names)} tools '
+        f'({len(all_tool_names) - len(filtered_names)} blocked)'
+    )
+
+    server = create_sdk_mcp_server(name='databricks', tools=filtered_tools)
+    return server, filtered_names
 
 
 def _create_check_operation_status_tool():

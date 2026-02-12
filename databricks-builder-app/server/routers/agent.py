@@ -48,6 +48,7 @@ class InvokeAgentRequest(BaseModel):
     default_schema: Optional[str] = None  # Default schema
     warehouse_id: Optional[str] = None  # Databricks SQL warehouse for queries
     workspace_folder: Optional[str] = None  # Workspace folder for file uploads
+    mlflow_experiment_name: Optional[str] = None  # MLflow experiment name for tracing
 
 
 class InvokeAgentResponse(BaseModel):
@@ -97,6 +98,11 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
     if not project:
         logger.error(f'Project not found: {body.project_id}')
         raise HTTPException(status_code=404, detail=f'Project not found: {body.project_id}')
+
+    # Read enabled skills from project filesystem (not DB)
+    from ..services.skills_manager import get_project_enabled_skills
+    project_dir = get_project_directory(body.project_id)
+    enabled_skills = get_project_enabled_skills(project_dir)
 
     # Get or create conversation
     conv_storage = ConversationStorage(user_email, body.project_id)
@@ -166,6 +172,8 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
                 databricks_host=workspace_url,
                 databricks_token=user_token,
                 is_cancelled_fn=lambda: stream.is_cancelled,
+                enabled_skills=enabled_skills,
+                mlflow_experiment_name=body.mlflow_experiment_name,
             ):
                 # Check if cancelled (also checked in agent thread, but double-check here)
                 if stream.is_cancelled:

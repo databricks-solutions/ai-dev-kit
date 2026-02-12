@@ -8,7 +8,7 @@ from .backup_manager import (
   stop_backup_worker,
 )
 from .clusters import list_clusters_async
-from .skills_manager import SkillNotFoundError, copy_skills_to_app, copy_skills_to_project, get_available_skills, reload_project_skills
+from .skills_manager import SkillNotFoundError, copy_skills_to_app, copy_skills_to_project, get_allowed_mcp_tools, get_available_skills, get_project_enabled_skills, reload_project_skills, set_project_enabled_skills, sync_project_skills
 from .storage import ConversationStorage, ProjectStorage
 from .system_prompt import get_system_prompt
 from .user import get_current_user, get_workspace_url
@@ -21,6 +21,7 @@ __all__ = [
   'SkillNotFoundError',
   'copy_skills_to_app',
   'copy_skills_to_project',
+  'get_allowed_mcp_tools',
   'get_available_skills',
   'get_current_user',
   'get_project_directory',
@@ -29,7 +30,10 @@ __all__ = [
   'get_workspace_url',
   'list_clusters_async',
   'mark_for_backup',
+  'get_project_enabled_skills',
   'reload_project_skills',
+  'set_project_enabled_skills',
+  'sync_project_skills',
   'start_backup_worker',
   'stop_backup_worker',
   'stream_agent_response',

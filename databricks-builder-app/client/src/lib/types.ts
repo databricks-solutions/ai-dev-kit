@@ -70,6 +70,13 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
+/** Skill with enabled status from GET .../skills/available */
+export interface AvailableSkill {
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
 /** Active or recent execution from GET .../executions */
 export interface Execution {
   id: string;

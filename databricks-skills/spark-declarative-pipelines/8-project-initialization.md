@@ -18,7 +18,7 @@ The `databricks pipelines init` command scaffolds a complete Databricks Asset Bu
 ### Interactive Mode
 
 ```bash
-databricks pipelines init --output-dir ./my_pipeline
+databricks pipelines init --output-dir .
 ```
 
 **Interactive Prompts:**
@@ -43,7 +43,7 @@ databricks pipelines init --output-dir ./my_pipeline
 
 ```bash
 databricks pipelines init \
-  --output-dir ./customer_pipeline \
+  --output-dir . \
   --config-file init-config.json
 ```
 
@@ -70,7 +70,7 @@ databricks pipelines init \
 ### SQL Project
 
 ```
-customer_pipeline/
+project_root/
 ├── databricks.yml                           # Bundle configuration
 ├── resources/
 │   ├── customer_pipeline_etl.pipeline.yml  # Pipeline resource definition
@@ -89,7 +89,7 @@ customer_pipeline/
 ### Python Project
 
 ```
-customer_pipeline/
+project_root/
 ├── databricks.yml                           # Bundle configuration
 ├── pyproject.toml                           # Python dependencies
 ├── resources/
@@ -245,10 +245,22 @@ databricks pipelines start-update --pipeline-id <id>
 
 When a user requests a new Lakeflow pipeline, Claude should detect the appropriate language from keywords in the prompt.
 
-### SQL Indicators (Default Choice)
+### CRITICAL: Explicit Language Requests
+
+**If the user explicitly mentions a language, use it without asking:**
+
+| User Says | Action |
+|-----------|--------|
+| "Python pipeline", "Python SDP", "use Python" | **Use Python immediately** |
+| "SQL pipeline", "SQL files", "use SQL" | **Use SQL immediately** |
+| "Python Spark Declarative Pipeline" | **Use Python immediately** |
+
+**DO NOT ask for clarification when the user explicitly states a language.** This is the most common mistake - ignoring an explicit language request.
+
+### SQL Indicators (Default Choice When Ambiguous)
 
 **Keywords:**
-- "SQL", "sql files", ".sql"
+- "sql files", ".sql"
 - "simple", "basic", "straightforward"
 - "aggregations", "joins", "transformations"
 - "materialized view", "CREATE OR REFRESH"
@@ -258,8 +270,9 @@ When a user requests a new Lakeflow pipeline, Claude should detect the appropria
 - User mentions only data transformations without complex logic
 - Request focuses on filtering, joining, aggregating data
 - No mention of custom functions or external integrations
+- **No explicit mention of "Python"**
 
-**Default Behavior**: Prefer SQL when ambiguous (covers 90% of use cases)
+**Default Behavior**: Prefer SQL only when ambiguous AND no Python indicators present
 
 ### Python Indicators
 
@@ -280,11 +293,10 @@ When a user requests a new Lakeflow pipeline, Claude should detect the appropria
 
 ### Ambiguous Cases (Ask User)
 
-**Indicators:**
-- Both SQL and Python keywords mentioned
-- "mixed pipeline", "some Python, some SQL"
-- "complex pipeline" without specifics
-- Unclear requirements or vague description
+**Only ask when ALL conditions are met:**
+- User did NOT explicitly mention "Python" or "SQL"
+- Mixed signals present (some SQL keywords, some Python keywords)
+- OR no clear indicators either way
 
 **Response:**
 ```
@@ -302,7 +314,7 @@ Which would you prefer?
 
 For bronze/silver/gold organization, Asset Bundles support two approaches. Both work with the `transformations/**` glob pattern in pipeline configuration.
 
-### Option 1: Flat Structure with Naming (Template Default)
+### Option 1: Flat Structure with Naming (Template Default, SQL Example)
 
 ```
 transformations/
@@ -323,7 +335,7 @@ transformations/
 - Simple file listing and discovery
 - Clear naming provides logical organization
 
-### Option 2: Subdirectories by Layer
+### Option 2: Subdirectories by Layer, SQL Example
 
 ```
 transformations/
@@ -428,73 +440,6 @@ my_pipeline/
 └── gold/
     └── summary.sql
 ```
-
-**Migration Steps:**
-
-1. **Initialize new bundle project**
-   ```bash
-   databricks pipelines init --output-dir my_pipeline_bundle
-   cd my_pipeline_bundle/src/my_pipeline_bundle_etl/transformations/
-   ```
-
-2. **Copy files using either approach**
-
-   **Option A: Flat structure with naming**
-   ```bash
-   # Remove sample files
-   rm sample_*.sql
-
-   # Copy and rename with medallion prefix
-   cp ../../../../my_pipeline/bronze/orders.sql bronze_orders.sql
-   cp ../../../../my_pipeline/bronze/events.sql bronze_events.sql
-   cp ../../../../my_pipeline/silver/cleaned.sql silver_cleaned.sql
-   cp ../../../../my_pipeline/silver/joined.sql silver_joined.sql
-   cp ../../../../my_pipeline/gold/summary.sql gold_summary.sql
-   ```
-
-   **Option B: Keep subdirectories**
-   ```bash
-   # Remove sample files
-   rm sample_*.sql
-
-   # Copy entire directory structure
-   cp -r ../../../../my_pipeline/bronze .
-   cp -r ../../../../my_pipeline/silver .
-   cp -r ../../../../my_pipeline/gold .
-   ```
-
-3. **Update file references (if needed)**
-   - If files reference each other by path, update to use table names
-   - Example: Change `FROM ../bronze/orders` to `FROM LIVE.bronze_orders`
-   - Table names are derived from filenames or view/table definitions, not folder structure
-
-4. **Deploy bundle**
-   ```bash
-   cd ../../..  # Back to bundle root
-   databricks bundle deploy
-   databricks bundle run my_pipeline_bundle_etl
-   ```
-
-**Benefits:**
-- Multi-environment support (dev/staging/prod)
-- Version control for configuration
-- CI/CD integration
-- Professional project structure
-
-### Option 2: Keep Manual Structure (Legacy)
-
-Continue using the manual workflow if:
-- Quick prototyping without multi-environment needs
-- Existing workflow is working well
-- Team prefers manual control
-
-**Legacy Workflow:**
-1. Write files in bronze/silver/gold folders
-2. Upload with `upload_folder` MCP tool
-3. Create pipeline with `create_or_update_pipeline` MCP tool
-4. Update files and re-upload
-
-See [SKILL.md](SKILL.md) "Alternative: Manual Workflow" section for details.
 
 ---
 

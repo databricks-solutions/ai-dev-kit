@@ -44,7 +44,7 @@ from claude_agent_sdk.types import (
 from databricks_tools_core.auth import set_databricks_auth, clear_databricks_auth
 
 from .backup_manager import ensure_project_directory as _ensure_project_directory
-from .databricks_tools import load_databricks_tools
+from .databricks_tools import load_databricks_tools, create_filtered_databricks_server
 from .system_prompt import get_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,6 @@ BUILTIN_TOOLS = [
 #  'Bash',
   'Glob',
   'Grep',
-  'Skill',  # For loading skills
 ]
 
 # Cached Databricks tools (loaded once)
@@ -141,8 +140,13 @@ def _get_mlflow_stop_hook(experiment_name: str | None = None):
     mlflow.set_tracking_uri('databricks')
     if experiment_name:
       try:
-        mlflow.set_experiment(experiment_name)
-        logger.info(f'MLflow experiment set to: {experiment_name}')
+        # Support both experiment IDs (numeric) and experiment names (paths)
+        if experiment_name.isdigit():
+          mlflow.set_experiment(experiment_id=experiment_name)
+          logger.info(f'MLflow experiment set by ID: {experiment_name}')
+        else:
+          mlflow.set_experiment(experiment_name)
+          logger.info(f'MLflow experiment set to: {experiment_name}')
       except Exception as e:
         logger.warning(f'Could not set MLflow experiment: {e}')
 
@@ -307,6 +311,8 @@ async def stream_agent_response(
   databricks_host: str | None = None,
   databricks_token: str | None = None,
   is_cancelled_fn: callable = None,
+  enabled_skills: list[str] | None = None,
+  mlflow_experiment_name: str | None = None,
 ) -> AsyncIterator[dict]:
   """Stream Claude agent response with all event types.
 
@@ -325,6 +331,7 @@ async def stream_agent_response(
       databricks_host: Databricks workspace URL for auth context
       databricks_token: User's Databricks access token for auth context
       is_cancelled_fn: Optional callable that returns True if request is cancelled
+      enabled_skills: Optional list of enabled skill names. None means all skills.
 
   Yields:
       Event dicts with 'type' field for frontend consumption
@@ -347,10 +354,30 @@ async def stream_agent_response(
     # Build allowed tools list
     allowed_tools = BUILTIN_TOOLS.copy()
 
-    # Get in-process Databricks tools
+    # Sync project skills directory before running agent
+    from .skills_manager import sync_project_skills, get_available_skills, get_allowed_mcp_tools
+    sync_project_skills(project_dir, enabled_skills=enabled_skills)
+
+    # Get Databricks tools and filter based on enabled skills.
+    # We must create a filtered MCP server (not just filter allowed_tools)
+    # because bypassPermissions mode exposes all tools in registered MCP servers.
     databricks_server, databricks_tool_names = get_databricks_tools()
-    allowed_tools.extend(databricks_tool_names)
-    logger.info(f'Databricks MCP server configured with {len(databricks_tool_names)} tools')
+    filtered_tool_names = get_allowed_mcp_tools(databricks_tool_names, enabled_skills=enabled_skills)
+
+    if len(filtered_tool_names) < len(databricks_tool_names):
+      # Some tools are blocked — create a filtered MCP server with only allowed tools
+      databricks_server, filtered_tool_names = create_filtered_databricks_server(filtered_tool_names)
+      blocked_count = len(databricks_tool_names) - len(filtered_tool_names)
+      logger.info(f'Databricks MCP server: {len(filtered_tool_names)} tools allowed, {blocked_count} blocked by disabled skills')
+    else:
+      logger.info(f'Databricks MCP server configured with {len(filtered_tool_names)} tools')
+
+    allowed_tools.extend(filtered_tool_names)
+
+    # Only add the Skill tool if there are enabled skills for the agent to use
+    available = get_available_skills(enabled_skills=enabled_skills)
+    if available:
+      allowed_tools.append('Skill')
 
     # Generate system prompt with available skills, cluster, warehouse, and catalog/schema context
     system_prompt = get_system_prompt(
@@ -360,6 +387,7 @@ async def stream_agent_response(
       warehouse_id=warehouse_id,
       workspace_folder=workspace_folder,
       workspace_url=databricks_host,
+      enabled_skills=enabled_skills,
     )
 
     # Load Claude settings for Databricks model serving authentication
@@ -423,8 +451,8 @@ async def stream_agent_response(
     # Default to always-false if no cancellation function provided
     cancel_check = is_cancelled_fn if is_cancelled_fn else lambda: False
 
-    # Get MLflow experiment name from environment
-    mlflow_experiment = os.environ.get('MLFLOW_EXPERIMENT_NAME')
+    # Get MLflow experiment name from request param, falling back to environment
+    mlflow_experiment = mlflow_experiment_name or os.environ.get('MLFLOW_EXPERIMENT_NAME')
 
     agent_thread = threading.Thread(
       target=_run_agent_in_fresh_loop,

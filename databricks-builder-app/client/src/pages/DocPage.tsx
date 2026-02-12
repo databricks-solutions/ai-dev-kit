@@ -115,13 +115,13 @@ function OverviewSection() {
                 {/* Tools Core Layer (nested inside MCP Server) */}
                 <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Database className="h-5 w-5 text-blue-400" />
+                    <Database className="h-5 w-5 text-[var(--color-accent-primary)]" />
                     <h3 className="font-semibold text-[var(--color-text-heading)] font-mono">databricks-tools-core/</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">Python</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-accent-primary)]/20 text-[var(--color-accent-primary)]">Python</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {['sql/', 'unity_catalog/', 'compute/', 'spark_declarative_pipelines/', 'agent_bricks/', 'file/'].map((module) => (
-                      <span key={module} className="text-xs px-2 py-1 rounded bg-blue-500/10 text-[var(--color-text-secondary)] font-mono">
+                      <span key={module} className="text-xs px-2 py-1 rounded bg-[var(--color-accent-primary)]/10 text-[var(--color-text-secondary)] font-mono">
                         {module}
                       </span>
                     ))}
@@ -186,8 +186,8 @@ function OverviewSection() {
           <div className="space-y-4">
             {/* User Request */}
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-blue-400">1</span>
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--color-accent-primary)]/20 flex items-center justify-center">
+                <span className="text-sm font-medium text-[var(--color-accent-primary)]">1</span>
               </div>
               <div>
                 <p className="font-medium text-[var(--color-text-heading)]">User Request</p>
@@ -199,8 +199,8 @@ function OverviewSection() {
 
             {/* Read Skill */}
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-blue-400">2</span>
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--color-accent-primary)]/20 flex items-center justify-center">
+                <span className="text-sm font-medium text-[var(--color-accent-primary)]">2</span>
               </div>
               <div>
                 <p className="font-medium text-[var(--color-text-heading)]">Read Skill</p>
@@ -209,7 +209,7 @@ function OverviewSection() {
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {['Non-linear distributions', 'Referential integrity', 'Time patterns', 'Row coherence'].map((item) => (
-                    <span key={item} className="text-xs px-2 py-1 rounded bg-blue-500/10 text-[var(--color-text-secondary)]">
+                    <span key={item} className="text-xs px-2 py-1 rounded bg-[var(--color-accent-primary)]/10 text-[var(--color-text-secondary)]">
                       {item}
                     </span>
                   ))}
@@ -219,8 +219,8 @@ function OverviewSection() {
 
             {/* Understand Storage */}
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-blue-400">3</span>
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--color-accent-primary)]/20 flex items-center justify-center">
+                <span className="text-sm font-medium text-[var(--color-accent-primary)]">3</span>
               </div>
               <div>
                 <p className="font-medium text-[var(--color-text-heading)]">Understand how to write and store raw data on Databricks UC</p>
@@ -293,7 +293,7 @@ function OverviewSection() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
             <div className="flex items-center gap-2 mb-2">
-              <BookOpen className="h-5 w-5 text-blue-400" />
+              <BookOpen className="h-5 w-5 text-[var(--color-accent-primary)]" />
               <h3 className="font-semibold text-[var(--color-text-heading)]">Skills teach latest features</h3>
             </div>
             <p className="text-sm text-[var(--color-text-muted)]">
@@ -333,7 +333,7 @@ function OverviewSection() {
 
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
             <div className="flex items-center gap-2 mb-2">
-              <ArrowRight className="h-5 w-5 text-blue-400" />
+              <ArrowRight className="h-5 w-5 text-[var(--color-accent-primary)]" />
               <h3 className="font-semibold text-[var(--color-text-heading)]">Built-in feedback loops</h3>
             </div>
             <p className="text-sm text-[var(--color-text-muted)]">
@@ -418,7 +418,7 @@ function StatusBadge({ status }: { status: CoverageStatus }) {
   const config = {
     'done': { label: 'Initial Coverage', bg: 'bg-green-500/20', text: 'text-green-400', dot: 'bg-green-400' },
     'in-progress': { label: 'In Progress', bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400' },
-    'not-started': { label: 'Not Started', bg: 'bg-gray-500/20', text: 'text-gray-400', dot: 'bg-gray-400' },
+    'not-started': { label: 'Not Started', bg: 'bg-[var(--color-text-muted)]/20', text: 'text-[var(--color-text-muted)]', dot: 'bg-[var(--color-text-muted)]' },
     'tbd': { label: 'TBD', bg: 'bg-purple-500/20', text: 'text-purple-400', dot: 'bg-purple-400' },
   };
   const { label, bg, text, dot } = config[status];
@@ -500,7 +500,7 @@ function ToolsSkillsSection() {
           <span>In Progress</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-gray-400" />
+          <span className="w-2 h-2 rounded-full bg-[var(--color-text-muted)]" />
           <span>Not Started</span>
         </div>
         <div className="flex items-center gap-2">
@@ -538,9 +538,9 @@ function AppSection() {
         </h2>
         <div className="rounded-xl border border-[var(--color-border)] p-6 space-y-4">
           {/* React Frontend - Top */}
-          <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
+          <div className="rounded-xl border border-[var(--color-accent-primary)]/30 bg-[var(--color-accent-primary)]/5 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Code className="h-5 w-5 text-blue-400" />
+              <Code className="h-5 w-5 text-[var(--color-accent-primary)]" />
               <h3 className="font-semibold text-[var(--color-text-heading)]">React Frontend</h3>
             </div>
             <p className="text-sm text-[var(--color-text-muted)]">
@@ -585,9 +585,9 @@ function AppSection() {
                   When starting a new project, we load skills and provide tools in the Claude Code session:
                 </p>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+                  <div className="rounded-lg border border-[var(--color-accent-primary)]/30 bg-[var(--color-accent-primary)]/5 p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <BookOpen className="h-4 w-4 text-blue-400" />
+                      <BookOpen className="h-4 w-4 text-[var(--color-accent-primary)]" />
                       <span className="font-semibold text-sm text-[var(--color-text-heading)]">Skills</span>
                     </div>
                     <p className="text-xs text-[var(--color-text-muted)]">
@@ -645,7 +645,7 @@ function AppSection() {
           {/* Project Creation */}
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-semibold text-sm">1</div>
+              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--color-accent-primary)]/20 flex items-center justify-center text-[var(--color-accent-primary)] font-semibold text-sm">1</div>
               <div>
                 <h3 className="font-semibold text-[var(--color-text-heading)]">Project Creation</h3>
                 <p className="text-sm text-[var(--color-text-muted)] mt-1">
@@ -720,7 +720,7 @@ function AppSection() {
           {/* Streaming */}
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-semibold text-sm">5</div>
+              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--color-accent-primary)]/20 flex items-center justify-center text-[var(--color-accent-primary)] font-semibold text-sm">5</div>
               <div>
                 <h3 className="font-semibold text-[var(--color-text-heading)]">Real-Time Streaming</h3>
                 <p className="text-sm text-[var(--color-text-muted)] mt-1">
@@ -760,7 +760,7 @@ function AppSection() {
           <p className="text-sm text-[var(--color-text-muted)] mb-3">
             This design allows us to use Python <code className="px-1.5 py-0.5 rounded bg-[var(--color-background)] text-xs font-mono">contextvars</code> to inject per-user Databricks credentials at request time. Each tool call knows which user is calling it without passing auth tokens through the tool interface.
           </p>
-          <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 mt-4">
+          <div className="rounded-lg border border-[var(--color-accent-primary)]/30 bg-[var(--color-accent-primary)]/5 p-3 mt-4">
             <p className="text-sm text-[var(--color-text-secondary)]">
               <strong>Benefits:</strong> No subprocess overhead, shared memory, per-request auth isolation, dynamic tool discovery from <code className="px-1 py-0.5 rounded bg-[var(--color-background)] text-xs font-mono">databricks-tools-core</code>.
             </p>
@@ -801,7 +801,7 @@ function AppSection() {
             <h3 className="font-semibold text-[var(--color-text-heading)] mb-2">Frontend</h3>
             <div className="flex flex-wrap gap-2">
               {['React', 'TypeScript', 'TailwindCSS', 'Vite'].map((tech) => (
-                <span key={tech} className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-400">
+                <span key={tech} className="text-xs px-2 py-1 rounded bg-[var(--color-accent-primary)]/10 text-[var(--color-accent-primary)]">
                   {tech}
                 </span>
               ))}

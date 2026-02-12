@@ -33,15 +33,13 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 
 ## Choose Your Own Adventure
 
-| Adventure | Best For | Start Here |
-|-----------|----------|------------|
-| :star: [**Install ai-dev-kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | Quick Start (install)
-| [**Starter Project**](#starter-kit) | Starter project for Claude Code + full Databricks integration | `ai-dev-project/` |
-| [**Visual Builder**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
-| [**Skills Only**](#skills-only) | Teaching your AI Databricks patterns (no actions) | Install skills |
-| [**MCP Tools Only**](#mcp-tools-only) | Just executable actions (no guidance) | Register MCP server |
+| Adventure                        | Best For | Start Here |
+|----------------------------------|----------|------------|
+| :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | [Quick Start (install)](#install-in-existing-project)
+| [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
-
+| [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
+| [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
 ---
 
 ## Quick Start
@@ -60,30 +58,79 @@ By default this will install at a project level rather than a user level. This i
 _Note: Project configuration files can be re-used in other projects. You find these configs under .claude or .cursor_
 
 #### Mac / Linux
-1. Open terminal
-2. Navigate to a local project directory (the root folder you will open with Cursor or Claude Code)
-3. Run `curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash`
-4. Respond to interactive prompts and follow next steps. 
-   - Note: Cursor and Co-pilot require updating settings manually after install.
 
-#### Windows (Powershell)
-1. Open powershell terminal (requires `git` installed)
-2. Navigate to a local project directory (the root folder you will open with Cursor or Claude Code)
-3. Run `irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex`
-
-
-### Starter Kit
-
-If you prefer to clone the repo and start building, use the starter project.:
+**Basic installation** (uses DEFAULT profile, project scope)
 
 ```bash
-git clone https://github.com/databricks-solutions/ai-dev-kit.git
-cd ai-dev-kit/ai-dev-project
-./setup.sh
-claude
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
 ```
 
-This installs skills + MCP tools and opens Claude Code ready to build on Databricks.
+<details>
+<summary><strong>Advanced Options</strong> (click to expand)</summary>
+
+**Global installation with force reinstall**
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --global --force
+```
+
+**Specify profile and force reinstall**
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --profile DEFAULT --force
+```
+
+**Install for specific tools only**
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor
+```
+
+</details>
+
+**Next steps:** Respond to interactive prompts and follow the on-screen instructions.
+- Note: Cursor and Copilot require updating settings manually after install.
+
+#### Windows (PowerShell)
+
+**Basic installation** (uses DEFAULT profile, project scope)
+
+```powershell
+irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex
+```
+
+<details>
+<summary><strong>Advanced Options</strong> (click to expand)</summary>
+
+**Download script first**
+
+```powershell
+irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
+```
+
+**Global installation with force reinstall**
+
+```powershell
+.\install.ps1 -Global -Force
+```
+
+**Specify profile and force reinstall**
+
+```powershell
+.\install.ps1 -Profile DEFAULT -Force
+```
+
+**Install for specific tools only**
+
+```powershell
+.\install.ps1 -Tools cursor
+```
+
+</details>
+
+**Next steps:** Respond to interactive prompts and follow the on-screen instructions.
+- Note: Cursor and Copilot require updating settings manually after install.
+
 
 ### Visual Builder App
 
@@ -95,39 +142,6 @@ cd ai-dev-kit/databricks-builder-app
 # Follow instructions to start the app
 ```
 
-### Skills Only
-
-Just want to teach your local AI assistant Databricks patterns?
-
-```bash
-cd ai-dev-kit
-./databricks-skills/install_skills.sh
-```
-
-Just want to teach your workspace AI assistant Databricks patterns?
-```bash
-cd ai-dev-kit
-./databricks-skills/install_to_dbx_assistant.sh --profile <databricks cli profile>
-```
-
-Skills include: Spark Declarative Pipelines, Asset Bundles, MLflow Evaluation, Model Serving, Synthetic Data Generation, and [more](databricks-skills/).
-
-
-
-### MCP Tools Only
-
-Just want executable Databricks actions?
-
-```bash
-cd ai-dev-kit
-./databricks-mcp-server/setup.sh
-
-# Register with Claude Code
-claude mcp add-json databricks "{
-  \"command\": \"$(pwd)/.venv/bin/python\",
-  \"args\": [\"$(pwd)/run_server.py\"]
-}"
-```
 
 ### Core Library
 
@@ -149,7 +163,7 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 15 markdown skills teaching Databricks patterns |
+| [`databricks-skills/`](databricks-skills/) | 19 markdown skills teaching Databricks patterns |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 | [`ai-dev-project/`](ai-dev-project/) | Starter template for new projects |
 

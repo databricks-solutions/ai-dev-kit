@@ -4,43 +4,63 @@
 #
 # Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
 #
-# Usage:
-#   curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
-#   curl -sL ... | bash -s -- --global
-#   curl -sL ... | bash -s -- --skills-only
-#   curl -sL ... | bash -s -- --mcp-only
-#   curl -sL ... | bash -s -- --tools cursor,codex,copilot
-#   curl -sL ... | bash -s -- --force
+# Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
+#
+# Examples:
+#   # Basic installation (project scoped, prompts for inputs)
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+#
+#   # Global installation with force reinstall
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --global --force
+#
+#   # Specify profile and force reinstall
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --profile DEFAULT --force
+#
+#   # Install for specific tools only
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,codex,copilot
+#
+#   # Skills only (skip MCP server)
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-only
+#
+# Alternative: Use environment variables
+#   DEVKIT_TOOLS=cursor curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
+#   DEVKIT_FORCE=true DEVKIT_PROFILE=DEFAULT curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
 #
 
 set -e
 
-# Configuration
-REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
-RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
-INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
-REPO_DIR="$INSTALL_DIR/repo"
-VENV_DIR="$INSTALL_DIR/.venv"
-VENV_PYTHON="$VENV_DIR/bin/python"
-MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
+# Defaults (can be overridden by environment variables or command-line arguments)
+PROFILE="${DEVKIT_PROFILE:-DEFAULT}"
+SCOPE="${DEVKIT_SCOPE:-project}"
+SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
+BRANCH="${DEVKIT_BRANCH:-main}"
+FORCE="${DEVKIT_FORCE:-false}"
+IS_UPDATE=false
+SILENT="${DEVKIT_SILENT:-false}"
+TOOLS="${DEVKIT_TOOLS:-}"
+USER_TOOLS=""
+USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
+
+# Convert string booleans from env vars to actual booleans
+[ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
+[ "$SILENT" = "true" ] || [ "$SILENT" = "1" ] && SILENT=true || SILENT=false
+
+# Check if scope was explicitly set via env var
+[ -n "${DEVKIT_SCOPE:-}" ] && SCOPE_EXPLICIT=true
+
+# Installation mode defaults
+INSTALL_MCP=true
+INSTALL_SKILLS=true
+
+# Minimum required versions
+MIN_CLI_VERSION="0.278.0"
+MIN_SDK_VERSION="0.85.0"
 
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
-# Defaults
-PROFILE="DEFAULT"
-SCOPE="project"
-INSTALL_MCP=true
-INSTALL_SKILLS=true
-FORCE=false
-IS_UPDATE=false
-SILENT=false
-TOOLS=""
-USER_TOOLS=""
-USER_MCP_PATH=""
-
 # Databricks skills (bundled in repo)
-SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -57,7 +77,8 @@ step() { [ "$SILENT" = false ] && echo -e "\n${B}$*${N}"; }
 while [ $# -gt 0 ]; do
     case $1 in
         -p|--profile)     PROFILE="$2"; shift 2 ;;
-        -g|--global)      SCOPE="global"; shift ;;
+        -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
+        -b|--branch)      BRANCH="$2"; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; shift ;;
         --mcp-path)       USER_MCP_PATH="$2"; shift 2 ;;
@@ -67,10 +88,11 @@ while [ $# -gt 0 ]; do
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
             echo ""
-            echo "Usage: curl -sL .../install.sh | bash [OPTIONS]"
+            echo "Usage: bash <(curl -sL .../install.sh) [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
+            echo "  -b, --branch NAME     Git branch to install from (default: main)"
             echo "  -g, --global          Install globally for all projects"
             echo "  --skills-only         Skip MCP server setup"
             echo "  --mcp-only            Skip skills installation"
@@ -79,10 +101,30 @@ while [ $# -gt 0 ]; do
             echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
+            echo ""
+            echo "Environment Variables (alternative to flags):"
+            echo "  DEVKIT_PROFILE        Databricks config profile"
+            echo "  DEVKIT_SCOPE          'project' or 'global'"
+            echo "  DEVKIT_TOOLS          Comma-separated list of tools"
+            echo "  DEVKIT_FORCE          Set to 'true' to force reinstall"
+            echo ""
+            echo "Examples:"
+            echo "  # Using environment variables"
+            echo "  DEVKIT_TOOLS=cursor curl -sL .../install.sh | bash"
+            echo ""
             exit 0 ;;
         *) die "Unknown option: $1 (use -h for help)" ;;
     esac
 done
+
+# Set configuration URLs after parsing branch argument
+REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
+RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/${BRANCH}"
+INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
+REPO_DIR="$INSTALL_DIR/repo"
+VENV_DIR="$INSTALL_DIR/.venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 
 # ─── Interactive helpers ────────────────────────────────────────
 # Reads from /dev/tty so prompts work even when piped via curl | bash
@@ -320,9 +362,13 @@ radio_select() {
 
 # ─── Tool detection & selection ─────────────────────────────────
 detect_tools() {
-    # If provided via --tools flag, skip detection and prompts
+    # If provided via --tools flag or TOOLS env var, skip detection and prompts
     if [ -n "$USER_TOOLS" ]; then
         TOOLS=$(echo "$USER_TOOLS" | tr ',' ' ')
+        return
+    elif [ -n "$TOOLS" ]; then
+        # TOOLS env var already set, just normalize it
+        TOOLS=$(echo "$TOOLS" | tr ',' ' ')
         return
     fi
 
@@ -417,6 +463,9 @@ prompt_profile() {
             [ "$p" = "DEFAULT" ] && state="on" && hint="default"
             items+=("${p}|${p}|${state}|${hint}")
         done
+        
+        # Add custom profile option at the end
+        items+=("Custom profile name...|__CUSTOM__|off|Enter a custom profile name")
 
         # If no DEFAULT profile exists, pre-select the first one
         local has_default=false
@@ -427,7 +476,18 @@ prompt_profile() {
             items[0]=$(echo "${items[0]}" | sed 's/|off|/|on|/')
         fi
 
-        PROFILE=$(radio_select "${items[@]}")
+        local selected_profile
+        selected_profile=$(radio_select "${items[@]}")
+        
+        # If custom was selected, prompt for name
+        if [ "$selected_profile" = "__CUSTOM__" ]; then
+            echo ""
+            local custom_name
+            custom_name=$(prompt "Enter profile name" "DEFAULT")
+            PROFILE="$custom_name"
+        else
+            PROFILE="$selected_profile"
+        fi
     else
         echo -e "  ${D}No ~/.databrickscfg found. You can authenticate after install.${N}"
         echo ""
@@ -463,13 +523,54 @@ prompt_mcp_path() {
     MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 }
 
+# Compare semantic versions (returns 0 if $1 >= $2)
+version_gte() {
+    printf '%s\n%s' "$2" "$1" | sort -V -C
+}
+
+# Check Databricks CLI version meets minimum requirement
+check_cli_version() {
+    local cli_version
+    cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+
+    if [ -z "$cli_version" ]; then
+        warn "Could not determine Databricks CLI version"
+        return
+    fi
+
+    if version_gte "$cli_version" "$MIN_CLI_VERSION"; then
+        ok "Databricks CLI v${cli_version}"
+    else
+        warn "Databricks CLI v${cli_version} is outdated (minimum: v${MIN_CLI_VERSION})"
+        msg "  ${B}Upgrade:${N} curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh"
+    fi
+}
+
+# Check Databricks SDK version in the MCP venv
+check_sdk_version() {
+    local sdk_version
+    sdk_version=$("$VENV_PYTHON" -c "from databricks.sdk.version import __version__; print(__version__)" 2>/dev/null)
+
+    if [ -z "$sdk_version" ]; then
+        warn "Could not determine Databricks SDK version"
+        return
+    fi
+
+    if version_gte "$sdk_version" "$MIN_SDK_VERSION"; then
+        ok "Databricks SDK v${sdk_version}"
+    else
+        warn "Databricks SDK v${sdk_version} is outdated (minimum: v${MIN_SDK_VERSION})"
+        msg "  ${B}Upgrade:${N} $VENV_PYTHON -m pip install --upgrade databricks-sdk"
+    fi
+}
+
 # Check prerequisites
 check_deps() {
     command -v git >/dev/null 2>&1 || die "git required"
     ok "git"
 
     if command -v databricks >/dev/null 2>&1; then
-        ok "databricks CLI"
+        check_cli_version
     else
         warn "Databricks CLI not found. Install: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}"
         msg "${D}You can still install, but authentication will require the CLI later.${N}"
@@ -517,13 +618,15 @@ setup_mcp() {
     
     # Clone or update repo
     if [ -d "$REPO_DIR/.git" ]; then
+        git -C "$REPO_DIR" fetch -q origin "$BRANCH" 2>/dev/null || true
+        git -C "$REPO_DIR" checkout -q "$BRANCH" 2>/dev/null || true
         git -C "$REPO_DIR" pull -q 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+            git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
         }
     else
         mkdir -p "$INSTALL_DIR"
-        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+        git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
     fi
     ok "Repository cloned"
     
@@ -736,9 +839,6 @@ summary() {
         echo ""
         msg "${B}Next steps:${N}"
         local step=1
-        msg "${step}. Configure profile $PROFILE or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN".
-        msg "   Authenticate: ${B}${BL}databricks auth login --profile $PROFILE${N}"
-        step=$((step + 1))
         if echo "$TOOLS" | grep -q cursor; then
             msg "${R}${step}. Enable MCP in Cursor: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
             step=$((step + 1))
@@ -754,6 +854,75 @@ summary() {
         msg "${step}. Try: \"List my SQL warehouses\""
         echo ""
     fi
+}
+
+# Prompt for installation scope
+prompt_scope() {
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Select installation scope${N}"
+    
+    # Simple radio selector without Confirm button
+    local -a labels=("Project" "Global")
+    local -a values=("project" "global")
+    local -a hints=("Install in current directory (.cursor/ and .claude/)" "Install in home directory (~/.cursor/ and ~/.claude/)")
+    local count=2
+    local selected=0
+    local cursor=0
+    
+    _scope_draw() {
+        for i in 0 1; do
+            local dot="○"
+            local dot_color="\033[2m"
+            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
+            local arrow="  "
+            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
+            local hint_style="\033[2m"
+            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
+            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
+        done
+    }
+    
+    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
+    printf "\033[?25l" > /dev/tty
+    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+    
+    _scope_draw
+    
+    while true; do
+        printf "\033[%dA" "$count" > /dev/tty
+        _scope_draw
+        
+        local key=""
+        IFS= read -rsn1 key < /dev/tty 2>/dev/null
+        
+        if [ "$key" = $'\x1b' ]; then
+            local s1="" s2=""
+            read -rsn1 s1 < /dev/tty 2>/dev/null
+            read -rsn1 s2 < /dev/tty 2>/dev/null
+            if [ "$s1" = "[" ]; then
+                case "$s2" in
+                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
+                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
+                esac
+            fi
+        elif [ "$key" = "" ]; then
+            selected=$cursor
+            printf "\033[%dA" "$count" > /dev/tty
+            _scope_draw
+            break
+        elif [ "$key" = " " ]; then
+            selected=$cursor
+        fi
+    done
+    
+    printf "\033[?25h" > /dev/tty
+    trap - EXIT
+    
+    SCOPE="${values[$selected]}"
 }
 
 # Prompt to run auth
@@ -825,6 +994,12 @@ main() {
     prompt_profile
     ok "Profile: $PROFILE"
 
+    # ── Step 3.5: Interactive scope selection ──
+    if [ "$SCOPE_EXPLICIT" = false ]; then
+        prompt_scope
+        ok "Scope: $SCOPE"
+    fi
+
     # ── Step 4: Interactive MCP path ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
@@ -881,11 +1056,11 @@ main() {
     # Save version
     save_version
     
-    # Done
-    summary
-    
     # Prompt to run auth
     prompt_auth
+    
+    # Done
+    summary
 }
 
 main "$@"
