@@ -46,6 +46,8 @@ Every mutating call **requires** a valid `approval_token` obtained from `preview
 - Parameters must match exactly between preview and mutation
 - Action mapping: preview `CREATE` → mutation `create`, `UPDATE` → `update`, `DELETE` → `delete`
 
+> **Design note:** The approval token ensures mutations match what was previewed and prevents parameter tampering, but it does **not** guarantee a human reviewed the preview. Human-in-the-loop confirmation depends on the MCP client — for example, Claude Code prompts the user to approve each tool call, creating a natural pause between preview and mutation. If using a client that auto-approves tool calls, consider adding explicit confirmation logic.
+
 ### Admin Group Check
 
 The caller must be a member of the configured admin group. Membership is verified via `w.current_user.me().groups`.

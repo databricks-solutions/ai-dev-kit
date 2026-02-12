@@ -7,6 +7,17 @@ via the Databricks Python SDK (WorkspaceClient.policies).
 FGAC policies bind governed tags to masking UDFs or row filters, scoped to
 catalogs, schemas, or tables, and targeted at specific principals.
 
+Human-in-the-loop design:
+  Mutations (create/update/delete) require an approval token from
+  preview_policy_changes(). The token is an HMAC-signed binding of
+  preview parameters to a timestamp — it ensures mutations match what
+  was previewed and prevents parameter tampering.
+
+  IMPORTANT: The token does NOT guarantee a human reviewed the preview.
+  That responsibility falls on the MCP client (e.g., Claude Code prompts
+  the user for confirmation between tool calls). The token only ensures
+  that whatever was approved matches what gets executed.
+
 Policy quotas:
   - Catalog: 10 policies max
   - Schema:  10 policies max
