@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import requests
 from databricks.sdk import WorkspaceClient
 
-from ..auth import get_workspace_client
+from ..auth import get_workspace_client, get_current_username
 from .models import (
     EndpointStatus,
     EvaluationRunDict,
@@ -1159,6 +1159,8 @@ class AgentBricksManager:
         """Get the best available SQL warehouse ID for Genie spaces.
 
         Prioritizes running warehouses, then starting ones, preferring smaller sizes.
+        Within the same state/size tier, warehouses owned by the current user are
+        preferred (soft preference — no warehouses are excluded).
 
         Returns:
             Warehouse ID string, or None if no warehouses available.
@@ -1168,7 +1170,10 @@ class AgentBricksManager:
             if not warehouses:
                 return None
 
-            # Sort by state (RUNNING first) and size (smaller first)
+            current_user = get_current_username()
+
+            # Sort by state (RUNNING first) and size (smaller first),
+            # with a soft preference for user-owned warehouses within each tier
             size_order = [
                 "2X-Small",
                 "X-Small",
@@ -1187,7 +1192,9 @@ class AgentBricksManager:
                     size_priority = size_order.index(wh.cluster_size)
                 except ValueError:
                     size_priority = 99
-                return (state_priority, size_priority)
+                # Soft preference: user-owned warehouses sort first (0) within same tier
+                owner_priority = 0 if (current_user and (wh.creator_name or "").lower() == current_user.lower()) else 1
+                return (state_priority, size_priority, owner_priority)
 
             warehouses_sorted = sorted(warehouses, key=sort_key)
             return warehouses_sorted[0].id if warehouses_sorted else None

@@ -116,6 +116,57 @@ FROM read_files(
 )
 ```
 
+Add this to the pipeline configuration in `resources/*_etl.pipeline.yml`:
+```yaml
+configuration:
+  bronze_schema: ${var.bronze_schema}
+  silver_schema: ${var.silver_schema}
+  gold_schema: ${var.gold_schema}
+  schema_location_base: ${var.schema_location_base}
+```
+
+And define variables in `databricks.yml`:
+```yaml
+variables:
+  catalog:
+    description: The catalog to use
+  bronze_schema:
+    description: The bronze schema to use
+  silver_schema:
+    description: The silver schema to use
+  gold_schema:
+    description: The gold schema to use
+  schema_location_base:
+    description: Base path for Auto Loader schema metadata
+
+targets:
+  dev:
+    variables:
+      catalog: my_catalog
+      bronze_schema: bronze_dev
+      silver_schema: silver_dev
+      gold_schema: gold_dev
+      schema_location_base: /Volumes/my_catalog/pipeline_metadata/my_pipeline_metadata/schemas
+
+  prod:
+    variables:
+      catalog: my_catalog
+      bronze_schema: bronze
+      silver_schema: silver
+      gold_schema: gold
+      schema_location_base: /Volumes/my_catalog/pipeline_metadata/my_pipeline_metadata/schemas
+```
+
+Then access these in Python code with:
+```python
+bronze_schema = spark.conf.get("bronze_schema")
+silver_schema = spark.conf.get("silver_schema")
+gold_schema = spark.conf.get("gold_schema")
+schema_location_base = spark.conf.get("schema_location_base")
+```
+
+
+
 ### Rescue Data and Quarantine
 
 Handle malformed records with `_rescued_data`:
@@ -346,11 +397,48 @@ SELECT * FROM STREAM bronze_data WHERE NOT has_errors;
 
 For Python, use modern `pyspark.pipelines` API. See [5-python-api.md](5-python-api.md) for complete guidance.
 
+**IMPORTANT for Python**: When using `spark.readStream.format("cloudFiles")` for cloud storage ingestion, you **must specify a `cloudFiles.schemaLocation`** for Auto Loader schema metadata.
+
+### Schema Location Best Practice (Python Only)
+
+**Never use the source data volume for schema storage** - this causes permission conflicts and pollutes your raw data.
+
+#### Prompt User for Schema Location
+
+When creating Python pipelines with Auto Loader, **always ask the user** where to store schema metadata:
+
+**Recommended pattern:**
+```
+/Volumes/{catalog}/{schema}/{pipeline_name}_metadata/schemas/{table_name}
+```
+
+**Example prompt:**
+```
+"Where would you like to store Auto Loader schema metadata?
+
+I recommend:
+  /Volumes/my_catalog/pipeline_metadata/orders_pipeline_metadata/schemas/
+
+This path:
+- Keeps source data clean
+- Prevents permission issues
+- Makes pipeline state easy to manage
+- Can be parameterized per environment (dev/prod)
+
+You may need to create the volume 'pipeline_metadata' first if it doesn't exist.
+
+Would you like to use this path?"
+```
+
 ### Auto Loader (Python)
 
 ```python
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
+
+# Get schema location from pipeline configuration
+# Suggested format: /Volumes/{catalog}/{schema}/{pipeline_name}_metadata/schemas
+schema_location_base = spark.conf.get("schema_location_base")
 
 @dp.table(name="bronze_orders", cluster_by=["order_date"])
 def bronze_orders():
@@ -358,12 +446,18 @@ def bronze_orders():
         spark.readStream
         .format("cloudFiles")
         .option("cloudFiles.format", "json")
-        .option("cloudFiles.schemaLocation", "/checkpoints/bronze_orders")
-        .option("cloudFiles.schemaHints", "order_id STRING, amount DECIMAL(10,2)")
-        .load("/mnt/raw/orders/")
+        .option("cloudFiles.schemaLocation", f"{schema_location_base}/bronze_orders")
+        .option("cloudFiles.inferColumnTypes", "true")
+        .load("/Volumes/catalog/schema/raw/orders/")
         .withColumn("_ingested_at", F.current_timestamp())
         .withColumn("_source_file", F.col("_metadata.file_path"))
     )
+```
+
+**Pipeline Configuration** (in `pipeline.yml`):
+```yaml
+configuration:
+  schema_location_base: /Volumes/my_catalog/pipeline_metadata/orders_pipeline_metadata/schemas
 ```
 
 ### Kafka (Python)
@@ -391,14 +485,18 @@ def bronze_kafka_events():
 ### Quarantine (Python)
 
 ```python
+# Get schema location from pipeline configuration
+schema_location_base = spark.conf.get("schema_location_base")
+
 @dp.table(name="bronze_events", cluster_by=["ingestion_date"])
 def bronze_events():
     return (
         spark.readStream
         .format("cloudFiles")
         .option("cloudFiles.format", "json")
+        .option("cloudFiles.schemaLocation", f"{schema_location_base}/bronze_events")
         .option("rescuedDataColumn", "_rescued_data")
-        .load("/mnt/raw/events/")
+        .load("/Volumes/catalog/schema/raw/events/")
         .withColumn("_ingested_at", F.current_timestamp())
         .withColumn("ingestion_date", F.current_date())
         .withColumn("_has_parsing_errors",

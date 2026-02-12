@@ -51,16 +51,16 @@ echo "✓ npm is installed"
 # ── Environment file ─────────────────────────────────────────────────────────
 
 echo ""
-if [ ! -f "$PROJECT_DIR/.env" ]; then
-    echo "Creating .env from .env.example..."
-    cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-    echo "✓ Created .env"
+if [ ! -f "$PROJECT_DIR/.env.local" ]; then
+    echo "Creating .env.local from .env.example..."
+    cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env.local"
+    echo "✓ Created .env.local"
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║  ACTION REQUIRED: Configure your .env file                     ║"
+    echo "║  ACTION REQUIRED: Configure your .env.local file               ║"
     echo "╠══════════════════════════════════════════════════════════════════╣"
     echo "║                                                                ║"
-    echo "║  Open databricks-builder-app/.env and fill in your values:     ║"
+    echo "║  Open databricks-builder-app/.env.local and fill in values:    ║"
     echo "║                                                                ║"
     echo "║  1. DATABRICKS_HOST  - Your workspace URL                      ║"
     echo "║  2. DATABRICKS_TOKEN - Your personal access token              ║"
@@ -73,7 +73,7 @@ if [ ! -f "$PROJECT_DIR/.env" ]; then
     echo ""
     ENV_CREATED=true
 else
-    echo "✓ .env file already exists"
+    echo "✓ .env.local file already exists"
     ENV_CREATED=false
 fi
 
@@ -116,7 +116,7 @@ echo ""
 
 if [ "$ENV_CREATED" = true ]; then
     echo "Next steps:"
-    echo "  1. Edit .env with your Databricks credentials and database config"
+    echo "  1. Edit .env.local with your Databricks credentials and database config"
     echo "  2. Run: ./scripts/start_dev.sh"
     echo ""
 else

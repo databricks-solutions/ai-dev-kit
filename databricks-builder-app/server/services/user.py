@@ -189,7 +189,7 @@ def get_workspace_url() -> str:
   Result is cached for subsequent calls.
 
   Returns:
-      Workspace URL (e.g., https://e2-demo-field-eng.cloud.databricks.com)
+      Workspace URL (e.g., https://company-dev.cloud.databricks.com)
   """
   global _workspace_url_cache
 

@@ -4,8 +4,12 @@
 #
 # Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
 #
-# Usage:
+# Usage (with environment variables - cleaner):
 #   curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
+#   DEVKIT_PROFILE=dev_profile DEVKIT_TOOLS=cursor curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
+#   DEVKIT_SILENT=true DEVKIT_FORCE=true curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
+#
+# Usage (with command-line flags):
 #   curl -sL ... | bash -s -- --global
 #   curl -sL ... | bash -s -- --skills-only
 #   curl -sL ... | bash -s -- --mcp-only
@@ -15,32 +19,30 @@
 
 set -e
 
-# Configuration
-REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
-RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
-INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
-REPO_DIR="$INSTALL_DIR/repo"
-VENV_DIR="$INSTALL_DIR/.venv"
-VENV_PYTHON="$VENV_DIR/bin/python"
-MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
+# Defaults (can be overridden by environment variables or command-line arguments)
+PROFILE="${DEVKIT_PROFILE:-DEFAULT}"
+SCOPE="${DEVKIT_SCOPE:-project}"
+BRANCH="${DEVKIT_BRANCH:-main}"
+FORCE="${DEVKIT_FORCE:-false}"
+IS_UPDATE=false
+SILENT="${DEVKIT_SILENT:-false}"
+TOOLS="${DEVKIT_TOOLS:-}"
+USER_TOOLS=""
+USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
+
+# Convert string booleans from env vars to actual booleans
+[ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
+[ "$SILENT" = "true" ] || [ "$SILENT" = "1" ] && SILENT=true || SILENT=false
+
+# Installation mode defaults
+INSTALL_MCP=true
+INSTALL_SKILLS=true
 
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
-# Defaults
-PROFILE="DEFAULT"
-SCOPE="project"
-INSTALL_MCP=true
-INSTALL_SKILLS=true
-FORCE=false
-IS_UPDATE=false
-SILENT=false
-TOOLS=""
-USER_TOOLS=""
-USER_MCP_PATH=""
-
 # Databricks skills (bundled in repo)
-SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -58,6 +60,7 @@ while [ $# -gt 0 ]; do
     case $1 in
         -p|--profile)     PROFILE="$2"; shift 2 ;;
         -g|--global)      SCOPE="global"; shift ;;
+        -b|--branch)      BRANCH="$2"; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; shift ;;
         --mcp-path)       USER_MCP_PATH="$2"; shift 2 ;;
@@ -67,10 +70,13 @@ while [ $# -gt 0 ]; do
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
             echo ""
-            echo "Usage: curl -sL .../install.sh | bash [OPTIONS]"
+            echo "Usage:"
+            echo "  curl -sL .../install.sh | bash [OPTIONS]"
+            echo "  DEVKIT_BRANCH=develop curl -sL .../install.sh | bash"
             echo ""
-            echo "Options:"
+            echo "Options (command-line):"
             echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
+            echo "  -b, --branch NAME     Git branch to install from (default: main)"
             echo "  -g, --global          Install globally for all projects"
             echo "  --skills-only         Skip MCP server setup"
             echo "  --mcp-only            Skip skills installation"
@@ -79,10 +85,35 @@ while [ $# -gt 0 ]; do
             echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
+            echo ""
+            echo "Environment Variables (alternative to flags):"
+            echo "  DEVKIT_PROFILE        Databricks config profile"
+            echo "  DEVKIT_BRANCH         Git branch to install from"
+            echo "  DEVKIT_SCOPE          'project' or 'global'"
+            echo "  DEVKIT_MCP_PATH       MCP server installation path"
+            echo "  DEVKIT_TOOLS          Comma-separated list of tools"
+            echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
+            echo "  DEVKIT_FORCE          Set to 'true' to force reinstall"
+            echo ""
+            echo "Examples:"
+            echo "  # Using environment variables (cleaner)"
+            echo "  DEVKIT_BRANCH=develop DEVKIT_TOOLS=cursor curl -sL .../install.sh | bash"
+            echo ""
+            echo "  # Using command-line flags"
+            echo "  curl -sL .../install.sh | bash -s -- --branch develop --tools cursor"
             exit 0 ;;
         *) die "Unknown option: $1 (use -h for help)" ;;
     esac
 done
+
+# Set configuration URLs after parsing branch argument
+REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
+RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/${BRANCH}"
+INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
+REPO_DIR="$INSTALL_DIR/repo"
+VENV_DIR="$INSTALL_DIR/.venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 
 # ─── Interactive helpers ────────────────────────────────────────
 # Reads from /dev/tty so prompts work even when piped via curl | bash
@@ -320,9 +351,13 @@ radio_select() {
 
 # ─── Tool detection & selection ─────────────────────────────────
 detect_tools() {
-    # If provided via --tools flag, skip detection and prompts
+    # If provided via --tools flag or TOOLS env var, skip detection and prompts
     if [ -n "$USER_TOOLS" ]; then
         TOOLS=$(echo "$USER_TOOLS" | tr ',' ' ')
+        return
+    elif [ -n "$TOOLS" ]; then
+        # TOOLS env var already set, just normalize it
+        TOOLS=$(echo "$TOOLS" | tr ',' ' ')
         return
     fi
 
@@ -517,13 +552,15 @@ setup_mcp() {
     
     # Clone or update repo
     if [ -d "$REPO_DIR/.git" ]; then
+        git -C "$REPO_DIR" fetch -q origin "$BRANCH" 2>/dev/null || true
+        git -C "$REPO_DIR" checkout -q "$BRANCH" 2>/dev/null || true
         git -C "$REPO_DIR" pull -q 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+            git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
         }
     else
         mkdir -p "$INSTALL_DIR"
-        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+        git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
     fi
     ok "Repository cloned"
     
@@ -868,7 +905,7 @@ main() {
     elif [ ! -d "$REPO_DIR" ]; then
         step "Downloading sources"
         mkdir -p "$INSTALL_DIR"
-        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+        git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
         ok "Repository cloned"
     fi
     

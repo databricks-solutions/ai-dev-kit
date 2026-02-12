@@ -33,9 +33,9 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 
 ## Choose Your Own Adventure
 
-| Adventure | Best For | Start Here |
-|-----------|----------|------------|
-| :star: [**Install ai-dev-kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | Quick Start (install)
+| Adventure                        | Best For | Start Here |
+|----------------------------------|----------|------------|
+| :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | Quick Start (install)
 | [**Starter Project**](#starter-kit) | Starter project for Claude Code + full Databricks integration | `ai-dev-project/` |
 | [**Visual Builder**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
 | [**Skills Only**](#skills-only) | Teaching your AI Databricks patterns (no actions) | Install skills |
@@ -149,7 +149,7 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 15 markdown skills teaching Databricks patterns |
+| [`databricks-skills/`](databricks-skills/) | 19 markdown skills teaching Databricks patterns |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 | [`ai-dev-project/`](ai-dev-project/) | Starter template for new projects |
 

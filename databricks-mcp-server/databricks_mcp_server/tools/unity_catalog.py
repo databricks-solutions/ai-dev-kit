@@ -11,6 +11,15 @@ from typing import Any, Dict, List
 
 from databricks_tools_core.identity import get_default_tags
 from databricks_tools_core.unity_catalog import (
+    # Metric Views
+    create_metric_view as _create_metric_view,
+    alter_metric_view as _alter_metric_view,
+    drop_metric_view as _drop_metric_view,
+    describe_metric_view as _describe_metric_view,
+    query_metric_view as _query_metric_view,
+    grant_metric_view as _grant_metric_view,
+)
+from databricks_tools_core.unity_catalog import (
     # Catalogs
     list_catalogs as _list_catalogs,
     get_catalog as _get_catalog,
@@ -936,3 +945,159 @@ def manage_uc_sharing(
             return {"items": _list_provider_shares(name=name)}
 
     raise ValueError(f"Invalid resource_type='{resource_type}' or action='{action}'")
+
+
+# =============================================================================
+# Tool 9: manage_metric_views
+# =============================================================================
+
+
+@mcp.tool
+def manage_metric_views(
+    action: str,
+    full_name: str,
+    source: str = None,
+    dimensions: List[Dict[str, str]] = None,
+    measures: List[Dict[str, str]] = None,
+    version: str = "1.1",
+    comment: str = None,
+    filter_expr: str = None,
+    joins: List[Dict[str, Any]] = None,
+    materialization: Dict[str, Any] = None,
+    or_replace: bool = False,
+    query_measures: List[str] = None,
+    query_dimensions: List[str] = None,
+    where: str = None,
+    order_by: str = None,
+    limit: int = None,
+    principal: str = None,
+    privileges: List[str] = None,
+    warehouse_id: str = None,
+) -> Dict[str, Any]:
+    """
+    Manage Unity Catalog metric views: create, alter, describe, query, drop, and grant.
+
+    Metric views define reusable, governed business metrics in YAML. They separate
+    measure definitions from dimension groupings, allowing flexible querying across
+    any dimension at runtime. Requires Databricks Runtime 17.2+ and a SQL warehouse.
+
+    Actions:
+    - create: Create a metric view with dimensions and measures.
+    - alter: Update a metric view's YAML definition.
+    - describe: Get the full definition and metadata of a metric view.
+    - query: Query measures grouped by dimensions using MEASURE() syntax.
+    - drop: Drop a metric view.
+    - grant: Grant privileges (e.g., SELECT) on a metric view.
+
+    Args:
+        action: "create", "alter", "describe", "query", "drop", or "grant"
+        full_name: Three-level name (catalog.schema.metric_view_name)
+        source: Source table/view (for create/alter, e.g., "catalog.schema.orders")
+        dimensions: List of dimension dicts for create/alter. Each has:
+            - name: Display name (e.g., "Order Month")
+            - expr: SQL expression (e.g., "DATE_TRUNC('MONTH', order_date)")
+            - comment: (optional) Description
+        measures: List of measure dicts for create/alter. Each has:
+            - name: Display name (e.g., "Total Revenue")
+            - expr: Aggregate expression (e.g., "SUM(total_price)")
+            - comment: (optional) Description
+        version: YAML spec version (default: "1.1" for DBR 17.2+)
+        comment: Description of the metric view (for create/alter)
+        filter_expr: SQL boolean filter applied to all queries (for create/alter)
+        joins: Star/snowflake schema joins (for create/alter).
+            Each dict: name, source, on (or using), joins (nested for snowflake)
+        materialization: Materialization config (experimental, for create/alter).
+            Keys: schedule, mode ("relaxed"), materialized_views (list)
+        or_replace: If True, uses CREATE OR REPLACE (for create, default: False)
+        query_measures: Measure names to query (for query action)
+        query_dimensions: Dimension names to group by (for query action)
+        where: WHERE clause filter (for query action)
+        order_by: ORDER BY clause, use "ALL" for ORDER BY ALL (for query action)
+        limit: Row limit (for query action)
+        principal: User/group to grant to (for grant action)
+        privileges: Privileges to grant, default ["SELECT"] (for grant action)
+        warehouse_id: SQL warehouse ID (auto-selected if not provided)
+
+    Returns:
+        Dict with operation result. For query: list of row dicts.
+    """
+    act = action.lower()
+
+    if act == "create":
+        result = _create_metric_view(
+            full_name=full_name,
+            source=source,
+            dimensions=dimensions,
+            measures=measures,
+            version=version,
+            comment=comment,
+            filter_expr=filter_expr,
+            joins=joins,
+            materialization=materialization,
+            or_replace=or_replace,
+            warehouse_id=warehouse_id,
+        )
+        try:
+            from ..manifest import track_resource
+
+            track_resource(
+                resource_type="metric_view",
+                name=full_name,
+                resource_id=full_name,
+            )
+        except Exception:
+            pass
+        return result
+    elif act == "alter":
+        return _alter_metric_view(
+            full_name=full_name,
+            source=source,
+            dimensions=dimensions,
+            measures=measures,
+            version=version,
+            comment=comment,
+            filter_expr=filter_expr,
+            joins=joins,
+            materialization=materialization,
+            warehouse_id=warehouse_id,
+        )
+    elif act == "describe":
+        return _describe_metric_view(
+            full_name=full_name,
+            warehouse_id=warehouse_id,
+        )
+    elif act == "query":
+        if not query_measures:
+            raise ValueError("query_measures is required for query action")
+        return {
+            "data": _query_metric_view(
+                full_name=full_name,
+                measures=query_measures,
+                dimensions=query_dimensions,
+                where=where,
+                order_by=order_by,
+                limit=limit,
+                warehouse_id=warehouse_id,
+            )
+        }
+    elif act == "drop":
+        result = _drop_metric_view(
+            full_name=full_name,
+            warehouse_id=warehouse_id,
+        )
+        try:
+            from ..manifest import remove_resource
+
+            remove_resource(resource_type="metric_view", resource_id=full_name)
+        except Exception:
+            pass
+        return result
+    elif act == "grant":
+        return _grant_metric_view(
+            full_name=full_name,
+            principal=principal,
+            privileges=privileges,
+            warehouse_id=warehouse_id,
+        )
+
+    raise ValueError(f"Invalid action: '{action}'. Valid: create, alter, describe, query, drop, grant")
