@@ -85,10 +85,23 @@ def _wait_statement(client, statement_id: str, timeout_seconds: int = 30):
         last = client.statement_execution.get_statement(statement_id)
         status = getattr(last, "status", None)
         state = getattr(status, "state", None)
-        if state in {"SUCCEEDED", "FAILED", "CANCELED", "CLOSED", "ERROR"}:
+        state_value = getattr(state, "value", state)
+        if state_value in {"SUCCEEDED", "FAILED", "CANCELED", "CLOSED", "ERROR"}:
             return last
         time.sleep(1)
     return last
+
+
+def _run_sql_statement(client, warehouse_id: str, sql: str, timeout_seconds: int = 60):
+    resp = client.statement_execution.execute_statement(
+        sql,
+        warehouse_id=warehouse_id,
+        wait_timeout="20s",
+    )
+    stmt = _wait_statement(client, resp.statement_id, timeout_seconds=timeout_seconds)
+    state = getattr(getattr(stmt, "status", None), "state", None)
+    state_value = getattr(state, "value", state)
+    return stmt, state_value
 
 
 @pytest.mark.integration
@@ -234,19 +247,33 @@ def test_create_catalog(databricks_connected):
     """Create and delete a Unity Catalog catalog."""
     logger.info("Starting catalog creation test")
     client = _get_client(databricks_connected)
-    name = _unique_name("codex_itest_catalog")
-    created = False
+    warehouse = _pick_warehouse(client)
+    if not warehouse:
+        pytest.skip("No SQL warehouse available for catalog creation")
+
+    warehouse_id = getattr(warehouse, "id", None) or getattr(warehouse, "warehouse_id", None)
+    # Keep identifier SQL-safe without quoting.
+    name = _unique_name("codex_itest_catalog").replace("-", "_")
     try:
-        client.catalogs.create(name=name, comment="codex integration test catalog")
-        created = True
+        _, create_state = _run_sql_statement(
+            client,
+            warehouse_id=warehouse_id,
+            sql=f"CREATE CATALOG {name} COMMENT 'codex integration test catalog'",
+            timeout_seconds=90,
+        )
+        assert create_state == "SUCCEEDED"
     except Exception as exc:
         pytest.skip(f"Catalog creation not available: {exc}")
     finally:
-        if created:
-            try:
-                client.catalogs.delete(name=name, force=True)
-            except Exception:
-                pass
+        try:
+            _run_sql_statement(
+                client,
+                warehouse_id=warehouse_id,
+                sql=f"DROP CATALOG IF EXISTS {name} CASCADE",
+                timeout_seconds=90,
+            )
+        except Exception:
+            pass
 
 
 @pytest.mark.integration
