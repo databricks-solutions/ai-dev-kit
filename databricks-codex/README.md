@@ -51,6 +51,25 @@ This installs Databricks skills into `~/.codex/skills` and writes a project MCP 
 By default it uses the first profile from `databricks auth profiles`.
 Restart Codex after running it.
 
+### Run It (End-to-End)
+
+```bash
+# from ai-dev-kit repo root
+source ./.databricks_cfg  # or export DATABRICKS_HOST / DATABRICKS_TOKEN
+
+# install skills + MCP wiring
+bash databricks-codex/scripts/install_codex_skills_and_mcp.sh
+
+# run the installer + dashboard-prompt integration tests
+cd databricks-codex
+uv run pytest tests/integration/test_install_and_dashboard_prompt.py -vv
+```
+
+What this validates:
+- installer copies skills into `~/.codex/skills`
+- project MCP config is written to `.codex/config.toml`
+- Codex can execute a prompt that generates dashboard SQL
+
 ### Configuration
 
 ```python
@@ -223,15 +242,19 @@ new_id = manager.fork_session(
 ## Testing
 
 ```bash
-# Export Databricks env vars in your shell for integration tests
+# Export Databricks env vars for integration tests
 export DATABRICKS_HOST="https://<your-workspace-host>"
 export DATABRICKS_TOKEN="<your-pat>"
+# or: source ./.databricks_cfg
 
 # Run unit tests
 pytest tests/ -v --ignore=tests/integration
 
 # Run integration tests (requires Codex + Databricks)
 pytest tests/integration/ -v -m integration
+
+# Run installer + dashboard prompt tests only
+pytest tests/integration/test_install_and_dashboard_prompt.py -vv
 
 # Run with coverage
 pytest tests/ --cov=databricks_codex --cov-report=html
