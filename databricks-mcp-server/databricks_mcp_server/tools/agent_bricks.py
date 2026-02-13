@@ -328,7 +328,8 @@ def create_or_update_mas(
             - ka_tile_id: Knowledge Assistant tile ID (for document Q&A agents)
             - uc_function_name: Unity Catalog function name in format 'catalog.schema.function_name'
             - connection_name: Unity Catalog connection name (for external MCP servers)
-            Note: Provide exactly one of: endpoint_name, genie_space_id, ka_tile_id, uc_function_name, or connection_name.
+            Note: Provide exactly one of: endpoint_name, genie_space_id,
+                ka_tile_id, uc_function_name, or connection_name.
         description: Optional description of what the MAS does
         instructions: Optional routing instructions for the supervisor
         tile_id: Optional existing tile_id to update instead of create
@@ -409,12 +410,18 @@ def create_or_update_mas(
         agent_type_count = sum([has_endpoint, has_genie, has_ka, has_uc_function, has_connection])
         if agent_type_count > 1:
             return {
-                "error": f"""Agent '{agent_name}' has multiple agent types.
-                Provide only one of: 'endpoint_name', 'genie_space_id', 'ka_tile_id', 'uc_function_name', or 'connection_name'."""
+                "error": (
+                    f"Agent '{agent_name}' has multiple agent types. "
+                    "Provide only one of: 'endpoint_name', 'genie_space_id', "
+                    "'ka_tile_id', 'uc_function_name', or 'connection_name'."
+                )
             }
         if agent_type_count == 0:
             return {
-                "error": f"Agent '{agent_name}' must have one of: 'endpoint_name', 'genie_space_id', 'ka_tile_id', 'uc_function_name', or 'connection_name'"
+                "error": (
+                    f"Agent '{agent_name}' must have one of: 'endpoint_name', "
+                    "'genie_space_id', 'ka_tile_id', 'uc_function_name', or 'connection_name'"
+                )
             }
 
         agent_config = {
@@ -437,7 +444,10 @@ def create_or_update_mas(
             uc_parts = uc_function_name.split(".")
             if len(uc_parts) != 3:
                 return {
-                    "error": f"Agent '{agent_name}': uc_function_name must be in format 'catalog.schema.function_name', got '{uc_function_name}'"
+                    "error": (
+                        f"Agent '{agent_name}': uc_function_name must be in format "
+                        f"'catalog.schema.function_name', got '{uc_function_name}'"
+                    )
                 }
             agent_config["agent_type"] = "unity-catalog-function"
             agent_config["unity_catalog_function"] = {
