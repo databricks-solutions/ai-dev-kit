@@ -28,11 +28,11 @@ scorers:
   # Default evaluation guidelines
   default_guidelines:
     - "Response must address the user's request completely"
-    - "Must use the correct MCP tool for the task (create_or_update_ka, create_or_update_mas, etc.)"
-    - "KA creation must include volume_path pointing to a Unity Catalog Volume"
+    - "Must use the correct MCP tool for the task (manage_ka or manage_mas with appropriate action)"
+    - "KA creation must use manage_ka with action=\"create_or_update\" and include volume_path pointing to a Unity Catalog Volume"
     - "MAS agents must each have exactly one of: ka_tile_id, genie_space_id, or endpoint_name"
     - "Agent descriptions in MAS must be specific enough for routing decisions"
-    - "Must use find_ka_by_name or find_mas_by_name for lookup by name, not arbitrary queries"
+    - "Must use manage_ka with action=\"find_by_name\" or manage_mas with action=\"find_by_name\" for lookup by name, not arbitrary queries"
     - "Must not reference deprecated system tables like system.ai.genie_spaces"
     - "Volume paths must follow /Volumes/catalog/schema/volume/folder format"
 
@@ -41,15 +41,9 @@ scorers:
     tool_limits:
       Bash: 10
       Read: 20
-      mcp__databricks__create_or_update_ka: 5
-      mcp__databricks__create_or_update_mas: 5
+      mcp__databricks__manage_ka: 10
+      mcp__databricks__manage_mas: 10
       mcp__databricks__create_or_update_genie: 5
-      mcp__databricks__get_ka: 5
-      mcp__databricks__get_mas: 5
-      mcp__databricks__find_ka_by_name: 5
-      mcp__databricks__find_mas_by_name: 5
-      mcp__databricks__delete_ka: 3
-      mcp__databricks__delete_mas: 3
     token_budget:
       max_total: 120000
     required_tools:

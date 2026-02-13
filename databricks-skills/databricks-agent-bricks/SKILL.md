@@ -46,26 +46,22 @@ Before creating Agent Bricks, ensure you have the required data:
 
 ## MCP Tools
 
-### Knowledge Assistant Tools
+### Knowledge Assistant Tool
 
-**create_or_update_ka** - Create or update a Knowledge Assistant
-- `name`: Name for the KA
-- `volume_path`: Path to documents (e.g., `/Volumes/catalog/schema/volume/folder`)
-- `description`: (optional) What the KA does
-- `instructions`: (optional) How the KA should answer
-- `tile_id`: (optional) Existing tile_id to update
-- `add_examples_from_volume`: (optional, default: true) Auto-add examples from JSON files
+**manage_ka** - Manage Knowledge Assistants (KA)
+- `action`: "create_or_update", "get", "find_by_name", or "delete"
+- `name`: Name for the KA (for create_or_update, find_by_name)
+- `volume_path`: Path to documents (e.g., `/Volumes/catalog/schema/volume/folder`) (for create_or_update)
+- `description`: (optional) What the KA does (for create_or_update)
+- `instructions`: (optional) How the KA should answer (for create_or_update)
+- `tile_id`: The KA tile ID (for get, delete, or update via create_or_update)
+- `add_examples_from_volume`: (optional, default: true) Auto-add examples from JSON files (for create_or_update)
 
-**get_ka** - Get Knowledge Assistant details
-- `tile_id`: The KA tile ID
-
-**find_ka_by_name** - Find a Knowledge Assistant by name
-- `name`: The exact name of the KA to find
-- Returns: `tile_id`, `name`, `endpoint_name`, `endpoint_status`
-- Use this to look up an existing KA when you know the name but not the tile_id
-
-**delete_ka** - Delete a Knowledge Assistant
-- `tile_id`: The KA tile ID to delete
+Actions:
+- **create_or_update**: Requires `name`, `volume_path`. Optionally pass `tile_id` to update.
+- **get**: Requires `tile_id`. Returns tile_id, name, description, endpoint_status, knowledge_sources, examples_count.
+- **find_by_name**: Requires `name` (exact match). Returns found, tile_id, name, endpoint_name, endpoint_status. Use this to look up an existing KA when you know the name but not the tile_id.
+- **delete**: Requires `tile_id`.
 
 ### Genie Space Tools
 
@@ -84,11 +80,12 @@ See `databricks-genie` skill for:
 
 **IMPORTANT**: There is NO system table for Genie spaces (e.g., `system.ai.genie_spaces` does not exist). To find a Genie space by name, use the `find_genie_by_name` tool.
 
-### Supervisor Agent Tools
+### Supervisor Agent Tool
 
-**create_or_update_mas** - Create or update a Supervisor Agent
-- `name`: Name for the Supervisor Agent
-- `agents`: List of agent configurations, each with:
+**manage_mas** - Manage Supervisor Agents (MAS)
+- `action`: "create_or_update", "get", "find_by_name", or "delete"
+- `name`: Name for the Supervisor Agent (for create_or_update, find_by_name)
+- `agents`: List of agent configurations (for create_or_update), each with:
   - `name`: Agent identifier (required)
   - `description`: What this agent handles - critical for routing (required)
   - `ka_tile_id`: Knowledge Assistant tile ID (use for document Q&A agents - recommended for KAs)
@@ -97,21 +94,16 @@ See `databricks-genie` skill for:
   - `uc_function_name`: Unity Catalog function name in format `catalog.schema.function_name`
   - `connection_name`: Unity Catalog connection name (for external MCP servers)
   - Note: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, `uc_function_name`, or `connection_name`
-- `description`: (optional) What the Supervisor Agent does
-- `instructions`: (optional) Routing instructions for the supervisor
-- `tile_id`: (optional) Existing tile_id to update
-- `examples`: (optional) List of example questions with `question` and `guideline` fields
+- `description`: (optional) What the Supervisor Agent does (for create_or_update)
+- `instructions`: (optional) Routing instructions for the supervisor (for create_or_update)
+- `tile_id`: The Supervisor Agent tile ID (for get, delete, or update via create_or_update)
+- `examples`: (optional) List of example questions with `question` and `guideline` fields (for create_or_update)
 
-**get_mas** - Get Supervisor Agent details
-- `tile_id`: The Supervisor Agent tile ID
-
-**find_mas_by_name** - Find a Supervisor Agent by name
-- `name`: The exact name of the Supervisor Agent to find
-- Returns: `tile_id`, `name`, `endpoint_status`, `agents_count`
-- Use this to look up an existing Supervisor Agent when you know the name but not the tile_id
-
-**delete_mas** - Delete a Supervisor Agent
-- `tile_id`: The Supervisor Agent tile ID to delete
+Actions:
+- **create_or_update**: Requires `name`, `agents`. Optionally pass `tile_id` to update.
+- **get**: Requires `tile_id`. Returns tile_id, name, description, endpoint_status, agents, examples_count.
+- **find_by_name**: Requires `name` (exact match). Returns found, tile_id, name, endpoint_status, agents_count. Use this to look up an existing Supervisor Agent when you know the name but not the tile_id.
+- **delete**: Requires `tile_id`.
 
 ## Typical Workflow
 
@@ -133,7 +125,7 @@ Before creating Agent Bricks, generate the required source data:
 
 ### 2. Create the Agent Brick
 
-Use the appropriate `create_or_update_*` tool with your data sources.
+Use `manage_ka(action="create_or_update", ...)` or `manage_mas(action="create_or_update", ...)` with your data sources.
 
 ### 3. Wait for Provisioning
 
@@ -157,7 +149,8 @@ For KA, if `add_examples_from_volume=true`, examples are automatically extracted
 ## Example: Multi-Modal Supervisor Agent
 
 ```python
-create_or_update_mas(
+manage_mas(
+    action="create_or_update",
     name="Enterprise Support Supervisor",
     agents=[
         {
