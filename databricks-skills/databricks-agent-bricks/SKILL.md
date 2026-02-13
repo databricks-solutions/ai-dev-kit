@@ -93,9 +93,10 @@ See `databricks-genie` skill for:
   - `description`: What this agent handles - critical for routing (required)
   - `ka_tile_id`: Knowledge Assistant tile ID (use for document Q&A agents - recommended for KAs)
   - `genie_space_id`: Genie space ID (use for SQL-based data agents)
-  - `endpoint_name`: Model serving endpoint name (for custom agents) OR `uc-connection:CONNECTION_NAME` (for external MCP servers)
+  - `endpoint_name`: Model serving endpoint name (for custom agents)
   - `uc_function_name`: Unity Catalog function name in format `catalog.schema.function_name`
-  - Note: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, or `uc_function_name`
+  - `connection_name`: Unity Catalog connection name (for external MCP servers)
+  - Note: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, `uc_function_name`, or `connection_name`
 - `description`: (optional) What the Supervisor Agent does
 - `instructions`: (optional) Routing instructions for the supervisor
 - `tile_id`: (optional) Existing tile_id to update
@@ -181,7 +182,7 @@ create_or_update_mas(
         },
         {
             "name": "ticket_operations",
-            "endpoint_name": "uc-connection:ticket_system_mcp",
+            "connection_name": "ticket_system_mcp",
             "description": "Creates, updates, assigns, and closes support tickets in external ticketing system"
         }
     ],

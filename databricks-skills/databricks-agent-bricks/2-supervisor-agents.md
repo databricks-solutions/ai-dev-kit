@@ -119,17 +119,17 @@ GRANT USE CONNECTION ON my_mcp_connection TO `<agent_sp>`;
 
 ### Configuration
 
-Reference the UC Connection using the `uc-connection:` prefix:
+Reference the UC Connection using the `connection_name` field:
 
 ```python
 {
     "name": "external_operations",
-    "endpoint_name": "uc-connection:my_mcp_connection",
+    "connection_name": "my_mcp_connection",
     "description": "Execute external system operations: approve invoices, create records, trigger workflows"
 }
 ```
 
-**Field**: `endpoint_name` with `uc-connection:` prefix to reference an existing UC HTTP Connection
+**Field**: `connection_name` - the name of the Unity Catalog HTTP Connection configured as an MCP server
 
 **Important**: Make the description comprehensive - it guides the Supervisor Agent's routing decisions for when to call this agent.
 
@@ -153,7 +153,7 @@ create_or_update_mas(
         },
         {
             "name": "ap_operations",
-            "endpoint_name": "uc-connection:ap_invoice_mcp",
+            "connection_name": "ap_invoice_mcp",
             "description": (
                 "Execute AP operations: approve/reject/flag invoices, search invoice details, "
                 "get vendor summaries, trigger batch workflows. Use for ANY action or write operation."
@@ -230,10 +230,11 @@ Each agent in the `agents` list needs:
 | `description` | Yes | What this agent handles (critical for routing) |
 | `ka_tile_id` | One of these | Knowledge Assistant tile ID (for document Q&A agents) |
 | `genie_space_id` | One of these | Genie space ID (for SQL-based data agents) |
-| `endpoint_name` | One of these | Model serving endpoint name (for custom agents) OR `uc-connection:CONNECTION_NAME` (for external MCP servers) |
+| `endpoint_name` | One of these | Model serving endpoint name (for custom agents) |
 | `uc_function_name` | One of these | Unity Catalog function name in format `catalog.schema.function_name` |
+| `connection_name` | One of these | Unity Catalog connection name (for external MCP servers) |
 
-**Note**: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, or `uc_function_name`.
+**Note**: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, `uc_function_name`, or `connection_name`.
 
 To find a KA tile_id, use `find_ka_by_name(name="Your KA Name")`.
 To find a Genie space_id, use `find_genie_by_name(display_name="Your Genie Name")`.

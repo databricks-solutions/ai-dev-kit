@@ -324,11 +324,11 @@ def create_or_update_mas(
             - name: Agent identifier (used internally for routing)
             - description: What this agent handles (critical for routing decisions)
             - endpoint_name: Model serving endpoint name (for custom agents)
-              OR 'uc-connection:CONNECTION_NAME' (for external MCP servers)
             - genie_space_id: Genie space ID (for SQL-based data agents)
             - ka_tile_id: Knowledge Assistant tile ID (for document Q&A agents)
             - uc_function_name: Unity Catalog function name in format 'catalog.schema.function_name'
-            Note: Provide exactly one of: endpoint_name, genie_space_id, ka_tile_id, or uc_function_name.
+            - connection_name: Unity Catalog connection name (for external MCP servers)
+            Note: Provide exactly one of: endpoint_name, genie_space_id, ka_tile_id, uc_function_name, or connection_name.
         description: Optional description of what the MAS does
         instructions: Optional routing instructions for the supervisor
         tile_id: Optional existing tile_id to update instead of create
@@ -371,7 +371,7 @@ def create_or_update_mas(
         ...         },
         ...         {
         ...             "name": "ticket_operations",
-        ...             "endpoint_name": "uc-connection:ticket_system_mcp",
+        ...             "connection_name": "ticket_system_mcp",
         ...             "description": "Creates and updates tickets in external ticketing system"
         ...         }
         ...     ],
@@ -403,17 +403,18 @@ def create_or_update_mas(
         has_genie = bool(agent.get("genie_space_id"))
         has_ka = bool(agent.get("ka_tile_id"))
         has_uc_function = bool(agent.get("uc_function_name"))
+        has_connection = bool(agent.get("connection_name"))
 
         # Count how many agent types are specified
-        agent_type_count = sum([has_endpoint, has_genie, has_ka, has_uc_function])
+        agent_type_count = sum([has_endpoint, has_genie, has_ka, has_uc_function, has_connection])
         if agent_type_count > 1:
             return {
                 "error": f"""Agent '{agent_name}' has multiple agent types.
-                Provide only one of: 'endpoint_name', 'genie_space_id', 'ka_tile_id', or 'uc_function_name'."""
+                Provide only one of: 'endpoint_name', 'genie_space_id', 'ka_tile_id', 'uc_function_name', or 'connection_name'."""
             }
         if agent_type_count == 0:
             return {
-                "error": f"Agent '{agent_name}' must have one of: 'endpoint_name', 'genie_space_id', 'ka_tile_id', or 'uc_function_name'"
+                "error": f"Agent '{agent_name}' must have one of: 'endpoint_name', 'genie_space_id', 'ka_tile_id', 'uc_function_name', or 'connection_name'"
             }
 
         agent_config = {
@@ -422,21 +423,35 @@ def create_or_update_mas(
         }
 
         if has_genie:
-            agent_config["agent_type"] = "genie"
+            agent_config["agent_type"] = "genie-space"
             agent_config["genie_space"] = {"id": agent.get("genie_space_id")}
         elif has_ka:
             # KA tiles are referenced via their serving endpoint
             # Endpoint name uses the first segment of the tile_id
             ka_tile_id = agent.get("ka_tile_id")
             tile_id_prefix = ka_tile_id.split("-")[0]
-            agent_config["agent_type"] = "serving_endpoint"
+            agent_config["agent_type"] = "serving-endpoint"
             agent_config["serving_endpoint"] = {"name": f"ka-{tile_id_prefix}-endpoint"}
         elif has_uc_function:
-            agent_config["agent_type"] = "uc_function"
-            agent_config["uc_function"] = {"name": agent.get("uc_function_name")}
+            uc_function_name = agent.get("uc_function_name")
+            uc_parts = uc_function_name.split(".")
+            if len(uc_parts) != 3:
+                return {
+                    "error": f"Agent '{agent_name}': uc_function_name must be in format 'catalog.schema.function_name', got '{uc_function_name}'"
+                }
+            agent_config["agent_type"] = "unity-catalog-function"
+            agent_config["unity_catalog_function"] = {
+                "uc_path": {
+                    "catalog": uc_parts[0],
+                    "schema": uc_parts[1],
+                    "name": uc_parts[2],
+                }
+            }
+        elif has_connection:
+            agent_config["agent_type"] = "external-mcp-server"
+            agent_config["external_mcp_server"] = {"connection_name": agent.get("connection_name")}
         else:
-            # Handles both model serving endpoints and MCP servers (uc-connection: prefix)
-            agent_config["agent_type"] = "serving_endpoint"
+            agent_config["agent_type"] = "serving-endpoint"
             agent_config["serving_endpoint"] = {"name": agent.get("endpoint_name")}
 
         agent_list.append(agent_config)
