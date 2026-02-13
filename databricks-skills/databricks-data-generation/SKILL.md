@@ -1,7 +1,7 @@
 ---
 name: databricks-data-gen
 description: Generate realistic synthetic data for demos and testing across retail, healthcare, financial, IoT, and manufacturing industries using Polars + Mimesis (local/UC) or dbldatagen (Connect/notebooks).
-argument-hint: [industry] [--rows N] [--catalog NAME] [--schema NAME]
+argument-hint: "[industry] [--rows N] [--catalog NAME] [--schema NAME]"
 audience: external
 ---
 
