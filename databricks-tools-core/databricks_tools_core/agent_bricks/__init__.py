@@ -1,9 +1,9 @@
 """
-Agent Bricks - Manage Genie Spaces, Knowledge Assistants, and Multi-Agent Supervisors.
+Agent Bricks - Manage Genie Spaces, Knowledge Assistants, and Supervisor Agents.
 
 This module provides a unified interface for managing Agent Bricks resources:
 - Knowledge Assistants (KA): Document-based Q&A systems
-- Multi-Agent Supervisors (MAS): Multi-agent orchestration
+- Supervisor Agents (MAS): Multi-agent orchestration
 - Genie Spaces: SQL-based data exploration
 """
 

@@ -120,9 +120,9 @@ To update the indexed documents:
 
 5. **Test the KA** in the Databricks UI
 
-## Using KA in Multi-Agent Supervisors
+## Using KA in Supervisor Agents
 
-Knowledge Assistants can be used as agents in a Multi-Agent Supervisor (MAS). Each KA has an associated model serving endpoint.
+Knowledge Assistants can be used as agents in a Supervisor Agent (formerly Multi-Agent Supervisor, MAS). Each KA has an associated model serving endpoint.
 
 ### Finding the Endpoint Name
 

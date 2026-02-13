@@ -389,7 +389,7 @@ const coverageSections: CoverageSection[] = [
     title: 'ML / AI',
     items: [
       { product: 'Agent Bricks - Knowledge Assistant', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '', comments: 'Knowledge Assistant tile management' },
-      { product: 'Agent Bricks - Multi Agent Supervisor', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '', comments: 'Multi Agent Supervisor tile management' },
+      { product: 'Agent Bricks - Supervisor Agent', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '', comments: 'Supervisor Agent tile management' },
       { product: 'Agent Bricks - Genie', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '', comments: 'Genie tile management' },
       { product: 'Model Serving', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
       { product: 'Classic ML and MLFlow', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },

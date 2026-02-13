@@ -22,7 +22,7 @@ class TileType(Enum):
     T2T = 2  # Text to Text
     KA = 3  # Knowledge Assistant
     MAO = 4  # Deprecated
-    MAS = 5  # Multi-Agent Supervisor
+    MAS = 5  # Supervisor Agent (formerly Multi-Agent Supervisor)
 
 
 class EndpointStatus(Enum):
@@ -67,7 +67,7 @@ class GenieIds:
 
 @dataclass(frozen=True)
 class MASIds:
-    """Multi-Agent Supervisor identifiers."""
+    """Supervisor Agent identifiers."""
 
     tile_id: str
     name: str
@@ -154,7 +154,7 @@ class MultiAgentSupervisorStatusDict(TypedDict):
 
 
 class MultiAgentSupervisorDict(TypedDict, total=False):
-    """Complete Multi-Agent Supervisor response."""
+    """Complete Supervisor Agent response."""
 
     tile: TileDict
     agents: List[BaseAgentDict]

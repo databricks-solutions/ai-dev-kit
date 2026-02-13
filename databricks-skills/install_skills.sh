@@ -54,7 +54,7 @@ ALL_SKILLS="$DATABRICKS_SKILLS $MLFLOW_SKILLS"
 get_skill_description() {
     case "$1" in
         # Databricks skills
-        "agent-bricks") echo "Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors" ;;
+        "agent-bricks") echo "Knowledge Assistants, Genie Spaces, Supervisor Agents" ;;
         "databricks-aibi-dashboards") echo "Databricks AI/BI Dashboards - create and manage dashboards" ;;
         "asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
@@ -92,7 +92,7 @@ get_skill_description() {
 # Get extra files for a Databricks skill (besides SKILL.md)
 get_skill_extra_files() {
     case "$1" in
-        "agent-bricks") echo "1-knowledge-assistants.md 3-multi-agent-supervisors.md" ;;
+        "agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
         "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
         "databricks-genie") echo "spaces.md conversation.md" ;;
         "asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;

@@ -1,9 +1,9 @@
 """
-Agent Bricks Manager - Manage Genie Spaces, Knowledge Assistants, and Multi-Agent Supervisors.
+Agent Bricks Manager - Manage Genie Spaces, Knowledge Assistants, and Supervisor Agents.
 
 Unified wrapper for Agent Bricks tiles with operations for:
 - Knowledge Assistants (KA): Document-based Q&A systems
-- Multi-Agent Supervisors (MAS): Multi-agent orchestration
+- Supervisor Agents (MAS): Multi-agent orchestration
 - Genie Spaces: SQL-based data exploration
 """
 
@@ -638,7 +638,7 @@ class AgentBricksManager:
         return knowledge_sources
 
     # ========================================================================
-    # Multi-Agent Supervisor (MAS) Operations
+    # Supervisor Agent (MAS) Operations
     # ========================================================================
 
     def mas_create(
@@ -648,10 +648,10 @@ class AgentBricksManager:
         description: Optional[str] = None,
         instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a Multi-Agent Supervisor with specified agents.
+        """Create a Supervisor Agent with specified agents.
 
         Args:
-            name: Name for the MAS
+            name: Name for the Supervisor Agent
             agents: List of agent configurations (BaseAgent format):
                 {
                     "name": "Agent Name",
@@ -663,7 +663,7 @@ class AgentBricksManager:
             instructions: Optional instructions
 
         Returns:
-            MAS creation response
+            Supervisor Agent creation response
         """
         payload = {"name": self.sanitize_name(name), "agents": agents}
         if description:
@@ -691,7 +691,7 @@ class AgentBricksManager:
         instructions: Optional[str] = None,
         agents: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Update a Multi-Agent Supervisor."""
+        """Update a Supervisor Agent."""
         payload = {"tile_id": tile_id}
         if name:
             payload["name"] = self.sanitize_name(name)

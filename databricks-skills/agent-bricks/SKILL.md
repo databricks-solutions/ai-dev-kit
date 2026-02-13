@@ -1,6 +1,6 @@
 ---
 name: agent-bricks
-description: "Create and manage Databricks Agent Bricks: Knowledge Assistants (KA) for document Q&A, Genie Spaces for SQL exploration, and Multi-Agent Supervisors (MAS) for multi-agent orchestration. Use when building conversational AI applications on Databricks."
+description: "Create and manage Databricks Agent Bricks: Knowledge Assistants (KA) for document Q&A, Genie Spaces for SQL exploration, and Supervisor Agents (MAS) for multi-agent orchestration. Use when building conversational AI applications on Databricks."
 ---
 
 # Agent Bricks
@@ -15,7 +15,7 @@ Agent Bricks are three types of pre-built AI tiles in Databricks:
 |-------|---------|-------------|
 | **Knowledge Assistant (KA)** | Document-based Q&A using RAG | PDF/text files in Volumes |
 | **Genie Space** | Natural language to SQL | Unity Catalog tables |
-| **Multi-Agent Supervisor (MAS)** | Multi-agent orchestration | Model serving endpoints |
+| **Supervisor Agent (MAS)** | Multi-agent orchestration | Model serving endpoints |
 
 ## Prerequisites
 
@@ -31,10 +31,10 @@ Before creating Agent Bricks, ensure you have the required data:
 - Generate raw data using the `synthetic-data-generation` skill
 - Create tables using the `spark-declarative-pipelines` skill
 
-### For Multi-Agent Supervisors
+### For Supervisor Agents
 - **Model Serving Endpoints**: Deployed agent endpoints (KA endpoints, custom agents, fine-tuned models)
 - **Genie Spaces**: Existing Genie spaces can be used directly as agents for SQL-based queries
-- Mix and match endpoint-based and Genie-based agents in the same MAS
+- Mix and match endpoint-based and Genie-based agents in the same Supervisor Agent
 
 ## MCP Tools
 
@@ -76,10 +76,10 @@ See `databricks-genie` skill for:
 
 **IMPORTANT**: There is NO system table for Genie spaces (e.g., `system.ai.genie_spaces` does not exist). To find a Genie space by name, use the `find_genie_by_name` tool.
 
-### Multi-Agent Supervisor Tools
+### Supervisor Agent Tools
 
-**create_or_update_mas** - Create or update a Multi-Agent Supervisor
-- `name`: Name for the MAS
+**create_or_update_mas** - Create or update a Supervisor Agent
+- `name`: Name for the Supervisor Agent
 - `agents`: List of agent configurations, each with:
   - `name`: Agent identifier (required)
   - `description`: What this agent handles - critical for routing (required)
@@ -87,21 +87,21 @@ See `databricks-genie` skill for:
   - `genie_space_id`: Genie space ID (use for SQL-based data agents)
   - `endpoint_name`: Model serving endpoint name (use for custom agents)
   - Note: Provide exactly one of: `ka_tile_id`, `genie_space_id`, or `endpoint_name`
-- `description`: (optional) What the MAS does
+- `description`: (optional) What the Supervisor Agent does
 - `instructions`: (optional) Routing instructions for the supervisor
 - `tile_id`: (optional) Existing tile_id to update
 - `examples`: (optional) List of example questions with `question` and `guideline` fields
 
-**get_mas** - Get Multi-Agent Supervisor details
-- `tile_id`: The MAS tile ID
+**get_mas** - Get Supervisor Agent details
+- `tile_id`: The Supervisor Agent tile ID
 
-**find_mas_by_name** - Find a Multi-Agent Supervisor by name
-- `name`: The exact name of the MAS to find
+**find_mas_by_name** - Find a Supervisor Agent by name
+- `name`: The exact name of the Supervisor Agent to find
 - Returns: `tile_id`, `name`, `endpoint_status`, `agents_count`
-- Use this to look up an existing MAS when you know the name but not the tile_id
+- Use this to look up an existing Supervisor Agent when you know the name but not the tile_id
 
-**delete_mas** - Delete a Multi-Agent Supervisor
-- `tile_id`: The MAS tile ID to delete
+**delete_mas** - Delete a Supervisor Agent
+- `tile_id`: The Supervisor Agent tile ID to delete
 
 ## Typical Workflow
 

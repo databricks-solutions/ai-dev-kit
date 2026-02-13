@@ -33,7 +33,7 @@ cp -r ai-dev-kit/databricks-skills/agent-bricks .claude/skills/
 ## Available Skills
 
 ### 🤖 AI & Agents
-- **agent-bricks** - Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors
+- **agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
 - **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
 - **model-serving** - Deploy MLflow models and AI agents to endpoints
 - **unstructured-pdf-generation** - Generate synthetic PDFs for RAG

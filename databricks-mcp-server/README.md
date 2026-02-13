@@ -152,14 +152,14 @@ Claude now has both:
 | `find_genie_by_name` | Find Genie Space by name, returns space ID |
 | `delete_genie` | Delete a Genie Space |
 
-### Multi-Agent Supervisor (MAS)
+### Supervisor Agent (MAS)
 
 | Tool | Description |
 |------|-------------|
-| `create_or_update_mas` | Create or update a Multi-Agent Supervisor |
+| `create_or_update_mas` | Create or update a Supervisor Agent |
 | `get_mas` | Get MAS details by tile ID |
 | `find_mas_by_name` | Find MAS by name, returns tile ID |
-| `delete_mas` | Delete a Multi-Agent Supervisor |
+| `delete_mas` | Delete a Supervisor Agent |
 
 ### AI/BI Dashboards
 

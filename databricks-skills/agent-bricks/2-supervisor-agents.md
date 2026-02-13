@@ -1,10 +1,10 @@
-# Multi-Agent Supervisors (MAS)
+# Supervisor Agents (MAS)
 
-Multi-Agent Supervisors orchestrate multiple specialized agents, routing user queries to the most appropriate agent based on the query content.
+Supervisor Agents orchestrate multiple specialized agents, routing user queries to the most appropriate agent based on the query content.
 
-## What is a Multi-Agent Supervisor?
+## What is a Supervisor Agent?
 
-A MAS acts as a traffic controller for multiple AI agents. When a user asks a question:
+A Supervisor Agent (formerly Multi-Agent Supervisor, MAS) acts as a traffic controller for multiple AI agents. When a user asks a question:
 
 1. **Analyzes** the query to understand the intent
 2. **Routes** to the most appropriate specialized agent
@@ -14,14 +14,14 @@ This allows you to combine multiple specialized agents into a single unified int
 
 ## When to Use
 
-Use a Multi-Agent Supervisor when:
+Use a Supervisor Agent when:
 - You have multiple specialized agents (billing, technical support, HR, etc.)
 - Users shouldn't need to know which agent to ask
 - You want to provide a unified conversational experience
 
 ## Prerequisites
 
-Before creating a MAS, you need agents of one or both types:
+Before creating a Supervisor Agent, you need agents of one or both types:
 
 **Model Serving Endpoints** (`endpoint_name`):
 - Knowledge Assistant (KA) endpoints (e.g., `ka-abc123-endpoint`)
@@ -36,7 +36,7 @@ Before creating a MAS, you need agents of one or both types:
 - To find a Genie space by name, use `find_genie_by_name(display_name="My Genie")`
 - **Note**: There is NO system table for Genie spaces - do not try to query `system.ai.genie_spaces`
 
-## Creating a Multi-Agent Supervisor
+## Creating a Supervisor Agent
 
 Use the `create_or_update_mas` tool:
 
@@ -99,7 +99,7 @@ The `description` field is critical for routing. Make it specific:
 
 ## Provisioning Timeline
 
-After creation, the MAS endpoint needs to provision:
+After creation, the Supervisor Agent endpoint needs to provision:
 
 | Status | Meaning | Duration |
 |--------|---------|----------|
@@ -132,7 +132,7 @@ Example questions help with evaluation and can guide routing optimization:
 }
 ```
 
-If the MAS is not yet `ONLINE`, examples are queued and added automatically when ready.
+If the Supervisor Agent is not yet `ONLINE`, examples are queued and added automatically when ready.
 
 ## Best Practices
 
@@ -185,15 +185,15 @@ Consider adding a general-purpose agent for queries that don't fit elsewhere:
 
 5. **Test routing** with various query types
 
-## Updating a Multi-Agent Supervisor
+## Updating a Supervisor Agent
 
-To update an existing MAS:
+To update an existing Supervisor Agent:
 
 1. **Add/remove agents**: Call `create_or_update_mas` with updated `agents` list
 2. **Update descriptions**: Change agent descriptions to improve routing
 3. **Modify instructions**: Update routing rules
 
-The tool finds the existing MAS by name and updates it.
+The tool finds the existing Supervisor Agent by name and updates it.
 
 ## Troubleshooting
 
@@ -217,21 +217,21 @@ The tool finds the existing MAS by name and updates it.
 
 ## Advanced: Hierarchical Routing
 
-For complex scenarios, you can create multiple levels of MAS:
+For complex scenarios, you can create multiple levels of Supervisor Agents:
 
 ```
-Top-level MAS
-├── Customer Support MAS
+Top-level Supervisor
+├── Customer Support Supervisor
 │   ├── billing_agent
 │   ├── technical_agent
 │   └── general_agent
-├── Sales MAS
+├── Sales Supervisor
 │   ├── pricing_agent
 │   ├── demo_agent
 │   └── contract_agent
-└── Internal MAS
+└── Internal Supervisor
     ├── hr_agent
     └── it_helpdesk_agent
 ```
 
-Each sub-MAS is deployed as an endpoint and configured as an agent in the top-level MAS.
+Each sub-supervisor is deployed as an endpoint and configured as an agent in the top-level supervisor.

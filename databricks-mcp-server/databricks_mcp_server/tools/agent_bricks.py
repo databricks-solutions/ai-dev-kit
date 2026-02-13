@@ -1,4 +1,4 @@
-"""Agent Bricks tools - Manage Knowledge Assistants (KA) and Multi-Agent Supervisors (MAS).
+"""Agent Bricks tools - Manage Knowledge Assistants (KA) and Supervisor Agents (MAS).
 
 For Genie Space tools, see genie.py
 """
@@ -218,7 +218,7 @@ def find_ka_by_name(name: str) -> Dict[str, Any]:
     Find a Knowledge Assistant by its name.
 
     Use this to look up a KA when you know the name but not the tile_id.
-    This is useful when referencing an existing KA in a Multi-Agent Supervisor.
+    This is useful when referencing an existing KA in a Supervisor Agent.
 
     Args:
         name: The name of the Knowledge Assistant to find (exact match)
@@ -298,7 +298,7 @@ def delete_ka(tile_id: str) -> Dict[str, Any]:
 
 
 # ============================================================================
-# Multi-Agent Supervisor (MAS) Tools
+# Supervisor Agent (MAS) Tools
 # ============================================================================
 
 
@@ -312,14 +312,14 @@ def create_or_update_mas(
     examples: List[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
-    Create or update a Multi-Agent Supervisor (MAS).
+    Create or update a Supervisor Agent (formerly Multi-Agent Supervisor, MAS).
 
-    A MAS orchestrates multiple agents, routing user queries to the appropriate
+    A Supervisor Agent orchestrates multiple agents, routing user queries to the appropriate
     specialized agent based on the query content. Supports both model serving
     endpoints and Genie spaces as agents.
 
     Args:
-        name: Name for the MAS (will be sanitized for Databricks naming rules)
+        name: Name for the Supervisor Agent (will be sanitized for Databricks naming rules)
         agents: List of agent configurations. Each agent requires:
             - name: Agent identifier (used internally for routing)
             - description: What this agent handles (critical for routing decisions)
@@ -509,15 +509,15 @@ def create_or_update_mas(
 @mcp.tool
 def get_mas(tile_id: str) -> Dict[str, Any]:
     """
-    Get a Multi-Agent Supervisor by tile ID.
+    Get a Supervisor Agent by tile ID.
 
     Args:
-        tile_id: The MAS tile ID
+        tile_id: The Supervisor Agent tile ID
 
     Returns:
-        Dictionary with MAS details including:
+        Dictionary with Supervisor Agent details including:
         - tile_id: The tile ID
-        - name: The MAS name
+        - name: The Supervisor Agent name
         - description: The description
         - endpoint_status: Current status (ONLINE, PROVISIONING, etc.)
         - agents: List of configured agents
@@ -537,7 +537,7 @@ def get_mas(tile_id: str) -> Dict[str, Any]:
     result = manager.mas_get(tile_id)
 
     if not result:
-        return {"error": f"Multi-Agent Supervisor {tile_id} not found"}
+        return {"error": f"Supervisor Agent {tile_id} not found"}
 
     mas_data = result.get("multi_agent_supervisor", {})
     tile_data = mas_data.get("tile", {})
@@ -561,12 +561,12 @@ def get_mas(tile_id: str) -> Dict[str, Any]:
 @mcp.tool
 def find_mas_by_name(name: str) -> Dict[str, Any]:
     """
-    Find a Multi-Agent Supervisor by its name.
+    Find a Supervisor Agent by its name.
 
-    Use this to look up a MAS when you know the name but not the tile_id.
+    Use this to look up a Supervisor Agent when you know the name but not the tile_id.
 
     Args:
-        name: The name of the MAS to find (exact match)
+        name: The name of the Supervisor Agent to find (exact match)
 
     Returns:
         Dictionary with:
@@ -617,10 +617,10 @@ def find_mas_by_name(name: str) -> Dict[str, Any]:
 @mcp.tool
 def delete_mas(tile_id: str) -> Dict[str, Any]:
     """
-    Delete a Multi-Agent Supervisor.
+    Delete a Supervisor Agent.
 
     Args:
-        tile_id: The MAS tile ID to delete
+        tile_id: The Supervisor Agent tile ID to delete
 
     Returns:
         Dictionary with:

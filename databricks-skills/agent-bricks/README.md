@@ -1,6 +1,6 @@
 # Agent Bricks
 
-Create and manage Databricks Agent Bricks: Knowledge Assistants (KA) for document Q&A, Genie Spaces for SQL exploration, and Multi-Agent Supervisors (MAS) for multi-agent orchestration.
+Create and manage Databricks Agent Bricks: Knowledge Assistants (KA) for document Q&A, Genie Spaces for SQL exploration, and Supervisor Agents (MAS) for multi-agent orchestration.
 
 ## Overview
 
@@ -19,7 +19,7 @@ agent-bricks/
 
 - Knowledge Assistants (KA) for RAG-based document Q&A over Unity Catalog Volumes
 - Genie Spaces for natural language to SQL exploration (delegated to the `databricks-genie` skill)
-- Multi-Agent Supervisors (MAS) for routing queries across multiple specialized agents
+- Supervisor Agents (MAS) for routing queries across multiple specialized agents
 - MCP tools for creating, updating, finding, and deleting each brick type
 - Provisioning lifecycle and endpoint status monitoring
 - Automatic example ingestion from companion JSON files

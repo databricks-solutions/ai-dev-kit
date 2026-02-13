@@ -38,7 +38,7 @@ databricks-genie/
 
 ## Related Skills
 
-- [Agent Bricks](../agent-bricks/) -- Use Genie Spaces as agents inside Multi-Agent Supervisors
+- [Agent Bricks](../agent-bricks/) -- Use Genie Spaces as agents inside Supervisor Agents
 - [Synthetic Data Generation](../synthetic-data-generation/) -- Generate raw parquet data to populate tables for Genie
 - [Spark Declarative Pipelines](../spark-declarative-pipelines/) -- Build bronze/silver/gold tables consumed by Genie Spaces
 - [Databricks Unity Catalog](../databricks-unity-catalog/) -- Manage the catalogs, schemas, and tables Genie queries
