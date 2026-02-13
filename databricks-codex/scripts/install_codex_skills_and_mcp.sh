@@ -25,7 +25,7 @@ Options:
 
 Examples:
   $(basename "$0")
-  $(basename "$0") --profile ai-specialist
+  $(basename "$0") --profile my-profile
   $(basename "$0") databricks-dbsql databricks-genie
 EOF
 }
