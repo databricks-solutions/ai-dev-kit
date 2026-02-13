@@ -1,4 +1,4 @@
-# MLflow LLMOps
+# MLflow GenAI
 
 MLflow 3 GenAI skill for agent development. Covers tracing, evaluation, scorer creation, dataset building, trace analysis, context optimization, and debugging — the full LLMOps workflow from observability through quality assessment.
 
