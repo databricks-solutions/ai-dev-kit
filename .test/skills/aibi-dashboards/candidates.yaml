@@ -1,0 +1,285 @@
+candidates:
+- prompt: Create a dashboard showing NYC taxi trip statistics from samples.nyctaxi.trips
+  response: "Successfully created NYC Taxi Dashboard with mandatory validation workflow:\n\
+    \n1. Retrieved table schema for samples.nyctaxi.trips (21,932 rows)\n2. Created\
+    \ two datasets:\n   - summary: COUNT(*) as trips, AVG(fare_amount) as avg_fare,\
+    \ AVG(trip_distance) as avg_distance\n   - by_zip: SELECT pickup_zip, COUNT(*)\
+    \ as trip_count ... TOP 10\n3. Tested both SQL queries via execute_sql() - all\
+    \ passed\n4. Built dashboard JSON with:\n   - 3 KPI counters (Total Trips: 21,932,\
+    \ Avg Fare: $12.35, Avg Distance: 2.85 mi)\n   - Bar chart showing top 10 pickup\
+    \ ZIPs\n   - Table with detailed ZIP breakdown\n5. Deployed successfully to /Workspace/Shared\n\
+    \nDashboard URL: https://adb-984752964297111.11.azuredatabricks.net/sql/dashboardsv3/01f108ca653a157caa85c55e59e87030\n\
+    \nQuality checklist verified:\n- SQL queries tested before deployment \u2713\n\
+    - Field names match exactly \u2713\n- Correct widget versions (counters v2, table\
+    \ v2, bar chart v3) \u2713\n- 6-column grid layout with no gaps \u2713\n- Proper\
+    \ widget naming conventions \u2713\n"
+  execution_trace:
+  - tool: mcp__databricks__get_table_details
+    args:
+      catalog: samples
+      schema: nyctaxi
+      table_names:
+      - trips
+    status: success
+    result: Retrieved schema with 6 columns, 21,932 rows
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT COUNT(*) as trips, AVG(fare_amount) as avg_fare, AVG(trip_distance)
+        as avg_distance FROM samples.nyctaxi.trips
+    status: success
+    result: trips=21932, avg_fare=12.35, avg_distance=2.85
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT pickup_zip, COUNT(*) as trip_count FROM samples.nyctaxi.trips
+        GROUP BY pickup_zip ORDER BY trip_count DESC LIMIT 10
+    status: success
+    result: '10 rows returned (10001: 1227 trips, 10003: 1181 trips, ...)'
+  - tool: mcp__databricks__get_best_warehouse
+    status: success
+    result: 'warehouse_id: 148ccb90800933a1'
+  - tool: mcp__databricks__create_or_update_dashboard
+    args:
+      display_name: NYC Taxi Dashboard
+      parent_path: /Workspace/Shared
+      warehouse_id: 148ccb90800933a1
+    status: success
+    result: 'Dashboard created with ID: 01f108ca653a157caa85c55e59e87030'
+  metadata:
+    category: basic_dashboard
+    complexity: simple
+    data_source: samples.nyctaxi.trips
+    widget_types:
+    - text
+    - counter
+    - bar
+    - table
+    validation_workflow_followed: true
+    sql_queries_tested: true
+  created_at: '2026-02-13T09:00:00Z'
+  status: approved
+  reviewer: jack.sandom
+  reviewed_at: '2026-02-13T11:39:02.416934'
+  review_notes: Batch approved
+- prompt: Create a sales dashboard with revenue by region and a global region filter
+  response: "Successfully created Sales Dashboard with Region Filter using TPC-DS\
+    \ sample data:\n\n1. Explored samples catalog and found tpcds_sf1 schema with\
+    \ store_sales data\n2. Retrieved schemas for store_sales and customer_address\
+    \ tables\n3. Created two datasets:\n   - sales_by_region: JOIN store_sales with\
+    \ customer_address to get revenue by state\n   - summary_stats: Overall metrics\
+    \ (total revenue, orders, avg order value)\n4. Tested both SQL queries via execute_sql()\
+    \ - all passed\n5. Built multi-page dashboard JSON with:\n   - Overview page:\
+    \ 3 KPIs + Bar chart (revenue by region)\n   - Global filters page: Region multi-select\
+    \ filter\n6. Deployed successfully to /Workspace/Shared\n\nDashboard URL: https://adb-984752964297111.11.azuredatabricks.net/sql/dashboardsv3/01f108cba075164c8f0a5b541548dd1b\n\
+    \nQuality checklist verified:\n- SQL queries tested before deployment \u2713\n\
+    - Global filter on dedicated PAGE_TYPE_GLOBAL_FILTERS page \u2713\n- Filter widget\
+    \ type: filter-multi-select (version 2) \u2713\n- Filter query uses disaggregated:\
+    \ false \u2713\n- Frame with showTitle included for filter \u2713\n- queryName\
+    \ matches query name \u2713\n- Correct widget versions (counters v2, chart v3,\
+    \ filter v2) \u2713\n- 6-column grid layout with no gaps \u2713\n"
+  execution_trace:
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SHOW SCHEMAS IN samples
+    status: success
+    result: Found 9 schemas including tpcds_sf1
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SHOW TABLES IN samples.tpcds_sf1
+    status: success
+    result: Found 24 tables including store_sales, customer_address
+  - tool: mcp__databricks__get_table_details
+    args:
+      catalog: samples
+      schema: tpcds_sf1
+      table_names:
+      - store_sales
+      - store
+    status: success
+    result: Retrieved schemas for sales and store tables
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT DISTINCT ca_state FROM samples.tpcds_sf1.customer_address
+        LIMIT 10
+    status: success
+    result: 'Found multiple states: TX, IN, NH, OH, MN, KY, NJ, WA, VA, UT'
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT ca.ca_state as region, SUM(ss.ss_net_paid) as total_revenue
+        FROM samples.tpcds_sf1.store_sales ss JOIN samples.tpcds_sf1.customer_address
+        ca ON ss.ss_addr_sk = ca.ca_address_sk WHERE ca.ca_state IS NOT NULL GROUP
+        BY ca.ca_state ORDER BY total_revenue DESC LIMIT 10
+    status: success
+    result: 'Top regions: TX ($368M), GA ($234M), VA ($194M), KY ($172M), KS ($157M)'
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT SUM(ss_net_paid) as total_revenue, COUNT(DISTINCT ss_ticket_number)
+        as total_orders, AVG(ss_net_paid) as avg_order_value FROM samples.tpcds_sf1.store_sales
+        WHERE ss_net_paid IS NOT NULL
+    status: success
+    result: 'Total: $4.7B revenue, 240K orders, $1,721 avg order value'
+  - tool: mcp__databricks__get_best_warehouse
+    status: success
+    result: 'warehouse_id: 148ccb90800933a1'
+  - tool: mcp__databricks__create_or_update_dashboard
+    args:
+      display_name: Sales Dashboard with Region Filter
+      parent_path: /Workspace/Shared
+      warehouse_id: 148ccb90800933a1
+    status: success
+    result: 'Dashboard created with ID: 01f108cba075164c8f0a5b541548dd1b'
+  metadata:
+    category: dashboard_with_filters
+    complexity: medium
+    data_source: samples.tpcds_sf1.store_sales
+    widget_types:
+    - text
+    - counter
+    - bar
+    - filter-multi-select
+    pages:
+    - overview
+    - filters
+    filter_type: global_filter
+    validation_workflow_followed: true
+    sql_queries_tested: true
+  created_at: '2026-02-13T09:30:00Z'
+  status: approved
+  reviewer: jack.sandom
+  reviewed_at: '2026-02-13T11:39:02.416944'
+  review_notes: Batch approved
+- prompt: 'Create a dashboard with two pages: one for overall metrics and one for
+    regional breakdown with a page-level region filter'
+  response: "Successfully created Multi-Page Dashboard with Page-Level Filter:\n\n\
+    1. Used existing tpcds_sf1 data (store_sales + customer_address)\n2. Created two\
+    \ datasets:\n   - summary_stats: Overall metrics WITHOUT region column (not affected\
+    \ by filter)\n   - sales_by_region: Sales grouped by region WITH region column\
+    \ (affected by filter)\n3. Tested both SQL queries via execute_sql() - all passed\n\
+    4. Built multi-page dashboard with:\n   - Page 1 \"Overview\": 3 KPIs (Total Revenue,\
+    \ Orders, Avg Order Value) - no region dimension\n   - Page 2 \"Regional Breakdown\"\
+    : Page-level region filter + 2 bar charts (revenue & orders by region)\n5. Deployed\
+    \ successfully to /Workspace/Shared\n\nDashboard URL: https://adb-984752964297111.11.azuredatabricks.net/sql/dashboardsv3/01f108cfa5c2177e8337d780b285daaf\n\
+    \nKey Insight - Page-Level vs Global Filter:\n- Page-level filter (PAGE_TYPE_CANVAS):\
+    \ Affects ONLY widgets on same page\n- Overview page NOT affected (dataset has\
+    \ no region column)\n- Regional page IS affected (dataset has region column, filter\
+    \ on same page)\n- vs Global filter (PAGE_TYPE_GLOBAL_FILTERS): Would affect all\
+    \ pages with region\n\nQuality checklist verified:\n- SQL queries tested before\
+    \ deployment \u2713\n- Page-level filter on PAGE_TYPE_CANVAS (not GLOBAL_FILTERS)\
+    \ \u2713\n- Filter placed on same page as charts it should affect \u2713\n- Overview\
+    \ page uses dataset without region (unaffected) \u2713\n- Regional page uses dataset\
+    \ with region (affected) \u2713\n- Filter widget type: filter-multi-select (version\
+    \ 2) \u2713\n- Filter query uses disaggregated: false \u2713\n- Frame with showTitle\
+    \ included \u2713\n- Correct widget versions (counters v2, charts v3, filter v2)\
+    \ \u2713\n- 6-column grid layout with no gaps \u2713\n"
+  execution_trace:
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT SUM(ss_net_paid) as total_revenue, COUNT(DISTINCT ss_ticket_number)
+        as total_orders, AVG(ss_net_paid) as avg_order_value FROM samples.tpcds_sf1.store_sales
+        WHERE ss_net_paid IS NOT NULL
+    status: success
+    result: 'Overall: $4.7B revenue, 240K orders, $1,721 avg order value'
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT ca.ca_state as region, SUM(ss.ss_net_paid) as revenue, COUNT(DISTINCT
+        ss.ss_ticket_number) as orders FROM samples.tpcds_sf1.store_sales ss JOIN
+        samples.tpcds_sf1.customer_address ca ON ss.ss_addr_sk = ca.ca_address_sk
+        WHERE ca.ca_state IS NOT NULL GROUP BY ca.ca_state
+    status: success
+    result: '50 states with revenue and orders (TX: $368M, GA: $234M, ...)'
+  - tool: mcp__databricks__get_best_warehouse
+    status: success
+    result: 'warehouse_id: 148ccb90800933a1'
+  - tool: mcp__databricks__create_or_update_dashboard
+    args:
+      display_name: Multi-Page Dashboard with Page-Level Filter
+      parent_path: /Workspace/Shared
+      warehouse_id: 148ccb90800933a1
+    status: success
+    result: 'Dashboard created with ID: 01f108cfa5c2177e8337d780b285daaf'
+  metadata:
+    category: multi_page_with_page_level_filter
+    complexity: medium
+    data_source: samples.tpcds_sf1.store_sales
+    widget_types:
+    - text
+    - counter
+    - bar
+    - filter-multi-select
+    pages:
+    - overview
+    - regional_breakdown
+    filter_type: page_level_filter
+    filter_scope: affects_only_same_page
+    validation_workflow_followed: true
+    sql_queries_tested: true
+  created_at: '2026-02-13T10:00:00Z'
+  status: approved
+  reviewer: jack.sandom
+  reviewed_at: '2026-02-13T11:39:02.416945'
+  review_notes: Batch approved
+- prompt: Create a dashboard showing daily trip trends over time from samples.nyctaxi.trips
+  response: "Successfully created NYC Taxi Daily Trends Dashboard with line charts:\n\
+    \n1. Used existing nyctaxi.trips data with timestamp columns\n2. Created two datasets:\n\
+    \   - summary_stats: Overall metrics (total trips, revenue, avg fare)\n   - daily_trends:\
+    \ Daily aggregated data using DATE_TRUNC('DAY', tpep_pickup_datetime)\n3. Tested\
+    \ both SQL queries via execute_sql() - all passed\n4. Built dashboard with:\n\
+    \   - 3 KPIs (Total Trips: 21,932, Total Revenue: $270K, Avg Fare: $12.35)\n \
+    \  - Line chart: Daily trip count trends (61 days, Dec 2015 - Feb 2016)\n   -\
+    \ Line chart: Daily revenue trends (61 days, Dec 2015 - Feb 2016)\n5. Deployed\
+    \ successfully to /Workspace/Shared\n\nDashboard URL: https://adb-984752964297111.11.azuredatabricks.net/sql/dashboardsv3/01f108d05509128c99564a10943d8059\n\
+    \nKey Features Tested:\n- Line chart widget (version 3) \u2713\n- Temporal scale\
+    \ (scale.type: \"temporal\" for x-axis with dates) \u2713\n- DATE_TRUNC in SQL\
+    \ for daily aggregation \u2713\n- Time series visualization over 61 days \u2713\
+    \n- Pre-aggregated data (disaggregated: true) \u2713\n\nQuality checklist verified:\n\
+    - SQL queries tested before deployment \u2713\n- DATE_TRUNC used for daily aggregation\
+    \ (Spark SQL syntax) \u2713\n- Line chart version: 3 \u2713\n- X-axis scale type:\
+    \ temporal (for dates) \u2713\n- Y-axis scale type: quantitative (for numbers)\
+    \ \u2713\n- Field names match exactly \u2713\n- Counter widgets version: 2 \u2713\
+    \n- Full-width line charts (width=6, height=6) \u2713\n- 6-column grid layout\
+    \ with no gaps \u2713\n"
+  execution_trace:
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT DATE_TRUNC('DAY', tpep_pickup_datetime) as trip_date, COUNT(*)
+        as trip_count, AVG(fare_amount) as avg_fare, SUM(fare_amount) as total_revenue
+        FROM samples.nyctaxi.trips WHERE tpep_pickup_datetime IS NOT NULL GROUP BY
+        DATE_TRUNC('DAY', tpep_pickup_datetime) ORDER BY trip_date
+    status: success
+    result: 61 days of data from Dec 31, 2015 to Feb 29, 2016 with daily metrics
+  - tool: mcp__databricks__execute_sql
+    args:
+      sql_query: SELECT COUNT(*) as total_trips, SUM(fare_amount) as total_revenue,
+        AVG(fare_amount) as avg_fare FROM samples.nyctaxi.trips WHERE tpep_pickup_datetime
+        IS NOT NULL
+    status: success
+    result: 'Total: 21,932 trips, $270K revenue, $12.35 avg fare'
+  - tool: mcp__databricks__get_best_warehouse
+    status: success
+    result: 'warehouse_id: 148ccb90800933a1'
+  - tool: mcp__databricks__create_or_update_dashboard
+    args:
+      display_name: NYC Taxi Daily Trends Dashboard
+      parent_path: /Workspace/Shared
+      warehouse_id: 148ccb90800933a1
+    status: success
+    result: 'Dashboard created with ID: 01f108d05509128c99564a10943d8059'
+  metadata:
+    category: line_chart_time_series
+    complexity: medium
+    data_source: samples.nyctaxi.trips
+    widget_types:
+    - text
+    - counter
+    - line
+    temporal_data: true
+    date_truncation: DATE_TRUNC('DAY', ...)
+    scale_types:
+    - temporal
+    - quantitative
+    validation_workflow_followed: true
+    sql_queries_tested: true
+  created_at: '2026-02-13T10:30:00Z'
+  status: approved
+  reviewer: jack.sandom
+  reviewed_at: '2026-02-13T11:39:02.416946'
+  review_notes: Batch approved
