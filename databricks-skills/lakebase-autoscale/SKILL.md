@@ -171,43 +171,28 @@ w.postgres.update_endpoint(
 
 ## MCP Tools
 
-The following MCP tools are available for managing Lakebase Autoscaling infrastructure.
+The following MCP tools are available for managing Lakebase infrastructure. Use `type="autoscale"` for Lakebase Autoscaling.
 
-### Project Management
+### Database (Project) Management
 
 | Tool | Description |
 |------|-------------|
-| `create_lakebase_autoscale_project` | Create a new project with Postgres version and display name |
-| `get_lakebase_autoscale_project` | Get project details (state, display name, pg_version) |
-| `list_lakebase_autoscale_projects` | List all projects in the workspace |
-| `update_lakebase_autoscale_project` | Update project display name |
-| `delete_lakebase_autoscale_project` | Delete a project and all its resources |
+| `create_or_update_lakebase_database` | Create or update a database. Finds by name, creates if new, updates if existing. Use `type="autoscale"`, `display_name`, `pg_version` params. A new project auto-creates a production branch, default compute, and databricks_postgres database. |
+| `get_lakebase_database` | Get database details (including branches and endpoints) or list all. Pass `name` to get one, omit to list all. Use `type="autoscale"` to filter. |
+| `delete_lakebase_database` | Delete a project and all its branches, computes, and data. Use `type="autoscale"`. |
 
 ### Branch Management
 
 | Tool | Description |
 |------|-------------|
-| `create_lakebase_autoscale_branch` | Create a branch from a parent branch (with optional TTL) |
-| `get_lakebase_autoscale_branch` | Get branch details (state, protection, expiration) |
-| `list_lakebase_autoscale_branches` | List all branches in a project |
-| `update_lakebase_autoscale_branch` | Update branch (protect, set expiration) |
-| `delete_lakebase_autoscale_branch` | Delete a branch and its resources |
-
-### Compute (Endpoint) Management
-
-| Tool | Description |
-|------|-------------|
-| `create_lakebase_autoscale_endpoint` | Create a compute endpoint on a branch |
-| `get_lakebase_autoscale_endpoint` | Get endpoint details (host, CU range, state) |
-| `list_lakebase_autoscale_endpoints` | List all endpoints on a branch |
-| `update_lakebase_autoscale_endpoint` | Resize compute or configure scale-to-zero |
-| `delete_lakebase_autoscale_endpoint` | Delete a compute endpoint |
+| `create_or_update_lakebase_branch` | Create or update a branch with its compute endpoint. Params: `project_name`, `branch_id`, `source_branch`, `ttl_seconds`, `is_protected`, plus compute params (`autoscaling_limit_min_cu`, `autoscaling_limit_max_cu`, `scale_to_zero_seconds`). |
+| `delete_lakebase_branch` | Delete a branch and its compute endpoints. |
 
 ### Credentials
 
 | Tool | Description |
 |------|-------------|
-| `generate_lakebase_autoscale_credential` | Generate OAuth token for PostgreSQL connections (1-hour expiry, optionally scoped to endpoint) |
+| `generate_lakebase_credential` | Generate OAuth token for PostgreSQL connections (1-hour expiry). Pass `endpoint` resource name for autoscale. |
 
 ## Reference Files
 
