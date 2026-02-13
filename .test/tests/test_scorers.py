@@ -45,7 +45,7 @@ class TestDetectSkillsFromPrompt:
         skills = detect_skills_from_prompt(prompt)
         assert "asset-bundles" in skills
 
-    def test_detect_mlflow_llmops(self):
+    def test_detect_mlflow(self):
         """Test detection of mlflow skill."""
         prompt = "Evaluate my agent using genai.evaluate"
         skills = detect_skills_from_prompt(prompt)

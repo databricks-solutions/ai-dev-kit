@@ -1,6 +1,6 @@
 ---
 name: mlflow
-description: "MLflow 3 GenAI tracing, evaluation, and LLMOps for agent development. Use when (1) writing mlflow.genai.evaluate() code, (2) creating @scorer functions, (3) building evaluation datasets from traces, (4) using built-in scorers (Guidelines, Correctness, Safety, RetrievalGroundedness), (5) analyzing traces for latency/errors/architecture, (6) optimizing agent context/prompts/token usage, (7) debugging evaluation failures. Covers the full LLMOps workflow: trace analysis -> dataset building -> scorer creation -> evaluation execution."
+description: "MLflow 3 GenAI tracing and evaluation for agent development. Use when (1) writing mlflow.genai.evaluate() code, (2) creating @scorer functions, (3) building evaluation datasets from traces, (4) using built-in scorers (Guidelines, Correctness, Safety, RetrievalGroundedness), (5) analyzing traces for latency/errors/architecture, (6) optimizing agent context/prompts/token usage, (7) debugging evaluation failures. Covers the full eval workflow: trace analysis -> dataset building -> scorer creation -> evaluation execution."
 ---
 
 # MLflow 3 GenAI Evaluation
