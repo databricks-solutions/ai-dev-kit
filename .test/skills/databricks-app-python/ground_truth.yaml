@@ -1,0 +1,533 @@
+test_cases:
+  - id: "app_dash_001"
+    inputs:
+      prompt: "Create a Dash app that queries a SQL warehouse and displays data in a table"
+    outputs:
+      response: |
+        Here's a Dash dashboard that connects to a SQL warehouse:
+
+        ```python
+        import os
+        import dash
+        import dash_bootstrap_components as dbc
+        from dash import html, dash_table, dcc, Input, Output
+        from databricks.sdk.core import Config
+        from databricks import sql
+
+        app = dash.Dash(
+            __name__,
+            external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME],
+            title="Data Dashboard",
+        )
+
+        cfg = Config()
+
+        def get_data():
+            conn = sql.connect(
+                server_hostname=cfg.host,
+                http_path=f"/sql/1.0/warehouses/{os.getenv('DATABRICKS_WAREHOUSE_ID')}",
+                credentials_provider=lambda: cfg.authenticate,
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM catalog.schema.table LIMIT 100")
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+            conn.close()
+            return columns, rows
+
+        columns, rows = get_data()
+
+        app.layout = dbc.Container([
+            dbc.Row([
+                dbc.Col(html.H1("Data Dashboard", className="mb-4"), width=12),
+            ]),
+            dbc.Row([
+                dbc.Col(dash_table.DataTable(
+                    id="data-table",
+                    columns=[{"name": c, "id": c} for c in columns],
+                    data=[dict(zip(columns, row)) for row in rows],
+                    page_size=20,
+                    style_table={"overflowX": "auto"},
+                ), width=12),
+            ]),
+        ], fluid=True)
+
+        if __name__ == "__main__":
+            app.run(host="0.0.0.0", port=8080)
+        ```
+
+        **app.yaml:**
+        ```yaml
+        command:
+          - "python"
+          - "app.py"
+        env:
+          - name: DATABRICKS_WAREHOUSE_ID
+            valueFrom:
+              resource: sql-warehouse
+        ```
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "dash_bootstrap_components"
+        - "Config()"
+        - "valueFrom"
+        - "sql.connect"
+      expected_patterns:
+        - pattern: "dash_bootstrap_components"
+          min_count: 1
+          description: "Must use DBC"
+        - pattern: "Config\\(\\)"
+          min_count: 1
+          description: "Must use SDK Config"
+        - pattern: "valueFrom"
+          min_count: 1
+          description: "Must use valueFrom in app.yaml"
+      guidelines:
+        - "Must use dash-bootstrap-components for layout"
+        - "Must use Config() for auth, not hardcoded tokens"
+        - "Must use valueFrom for SQL warehouse ID"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["dash", "sql-warehouse", "dbc"]
+
+  - id: "app_streamlit_001"
+    inputs:
+      prompt: "Build a Streamlit app that lets users query a SQL warehouse"
+    outputs:
+      response: |
+        Here's a Streamlit data explorer:
+
+        ```python
+        import os
+        import streamlit as st
+        from databricks.sdk.core import Config
+        from databricks import sql
+
+        st.set_page_config(page_title="Data Explorer", layout="wide")
+
+        cfg = Config()
+
+        @st.cache_resource
+        def get_connection():
+            return sql.connect(
+                server_hostname=cfg.host,
+                http_path=f"/sql/1.0/warehouses/{os.getenv('DATABRICKS_WAREHOUSE_ID')}",
+                credentials_provider=lambda: cfg.authenticate,
+            )
+
+        @st.cache_data(ttl=300)
+        def run_query(query):
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+            return columns, rows
+
+        st.title("Data Explorer")
+        query = st.text_area("Enter SQL query:", value="SELECT * FROM catalog.schema.table LIMIT 100")
+
+        if st.button("Run Query"):
+            columns, rows = run_query(query)
+            st.dataframe(
+                [dict(zip(columns, row)) for row in rows],
+                use_container_width=True,
+            )
+        ```
+
+        **app.yaml:**
+        ```yaml
+        command:
+          - "streamlit"
+          - "run"
+          - "app.py"
+          - "--server.port"
+          - "8080"
+          - "--server.address"
+          - "0.0.0.0"
+          - "--server.headless"
+          - "true"
+        env:
+          - name: DATABRICKS_WAREHOUSE_ID
+            valueFrom:
+              resource: sql-warehouse
+        ```
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "st.set_page_config"
+        - "@st.cache_resource"
+        - "Config()"
+      expected_patterns:
+        - pattern: "st\\.set_page_config"
+          min_count: 1
+          description: "set_page_config must be first"
+        - pattern: "@st\\.cache_resource"
+          min_count: 1
+          description: "Must cache connections"
+        - pattern: "Config\\(\\)"
+          min_count: 1
+          description: "Must use SDK Config"
+      guidelines:
+        - "st.set_page_config() must be the first Streamlit command"
+        - "Must use @st.cache_resource for database connections"
+        - "Must use Config() for auth, not hardcoded tokens"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["streamlit", "sql-warehouse", "caching"]
+
+  - id: "app_gradio_001"
+    inputs:
+      prompt: "Create a Gradio app that sends prompts to a model serving endpoint"
+    outputs:
+      response: |
+        Here's a Gradio app connected to a model serving endpoint:
+
+        ```python
+        import os
+        import gradio as gr
+        import requests
+        from databricks.sdk.core import Config
+
+        cfg = Config()
+
+        def predict(message, request: gr.Request):
+            headers = cfg.authenticate()
+            headers["Content-Type"] = "application/json"
+            endpoint = os.getenv("SERVING_ENDPOINT_NAME")
+            resp = requests.post(
+                f"https://{cfg.host}/serving-endpoints/{endpoint}/invocations",
+                headers=headers,
+                json={"inputs": [{"prompt": message}]},
+            )
+            return resp.json()["predictions"][0]
+
+        demo = gr.Interface(
+            fn=predict,
+            inputs=gr.Textbox(label="Prompt"),
+            outputs=gr.Textbox(label="Response"),
+            title="ML Model Demo",
+        )
+
+        demo.launch(server_name="0.0.0.0", server_port=8080)
+        ```
+
+        **app.yaml:**
+        ```yaml
+        command:
+          - "python"
+          - "app.py"
+        env:
+          - name: SERVING_ENDPOINT_NAME
+            valueFrom:
+              resource: serving-endpoint
+        ```
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "gr.Request"
+        - "Config()"
+        - "serving-endpoint"
+      expected_patterns:
+        - pattern: "gr\\.Request"
+          min_count: 1
+          description: "Must use gr.Request for auth"
+        - pattern: "Config\\(\\)"
+          min_count: 1
+          description: "Must use SDK Config"
+        - pattern: "valueFrom"
+          min_count: 1
+          description: "Must use valueFrom for resources"
+      guidelines:
+        - "Must use gr.Request parameter for accessing headers"
+        - "Must use Config() for auth, not hardcoded tokens"
+        - "Must use valueFrom for serving endpoint reference"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["gradio", "model-serving"]
+
+  - id: "app_fastapi_001"
+    inputs:
+      prompt: "Build a FastAPI app that queries a SQL warehouse"
+    outputs:
+      response: |
+        Here's a FastAPI REST API connected to a SQL warehouse:
+
+        ```python
+        import os
+        from fastapi import FastAPI, Request
+        from databricks.sdk.core import Config
+        from databricks import sql
+
+        app = FastAPI(title="Data API")
+        cfg = Config()
+
+        @app.get("/api/data")
+        async def get_data(request: Request):
+            user_token = request.headers.get("x-forwarded-access-token")
+            conn = sql.connect(
+                server_hostname=cfg.host,
+                http_path=f"/sql/1.0/warehouses/{os.getenv('DATABRICKS_WAREHOUSE_ID')}",
+                access_token=user_token,
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM catalog.schema.table LIMIT 100")
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+            conn.close()
+            return [dict(zip(columns, row)) for row in rows]
+        ```
+
+        **app.yaml:**
+        ```yaml
+        command:
+          - "uvicorn"
+          - "app:app"
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8080"
+        env:
+          - name: DATABRICKS_WAREHOUSE_ID
+            valueFrom:
+              resource: sql-warehouse
+        ```
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "FastAPI"
+        - "uvicorn"
+        - "Config()"
+      expected_patterns:
+        - pattern: "FastAPI"
+          min_count: 1
+          description: "Must use FastAPI"
+        - pattern: "uvicorn"
+          min_count: 1
+          description: "Must deploy with uvicorn"
+        - pattern: "Config\\(\\)"
+          min_count: 1
+          description: "Must use SDK Config"
+      guidelines:
+        - "Must deploy with uvicorn, not dev server"
+        - "Must use Config() for auth"
+        - "Must use valueFrom for SQL warehouse ID"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["fastapi", "sql-warehouse", "api"]
+
+  - id: "app_user_auth_001"
+    inputs:
+      prompt: "How do I implement user authorization (on-behalf-of) in a Streamlit app?"
+    outputs:
+      response: |
+        Here's how to implement user authorization in Streamlit:
+
+        ```python
+        import os
+        import streamlit as st
+        from databricks.sdk.core import Config
+        from databricks import sql
+
+        st.set_page_config(page_title="User Auth App", layout="wide")
+
+        cfg = Config()
+
+        user_token = st.context.headers.get("x-forwarded-access-token")
+
+        if not user_token:
+            st.warning("User authorization not available. Running with app auth.")
+            conn = sql.connect(
+                server_hostname=cfg.host,
+                http_path=f"/sql/1.0/warehouses/{os.getenv('DATABRICKS_WAREHOUSE_ID')}",
+                credentials_provider=lambda: cfg.authenticate,
+            )
+        else:
+            conn = sql.connect(
+                server_hostname=cfg.host,
+                http_path=f"/sql/1.0/warehouses/{os.getenv('DATABRICKS_WAREHOUSE_ID')}",
+                access_token=user_token,
+            )
+        ```
+
+        **Key points:**
+        - Use `st.context.headers.get("x-forwarded-access-token")` for user token
+        - Fall back to app auth if user token not available (e.g., local dev)
+        - User auth respects Unity Catalog row/column level security
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "x-forwarded-access-token"
+        - "st.context.headers"
+        - "access_token"
+      expected_patterns:
+        - pattern: "x-forwarded-access-token"
+          min_count: 1
+          description: "Must reference the auth header"
+        - pattern: "st\\.context\\.headers"
+          min_count: 1
+          description: "Must use Streamlit context for headers"
+      guidelines:
+        - "Must show how to retrieve user token via st.context.headers"
+        - "Should mention fallback to app auth for local development"
+        - "Should mention Unity Catalog row/column filters"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["user-auth", "streamlit", "oauth"]
+
+  - id: "app_lakebase_001"
+    inputs:
+      prompt: "Create a Dash app that stores data in Lakebase"
+    outputs:
+      response: |
+        Here's a Dash app using Lakebase for data storage:
+
+        ```python
+        import os
+        import dash
+        import dash_bootstrap_components as dbc
+        from dash import html, dcc, dash_table
+
+        app = dash.Dash(
+            __name__,
+            external_stylesheets=[dbc.themes.BOOTSTRAP],
+            title="Lakebase App",
+        )
+
+        def get_db_connection():
+            import psycopg2
+            return psycopg2.connect(
+                host=os.getenv("PGHOST"),
+                database=os.getenv("PGDATABASE"),
+                user=os.getenv("PGUSER"),
+                password=os.getenv("PGPASSWORD"),
+                port=os.getenv("PGPORT", "5432"),
+            )
+
+        app.layout = dbc.Container([
+            dbc.Row(dbc.Col(html.H1("Lakebase App"), className="my-4")),
+            dbc.Row(dbc.Col(html.P(
+                "Connected to Lakebase" if os.getenv("PGHOST") else "No Lakebase configured"
+            ))),
+        ], fluid=True)
+
+        if __name__ == "__main__":
+            app.run(host="0.0.0.0", port=8080, debug=False)
+        ```
+
+        **app.yaml:**
+        ```yaml
+        command:
+          - "python"
+          - "app.py"
+        ```
+
+        > **Note:** When a Lakebase database resource is attached to the app, the
+        > runtime auto-injects `PGHOST`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`,
+        > and `PGPORT` environment variables. No explicit `env` section is needed
+        > in `app.yaml` — just attach the database resource in the app settings.
+
+        **requirements.txt:**
+        ```text
+        psycopg2-binary
+        ```
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "psycopg2"
+        - "PGHOST"
+        - "dash_bootstrap_components"
+      expected_patterns:
+        - pattern: "psycopg2"
+          min_count: 1
+          description: "Must use psycopg2 for Lakebase"
+        - pattern: "PGHOST"
+          min_count: 1
+          description: "Must use auto-injected env vars"
+        - pattern: "dash_bootstrap_components"
+          min_count: 1
+          description: "Must use DBC for Dash"
+      guidelines:
+        - "Must use psycopg2 for Lakebase connectivity"
+        - "Must reference auto-injected PGHOST, PGDATABASE, etc."
+        - "Must include psycopg2 in requirements.txt (not pre-installed)"
+        - "Dash app must use dash-bootstrap-components"
+    metadata:
+      category: "happy_path"
+      difficulty: "hard"
+      source: "manual"
+      tags: ["lakebase", "dash", "postgresql"]
+
+  - id: "app_deployment_config_001"
+    inputs:
+      prompt: "How do I configure and deploy a Streamlit app to Databricks?"
+    outputs:
+      response: |
+        To deploy a Streamlit app:
+
+        **1. Create `app.yaml`:**
+        ```yaml
+        command:
+          - "streamlit"
+          - "run"
+          - "app.py"
+          - "--server.port"
+          - "8080"
+          - "--server.address"
+          - "0.0.0.0"
+          - "--server.headless"
+          - "true"
+        env:
+          - name: DATABRICKS_WAREHOUSE_ID
+            valueFrom:
+              resource: sql-warehouse
+        ```
+
+        **2. Deploy with CLI:**
+        ```bash
+        databricks apps create my-streamlit-app
+        databricks workspace mkdirs /Workspace/Users/user@example.com/apps/my-streamlit-app
+        databricks workspace import-dir . /Workspace/Users/user@example.com/apps/my-streamlit-app
+        databricks apps deploy my-streamlit-app \
+          --source-code-path /Workspace/Users/user@example.com/apps/my-streamlit-app
+        ```
+
+        **3. Verify:**
+        ```bash
+        databricks apps get my-streamlit-app
+        databricks apps logs my-streamlit-app
+        ```
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "app.yaml"
+        - "databricks apps create"
+        - "databricks apps deploy"
+        - "--source-code-path"
+      expected_patterns:
+        - pattern: "app\\.yaml"
+          min_count: 1
+          description: "Must reference app.yaml"
+        - pattern: "databricks apps (create|deploy)"
+          min_count: 2
+          description: "Must show CLI create and deploy"
+      guidelines:
+        - "Must show app.yaml with correct Streamlit command"
+        - "Must show CLI create and deploy steps"
+        - "Must use valueFrom for resources, not hardcoded values"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["deployment", "streamlit", "cli"]

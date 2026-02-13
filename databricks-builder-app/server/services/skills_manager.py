@@ -51,6 +51,14 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
     'delete_volume_file', 'delete_volume_directory', 'create_volume_directory',
     'get_volume_file_info',
   ],
+  # APX (FastAPI+React) and Python (Dash/Streamlit/etc.) share the same
+  # app lifecycle tools — the skill content differs, not the MCP operations.
+  'databricks-app-apx': [
+    'create_app', 'get_app', 'list_apps', 'deploy_app', 'delete_app', 'get_app_logs',
+  ],
+  'databricks-app-python': [
+    'create_app', 'get_app', 'list_apps', 'deploy_app', 'delete_app', 'get_app_logs',
+  ],
 }
 
 

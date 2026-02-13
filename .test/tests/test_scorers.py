@@ -69,12 +69,86 @@ class TestDetectSkillsFromPrompt:
         skills = detect_skills_from_prompt(prompt)
         assert "agent-bricks" in skills
 
+    def test_detect_app_python_streamlit(self):
+        """Test detection of databricks-app-python via Streamlit."""
+        prompt = "Create a Streamlit app that shows sales data"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-python" in skills
+
+    def test_detect_app_python_dash(self):
+        """Test detection of databricks-app-python via Dash."""
+        prompt = "Build a Dash app with interactive charts"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-python" in skills
+
+    def test_detect_app_python_gradio(self):
+        """Test detection of databricks-app-python via Gradio."""
+        prompt = "Create a Gradio app for testing my ML model"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-python" in skills
+
+    def test_detect_app_python_fastapi(self):
+        """Test detection of databricks-app-python via FastAPI."""
+        prompt = "Build a FastAPI app that serves data from a warehouse"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-python" in skills
+
+    def test_detect_app_python_reflex(self):
+        """Test detection of databricks-app-python via Reflex."""
+        prompt = "Create a Reflex app for managing inventory"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-python" in skills
+
+    def test_detect_app_apx(self):
+        """Test detection of databricks-app-apx."""
+        prompt = "Create a full-stack app with APX"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-apx" in skills
+
+    def test_detect_fastapi_react_matches_both(self):
+        """Test that 'FastAPI React' matches both APX and Python app skills.
+
+        'fastapi react' triggers APX, while bare 'fastapi' also triggers
+        databricks-app-python. This is intentional — the router sees both
+        and picks the best fit.
+        """
+        prompt = "Create a FastAPI React app for my dashboard"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-apx" in skills
+        assert "databricks-app-python" in skills
+
+    def test_detect_lakebase(self):
+        """Test detection of lakebase-provisioned skill."""
+        prompt = "Create an app that stores data in Lakebase"
+        skills = detect_skills_from_prompt(prompt)
+        assert "lakebase-provisioned" in skills
+
+    def test_detect_model_serving(self):
+        """Test detection of model-serving skill."""
+        prompt = "Query a model serving endpoint"
+        skills = detect_skills_from_prompt(prompt)
+        assert "model-serving" in skills
+
     def test_detect_multi_skill(self):
         """Test detection of multiple skills."""
         prompt = "Create streaming tables and deploy with DABs"
         skills = detect_skills_from_prompt(prompt)
         assert "spark-declarative-pipelines" in skills
         assert "asset-bundles" in skills
+
+    def test_detect_multi_app_lakebase(self):
+        """Test detection of app + lakebase."""
+        prompt = "Create a Streamlit app that stores data in Lakebase"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-python" in skills
+        assert "lakebase-provisioned" in skills
+
+    def test_detect_multi_app_serving(self):
+        """Test detection of app + model serving."""
+        prompt = "Build a Gradio app that queries a model serving endpoint"
+        skills = detect_skills_from_prompt(prompt)
+        assert "databricks-app-python" in skills
+        assert "model-serving" in skills
 
     def test_detect_no_match(self):
         """Test no skills detected for unrelated prompt."""
@@ -103,7 +177,9 @@ class TestSkillTriggers:
             "databricks-jobs",
             "synthetic-data-generation",
             "mlflow-evaluation",
-            "agent-bricks"
+            "agent-bricks",
+            "lakebase-provisioned",
+            "model-serving",
         ]
         for skill in expected_skills:
             assert skill in SKILL_TRIGGERS
