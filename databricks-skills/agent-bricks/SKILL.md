@@ -36,6 +36,14 @@ Before creating Agent Bricks, ensure you have the required data:
 - **Genie Spaces**: Existing Genie spaces can be used directly as agents for SQL-based queries
 - Mix and match endpoint-based and Genie-based agents in the same Supervisor Agent
 
+### For Unity Catalog Functions
+- **Existing UC Function**: Function already registered in Unity Catalog
+- Agent service principal has `EXECUTE` privilege on the function
+
+### For External MCP Servers
+- **Existing UC HTTP Connection**: Connection configured with `is_mcp_connection: 'true'`
+- Agent service principal has `USE CONNECTION` privilege on the connection
+
 ## MCP Tools
 
 ### Knowledge Assistant Tools
@@ -85,8 +93,9 @@ See `databricks-genie` skill for:
   - `description`: What this agent handles - critical for routing (required)
   - `ka_tile_id`: Knowledge Assistant tile ID (use for document Q&A agents - recommended for KAs)
   - `genie_space_id`: Genie space ID (use for SQL-based data agents)
-  - `endpoint_name`: Model serving endpoint name (use for custom agents)
-  - Note: Provide exactly one of: `ka_tile_id`, `genie_space_id`, or `endpoint_name`
+  - `endpoint_name`: Model serving endpoint name (for custom agents) OR `uc-connection:CONNECTION_NAME` (for external MCP servers)
+  - `uc_function_name`: Unity Catalog function name in format `catalog.schema.function_name`
+  - Note: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, or `uc_function_name`
 - `description`: (optional) What the Supervisor Agent does
 - `instructions`: (optional) Routing instructions for the supervisor
 - `tile_id`: (optional) Existing tile_id to update
@@ -144,8 +153,56 @@ For KA, if `add_examples_from_volume=true`, examples are automatically extracted
 4. **Include sample questions**: Shows users how to interact with the brick
 5. **Use the workflow**: Generate data first, then create the brick
 
+## Example: Multi-Modal Supervisor Agent
+
+```python
+create_or_update_mas(
+    name="Enterprise Support Supervisor",
+    agents=[
+        {
+            "name": "knowledge_base",
+            "ka_tile_id": "f32c5f73-466b-...",
+            "description": "Answers questions about company policies, procedures, and documentation from indexed files"
+        },
+        {
+            "name": "analytics_engine",
+            "genie_space_id": "01abc123...",
+            "description": "Runs SQL analytics on usage metrics, performance stats, and operational data"
+        },
+        {
+            "name": "ml_classifier",
+            "endpoint_name": "custom-classification-endpoint",
+            "description": "Classifies support tickets and predicts resolution time using custom ML model"
+        },
+        {
+            "name": "data_enrichment",
+            "uc_function_name": "support.utils.enrich_ticket_data",
+            "description": "Enriches support ticket data with customer history and context"
+        },
+        {
+            "name": "ticket_operations",
+            "endpoint_name": "uc-connection:ticket_system_mcp",
+            "description": "Creates, updates, assigns, and closes support tickets in external ticketing system"
+        }
+    ],
+    description="Comprehensive enterprise support agent with knowledge retrieval, analytics, ML, data enrichment, and ticketing operations",
+    instructions="""
+    Route queries as follows:
+    1. Policy/procedure questions → knowledge_base
+    2. Data analysis requests → analytics_engine
+    3. Ticket classification → ml_classifier
+    4. Customer context lookups → data_enrichment
+    5. Ticket creation/updates → ticket_operations
+
+    If a query spans multiple domains, chain agents:
+    - First gather information (analytics_engine or knowledge_base)
+    - Then take action (ticket_operations)
+    """
+)
+```
+
 ## See Also
 
 - `1-knowledge-assistants.md` - Detailed KA patterns and examples
 - `databricks-genie` skill - Detailed Genie patterns, curation, and examples
-- `3-multi-agent-supervisors.md` - Detailed MAS patterns and examples
+- `2-supervisor-agents.md` - Detailed MAS patterns and examples

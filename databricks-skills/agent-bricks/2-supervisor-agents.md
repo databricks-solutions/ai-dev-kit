@@ -4,8 +4,15 @@ Supervisor Agents orchestrate multiple specialized agents, routing user queries 
 
 ## What is a Supervisor Agent?
 
-A Supervisor Agent (formerly Multi-Agent Supervisor, MAS) acts as a traffic controller for multiple AI agents. When a user asks a question:
+A Supervisor Agent (formerly Multi-Agent Supervisor, MAS) acts as a traffic controller for multiple AI agents, routing user queries to the most appropriate agent. It supports five types of agents:
 
+1. **Knowledge Assistants (KA)**: Document-based Q&A from PDFs/files in Volumes
+2. **Genie Spaces**: Natural language to SQL for data exploration
+3. **Model Serving Endpoints**: Custom LLM agents, fine-tuned models, RAG applications
+4. **Unity Catalog Functions**: Callable UC functions for data operations
+5. **External MCP Servers**: JSON-RPC endpoints via UC HTTP Connections for external system integration
+
+When a user asks a question:
 1. **Analyzes** the query to understand the intent
 2. **Routes** to the most appropriate specialized agent
 3. **Returns** the agent's response to the user
@@ -35,6 +42,153 @@ Before creating a Supervisor Agent, you need agents of one or both types:
 - No separate endpoint deployment required - reference the space directly
 - To find a Genie space by name, use `find_genie_by_name(display_name="My Genie")`
 - **Note**: There is NO system table for Genie spaces - do not try to query `system.ai.genie_spaces`
+
+## Unity Catalog Functions
+
+Unity Catalog Functions allow Supervisor Agents to call registered UC functions for data operations.
+
+### Prerequisites
+
+- UC Function already exists (use SQL `CREATE FUNCTION` or Python UDF)
+- Agent service principal has `EXECUTE` privilege:
+  ```sql
+  GRANT EXECUTE ON FUNCTION catalog.schema.function_name TO `<agent_sp>`;
+  ```
+
+### Configuration
+
+```json
+{
+  "name": "data_enrichment",
+  "uc_function_name": "sales_analytics.utils.enrich_customer_data",
+  "description": "Enriches customer records with demographic and purchase history data"
+}
+```
+
+**Field**: `uc_function_name` - Fully-qualified function name in format `catalog.schema.function_name`
+
+## External MCP Servers
+
+External MCP Servers enable Supervisor Agents to interact with external systems (ERP, CRM, etc.) via UC HTTP Connections. The MCP server implements a JSON-RPC 2.0 endpoint that exposes tools for the Supervisor Agent to call.
+
+### Prerequisites
+
+**1. MCP Server Endpoint**: Your external system must provide a JSON-RPC 2.0 endpoint (e.g., `/api/mcp`) that implements the MCP protocol:
+
+```python
+# Example MCP server tool definition
+TOOLS = [
+    {
+        "name": "approve_invoice",
+        "description": "Approve a specific invoice",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "invoice_number": {"type": "string", "description": "Invoice number to approve"},
+                "approver": {"type": "string", "description": "Name/email of approver"},
+            },
+            "required": ["invoice_number"],
+        },
+    },
+]
+
+# JSON-RPC methods: initialize, tools/list, tools/call
+```
+
+**2. UC HTTP Connection**: Create a Unity Catalog HTTP Connection that points to your MCP endpoint:
+
+```sql
+CREATE CONNECTION my_mcp_connection TYPE HTTP
+OPTIONS (
+  host 'https://my-app.databricksapps.com',  -- Your MCP server URL
+  port '443',
+  base_path '/api/mcp',                       -- Path to JSON-RPC endpoint
+  client_id '<service_principal_id>',         -- OAuth M2M credentials
+  client_secret '<service_principal_secret>',
+  oauth_scope 'all-apis',
+  token_endpoint 'https://<workspace>.azuredatabricks.net/oidc/v1/token',
+  is_mcp_connection 'true'                    -- REQUIRED: Identifies as MCP connection
+);
+```
+
+**3. Grant Permissions**: Agent service principal needs access to the connection:
+
+```sql
+GRANT USE CONNECTION ON my_mcp_connection TO `<agent_sp>`;
+```
+
+### Configuration
+
+Reference the UC Connection using the `uc-connection:` prefix:
+
+```python
+{
+    "name": "external_operations",
+    "endpoint_name": "uc-connection:my_mcp_connection",
+    "description": "Execute external system operations: approve invoices, create records, trigger workflows"
+}
+```
+
+**Field**: `endpoint_name` with `uc-connection:` prefix to reference an existing UC HTTP Connection
+
+**Important**: Make the description comprehensive - it guides the Supervisor Agent's routing decisions for when to call this agent.
+
+### Complete Example: Multi-System Supervisor
+
+Example showing integration of Genie, KA, and external MCP:
+
+```python
+create_or_update_mas(
+    name="AP_Invoice_Supervisor",
+    agents=[
+        {
+            "name": "billing_analyst",
+            "genie_space_id": "01abc123...",
+            "description": "SQL analytics on AP invoice data: spending trends, vendor analysis, aging reports"
+        },
+        {
+            "name": "policy_expert",
+            "ka_tile_id": "f32c5f73...",
+            "description": "Answers questions about AP policies, approval workflows, and compliance requirements from policy documents"
+        },
+        {
+            "name": "ap_operations",
+            "endpoint_name": "uc-connection:ap_invoice_mcp",
+            "description": (
+                "Execute AP operations: approve/reject/flag invoices, search invoice details, "
+                "get vendor summaries, trigger batch workflows. Use for ANY action or write operation."
+            )
+        }
+    ],
+    description="AP automation assistant with analytics, policy guidance, and operational actions",
+    instructions="""
+    Route queries as follows:
+    - Data questions (invoice counts, spend analysis, vendor metrics) → billing_analyst
+    - Policy questions (thresholds, SLAs, compliance rules) → policy_expert
+    - Actions (approve, reject, flag, search, workflows) → ap_operations
+
+    When a user asks to approve, reject, or flag an invoice, ALWAYS use ap_operations.
+    """
+)
+```
+
+### MCP Connection Testing
+
+Verify your connection before adding to MAS:
+
+```sql
+-- Test tools/list method
+SELECT http_request(
+  conn => 'my_mcp_connection',
+  method => 'POST',
+  path => '',
+  json => '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+);
+```
+
+### Resources
+
+- **MCP Protocol Spec**: [Model Context Protocol](https://modelcontextprotocol.io)
 
 ## Creating a Supervisor Agent
 
@@ -76,9 +230,10 @@ Each agent in the `agents` list needs:
 | `description` | Yes | What this agent handles (critical for routing) |
 | `ka_tile_id` | One of these | Knowledge Assistant tile ID (for document Q&A agents) |
 | `genie_space_id` | One of these | Genie space ID (for SQL-based data agents) |
-| `endpoint_name` | One of these | Model serving endpoint name (for custom agents) |
+| `endpoint_name` | One of these | Model serving endpoint name (for custom agents) OR `uc-connection:CONNECTION_NAME` (for external MCP servers) |
+| `uc_function_name` | One of these | Unity Catalog function name in format `catalog.schema.function_name` |
 
-**Note**: Provide exactly one of: `ka_tile_id`, `genie_space_id`, or `endpoint_name`.
+**Note**: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, or `uc_function_name`.
 
 To find a KA tile_id, use `find_ka_by_name(name="Your KA Name")`.
 To find a Genie space_id, use `find_genie_by_name(display_name="Your Genie Name")`.

@@ -12,14 +12,14 @@ This skill covers building conversational AI applications on Databricks using th
 agent-bricks/
 ├── SKILL.md                        # Main skill reference: tools, workflows, and best practices
 ├── 1-knowledge-assistants.md       # Deep dive into KA creation, provisioning, and examples
-└── 3-multi-agent-supervisors.md    # Deep dive into MAS routing, agent config, and hierarchical patterns
+└── 2-supervisor-agents.md          # Deep dive into MAS routing, agent config, and hierarchical patterns
 ```
 
 ## Key Topics
 
 - Knowledge Assistants (KA) for RAG-based document Q&A over Unity Catalog Volumes
 - Genie Spaces for natural language to SQL exploration (delegated to the `databricks-genie` skill)
-- Supervisor Agents (MAS) for routing queries across multiple specialized agents
+- Supervisor Agents (MAS) for routing queries across multiple specialized agents (KA, Genie, model endpoints, UC Functions, external MCP servers)
 - MCP tools for creating, updating, finding, and deleting each brick type
 - Provisioning lifecycle and endpoint status monitoring
 - Automatic example ingestion from companion JSON files
