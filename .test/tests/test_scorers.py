@@ -58,16 +58,16 @@ class TestDetectSkillsFromPrompt:
         assert "synthetic-data-generation" in skills
 
     def test_detect_agent_bricks(self):
-        """Test detection of agent-bricks skill."""
+        """Test detection of databricks-agent-bricks skill."""
         prompt = "Create a knowledge assistant for my documents"
         skills = detect_skills_from_prompt(prompt)
-        assert "agent-bricks" in skills
+        assert "databricks-agent-bricks" in skills
 
     def test_detect_genie(self):
         """Test detection via Genie keyword."""
         prompt = "Build a Genie space for data exploration"
         skills = detect_skills_from_prompt(prompt)
-        assert "agent-bricks" in skills
+        assert "databricks-agent-bricks" in skills
 
     def test_detect_app_python_streamlit(self):
         """Test detection of databricks-app-python via Streamlit."""
@@ -177,7 +177,7 @@ class TestSkillTriggers:
             "databricks-jobs",
             "synthetic-data-generation",
             "mlflow-evaluation",
-            "agent-bricks",
+            "databricks-agent-bricks",
             "lakebase-provisioned",
             "model-serving",
         ]

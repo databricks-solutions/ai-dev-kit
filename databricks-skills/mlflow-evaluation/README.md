@@ -51,7 +51,7 @@ mlflow-evaluation/
 
 - [Databricks Docs](../databricks-docs/) -- General Databricks documentation reference
 - [Model Serving](../model-serving/) -- Deploying models and agents to serving endpoints
-- [Agent Bricks](../agent-bricks/) -- Building agents that can be evaluated with this skill
+- [Agent Bricks](../databricks-agent-bricks/) -- Building agents that can be evaluated with this skill
 - [Databricks Python SDK](../databricks-python-sdk/) -- SDK patterns used alongside MLflow APIs
 - [Databricks Unity Catalog](../databricks-unity-catalog/) -- Unity Catalog tables for managed evaluation datasets
 

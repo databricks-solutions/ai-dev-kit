@@ -66,7 +66,7 @@ SKILL_TRIGGERS = {
         "genai.evaluate",
         "llm judge",
     ],
-    "agent-bricks": [
+    "databricks-agent-bricks": [
         "agent brick",
         "knowledge assistant",
         "genie",

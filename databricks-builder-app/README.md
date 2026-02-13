@@ -585,7 +585,7 @@ env:
 
   # Skills to enable (comma-separated)
   - name: ENABLED_SKILLS
-    value: "agent-bricks,databricks-python-sdk,spark-declarative-pipelines"
+    value: "databricks-agent-bricks,databricks-python-sdk,spark-declarative-pipelines"
 
   # MLflow tracing (optional)
   - name: MLFLOW_TRACKING_URI

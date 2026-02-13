@@ -39,7 +39,7 @@ vector-search/
 ## Related Skills
 
 - [Model Serving](../model-serving/) -- Deploy agents that use VectorSearchRetrieverTool
-- [Agent Bricks](../agent-bricks/) -- Knowledge Assistants use RAG over indexed documents
+- [Agent Bricks](../databricks-agent-bricks/) -- Knowledge Assistants use RAG over indexed documents
 - [Unstructured PDF Generation](../unstructured-pdf-generation/) -- Generate documents to index in Vector Search
 - [Databricks Unity Catalog](../databricks-unity-catalog/) -- Manage the catalogs and tables that back Delta Sync indexes
 - [Spark Declarative Pipelines](../spark-declarative-pipelines/) -- Build Delta tables used as Vector Search sources

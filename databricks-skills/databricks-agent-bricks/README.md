@@ -9,7 +9,7 @@ This skill covers building conversational AI applications on Databricks using th
 ## What's Included
 
 ```
-agent-bricks/
+databricks-agent-bricks/
 ├── SKILL.md                        # Main skill reference: tools, workflows, and best practices
 ├── 1-knowledge-assistants.md       # Deep dive into KA creation, provisioning, and examples
 └── 2-supervisor-agents.md          # Deep dive into MAS routing, agent config, and hierarchical patterns

@@ -47,7 +47,7 @@ model-serving/
 
 ## Related Skills
 
-- [Agent Bricks](../agent-bricks/) -- Pre-built agent tiles that deploy to model-serving endpoints
+- [Agent Bricks](../databricks-agent-bricks/) -- Pre-built agent tiles that deploy to model-serving endpoints
 - [Vector Search](../vector-search/) -- Create vector indexes used as retriever tools in agents
 - [Databricks Genie](../databricks-genie/) -- Genie Spaces can serve as agents in multi-agent setups
 - [MLflow Evaluation](../mlflow-evaluation/) -- Evaluate model and agent quality before deployment

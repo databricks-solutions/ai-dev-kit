@@ -1,5 +1,5 @@
 ---
-name: agent-bricks
+name: databricks-agent-bricks
 description: "Create and manage Databricks Agent Bricks: Knowledge Assistants (KA) for document Q&A, Genie Spaces for SQL exploration, and Supervisor Agents (MAS) for multi-agent orchestration. Use when building conversational AI applications on Databricks."
 ---
 
