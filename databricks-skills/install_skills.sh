@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="agent-bricks databricks-aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search zerobus-ingest"
+DATABRICKS_SKILLS="asset-bundles databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search zerobus-ingest"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -54,7 +54,7 @@ ALL_SKILLS="$DATABRICKS_SKILLS $MLFLOW_SKILLS"
 get_skill_description() {
     case "$1" in
         # Databricks skills
-        "agent-bricks") echo "Knowledge Assistants, Genie Spaces, Supervisor Agents" ;;
+        "databricks-agent-bricks") echo "Knowledge Assistants, Genie Spaces, Supervisor Agents" ;;
         "databricks-aibi-dashboards") echo "Databricks AI/BI Dashboards - create and manage dashboards" ;;
         "asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
@@ -92,7 +92,7 @@ get_skill_description() {
 # Get extra files for a Databricks skill (besides SKILL.md)
 get_skill_extra_files() {
     case "$1" in
-        "agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
+        "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
         "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
         "databricks-genie") echo "spaces.md conversation.md" ;;
         "asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;

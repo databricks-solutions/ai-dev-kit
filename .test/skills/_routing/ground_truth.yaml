@@ -113,12 +113,12 @@ test_cases:
     expectations:
       expected_skills:
         - "spark-declarative-pipelines"
-        - "agent-bricks"
+        - "databricks-agent-bricks"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
       difficulty: "hard"
-      reasoning: "Combines 'medallion' (SDP) with 'Genie space' (agent-bricks)"
+      reasoning: "Combines 'medallion' (SDP) with 'Genie space' (databricks-agent-bricks)"
 
   # Single-skill routing - Databricks App APX
   - id: "routing_apx_001"
