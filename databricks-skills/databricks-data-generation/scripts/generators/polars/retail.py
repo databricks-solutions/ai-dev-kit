@@ -41,6 +41,7 @@ def generate_customers(rows: int = 10_000, seed: int = 42) -> pl.DataFrame:
         None if random.random() < 0.01 else g.person.telephone()
         for _ in range(rows)
     ]
+    addresses = [g.address.address() for _ in range(rows)]
     cities = [g.address.city() for _ in range(rows)]
     states = random.choices(STATES, k=rows)
     zip_codes = [f"{random.randint(10000, 99999)}" for _ in range(rows)]
@@ -55,6 +56,7 @@ def generate_customers(rows: int = 10_000, seed: int = 42) -> pl.DataFrame:
         "last_name": last_names,
         "email": emails,
         "phone": phones,
+        "address_line1": addresses,
         "city": cities,
         "state": states,
         "zip_code": zip_codes,

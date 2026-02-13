@@ -5,7 +5,7 @@ argument-hint: "[industry] [--rows N] [--catalog NAME] [--schema NAME]"
 audience: external
 ---
 
-> **This skill is self-contained.** All tier definitions, code patterns, and reference files are documented below. Do not search the filesystem or spawn agents to find additional saunter files. Catalog and schema are **always user-supplied** — never default to any value. If the user hasn't provided them, ask. For any UC write, **always create the schema if it doesn't exist** before writing data.
+> **This skill is self-contained.** All tier definitions, code patterns, and reference files are documented below. Do not search the filesystem or spawn agents to find additional files. Catalog and schema are **always user-supplied** — never default to any value. If the user hasn't provided them, ask. For any UC write, **always create the schema if it doesn't exist** before writing data.
 
 # Synthetic Data Generator
 
@@ -37,11 +37,11 @@ Generate realistic synthetic data for demos, proof-of-concepts, and testing.
 
 When invoked with arguments (`/databricks-data-gen $ARGUMENTS`):
 
-| Argument         | Position | Example                                                     | Default                 |
-| ---------------- | -------- | ----------------------------------------------------------- | ----------------------- |
-| Industry         | `$0`     | `retail`, `healthcare`, `financial`, `iot`, `manufacturing` | _(prompt user)_         |
-| `--rows N`       | flag     | `--rows 100000`                                             | `10000`                 |
-| `--tier N`       | flag     | `--tier 2`                                                  | Auto from row count     |
+| Argument         | Position | Example                                                     | Default                      |
+| ---------------- | -------- | ----------------------------------------------------------- | ---------------------------- |
+| Industry         | `$0`     | `retail`, `healthcare`, `financial`, `iot`, `manufacturing` | _(prompt user)_              |
+| `--rows N`       | flag     | `--rows 100000`                                             | `10000`                      |
+| `--tier N`       | flag     | `--tier 2`                                                  | Auto from row count          |
 | `--catalog NAME` | flag     | `--catalog main`                                            | _(ask user if not provided)_ |
 | `--schema NAME`  | flag     | `--schema retail`                                           | _(ask user if not provided)_ |
 
@@ -105,7 +105,7 @@ After determining tier, industry, row count, and output destination from the use
 
 ## Running Generated Scripts
 
-This skill has **no `pyproject.toml`** — scripts are standalone reference implementations.
+Scripts are standalone reference implementations — do not install them as a package.
 Always use `uv run --with` to supply dependencies at execution time:
 
 ```bash
@@ -371,14 +371,14 @@ See [schema-introspection-patterns.md](references/schema-introspection-patterns.
 
 ## Output Destinations
 
-| Tier | Pattern | Code |
-|---|---|---|
-| **1** local | Polars → parquet | `df.write_parquet("output/{industry}/{table}.parquet")` |
-| **1 + UC** | Polars → Connect bridge | `spark.createDataFrame(df.to_pandas()).write...saveAsTable()` |
-| **2** primary | dbldatagen → UC | `spec.build().write...saveAsTable()` |
-| **2** alt | Polars → Connect | Same as Tier 1 + UC |
-| **3** notebook | dbldatagen → UC | `df.write.format("delta")...saveAsTable()` |
-| **3** streaming | writeStream | `df.writeStream.format("delta")...toTable()` |
+| Tier            | Pattern                 | Code                                                          |
+| --------------- | ----------------------- | ------------------------------------------------------------- |
+| **1** local     | Polars → parquet        | `df.write_parquet("output/{industry}/{table}.parquet")`       |
+| **1 + UC**      | Polars → Connect bridge | `spark.createDataFrame(df.to_pandas()).write...saveAsTable()` |
+| **2** primary   | dbldatagen → UC         | `spec.build().write...saveAsTable()`                          |
+| **2** alt       | Polars → Connect        | Same as Tier 1 + UC                                           |
+| **3** notebook  | dbldatagen → UC         | `df.write.format("delta")...saveAsTable()`                    |
+| **3** streaming | writeStream             | `df.writeStream.format("delta")...toTable()`                  |
 
 All UC writes use `.mode("overwrite").option("overwriteSchema", "true")`. See Quick Start sections for full examples.
 
@@ -435,49 +435,15 @@ customers = spark.table("demo.retail.customers")
 
 ## Industry Quick Reference
 
-### Retail Tables
+Five industries supported: **retail**, **healthcare**, **financial**, **iot**, **manufacturing**.
 
-| Table          | Key Columns                                        | Typical Size |
-| -------------- | -------------------------------------------------- | ------------ |
-| `customers`    | customer_id, name, email, loyalty_tier, region     | 100K-1M      |
-| `transactions` | txn_id, customer_id, product_id, amount, timestamp | 1M-100M      |
-| `products`     | product_id, name, category, price, sku             | 10K-100K     |
-| `inventory`    | product_id, store_id, quantity, last_updated       | 100K-1M      |
+See the per-industry pattern files for table schemas, key columns, typical sizes, and FK relationships:
 
-### Healthcare Tables
-
-| Table        | Key Columns                                 | Notes                |
-| ------------ | ------------------------------------------- | -------------------- |
-| `patients`   | patient_id, name, dob, mrn                  | HIPAA-safe synthetic |
-| `encounters` | encounter_id, patient_id, provider_id, date | Clinical visits      |
-| `claims`     | claim_id, encounter_id, icd10_code, amount  | Insurance claims     |
-
-### Financial Tables
-
-| Table          | Key Columns                                   | Use Case          |
-| -------------- | --------------------------------------------- | ----------------- |
-| `accounts`     | account_id, customer_id, type, balance        | Customer accounts |
-| `trades`       | trade_id, account_id, symbol, quantity, price | Trading activity  |
-| `transactions` | txn_id, account_id, type, amount, timestamp   | Money movement    |
-
-### IoT Tables
-
-| Table             | Key Columns                                    | Pattern              |
-| ----------------- | ---------------------------------------------- | -------------------- |
-| `devices`         | device_id, device_type, location, install_date | Device registry      |
-| `sensor_readings` | device_id, timestamp, metric, value            | Time-series data     |
-| `events`          | event_id, device_id, event_type, severity      | Alerts/notifications |
-| `telemetry`       | device_id, timestamp, lat, lon, speed          | GPS/telematics       |
-
-### Manufacturing Tables
-
-| Table                 | Key Columns                                          | Pattern                           |
-| --------------------- | ---------------------------------------------------- | --------------------------------- |
-| `equipment`           | equipment_id, type, manufacturer, zone, install_date | Asset registry                    |
-| `sensor_data`         | equipment_id, timestamp, sensors A-F, is_anomaly     | Multi-sensor with fault injection |
-| `maintenance_records` | work_order_id, equipment_id, type, priority, cost    | Predictive maintenance            |
-
-See `references/industry-patterns/` for complete schemas per industry.
+- [retail.md](references/industry-patterns/retail.md) — customers, products, transactions, line_items, inventory
+- [healthcare.md](references/industry-patterns/healthcare.md) — patients, encounters, claims
+- [financial.md](references/industry-patterns/financial.md) — accounts, trades, transactions
+- [iot.md](references/industry-patterns/iot.md) — devices, sensor_readings, events, telemetry
+- [manufacturing.md](references/industry-patterns/manufacturing.md) — equipment, sensor_data, maintenance_records
 
 ## Multi-Table Generation (Spark)
 

@@ -7,8 +7,7 @@
   "medallion_layer": "silver",
   "typical_rows": {"min": 10000, "default": 100000, "max": 1000000},
   "relationships": [
-    {"parent_of": "retail_transaction", "fk_column": "customer_id", "fk_range": [1000000, 1099999]},
-    {"parent_of": "retail_line_item", "fk_column": "customer_id", "fk_range": [1000000, 1099999]}
+    {"parent_of": "retail_transaction", "fk_column": "customer_id", "fk_range": [1000000, 1099999]}
   ],
   "cdc": {"operations": {"APPEND": 50, "UPDATE": 30, "DELETE": 10}, "sequence_column": "operation_date"},
   "data_quality": {"duplicate_rate": 0.04, "column_nulls": {"email": 0.02, "phone": 0.01}},

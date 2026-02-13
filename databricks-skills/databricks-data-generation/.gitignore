@@ -4,4 +4,4 @@ output/
 .venv/
 *.egg-info/
 .pytest_cache/
-test_*.py
+/test_*.py

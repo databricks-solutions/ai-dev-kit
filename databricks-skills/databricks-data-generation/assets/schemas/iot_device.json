@@ -7,7 +7,7 @@
   "medallion_layer": "silver",
   "typical_rows": {"min": 100, "default": 10000, "max": 100000},
   "relationships": [
-    {"parent_of": "iot_sensor_reading", "fk_column": "device_id", "fk_range": [1000, 10999]},
+    {"parent_of": "iot_sensor", "fk_column": "device_id", "fk_range": [1000, 10999]},
     {"parent_of": "iot_event", "fk_column": "device_id", "fk_range": [1000, 10999]},
     {"parent_of": "iot_telemetry", "fk_column": "device_id", "fk_range": [1000, 1999]}
   ],

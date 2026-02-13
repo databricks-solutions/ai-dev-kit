@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "name": "iot_sensor_reading",
+  "name": "iot_sensor",
   "version": "2.0.0",
   "description": "IoT sensor reading time-series data",
   "industry": "iot",
