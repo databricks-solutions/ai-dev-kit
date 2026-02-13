@@ -73,7 +73,7 @@ test_cases:
     inputs:
       prompt: "How do I evaluate my agent using mlflow genai.evaluate?"
     expectations:
-      expected_skills: ["mlflow-evaluation"]
+      expected_skills: ["mlflow"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -100,7 +100,7 @@ test_cases:
     expectations:
       expected_skills:
         - "synthetic-data-generation"
-        - "mlflow-evaluation"
+        - "mlflow"
       is_multi_skill: true
     metadata:
       category: "multi_skill"

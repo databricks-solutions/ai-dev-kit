@@ -59,7 +59,7 @@ SKILL_TRIGGERS = {
         "mock data",
         "faker",
     ],
-    "mlflow-evaluation": [
+    "mlflow": [
         "mlflow eval",
         "evaluate agent",
         "scorer",

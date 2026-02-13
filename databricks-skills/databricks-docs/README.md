@@ -34,7 +34,7 @@ databricks-docs/
 - [Spark Declarative Pipelines](../spark-declarative-pipelines/) -- DLT / Lakeflow pipeline workflows
 - [Databricks Unity Catalog](../databricks-unity-catalog/) -- Governance and catalog management
 - [Model Serving](../model-serving/) -- Serving endpoints and model deployment
-- [MLflow Evaluation](../mlflow-evaluation/) -- MLflow 3 GenAI evaluation workflows
+- [MLflow](../mlflow/) -- MLflow 3 GenAI tracing, evaluation, and LLMOps workflows
 
 ## Resources
 

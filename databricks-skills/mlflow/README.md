@@ -1,6 +1,6 @@
-# MLflow Evaluation
+# MLflow LLMOps
 
-MLflow 3 GenAI evaluation for agent development. Use when writing evaluation code, creating scorers, building datasets from traces, using built-in scorers, analyzing traces, optimizing agent context, or debugging evaluation failures.
+MLflow 3 GenAI skill for agent development. Covers tracing, evaluation, scorer creation, dataset building, trace analysis, context optimization, and debugging — the full LLMOps workflow from observability through quality assessment.
 
 ## Overview
 
@@ -9,7 +9,7 @@ This skill covers the full MLflow 3 GenAI evaluation workflow, from trace analys
 ## What's Included
 
 ```
-mlflow-evaluation/
+mlflow/
   SKILL.md
   README.md
   references/

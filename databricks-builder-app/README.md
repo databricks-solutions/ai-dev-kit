@@ -177,7 +177,7 @@ Skills include:
 - **databricks-app-apx**: Full-stack apps with APX framework (FastAPI + React)
 - **databricks-app-python**: Python apps with Dash, Streamlit, Flask
 - **databricks-python-sdk**: Python SDK patterns
-- **mlflow-evaluation**: MLflow evaluation and trace analysis
+- **mlflow**: MLflow evaluation and trace analysis
 - **spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) development
 - **synthetic-data-generation**: Creating test datasets
 

@@ -19,7 +19,7 @@ Load skills for detailed guidance:
 - `skill: "databricks-jobs"` - Lakeflow Jobs and workflows
 - `skill: "databricks-python-sdk"` - Python SDK patterns
 - `skill: "databricks-unity-catalog"` - System tables for lineage, audit, billing
-- `skill: "mlflow-evaluation"` - MLflow evaluation and trace analysis
+- `skill: "mlflow"` - MLflow evaluation and trace analysis
 - `skill: "model-serving"` - Model Serving deployment and endpoint management
 - `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
 - `skill: "synthetic-data-generation"` - Test data generation

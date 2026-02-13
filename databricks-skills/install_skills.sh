@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search"
+DATABRICKS_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -103,7 +103,7 @@ get_skill_extra_files() {
         "lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
         "metric-views") echo "yaml-reference.md patterns.md" ;;
-        "mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
+        "mlflow") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
         "model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
         "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;
         "spark-structured-streaming") echo "checkpoint-best-practices.md kafka-streaming.md merge-operations.md multi-sink-writes.md stateful-operations.md stream-static-joins.md stream-stream-joins.md streaming-best-practices.md trigger-and-cost-optimization.md" ;;

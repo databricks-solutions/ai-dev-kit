@@ -45,11 +45,11 @@ class TestDetectSkillsFromPrompt:
         skills = detect_skills_from_prompt(prompt)
         assert "asset-bundles" in skills
 
-    def test_detect_mlflow_evaluation(self):
-        """Test detection of mlflow-evaluation skill."""
+    def test_detect_mlflow_llmops(self):
+        """Test detection of mlflow skill."""
         prompt = "Evaluate my agent using genai.evaluate"
         skills = detect_skills_from_prompt(prompt)
-        assert "mlflow-evaluation" in skills
+        assert "mlflow" in skills
 
     def test_detect_synthetic_data(self):
         """Test detection of synthetic-data-generation skill."""
@@ -176,7 +176,7 @@ class TestSkillTriggers:
             "databricks-python-sdk",
             "databricks-jobs",
             "synthetic-data-generation",
-            "mlflow-evaluation",
+            "mlflow",
             "agent-bricks",
             "lakebase-provisioned",
             "model-serving",

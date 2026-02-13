@@ -65,7 +65,7 @@ Load skills for detailed guidance:
 - `skill: "databricks-app-apx"` - Full-stack apps with APX framework
 - `skill: "databricks-app-python"` - Python apps with Dash, Streamlit, Flask
 - `skill: "databricks-python-sdk"` - Python SDK patterns
-- `skill: "mlflow-evaluation"` - MLflow evaluation and trace analysis
+- `skill: "mlflow"` - MLflow evaluation and trace analysis
 - `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
 - `skill: "synthetic-data-generation"` - Test data generation
 

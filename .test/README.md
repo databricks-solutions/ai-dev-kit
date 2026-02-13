@@ -17,7 +17,7 @@ Requires a Databricks workspace with serverless SQL/compute enabled.
 
 ## New Skill Journey
 
-Complete workflow for testing a skill from scratch (e.g., `mlflow-evaluation`).
+Complete workflow for testing a skill from scratch (e.g., `mlflow`).
 
 ### 1. Initialize Test Scaffolding
 
