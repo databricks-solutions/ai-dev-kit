@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "manufacturing_sensor_data",
+  "version": "1.0.0",
+  "description": "Multi-sensor time-series from manufacturing equipment with fault injection",
+  "industry": "manufacturing",
+  "medallion_layer": "bronze",
+  "typical_rows": {"min": 100000, "default": 10000000, "max": 1000000000},
+  "relationships": [
+    {"child_of": "manufacturing_equipment", "fk_column": "equipment_id", "fk_range": [1000, 1999]}
+  ],
+  "cdc": {"operations": {"APPEND": 100}, "sequence_column": "timestamp"},
+  "data_quality": {"anomaly_rate": 0.10, "column_nulls": {"energy": 0.005}},
+  "columns": [
+    {
+      "name": "reading_id",
+      "type": "long",
+      "description": "Unique sensor reading identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "equipment_id",
+      "type": "long",
+      "description": "Foreign key to equipment table",
+      "generation": {
+        "minValue": 1000,
+        "maxValue": 1999
+      }
+    },
+    {
+      "name": "timestamp",
+      "type": "timestamp",
+      "description": "Sensor reading timestamp",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "interval": "10 seconds"
+      }
+    },
+    {
+      "name": "sensor_A",
+      "type": "double",
+      "description": "Sensor channel A: pure noise, low sigma (sigma=1)",
+      "generation": {
+        "expr": "(rand() * 2 - 1) * 1 * outlier_multiplier"
+      }
+    },
+    {
+      "name": "sensor_B",
+      "type": "double",
+      "description": "Sensor channel B: pure noise, medium sigma (sigma=2)",
+      "generation": {
+        "expr": "(rand() * 2 - 1) * 2 * outlier_multiplier"
+      }
+    },
+    {
+      "name": "sensor_C",
+      "type": "double",
+      "description": "Sensor channel C: pure noise, high sigma (sigma=3)",
+      "generation": {
+        "expr": "(rand() * 2 - 1) * 3 * outlier_multiplier"
+      }
+    },
+    {
+      "name": "sensor_D",
+      "type": "double",
+      "description": "Sensor channel D: slow sine wave (step=0.1) + noise (sigma=1.5)",
+      "generation": {
+        "expr": "(2 * exp(sin(0.1 * reading_id)) + (rand() * 3 - 1.5)) * outlier_multiplier"
+      }
+    },
+    {
+      "name": "sensor_E",
+      "type": "double",
+      "description": "Sensor channel E: very slow sine wave (step=0.01) + noise (sigma=2)",
+      "generation": {
+        "expr": "(2 * exp(sin(0.01 * reading_id)) + (rand() * 4 - 2)) * outlier_multiplier"
+      }
+    },
+    {
+      "name": "sensor_F",
+      "type": "double",
+      "description": "Sensor channel F: fast sine wave (step=0.2) + low noise (sigma=1)",
+      "generation": {
+        "expr": "(2 * exp(sin(0.2 * reading_id)) + (rand() * 2 - 1)) * outlier_multiplier"
+      }
+    },
+    {
+      "name": "energy",
+      "type": "float",
+      "description": "Power output / energy reading (0-100)",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 100,
+        "random": true,
+        "percentNulls": 0.005
+      }
+    },
+    {
+      "name": "is_anomaly",
+      "type": "boolean",
+      "description": "Whether reading exceeds 3-sigma threshold on any sensor",
+      "generation": {
+        "expr": "abs(sensor_A) > 9 OR abs(sensor_B) > 18 OR abs(sensor_C) > 27 OR abs(sensor_D) > 12 OR abs(sensor_E) > 15 OR abs(sensor_F) > 12"
+      }
+    }
+  ]
+}

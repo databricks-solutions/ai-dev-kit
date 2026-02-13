@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "iot_device",
+  "version": "1.0.0",
+  "description": "IoT device registry with metadata and location",
+  "industry": "iot",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 100, "default": 10000, "max": 100000},
+  "relationships": [
+    {"parent_of": "iot_sensor_reading", "fk_column": "device_id", "fk_range": [1000, 10999]},
+    {"parent_of": "iot_event", "fk_column": "device_id", "fk_range": [1000, 10999]},
+    {"parent_of": "iot_telemetry", "fk_column": "device_id", "fk_range": [1000, 1999]}
+  ],
+  "cdc": {"operations": {"APPEND": 30, "UPDATE": 60, "DELETE": 5}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {"latitude": 0.01, "longitude": 0.01}},
+  "columns": [
+    {
+      "name": "device_id",
+      "type": "long",
+      "description": "Unique device identifier",
+      "generation": {
+        "minValue": 1000,
+        "maxValue": 10999,
+        "unique": true
+      }
+    },
+    {
+      "name": "device_serial",
+      "type": "string",
+      "description": "Device serial number",
+      "generation": {
+        "template": "DEV-dddddddd"
+      }
+    },
+    {
+      "name": "device_type",
+      "type": "string",
+      "description": "Type of IoT device",
+      "generation": {
+        "values": ["Temperature Sensor", "Humidity Sensor", "Pressure Sensor", "Motion Detector", "Smart Meter", "GPS Tracker", "Camera", "HVAC Controller"]
+      }
+    },
+    {
+      "name": "manufacturer",
+      "type": "string",
+      "description": "Device manufacturer",
+      "generation": {
+        "values": ["SensorCorp", "IoTech", "SmartDevices", "TelcoSystems", "DataSense"]
+      }
+    },
+    {
+      "name": "install_date",
+      "type": "date",
+      "description": "Device installation date",
+      "generation": {
+        "begin": "2020-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "latitude",
+      "type": "double",
+      "description": "Device latitude",
+      "generation": {
+        "minValue": 25.0,
+        "maxValue": 48.0,
+        "random": true,
+        "percentNulls": 0.01
+      }
+    },
+    {
+      "name": "longitude",
+      "type": "double",
+      "description": "Device longitude",
+      "generation": {
+        "minValue": -125.0,
+        "maxValue": -70.0,
+        "random": true,
+        "percentNulls": 0.01
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Device operational status",
+      "generation": {
+        "values": ["Online", "Offline", "Maintenance", "Decommissioned"],
+        "weights": [85, 8, 5, 2]
+      }
+    }
+  ]
+}

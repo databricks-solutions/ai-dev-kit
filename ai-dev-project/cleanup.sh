@@ -67,7 +67,7 @@ Load skills for detailed guidance:
 - `skill: "databricks-python-sdk"` - Python SDK patterns
 - `skill: "mlflow-evaluation"` - MLflow evaluation and trace analysis
 - `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
-- `skill: "synthetic-data-generation"` - Test data generation
+- `skill: "databricks-data-generation"` - Test data generation
 
 ## Testing Workflow
 

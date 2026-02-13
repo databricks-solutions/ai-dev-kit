@@ -99,7 +99,7 @@ test_cases:
       prompt: "Generate synthetic customer data and evaluate the agent quality with MLflow scorers"
     expectations:
       expected_skills:
-        - "synthetic-data-generation"
+        - "databricks-data-generation"
         - "mlflow-evaluation"
       is_multi_skill: true
     metadata:

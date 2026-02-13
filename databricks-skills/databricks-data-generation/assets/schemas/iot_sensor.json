@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "iot_sensor_reading",
+  "version": "2.0.0",
+  "description": "IoT sensor reading time-series data",
+  "industry": "iot",
+  "medallion_layer": "bronze",
+  "typical_rows": {"min": 1000000, "default": 50000000, "max": 500000000},
+  "relationships": [
+    {"child_of": "iot_device", "fk_column": "device_id", "fk_range": [1000, 10999]}
+  ],
+  "cdc": {"operations": {"APPEND": 100}, "sequence_column": "timestamp"},
+  "data_quality": {"anomaly_rate": 0.02, "column_nulls": {"metric_value": 0.005}},
+  "columns": [
+    {
+      "name": "reading_id",
+      "type": "long",
+      "description": "Unique reading identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "device_id",
+      "type": "long",
+      "description": "Device identifier",
+      "generation": {
+        "minValue": 1000,
+        "maxValue": 10999
+      }
+    },
+    {
+      "name": "timestamp",
+      "type": "timestamp",
+      "description": "Reading timestamp",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "interval": "1 minute"
+      }
+    },
+    {
+      "name": "metric_name",
+      "type": "string",
+      "description": "Type of measurement",
+      "generation": {
+        "values": ["temperature", "humidity", "pressure", "power", "vibration"]
+      }
+    },
+    {
+      "name": "metric_value",
+      "type": "double",
+      "description": "Sensor reading value",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 100,
+        "random": true,
+        "percentNulls": 0.005
+      }
+    },
+    {
+      "name": "unit",
+      "type": "string",
+      "description": "Unit of measurement",
+      "generation": {
+        "expr": "case metric_name when 'temperature' then 'celsius' when 'humidity' then 'percent' when 'pressure' then 'hPa' when 'power' then 'kWh' when 'vibration' then 'mm/s' else 'unknown' end"
+      }
+    },
+    {
+      "name": "quality_score",
+      "type": "integer",
+      "description": "Data quality indicator (0-100)",
+      "generation": {
+        "minValue": 80,
+        "maxValue": 100,
+        "random": true
+      }
+    },
+    {
+      "name": "is_anomaly",
+      "type": "boolean",
+      "description": "Anomaly detection flag",
+      "generation": {
+        "expr": "rand() < 0.02"
+      }
+    }
+  ]
+}

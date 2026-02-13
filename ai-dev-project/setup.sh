@@ -137,7 +137,7 @@ Load skills for detailed guidance:
 - `skill: "databricks-unity-catalog"` - System tables for lineage, audit, billing
 - `skill: "mlflow-evaluation"` - MLflow evaluation and trace analysis
 - `skill: "spark-declarative-pipelines"` - Spark Declarative Pipelines
-- `skill: "synthetic-data-generation"` - Test data generation
+- `skill: "databricks-data-generation"` - Test data generation
 - `skill: "unstructured-pdf-generation"` - Generate synthetic PDFs for RAG
 
 ## Testing Workflow

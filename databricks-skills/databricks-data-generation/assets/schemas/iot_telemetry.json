@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "iot_telemetry",
+  "version": "1.0.0",
+  "description": "Vehicle/GPS telemetry data from IoT devices (subset: device_id 1000-1999)",
+  "industry": "iot",
+  "medallion_layer": "bronze",
+  "typical_rows": {"min": 100000, "default": 5000000, "max": 100000000},
+  "relationships": [
+    {"child_of": "iot_device", "fk_column": "device_id", "fk_range": [1000, 1999]}
+  ],
+  "cdc": {"operations": {"APPEND": 100}, "sequence_column": "timestamp"},
+  "data_quality": {"anomaly_rate": 0.01, "column_nulls": {"fuel_level": 0.02, "engine_temp": 0.01}},
+  "columns": [
+    {
+      "name": "telemetry_id",
+      "type": "long",
+      "description": "Unique telemetry record identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "device_id",
+      "type": "long",
+      "description": "Foreign key to devices table (vehicle subset)",
+      "generation": {
+        "minValue": 1000,
+        "maxValue": 1999
+      }
+    },
+    {
+      "name": "timestamp",
+      "type": "timestamp",
+      "description": "Telemetry reading timestamp",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "interval": "5 seconds"
+      }
+    },
+    {
+      "name": "latitude",
+      "type": "double",
+      "description": "GPS latitude",
+      "generation": {
+        "minValue": 37.0,
+        "maxValue": 38.0,
+        "random": true
+      }
+    },
+    {
+      "name": "longitude",
+      "type": "double",
+      "description": "GPS longitude",
+      "generation": {
+        "minValue": -122.5,
+        "maxValue": -121.5,
+        "random": true
+      }
+    },
+    {
+      "name": "speed",
+      "type": "double",
+      "description": "Vehicle speed in mph",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 80,
+        "random": true
+      }
+    },
+    {
+      "name": "heading",
+      "type": "integer",
+      "description": "Compass heading in degrees",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 359,
+        "random": true
+      }
+    },
+    {
+      "name": "fuel_level",
+      "type": "double",
+      "description": "Fuel level percentage",
+      "generation": {
+        "minValue": 10,
+        "maxValue": 100,
+        "random": true,
+        "percentNulls": 0.02
+      }
+    },
+    {
+      "name": "engine_temp",
+      "type": "double",
+      "description": "Engine temperature in Fahrenheit",
+      "generation": {
+        "minValue": 180,
+        "maxValue": 220,
+        "distribution": "normal",
+        "percentNulls": 0.01
+      }
+    }
+  ]
+}

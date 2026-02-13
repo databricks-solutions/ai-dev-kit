@@ -61,7 +61,7 @@ $script:Skills = @(
     "databricks-app-python", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-jobs", "databricks-python-sdk", "databricks-unity-catalog",
     "lakebase-provisioned", "model-serving", "spark-declarative-pipelines",
-    "synthetic-data-generation", "unstructured-pdf-generation"
+    "databricks-data-generation", "unstructured-pdf-generation"
 )
 
 # MLflow skills (fetched from mlflow/skills repo)

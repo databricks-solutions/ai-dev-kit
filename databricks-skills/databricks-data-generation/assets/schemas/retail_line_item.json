@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "retail_line_item",
+  "version": "1.0.0",
+  "description": "Individual line items within retail transactions",
+  "industry": "retail",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 300000, "default": 3000000, "max": 30000000},
+  "relationships": [
+    {"child_of": "retail_transaction", "fk_column": "txn_id", "fk_range": [1, 1000000]},
+    {"child_of": "retail_product", "fk_column": "product_id", "fk_range": [10000, 19999]}
+  ],
+  "cdc": {"operations": {"APPEND": 50, "UPDATE": 30, "DELETE": 10}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {}},
+  "columns": [
+    {
+      "name": "line_item_id",
+      "type": "long",
+      "description": "Unique line item identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "txn_id",
+      "type": "long",
+      "description": "Foreign key to transactions table",
+      "generation": {
+        "minValue": 1,
+        "maxValue": 1000000
+      }
+    },
+    {
+      "name": "product_id",
+      "type": "long",
+      "description": "Foreign key to products table",
+      "generation": {
+        "minValue": 10000,
+        "maxValue": 19999
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "integer",
+      "description": "Number of units purchased",
+      "generation": {
+        "minValue": 1,
+        "maxValue": 10,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal(10,2)",
+      "description": "Price per unit at time of sale",
+      "generation": {
+        "minValue": 5,
+        "maxValue": 500,
+        "random": true
+      }
+    },
+    {
+      "name": "line_total",
+      "type": "decimal(12,2)",
+      "description": "Line item total (quantity * unit_price)",
+      "generation": {
+        "expr": "quantity * unit_price"
+      }
+    }
+  ]
+}

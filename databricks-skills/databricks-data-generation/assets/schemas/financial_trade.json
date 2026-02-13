@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "financial_trade",
+  "version": "2.0.0",
+  "description": "Financial trading activity data",
+  "industry": "financial",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 100000, "default": 1000000, "max": 10000000},
+  "relationships": [
+    {"child_of": "financial_account", "fk_column": "account_id", "fk_range": [1000000, 1099999]}
+  ],
+  "cdc": {"operations": {"APPEND": 50, "UPDATE": 30, "DELETE": 10}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {"price": 0.001}},
+  "columns": [
+    {
+      "name": "trade_id",
+      "type": "long",
+      "description": "Unique trade identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "account_id",
+      "type": "long",
+      "description": "Trading account identifier",
+      "generation": {
+        "minValue": 1000000,
+        "maxValue": 1099999
+      }
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "description": "Stock/ETF ticker symbol",
+      "generation": {
+        "values": ["AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA", "TSLA", "JPM", "BAC", "WMT"]
+      }
+    },
+    {
+      "name": "trade_type",
+      "type": "string",
+      "description": "Buy or sell",
+      "generation": {
+        "values": ["BUY", "SELL"],
+        "weights": [55, 45]
+      }
+    },
+    {
+      "name": "order_type",
+      "type": "string",
+      "description": "Order execution type",
+      "generation": {
+        "values": ["Market", "Limit", "Stop", "Stop-Limit"],
+        "weights": [60, 25, 10, 5]
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "integer",
+      "description": "Number of shares",
+      "generation": {
+        "minValue": 1,
+        "maxValue": 10000,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "price",
+      "type": "decimal(12,4)",
+      "description": "Execution price per share",
+      "generation": {
+        "minValue": 10,
+        "maxValue": 1000,
+        "random": true,
+        "percentNulls": 0.001
+      }
+    },
+    {
+      "name": "trade_value",
+      "type": "decimal(15,2)",
+      "description": "Total trade value",
+      "generation": {
+        "expr": "quantity * price"
+      }
+    },
+    {
+      "name": "commission",
+      "type": "decimal(8,2)",
+      "description": "Trading fee",
+      "generation": {
+        "expr": "greatest(0.99, trade_value * 0.001)"
+      }
+    },
+    {
+      "name": "trade_timestamp",
+      "type": "timestamp",
+      "description": "Trade execution time",
+      "generation": {
+        "begin": "2024-01-02 09:30:00",
+        "end": "2024-12-31 16:00:00",
+        "random": true
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Trade execution status",
+      "generation": {
+        "values": ["Filled", "Partial", "Cancelled", "Rejected"],
+        "weights": [90, 5, 3, 2]
+      }
+    },
+    {
+      "name": "execution_venue",
+      "type": "string",
+      "description": "Exchange or venue",
+      "generation": {
+        "values": ["NYSE", "NASDAQ", "ARCA", "BATS"],
+        "weights": [35, 35, 15, 15]
+      }
+    }
+  ]
+}

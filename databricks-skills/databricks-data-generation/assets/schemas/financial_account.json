@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "financial_account",
+  "version": "1.0.0",
+  "description": "Financial accounts with types, balances, and risk ratings",
+  "industry": "financial",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 10000, "default": 100000, "max": 1000000},
+  "relationships": [
+    {"parent_of": "financial_trade", "fk_column": "account_id", "fk_range": [1000000, 1099999]},
+    {"parent_of": "financial_transaction", "fk_column": "account_id", "fk_range": [1000000, 1099999]}
+  ],
+  "cdc": {"operations": {"APPEND": 40, "UPDATE": 50, "DELETE": 5}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {"risk_rating": 0.01}},
+  "columns": [
+    {
+      "name": "account_id",
+      "type": "long",
+      "description": "Unique account identifier",
+      "generation": {
+        "minValue": 1000000,
+        "maxValue": 1099999,
+        "unique": true
+      }
+    },
+    {
+      "name": "customer_id",
+      "type": "long",
+      "description": "Customer who owns the account",
+      "generation": {
+        "minValue": 500000,
+        "uniqueValues": "rows * 0.8"
+      }
+    },
+    {
+      "name": "account_number",
+      "type": "string",
+      "description": "Account number",
+      "generation": {
+        "template": "dddddddddddd"
+      }
+    },
+    {
+      "name": "account_type",
+      "type": "string",
+      "description": "Type of financial account",
+      "generation": {
+        "values": ["Checking", "Savings", "Investment", "Retirement", "Credit Card", "Loan"],
+        "weights": [30, 25, 20, 10, 10, 5]
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Account status",
+      "generation": {
+        "values": ["Active", "Dormant", "Closed"],
+        "weights": [85, 10, 5]
+      }
+    },
+    {
+      "name": "open_date",
+      "type": "date",
+      "description": "Date account was opened",
+      "generation": {
+        "begin": "2015-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "balance",
+      "type": "decimal(15,2)",
+      "description": "Current account balance",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 10000000,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "description": "Account currency",
+      "generation": {
+        "values": ["USD", "EUR", "GBP", "JPY"],
+        "weights": [70, 15, 10, 5]
+      }
+    },
+    {
+      "name": "risk_rating",
+      "type": "string",
+      "description": "Account risk classification",
+      "generation": {
+        "values": ["Low", "Medium", "High"],
+        "weights": [60, 30, 10],
+        "percentNulls": 0.01
+      }
+    }
+  ]
+}

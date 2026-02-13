@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "retail_transaction",
+  "version": "2.0.0",
+  "description": "Retail sales transaction with payment and totals",
+  "industry": "retail",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 100000, "default": 1000000, "max": 10000000},
+  "relationships": [
+    {"child_of": "retail_customer", "fk_column": "customer_id", "fk_range": [1000000, 1099999]},
+    {"parent_of": "retail_line_item", "fk_column": "txn_id", "fk_range": [1, 1000000]}
+  ],
+  "cdc": {"operations": {"APPEND": 50, "UPDATE": 30, "DELETE": 10}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.01, "column_nulls": {"discount_amount": 0.02}},
+  "columns": [
+    {
+      "name": "txn_id",
+      "type": "long",
+      "description": "Unique transaction identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "customer_id",
+      "type": "long",
+      "description": "Foreign key to customers table",
+      "generation": {
+        "minValue": 1000000,
+        "maxValue": 1099999
+      }
+    },
+    {
+      "name": "store_id",
+      "type": "long",
+      "description": "Store location identifier",
+      "generation": {
+        "minValue": 100,
+        "maxValue": 150
+      }
+    },
+    {
+      "name": "txn_timestamp",
+      "type": "timestamp",
+      "description": "Transaction date and time",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "payment_method",
+      "type": "string",
+      "description": "Payment type used",
+      "generation": {
+        "values": ["Credit Card", "Debit Card", "Cash", "Digital Wallet", "Gift Card"],
+        "weights": [40, 25, 15, 15, 5]
+      }
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal(12,2)",
+      "description": "Pre-discount amount",
+      "generation": {
+        "minValue": 10,
+        "maxValue": 500,
+        "random": true
+      }
+    },
+    {
+      "name": "discount_amount",
+      "type": "decimal(10,2)",
+      "description": "Total discounts applied",
+      "generation": {
+        "expr": "subtotal * rand() * 0.2"
+      }
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal(10,2)",
+      "description": "Sales tax",
+      "generation": {
+        "expr": "(subtotal - discount_amount) * 0.08"
+      }
+    },
+    {
+      "name": "total_amount",
+      "type": "decimal(12,2)",
+      "description": "Final transaction total",
+      "generation": {
+        "expr": "subtotal - discount_amount + tax_amount"
+      }
+    },
+    {
+      "name": "items_count",
+      "type": "integer",
+      "description": "Number of items in basket",
+      "generation": {
+        "minValue": 1,
+        "maxValue": 20,
+        "distribution": "exponential"
+      }
+    }
+  ]
+}

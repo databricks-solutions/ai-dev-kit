@@ -109,7 +109,7 @@ Before creating a Genie Space:
 ### Creating Tables
 
 Use these skills in sequence:
-1. `synthetic-data-generation` - Generate raw parquet files
+1. `databricks-data-generation` - Generate raw parquet files
 2. `spark-declarative-pipelines` - Create bronze/silver/gold tables
 
 ## Common Issues

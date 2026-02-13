@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "financial_transaction",
+  "version": "1.0.0",
+  "description": "Financial account transactions including deposits, withdrawals, and transfers",
+  "industry": "financial",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 100000, "default": 1000000, "max": 50000000},
+  "relationships": [
+    {"child_of": "financial_account", "fk_column": "account_id", "fk_range": [1000000, 1099999]}
+  ],
+  "cdc": {"operations": {"APPEND": 80, "UPDATE": 15, "DELETE": 2}, "sequence_column": "txn_timestamp"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {"channel": 0.01}},
+  "columns": [
+    {
+      "name": "txn_id",
+      "type": "long",
+      "description": "Unique transaction identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "account_id",
+      "type": "long",
+      "description": "Foreign key to accounts table",
+      "generation": {
+        "minValue": 1000000,
+        "maxValue": 1099999
+      }
+    },
+    {
+      "name": "txn_type",
+      "type": "string",
+      "description": "Transaction type",
+      "generation": {
+        "values": ["Deposit", "Withdrawal", "Transfer In", "Transfer Out", "Payment", "Fee", "Interest"],
+        "weights": [20, 15, 15, 15, 25, 5, 5]
+      }
+    },
+    {
+      "name": "amount",
+      "type": "decimal(12,2)",
+      "description": "Transaction amount",
+      "generation": {
+        "minValue": 1,
+        "maxValue": 100000,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "txn_timestamp",
+      "type": "timestamp",
+      "description": "Transaction date and time",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "channel",
+      "type": "string",
+      "description": "Transaction channel",
+      "generation": {
+        "values": ["Online", "Mobile", "Branch", "ATM", "Wire"],
+        "weights": [35, 30, 15, 15, 5],
+        "percentNulls": 0.01
+      }
+    },
+    {
+      "name": "is_international",
+      "type": "boolean",
+      "description": "Whether transaction crosses borders",
+      "generation": {
+        "expr": "rand() < 0.05"
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Transaction processing status",
+      "generation": {
+        "values": ["Completed", "Pending", "Failed", "Reversed"],
+        "weights": [90, 5, 3, 2]
+      }
+    }
+  ]
+}

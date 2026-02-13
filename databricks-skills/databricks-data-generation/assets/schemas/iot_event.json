@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "iot_event",
+  "version": "1.0.0",
+  "description": "IoT device events including alerts, maintenance, and status changes",
+  "industry": "iot",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 10000, "default": 100000, "max": 5000000},
+  "relationships": [
+    {"child_of": "iot_device", "fk_column": "device_id", "fk_range": [1000, 10999]}
+  ],
+  "cdc": {"operations": {"APPEND": 90, "UPDATE": 8, "DELETE": 2}, "sequence_column": "timestamp"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {"description": 0.05}},
+  "columns": [
+    {
+      "name": "event_id",
+      "type": "long",
+      "description": "Unique event identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "device_id",
+      "type": "long",
+      "description": "Foreign key to devices table",
+      "generation": {
+        "minValue": 1000,
+        "maxValue": 10999
+      }
+    },
+    {
+      "name": "timestamp",
+      "type": "timestamp",
+      "description": "Event occurrence time",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "description": "Type of device event",
+      "generation": {
+        "values": ["Threshold Exceeded", "Device Offline", "Firmware Update", "Calibration Required", "Battery Low", "Connection Lost", "Maintenance Due"]
+      }
+    },
+    {
+      "name": "severity",
+      "type": "string",
+      "description": "Event severity level",
+      "generation": {
+        "values": ["Critical", "Warning", "Info"],
+        "weights": [10, 30, 60]
+      }
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "description": "Event description text",
+      "generation": {
+        "prefix": "Event on device ",
+        "baseColumn": "device_id",
+        "percentNulls": 0.05
+      }
+    },
+    {
+      "name": "acknowledged",
+      "type": "boolean",
+      "description": "Whether event has been acknowledged",
+      "generation": {
+        "expr": "rand() < 0.7"
+      }
+    },
+    {
+      "name": "resolved",
+      "type": "boolean",
+      "description": "Whether event has been resolved",
+      "generation": {
+        "expr": "acknowledged and rand() < 0.8"
+      }
+    }
+  ]
+}

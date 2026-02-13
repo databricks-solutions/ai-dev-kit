@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search"
+DATABRICKS_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming databricks-data-generation unstructured-pdf-generation vector-search"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -72,7 +72,7 @@ get_skill_description() {
         "model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
         "spark-structured-streaming") echo "Spark Structured Streaming patterns and best practices" ;;
-        "synthetic-data-generation") echo "Synthetic test data generation" ;;
+        "databricks-data-generation") echo "Synthetic test data generation" ;;
         "unstructured-pdf-generation") echo "Generate synthetic PDFs for RAG" ;;
         "vector-search") echo "Vector Search - endpoints, indexes, and queries for RAG" ;;
         # MLflow skills (from mlflow/skills repo)
@@ -107,6 +107,7 @@ get_skill_extra_files() {
         "model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
         "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;
         "spark-structured-streaming") echo "checkpoint-best-practices.md kafka-streaming.md merge-operations.md multi-sink-writes.md stateful-operations.md stream-static-joins.md stream-stream-joins.md streaming-best-practices.md trigger-and-cost-optimization.md" ;;
+        "databricks-data-generation") echo "references/cdc-patterns.md references/data-quality-patterns.md references/databricks-connect-guide.md references/dbldatagen-connect-patterns.md references/dbldatagen-guide.md references/examples.md references/generator-api.md references/medallion-patterns.md references/mimesis-guide.md references/ml-feature-patterns.md references/multi-table-patterns.md references/polars-generation-guide.md references/schema-introspection-patterns.md references/seasonality-patterns.md references/streaming-patterns.md references/time-series-patterns.md references/troubleshooting.md references/industry-patterns/financial.md references/industry-patterns/healthcare.md references/industry-patterns/iot.md references/industry-patterns/manufacturing.md references/industry-patterns/retail.md" ;;
         "vector-search") echo "index-types.md" ;;
         *) echo "" ;;
     esac

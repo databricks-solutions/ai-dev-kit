@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "retail_inventory",
+  "version": "1.0.0",
+  "description": "Retail inventory levels by product and store location",
+  "industry": "retail",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 50000, "default": 500000, "max": 5000000},
+  "relationships": [
+    {"child_of": "retail_product", "fk_column": "product_id", "fk_range": [10000, 19999]}
+  ],
+  "cdc": {"operations": {"APPEND": 20, "UPDATE": 70, "DELETE": 5}, "sequence_column": "last_updated"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {}},
+  "columns": [
+    {
+      "name": "inventory_id",
+      "type": "long",
+      "description": "Unique inventory record identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "product_id",
+      "type": "long",
+      "description": "Foreign key to products table",
+      "generation": {
+        "minValue": 10000,
+        "maxValue": 19999
+      }
+    },
+    {
+      "name": "store_id",
+      "type": "long",
+      "description": "Store location identifier",
+      "generation": {
+        "minValue": 100,
+        "maxValue": 150
+      }
+    },
+    {
+      "name": "quantity_on_hand",
+      "type": "integer",
+      "description": "Current stock level",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 500,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "reorder_point",
+      "type": "integer",
+      "description": "Stock level that triggers reorder",
+      "generation": {
+        "minValue": 10,
+        "maxValue": 50,
+        "random": true
+      }
+    },
+    {
+      "name": "last_updated",
+      "type": "timestamp",
+      "description": "Last inventory update timestamp",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    }
+  ]
+}

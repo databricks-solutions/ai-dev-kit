@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "healthcare_patient",
+  "version": "1.0.0",
+  "description": "Healthcare patient demographics (100% synthetic, HIPAA-safe)",
+  "industry": "healthcare",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 10000, "default": 100000, "max": 1000000},
+  "relationships": [
+    {"parent_of": "healthcare_encounter", "fk_column": "patient_id", "fk_range": [1000000, 1099999]}
+  ],
+  "cdc": {"operations": {"APPEND": 50, "UPDATE": 40, "DELETE": 5}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.03, "column_nulls": {"email": 0.05, "phone": 0.02}},
+  "columns": [
+    {
+      "name": "patient_id",
+      "type": "long",
+      "description": "Unique patient identifier",
+      "generation": {
+        "minValue": 1000000,
+        "maxValue": 1099999,
+        "unique": true
+      }
+    },
+    {
+      "name": "mrn",
+      "type": "string",
+      "description": "Medical record number",
+      "generation": {
+        "template": "MRNdddddddddd"
+      }
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "description": "Patient first name",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.first_name"
+      }
+    },
+    {
+      "name": "last_name",
+      "type": "string",
+      "description": "Patient last name",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.last_name"
+      }
+    },
+    {
+      "name": "date_of_birth",
+      "type": "date",
+      "description": "Patient date of birth",
+      "pii": true,
+      "generation": {
+        "begin": "1924-01-01",
+        "end": "2024-01-01",
+        "random": true
+      }
+    },
+    {
+      "name": "gender",
+      "type": "string",
+      "description": "Patient gender",
+      "generation": {
+        "values": ["M", "F", "Other"],
+        "weights": [49, 49, 2]
+      }
+    },
+    {
+      "name": "ssn_last4",
+      "type": "string",
+      "description": "Last 4 digits of SSN",
+      "pii": true,
+      "generation": {
+        "template": "dddd"
+      }
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "description": "Patient email address",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.email",
+        "percentNulls": 0.05
+      }
+    },
+    {
+      "name": "phone",
+      "type": "string",
+      "description": "Patient phone number",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.telephone",
+        "percentNulls": 0.02
+      }
+    },
+    {
+      "name": "address",
+      "type": "string",
+      "description": "Patient street address",
+      "pii": true,
+      "generation": {
+        "mimesis": "address.address"
+      }
+    },
+    {
+      "name": "city",
+      "type": "string",
+      "description": "City",
+      "generation": {
+        "mimesis": "address.city"
+      }
+    },
+    {
+      "name": "state",
+      "type": "string",
+      "description": "State abbreviation",
+      "generation": {
+        "values": ["MA", "NY", "IL", "TX", "AZ", "CA", "FL", "PA"]
+      }
+    },
+    {
+      "name": "zip_code",
+      "type": "string",
+      "description": "ZIP code",
+      "generation": {
+        "template": "ddddd"
+      }
+    },
+    {
+      "name": "insurance_id",
+      "type": "string",
+      "description": "Insurance plan identifier",
+      "generation": {
+        "template": "INS-dddddddd"
+      }
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "description": "Whether patient record is active",
+      "generation": {
+        "expr": "rand() < 0.9"
+      }
+    }
+  ]
+}

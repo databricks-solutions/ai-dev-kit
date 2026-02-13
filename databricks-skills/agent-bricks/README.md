@@ -38,7 +38,7 @@ agent-bricks/
 
 - [Databricks Genie](../databricks-genie/) -- Comprehensive Genie Space creation, curation, and Conversation API guidance
 - [Unstructured PDF Generation](../unstructured-pdf-generation/) -- Generate synthetic PDFs to feed into Knowledge Assistants
-- [Synthetic Data Generation](../synthetic-data-generation/) -- Create raw data for Genie Space tables
+- [Synthetic Data Generation](../databricks-data-generation/) -- Create raw data for Genie Space tables
 - [Spark Declarative Pipelines](../spark-declarative-pipelines/) -- Build bronze/silver/gold tables consumed by Genie Spaces
 - [Model Serving](../model-serving/) -- Deploy custom agent endpoints used as MAS agents
 - [Vector Search](../vector-search/) -- Build vector indexes for RAG applications paired with KAs

@@ -35,7 +35,7 @@ unstructured-pdf-generation/
 
 - [Agent Bricks](../agent-bricks/) -- Create Knowledge Assistants that ingest the generated PDFs
 - [Vector Search](../vector-search/) -- Index generated documents for semantic search and RAG
-- [Synthetic Data Generation](../synthetic-data-generation/) -- Generate structured tabular data (complement to unstructured PDFs)
+- [Synthetic Data Generation](../databricks-data-generation/) -- Generate structured tabular data (complement to unstructured PDFs)
 - [MLflow Evaluation](../mlflow-evaluation/) -- Evaluate RAG systems using the generated question/guideline pairs
 
 ## Resources

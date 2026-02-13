@@ -52,7 +52,7 @@ spark-declarative-pipelines/
 
 - [Databricks Jobs](../databricks-jobs/) -- for orchestrating and scheduling pipeline runs
 - [Asset Bundles](../asset-bundles/) -- for multi-environment deployment of pipeline projects
-- [Synthetic Data Generation](../synthetic-data-generation/) -- for generating test data to feed into pipelines
+- [Synthetic Data Generation](../databricks-data-generation/) -- for generating test data to feed into pipelines
 - [Databricks Unity Catalog](../databricks-unity-catalog/) -- for catalog/schema/volume management and governance
 
 ## Resources

@@ -28,7 +28,7 @@ Before creating Agent Bricks, ensure you have the required data:
 ### For Genie Spaces
 - **See the `databricks-genie` skill** for comprehensive Genie Space guidance
 - Tables in Unity Catalog with the data to explore
-- Generate raw data using the `synthetic-data-generation` skill
+- Generate raw data using the `databricks-data-generation` skill
 - Create tables using the `spark-declarative-pipelines` skill
 
 ### For Multi-Agent Supervisors
@@ -117,7 +117,7 @@ Before creating Agent Bricks, generate the required source data:
 
 **For Genie (SQL exploration)**:
 ```
-1. Use `synthetic-data-generation` skill to create raw parquet data
+1. Use `databricks-data-generation` skill to create raw parquet data
 2. Use `spark-declarative-pipelines` skill to create bronze/silver/gold tables
 ```
 

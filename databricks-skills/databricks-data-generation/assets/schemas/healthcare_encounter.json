@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "healthcare_encounter",
+  "version": "1.0.0",
+  "description": "Clinical encounters between patients and providers",
+  "industry": "healthcare",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 50000, "default": 500000, "max": 5000000},
+  "relationships": [
+    {"child_of": "healthcare_patient", "fk_column": "patient_id", "fk_range": [1000000, 1099999]},
+    {"parent_of": "healthcare_claim", "fk_column": "encounter_id", "fk_range": [1, 500000]}
+  ],
+  "cdc": {"operations": {"APPEND": 50, "UPDATE": 40, "DELETE": 5}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.005, "column_nulls": {"discharge_datetime": 0.1, "chief_complaint": 0.01}},
+  "columns": [
+    {
+      "name": "encounter_id",
+      "type": "long",
+      "description": "Unique encounter identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "patient_id",
+      "type": "long",
+      "description": "Foreign key to patients table",
+      "generation": {
+        "minValue": 1000000,
+        "maxValue": 1099999
+      }
+    },
+    {
+      "name": "provider_id",
+      "type": "long",
+      "description": "Attending provider identifier",
+      "generation": {
+        "minValue": 5000,
+        "maxValue": 9999
+      }
+    },
+    {
+      "name": "facility_id",
+      "type": "long",
+      "description": "Healthcare facility identifier",
+      "generation": {
+        "minValue": 100,
+        "maxValue": 200
+      }
+    },
+    {
+      "name": "encounter_type",
+      "type": "string",
+      "description": "Type of clinical encounter",
+      "generation": {
+        "values": ["Outpatient", "Inpatient", "Emergency", "Observation", "Telehealth"],
+        "weights": [50, 20, 15, 10, 5]
+      }
+    },
+    {
+      "name": "admit_datetime",
+      "type": "timestamp",
+      "description": "Admission date and time",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "discharge_datetime",
+      "type": "timestamp",
+      "description": "Discharge date and time",
+      "generation": {
+        "expr": "admit_datetime + make_interval(0, 0, 0, cast(1 + rand() * 7 as int), 0, 0, 0)",
+        "percentNulls": 0.1
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Encounter status",
+      "generation": {
+        "values": ["Completed", "Active", "Cancelled"],
+        "weights": [85, 10, 5]
+      }
+    },
+    {
+      "name": "chief_complaint",
+      "type": "string",
+      "description": "Primary reason for visit",
+      "generation": {
+        "values": [
+          "Chest pain", "Shortness of breath", "Abdominal pain", "Headache",
+          "Back pain", "Fever", "Cough", "Fatigue", "Dizziness", "Follow-up",
+          "Routine checkup", "Medication refill", "Post-surgical", "Lab review"
+        ]
+      }
+    }
+  ]
+}

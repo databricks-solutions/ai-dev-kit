@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "manufacturing_equipment",
+  "version": "1.0.0",
+  "description": "Manufacturing equipment/asset registry for factory floor",
+  "industry": "manufacturing",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 100, "default": 1000, "max": 10000},
+  "relationships": [
+    {"parent_of": "manufacturing_sensor_data", "fk_column": "equipment_id", "fk_range": [1000, 1999]},
+    {"parent_of": "manufacturing_maintenance", "fk_column": "equipment_id", "fk_range": [1000, 1999]}
+  ],
+  "cdc": {"operations": {"APPEND": 30, "UPDATE": 60, "DELETE": 5}, "sequence_column": "last_maintenance_date"},
+  "data_quality": {"duplicate_rate": 0.001},
+  "columns": [
+    {
+      "name": "equipment_id",
+      "type": "long",
+      "description": "Unique equipment identifier",
+      "generation": {
+        "minValue": 1000,
+        "unique": true
+      }
+    },
+    {
+      "name": "serial_number",
+      "type": "string",
+      "description": "Equipment serial number",
+      "generation": {
+        "template": "EQ-dddddddd"
+      }
+    },
+    {
+      "name": "equipment_type",
+      "type": "string",
+      "description": "Type of manufacturing equipment",
+      "generation": {
+        "values": ["CNC Machine", "Assembly Robot", "Conveyor Belt", "Press", "Welder", "Packaging Unit", "Quality Scanner", "HVAC System"]
+      }
+    },
+    {
+      "name": "manufacturer",
+      "type": "string",
+      "description": "Equipment manufacturer/OEM",
+      "generation": {
+        "values": ["Siemens", "ABB", "Fanuc", "Bosch", "Honeywell"]
+      }
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "description": "Equipment model identifier",
+      "generation": {
+        "prefix": "Model-",
+        "baseColumn": "equipment_id"
+      }
+    },
+    {
+      "name": "install_date",
+      "type": "date",
+      "description": "Equipment installation date",
+      "generation": {
+        "begin": "2015-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "location_zone",
+      "type": "string",
+      "description": "Factory floor zone",
+      "generation": {
+        "values": ["Zone A", "Zone B", "Zone C", "Zone D", "Zone E", "Zone F"]
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Equipment operational status",
+      "generation": {
+        "values": ["Operational", "Maintenance", "Idle", "Decommissioned"],
+        "weights": [80, 10, 7, 3]
+      }
+    },
+    {
+      "name": "last_maintenance_date",
+      "type": "date",
+      "description": "Date of most recent maintenance",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "expected_lifespan_years",
+      "type": "integer",
+      "description": "Expected operational lifespan in years",
+      "generation": {
+        "minValue": 5,
+        "maxValue": 25,
+        "distribution": "normal"
+      }
+    }
+  ]
+}

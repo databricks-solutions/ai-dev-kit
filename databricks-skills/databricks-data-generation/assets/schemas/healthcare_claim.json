@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "healthcare_claim",
+  "version": "1.0.0",
+  "description": "Insurance claims linked to clinical encounters",
+  "industry": "healthcare",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 50000, "default": 500000, "max": 5000000},
+  "relationships": [
+    {"child_of": "healthcare_encounter", "fk_column": "encounter_id", "fk_range": [1, 500000]},
+    {"child_of": "healthcare_patient", "fk_column": "patient_id", "fk_range": [1000000, 1099999]}
+  ],
+  "cdc": {"operations": {"APPEND": 40, "UPDATE": 50, "DELETE": 5}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.002, "column_nulls": {"paid_amount": 0.05}},
+  "columns": [
+    {
+      "name": "claim_id",
+      "type": "long",
+      "description": "Unique claim identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "encounter_id",
+      "type": "long",
+      "description": "Foreign key to encounters table",
+      "generation": {
+        "minValue": 1,
+        "maxValue": 500000
+      }
+    },
+    {
+      "name": "patient_id",
+      "type": "long",
+      "description": "Foreign key to patients table",
+      "generation": {
+        "minValue": 1000000,
+        "maxValue": 1099999
+      }
+    },
+    {
+      "name": "payer_id",
+      "type": "string",
+      "description": "Insurance payer",
+      "generation": {
+        "values": ["Medicare", "Medicaid", "Blue Cross", "Aetna", "United", "Cigna", "Self-Pay"],
+        "weights": [25, 15, 20, 15, 15, 8, 2]
+      }
+    },
+    {
+      "name": "claim_type",
+      "type": "string",
+      "description": "Type of insurance claim",
+      "generation": {
+        "values": ["Professional", "Institutional"],
+        "weights": [70, 30]
+      }
+    },
+    {
+      "name": "service_date",
+      "type": "date",
+      "description": "Date of service",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "billed_amount",
+      "type": "decimal(12,2)",
+      "description": "Total billed amount",
+      "generation": {
+        "minValue": 50,
+        "maxValue": 50000,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "allowed_amount",
+      "type": "decimal(12,2)",
+      "description": "Insurance-allowed amount",
+      "generation": {
+        "expr": "billed_amount * (0.6 + rand() * 0.3)"
+      }
+    },
+    {
+      "name": "paid_amount",
+      "type": "decimal(12,2)",
+      "description": "Amount paid by insurance",
+      "generation": {
+        "expr": "allowed_amount * (0.7 + rand() * 0.3)",
+        "percentNulls": 0.05
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Claim processing status",
+      "generation": {
+        "values": ["Paid", "Pending", "Denied", "Appealed"],
+        "weights": [70, 15, 10, 5]
+      }
+    }
+  ]
+}

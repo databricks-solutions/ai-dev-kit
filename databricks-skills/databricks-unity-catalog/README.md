@@ -41,7 +41,7 @@ databricks-unity-catalog/
 
 - [Spark Declarative Pipelines](../spark-declarative-pipelines/) -- for pipelines that write to Unity Catalog tables
 - [Databricks Jobs](../databricks-jobs/) -- for job execution data visible in system tables
-- [Synthetic Data Generation](../synthetic-data-generation/) -- for generating data stored in Unity Catalog Volumes
+- [Synthetic Data Generation](../databricks-data-generation/) -- for generating data stored in Unity Catalog Volumes
 - [AI/BI Dashboards](../aibi-dashboards/) -- for building dashboards on top of Unity Catalog data
 
 ## Resources

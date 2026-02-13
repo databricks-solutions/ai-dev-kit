@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "manufacturing_maintenance",
+  "version": "1.0.0",
+  "description": "Manufacturing maintenance work orders and event records",
+  "industry": "manufacturing",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 1000, "default": 50000, "max": 500000},
+  "relationships": [
+    {"child_of": "manufacturing_equipment", "fk_column": "equipment_id", "fk_range": [1000, 1999]}
+  ],
+  "cdc": {"operations": {"APPEND": 60, "UPDATE": 35, "DELETE": 5}, "sequence_column": "scheduled_date"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {"completion_date": 0.12}},
+  "columns": [
+    {
+      "name": "maintenance_id",
+      "type": "long",
+      "description": "Unique maintenance work order identifier",
+      "generation": {
+        "minValue": 1,
+        "unique": true
+      }
+    },
+    {
+      "name": "equipment_id",
+      "type": "long",
+      "description": "Foreign key to equipment table",
+      "generation": {
+        "minValue": 1000,
+        "maxValue": 1999
+      }
+    },
+    {
+      "name": "scheduled_date",
+      "type": "timestamp",
+      "description": "Planned maintenance date",
+      "generation": {
+        "begin": "2024-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "completion_date",
+      "type": "timestamp",
+      "description": "Actual completion timestamp (null for in-progress/scheduled)",
+      "generation": {
+        "expr": "scheduled_date + interval los_hours hours",
+        "percentNulls": 0.12
+      }
+    },
+    {
+      "name": "maintenance_type",
+      "type": "string",
+      "description": "Category of maintenance work",
+      "generation": {
+        "values": ["Preventive", "Corrective", "Predictive", "Emergency"],
+        "weights": [50, 30, 15, 5]
+      }
+    },
+    {
+      "name": "priority",
+      "type": "string",
+      "description": "Work order priority level",
+      "generation": {
+        "values": ["Critical", "High", "Medium", "Low"],
+        "weights": [5, 20, 50, 25]
+      }
+    },
+    {
+      "name": "duration_hours",
+      "type": "integer",
+      "description": "Actual work duration in hours",
+      "generation": {
+        "minValue": 1,
+        "maxValue": 72,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "cost",
+      "type": "decimal(12,2)",
+      "description": "Total maintenance cost in dollars",
+      "generation": {
+        "minValue": 100,
+        "maxValue": 50000,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "technician_id",
+      "type": "long",
+      "description": "Assigned technician identifier",
+      "generation": {
+        "minValue": 100,
+        "maxValue": 200
+      }
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "description": "Work order description",
+      "generation": {
+        "prefix": "WO-",
+        "baseColumn": "equipment_id"
+      }
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "description": "Work order status",
+      "generation": {
+        "values": ["Completed", "In Progress", "Scheduled", "Cancelled"],
+        "weights": [80, 10, 8, 2]
+      }
+    },
+    {
+      "name": "parts_replaced",
+      "type": "integer",
+      "description": "Number of parts replaced during maintenance",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 10,
+        "distribution": "exponential"
+      }
+    }
+  ]
+}

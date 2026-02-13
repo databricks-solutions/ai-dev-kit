@@ -179,7 +179,7 @@ Skills include:
 - **databricks-python-sdk**: Python SDK patterns
 - **mlflow-evaluation**: MLflow evaluation and trace analysis
 - **spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) development
-- **synthetic-data-generation**: Creating test datasets
+- **databricks-data-generation**: Creating test datasets
 
 ### 5. Project Persistence
 
@@ -329,7 +329,7 @@ Skills are loaded from `../databricks-skills/` and filtered by the `ENABLED_SKIL
 
 - `databricks-python-sdk`: Patterns for using the Databricks Python SDK
 - `spark-declarative-pipelines`: SDP/DLT pipeline development
-- `synthetic-data-generation`: Creating test datasets
+- `databricks-data-generation`: Creating test datasets
 - `databricks-app-apx`: Full-stack apps with React (APX framework)
 - `databricks-app-python`: Python apps with Dash, Streamlit, Flask
 

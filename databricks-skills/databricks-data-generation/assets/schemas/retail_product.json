@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "retail_product",
+  "version": "1.0.0",
+  "description": "Retail product catalog with pricing and categorization",
+  "industry": "retail",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 1000, "default": 10000, "max": 100000},
+  "relationships": [
+    {"parent_of": "retail_line_item", "fk_column": "product_id", "fk_range": [10000, 19999]},
+    {"parent_of": "retail_inventory", "fk_column": "product_id", "fk_range": [10000, 19999]}
+  ],
+  "cdc": {"operations": {"APPEND": 60, "UPDATE": 35, "DELETE": 5}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.001, "column_nulls": {"brand": 0.01}},
+  "columns": [
+    {
+      "name": "product_id",
+      "type": "long",
+      "description": "Unique product identifier",
+      "generation": {
+        "minValue": 10000,
+        "maxValue": 19999,
+        "unique": true
+      }
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "description": "Stock keeping unit code",
+      "generation": {
+        "template": "SKU-dddddddd"
+      }
+    },
+    {
+      "name": "product_name",
+      "type": "string",
+      "description": "Product display name",
+      "generation": {
+        "prefix": "Product-",
+        "baseColumn": "product_id"
+      }
+    },
+    {
+      "name": "category",
+      "type": "string",
+      "description": "Product category",
+      "generation": {
+        "values": ["Electronics", "Clothing", "Home & Garden", "Sports", "Beauty", "Food & Grocery", "Toys", "Automotive"]
+      }
+    },
+    {
+      "name": "brand",
+      "type": "string",
+      "description": "Product brand",
+      "generation": {
+        "values": ["BrandA", "BrandB", "BrandC", "BrandD", "BrandE", "Generic"],
+        "percentNulls": 0.01
+      }
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal(10,2)",
+      "description": "Retail price per unit",
+      "generation": {
+        "minValue": 5,
+        "maxValue": 500,
+        "random": true
+      }
+    },
+    {
+      "name": "cost",
+      "type": "decimal(10,2)",
+      "description": "Cost of goods sold",
+      "generation": {
+        "expr": "unit_price * (0.4 + rand() * 0.3)"
+      }
+    },
+    {
+      "name": "weight_kg",
+      "type": "decimal(6,2)",
+      "description": "Product weight in kilograms",
+      "generation": {
+        "minValue": 0.1,
+        "maxValue": 50,
+        "random": true
+      }
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "description": "Whether product is currently sold",
+      "generation": {
+        "expr": "rand() < 0.95"
+      }
+    },
+    {
+      "name": "created_date",
+      "type": "date",
+      "description": "Date product was added to catalog",
+      "generation": {
+        "begin": "2018-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    }
+  ]
+}

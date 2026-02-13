@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "name": "retail_customer",
+  "version": "2.0.0",
+  "description": "Retail customer master data with demographics and loyalty information",
+  "industry": "retail",
+  "medallion_layer": "silver",
+  "typical_rows": {"min": 10000, "default": 100000, "max": 1000000},
+  "relationships": [
+    {"parent_of": "retail_transaction", "fk_column": "customer_id", "fk_range": [1000000, 1099999]},
+    {"parent_of": "retail_line_item", "fk_column": "customer_id", "fk_range": [1000000, 1099999]}
+  ],
+  "cdc": {"operations": {"APPEND": 50, "UPDATE": 30, "DELETE": 10}, "sequence_column": "operation_date"},
+  "data_quality": {"duplicate_rate": 0.04, "column_nulls": {"email": 0.02, "phone": 0.01}},
+  "columns": [
+    {
+      "name": "customer_id",
+      "type": "long",
+      "description": "Unique customer identifier",
+      "generation": {
+        "minValue": 1000000,
+        "unique": true
+      }
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "description": "Customer first name",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.first_name"
+      }
+    },
+    {
+      "name": "last_name",
+      "type": "string",
+      "description": "Customer last name",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.last_name"
+      }
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "description": "Email address",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.email",
+        "percentNulls": 0.02
+      }
+    },
+    {
+      "name": "phone",
+      "type": "string",
+      "description": "Phone number",
+      "pii": true,
+      "generation": {
+        "mimesis": "person.telephone",
+        "percentNulls": 0.01
+      }
+    },
+    {
+      "name": "address_line1",
+      "type": "string",
+      "description": "Street address",
+      "pii": true,
+      "generation": {
+        "mimesis": "address.address"
+      }
+    },
+    {
+      "name": "city",
+      "type": "string",
+      "description": "City",
+      "generation": {
+        "mimesis": "address.city"
+      }
+    },
+    {
+      "name": "state",
+      "type": "string",
+      "description": "State abbreviation",
+      "generation": {
+        "values": ["NY", "CA", "IL", "TX", "AZ", "PA", "FL", "OH", "NC", "GA"]
+      }
+    },
+    {
+      "name": "zip_code",
+      "type": "string",
+      "description": "ZIP code",
+      "generation": {
+        "template": "ddddd"
+      }
+    },
+    {
+      "name": "loyalty_tier",
+      "type": "string",
+      "description": "Customer loyalty tier",
+      "generation": {
+        "values": ["Bronze", "Silver", "Gold", "Platinum"],
+        "weights": [50, 30, 15, 5]
+      }
+    },
+    {
+      "name": "signup_date",
+      "type": "date",
+      "description": "Account creation date",
+      "generation": {
+        "begin": "2020-01-01",
+        "end": "2024-12-31",
+        "random": true
+      }
+    },
+    {
+      "name": "lifetime_value",
+      "type": "decimal(12,2)",
+      "description": "Total customer spend",
+      "generation": {
+        "minValue": 0,
+        "maxValue": 50000,
+        "distribution": "exponential"
+      }
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "description": "Whether customer is active",
+      "generation": {
+        "expr": "rand() < 0.85"
+      }
+    }
+  ]
+}
