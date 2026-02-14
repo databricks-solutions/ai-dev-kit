@@ -165,7 +165,6 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
 | [`databricks-skills/`](databricks-skills/) | 19 markdown skills teaching Databricks patterns |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
-| [`ai-dev-project/`](ai-dev-project/) | Starter template for new projects |
 
 ---
 
