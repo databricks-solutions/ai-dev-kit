@@ -78,7 +78,7 @@ test_cases:
       ,\n            \"genie_space_id\": \"def456\",\n            \"description\"\
       : \"SQL analytics on sales data: revenue trends, customer metrics, order history,\
       \ and pipeline analysis\"\n        },\n        {\n            \"name\": \"erp_operations\"\
-      ,\n            \"endpoint_name\": \"uc-connection:erp_mcp_connection\",\n  \
+      ,\n            \"connection_name\": \"erp_mcp_connection\",\n  \
       \          \"description\": \"Execute ERP invoice operations: create, approve,\
       \ reject, and search invoices, retrieve vendor details, and trigger batch processing\
       \ workflows\"\n        }\n    ],\n    description=\"Unified enterprise assistant\
@@ -95,15 +95,15 @@ test_cases:
       \ for invoice operations\n\nThe endpoint will take 2-5 minutes to provision.\
       \ Check status with `manage_mas(action=\"get\", tile_id=...)` using the returned\
       \ `tile_id`. Each agent type uses a different identifier field:\n- `ka_tile_id`\
-      \ for Knowledge Assistants\n- `genie_space_id` for Genie Spaces\n- `endpoint_name`\
-      \ with `uc-connection:` prefix for external MCP servers"
+      \ for Knowledge Assistants\n- `genie_space_id` for Genie Spaces\n- `connection_name`\
+      \ for external MCP servers (UC HTTP connection name)"
     execution_success: true
   expectations:
     expected_facts:
     - Uses manage_mas tool with action="create_or_update"
     - Includes ka_tile_id for the Knowledge Assistant agent
     - Includes genie_space_id for the Genie Space agent
-    - 'Uses uc-connection: prefix for external MCP server agent'
+    - Uses connection_name for external MCP server agent
     - Each agent has a name and description
     expected_patterns:
     - pattern: manage_mas
@@ -118,18 +118,18 @@ test_cases:
     - pattern: genie_space_id
       min_count: 1
       description: Must use genie_space_id for the Genie agent
-    - pattern: uc-connection:erp_mcp_connection
+    - pattern: connection_name
       min_count: 1
-      description: 'Must use uc-connection: prefix with the specified connection name'
-    - pattern: endpoint_name
+      description: Must use connection_name field for external MCP server agent
+    - pattern: erp_mcp_connection
       min_count: 1
-      description: MCP server agent must use endpoint_name field
+      description: Must reference the specified UC connection name
     guidelines:
     - Must use manage_mas with action="create_or_update" and an agents list containing
       all three agent types
     - KA agent must use ka_tile_id (not endpoint_name) with the provided tile_id
     - Genie agent must use genie_space_id with the provided space_id
-    - 'MCP server agent must use endpoint_name with uc-connection: prefix'
+    - MCP server agent must use connection_name field with the UC connection name
     - Each agent must have a specific, routing-quality description
     - Should include routing instructions that map query types to agents
   metadata:
@@ -143,7 +143,7 @@ test_cases:
     - mcp-server
     - genie
     - ka
-    - uc-connection
+    - connection-name
     created_at: '2026-02-13T16:19:54.625799'
     execution_verified:
       mode: local
@@ -325,7 +325,7 @@ test_cases:
       \ updates it:\n\n```python\nmanage_mas(\n    action=\"create_or_update\",\n\
       \    name=\"Customer_Support\",\n    agents=[\n        # ... include existing\
       \ agents from manage_mas get response ...\n        {\n            \"name\": \"\
-      crm_operations\",\n            \"endpoint_name\": \"uc-connection:crm_mcp_server\"\
+      crm_operations\",\n            \"connection_name\": \"crm_mcp_server\"\
       ,\n            \"description\": \"Interact with the CRM system: look up customer\
       \ profiles, create and update support tickets, view interaction history, and\
       \ manage account details\"\n        }\n    ],\n    description=\"Customer support\
@@ -343,7 +343,7 @@ test_cases:
       - "Uses manage_mas with action=\"find_by_name\" to look up the existing MAS"
       - "Uses manage_mas with action=\"get\" to retrieve the current configuration"
       - "Uses manage_mas with action=\"create_or_update\" to update the MAS"
-      - "Uses uc-connection: prefix for the external MCP server agent"
+      - "Uses connection_name for the external MCP server agent"
       - "Warns that all existing agents must be included in the update"
     expected_patterns:
       - pattern: "manage_mas"
@@ -358,21 +358,24 @@ test_cases:
       - pattern: "action"
         min_count: 3
         description: "Must specify action parameter for each manage_mas call"
-      - pattern: "uc-connection:crm_mcp_server"
+      - pattern: "connection_name"
         min_count: 1
-        description: "Must use uc-connection: prefix with the specified connection name"
+        description: "Must use connection_name field for external MCP server agent"
+      - pattern: "crm_mcp_server"
+        min_count: 1
+        description: "Must reference the specified UC connection name"
     guidelines:
       - "Must follow a multi-step workflow: find by name, get current config, then update"
       - "Must use manage_mas with action=\"find_by_name\" (not hardcode a tile_id) to locate the existing MAS"
       - "Must use manage_mas with action=\"get\" to read the current agents before updating"
-      - "New MCP agent must use endpoint_name with uc-connection: prefix"
+      - "New MCP agent must use connection_name field with the UC connection name"
       - "Must warn that omitting existing agents from the update will remove them"
       - "Should preserve the original MAS name when updating"
   metadata:
     category: happy_path
     difficulty: hard
     source: interactive
-    tags: ["mas", "update", "mcp-server", "uc-connection", "find-by-name", "multi-step"]
+    tags: ["mas", "update", "mcp-server", "connection-name", "find-by-name", "multi-step"]
     created_at: '2026-02-13T16:25:01.420945'
     execution_verified:
       mode: local
