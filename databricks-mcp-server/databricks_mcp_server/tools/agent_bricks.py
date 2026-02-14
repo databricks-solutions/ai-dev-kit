@@ -261,14 +261,14 @@ def _mas_create_or_update(
         }
 
         if has_genie:
-            agent_config["agent_type"] = "genie-space"
+            agent_config["agent_type"] = "genie"
             agent_config["genie_space"] = {"id": agent.get("genie_space_id")}
         elif has_ka:
             # KA tiles are referenced via their serving endpoint
             # Endpoint name uses the first segment of the tile_id
             ka_tile_id = agent.get("ka_tile_id")
             tile_id_prefix = ka_tile_id.split("-")[0]
-            agent_config["agent_type"] = "serving-endpoint"
+            agent_config["agent_type"] = "serving_endpoint"
             agent_config["serving_endpoint"] = {"name": f"ka-{tile_id_prefix}-endpoint"}
         elif has_uc_function:
             uc_function_name = agent.get("uc_function_name")
@@ -280,7 +280,7 @@ def _mas_create_or_update(
                         f"'catalog.schema.function_name', got '{uc_function_name}'"
                     )
                 }
-            agent_config["agent_type"] = "unity-catalog-function"
+            agent_config["agent_type"] = "unity_catalog_function"
             agent_config["unity_catalog_function"] = {
                 "uc_path": {
                     "catalog": uc_parts[0],
@@ -289,10 +289,10 @@ def _mas_create_or_update(
                 }
             }
         elif has_connection:
-            agent_config["agent_type"] = "external-mcp-server"
+            agent_config["agent_type"] = "external_mcp_server"
             agent_config["external_mcp_server"] = {"connection_name": agent.get("connection_name")}
         else:
-            agent_config["agent_type"] = "serving-endpoint"
+            agent_config["agent_type"] = "serving_endpoint"
             agent_config["serving_endpoint"] = {"name": agent.get("endpoint_name")}
 
         agent_list.append(agent_config)

@@ -140,11 +140,12 @@ class BaseAgentDict(TypedDict, total=False):
 
     name: str
     description: str
-    agent_type: str  # genie, ka, app, etc.
+    agent_type: str  # genie, serving_endpoint, unity_catalog_function, external_mcp_server
     genie_space: Optional[Dict[str, str]]  # {id: ...}
     serving_endpoint: Optional[Dict[str, str]]  # {name: ...}
     app: Optional[Dict[str, str]]  # {name: ...}
-    unity_catalog_function: Optional[Dict[str, Any]]
+    unity_catalog_function: Optional[Dict[str, Any]]  # {uc_path: {catalog, schema, name}}
+    external_mcp_server: Optional[Dict[str, str]]  # {connection_name: ...}
 
 
 class MultiAgentSupervisorStatusDict(TypedDict):
