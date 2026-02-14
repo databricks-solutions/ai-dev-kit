@@ -18,10 +18,7 @@ logger = logging.getLogger(__name__)
 # available regardless of which skills are enabled.
 # ---------------------------------------------------------------------------
 SKILL_TOOL_MAPPING: dict[str, list[str]] = {
-  'databricks-agent-bricks': [
-    'create_or_update_ka', 'get_ka', 'find_ka_by_name', 'delete_ka',
-    'create_or_update_mas', 'get_mas', 'find_mas_by_name', 'delete_mas',
-  ],
+  'databricks-agent-bricks': ['manage_ka', 'manage_mas'],
   'databricks-aibi-dashboards': [
     'create_or_update_dashboard', 'get_dashboard', 'list_dashboards',
     'trash_dashboard', 'publish_dashboard', 'unpublish_dashboard',

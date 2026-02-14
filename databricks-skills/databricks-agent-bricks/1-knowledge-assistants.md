@@ -30,7 +30,7 @@ Before creating a KA, you need documents in a Unity Catalog Volume:
 
 ## Creating a Knowledge Assistant
 
-Use the `create_or_update_ka` tool:
+Use the `manage_ka` tool with `action="create_or_update"`:
 
 - `name`: "HR Policy Assistant"
 - `volume_path`: "/Volumes/my_catalog/my_schema/raw_data/hr_docs"
@@ -52,7 +52,7 @@ After creation, the KA endpoint needs to provision:
 | `ONLINE` | Ready to use | - |
 | `OFFLINE` | Not currently running | - |
 
-Use `get_ka` to check the status:
+Use `manage_ka` with `action="get"` to check the status:
 
 - `tile_id`: "<the tile_id from create>"
 
@@ -76,7 +76,7 @@ These are automatically added when `add_examples_from_volume=true` (default).
 
 ### Manual
 
-Examples can also be specified in the `create_or_update_ka` call if needed.
+Examples can also be specified in the `manage_ka` create_or_update call if needed.
 
 ## Best Practices
 
@@ -101,7 +101,7 @@ Be helpful and professional. When answering:
 
 To update the indexed documents:
 1. Add/remove/modify files in the volume
-2. Call `create_or_update_ka` with the same name and `tile_id`
+2. Call `manage_ka` with `action="create_or_update"`, the same name and `tile_id`
 3. The KA will re-index the updated content
 
 ## Example Workflow
@@ -126,7 +126,7 @@ Knowledge Assistants can be used as agents in a Supervisor Agent (formerly Multi
 
 ### Finding the Endpoint Name
 
-Use `get_ka` to retrieve the KA details. The response includes:
+Use `manage_ka` with `action="get"` to retrieve the KA details. The response includes:
 - `tile_id`: The unique identifier for the KA
 - `name`: The KA name (sanitized)
 - `endpoint_status`: Current status (ONLINE, PROVISIONING, etc.)
@@ -135,26 +135,27 @@ The endpoint name follows this pattern: `ka-{tile_id}-endpoint`
 
 ### Finding a KA by Name
 
-If you know the KA name but not the tile_id, use `find_ka_by_name`:
+If you know the KA name but not the tile_id, use `manage_ka` with `action="find_by_name"`:
 
 ```python
-find_ka_by_name(name="HR_Policy_Assistant")
+manage_ka(action="find_by_name", name="HR_Policy_Assistant")
 # Returns: {"found": True, "tile_id": "01abc...", "name": "HR_Policy_Assistant", "endpoint_name": "ka-01abc...-endpoint"}
 ```
 
-### Example: Adding KA to MAS
+### Example: Adding KA to Supervisor Agent
 
 ```python
 # First, find the KA
-ka_result = find_ka_by_name(name="HR_Policy_Assistant")
+manage_ka(action="find_by_name", name="HR_Policy_Assistant")
 
-# Then use it in a MAS
-create_or_update_mas(
-    name="Support MAS",
+# Then use the tile_id in a Supervisor Agent
+manage_mas(
+    action="create_or_update",
+    name="Support_MAS",
     agents=[
         {
             "name": "hr_agent",
-            "endpoint_name": ka_result["endpoint_name"],
+            "ka_tile_id": "<tile_id from find_by_name>",
             "description": "Answers HR policy questions from the employee handbook"
         }
     ]

@@ -138,7 +138,8 @@ Reference the UC Connection using the `connection_name` field:
 Example showing integration of Genie, KA, and external MCP:
 
 ```python
-create_or_update_mas(
+manage_mas(
+    action="create_or_update",
     name="AP_Invoice_Supervisor",
     agents=[
         {
@@ -192,7 +193,7 @@ SELECT http_request(
 
 ## Creating a Supervisor Agent
 
-Use the `create_or_update_mas` tool:
+Use the `manage_mas` tool with `action="create_or_update"`:
 
 - `name`: "Customer Support MAS"
 - `agents`:
@@ -236,7 +237,7 @@ Each agent in the `agents` list needs:
 
 **Note**: Provide exactly one of: `ka_tile_id`, `genie_space_id`, `endpoint_name`, `uc_function_name`, or `connection_name`.
 
-To find a KA tile_id, use `find_ka_by_name(name="Your KA Name")`.
+To find a KA tile_id, use `manage_ka(action="find_by_name", name="Your KA Name")`.
 To find a Genie space_id, use `find_genie_by_name(display_name="Your Genie Name")`.
 
 ### Writing Good Descriptions
@@ -263,7 +264,7 @@ After creation, the Supervisor Agent endpoint needs to provision:
 | `ONLINE` | Ready to route queries | - |
 | `OFFLINE` | Not currently running | - |
 
-Use `get_mas` to check the status.
+Use `manage_mas` with `action="get"` to check the status.
 
 ## Adding Example Questions
 
@@ -345,7 +346,7 @@ Consider adding a general-purpose agent for queries that don't fit elsewhere:
 
 To update an existing Supervisor Agent:
 
-1. **Add/remove agents**: Call `create_or_update_mas` with updated `agents` list
+1. **Add/remove agents**: Call `manage_mas` with `action="create_or_update"` and updated `agents` list
 2. **Update descriptions**: Change agent descriptions to improve routing
 3. **Modify instructions**: Update routing rules
 
