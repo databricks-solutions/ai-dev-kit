@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "databricks": {
-      "command": "/Users/cal.reynolds/Downloads/skunkworks/ai-dev-kit/databricks-mcp-server/.venv/bin/python",
-      "args": ["/Users/cal.reynolds/Downloads/skunkworks/ai-dev-kit/databricks-mcp-server/run_server.py"]
+      "command": "../.venv/bin/python",
+      "args": ["../databricks-mcp-server/run_server.py"]
     }
   }
 }
