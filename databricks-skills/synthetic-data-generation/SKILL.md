@@ -77,8 +77,12 @@ Run code locally while Spark operations execute on serverless compute. Best for 
 
 **Setup:**
 ```bash
-# Install locally - IMPORTANT: Use version 17.3.x (NOT 18.x which has serverless issues)
-pip install "databricks-connect>=17.3,<18" faker polars numpy pandas
+# Install locally - version depends on your Python version
+# For Python 3.10 or 3.11:
+pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas
+
+# For Python 3.12:
+pip install "databricks-connect>=16.2" faker polars numpy pandas
 
 # Configure ~/.databrickscfg
 [DEFAULT]
@@ -149,7 +153,7 @@ These libraries are useful for generating realistic synthetic data:
 - **numpy/pandas**: Statistical distributions and data manipulation
 - **holidays**: Provides country-specific holiday calendars for realistic date patterns
 
-**For Databricks Connect:** Install locally with `pip install "databricks-connect>=17.3,<18" faker polars numpy pandas holidays`
+**For Databricks Connect:** Install locally with `pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas holidays` (Python 3.10/3.11) or `pip install "databricks-connect>=16.2" faker polars numpy pandas holidays` (Python 3.12)
 
 **For Serverless Jobs:** Include in `environments.spec.dependencies`: `["faker", "polars", "numpy", "pandas", "holidays"]`
 
@@ -348,7 +352,7 @@ customers_df = customers_df.withColumn("arr", generate_lognormal_amount(F.col("t
 The recommended workflow for development and interactive data generation:
 
 1. **Configure Databricks Connect** (one-time setup):
-   - Install: `pip install "databricks-connect>=17.3,<18" faker polars numpy pandas holidays`
+   - Install: `pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas holidays` (Python 3.10/3.11) or `pip install "databricks-connect>=16.2" faker polars numpy pandas holidays` (Python 3.12)
    - Configure `~/.databrickscfg` with `serverless_compute_id = auto`
 
 2. **Write Python script locally** (e.g., `scripts/generate_data.py`):
@@ -1146,6 +1150,6 @@ This returns schema, row counts, and column statistics to confirm the data was w
 | **Out of memory with large data** | Increase `partitions` parameter in `spark.range()` |
 | **Foreign keys don't match across tables** | Use same random seed across all generators |
 | **Delta table write fails** | Ensure `CREATE SCHEMA IF NOT EXISTS` runs before `saveAsTable()` |
-| **databricks-connect serverless issues** | Use version 17.3.x: `pip install "databricks-connect>=17.3,<18"` |
+| **databricks-connect serverless issues** | Use `pip install "databricks-connect>=15.1,<16.2"` (Python 3.10/3.11) or `pip install "databricks-connect>=16.2"` (Python 3.12) |
 | **Databricks Connect connection fails** | Verify `~/.databrickscfg` has correct host and `serverless_compute_id = auto` |
 | **Context corrupted on classic cluster** | Omit `context_id` to create fresh context, reinstall libraries |
