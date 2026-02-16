@@ -1,0 +1,42 @@
+run_id: '20260214_120421'
+created_at: '2026-02-14T12:04:21.014541'
+skill_name: databricks-asset-bundles
+metrics:
+  pass_rate: 1.0
+  total_tests: 11
+  passed_tests: 11
+  failed_tests: 0
+test_results:
+- id: dabs_multi_env_variables_001
+  passed: true
+  execution_mode: local
+- id: dabs_ipynb_notebook_serverless_001
+  passed: true
+  execution_mode: local
+- id: dabs_ipynb_notebook_classic_001
+  passed: true
+  execution_mode: local
+- id: dabs_py_notebook_serverless_001
+  passed: true
+  execution_mode: local
+- id: dabs_py_notebook_classic_001
+  passed: true
+  execution_mode: local
+- id: dabs_python_script_serverless_001
+  passed: true
+  execution_mode: local
+- id: dabs_python_script_classic_001
+  passed: true
+  execution_mode: local
+- id: dabs_sql_task_001
+  passed: true
+  execution_mode: local
+- id: dabs_sdp_pipeline_serverless_001
+  passed: true
+  execution_mode: local
+- id: dabs_sql_alert_v2_001
+  passed: true
+  execution_mode: local
+- id: dabs_dashboard_001
+  passed: true
+  execution_mode: local

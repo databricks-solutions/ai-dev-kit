@@ -1,6 +1,23 @@
 #!/bin/bash
 # Post-install setup for databricks-ai-dev-kit plugin
 # Creates virtual environment and installs MCP server dependencies
+# ============================================================
+# SECURITY NOTE: This script runs automatically on plugin load
+#
+# What it does:
+#   1. Creates .venv/ with Python 3.11 (if not present)
+#   2. Installs databricks-tools-core (local package)
+#   3. Installs databricks-mcp-server (local package)
+#   4. Verifies MCP server import works
+#
+# What it does NOT do:
+#   - Collect or transmit credentials
+#   - Modify files outside the plugin directory
+#   - Run with elevated privileges
+#   - Access your Databricks workspace (until you authenticate)
+#
+# Source: https://github.com/databricks-solutions/ai-dev-kit
+# ============================================================
 
 set -e
 
@@ -9,72 +26,41 @@ PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && p
 TOOLS_CORE_DIR="${PLUGIN_ROOT}/databricks-tools-core"
 MCP_SERVER_DIR="${PLUGIN_ROOT}/databricks-mcp-server"
 
-echo "======================================"
-echo "Setting up Databricks AI Dev Kit"
-echo "======================================"
-echo ""
+# Idempotency check: skip if already set up and working
+if [ -f "${PLUGIN_ROOT}/.venv/bin/python" ] && \
+   "${PLUGIN_ROOT}/.venv/bin/python" -c "import databricks_mcp_server" 2>/dev/null; then
+    echo "Databricks AI Dev Kit already set up."
+    exit 0
+fi
+
+echo "Setting up Databricks AI Dev Kit..." >&2
 
 # Check for uv
 if ! command -v uv &> /dev/null; then
-    echo "Error: 'uv' is required but not installed."
-    echo "Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo "Error: 'uv' is required but not installed." >&2
+    echo "Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
     exit 1
 fi
-echo "uv is installed"
 
 # Check if tools-core directory exists
 if [ ! -d "$TOOLS_CORE_DIR" ]; then
-    echo "Error: databricks-tools-core not found at $TOOLS_CORE_DIR"
+    echo "Error: databricks-tools-core not found at $TOOLS_CORE_DIR" >&2
     exit 1
 fi
-echo "databricks-tools-core found"
 
 # Create virtual environment at plugin root
-echo ""
-echo "Creating virtual environment..."
 cd "$PLUGIN_ROOT"
-uv venv --python 3.11
-echo "Virtual environment created"
+uv venv --python 3.11 >&2
 
 # Install dependencies
-echo ""
-echo "Installing databricks-tools-core..."
-uv pip install --python .venv/bin/python -e "$TOOLS_CORE_DIR" --quiet
-echo "databricks-tools-core installed"
-
-echo ""
-echo "Installing databricks-mcp-server..."
-uv pip install --python .venv/bin/python -e "$MCP_SERVER_DIR" --quiet
-echo "databricks-mcp-server installed"
+uv pip install --python .venv/bin/python -e "$TOOLS_CORE_DIR" --quiet >&2
+uv pip install --python .venv/bin/python -e "$MCP_SERVER_DIR" --quiet >&2
 
 # Verify installation
-echo ""
-echo "Verifying installation..."
 if .venv/bin/python -c "import databricks_mcp_server" 2>/dev/null; then
-    echo "MCP server verified"
+    touch "${PLUGIN_ROOT}/.venv/.setup-complete"
+    echo "Databricks AI Dev Kit setup complete."
 else
-    echo "Warning: Could not verify MCP server import"
+    echo "Error: Could not verify MCP server import after install." >&2
+    exit 1
 fi
-
-echo ""
-echo "======================================"
-echo "Databricks AI Dev Kit setup complete!"
-echo "======================================"
-echo ""
-echo "To enable the MCP server, add this to your project's .mcp.json:"
-echo ""
-cat <<'EOF'
-{
-  "mcpServers": {
-    "databricks": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/.venv/bin/python",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/databricks-mcp-server/run_server.py"],
-      "defer_loading": true
-    }
-  }
-}
-EOF
-echo ""
-echo "Or run this command to add it via CLI:"
-echo "  claude mcp add-json databricks '{\"command\":\"\${CLAUDE_PLUGIN_ROOT}/.venv/bin/python\",\"args\":[\"\${CLAUDE_PLUGIN_ROOT}/databricks-mcp-server/run_server.py\"],\"defer_loading\":true}'"
-echo ""

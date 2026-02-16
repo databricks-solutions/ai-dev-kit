@@ -198,3 +198,11 @@ class EntityIn(BaseModel):
 - **[Resources](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/resources)** — SQL warehouse, Lakebase, serving, secrets
 - **[app.yaml Reference](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime)** — command and env config
 - **[System Environment](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/system-env)** — pre-installed packages, runtime details
+
+## Related Skills
+
+- **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps with FastAPI + React
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps via DABs
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - backend SDK integration
+- **[lakebase-provisioned](../lakebase-provisioned/SKILL.md)** - adding persistent PostgreSQL state
+- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving ML models for app integration

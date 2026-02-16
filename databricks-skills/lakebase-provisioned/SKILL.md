@@ -298,3 +298,11 @@ databricks database start-database-instance --name my-lakebase-instance
 - **Lakebase Autoscaling** is a newer offering with automatic scaling but limited regional availability. This skill focuses on **Lakebase Provisioned** which is more widely available.
 - For memory/state in LangChain agents, use `databricks-langchain[memory]` which includes Lakebase support.
 - Tokens are short-lived (1 hour) - production apps MUST implement token refresh.
+
+## Related Skills
+
+- **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps that can use Lakebase for persistence
+- **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python apps with Lakebase backend
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for instance management and token generation
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps with Lakebase resources
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** - scheduling reverse ETL sync jobs

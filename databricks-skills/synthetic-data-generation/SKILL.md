@@ -1129,6 +1129,15 @@ This returns schema, row counts, and column statistics to confirm the data was w
 11. **Time patterns**: Weekday/weekend, holidays, seasonality, event spikes
 12. **Row coherence**: Priority affects resolution time affects CSAT
 13. **Volume for aggregation**: 10K-50K rows minimum so patterns survive GROUP BY
+14. **Always use files**: Write to local file, execute, edit if error, re-execute
+15. **Context reuse**: Pass `cluster_id` and `context_id` for faster iterations
+16. **Libraries**: Install `faker` and `holidays` first; most others are pre-installed
+
+## Related Skills
+
+- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - for building bronze/silver/gold pipelines on top of generated data
+- **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - for visualizing the generated data in dashboards
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for managing catalogs, schemas, and volumes where data is stored
 
 ### Output
 14. **Create infrastructure in script**: Use `CREATE SCHEMA/VOLUME IF NOT EXISTS`

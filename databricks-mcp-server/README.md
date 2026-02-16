@@ -183,7 +183,7 @@ Claude now has both:
 │  Skills (knowledge)          MCP Tools (actions)            │
 │  └── .claude/skills/         └── .claude/mcp.json           │
 │      ├── sdp-writer              └── databricks server      │
-│      ├── asset-bundles                                      │
+│      ├── databricks-asset-bundles                          │
 │      └── ...                                                │
 └──────────────────────────────┬──────────────────────────────┘
                                │ MCP Protocol (stdio)

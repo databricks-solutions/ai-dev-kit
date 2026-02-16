@@ -283,3 +283,12 @@ These features are NOT yet supported in Lakebase Autoscaling:
 - All create/update/delete operations are **long-running** -- use `.wait()` in the SDK.
 - Tokens are short-lived (1 hour) -- production apps MUST implement token refresh.
 - **Postgres versions** 16 and 17 are supported.
+
+## Related Skills
+
+- **[lakebase-provisioned](../lakebase-provisioned/SKILL.md)** - fixed-capacity managed PostgreSQL (predecessor)
+- **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps that can use Lakebase for persistence
+- **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python apps with Lakebase backend
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for project management and token generation
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps with Lakebase resources
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** - scheduling reverse ETL sync jobs

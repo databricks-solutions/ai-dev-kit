@@ -1,0 +1,171 @@
+# Baseline for model-serving skill
+# Created: 2026-02-09
+# 
+# This baseline includes TWO evaluation runs:
+# 1. Original ground_truth (8 manually written tests): Run ID 00421604faf24acdb64ffb4cbe5eb672
+# 2. Cursor-generated candidates (8 tests): Run ID d0c0f08fa7d84b19bfdc28f386642d39
+#
+# Both runs achieved identical metrics, validating that Cursor generates
+# responses that match the quality of manually written ground truth.
+
+metadata:
+  skill_name: "databricks-model-serving"
+  created_at: "2026-02-09T10:22:00Z"
+  mlflow_run_ids:
+    ground_truth: "00421604faf24acdb64ffb4cbe5eb672"
+    cursor_generated: "d0c0f08fa7d84b19bfdc28f386642d39"
+  test_count: 8
+  evaluation_type: "full_cycle"
+  validation:
+    databricks_execution: "8/8 passed"
+    mlflow_evaluation: "8/8 passed"
+
+# Aggregate metrics (identical for both runs)
+metrics:
+  python_syntax:
+    mean: 1.0
+    threshold: 1.0
+  no_hallucinated_apis:
+    mean: 1.0
+    threshold: 1.0
+  expected_facts:
+    mean: 1.0
+    threshold: 0.9
+  pattern_adherence:
+    patterns:
+      - name: "ResponsesAgent subclass"
+        mean: 1.0
+      - name: "helper method for output"
+        mean: 1.0
+      - name: "model export"
+        mean: 1.0
+      - name: "sklearn autolog"
+        mean: 1.0
+      - name: "3-level UC path"
+        mean: 1.0
+      - name: "PythonModel subclass"
+        mean: 1.0
+      - name: "load_context method"
+        mean: 1.0
+      - name: "log_model call"
+        mean: 1.0
+      - name: "agents.deploy call"
+        mean: 1.0
+      - name: "job creation"
+        mean: 1.0
+      - name: "async job run"
+        mean: 1.0
+      - name: "dataframe_records format"
+        mean: 1.0
+      - name: "query method"
+        mean: 1.0
+      - name: "messages format"
+        mean: 1.0
+      - name: "resource specification"
+        mean: 1.0
+      - name: "correct helper method"
+        mean: 1.0
+      - name: "identifies the error"
+        mean: 1.0
+    overall_mean: 1.0
+    threshold: 0.9
+  safety:
+    mean: 1.0
+  guidelines:
+    mean: 0.875
+
+# Per-test results (Cursor-generated)
+test_results:
+  - id: "cursor_gen_001"
+    description: "ResponsesAgent Echo"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+  - id: "cursor_gen_002"
+    description: "Classical ML autolog"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+  - id: "cursor_gen_003"
+    description: "Custom PyFunc"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+  - id: "cursor_gen_004"
+    description: "Job-based deployment"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+  - id: "cursor_gen_005"
+    description: "Query ML endpoint"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+  - id: "cursor_gen_006"
+    description: "Query chat endpoint"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+  - id: "cursor_gen_007"
+    description: "Log agent to UC"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+  - id: "cursor_gen_008"
+    description: "Error case raw dicts"
+    scores:
+      python_syntax: 1.0
+      no_hallucinated_apis: 1.0
+      pattern_adherence: 1.0
+      safety: 1.0
+      guidelines: 1.0
+    databricks_execution: "passed"
+
+# Quality gates
+quality_gates:
+  syntax_valid:
+    threshold: 1.0
+    actual: 1.0
+    passed: true
+  pattern_adherence:
+    threshold: 0.9
+    actual: 1.0
+    passed: true
+  no_hallucinated_apis:
+    threshold: 1.0
+    actual: 1.0
+    passed: true
+  execution_success:
+    threshold: 0.8
+    actual: 1.0
+    passed: true
+
+overall_status: "pass"

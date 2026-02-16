@@ -157,7 +157,7 @@ Manually verify in browser:
 
 ### Deploy to Databricks
 
-Use DABs to deploy your APX application to Databricks. See the `asset-bundles` skill for complete deployment guidance.
+Use DABs to deploy your APX application to Databricks. See the `databricks-asset-bundles` skill for complete deployment guidance.
 
 ### Monitor Application Logs
 
@@ -244,3 +244,10 @@ Create two markdown files:
 - **[best-practices.md](best-practices.md)** - Best practices, anti-patterns, debugging
 
 Read these files only when actively writing that type of code or debugging issues.
+
+## Related Skills
+
+- **[databricks-app-python](../databricks-app-python/SKILL.md)** - for Streamlit, Dash, Gradio, or Flask apps
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying APX apps via DABs
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - backend SDK integration
+- **[lakebase-provisioned](../lakebase-provisioned/SKILL.md)** - adding persistent PostgreSQL state to apps

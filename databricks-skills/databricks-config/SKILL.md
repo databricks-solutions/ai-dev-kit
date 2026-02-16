@@ -72,3 +72,10 @@ cluster_id = 1217-064531-c9c3ngyn
 
 View full configuration at: ~/.databrickscfg
 ```
+
+## Related Skills
+
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - uses profiles configured by this skill
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - references workspace profiles for deployment targets
+- **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - apps that connect via configured profiles
+- **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python apps using configured profiles

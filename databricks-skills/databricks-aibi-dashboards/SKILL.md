@@ -915,3 +915,9 @@ print(result["url"])
 - Multiple items in the `lines` array are **concatenated**, not displayed on separate lines
 - Use **separate text widgets** for title and subtitle at different y positions
 - Example: title at y=0 with height=1, subtitle at y=1 with height=1
+
+## Related Skills
+
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for querying the underlying data and system tables
+- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - for building the data pipelines that feed dashboards
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** - for scheduling dashboard data refreshes

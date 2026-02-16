@@ -195,6 +195,15 @@ manage_mas(
 )
 ```
 
+## Related Skills
+
+- **[databricks-genie](../databricks-genie/SKILL.md)** - Comprehensive Genie Space creation, curation, and Conversation API guidance
+- **[unstructured-pdf-generation](../unstructured-pdf-generation/SKILL.md)** - Generate synthetic PDFs to feed into Knowledge Assistants
+- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - Create raw data for Genie Space tables
+- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
+- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy custom agent endpoints used as MAS agents
+- **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Build vector indexes for RAG applications paired with KAs
+
 ## See Also
 
 - `1-knowledge-assistants.md` - Detailed KA patterns and examples

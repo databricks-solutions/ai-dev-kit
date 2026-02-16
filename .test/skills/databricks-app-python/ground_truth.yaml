@@ -251,7 +251,7 @@ test_cases:
       category: "happy_path"
       difficulty: "medium"
       source: "manual"
-      tags: ["gradio", "model-serving"]
+      tags: ["gradio", "databricks-model-serving"]
 
   - id: "app_fastapi_001"
     inputs:

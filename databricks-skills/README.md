@@ -11,7 +11,7 @@ Run in your project root:
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 
 # Install specific skills
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- asset-bundles agent-evaluation
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-asset-bundles agent-evaluation
 
 # Pin MLflow skills to a specific version
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --mlflow-version v1.0.0
@@ -35,9 +35,9 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ### 🤖 AI & Agents
 - **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
 - **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
-- **model-serving** - Deploy MLflow models and AI agents to endpoints
+- **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints
 - **unstructured-pdf-generation** - Generate synthetic PDFs for RAG
-- **vector-search** - Vector similarity search for RAG and semantic search
+- **databricks-vector-search** - Vector similarity search for RAG and semantic search
 
 ### 📊 MLflow (from [mlflow/skills](https://github.com/mlflow/skills))
 - **agent-evaluation** - End-to-end agent evaluation workflow
@@ -59,7 +59,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **synthetic-data-generation** - Realistic test data with Faker
 
 ### 🚀 Development & Deployment
-- **asset-bundles** - DABs for multi-environment deployments
+- **databricks-asset-bundles** - DABs for multi-environment deployments
 - **databricks-app-apx** - Full-stack apps (FastAPI + React)
 - **databricks-app-python** - Python web apps (Dash, Streamlit, Flask)
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API

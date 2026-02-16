@@ -61,7 +61,7 @@ test_cases:
     inputs:
       prompt: "Create a databricks asset bundle for deploying my pipeline"
     expectations:
-      expected_skills: ["asset-bundles"]
+      expected_skills: ["databricks-asset-bundles"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -87,7 +87,7 @@ test_cases:
     expectations:
       expected_skills:
         - "spark-declarative-pipelines"
-        - "asset-bundles"
+        - "databricks-asset-bundles"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
@@ -206,7 +206,7 @@ test_cases:
     expectations:
       expected_skills:
         - "databricks-app-python"
-        - "asset-bundles"
+        - "databricks-asset-bundles"
       is_multi_skill: true
     metadata:
       category: "multi_skill"

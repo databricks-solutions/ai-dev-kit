@@ -54,3 +54,11 @@ The llms.txt file is organized by category:
 1. Fetch llms.txt to find relevant documentation
 2. Read the specific docs to understand the feature
 3. Determine which skill/tools apply, then use them
+
+## Related Skills
+
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns for programmatic Databricks access
+- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - DLT / Lakeflow pipeline workflows
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Governance and catalog management
+- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Serving endpoints and model deployment
+- **[mlflow-evaluation](../mlflow-evaluation/SKILL.md)** - MLflow 3 GenAI evaluation workflows

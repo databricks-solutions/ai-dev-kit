@@ -568,3 +568,10 @@ For advanced configuration options (development mode, continuous pipelines, cust
 | **Sinks** | Python only, streaming only, append flows only |
 
 **Default to serverless** unless user explicitly requires R, RDD APIs, or JAR libraries.
+
+## Related Skills
+
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** - for orchestrating and scheduling pipeline runs
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - for multi-environment deployment of pipeline projects
+- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - for generating test data to feed into pipelines
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for catalog/schema/volume management and governance

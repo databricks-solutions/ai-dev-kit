@@ -613,3 +613,13 @@ If I'm unsure about a method, I should:
 | Pipelines | https://databricks-sdk-py.readthedocs.io/en/latest/workspace/pipelines/pipelines.html |
 | Secrets | https://databricks-sdk-py.readthedocs.io/en/latest/workspace/workspace/secrets.html |
 | DBUtils | https://databricks-sdk-py.readthedocs.io/en/latest/dbutils.html |
+
+## Related Skills
+
+- **[databricks-config](../databricks-config/SKILL.md)** - profile and authentication setup
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying resources via DABs
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** - job orchestration patterns
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - catalog governance
+- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving endpoint management
+- **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - vector index operations
+- **[lakebase-provisioned](../lakebase-provisioned/SKILL.md)** - managed PostgreSQL via SDK

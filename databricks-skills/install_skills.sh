@@ -10,11 +10,11 @@
 #   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 #
 #   # Install specific skills (can mix Databricks and MLflow skills)
-#   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- asset-bundles agent-evaluation
+#   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-asset-bundles agent-evaluation
 #
 #   # Or run locally
 #   ./install_skills.sh                              # Install all skills
-#   ./install_skills.sh asset-bundles agent-evaluation  # Install specific skills
+#   ./install_skills.sh databricks-asset-bundles agent-evaluation  # Install specific skills
 #   ./install_skills.sh --mlflow-version v1.0.0      # Pin MLflow skills version
 #   ./install_skills.sh --local                      # Install Databricks skills from local directory
 #   ./install_skills.sh --list                       # List available skills
@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="asset-bundles databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search zerobus-ingest"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-metric-views databricks-model-serving databricks-python-sdk databricks-unity-catalog databricks-vector-search databricks-zerobus-ingest lakebase-autoscale lakebase-provisioned mlflow-evaluation spark-declarative-pipelines spark-python-data-source spark-structured-streaming synthetic-data-generation unstructured-pdf-generation"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -56,7 +56,7 @@ get_skill_description() {
         # Databricks skills
         "databricks-agent-bricks") echo "Knowledge Assistants, Genie Spaces, Supervisor Agents" ;;
         "databricks-aibi-dashboards") echo "Databricks AI/BI Dashboards - create and manage dashboards" ;;
-        "asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
+        "databricks-asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
         "databricks-config") echo "Profile authentication setup for Databricks" ;;
@@ -68,14 +68,15 @@ get_skill_description() {
         "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
         "lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
         "lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
-        "metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
-        "model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
+        "databricks-metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
+        "databricks-model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
         "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
+        "spark-python-data-source") echo "Spark custom Python data sources" ;;
         "spark-structured-streaming") echo "Spark Structured Streaming patterns and best practices" ;;
         "synthetic-data-generation") echo "Synthetic test data generation" ;;
         "unstructured-pdf-generation") echo "Generate synthetic PDFs for RAG" ;;
-        "vector-search") echo "Vector Search - endpoints, indexes, and queries for RAG" ;;
-        "zerobus-ingest") echo "Zerobus Ingest - gRPC data ingestion into Delta tables" ;;
+        "databricks-vector-search") echo "Vector Search - endpoints, indexes, and queries for RAG" ;;
+        "databricks-zerobus-ingest") echo "Zerobus Ingest - gRPC data ingestion into Delta tables" ;;
         # MLflow skills (from mlflow/skills repo)
         "agent-evaluation") echo "End-to-end agent evaluation workflow" ;;
         "analyze-mlflow-chat-session") echo "Debug multi-turn conversations" ;;
@@ -95,7 +96,7 @@ get_skill_extra_files() {
         "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
         "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
         "databricks-genie") echo "spaces.md conversation.md" ;;
-        "asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
+        "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
@@ -103,13 +104,13 @@ get_skill_extra_files() {
         "databricks-unity-catalog") echo "5-system-tables.md" ;;
         "lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
-        "metric-views") echo "yaml-reference.md patterns.md" ;;
+        "databricks-metric-views") echo "yaml-reference.md patterns.md" ;;
+        "databricks-model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
         "mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
-        "model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
         "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;
         "spark-structured-streaming") echo "checkpoint-best-practices.md kafka-streaming.md merge-operations.md multi-sink-writes.md stateful-operations.md stream-static-joins.md stream-stream-joins.md streaming-best-practices.md trigger-and-cost-optimization.md" ;;
-        "vector-search") echo "index-types.md" ;;
-        "zerobus-ingest") echo "1-setup-and-authentication.md 2-python-client.md 3-multilanguage-clients.md 4-protobuf-schema.md 5-operations-and-limits.md" ;;
+        "databricks-vector-search") echo "index-types.md" ;;
+        "databricks-zerobus-ingest") echo "1-setup-and-authentication.md 2-python-client.md 3-multilanguage-clients.md 4-protobuf-schema.md 5-operations-and-limits.md" ;;
         *) echo "" ;;
     esac
 }
@@ -158,7 +159,7 @@ show_help() {
     echo "  ./install_skills.sh                          # Install all skills"
     echo "  ./install_skills.sh spark-declarative-pipelines  # Install specific Databricks skill"
     echo "  ./install_skills.sh agent-evaluation         # Install specific MLflow skill"
-    echo "  ./install_skills.sh asset-bundles agent-evaluation  # Mix of both sources"
+    echo "  ./install_skills.sh databricks-asset-bundles agent-evaluation  # Mix of both sources"
     echo "  ./install_skills.sh --mlflow-version v1.0.0  # Pin MLflow skills version"
     echo "  ./install_skills.sh --local                  # Install all from local directory"
     echo "  ./install_skills.sh --list                   # List available skills"

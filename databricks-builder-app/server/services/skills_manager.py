@@ -32,7 +32,7 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
     'start_update', 'get_update', 'stop_pipeline', 'get_pipeline_events',
     'create_or_update_pipeline', 'find_pipeline_by_name',
   ],
-  'model-serving': [
+  'databricks-model-serving': [
     'get_serving_endpoint_status', 'query_serving_endpoint', 'list_serving_endpoints',
   ],
   'databricks-jobs': [

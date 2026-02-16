@@ -119,3 +119,10 @@ Use these skills in sequence:
 | **No warehouse available** | Create a SQL warehouse or provide `warehouse_id` explicitly |
 | **Poor query generation** | Add instructions and sample questions that reference actual column names |
 | **Slow queries** | Ensure warehouse is running; use OPTIMIZE on tables |
+
+## Related Skills
+
+- **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Use Genie Spaces as agents inside Supervisor Agents
+- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - Generate raw parquet data to populate tables for Genie
+- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs, schemas, and tables Genie queries

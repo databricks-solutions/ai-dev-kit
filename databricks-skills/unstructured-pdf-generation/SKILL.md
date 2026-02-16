@@ -185,3 +185,10 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o
 | **"Volume does not exist"** | The tool creates volumes automatically; ensure you have CREATE VOLUME permission |
 | **"PDF generation timeout"** | Reduce `count` or check LLM endpoint availability |
 | **Low quality content** | Provide more detailed `description` with specific topics and document types |
+
+## Related Skills
+
+- **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Create Knowledge Assistants that ingest the generated PDFs
+- **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Index generated documents for semantic search and RAG
+- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - Generate structured tabular data (complement to unstructured PDFs)
+- **[mlflow-evaluation](../mlflow-evaluation/SKILL.md)** - Evaluate RAG systems using the generated question/guideline pairs

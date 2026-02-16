@@ -104,6 +104,13 @@ mcp__databricks__execute_sql(
 3. **Grant minimal access** - System tables contain sensitive metadata
 4. **Schedule reports** - Create scheduled queries for regular monitoring
 
+## Related Skills
+
+- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - for pipelines that write to Unity Catalog tables
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** - for job execution data visible in system tables
+- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - for generating data stored in Unity Catalog Volumes
+- **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - for building dashboards on top of Unity Catalog data
+
 ## Resources
 
 - [Unity Catalog System Tables](https://docs.databricks.com/administration-guide/system-tables/)
