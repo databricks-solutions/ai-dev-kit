@@ -2,6 +2,16 @@
 
 Create a new optimized Genie Space by applying findings from the best practices analysis (Option A) and benchmark analysis (Option B). The original space is preserved — a new copy is created with improvements applied.
 
+## Table of Contents
+
+- [Step 3a: Verify Prerequisites](#step-3a-verify-prerequisites)
+- [Step 3b: Load Analysis Results](#step-3b-load-analysis-results)
+- [Step 3c: Generate Optimization Plan](#step-3c-generate-optimization-plan)
+- [Step 3d: Present Changes for User Review](#step-3d-present-changes-for-user-review)
+- [Step 3e: Apply Changes to Config](#step-3e-apply-changes-to-config)
+- [Step 3f: Create New Genie Space](#step-3f-create-new-genie-space)
+- [Step 3g: Save Report & Present Results](#step-3g-save-report-present-results)
+
 ## Step 3a: Verify Prerequisites
 
 Check that both analysis reports exist:

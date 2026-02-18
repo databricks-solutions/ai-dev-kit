@@ -8,6 +8,20 @@ Evaluate each item against the serialized space JSON. For each item, determine:
 
 Provide a brief explanation for each assessment and, for any fail/warning, give a specific actionable fix referencing actual table names, column names, or instruction text from the space.
 
+## Table of Contents
+
+- [Data Sources](#data-sources)
+- [Tables](#tables)
+- [Columns](#columns)
+- [Metric Views](#metric-views)
+- [Instructions](#instructions)
+- [Text Instructions](#text-instructions)
+- [Example Question SQLs](#example-question-sqls)
+- [Join Specs](#join-specs)
+- [SQL Snippets](#sql-snippets)
+- [Benchmarks](#benchmarks)
+- [Config](#config)
+
 ---
 
 ## Data Sources

@@ -78,6 +78,14 @@ def run_benchmark(space_id: str, question: str) -> dict:
     deadline = time.time() + timedelta(minutes=5).total_seconds()
     sleep_seconds = 1
     message = None
+    active_statuses = {
+        MessageStatus.SUBMITTED,
+        MessageStatus.ASKING_AI,
+        MessageStatus.FETCHING_METADATA,
+        MessageStatus.FILTERING_CONTEXT,
+        MessageStatus.PENDING_WAREHOUSE,
+        MessageStatus.EXECUTING_QUERY,
+    }
 
     while time.time() < deadline:
         try:
@@ -102,8 +110,16 @@ def run_benchmark(space_id: str, question: str) -> dict:
             )
             return result
 
-        time.sleep(min(sleep_seconds, 10))
-        sleep_seconds += 1
+        if message.status in active_statuses:
+            time.sleep(min(sleep_seconds, 10))
+            sleep_seconds += 1
+            continue
+
+        result["status"] = "ERROR"
+        result["error"] = (
+            f"Genie returned terminal status '{message.status}' before completion"
+        )
+        return result
 
     if result["status"] is None:
         result["status"] = "TIMEOUT"

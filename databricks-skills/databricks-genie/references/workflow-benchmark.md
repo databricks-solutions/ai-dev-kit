@@ -2,6 +2,15 @@
 
 Run the space's benchmark questions against Genie via the SDK, compare generated SQL to expected SQL, and produce a detailed accuracy report.
 
+## Table of Contents
+
+- [Step 3a: Extract Benchmark Questions](#step-3a-extract-benchmark-questions)
+- [Step 3b: Present Benchmarks for Selection](#step-3b-present-benchmarks-for-selection)
+- [Step 3c: Run Selected Benchmarks](#step-3c-run-selected-benchmarks)
+- [Step 3d: Analyze Each Result](#step-3d-analyze-each-result)
+- [Step 3e: Generate Benchmark Report](#step-3e-generate-benchmark-report)
+- [Step 3f: Save Report](#step-3f-save-report)
+
 ## Step 3a: Extract Benchmark Questions
 
 From the fetched space configuration, read `serialized_space.benchmarks.questions`.
@@ -48,7 +57,7 @@ After each question completes, report progress:
 
 **Error handling:**
 - **Exit code 1 / `RuntimeError`** (script-level error: auth failure, space not found) → halt all remaining benchmarks and report the error to the user
-- **`status: "FAILED"`, `"TIMEOUT"`, or `"ERROR"`** in the result → record the result and continue to the next question
+- **`status: "FAILED"`, `"TIMEOUT"`, or `"ERROR"`** in the result (including cancelled/expired terminal statuses surfaced as `ERROR`) → record the result and continue to the next question
 
 ## Step 3d: Analyze Each Result
 
@@ -70,7 +79,7 @@ Assign a verdict to each question:
 - **correct**: Generated SQL is semantically equivalent to expected SQL (may differ in formatting, aliases, or expression order)
 - **partial**: Right general approach but with meaningful differences (e.g., missing a filter, different aggregation)
 - **incorrect**: Wrong logic (wrong tables, wrong joins, wrong calculations)
-- **error**: Genie could not generate SQL (failed, timed out, or returned a text response instead)
+- **error**: Genie could not generate SQL (failed, timed out, cancelled/expired, or returned a text response instead)
 
 ## Step 3e: Generate Benchmark Report
 

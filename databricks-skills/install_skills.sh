@@ -95,7 +95,7 @@ get_skill_extra_files() {
     case "$1" in
         "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
         "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
-        "databricks-genie") echo "spaces.md conversation.md README.md references/best-practices-checklist.md references/space-schema.md references/workflow-analyze.md references/workflow-benchmark.md references/workflow-optimize.md scripts/create_optimized_space.py scripts/fetch_space.py scripts/run_benchmark.py" ;;
+        "databricks-genie") echo "spaces.md conversation.md references/best-practices-checklist.md references/space-schema.md references/workflow-analyze.md references/workflow-benchmark.md references/workflow-optimize.md scripts/create_optimized_space.py scripts/fetch_space.py scripts/run_benchmark.py" ;;
         "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;

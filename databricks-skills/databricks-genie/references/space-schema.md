@@ -2,6 +2,21 @@
 
 The `serialized_space` field is a JSON string (parsed into a dict) returned by `client.genie.get_space(space_id, include_serialized_space=True)`. It contains the full Genie Space configuration.
 
+## Table of Contents
+
+- [Top-Level Structure](#top-level-structure)
+- [`config`](#config)
+- [`data_sources`](#data_sources)
+- [Tables](#tables)
+- [`instructions`](#instructions)
+- [Text Instructions](#text-instructions)
+- [Example Question SQLs](#example-question-sqls)
+- [Join Specs](#join-specs)
+- [SQL Functions](#sql-functions)
+- [SQL Snippets](#sql-snippets)
+- [`benchmarks`](#benchmarks)
+- [Validation Rules](#validation-rules)
+
 ## Top-Level Structure
 
 ```json
