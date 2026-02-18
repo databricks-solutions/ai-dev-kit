@@ -14,8 +14,14 @@ from fastmcp import FastMCP
 
 from .middleware import TimeoutHandlingMiddleware
 
-# Create the server
-mcp = FastMCP("Databricks MCP Server")
+# Create the server — disable FastMCP's built-in task worker on Windows.
+# The docket worker uses fakeredis XREADGROUP BLOCK which deadlocks
+# the ProactorEventLoop, preventing asyncio.to_thread() callbacks.
+_fastmcp_kwargs = {}
+if sys.platform == "win32":
+    _fastmcp_kwargs["tasks"] = False
+
+mcp = FastMCP("Databricks MCP Server", **_fastmcp_kwargs)
 
 # Register middleware (see middleware.py for details on each)
 mcp.add_middleware(TimeoutHandlingMiddleware())
