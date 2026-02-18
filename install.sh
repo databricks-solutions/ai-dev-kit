@@ -649,15 +649,25 @@ setup_mcp() {
     ok "Repository cloned ($BRANCH)"
     
     # Create venv and install
+    # On Apple Silicon under Rosetta, force arm64 to avoid architecture mismatch
+    # with universal2 Python binaries (see: github.com/databricks-solutions/ai-dev-kit/issues/115)
+    local arch_prefix=""
+    if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] && [ "$(uname -m)" = "x86_64" ]; then
+        if arch -arm64 python3 -c "pass" 2>/dev/null; then
+            arch_prefix="arch -arm64"
+            warn "Rosetta detected on Apple Silicon — forcing arm64 for Python"
+        fi
+    fi
+
     msg "Installing Python dependencies..."
     if [ "$PKG" = "uv" ]; then
-        uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || uv venv --allow-existing "$VENV_DIR" -q
-        uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
+        $arch_prefix uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
+        $arch_prefix uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
     else
-        [ ! -d "$VENV_DIR" ] && python3 -m venv "$VENV_DIR"
-        "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
+        [ ! -d "$VENV_DIR" ] && $arch_prefix python3 -m venv "$VENV_DIR"
+        $arch_prefix "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
     fi
-    
+
     "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
     ok "MCP server ready"
 }
