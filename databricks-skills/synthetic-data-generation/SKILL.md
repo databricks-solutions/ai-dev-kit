@@ -1,11 +1,12 @@
 ---
 name: synthetic-data-generation
-description: "Generate realistic synthetic data using Spark + Faker or Polars. Supports serverless execution, multiple output formats (Parquet/JSON/CSV/Delta), and scales from thousands to millions of rows. Use for test data, demo datasets, or synthetic tables."
+description: "Generate realistic synthetic data using Spark + Faker (strongly recommended). Supports serverless execution, multiple output formats (Parquet/JSON/CSV/Delta), and scales from thousands to millions of rows. For small datasets (<10K rows), can optionally generate locally and upload to volumes. Use for test data, demo datasets, or synthetic tables."
 ---
 
 # Synthetic Data Generation
 
-Generate realistic, story-driven synthetic data for Databricks using Spark + Faker or Polars.
+Generate realistic, story-driven synthetic data for Databricks using Spark + Faker (strongly recommended).
+For small datasets (<10K rows), can optionally generate locally with Polars and upload to volumes.
 Always present a generation plan with assumptions before generating code.
 
 ## Generation Planning Workflow
@@ -35,6 +36,10 @@ Show a clear specification with **YOUR ASSUMPTIONS surfaced**:
 - Date range: last 6 months from today
 - Status distribution: 65% delivered, 15% shipped, 10% processing, 5% pending, 5% cancelled
 
+**Generation Approach:**
+- **Total rows < 10K**: Notify user you'll generate data using **Spark** (strongly recommended for all use cases)
+- **Total rows < 10K with user preference**: Only if user explicitly prefers local generation, generate with Polars locally and upload to volume using `databricks fs cp`
+
 **Ask user**: "Does this look correct? Any adjustments needed?"
 
 ### Step 3: Ask About Data Features
@@ -54,6 +59,8 @@ Prompt user with options (enabled by default unless otherwise noted):
 
 Before writing any generation code, verify:
 
+- [ ] Generation approach determined: **Spark (strongly recommended)** or local generation with upload (only for <10K rows if user prefers)
+- [ ] If using local generation: User notified and prefers this approach
 - [ ] User confirmed compute preference (serverless vs cluster)
 - [ ] Table specification shown and approved
 - [ ] Assumptions about distributions surfaced and confirmed
@@ -63,26 +70,25 @@ Before writing any generation code, verify:
 
 **Do NOT proceed to code generation until user approves the plan.**
 
-## Execution Options
+## Execution Options & Installation
 
-Choose your execution mode based on your needs:
-
-### Option 1: Databricks Connect with Serverless (Recommended)
-
-Run code locally while Spark operations execute on serverless compute. Best for development and interactive work.
+Choose your execution mode based on your needs. **Serverless is strongly recommended** for all use cases.
 
 **When user requests data generation:**
 1. Confirm serverless is acceptable: "I'll use serverless compute. Is that OK?"
 2. If they request classic cluster: "Serverless is recommended for cost efficiency. Are you sure you need a classic cluster?"
 
-**Setup:**
-```bash
-# Install locally - version depends on your Python version
-# For Python 3.10 or 3.11:
-pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas
+### Option 1: Databricks Connect with Serverless (Recommended)
 
-# For Python 3.12:
-pip install "databricks-connect>=16.2" faker polars numpy pandas
+Run code locally while Spark operations execute on serverless compute. Best for development and interactive work.
+
+**Install locally (one-time setup):**
+```bash
+# Python 3.10 or 3.11:
+pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas holidays
+
+# Python 3.12:
+pip install "databricks-connect>=16.2,<18.0" faker polars numpy pandas holidays
 
 # Configure ~/.databrickscfg
 [DEFAULT]
@@ -96,80 +102,68 @@ auth_type = databricks-cli
 from databricks.connect import DatabricksSession
 
 spark = DatabricksSession.builder.serverless(True).getOrCreate()
-# Now Spark operations execute on serverless compute
+# Spark operations now execute on serverless compute
 ```
 
-**Benefits:**
-- Instant start (no cluster spin-up)
-- Local debugging with IDE integration
-- Dependencies installed locally via pip
-- Iterate quickly: edit file, re-run immediately
+**Benefits:** Instant start, local debugging, fast iteration (edit file, re-run immediately)
 
 ### Option 2: Serverless Job (Production/Scheduled)
 
-Submit jobs to serverless compute with dependencies managed via the `environments` parameter. Best for production workloads and scheduled jobs.
+Submit jobs to serverless compute with automatic dependency management. Best for production and scheduled workloads.
 
-**Use `create_job` MCP tool with environments:**
-- `name`: "generate_synthetic_data"
-- `tasks`: [{ task with `environment_key` reference }]
-- `environments`: [{
+**Dependencies managed via `environments` parameter:**
+```python
+# Use create_job MCP tool with:
+{
+  "name": "generate_synthetic_data",
+  "tasks": [{ "environment_key": "datagen_env", ... }],
+  "environments": [{
     "environment_key": "datagen_env",
     "spec": {
       "client": "4",
       "dependencies": ["faker", "polars", "numpy", "pandas", "holidays"]
     }
   }]
+}
+```
 
-**Benefits:**
-- No local environment needed
-- Automatic dependency management
-- Scheduled execution support
-- Production-ready scaling
+**Benefits:** No local setup, automatic dependency management, production-ready scaling
 
-### Option 3: Classic Cluster (Fallback)
+### Option 3: Classic Cluster (Fallback Only)
 
-Execute on a classic all-purpose cluster. Use only if serverless is unavailable or you need specific cluster features.
+Use only if serverless unavailable or you need specific cluster features (GPUs, custom init scripts).
 
-**Warning:** Classic clusters take 3-8 minutes to start if not already running. Prefer serverless for faster iteration.
+**Warning:** Classic clusters take 3-8 minutes to start. Prefer serverless.
 
-**Workflow:**
-1. Install dependencies using `execute_databricks_command` tool:
-   - `code`: "%pip install faker polars numpy pandas holidays"
-   - Save returned `cluster_id` and `context_id`
+**Install dependencies in cluster:**
+```python
+# Using execute_databricks_command tool:
+code = "%pip install faker polars numpy pandas holidays"
+# Save returned cluster_id and context_id for subsequent calls
+```
 
-2. Execute script using `run_python_file_on_databricks` tool:
-   - `file_path`: "scripts/generate_data.py"
-   - `cluster_id`: "<saved_cluster_id>"
-   - `context_id`: "<saved_context_id>"
+**When to use:** Only when serverless not available or specific cluster configurations required
 
-**When to use:** Only when serverless is not available, or you need specific cluster configurations (GPUs, custom init scripts, etc.)
+## Required Libraries
 
-## Common Libraries
+Standard libraries for generating realistic synthetic data:
 
-These libraries are useful for generating realistic synthetic data:
-
-- **faker**: Generates realistic names, addresses, emails, companies, dates, etc. (100+ providers)
-- **polars**: Fast local DataFrame library for small/medium datasets
+- **faker**: Realistic names, addresses, emails, companies, dates (100+ providers)
 - **numpy/pandas**: Statistical distributions and data manipulation
-- **holidays**: Provides country-specific holiday calendars for realistic date patterns
+- **holidays**: Country-specific holiday calendars for realistic date patterns
+- **polars**: Fast local DataFrame library (optional, only for local generation)
 
-**For Databricks Connect:** Install locally with `pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas holidays` (Python 3.10/3.11) or `pip install "databricks-connect>=16.2" faker polars numpy pandas holidays` (Python 3.12)
-
-**For Serverless Jobs:** Include in `environments.spec.dependencies`: `["faker", "polars", "numpy", "pandas", "holidays"]`
-
-**For Classic Clusters:** Install using `execute_databricks_command` tool:
-- `code`: "%pip install faker polars numpy pandas holidays"
-- Save the returned `cluster_id` and `context_id` for subsequent calls
+See **Execution Options & Installation** above for installation instructions per execution mode.
 
 ## Data Generation Approaches
 
 Choose your approach based on scale and where you need to write data:
 
-### Approach 1: Spark + Faker (Recommended for most cases)
+### Approach 1: Spark + Faker with Pandas UDFs (Recommended for most cases)
 
 **Best for:** Any dataset size, especially >100K rows, writing to Unity Catalog
 
-Generate data with Pandas + Faker locally, convert to Spark DataFrame for saving to Databricks.
+Generate data with Spark + Faker with Pandas UDFs, save to Databricks.
 
 **Key features:**
 - Full access to 100+ Faker providers (names, addresses, companies, etc.)
@@ -235,17 +229,19 @@ customers_df = (
 )
 ```
 
-### Approach 2: Polars (For local development)
+### Approach 2: Polars (For local development - Use only if Spark not suitable)
 
-**Best for:** Quick prototyping, datasets <100K rows, no Spark dependency needed
+**Important:** Spark is strongly recommended for all data generation. Only use this approach for datasets <10K rows if user explicitly prefers local generation.
 
-Generate entirely with Polars + Faker locally, export to parquet files.
+**Best for:** Quick prototyping when Spark is not needed, datasets <10K rows
+
+Generate entirely with Polars + Faker locally, export to parquet files, then upload to Databricks volumes.
 
 **Key features:**
 - Fast local generation (no Spark overhead)
 - Simple, clean API
-- Perfect for testing and prototyping
-- Can upload resulting parquet to Databricks volumes
+- Perfect for quick prototyping with very small datasets
+- Requires manual upload to Databricks volumes
 
 **Example:**
 ```python
@@ -267,142 +263,57 @@ customers = pl.DataFrame({
 customers.write_parquet("./output/customers.parquet")
 ```
 
+**Upload to Databricks Volume:**
+After generating data locally, upload to a Databricks volume:
+
+```bash
+# Create directory in volume if needed
+databricks fs mkdirs dbfs:/Volumes/<catalog>/<schema>/<volume>/source_data/
+
+# Upload local data to volume
+databricks fs cp -r ./output/customers.parquet dbfs:/Volumes/<catalog>/<schema>/<volume>/source_data/
+databricks fs cp -r ./output/orders.parquet dbfs:/Volumes/<catalog>/<schema>/<volume>/source_data/
+```
+
 ### Decision Guide
 
 | Need | Recommended Approach |
 |------|---------------------|
-| Write to Unity Catalog | **Spark + Faker** |
-| Scale to millions of rows | **Spark + Faker** with Pandas UDFs |
-| Quick local prototype | **Polars** |
-| Realistic text (names/addresses) | **Either** (both use Faker) |
-| No Spark dependency | **Polars** |
+| **Any data generation (default)** | **Spark + Faker** with Pandas UDFs (strongly recommended) |
+| Quick local prototype (<10K rows, user prefers local) | **Polars** (then upload with `databricks fs cp`) |
 
-### Approach 3: Faker with Spark UDFs
+**Default: Always use Spark + Faker unless user explicitly requests local generation for small datasets (<10K rows).**
 
-**Best for:** Realistic text data (names, addresses, companies), complex custom patterns
-
-Faker provides 100+ data providers for realistic text. Wrap it in Spark UDFs for parallelism.
-
-**Key features:**
-- Access to 100+ Faker providers (names, addresses, companies, phone numbers, etc.)
-- Custom UDFs for complex conditional logic
-- Row-level coherence where attributes correlate logically
-- Flexibility for domain-specific patterns
-
-**Example:**
-```python
-from pyspark.sql import functions as F
-from pyspark.sql.types import StringType, DoubleType
-from faker import Faker
-import numpy as np
-
-# Define Faker UDFs for realistic text
-@F.udf(returnType=StringType())
-def generate_company():
-    return Faker().company()
-
-@F.udf(returnType=StringType())
-def generate_address():
-    return Faker().address().replace('\n', ', ')
-
-@F.udf(returnType=DoubleType())
-def generate_lognormal_amount(tier):
-    """Generate amount based on tier using log-normal distribution."""
-    np.random.seed(hash(tier) % (2**32))
-    if tier == "Enterprise":
-        return float(np.random.lognormal(mean=10, sigma=0.8))
-    elif tier == "Pro":
-        return float(np.random.lognormal(mean=8, sigma=0.7))
-    else:
-        return float(np.random.lognormal(mean=5, sigma=0.6))
-
-# Generate with Spark parallelism
-customers_df = (
-    spark.range(0, 1_000_000, numPartitions=32)
-    .select(
-        F.concat(F.lit("CUST-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("customer_id"),
-        generate_company().alias("name"),
-        generate_address().alias("address"),
-        F.when(F.rand(42) < 0.6, "Free")
-         .when(F.rand(42) < 0.9, "Pro")
-         .otherwise("Enterprise").alias("tier")
-    )
-)
-
-# Add tier-based amounts
-customers_df = customers_df.withColumn("arr", generate_lognormal_amount(F.col("tier")))
-```
 
 ### When to Use Each Approach
 
 | Scenario | Recommended Approach |
 |----------|---------------------|
+| **Default - any data generation** | **Spark + Faker  with Pandas UDFs** (strongly recommended) |
 | Generating 1M+ rows | **Spark + Faker with Pandas UDFs** |
-| Need realistic names/addresses/emails | **Faker** (Spark or Polars) |
-| Writing to Unity Catalog | **Spark + Faker** |
-| Complex conditional row logic | **Spark + Faker UDFs** |
-| Foreign key with complex weighting | **Spark + Faker** |
-| Quick prototyping (small data) | **Polars** |
-| No Spark dependency needed | **Polars** |
+| Quick prototyping (<10K rows, user explicitly prefers local) | **Polars** (then upload with `databricks fs cp`) |
+
+**Important:** Default to Spark + Faker for all cases. Only use Polars if dataset is <10K rows AND user explicitly requests local generation.
 
 ## Workflow
 
-### Primary: Databricks Connect with Serverless
+### Development (Databricks Connect)
 
-The recommended workflow for development and interactive data generation:
+1. **One-time setup**: Install dependencies locally (see **Execution Options & Installation** above)
+2. **Write script**: Create `scripts/generate_data.py` with `DatabricksSession.builder.serverless(True)`
+3. **Run locally**: `python scripts/generate_data.py` (Spark ops execute on serverless)
+4. **Iterate**: Edit file, re-run immediately
 
-1. **Configure Databricks Connect** (one-time setup):
-   - Install: `pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas holidays` (Python 3.10/3.11) or `pip install "databricks-connect>=16.2" faker polars numpy pandas holidays` (Python 3.12)
-   - Configure `~/.databrickscfg` with `serverless_compute_id = auto`
+### Production (Serverless Job)
 
-2. **Write Python script locally** (e.g., `scripts/generate_data.py`):
-   ```python
-   from databricks.connect import DatabricksSession
-   spark = DatabricksSession.builder.serverless(True).getOrCreate()
-   # Your data generation code here
-   ```
+1. **Write script locally**
+2. **Upload** using `upload_file` MCP tool to `/Workspace/Users/{username}/datagen/{project}/`
+3. **Create job** using `create_job` MCP tool with `environments` parameter (see Option 2 above)
+4. **Run & monitor** using `run_job_now` and `wait_for_run` MCP tools
 
-3. **Run locally** - Spark operations execute on serverless compute:
-   ```bash
-   python scripts/generate_data.py
-   ```
+### Production (DABs Bundle)
 
-4. **Iterate quickly**: Edit file, re-run immediately. No cluster spin-up time.
-
-### Production: Serverless Job
-
-For scheduled or production workloads:
-
-1. **Write Python script locally**
-
-2. **Upload to workspace** using `upload_file` MCP tool:
-   - `local_path`: "scripts/generate_data.py"
-   - `workspace_path`: "/Workspace/Users/{username}/datagen/{project_name}/generate_data.py"
-
-3. **Create serverless job** using `create_job` MCP tool:
-   - `name`: "generate_synthetic_data"
-   - `tasks`: [{
-       "task_key": "generate",
-       "spark_python_task": {
-         "python_file": "/Workspace/Users/{username}/datagen/{project_name}/generate_data.py"
-       },
-       "environment_key": "datagen_env"
-     }]
-   - `environments`: [{
-       "environment_key": "datagen_env",
-       "spec": {
-         "client": "4",
-         "dependencies": ["faker", "polars", "numpy", "pandas", "holidays"]
-       }
-     }]
-
-4. **Run job** using `run_job_now` MCP tool
-
-5. **Monitor** using `get_run` or `wait_for_run` MCP tools
-
-### Production: DABs Bundle Deployment
-
-For scheduled runs with version control and CI/CD:
+For version control and CI/CD:
 
 ```yaml
 # databricks.yml
@@ -433,25 +344,6 @@ environments:
         - holidays
 ```
 
-**Note**: The `environments` block with `client: "4"` enables serverless compute. Dependencies are installed automatically.
-
-### Fallback: Classic Cluster
-
-Only use if serverless is unavailable:
-
-1. **Install dependencies** using `execute_databricks_command` tool:
-   - `code`: "%pip install faker polars numpy pandas holidays"
-   - Save returned `cluster_id` and `context_id`
-
-2. **Execute script** using `run_python_file_on_databricks` tool:
-   - `file_path`: "scripts/generate_data.py"
-   - `cluster_id`: "<saved_cluster_id>"
-   - `context_id`: "<saved_context_id>"
-
-3. **Iterate**: Edit local file, re-execute with same context (faster, keeps installed libraries)
-
-**Note:** Classic clusters take 3-8 minutes to start. Prefer serverless for faster iteration.
-
 ## Storage Destination
 
 ### Ask for Schema Name
@@ -464,7 +356,9 @@ If the user provides just a schema name, use `ai_dev_kit.{schema}`. If they prov
 
 ### Create Infrastructure in the Script
 
-Always create the catalog, schema, and volume **inside the Python script** using `spark.sql()`. Do NOT make separate MCP SQL calls - it's much slower.
+Always create the schema and volume **inside the Python script** using `spark.sql()`. Do NOT make separate MCP SQL calls - it's much slower.
+
+**Important:** Do NOT create catalogs - assume they already exist. Only create schema and volume.
 
 The `spark` variable is available by default on Databricks clusters.
 
@@ -472,7 +366,7 @@ The `spark` variable is available by default on Databricks clusters.
 # =============================================================================
 # CREATE INFRASTRUCTURE (inside the Python script)
 # =============================================================================
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
+# Note: Assume catalog exists - do NOT create it
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
 ```
@@ -768,29 +662,53 @@ When generating data for specific domains, consider these realistic patterns:
 
 ## Key Principles
 
-### 1. Use Polars for Generation, Spark for Saving
+### 1. Use Spark + Faker for All Data Generation (Strongly Recommended)
 
-Generate data with Polars (faster than Pandas), convert to Spark for saving:
+**Default:** Generate data with Spark + Faker for all use cases. This provides scalability, parallelism, and direct integration with Unity Catalog.
+
+```python
+from pyspark.sql import functions as F
+from pyspark.sql.functions import pandas_udf
+from pyspark.sql.types import StringType
+import pandas as pd
+from faker import Faker
+
+@pandas_udf(StringType())
+def fake_company(ids: pd.Series) -> pd.Series:
+    fake = Faker()
+    return pd.Series([fake.company() for _ in range(len(ids))])
+
+# Generate with Spark + Pandas UDFs
+customers_df = (
+    spark.range(0, N_CUSTOMERS, numPartitions=8)
+    .select(
+        F.concat(F.lit("CUST-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("customer_id"),
+        fake_company(F.col("id")).alias("name"),
+        F.when(F.rand() < 0.6, "Free")
+         .when(F.rand() < 0.9, "Pro")
+         .otherwise("Enterprise").alias("tier"),
+    )
+)
+customers_df.write.mode("overwrite").parquet(f"{VOLUME_PATH}/customers")
+```
+
+**Alternative (only for <10K rows if user prefers):** Generate with Polars locally and upload:
 
 ```python
 import polars as pl
-import numpy as np
 from faker import Faker
 
 fake = Faker()
 
-# Generate with Polars (faster than Pandas)
+# Generate with Polars
 customers_pl = pl.DataFrame({
     "customer_id": [f"CUST-{i:05d}" for i in range(N_CUSTOMERS)],
     "name": [fake.company() for _ in range(N_CUSTOMERS)],
     "tier": np.random.choice(['Free', 'Pro', 'Enterprise'], N_CUSTOMERS, p=[0.6, 0.3, 0.1]).tolist(),
-    "region": np.random.choice(['North', 'South', 'East', 'West'], N_CUSTOMERS, p=[0.4, 0.25, 0.2, 0.15]).tolist(),
-    "created_at": [fake.date_between(start_date='-2y', end_date='-6m') for _ in range(N_CUSTOMERS)],
 })
 
-# Convert to Spark and save
-customers_df = spark.createDataFrame(customers_pl.to_pandas())
-customers_df.write.mode("overwrite").parquet(f"{VOLUME_PATH}/customers")
+# Save locally then upload with: databricks fs cp -r ./output dbfs:/Volumes/{catalog}/{schema}/raw_data/
+customers_pl.write_parquet("./output/customers.parquet")
 ```
 
 ### 2. Iterate on DataFrames for Referential Integrity
@@ -976,7 +894,9 @@ INJECT_BAD_DATA = False  # Set True for data quality testing
 
 **Usage:** Copy to your scripts folder, update CATALOG/SCHEMA, run with `python generate_ecommerce_data.py`
 
-### Example 2: Local Development with Polars
+### Example 2: Local Development with Polars (Only for <10K rows if user prefers)
+
+**Note:** Spark is strongly recommended. Only use this approach for datasets <10K rows if user explicitly prefers local generation.
 
 Generate synthetic data locally without Spark dependency, then upload to Databricks.
 
@@ -984,9 +904,9 @@ Generate synthetic data locally without Spark dependency, then upload to Databri
 
 **Features:**
 - Fast local generation (no Spark overhead)
-- Perfect for prototyping and testing
+- For very small datasets (<10K rows)
 - Outputs parquet files to local directory
-- Upload to volumes with `databricks fs cp`
+- Requires manual upload to volumes with `databricks fs cp`
 
 **Key pattern:**
 
@@ -1114,24 +1034,22 @@ This returns schema, row counts, and column statistics to confirm the data was w
 ## Best Practices
 
 ### Execution
-1. **Use Databricks Connect with serverless** for development - instant start, local debugging
-2. **Use serverless jobs** for production - automatic dependency management, scheduling
-3. **Prefer serverless over classic** - avoid 3-8 minute cluster spin-up times
-4. **Ask for schema**: Default to `ai_dev_kit` catalog, ask user for schema name
-5. **Present plan before generating**: Show table spec with assumptions, get user approval
+1. **Use serverless** (Databricks Connect for dev, jobs for production) - instant start, no cluster wait
+2. **Ask for schema**: Default to `ai_dev_kit` catalog, ask user for schema name
+3. **Present plan before generating**: Show table spec with assumptions, get user approval
 
 ### Data Generation
-6. **Use Faker with Pandas UDFs for scale** (1M+ rows) - Spark parallelism
-7. **Use Polars for quick prototyping** - fast local generation
-8. **Master tables first**: Generate customers, then orders reference customer_ids
-9. **Weighted sampling**: Enterprise customers generate more activity
-10. **Distributions**: Log-normal for values, exponential for times, weighted categorical
-11. **Time patterns**: Weekday/weekend, holidays, seasonality, event spikes
-12. **Row coherence**: Priority affects resolution time affects CSAT
-13. **Volume for aggregation**: 10K-50K rows minimum so patterns survive GROUP BY
-14. **Always use files**: Write to local file, execute, edit if error, re-execute
-15. **Context reuse**: Pass `cluster_id` and `context_id` for faster iterations
-16. **Libraries**: Install `faker` and `holidays` first; most others are pre-installed
+6. **Default to Spark + Faker** for all data generation - scalable, parallel, direct Unity Catalog integration
+7. **Use Pandas UDFs for scale** (1M+ rows) - Spark parallelism with Faker
+8. **Only use local generation** (<10K rows) if user explicitly prefers it - then upload with `databricks fs cp`
+9. **Master tables first**: Generate customers, then orders reference customer_ids
+10. **Weighted sampling**: Enterprise customers generate more activity
+11. **Distributions**: Log-normal for values, exponential for times, weighted categorical
+12. **Time patterns**: Weekday/weekend, holidays, seasonality, event spikes
+13. **Row coherence**: Priority affects resolution time affects CSAT
+14. **Volume for aggregation**: 10K-50K rows minimum so patterns survive GROUP BY
+15. **Always use files**: Write to local file, execute, edit if error, re-execute
+16. **Context reuse**: Pass `cluster_id` and `context_id` for faster iterations (classic cluster only)
 
 ## Related Skills
 
@@ -1140,25 +1058,24 @@ This returns schema, row counts, and column statistics to confirm the data was w
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for managing catalogs, schemas, and volumes where data is stored
 
 ### Output
-14. **Create infrastructure in script**: Use `CREATE SCHEMA/VOLUME IF NOT EXISTS`
-15. **Raw data only**: No `total_x`, `sum_x`, `avg_x` fields - SDP pipeline computes those
-16. **Choose output format** based on downstream needs (Parquet/JSON/CSV/Delta)
-17. **Configuration at top**: All sizes, dates, and paths as variables
-18. **Dynamic dates**: Use `datetime.now() - timedelta(days=180)` for last 6 months
+14. **Create infrastructure in script**: Use `CREATE SCHEMA/VOLUME IF NOT EXISTS` - do NOT create catalogs
+15. **Assume catalogs exist**: Never auto-create catalogs, only create schema and volume
+16. **Raw data only**: No `total_x`, `sum_x`, `avg_x` fields - SDP pipeline computes those
+17. **Choose output format** based on downstream needs (Parquet/JSON/CSV/Delta)
+18. **Configuration at top**: All sizes, dates, and paths as variables
+19. **Dynamic dates**: Use `datetime.now() - timedelta(days=180)` for last 6 months
 
 ## Common Issues
 
 | Issue | Solution |
 |-------|----------|
 | **"Either base environment or version must be provided"** | Add `"client": "4"` to `spec` in job environments (auto-injected by MCP tool) |
-| **"ModuleNotFoundError: No module named 'faker'"** | Add `faker` to dependencies or install locally: `pip install faker` |
-| **"ModuleNotFoundError: No module named 'polars'"** | Add `polars` to dependencies or install locally: `pip install polars` |
+| **"ModuleNotFoundError"** for faker/polars/etc. | See **Execution Options & Installation** section for dependency setup per execution mode |
 | **Serverless job fails to start** | Verify workspace has serverless compute enabled; check Unity Catalog permissions |
 | **Faker UDF is slow** | Use `pandas_udf` for batched operations; adjust `numPartitions` |
 | **Classic cluster startup is slow (3-8 min)** | Switch to Databricks Connect with serverless for instant start |
 | **Out of memory with large data** | Increase `partitions` parameter in `spark.range()` |
 | **Foreign keys don't match across tables** | Use same random seed across all generators |
 | **Delta table write fails** | Ensure `CREATE SCHEMA IF NOT EXISTS` runs before `saveAsTable()` |
-| **databricks-connect serverless issues** | Use `pip install "databricks-connect>=15.1,<16.2"` (Python 3.10/3.11) or `pip install "databricks-connect>=16.2"` (Python 3.12) |
-| **Databricks Connect connection fails** | Verify `~/.databrickscfg` has correct host and `serverless_compute_id = auto` |
+| **Databricks Connect issues** | Verify correct version for your Python (see **Execution Options & Installation**), check `~/.databrickscfg` has `serverless_compute_id = auto` |
 | **Context corrupted on classic cluster** | Omit `context_id` to create fresh context, reinstall libraries |
