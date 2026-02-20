@@ -65,6 +65,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
 - **databricks-config** - Profile authentication setup
 - **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
+- **databricks-cicd-github-actions** – GitHub Actions CI/CD pipelines for Asset Bundle deployment across multiple environments with OIDC auth
 
 ### 📚 Reference
 - **databricks-docs** - Documentation index via llms.txt
