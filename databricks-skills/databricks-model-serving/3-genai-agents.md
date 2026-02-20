@@ -155,13 +155,16 @@ mlflow.models.set_model(AGENT)
 
 ## Using Databricks-Hosted Models
 
+Use exact endpoint names from the reference table in [SKILL.md](SKILL.md#foundation-model-api-endpoints).
+
 ```python
 from databricks_langchain import ChatDatabricks
 
-# Foundation Model APIs (pay-per-token)
+# Foundation Model APIs (pay-per-token) - use exact endpoint names
 llm = ChatDatabricks(endpoint="databricks-meta-llama-3-3-70b-instruct")
-llm = ChatDatabricks(endpoint="databricks-claude-3-7-sonnet")
-llm = ChatDatabricks(endpoint="databricks-dbrx-instruct")
+llm = ChatDatabricks(endpoint="databricks-claude-sonnet-4-6")
+llm = ChatDatabricks(endpoint="databricks-gpt-5-1")
+llm = ChatDatabricks(endpoint="databricks-gemini-3-flash")
 
 # Custom fine-tuned model endpoint
 llm = ChatDatabricks(endpoint="my-finetuned-model-endpoint")
