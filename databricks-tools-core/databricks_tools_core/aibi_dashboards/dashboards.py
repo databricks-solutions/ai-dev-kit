@@ -6,8 +6,9 @@ The SDK/API still uses the 'lakeview' name internally.
 """
 
 import asyncio
+import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from databricks.sdk.service.dashboards import Dashboard
 
@@ -357,7 +358,7 @@ async def deploy_dashboard(
 
 
 def deploy_dashboard_sync(
-    dashboard_content: str,
+    dashboard_content: Union[str, dict],
     install_path: str,
     dashboard_name: str,
     warehouse_id: str,
@@ -370,7 +371,7 @@ def deploy_dashboard_sync(
     - Publishes the dashboard
 
     Args:
-        dashboard_content: Dashboard JSON content as string
+        dashboard_content: Dashboard JSON content as string or dict
         install_path: Workspace folder path (e.g., /Workspace/Users/me/dashboards)
         dashboard_name: Display name for the dashboard
         warehouse_id: SQL warehouse ID
@@ -379,6 +380,10 @@ def deploy_dashboard_sync(
         DashboardDeploymentResult with deployment status and details
     """
     from databricks.sdk.errors.platform import ResourceDoesNotExist
+
+    # Ensure dashboard_content is a JSON string — MCP may deserialize it to a dict
+    if isinstance(dashboard_content, dict):
+        dashboard_content = json.dumps(dashboard_content)
 
     w = get_workspace_client()
     dashboard_path = f"{install_path}/{dashboard_name}.lvdash.json"
@@ -456,7 +461,7 @@ def deploy_dashboard_sync(
 def create_or_update_dashboard(
     display_name: str,
     parent_path: str,
-    serialized_dashboard: str,
+    serialized_dashboard: Union[str, dict],
     warehouse_id: str,
     publish: bool = True,
 ) -> Dict[str, Any]:

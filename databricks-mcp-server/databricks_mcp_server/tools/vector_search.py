@@ -1,6 +1,7 @@
 """Vector Search tools - Manage endpoints, indexes, and query vector data."""
 
-from typing import Any, Dict, List, Optional
+import json
+from typing import Any, Dict, List, Optional, Union
 
 from databricks_tools_core.vector_search import (
     create_vs_endpoint as _create_vs_endpoint,
@@ -273,7 +274,7 @@ def query_vs_index(
     query_text: Optional[str] = None,
     query_vector: Optional[List[float]] = None,
     num_results: int = 5,
-    filters_json: Optional[str] = None,
+    filters_json: Optional[Union[str, dict]] = None,
     filter_string: Optional[str] = None,
     query_type: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -312,6 +313,10 @@ def query_vs_index(
         ... )
         {"columns": ["id", "content", "score"], "data": [...], "num_results": 5}
     """
+    # MCP deserializes JSON params, so filters_json may arrive as a dict
+    if isinstance(filters_json, dict):
+        filters_json = json.dumps(filters_json)
+
     return _query_vs_index(
         index_name=index_name,
         columns=columns,
@@ -327,7 +332,7 @@ def query_vs_index(
 @mcp.tool
 def upsert_vs_data(
     index_name: str,
-    inputs_json: str,
+    inputs_json: Union[str, list],
 ) -> Dict[str, Any]:
     """
     Upsert data into a Direct Access Vector Search index.
@@ -348,6 +353,10 @@ def upsert_vs_data(
         ... )
         {"name": "catalog.schema.direct_index", "status": "SUCCESS", "num_records": 1}
     """
+    # MCP deserializes JSON params, so inputs_json may arrive as a list
+    if isinstance(inputs_json, (dict, list)):
+        inputs_json = json.dumps(inputs_json)
+
     return _upsert_vs_data(index_name=index_name, inputs_json=inputs_json)
 
 
