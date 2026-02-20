@@ -81,6 +81,14 @@ Choose your execution mode based on your needs. **Serverless is strongly recomme
 
 Run code locally while Spark operations execute on serverless compute. Best for development and interactive work.
 
+# ❌ WRONG - DO NOT USE
+from pyspark.sql import SparkSession
+spark = SparkSession.builder.getOrCreate()  # Will fail with RuntimeError
+
+# ✅ CORRECT - ALWAYS USE THIS
+from databricks.connect import DatabricksSession
+spark = DatabricksSession.builder.serverless(True).getOrCreate()
+
 **Install locally (one-time setup):**
 ```bash
 # Python 3.10 or 3.11:
@@ -508,7 +516,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from faker import Faker
 import holidays
-from pyspark.sql import SparkSession
+from databricks.connect import DatabricksSession
 
 # =============================================================================
 # CONFIGURATION - Edit these values
@@ -539,10 +547,12 @@ SEED = 42
 # =============================================================================
 # SETUP
 # =============================================================================
+# IMPORTANT: Always use DatabricksSession, NOT SparkSession!
+
 np.random.seed(SEED)
 Faker.seed(SEED)
 fake = Faker()
-spark = SparkSession.builder.getOrCreate()
+spark = DatabricksSession.builder.serverless(True).getOrCreate()
 
 # ... rest of script
 ```
