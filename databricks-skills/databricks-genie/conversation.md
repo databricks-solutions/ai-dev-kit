@@ -213,6 +213,15 @@ ask_genie(space_id, "Calculate customer lifetime value for all customers",
           timeout_seconds=180)
 ```
 
+## Advanced Optimization Links
+
+If conversation output quality is inconsistent across similar questions:
+
+- Audit serialized space configuration with `references/workflow-analyze.md`
+- Run benchmark checks with `references/workflow-benchmark.md`
+- Use `scripts/run_benchmark.py` for repeatable per-question scoring inputs
+- Apply guided optimization in `references/workflow-optimize.md`
+
 ## Troubleshooting
 
 ### "Genie Space not found"

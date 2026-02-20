@@ -182,6 +182,15 @@ The tool finds the existing space by name and updates it.
 
 6. **Test** in the Databricks UI
 
+## Advanced Optimization
+
+For deeper quality tuning after initial setup:
+
+- Use `scripts/fetch_space.py` to retrieve serialized config for a target space
+- Run the best-practices workflow in `references/workflow-analyze.md`
+- Run benchmark-driven SQL analysis in `references/workflow-benchmark.md`
+- Use `references/workflow-optimize.md` with `scripts/create_optimized_space.py` to create an optimized copy
+
 ## Troubleshooting
 
 ### No warehouse available
