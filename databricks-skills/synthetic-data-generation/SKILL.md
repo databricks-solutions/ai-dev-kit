@@ -33,12 +33,11 @@ Show a clear specification with **YOUR ASSUMPTIONS surfaced**:
 
 **Assumptions I'm making:**
 - Amount distribution: log-normal by tier (Enterprise avg ~$1800, Pro ~$245, Free ~$55)
-- Date range: last 6 months from today
 - Status distribution: 65% delivered, 15% shipped, 10% processing, 5% pending, 5% cancelled
 
 **Generation Approach:**
-- **Total rows < 10K**: Notify user you'll generate data using **Spark** (strongly recommended for all use cases)
-- **Total rows < 10K with user preference**: Only if user explicitly prefers local generation, generate with Polars locally and upload to volume using `databricks fs cp`
+- **Default**: Generate data using **Spark** (recommended for all use cases)
+- **Alternative for <10K rows**: Only if user explicitly prefers local generation, use Polars and upload to volume using `databricks fs cp`
 
 **Ask user**: "Does this look correct? Any adjustments needed?"
 
@@ -182,24 +181,25 @@ from databricks.connect import DatabricksSession
 
 spark = DatabricksSession.builder.serverless(True).getOrCreate()
 
-# Define Pandas UDFs for Faker data (batch processing)
+# Define Pandas UDFs for Faker data (batch processing for parallelism)
 @pandas_udf(StringType())
 def fake_name(ids: pd.Series) -> pd.Series:
     fake = Faker()
     return pd.Series([fake.name() for _ in range(len(ids))])
 
 @pandas_udf(StringType())
-def fake_email(ids: pd.Series) -> pd.Series:
+def fake_company(ids: pd.Series) -> pd.Series:
     fake = Faker()
-    return pd.Series([fake.email() for _ in range(len(ids))])
+    return pd.Series([fake.company() for _ in range(len(ids))])
 
 # Generate with Spark + Pandas UDFs
+# Adjust numPartitions based on scale: 8 for <100K, 32 for 1M+
 customers_df = (
     spark.range(0, N_CUSTOMERS, numPartitions=8)
     .select(
         F.concat(F.lit("CUST-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("customer_id"),
         fake_name(F.col("id")).alias("name"),
-        fake_email(F.col("id")).alias("email"),
+        fake_company(F.col("id")).alias("company"),
         F.when(F.rand() < 0.6, "Free")
          .when(F.rand() < 0.9, "Pro")
          .otherwise("Enterprise").alias("tier"),
@@ -208,30 +208,9 @@ customers_df = (
 customers_df.write.mode("overwrite").parquet(f"{VOLUME_PATH}/customers")
 ```
 
-**Scaling with Pandas UDFs (for large datasets):**
-```python
-from pyspark.sql import functions as F
-from pyspark.sql.functions import pandas_udf
-from pyspark.sql.types import StringType
-import pandas as pd
-from faker import Faker
-
-@pandas_udf(StringType())
-def generate_company_batch(ids: pd.Series) -> pd.Series:
-    """Batch generate company names - more efficient than row-by-row UDF."""
-    fake = Faker()
-    return pd.Series([fake.company() for _ in range(len(ids))])
-
-# Generate with Spark parallelism + batch processing
-customers_df = (
-    spark.range(0, 1_000_000, numPartitions=32)
-    .withColumn("name", generate_company_batch(F.col("id")))
-)
-```
-
 ### Approach 2: Polars (For local development - Use only if Spark not suitable)
 
-**Important:** Spark is strongly recommended for all data generation. Only use this approach for datasets <10K rows if user explicitly prefers local generation.
+**Important:** Only use this approach for datasets <10K rows if user explicitly prefers local generation.
 
 **Best for:** Quick prototyping when Spark is not needed, datasets <10K rows
 
@@ -275,25 +254,15 @@ databricks fs cp -r ./output/customers.parquet dbfs:/Volumes/<catalog>/<schema>/
 databricks fs cp -r ./output/orders.parquet dbfs:/Volumes/<catalog>/<schema>/<volume>/source_data/
 ```
 
-### Decision Guide
-
-| Need | Recommended Approach |
-|------|---------------------|
-| **Any data generation (default)** | **Spark + Faker** with Pandas UDFs (strongly recommended) |
-| Quick local prototype (<10K rows, user prefers local) | **Polars** (then upload with `databricks fs cp`) |
-
-**Default: Always use Spark + Faker unless user explicitly requests local generation for small datasets (<10K rows).**
-
-
 ### When to Use Each Approach
 
 | Scenario | Recommended Approach |
 |----------|---------------------|
-| **Default - any data generation** | **Spark + Faker  with Pandas UDFs** (strongly recommended) |
+| **Default - any data generation** | **Spark + Faker with Pandas UDFs** |
 | Generating 1M+ rows | **Spark + Faker with Pandas UDFs** |
 | Quick prototyping (<10K rows, user explicitly prefers local) | **Polars** (then upload with `databricks fs cp`) |
 
-**Important:** Default to Spark + Faker for all cases. Only use Polars if dataset is <10K rows AND user explicitly requests local generation.
+**Default:** Use Spark + Faker for all cases. Only use Polars if dataset is <10K rows AND user explicitly requests local generation.
 
 ## Workflow
 
@@ -662,9 +631,9 @@ When generating data for specific domains, consider these realistic patterns:
 
 ## Key Principles
 
-### 1. Use Spark + Faker for All Data Generation (Strongly Recommended)
+### 1. Use Spark + Faker for All Data Generation
 
-**Default:** Generate data with Spark + Faker for all use cases. This provides scalability, parallelism, and direct integration with Unity Catalog.
+Generate data with Spark + Faker for all use cases. This provides scalability, parallelism, and direct integration with Unity Catalog.
 
 ```python
 from pyspark.sql import functions as F
@@ -896,9 +865,7 @@ INJECT_BAD_DATA = False  # Set True for data quality testing
 
 ### Example 2: Local Development with Polars (Only for <10K rows if user prefers)
 
-**Note:** Spark is strongly recommended. Only use this approach for datasets <10K rows if user explicitly prefers local generation.
-
-Generate synthetic data locally without Spark dependency, then upload to Databricks.
+Generate synthetic data locally without Spark dependency, then upload to Databricks. Only use for datasets <10K rows if user explicitly prefers local generation.
 
 **Full implementation:** See `scripts/example_polars.py` in this skill folder.
 
@@ -978,31 +945,7 @@ This approach uses Pandas for generation (single-threaded) and Spark for saving.
 
 **Full implementation:** See `scripts/example_pandas.py` in this skill folder.
 
-**Key pattern - Pandas generation with referential integrity:**
-
-```python
-# Generate master table
-customers_pdf = pd.DataFrame({
-    "customer_id": [f"CUST-{i:05d}" for i in range(N_CUSTOMERS)],
-    "tier": np.random.choice(['Free', 'Pro', 'Enterprise'], N_CUSTOMERS, p=[0.6, 0.3, 0.1]),
-})
-
-# Create lookups for foreign keys
-customer_ids = customers_pdf["customer_id"].tolist()
-customer_tier_map = dict(zip(customers_pdf["customer_id"], customers_pdf["tier"]))
-tier_weights = customers_pdf["tier"].map({'Enterprise': 5.0, 'Pro': 2.0, 'Free': 1.0})
-customer_weights = (tier_weights / tier_weights.sum()).tolist()
-
-# Generate related table with weighted sampling
-orders_data = []
-for i in range(N_ORDERS):
-    cid = np.random.choice(customer_ids, p=customer_weights)
-    tier = customer_tier_map[cid]
-    orders_data.append({"order_id": f"ORD-{i:06d}", "customer_id": cid, ...})
-
-# Convert to Spark for saving
-spark.createDataFrame(customers_pdf).write.mode("overwrite").parquet(f"{VOLUME_PATH}/customers")
-```
+**Key pattern:** Generate master table (customers) first, create lookups for foreign keys, then generate related tables (orders) with weighted sampling. See **Key Principles → Iterate on DataFrames for Referential Integrity** for detailed pattern.
 
 **Usage:** Copy `example_pandas.py` to your scripts folder and customize the configuration and patterns.
 
@@ -1035,12 +978,12 @@ This returns schema, row counts, and column statistics to confirm the data was w
 
 ### Execution
 1. **Use serverless** (Databricks Connect for dev, jobs for production) - instant start, no cluster wait
-2. **Ask for schema**: Default to `ai_dev_kit` catalog, ask user for schema name
+2. **Ask for catalog and schema**: Ask for catalog (default to `ai_dev_kit`), ask user for schema name
 3. **Present plan before generating**: Show table spec with assumptions, get user approval
 
 ### Data Generation
 6. **Default to Spark + Faker** for all data generation - scalable, parallel, direct Unity Catalog integration
-7. **Use Pandas UDFs for scale** (1M+ rows) - Spark parallelism with Faker
+7. **Use Pandas UDFs for scale** (10k+ rows) - Spark parallelism with Faker
 8. **Only use local generation** (<10K rows) if user explicitly prefers it - then upload with `databricks fs cp`
 9. **Master tables first**: Generate customers, then orders reference customer_ids
 10. **Weighted sampling**: Enterprise customers generate more activity
@@ -1052,18 +995,13 @@ This returns schema, row counts, and column statistics to confirm the data was w
 16. **Context reuse**: Pass `cluster_id` and `context_id` for faster iterations (classic cluster only)
 
 ## Related Skills
-
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - for building bronze/silver/gold pipelines on top of generated data
-- **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - for visualizing the generated data in dashboards
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for managing catalogs, schemas, and volumes where data is stored
 
 ### Output
-14. **Create infrastructure in script**: Use `CREATE SCHEMA/VOLUME IF NOT EXISTS` - do NOT create catalogs
-15. **Assume catalogs exist**: Never auto-create catalogs, only create schema and volume
-16. **Raw data only**: No `total_x`, `sum_x`, `avg_x` fields - SDP pipeline computes those
-17. **Choose output format** based on downstream needs (Parquet/JSON/CSV/Delta)
-18. **Configuration at top**: All sizes, dates, and paths as variables
-19. **Dynamic dates**: Use `datetime.now() - timedelta(days=180)` for last 6 months
+17. **Create infrastructure in script**: Use `CREATE SCHEMA/VOLUME IF NOT EXISTS` - do NOT create catalogs
+18. **Assume catalogs exist**: Never auto-create catalogs, only create schema and volume
+19. **Choose output format** based on downstream needs (Parquet/JSON/CSV/Delta)
+20. **Configuration at top**: All sizes, dates, and paths as variables
 
 ## Common Issues
 
