@@ -54,6 +54,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-unity-catalog** - System tables for lineage, audit, billing
 
 ### 🔧 Data Engineering
+- **databricks-dqx** - DQX (Data Quality Extensions) for quality rules, profiling, and quarantine
 - **databricks-spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
 - **databricks-jobs** - Multi-task workflows, triggers, schedules
 - **databricks-synthetic-data-generation** - Realistic test data with Faker
