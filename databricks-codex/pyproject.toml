@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "databricks-codex"
+version = "0.1.0"
+description = "Databricks integration for OpenAI Codex CLI"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+authors = [
+    { name = "Databricks", email = "solutions@databricks.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["databricks", "codex", "openai", "mcp", "ai"]
+
+dependencies = [
+    "pydantic>=2.0.0",
+    "tomli>=2.0.0;python_version<'3.11'",
+    "tomli-w>=1.0.0",
+]
+
+[project.optional-dependencies]
+databricks = [
+    "databricks-sdk>=0.12.0",
+]
+http = [
+    "httpx>=0.25.0",
+]
+all = [
+    "databricks-sdk>=0.12.0",
+    "httpx>=0.25.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-timeout>=2.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/databricks-solutions/ai-dev-kit"
+Documentation = "https://github.com/databricks-solutions/ai-dev-kit/tree/main/databricks-codex"
+Repository = "https://github.com/databricks-solutions/ai-dev-kit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databricks_codex"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (require Codex + Databricks)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true

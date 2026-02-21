@@ -73,3 +73,7 @@ databricks-tools-core/tests/integration/pdf/generated_pdf/
 # Python cache
 __pycache__/
 windows_info.txt
+
+# Databricks local token files
+.DATABRICKS_TOKEN
+.databricks_cfg
