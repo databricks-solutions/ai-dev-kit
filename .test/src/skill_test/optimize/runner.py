@@ -21,6 +21,13 @@ from .evaluator import (
     token_efficiency_score,
 )
 from .splitter import create_gepa_datasets, generate_bootstrap_tasks, to_gepa_instances
+from .tools import (
+    extract_tool_descriptions,
+    tools_to_gepa_components,
+    parse_gepa_component,
+    write_tool_descriptions,
+    get_tool_stats,
+)
 
 
 @dataclass
@@ -31,15 +38,19 @@ class OptimizationResult:
     original_score: float
     optimized_score: float
     improvement: float
-    original_content: str
-    optimized_content: str
-    original_token_count: int
+    original_content: str  # SKILL.md content (may be empty for tools_only)
+    optimized_content: str  # Optimized SKILL.md content
+    original_token_count: int  # Total tokens across ALL components
     optimized_token_count: int
     token_reduction_pct: float
     diff_summary: str
     val_scores: dict[str, float]
     mlflow_run_id: str | None
     gepa_result: Any
+    # Multi-component data
+    components: dict[str, str] | None = None  # All optimized component texts
+    original_components: dict[str, str] | None = None  # All original component texts
+    tool_map: Any = None  # For writing back tool descriptions
 
 
 def _compute_diff_summary(original: str, optimized: str) -> str:
@@ -103,16 +114,20 @@ def optimize_skill(
     preset: Literal["quick", "standard", "thorough"] = "standard",
     task_lm: str | None = None,
     reflection_lm: str | None = None,
+    include_tools: bool = False,
+    tool_modules: list[str] | None = None,
+    tools_only: bool = False,
     dry_run: bool = False,
 ) -> OptimizationResult:
-    """Run end-to-end GEPA optimization on a skill.
+    """Run end-to-end GEPA optimization on a skill, optionally with MCP tools.
 
     1. Load current SKILL.md as seed_candidate
-    2. Create train/val datasets from ground_truth.yaml
-    3. Build adapter from existing scorers
-    4. Run gepa.optimize()
-    5. Log results to MLflow
-    6. Return OptimizationResult with original/optimized scores and diff
+    2. Optionally load MCP tool descriptions as additional components
+    3. Create train/val datasets from ground_truth.yaml
+    4. Build adapter from existing scorers
+    5. Run gepa.optimize() (round-robin across all components)
+    6. Log results to MLflow
+    7. Return OptimizationResult with original/optimized scores and diff
 
     Args:
         skill_name: Name of the skill to optimize
@@ -120,6 +135,9 @@ def optimize_skill(
         preset: GEPA config preset ("quick", "standard", "thorough")
         task_lm: LLM model for generative mode
         reflection_lm: Override reflection LM (default: GEPA_REFLECTION_LM env or databricks/databricks-gpt-5-2)
+        include_tools: If True, include MCP tool descriptions as additional GEPA components
+        tool_modules: Specific tool modules to include (e.g., ["sql", "compute"]). None = all.
+        tools_only: If True, optimize ONLY tool descriptions (no SKILL.md)
         dry_run: If True, show config and dataset info without running optimization
 
     Returns:
@@ -130,14 +148,24 @@ def optimize_skill(
     """
     # 1. Load current SKILL.md
     skill_path = _find_skill_md(skill_name)
-    if skill_path is None:
+    if not tools_only and skill_path is None:
         raise FileNotFoundError(
             f"Could not find SKILL.md for '{skill_name}'. "
             "Expected at .claude/skills/{name}/SKILL.md or databricks-skills/{name}/SKILL.md"
         )
 
-    original_content = skill_path.read_text()
-    original_token_count = count_tokens(original_content)
+    original_content = skill_path.read_text() if skill_path else ""
+    original_token_count = count_tokens(original_content) if original_content else 0
+
+    # 1b. Load MCP tool descriptions if requested
+    tool_map = None
+    tool_components: dict[str, str] = {}
+    if include_tools or tools_only:
+        tool_map = extract_tool_descriptions(modules=tool_modules)
+        tool_components = tools_to_gepa_components(tool_map, per_module=True)
+        stats = get_tool_stats()
+        print(f"Tool modules: {stats['modules']}, tools: {stats['total_tools']}, "
+              f"description chars: {stats['total_description_chars']:,}")
 
     # 2. Create train/val datasets
     try:
@@ -146,17 +174,30 @@ def optimize_skill(
         train, val = [], None
 
     if not train:
-        # Bootstrap mode
         train = generate_bootstrap_tasks(skill_name)
         val = None
         print(f"No test cases found for '{skill_name}'. Using {len(train)} auto-generated tasks.")
         print(f"For better results, add test cases: skill-test add {skill_name}")
 
-    # 3. Build adapter
-    adapter = create_skill_adapter(skill_name, mode=mode, task_lm=task_lm)
+    # 3. Build seed_candidate (multi-component if tools included)
+    original_token_counts: dict[str, int] = {}
+    seed_candidate: dict[str, str] = {}
 
-    # seed_candidate is a dict with our SKILL_KEY
-    seed_candidate = {SkillAdapter.SKILL_KEY: original_content}
+    if not tools_only:
+        seed_candidate[SkillAdapter.SKILL_KEY] = original_content
+        original_token_counts[SkillAdapter.SKILL_KEY] = original_token_count
+
+    for comp_name, comp_text in tool_components.items():
+        seed_candidate[comp_name] = comp_text
+        original_token_counts[comp_name] = count_tokens(comp_text)
+
+    total_original_tokens = sum(original_token_counts.values())
+
+    # 3b. Build adapter with per-component token counts
+    adapter = create_skill_adapter(
+        skill_name, mode=mode, task_lm=task_lm,
+        original_token_counts=original_token_counts,
+    )
 
     # 4. Get preset config (with optional reflection LM override)
     preset_config = get_preset(preset, reflection_lm=reflection_lm)
@@ -164,8 +205,12 @@ def optimize_skill(
     # Dry run: show info and exit
     if dry_run:
         print(f"\n=== Dry Run: {skill_name} ===")
-        print(f"SKILL.md path: {skill_path}")
-        print(f"Original tokens: {original_token_count:,}")
+        if not tools_only:
+            print(f"SKILL.md path: {skill_path}")
+        print(f"Components: {list(seed_candidate.keys())}")
+        print(f"Total original tokens: {total_original_tokens:,}")
+        for comp, tokens in original_token_counts.items():
+            print(f"  {comp}: {tokens:,} tokens")
         print(f"Train tasks: {len(train)}")
         print(f"Val tasks: {len(val) if val else 'None (single-task mode)'}")
         print(f"Mode: {mode}")
@@ -185,13 +230,16 @@ def optimize_skill(
             improvement=0.0,
             original_content=original_content,
             optimized_content=original_content,
-            original_token_count=original_token_count,
-            optimized_token_count=original_token_count,
+            original_token_count=total_original_tokens,
+            optimized_token_count=total_original_tokens,
             token_reduction_pct=0.0,
             diff_summary="Dry run - no optimization performed",
             val_scores={},
             mlflow_run_id=None,
             gepa_result=None,
+            components=dict(seed_candidate),
+            original_components=dict(seed_candidate),
+            tool_map=tool_map,
         )
 
     # Evaluate original score
@@ -215,25 +263,32 @@ def optimize_skill(
 
     result = gepa.optimize(**gepa_kwargs)
 
-    # result.best_candidate is dict[str, str]
-    optimized_content = result.best_candidate.get(SkillAdapter.SKILL_KEY, original_content)
-    optimized_token_count = count_tokens(optimized_content)
+    # result.best_candidate is dict[str, str] (all components)
+    best = result.best_candidate
+    optimized_content = best.get(SkillAdapter.SKILL_KEY, original_content)
+    optimized_token_count = sum(count_tokens(v) for v in best.values())
 
-    # Evaluate optimized on train
-    optimized_candidate = {SkillAdapter.SKILL_KEY: optimized_content}
-    optimized_score, _ = _evaluate_on_tasks(adapter, optimized_candidate, train)
+    # Evaluate optimized on train (using full multi-component candidate)
+    optimized_score, _ = _evaluate_on_tasks(adapter, best, train)
 
     # Evaluate on val if available
     val_scores: dict[str, float] = {}
     if val:
-        _, val_scores = _evaluate_on_tasks(adapter, optimized_candidate, val)
+        _, val_scores = _evaluate_on_tasks(adapter, best, val)
 
-    # Token reduction
+    # Token reduction (total across all components)
     token_reduction_pct = (
-        (original_token_count - optimized_token_count) / original_token_count * 100
-        if original_token_count > 0
+        (total_original_tokens - optimized_token_count) / total_original_tokens * 100
+        if total_original_tokens > 0
         else 0.0
     )
+
+    # Write optimized tool descriptions back if tools were included
+    optimized_tool_components: dict[str, str] = {}
+    if tool_map and not dry_run:
+        for comp_name, comp_text in best.items():
+            if comp_name.startswith("tools_"):
+                optimized_tool_components[comp_name] = comp_text
 
     # Diff summary
     diff_summary = _compute_diff_summary(original_content, optimized_content)
@@ -260,7 +315,7 @@ def optimize_skill(
                     "original_score": original_score,
                     "optimized_score": optimized_score,
                     "improvement": optimized_score - original_score,
-                    "original_tokens": float(original_token_count),
+                    "original_tokens": float(total_original_tokens),
                     "optimized_tokens": float(optimized_token_count),
                     "token_reduction_pct": token_reduction_pct,
                     "total_metric_calls": float(result.total_metric_calls or 0),
@@ -277,11 +332,14 @@ def optimize_skill(
         improvement=optimized_score - original_score,
         original_content=original_content,
         optimized_content=optimized_content,
-        original_token_count=original_token_count,
+        original_token_count=total_original_tokens,
         optimized_token_count=optimized_token_count,
         token_reduction_pct=token_reduction_pct,
         diff_summary=diff_summary,
         val_scores=val_scores,
         mlflow_run_id=mlflow_run_id,
         gepa_result=result,
+        components=dict(best),
+        original_components=dict(seed_candidate),
+        tool_map=tool_map,
     )

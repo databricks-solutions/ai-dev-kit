@@ -59,6 +59,32 @@ uv run python .test/scripts/optimize.py <skill-name> --apply
 uv run python .test/scripts/optimize.py --all --preset quick
 ```
 
+### Optimize MCP Tool Descriptions
+
+GEPA can also optimize the `@mcp.tool` docstrings in `databricks-mcp-server/`. Tool descriptions are what the AI agent sees when deciding which tool to call -- concise, accurate descriptions lead to better tool selection.
+
+```bash
+# Optimize a skill AND its related tool modules together
+uv run python .test/scripts/optimize.py databricks-model-serving --include-tools --tool-modules serving sql
+
+# Optimize specific tool modules alongside a skill
+uv run python .test/scripts/optimize.py databricks-model-serving --include-tools --tool-modules serving compute jobs
+
+# Optimize ALL tool modules alongside a skill
+uv run python .test/scripts/optimize.py databricks-model-serving --include-tools
+
+# Optimize ONLY tool descriptions (no SKILL.md)
+uv run python .test/scripts/optimize.py databricks-model-serving --tools-only --tool-modules serving
+
+# Dry run to see components and token counts
+uv run python .test/scripts/optimize.py databricks-model-serving --include-tools --dry-run
+```
+
+When `--include-tools` is used, GEPA creates one component per tool module (e.g., `tools_sql`, `tools_serving`) and round-robins through them alongside `skill_md`. The `--apply` flag writes optimized docstrings back to the MCP server source files.
+
+Available tool modules (88 tools across 16 modules):
+`agent_bricks`, `aibi_dashboards`, `apps`, `compute`, `file`, `genie`, `jobs`, `lakebase`, `manifest`, `pipelines`, `serving`, `sql`, `unity_catalog`, `user`, `vector_search`, `volume_files`
+
 ### Changing the Reflection Model
 
 GEPA uses a reflection LM to analyze scorer failures and propose skill improvements. The default is **Databricks Model Serving** (`databricks-gpt-5-2`).

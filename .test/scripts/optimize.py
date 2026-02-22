@@ -81,7 +81,23 @@ def main():
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="Apply the optimized SKILL.md (overwrites original)",
+        help="Apply the optimized SKILL.md and/or tool descriptions",
+    )
+    parser.add_argument(
+        "--include-tools",
+        action="store_true",
+        help="Include MCP tool descriptions as additional optimization components",
+    )
+    parser.add_argument(
+        "--tool-modules",
+        nargs="*",
+        default=None,
+        help="Specific tool modules to optimize (e.g., sql compute serving). Default: all.",
+    )
+    parser.add_argument(
+        "--tools-only",
+        action="store_true",
+        help="Optimize ONLY tool descriptions, not the SKILL.md",
     )
 
     args = parser.parse_args()
@@ -114,6 +130,9 @@ def main():
                     preset=args.preset,
                     task_lm=args.task_lm,
                     reflection_lm=args.reflection_lm,
+                    include_tools=args.include_tools,
+                    tool_modules=args.tool_modules,
+                    tools_only=args.tools_only,
                     dry_run=args.dry_run,
                 )
                 review_optimization(result)
@@ -143,6 +162,9 @@ def main():
                 preset=args.preset,
                 task_lm=args.task_lm,
                 reflection_lm=args.reflection_lm,
+                include_tools=args.include_tools,
+                tool_modules=args.tool_modules,
+                tools_only=args.tools_only,
                 dry_run=args.dry_run,
             )
             review_optimization(result)

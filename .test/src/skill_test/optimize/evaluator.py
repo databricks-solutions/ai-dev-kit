@@ -71,6 +71,14 @@ def count_tokens(text: str) -> int:
     return len(enc.encode(text))
 
 
+def token_efficiency_score_raw(candidate_tokens: int, original_tokens: int) -> float:
+    """Score 0-1 based on token count ratio. Same logic as token_efficiency_score."""
+    if original_tokens <= 0:
+        return 1.0
+    ratio = candidate_tokens / original_tokens
+    return max(0.0, min(1.0, 2.0 - ratio))
+
+
 def _run_scorer(scorer_fn: Any, outputs: dict, expectations: dict, inputs: dict) -> list[Feedback]:
     """Run a single scorer and normalize the result to a list of Feedbacks."""
     sig = inspect.signature(scorer_fn)
@@ -147,11 +155,13 @@ _RolloutOutput = dict[str, Any]
 
 
 class SkillAdapter(GEPAAdapter):
-    """GEPA adapter that evaluates candidate SKILL.md texts using existing scorers.
+    """GEPA adapter that evaluates candidate texts using existing scorers.
 
-    The seed_candidate dict has a single key "skill_md" whose value is the
-    SKILL.md content. The adapter evaluates each data instance (test case)
-    by running the configured scorers.
+    Supports multi-component optimization:
+    - "skill_md": SKILL.md content (primary)
+    - "tools_*": MCP tool description blocks (optional, one per module)
+
+    GEPA's RoundRobinReflectionComponentSelector cycles through all components.
     """
 
     SKILL_KEY = "skill_md"
@@ -161,15 +171,26 @@ class SkillAdapter(GEPAAdapter):
         skill_name: str,
         mode: Literal["static", "generative"] = "static",
         task_lm: str | None = None,
+        original_token_counts: dict[str, int] | None = None,
     ):
         self.skill_name = skill_name
         self.mode = mode
         self.task_lm = task_lm
         self.scorer_config = load_scorer_config(skill_name)
 
-        # Get original token count for efficiency scoring
-        skill_path = _find_skill_md(skill_name)
-        self.original_token_count = count_tokens(skill_path.read_text()) if skill_path else 0
+        # Per-component original token counts for efficiency scoring
+        if original_token_counts:
+            self.original_token_counts = original_token_counts
+        else:
+            skill_path = _find_skill_md(skill_name)
+            self.original_token_counts = {
+                self.SKILL_KEY: count_tokens(skill_path.read_text()) if skill_path else 0
+            }
+
+    @property
+    def original_token_count(self) -> int:
+        """Total original token count across all components."""
+        return sum(self.original_token_counts.values())
 
     def evaluate(
         self,
@@ -241,8 +262,10 @@ class SkillAdapter(GEPAAdapter):
             # 3. Convert to score + diagnostics
             composite, diagnostics = feedback_to_asi(all_feedbacks)
 
-            # 4. Factor in token efficiency
-            efficiency = token_efficiency_score(candidate_text, self.original_token_count)
+            # 4. Factor in token efficiency (across ALL components)
+            total_candidate_tokens = sum(count_tokens(v) for v in candidate.values())
+            total_original_tokens = self.original_token_count
+            efficiency = token_efficiency_score_raw(total_candidate_tokens, total_original_tokens)
 
             # Weighted composite: 80% quality, 20% token efficiency
             final_score = 0.8 * composite + 0.2 * efficiency
@@ -300,6 +323,7 @@ def create_skill_adapter(
     skill_name: str,
     mode: Literal["static", "generative"] = "static",
     task_lm: str | None = None,
+    original_token_counts: dict[str, int] | None = None,
 ) -> SkillAdapter:
     """Create a SkillAdapter for GEPA optimization.
 
@@ -307,15 +331,37 @@ def create_skill_adapter(
         skill_name: Name of the skill being optimized
         mode: "static" or "generative"
         task_lm: LLM model string for generative mode
+        original_token_counts: Per-component original token counts (for multi-component)
 
     Returns:
         Configured SkillAdapter instance
     """
-    return SkillAdapter(skill_name=skill_name, mode=mode, task_lm=task_lm)
+    return SkillAdapter(
+        skill_name=skill_name,
+        mode=mode,
+        task_lm=task_lm,
+        original_token_counts=original_token_counts,
+    )
 
 
-def build_optimization_background(skill_name: str, original_token_count: int) -> str:
+def build_optimization_background(
+    skill_name: str,
+    original_token_count: int,
+    component_names: list[str] | None = None,
+) -> str:
     """Build the background context string for GEPA's reflection LM."""
+    components_desc = ""
+    if component_names and any(c.startswith("tools_") for c in component_names):
+        tool_modules = [c.replace("tools_", "") for c in component_names if c.startswith("tools_")]
+        components_desc = (
+            "\n\nYou are also optimizing MCP tool descriptions for these modules: "
+            f"{', '.join(tool_modules)}. "
+            "Tool descriptions are docstrings on @mcp.tool functions. They tell the AI agent "
+            "what each tool does, its parameters, and return values. Keep descriptions "
+            "accurate, concise, and action-oriented. Include usage hints that help the agent "
+            "choose the right tool.\n"
+        )
+
     return (
         f"You are optimizing a SKILL.md file for the '{skill_name}' Databricks skill. "
         "SKILL.md files teach AI agents (like Claude Code) how to use specific Databricks features. "
@@ -331,4 +377,5 @@ def build_optimization_background(skill_name: str, original_token_count: int) ->
         "Remove redundant examples, consolidate similar patterns, "
         "and eliminate verbose explanations that don't add value. "
         "Every token consumed is agent context window budget -- keep skills lean and focused."
+        f"{components_desc}"
     )

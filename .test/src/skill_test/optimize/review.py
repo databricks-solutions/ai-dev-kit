@@ -88,39 +88,54 @@ def review_optimization(result: OptimizationResult) -> None:
     print(f"{'=' * 60}\n")
 
 
-def apply_optimization(result: OptimizationResult) -> Path:
-    """Overwrite the original SKILL.md with the optimized version.
+def apply_optimization(result: OptimizationResult) -> Path | None:
+    """Apply optimized SKILL.md and/or tool descriptions.
 
-    Also updates baseline via existing baseline workflow if possible.
+    Writes back:
+    - SKILL.md (if changed)
+    - MCP tool docstrings (if tools were included in optimization)
 
     Args:
         result: OptimizationResult from optimize_skill()
 
     Returns:
-        Path to the updated SKILL.md
+        Path to the updated SKILL.md (or None if tools_only)
 
     Raises:
-        FileNotFoundError: If original SKILL.md cannot be found
         ValueError: If optimization did not improve the skill
     """
-    skill_path = _find_skill_md(result.skill_name)
-    if skill_path is None:
-        raise FileNotFoundError(f"Cannot find SKILL.md for '{result.skill_name}'")
-
-    if result.optimized_content == result.original_content:
-        print(f"No changes to apply for '{result.skill_name}'.")
-        return skill_path
-
     if result.improvement < 0:
         raise ValueError(
             f"Optimization regressed quality ({result.improvement:+.3f}). "
             "Refusing to apply. Use --force to override."
         )
 
-    # Write optimized content
-    skill_path.write_text(result.optimized_content)
+    skill_path = None
 
-    print(f"Applied optimized SKILL.md to {skill_path}")
+    # Apply SKILL.md changes
+    if result.optimized_content and result.optimized_content != result.original_content:
+        skill_path = _find_skill_md(result.skill_name)
+        if skill_path:
+            skill_path.write_text(result.optimized_content)
+            print(f"Applied optimized SKILL.md to {skill_path}")
+
+    # Apply tool description changes
+    if result.tool_map and result.components:
+        from .tools import parse_gepa_component, write_tool_descriptions
+
+        all_optimized_tools = {}
+        for comp_name, comp_text in result.components.items():
+            if comp_name.startswith("tools_"):
+                parsed = parse_gepa_component(comp_text)
+                all_optimized_tools.update(parsed)
+
+        if all_optimized_tools:
+            modified = write_tool_descriptions(all_optimized_tools, result.tool_map)
+            if modified:
+                print(f"Applied optimized tool descriptions to {len(modified)} files:")
+                for f in modified:
+                    print(f"  {f}")
+
     print(f"  Quality: {result.original_score:.3f} -> {result.optimized_score:.3f} "
           f"({result.improvement:+.3f})")
     print(f"  Tokens: {result.original_token_count:,} -> {result.optimized_token_count:,} "
