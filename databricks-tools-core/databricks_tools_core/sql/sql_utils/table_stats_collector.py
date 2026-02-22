@@ -151,7 +151,7 @@ class TableStatsCollector:
 
     def get_table_ddl(self, catalog: str, schema: str, table_name: str) -> str:
         """Get the DDL (CREATE TABLE statement) for a table."""
-        full_table_name = f"{catalog}.{schema}.{table_name}"
+        full_table_name = f"`{catalog}`.`{schema}`.`{table_name}`"
         query = f"SHOW CREATE TABLE {full_table_name}"
 
         try:
@@ -220,7 +220,7 @@ class TableStatsCollector:
         Returns:
             Tuple of (column_details dict, total_rows, sample_data)
         """
-        full_table_name = f"{catalog}.{schema}.{table_name}"
+        full_table_name = f"`{catalog}`.`{schema}`.`{table_name}`"
         return self._collect_stats_for_ref(
             table_ref=full_table_name,
             catalog=catalog,
@@ -611,7 +611,9 @@ class TableStatsCollector:
         column_details: Dict[str, ColumnDetail],
     ) -> None:
         """Fetch exact value counts for small-cardinality columns."""
-        full_table_name = f"{catalog}.{schema}.{table_name}"
+        # Ensure table name is properly quoted for SQL
+        quoted_table = table_name if table_name.startswith("`") else f"`{table_name}`"
+        full_table_name = f"`{catalog}`.`{schema}`.{quoted_table}"
 
         for col_name, _col_type in columns:
             if col_name not in column_details:
