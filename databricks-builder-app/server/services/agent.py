@@ -412,11 +412,15 @@ async def stream_agent_response(
       claude_env['ANTHROPIC_AUTH_TOKEN'] = databricks_token
 
       # Set the model to use (required for Databricks FMAPI)
-      anthropic_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-5')
+      anthropic_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-6')
       claude_env['ANTHROPIC_MODEL'] = anthropic_model
 
-      # Disable beta headers for Databricks FMAPI compatibility
-      claude_env['ANTHROPIC_CUSTOM_HEADERS'] = 'x-databricks-disable-beta-headers: true'
+      # Disable beta headers and experimental betas for Databricks FMAPI compatibility
+      # ANTHROPIC_CUSTOM_HEADERS enables coding agent mode on FMAPI
+      # CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS prevents context_management and other
+      # experimental body parameters that FMAPI doesn't support (400: Extra inputs not permitted)
+      claude_env['ANTHROPIC_CUSTOM_HEADERS'] = 'x-databricks-use-coding-agent-mode: true'
+      claude_env['CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS'] = '1'
 
       logger.info(f'Configured Databricks model serving: {anthropic_base_url} with model {anthropic_model}')
       logger.info(f'Claude env vars: BASE_URL={claude_env.get("ANTHROPIC_BASE_URL")}, MODEL={claude_env.get("ANTHROPIC_MODEL")}')
