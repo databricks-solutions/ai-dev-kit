@@ -86,6 +86,8 @@ class SQLExecutor:
         try:
             response = self.client.statement_execution.execute_statement(**exec_params)
         except Exception as e:
+            from ..warehouse import invalidate_warehouse_cache
+            invalidate_warehouse_cache()
             raise SQLExecutionError(
                 f"Failed to submit SQL query to warehouse '{self.warehouse_id}': {str(e)}. "
                 f"Check that the warehouse exists and is accessible."

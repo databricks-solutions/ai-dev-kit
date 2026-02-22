@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from databricks_tools_core.sql import (
     execute_sql as _execute_sql,
     execute_sql_multi as _execute_sql_multi,
+    execute_sql_batch as _execute_sql_batch,
     list_warehouses as _list_warehouses,
     get_best_warehouse as _get_best_warehouse,
     get_table_details as _get_table_details,
@@ -31,6 +32,10 @@ def execute_sql(
     manage_uc_objects tool instead of SQL DDL. It handles resource tracking and
     auto-tagging. Only use execute_sql for queries (SELECT, INSERT, UPDATE) and
     table DDL (CREATE TABLE, DROP TABLE).
+
+    COST NOTE: Each call starts a separate warehouse execution. If you need to run
+    multiple independent SELECT queries, use execute_sql_batch instead to combine
+    them into a single call.
 
     Args:
         sql_query: SQL query to execute
@@ -89,6 +94,42 @@ def execute_sql_multi(
         schema=schema,
         timeout=timeout,
         max_workers=max_workers,
+    )
+
+
+@mcp.tool
+def execute_sql_batch(
+    queries: List[str],
+    warehouse_id: str = None,
+    catalog: str = None,
+    schema: str = None,
+    timeout: int = 180,
+) -> Dict[str, Any]:
+    """
+    Execute multiple independent SELECT queries in a single warehouse call.
+
+    PREFER THIS over multiple execute_sql calls when you have 2+ independent
+    SELECT queries. This merges them into one warehouse execution, significantly
+    reducing cost and latency.
+
+    Only works for SELECT/WITH queries. For DDL or DML, use execute_sql_multi.
+
+    Args:
+        queries: List of SELECT/WITH SQL queries to execute.
+        warehouse_id: Optional warehouse ID. If not provided, auto-selects one.
+        catalog: Optional catalog context for unqualified table names.
+        schema: Optional schema context for unqualified table names.
+        timeout: Timeout in seconds (default: 180)
+
+    Returns:
+        Dictionary with results (keyed by query index) and query_count.
+    """
+    return _execute_sql_batch(
+        queries=queries,
+        warehouse_id=warehouse_id,
+        catalog=catalog,
+        schema=schema,
+        timeout=timeout,
     )
 
 
