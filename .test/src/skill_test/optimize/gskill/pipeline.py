@@ -1,103 +1,17 @@
-"""gskill pipeline: wraps GEPA optimize for customer repository skill generation.
+"""gskill pipeline: generate optimized skills for customer repositories.
 
-Configures GEPA with Databricks-appropriate defaults, generates an optimized
-SKILL.md, and outputs it in the standard format.
+Uses optimize_anything to produce SKILL.md files from repository context.
 """
 
+import ast
 import re
 from pathlib import Path
 from typing import Any
 
-import gepa
-from gepa import GEPAAdapter, EvaluationBatch
+from gepa.optimize_anything import optimize_anything, GEPAConfig, EngineConfig, ReflectionConfig
+import gepa.optimize_anything as oa
 
 from ..config import get_preset
-
-
-class _GSkillAdapter(GEPAAdapter):
-    """Minimal adapter for gskill that scores SKILL.md structural quality."""
-
-    SKILL_KEY = "skill_md"
-
-    def evaluate(
-        self,
-        batch: list[dict[str, Any]],
-        candidate: dict[str, str],
-        capture_traces: bool = False,
-    ) -> EvaluationBatch:
-        """Score candidate skill based on structural quality metrics."""
-        import ast
-
-        candidate_text = candidate.get(self.SKILL_KEY, "")
-        trajectories = []
-
-        for data_inst in batch:
-            score = 0.0
-            parts = 0
-
-            # Has markdown headers
-            if re.search(r"^#{1,3}\s+", candidate_text, re.MULTILINE):
-                score += 1.0
-                parts += 1
-
-            # Has code blocks
-            code_blocks = re.findall(r"```(\w+)\n(.*?)```", candidate_text, re.DOTALL)
-            if code_blocks:
-                score += 1.0
-                parts += 1
-
-                # Python blocks parse
-                py_blocks = [b for lang, b in code_blocks if lang == "python"]
-                if py_blocks:
-                    valid = sum(1 for b in py_blocks if _parses(b))
-                    score += valid / len(py_blocks)
-                    parts += 1
-
-            # Reasonable length (not too short, not too long)
-            word_count = len(candidate_text.split())
-            if 200 <= word_count <= 5000:
-                score += 1.0
-                parts += 1
-
-            final = score / parts if parts > 0 else 0.0
-
-            trajectories.append({
-                "data": data_inst,
-                "full_assistant_response": candidate_text[:200],
-                "score": final,
-            })
-
-        return EvaluationBatch(trajectories=trajectories)
-
-    def make_reflective_dataset(
-        self,
-        candidate: dict[str, str],
-        eval_batch: EvaluationBatch,
-        components_to_update: list[str],
-    ) -> dict[str, list[dict[str, Any]]]:
-        reflective_data: dict[str, list[dict[str, Any]]] = {}
-        for component in components_to_update:
-            examples = []
-            for traj in eval_batch.trajectories:
-                if traj.get("score", 1.0) < 0.8:
-                    examples.append({
-                        "input": traj.get("data", {}).get("input", ""),
-                        "current_text": candidate.get(component, ""),
-                        "feedback": "Skill structural quality is below threshold.",
-                        "score": traj.get("score", 0.0),
-                    })
-            reflective_data[component] = examples
-        return reflective_data
-
-
-def _parses(code: str) -> bool:
-    """Check if Python code parses without syntax errors."""
-    import ast
-    try:
-        ast.parse(code)
-        return True
-    except SyntaxError:
-        return False
 
 
 def run_gskill(
@@ -107,10 +21,7 @@ def run_gskill(
     preset: str = "standard",
     context_files: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Generate an optimized skill for a customer repository using GEPA.
-
-    Scans the repo for Databricks patterns, generates a SKILL.md optimized
-    for Claude Code consumption, and outputs to .claude/skills/<name>/SKILL.md.
+    """Generate an optimized skill for a customer repository.
 
     Args:
         repo_path: Path to the customer's repository
@@ -120,21 +31,19 @@ def run_gskill(
         context_files: Additional files to provide as context
 
     Returns:
-        Dict with generated skill path, quality score, and metadata
+        Dict with generated skill path and metadata
     """
     repo_path = Path(repo_path).resolve()
     if not repo_path.exists():
         raise FileNotFoundError(f"Repository not found: {repo_path}")
 
-    preset_config = get_preset(preset)
+    config = get_preset(preset)
 
     if skill_name is None:
         skill_name = repo_path.name
 
-    # Gather repo context
     repo_context = _scan_repo(repo_path, context_files)
 
-    # Build seed candidate
     seed_content = (
         f"# {skill_name}\n\n"
         "## Overview\n\n"
@@ -142,35 +51,57 @@ def run_gskill(
         + repo_context
     )
 
-    seed_candidate = {_GSkillAdapter.SKILL_KEY: seed_content}
+    def evaluate(candidate: str, example: dict) -> tuple[float, dict]:
+        """Score structural quality of generated skill."""
+        score = 0.0
+        parts = 0
 
-    # Build a synthetic trainset from the repo
+        if re.search(r"^#{1,3}\s+", candidate, re.MULTILINE):
+            score += 1.0
+            parts += 1
+
+        code_blocks = re.findall(r"```(\w+)\n(.*?)```", candidate, re.DOTALL)
+        if code_blocks:
+            score += 1.0
+            parts += 1
+            py_blocks = [b for lang, b in code_blocks if lang == "python"]
+            if py_blocks:
+                valid = sum(1 for b in py_blocks if _parses(b))
+                score += valid / len(py_blocks)
+                parts += 1
+
+        word_count = len(candidate.split())
+        if 200 <= word_count <= 5000:
+            score += 1.0
+            parts += 1
+
+        final = score / parts if parts > 0 else 0.0
+        oa.log(f"Structure score: {final:.2f}, words: {word_count}")
+
+        return final, {"structure_score": final, "word_count": word_count}
+
     trainset = [
-        {
-            "input": f"Help me understand the patterns in {skill_name}",
-            "additional_context": {},
-            "answer": "",
-        },
-        {
-            "input": f"Show me code examples from {skill_name}",
-            "additional_context": {},
-            "answer": "",
-        },
+        {"input": f"Help me understand patterns in {skill_name}", "additional_context": {}, "answer": ""},
+        {"input": f"Show code examples from {skill_name}", "additional_context": {}, "answer": ""},
     ]
 
-    adapter = _GSkillAdapter()
-
-    # Run GEPA
-    result = gepa.optimize(
-        seed_candidate=seed_candidate,
-        trainset=trainset,
-        adapter=adapter,
-        **preset_config.to_kwargs(),
+    result = optimize_anything(
+        seed_candidate=seed_content,
+        evaluator=evaluate,
+        dataset=trainset,
+        objective=f"Generate a SKILL.md that teaches an AI coding agent the patterns in {skill_name}.",
+        background=(
+            "SKILL.md files teach AI agents (Claude Code) repository-specific patterns. "
+            "Focus on Databricks patterns: Unity Catalog, MLflow, Spark, Delta Lake, etc. "
+            "Be CONCISE and ACTION-ORIENTED. Lead with code examples."
+        ),
+        config=config,
     )
 
-    generated_content = result.best_candidate.get(_GSkillAdapter.SKILL_KEY, seed_content)
+    generated_content = result.best_candidate
+    if isinstance(generated_content, dict):
+        generated_content = list(generated_content.values())[0]
 
-    # Write output
     if output_dir is None:
         output_dir = repo_path / ".claude" / "skills" / skill_name
     else:
@@ -189,19 +120,23 @@ def run_gskill(
     }
 
 
-def _scan_repo(repo_path: Path, context_files: list[str] | None = None) -> str:
-    """Scan repository for Databricks-relevant patterns and build context."""
-    context_parts = []
+def _parses(code: str) -> bool:
+    try:
+        ast.parse(code)
+        return True
+    except SyntaxError:
+        return False
 
-    # Read explicitly provided context files
+
+def _scan_repo(repo_path: Path, context_files: list[str] | None = None) -> str:
+    context_parts = []
     if context_files:
         for f in context_files:
             p = Path(f) if Path(f).is_absolute() else repo_path / f
             if p.exists():
-                content = p.read_text()[:5000]  # Cap at 5K per file
+                content = p.read_text()[:5000]
                 context_parts.append(f"### {p.name}\n\n```\n{content}\n```\n")
 
-    # Auto-scan for README
     readme = repo_path / "README.md"
     if readme.exists() and not context_files:
         context_parts.append(f"### README\n\n{readme.read_text()[:3000]}\n")

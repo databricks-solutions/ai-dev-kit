@@ -1,11 +1,12 @@
-"""ASI diagnostics: convert MLflow Feedback to GEPA (score, diagnostics) contract.
+"""ASI diagnostics: convert MLflow Feedback to optimize_anything SideInfo.
 
-Collects failure diagnostics so the adapter's make_reflective_dataset() can
-provide actionable context to GEPA's reflection LM.
+Routes failure diagnostics through oa.log() so GEPA's reflection LM gets
+actionable context about what went wrong with each scorer.
 """
 
 from typing import Any
 
+import gepa.optimize_anything as oa
 from mlflow.entities import Feedback
 
 
@@ -17,9 +18,6 @@ def feedback_to_score(feedback: Feedback) -> float | None:
         "no"  -> 0.0
         "skip" -> None (excluded from scoring)
         numeric -> float(value)
-
-    Returns:
-        Float score or None if the feedback should be excluded.
     """
     value = feedback.value
     if value == "yes":
@@ -36,29 +34,27 @@ def feedback_to_score(feedback: Feedback) -> float | None:
 
 
 def feedback_to_asi(feedbacks: list[Feedback]) -> tuple[float, dict[str, Any]]:
-    """Convert a list of MLflow Feedback objects to GEPA (score, diagnostics).
+    """Convert MLflow Feedback objects to optimize_anything (score, SideInfo).
 
-    Computes the mean score across all non-skipped feedbacks and builds
-    a diagnostics dict with per-scorer results.
+    Computes the mean score across non-skipped feedbacks and builds a
+    SideInfo dict. Logs failures via oa.log() so GEPA's reflection LM
+    sees actionable failure context.
 
     Args:
         feedbacks: List of MLflow Feedback objects from running scorers
 
     Returns:
-        Tuple of (composite_score, diagnostics_dict)
-        - composite_score: 0.0-1.0 mean across all scorable feedbacks
-        - diagnostics_dict: per-scorer name -> {score, rationale, value}
+        Tuple of (composite_score, side_info_dict)
     """
     scores = []
-    diagnostics: dict[str, Any] = {}
-    failure_messages: list[str] = []
+    side_info: dict[str, Any] = {}
 
     for fb in feedbacks:
         score = feedback_to_score(fb)
         name = fb.name or "unnamed"
 
         if score is None:
-            diagnostics[name] = {
+            side_info[name] = {
                 "score": None,
                 "value": fb.value,
                 "rationale": fb.rationale or "",
@@ -67,22 +63,20 @@ def feedback_to_asi(feedbacks: list[Feedback]) -> tuple[float, dict[str, Any]]:
             continue
 
         scores.append(score)
-        diagnostics[name] = {
+        side_info[name] = {
             "score": score,
             "value": fb.value,
             "rationale": fb.rationale or "",
             "status": "pass" if score >= 0.5 else "fail",
         }
 
-        # Collect failure messages for reflection dataset
+        # Route failures through oa.log() for GEPA reflection
         if score < 1.0:
-            failure_messages.append(
-                f"Scorer '{name}' returned {fb.value}: {fb.rationale or 'no rationale'}"
-            )
+            oa.log(f"Scorer '{name}' returned {fb.value}: {fb.rationale or 'no rationale'}")
 
     composite = sum(scores) / len(scores) if scores else 0.0
 
-    diagnostics["_summary"] = {
+    side_info["_summary"] = {
         "composite_score": composite,
         "total_scorers": len(feedbacks),
         "scored": len(scores),
@@ -90,6 +84,5 @@ def feedback_to_asi(feedbacks: list[Feedback]) -> tuple[float, dict[str, Any]]:
         "passed": sum(1 for s in scores if s >= 0.5),
         "failed": sum(1 for s in scores if s < 0.5),
     }
-    diagnostics["_failure_messages"] = failure_messages
 
-    return composite, diagnostics
+    return composite, side_info
