@@ -5,6 +5,7 @@ Functions for listing and selecting SQL warehouses.
 """
 
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from databricks.sdk.service.sql import State
@@ -12,6 +13,15 @@ from databricks.sdk.service.sql import State
 from ..auth import get_workspace_client, get_current_username
 
 logger = logging.getLogger(__name__)
+
+_warehouse_cache: dict = {"id": None, "timestamp": 0.0}
+_WAREHOUSE_CACHE_TTL = 60  # seconds
+
+
+def invalidate_warehouse_cache() -> None:
+    """Clear cached warehouse — call on warehouse errors."""
+    _warehouse_cache["id"] = None
+    _warehouse_cache["timestamp"] = 0.0
 
 
 def list_warehouses(limit: int = 20) -> List[Dict[str, Any]]:
@@ -106,6 +116,11 @@ def get_best_warehouse() -> Optional[str]:
     Raises:
         Exception: If API request fails
     """
+    now = time.monotonic()
+    if _warehouse_cache["id"] and (now - _warehouse_cache["timestamp"]) < _WAREHOUSE_CACHE_TTL:
+        logger.debug(f"Using cached warehouse: {_warehouse_cache['id']}")
+        return _warehouse_cache["id"]
+
     client = get_workspace_client()
     current_user = get_current_username()
 
@@ -164,4 +179,6 @@ def get_best_warehouse() -> Optional[str]:
         return None
 
     logger.debug(f"Selected warehouse: {selected.name} (state: {selected.state})")
+    _warehouse_cache["id"] = selected.id
+    _warehouse_cache["timestamp"] = time.monotonic()
     return selected.id
