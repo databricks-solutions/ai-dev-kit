@@ -102,6 +102,7 @@ def optimize_skill(
     mode: Literal["static", "generative"] = "static",
     preset: Literal["quick", "standard", "thorough"] = "standard",
     task_lm: str | None = None,
+    reflection_lm: str | None = None,
     dry_run: bool = False,
 ) -> OptimizationResult:
     """Run end-to-end GEPA optimization on a skill.
@@ -118,6 +119,7 @@ def optimize_skill(
         mode: "static" (uses ground truth responses) or "generative" (generates fresh)
         preset: GEPA config preset ("quick", "standard", "thorough")
         task_lm: LLM model for generative mode
+        reflection_lm: Override reflection LM (default: GEPA_REFLECTION_LM env or databricks/databricks-gpt-5-2)
         dry_run: If True, show config and dataset info without running optimization
 
     Returns:
@@ -156,8 +158,8 @@ def optimize_skill(
     # seed_candidate is a dict with our SKILL_KEY
     seed_candidate = {SkillAdapter.SKILL_KEY: original_content}
 
-    # 4. Get preset config
-    preset_config = get_preset(preset)
+    # 4. Get preset config (with optional reflection LM override)
+    preset_config = get_preset(preset, reflection_lm=reflection_lm)
 
     # Dry run: show info and exit
     if dry_run:
@@ -168,6 +170,7 @@ def optimize_skill(
         print(f"Val tasks: {len(val) if val else 'None (single-task mode)'}")
         print(f"Mode: {mode}")
         print(f"Preset: {preset} (max_metric_calls={preset_config.max_metric_calls})")
+        print(f"Reflection LM: {preset_config.reflection_lm}")
         if mode == "generative":
             print(f"Task LM: {task_lm or 'not set'}")
 

@@ -150,6 +150,7 @@ def main():
         opt_preset = "standard"
         opt_mode = "static"
         opt_task_lm = None
+        opt_reflection_lm = None
         opt_dry_run = False
         opt_apply = False
 
@@ -164,6 +165,9 @@ def main():
             elif args[i] == "--task-lm" and i + 1 < len(args):
                 opt_task_lm = args[i + 1]
                 i += 2
+            elif args[i] == "--reflection-lm" and i + 1 < len(args):
+                opt_reflection_lm = args[i + 1]
+                i += 2
             elif args[i] == "--dry-run":
                 opt_dry_run = True
                 i += 1
@@ -176,6 +180,7 @@ def main():
         result = optimize(
             skill_name, ctx,
             preset=opt_preset, mode=opt_mode, task_lm=opt_task_lm,
+            reflection_lm=opt_reflection_lm,
             dry_run=opt_dry_run, apply=opt_apply,
         )
     else:

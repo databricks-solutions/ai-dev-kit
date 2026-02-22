@@ -69,6 +69,11 @@ def main():
         help="LLM model for generative mode (e.g., openai/gpt-4o)",
     )
     parser.add_argument(
+        "--reflection-lm",
+        default=None,
+        help="Override GEPA reflection model (default: GEPA_REFLECTION_LM env or databricks/databricks-gpt-5-2)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show config and cost estimate without running optimization",
@@ -108,6 +113,7 @@ def main():
                     mode=args.mode,
                     preset=args.preset,
                     task_lm=args.task_lm,
+                    reflection_lm=args.reflection_lm,
                     dry_run=args.dry_run,
                 )
                 review_optimization(result)
@@ -136,6 +142,7 @@ def main():
                 mode=args.mode,
                 preset=args.preset,
                 task_lm=args.task_lm,
+                reflection_lm=args.reflection_lm,
                 dry_run=args.dry_run,
             )
             review_optimization(result)

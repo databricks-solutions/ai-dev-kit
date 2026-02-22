@@ -1407,10 +1407,11 @@ def optimize(
     preset: str = "standard",
     mode: str = "static",
     task_lm: Optional[str] = None,
+    reflection_lm: Optional[str] = None,
     dry_run: bool = False,
     apply: bool = False,
 ) -> Dict[str, Any]:
-    """Optimize a skill using GEPA's optimize_anything.
+    """Optimize a skill using GEPA.
 
     Runs the full optimization pipeline: evaluate -> optimize -> review.
     Optionally applies the optimized result to the SKILL.md.
@@ -1421,6 +1422,7 @@ def optimize(
         preset: GEPA preset ("quick", "standard", "thorough")
         mode: "static" (uses ground truth) or "generative" (generates fresh responses)
         task_lm: LLM model for generative mode
+        reflection_lm: Override GEPA reflection model
         dry_run: Show config and estimate cost without running
         apply: Apply the optimized result to SKILL.md
 
@@ -1443,6 +1445,7 @@ def optimize(
             mode=mode,
             preset=preset,
             task_lm=task_lm,
+            reflection_lm=reflection_lm,
             dry_run=dry_run,
         )
 

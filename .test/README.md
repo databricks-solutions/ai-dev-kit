@@ -1,23 +1,95 @@
-# Skill Testing Framework
+# Skill Testing & Optimization Framework
 
-Test Databricks skills with real execution on serverless compute.
+Evaluate and optimize Databricks SKILL.md files using automated scorers and [GEPA](https://github.com/gepa-ai/gepa)-powered optimization.
 
-**Note:** This framework is for contributors only and is not distributed via install_skills.sh.
+## Quick Start: Optimize a Skill
+
+One command evaluates a skill's current quality, runs GEPA optimization, and shows the results:
+
+```bash
+uv run python .test/scripts/optimize.py databricks-model-serving --preset quick --apply
+```
+
+This will:
+1. Load the SKILL.md and its test cases from `ground_truth.yaml`
+2. Score the current skill against deterministic scorers (syntax, patterns, APIs, facts)
+3. Run GEPA's optimization loop (reflect on failures, propose mutations, select via Pareto frontier)
+4. Show a diff with quality improvement and token reduction
+5. Apply the optimized SKILL.md back to disk
 
 ## Setup
 
 ```bash
-uv pip install -e ".test/[dev]"
-.test/install_skill_test.sh
-```
+# Install with optimization dependencies
+uv pip install -e ".test/[all]"
 
-Requires a Databricks workspace with serverless SQL/compute enabled.
+# Authentication for the reflection model (pick one)
+# Option A: Databricks Model Serving (default)
+export DATABRICKS_API_KEY="dapi..."
+export DATABRICKS_API_BASE="https://<workspace>.cloud.databricks.com"
+
+# Option B: OpenAI
+export OPENAI_API_KEY="sk-..."
+export GEPA_REFLECTION_LM="openai/gpt-4o"
+```
 
 ---
 
-## New Skill Journey
+## Optimization Commands
 
-Complete workflow for testing a skill from scratch (e.g., `mlflow-evaluation`).
+### Evaluate + Optimize a Skill
+
+```bash
+# Standard optimization (50 iterations)
+uv run python .test/scripts/optimize.py <skill-name>
+
+# Quick pass (15 iterations, good for initial check)
+uv run python .test/scripts/optimize.py <skill-name> --preset quick
+
+# Thorough optimization (150 iterations, production quality)
+uv run python .test/scripts/optimize.py <skill-name> --preset thorough
+
+# Dry run: see scores and config without calling GEPA
+uv run python .test/scripts/optimize.py <skill-name> --dry-run
+
+# Optimize and apply the result
+uv run python .test/scripts/optimize.py <skill-name> --apply
+
+# Optimize all skills that have test cases
+uv run python .test/scripts/optimize.py --all --preset quick
+```
+
+### Changing the Reflection Model
+
+GEPA uses a reflection LM to analyze scorer failures and propose skill improvements. The default is **Databricks Model Serving** (`databricks-gpt-5-2`).
+
+| Method | Example |
+|--------|---------|
+| Environment variable | `export GEPA_REFLECTION_LM="databricks/databricks-gpt-5-2"` |
+| CLI flag | `--reflection-lm "openai/gpt-4o"` |
+| Python | `optimize_skill("my-skill", reflection_lm="anthropic/claude-sonnet-4-5-20250514")` |
+
+Model strings use [litellm provider prefixes](https://docs.litellm.ai/docs/providers):
+
+| Provider | Prefix | Example |
+|----------|--------|---------|
+| Databricks Model Serving | `databricks/` | `databricks/databricks-gpt-5-2` |
+| OpenAI | `openai/` | `openai/gpt-4o` |
+| Anthropic | `anthropic/` | `anthropic/claude-sonnet-4-5-20250514` |
+
+### Authentication
+
+| Provider | Required Environment Variables |
+|----------|-------------------------------|
+| Databricks | `DATABRICKS_API_KEY`, `DATABRICKS_API_BASE` |
+| OpenAI | `OPENAI_API_KEY` |
+| Anthropic | `ANTHROPIC_API_KEY` |
+
+---
+
+## Building Test Cases for a Skill
+
+Skills need test cases before optimization can work well. The workflow:
 
 ### 1. Initialize Test Scaffolding
 
@@ -25,11 +97,7 @@ Complete workflow for testing a skill from scratch (e.g., `mlflow-evaluation`).
 /skill-test <skill-name> init
 ```
 
-Claude will:
-1. Read the skill's SKILL.md documentation
-2. Generate `manifest.yaml` with appropriate scorers
-3. Create empty `ground_truth.yaml` and `candidates.yaml` templates
-4. Recommend test prompts based on documentation
+Generates `manifest.yaml` with scorer config, empty `ground_truth.yaml`, and `candidates.yaml`.
 
 ### 2. Add Test Cases
 
@@ -37,48 +105,21 @@ Claude will:
 /skill-test <skill-name> add
 ```
 
-Run this with the recommended prompts from init. Claude will:
-1. Ask for your test prompt
-2. Invoke the skill to generate a response
-3. Execute code blocks on Databricks
-4. Auto-save passing tests to `ground_truth.yaml`
-5. Save failing tests to `candidates.yaml` for review
-
-Repeat for each recommended prompt.
+Interactively generates test cases. Passing tests go to `ground_truth.yaml`, failing ones to `candidates.yaml` for review.
 
 ### 3. Review Candidates
 
 ```
 /skill-test <skill-name> review
-```
-
-Review any tests that failed execution and were saved to candidates:
-1. Load pending tests from `candidates.yaml`
-2. Present each with prompt, response, and execution results
-3. Allow you to approve, reject, skip, or edit
-4. Promote approved candidates to `ground_truth.yaml`
-
-For batch approval of successful tests:
-```
 /skill-test <skill-name> review --batch --filter-success
 ```
 
 ### 4. Configure Scorers (Optional)
 
-```
-/skill-test <skill-name> scorers
-```
-
-View current scorer configuration. To update:
-
+Edit `.test/skills/<skill-name>/manifest.yaml` or:
 ```
 /skill-test <skill-name> scorers update --add-guideline "Must use CLUSTER BY"
 ```
-
-Or edit `.test/skills/<skill-name>/manifest.yaml` directly to:
-- Add/remove scorers
-- Update default guidelines
-- Configure trace expectations
 
 ### 5. Run Evaluation
 
@@ -86,38 +127,16 @@ Or edit `.test/skills/<skill-name>/manifest.yaml` directly to:
 /skill-test <skill-name> run
 ```
 
-Executes code blocks on Databricks or locally (depends on SKILLS, MCP, etc.) and reports pass/fail for each test in `ground_truth.yaml`.
-
-**Note:** Requires test cases in ground_truth.yaml (from steps 2-3).
-
-### 6. MLflow Evaluation (Optional)
-
-```
-/skill-test <skill-name> mlflow
-```
-
-Runs full evaluation with LLM judges and logs results to MLflow. Provides deeper quality assessment beyond pass/fail execution.
-
-### 7. Save Baseline
+### 6. Save Baseline + Check Regressions
 
 ```
 /skill-test <skill-name> baseline
-```
-
-Saves current metrics to `baselines/<skill-name>/baseline.yaml`.
-
-### 8. Check Regressions
-
-After skill changes:
-```
 /skill-test <skill-name> regression
 ```
 
-Compares current pass rate against the saved baseline.
-
 ---
 
-## Trace Evaluation (In Progress)
+## Trace Evaluation
 
 Capture Claude Code sessions and evaluate against skill expectations.
 
@@ -133,60 +152,29 @@ mlflow autolog claude -u databricks -n "$MLFLOW_EXPERIMENT_NAME" .
 
 ### Evaluate Traces
 
-**Local trace file:**
 ```
 /skill-test <skill-name> trace-eval --trace ~/.claude/projects/.../session.jsonl
-```
-
-**From MLflow run ID** (from `mlflow.search_runs`):
-```
 /skill-test <skill-name> trace-eval --run-id abc123
-```
-
-**From MLflow trace ID** (from `mlflow.get_trace`):
-```
-/skill-test <skill-name> trace-eval --trace-id tr-d416fccdab46e2dea6bad1d0bd8aaaa8
-```
-
-**List available traces:**
-```
-/skill-test <skill-name> list-traces --local
 /skill-test <skill-name> list-traces --experiment "$MLFLOW_EXPERIMENT_NAME"
-```
-
-### Configure Expectations
-
-In `manifest.yaml`:
-```yaml
-scorers:
-  trace_expectations:
-    tool_limits:
-      Bash: 15
-      mcp__databricks__execute_sql: 10
-    token_budget:
-      max_total: 150000
-    required_tools:
-      - Read
-    banned_tools:
-      - "DROP DATABASE"
 ```
 
 ---
 
 ## Command Reference
 
-| Command | Description |
-|---------|-------------|
-| `run` | Execute tests against ground truth (default) |
-| `init` | Generate test scaffolding from skill docs |
-| `add` | Add test cases interactively |
-| `review` | Review and promote candidates |
-| `baseline` | Save current results as baseline |
-| `regression` | Compare against baseline |
-| `mlflow` | Full evaluation with LLM judges |
-| `trace-eval` | Evaluate session traces |
-| `list-traces` | List available traces |
-| `scorers` | View/update scorer config |
+| Command    | Description                              |
+|------------|------------------------------------------|
+| `run`      | Execute tests against ground truth       |
+| `init`     | Generate test scaffolding from skill docs|
+| `add`      | Add test cases interactively             |
+| `review`   | Review and promote candidates            |
+| `baseline` | Save current results as baseline         |
+| `regression` | Compare against baseline               |
+| `mlflow`   | Full evaluation with LLM judges          |
+| `optimize` | Optimize skill with GEPA                 |
+| `trace-eval` | Evaluate session traces                |
+| `list-traces` | List available traces                 |
+| `scorers`  | View/update scorer config                |
 
 ---
 
@@ -200,28 +188,6 @@ scorers:
 
 .test/baselines/<skill-name>/
 └── baseline.yaml       # Regression baseline
-```
-
----
-
-## Test Case Format
-
-```yaml
-test_cases:
-  - id: "eval_basic_001"
-    inputs:
-      prompt: "Create a scorer for response length"
-    outputs:
-      response: |
-        ```python
-        @scorer
-        def response_length(outputs):
-            return Feedback(name="length", value=len(outputs["response"]))
-        ```
-      execution_success: true
-    expectations:
-      expected_facts: ["@scorer", "Feedback"]
-      guidelines: ["Must use mlflow.genai.scorers"]
 ```
 
 ---
