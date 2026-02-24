@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class LakebaseQueryError(Exception):
     """Exception raised when Lakebase query execution fails."""
-    pass
+    
 
 
 def execute_lakebase_query(
