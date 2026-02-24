@@ -24,6 +24,7 @@ import logging
 import os
 import re
 import subprocess
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
@@ -32,7 +33,31 @@ from databricks.sdk import WorkspaceClient
 logger = logging.getLogger(__name__)
 
 PRODUCT_NAME = "databricks-ai-dev-kit"
-PRODUCT_VERSION = "0.1.0"
+
+DESCRIPTION_FOOTER = "Built with Databricks AI Dev Kit"
+
+
+def _load_version() -> str:
+    """Load version from the repository root ``VERSION`` file.
+
+    Searches upward from this module's directory for a ``VERSION`` file.
+    Falls back to ``"0.0.0-unknown"`` if not found.
+    """
+    try:
+        d = Path(__file__).resolve().parent
+        for _ in range(6):  # walk up at most 6 levels
+            candidate = d / "VERSION"
+            if candidate.is_file():
+                return candidate.read_text().strip()
+            if d.parent == d:
+                break
+            d = d.parent
+    except Exception:
+        pass
+    return "0.0.0-unknown"
+
+
+PRODUCT_VERSION = _load_version()
 
 _CONFIG_FILENAME = ".databricks-ai-dev-kit.yaml"
 
@@ -199,3 +224,13 @@ def tag_client(client: WorkspaceClient) -> WorkspaceClient:
     """
     client.config.with_user_agent_extra("project", detect_project_name())
     return client
+
+
+def with_description_footer(description: Optional[str]) -> str:
+    """Append the AI Dev Kit footer to a resource description.
+
+    If *description* is empty or ``None``, returns just the footer.
+    """
+    if not description:
+        return DESCRIPTION_FOOTER
+    return f"{description}\n\n{DESCRIPTION_FOOTER}"

@@ -421,6 +421,11 @@ async def stream_agent_response(
       logger.info(f'Configured Databricks model serving: {anthropic_base_url} with model {anthropic_model}')
       logger.info(f'Claude env vars: BASE_URL={claude_env.get("ANTHROPIC_BASE_URL")}, MODEL={claude_env.get("ANTHROPIC_MODEL")}')
 
+    # Databricks SDK upstream tracking for subprocess user-agent attribution
+    from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
+    claude_env['DATABRICKS_SDK_UPSTREAM'] = PRODUCT_NAME
+    claude_env['DATABRICKS_SDK_UPSTREAM_VERSION'] = PRODUCT_VERSION
+
     # Ensure stream timeout is set (1 hour to handle long tool sequences)
     stream_timeout = os.environ.get('CLAUDE_CODE_STREAM_CLOSE_TIMEOUT', '3600000')
     claude_env['CLAUDE_CODE_STREAM_CLOSE_TIMEOUT'] = stream_timeout

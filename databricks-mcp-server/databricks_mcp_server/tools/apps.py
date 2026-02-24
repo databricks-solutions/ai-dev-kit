@@ -10,6 +10,7 @@ from databricks_tools_core.apps.apps import (
     delete_app as _delete_app,
     get_app_logs as _get_app_logs,
 )
+from databricks_tools_core.identity import with_description_footer
 
 from ..manifest import register_deleter
 from ..server import mcp
@@ -37,7 +38,7 @@ def create_app(
     Returns:
         Dictionary with app details including name, url, and status.
     """
-    result = _create_app(name=name, description=description)
+    result = _create_app(name=name, description=with_description_footer(description))
 
     # Track resource on successful create
     try:

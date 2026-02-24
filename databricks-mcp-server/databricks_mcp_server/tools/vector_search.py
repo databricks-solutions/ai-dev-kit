@@ -53,7 +53,20 @@ def create_vs_endpoint(
         >>> create_vs_endpoint("my-endpoint", "STORAGE_OPTIMIZED")
         {"name": "my-endpoint", "endpoint_type": "STORAGE_OPTIMIZED", "status": "CREATING"}
     """
-    return _create_vs_endpoint(name=name, endpoint_type=endpoint_type)
+    result = _create_vs_endpoint(name=name, endpoint_type=endpoint_type)
+
+    try:
+        from ..manifest import track_resource
+
+        track_resource(
+            resource_type="vs_endpoint",
+            name=name,
+            resource_id=name,
+        )
+    except Exception:
+        pass  # best-effort tracking
+
+    return result
 
 
 @mcp.tool
@@ -172,7 +185,7 @@ def create_vs_index(
         ...     }
         ... )
     """
-    return _create_vs_index(
+    result = _create_vs_index(
         name=name,
         endpoint_name=endpoint_name,
         primary_key=primary_key,
@@ -180,6 +193,19 @@ def create_vs_index(
         delta_sync_index_spec=delta_sync_index_spec,
         direct_access_index_spec=direct_access_index_spec,
     )
+
+    try:
+        from ..manifest import track_resource
+
+        track_resource(
+            resource_type="vs_index",
+            name=name,
+            resource_id=name,
+        )
+    except Exception:
+        pass  # best-effort tracking
+
+    return result
 
 
 @mcp.tool

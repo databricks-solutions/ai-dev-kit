@@ -17,6 +17,7 @@ import time
 from typing import Optional
 
 from databricks.sdk import WorkspaceClient
+from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
 from fastapi import Request
 
 logger = logging.getLogger(__name__)
@@ -46,15 +47,17 @@ def _get_workspace_client() -> WorkspaceClient:
 
   In Databricks Apps, explicitly uses OAuth M2M to avoid conflicts with other auth methods.
   """
+  product_kwargs = dict(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
   if _has_oauth_credentials():
     # Explicitly configure OAuth M2M to prevent auth conflicts
     return WorkspaceClient(
       host=os.environ.get('DATABRICKS_HOST', ''),
       client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
       client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+      **product_kwargs,
     )
   # Development mode - use default SDK auth
-  return WorkspaceClient()
+  return WorkspaceClient(**product_kwargs)
 
 
 async def get_current_user(request: Request) -> str:

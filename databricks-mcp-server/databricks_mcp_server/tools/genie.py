@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from databricks_tools_core.agent_bricks import AgentBricksManager
 from databricks_tools_core.auth import get_workspace_client
+from databricks_tools_core.identity import with_description_footer
 
 from ..manifest import register_deleter
 from ..server import mcp
@@ -111,6 +112,7 @@ def create_or_update_genie(
         ... )
         {"space_id": "abc123...", "display_name": "Sales Analytics", "operation": "created", ...}
     """
+    description = with_description_footer(description)
     manager = _get_manager()
 
     # Auto-detect warehouse if not provided
