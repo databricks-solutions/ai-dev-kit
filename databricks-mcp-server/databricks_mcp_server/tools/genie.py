@@ -75,81 +75,80 @@ def create_or_update_genie(
         ... )
         {"space_id": "abc123...", "display_name": "Sales Analytics", "operation": "created", ...}
     """
-    manager = _get_manager()
-
-    # Auto-detect warehouse if not provided
-    if warehouse_id is None:
-        warehouse_id = manager.get_best_warehouse_id()
-        if warehouse_id is None:
-            return {"error": "No SQL warehouses available. Please provide a warehouse_id or create a warehouse."}
-
-    operation = "created"
-
-    if space_id:
-        # Update existing space by ID
-        existing = manager.genie_get(space_id)
-        if existing:
-            operation = "updated"
-            manager.genie_update(
-                space_id=space_id,
-                display_name=display_name,
-                description=description,
-                warehouse_id=warehouse_id,
-                table_identifiers=table_identifiers,
-                sample_questions=sample_questions,
-            )
-        else:
-            return {"error": f"Genie space {space_id} not found"}
-    else:
-        # Check if exists by name first
-        existing = manager.genie_find_by_name(display_name)
-        if existing:
-            operation = "updated"
-            manager.genie_update(
-                space_id=existing.space_id,
-                display_name=display_name,
-                description=description,
-                warehouse_id=warehouse_id,
-                table_identifiers=table_identifiers,
-                sample_questions=sample_questions,
-            )
-            space_id = existing.space_id
-        else:
-            # Create new
-            result = manager.genie_create(
-                display_name=display_name,
-                warehouse_id=warehouse_id,
-                table_identifiers=table_identifiers,
-                description=description,
-            )
-            space_id = result.get("space_id", "")
-
-            # Add sample questions if provided
-            if sample_questions and space_id:
-                manager.genie_add_sample_questions_batch(space_id, sample_questions)
-
-    response = {
-        "space_id": space_id,
-        "display_name": display_name,
-        "operation": operation,
-        "warehouse_id": warehouse_id,
-        "table_count": len(table_identifiers),
-    }
-
-    # Track resource on successful create/update
     try:
+        manager = _get_manager()
+
+        # Auto-detect warehouse if not provided
+        if warehouse_id is None:
+            warehouse_id = manager.get_best_warehouse_id()
+            if warehouse_id is None:
+                return {"error": "No SQL warehouses available. Please provide a warehouse_id or create a warehouse."}
+
+        operation = "created"
+
         if space_id:
-            from ..manifest import track_resource
+            existing = manager.genie_get(space_id)
+            if existing:
+                operation = "updated"
+                manager.genie_update(
+                    space_id=space_id,
+                    display_name=display_name,
+                    description=description,
+                    warehouse_id=warehouse_id,
+                    table_identifiers=table_identifiers,
+                    sample_questions=sample_questions,
+                )
+            else:
+                return {"error": f"Genie space {space_id} not found"}
+        else:
+            existing = manager.genie_find_by_name(display_name)
+            if existing:
+                operation = "updated"
+                manager.genie_update(
+                    space_id=existing.space_id,
+                    display_name=display_name,
+                    description=description,
+                    warehouse_id=warehouse_id,
+                    table_identifiers=table_identifiers,
+                    sample_questions=sample_questions,
+                )
+                space_id = existing.space_id
+            else:
+                result = manager.genie_create(
+                    display_name=display_name,
+                    warehouse_id=warehouse_id,
+                    table_identifiers=table_identifiers,
+                    description=description,
+                )
+                space_id = result.get("space_id", "")
 
-            track_resource(
-                resource_type="genie_space",
-                name=display_name,
-                resource_id=space_id,
-            )
-    except Exception:
-        pass  # best-effort tracking
+                if sample_questions and space_id:
+                    manager.genie_add_sample_questions_batch(space_id, sample_questions)
 
-    return response
+        response = {
+            "space_id": space_id,
+            "display_name": display_name,
+            "operation": operation,
+            "warehouse_id": warehouse_id,
+            "table_count": len(table_identifiers),
+        }
+
+        try:
+            if space_id:
+                from ..manifest import track_resource
+
+                track_resource(
+                    resource_type="genie_space",
+                    name=display_name,
+                    resource_id=space_id,
+                )
+        except Exception:
+            pass
+
+        return response
+
+    except Exception as e:
+        return {"error": f"Failed to create/update Genie space '{display_name}': {e}"}
 
 
 @mcp.tool
@@ -174,23 +173,26 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
         {"spaces": [{"space_id": "abc123...", "title": "Sales Analytics", ...}, ...]}
     """
     if space_id:
-        manager = _get_manager()
-        result = manager.genie_get(space_id)
+        try:
+            manager = _get_manager()
+            result = manager.genie_get(space_id)
 
-        if not result:
-            return {"error": f"Genie space {space_id} not found"}
+            if not result:
+                return {"error": f"Genie space {space_id} not found"}
 
-        questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
-        sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
+            questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
+            sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
 
-        return {
-            "space_id": result.get("space_id", space_id),
-            "display_name": result.get("display_name", ""),
-            "description": result.get("description", ""),
-            "warehouse_id": result.get("warehouse_id", ""),
-            "table_identifiers": result.get("table_identifiers", []),
-            "sample_questions": sample_questions,
-        }
+            return {
+                "space_id": result.get("space_id", space_id),
+                "display_name": result.get("display_name", ""),
+                "description": result.get("description", ""),
+                "warehouse_id": result.get("warehouse_id", ""),
+                "table_identifiers": result.get("table_identifiers", []),
+                "sample_questions": sample_questions,
+            }
+        except Exception as e:
+            return {"error": f"Failed to get Genie space {space_id}: {e}"}
 
     # List all spaces
     try:
