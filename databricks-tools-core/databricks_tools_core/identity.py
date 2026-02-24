@@ -43,18 +43,22 @@ def _load_version() -> str:
     Searches upward from this module's directory for a ``VERSION`` file.
     Falls back to ``"0.0.0-unknown"`` if not found.
     """
+    fallback = "0.0.0-unknown"
     try:
         d = Path(__file__).resolve().parent
         for _ in range(6):  # walk up at most 6 levels
             candidate = d / "VERSION"
             if candidate.is_file():
-                return candidate.read_text().strip()
+                version = candidate.read_text().strip()
+                logger.debug("Loaded version %s from %s", version, candidate)
+                return version
             if d.parent == d:
                 break
             d = d.parent
     except Exception:
-        pass
-    return "0.0.0-unknown"
+        logger.debug("Failed to read VERSION file", exc_info=True)
+    logger.warning("VERSION file not found; falling back to %s", fallback)
+    return fallback
 
 
 PRODUCT_VERSION = _load_version()
