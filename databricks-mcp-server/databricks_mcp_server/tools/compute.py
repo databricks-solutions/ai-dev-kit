@@ -20,6 +20,9 @@ def list_clusters() -> List[Dict[str, Any]]:
     """
     List all clusters in the workspace.
 
+    NOTE: Most workspaces use serverless compute. Only use clusters as a last
+    resort. Prefer execute_sql() for SQL and serverless jobs for Python.
+
     Returns:
         List of cluster info dicts with cluster_id, cluster_name, state, etc.
     """
@@ -30,6 +33,11 @@ def list_clusters() -> List[Dict[str, Any]]:
 def get_best_cluster() -> Dict[str, Any]:
     """
     Get the ID of the best available cluster for code execution.
+
+    WARNING: Consider whether you actually need a cluster. For SQL workloads,
+    use execute_sql(). For batch Python, use serverless jobs. Clusters are
+    expensive ($0.65/DBU) compared to serverless ($0.50/DBU) or SQL warehouse
+    ($0.95/DBU for queries only).
 
     Selection logic:
     1. Only considers RUNNING clusters
@@ -48,6 +56,12 @@ def get_best_cluster() -> Dict[str, Any]:
 def start_cluster(cluster_id: str) -> Dict[str, Any]:
     """
     Start a terminated Databricks cluster.
+
+    WARNING: Starting a cluster is expensive and slow (3-8 min startup,
+    $0.65/DBU). Before starting a cluster, consider alternatives: execute_sql()
+    for SQL, serverless jobs for batch Python, or local scripts with serving
+    endpoints for LLM calls. Only start a cluster if you specifically need Spark
+    DataFrame operations or custom libraries not available on serverless.
 
     IMPORTANT: Always ask the user for confirmation before starting a cluster.
     Starting a cluster consumes cloud resources and typically takes 3-8 minutes.
@@ -108,6 +122,12 @@ def execute_databricks_command(
 ) -> Dict[str, Any]:
     """
     Execute code on a Databricks cluster.
+
+    WARNING: This requires a running cluster. Consider serverless alternatives
+    first: execute_sql() for SQL workloads, or serverless jobs (via manage_jobs)
+    for batch Python. Only use cluster execution when serverless compute cannot
+    support your workload (e.g., custom JARs, specific library versions not on
+    serverless).
 
     If context_id is provided, reuses the existing context (faster, maintains state).
     If not provided, creates a new context.
@@ -191,6 +211,12 @@ def run_python_file_on_databricks(
 ) -> Dict[str, Any]:
     """
     Read a local Python file and execute it on a Databricks cluster.
+
+    WARNING: This requires a running cluster. Consider serverless alternatives
+    first: execute_sql() for SQL workloads, or serverless jobs (via manage_jobs)
+    for batch Python. Only use cluster execution when serverless compute cannot
+    support your workload (e.g., custom JARs, specific library versions not on
+    serverless).
 
     Useful for running data generation scripts or other Python code.
 
