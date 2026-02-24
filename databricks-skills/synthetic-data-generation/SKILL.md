@@ -27,6 +27,7 @@ Generate realistic, story-driven synthetic data for Databricks using **Spark + F
 4. **Use serverless compute** unless user explicitly requests classic cluster
 5. **Generate raw data only** - no pre-aggregated fields (unless user requests)
 6. **Create master tables first** - then generate related tables with valid FKs
+7. **NEVER use `.cache()` or `.persist()` with serverless compute** - these operations are NOT supported and will fail with `AnalysisException: PERSIST TABLE is not supported on serverless compute`. Instead, write master tables to Delta first, then read them back for FK joins.
 
 ## Generation Planning Workflow
 
@@ -211,6 +212,7 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 | `ModuleNotFoundError: faker` | See [references/1-setup-and-execution.md](references/1-setup-and-execution.md) |
 | Faker UDF is slow | Use `pandas_udf` for batch processing |
 | Out of memory | Increase `numPartitions` in `spark.range()` |
-| Referential integrity errors | Generate master tables first, cache, then join |
+| Referential integrity errors | Write master table to Delta first, read back for FK joins |
+| `PERSIST TABLE is not supported on serverless` | **NEVER use `.cache()` or `.persist()` with serverless** - write to Delta table first, then read back |
 
 See [references/6-troubleshooting.md](references/6-troubleshooting.md) for full troubleshooting guide.

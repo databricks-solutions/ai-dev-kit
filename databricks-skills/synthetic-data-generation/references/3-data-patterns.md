@@ -71,24 +71,34 @@ customers_df.write.mode("overwrite").parquet(f"{VOLUME_PATH}/customers")
 
 Generate master tables first, then iterate on them to create related tables with matching IDs.
 
+> **CRITICAL:** Do NOT use `.cache()` or `.persist()` with serverless compute - these operations are not supported and will fail. Instead, write master tables to Delta first, then read them back for FK joins.
+
 ### Pattern: Weighted Sampling by Tier
 
 ```python
 from pyspark.sql.window import Window
 
-# 1. Generate and cache customers (master table)
+# 1. Generate customers (master table) with index for FK mapping
 customers_df = (
     spark.range(0, N_CUSTOMERS, numPartitions=PARTITIONS)
     .select(
+        F.col("id").alias("customer_idx"),  # Keep index for FK joins
         F.concat(F.lit("CUST-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("customer_id"),
         F.when(F.rand(SEED) < 0.6, "Free")
          .when(F.rand(SEED) < 0.9, "Pro")
          .otherwise("Enterprise").alias("tier"),
     )
 )
-customer_lookup = customers_df.select("customer_id", "tier").cache()
 
-# 2. Generate orders with valid foreign keys
+# 2. Write to Delta table (do NOT use cache with serverless!)
+customers_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.customers")
+
+# 3. Read back for FK lookups
+customer_lookup = spark.table(f"{CATALOG}.{SCHEMA}.customers").select(
+    "customer_idx", "customer_id", "tier"
+)
+
+# 4. Generate orders with valid foreign keys
 orders_df = spark.range(0, N_ORDERS, numPartitions=PARTITIONS)
 
 # Map order to customer using hash-based distribution
@@ -97,16 +107,8 @@ orders_df = orders_df.select(
     (F.abs(F.hash(F.col("id"), F.lit(SEED))) % N_CUSTOMERS).alias("customer_idx"),
 )
 
-# Add customer_idx to lookup for join
-customer_lookup_with_idx = customer_lookup.withColumn(
-    "customer_idx",
-    (F.row_number().over(Window.orderBy(F.monotonically_increasing_id())) - 1).cast("int")
-)
-
 # Join to get valid foreign keys
-orders_with_fk = orders_df.join(customer_lookup_with_idx, on="customer_idx", how="left")
-
-customer_lookup.unpersist()
+orders_with_fk = orders_df.join(customer_lookup, on="customer_idx", how="left")
 ```
 
 ### Anti-Pattern: Random FK Generation

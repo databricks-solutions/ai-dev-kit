@@ -55,6 +55,37 @@ auth_type = databricks-cli
 
 ## Execution Issues
 
+### CRITICAL: cache() and persist() NOT supported on serverless
+
+**Problem:** Using `.cache()` or `.persist()` on serverless compute fails with:
+```
+AnalysisException: [NOT_SUPPORTED_WITH_SERVERLESS] PERSIST TABLE is not supported on serverless compute.
+```
+
+**Why this happens:** Serverless compute does not support caching DataFrames in memory. This is a fundamental limitation of the serverless architecture.
+
+**Solution:** Write master tables to Delta first, then read them back for FK joins:
+
+```python
+# BAD - will fail on serverless
+customers_df = spark.range(0, N_CUSTOMERS)...
+customers_df.cache()  # ❌ FAILS: "PERSIST TABLE is not supported on serverless compute"
+
+# GOOD - write to Delta, then read back
+customers_df = spark.range(0, N_CUSTOMERS)...
+customers_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.customers")
+customer_lookup = spark.table(f"{CATALOG}.{SCHEMA}.customers")  # ✓ Read from Delta
+```
+
+**Best practice for referential integrity:**
+1. Generate master table (e.g., customers)
+2. Write to Delta table
+3. Read back for FK lookup joins
+4. Generate child tables (e.g., orders, tickets) with valid FKs
+5. Write child tables to Delta
+
+---
+
 ### Serverless job fails to start
 
 **Possible causes:**
@@ -159,23 +190,25 @@ customers_df = spark.range(0, N_CUSTOMERS, numPartitions=64)  # Increase from de
 
 **Problem:** Foreign keys reference non-existent parent records.
 
-**Solution:** Generate master tables first, cache, then join:
+**Solution:** Write master table to Delta first, then read back for FK joins:
 
 ```python
-# 1. Generate and cache master table
+# 1. Generate and WRITE master table (do NOT use cache with serverless!)
 customers_df = spark.range(0, N_CUSTOMERS)...
-customer_lookup = customers_df.select("customer_id").cache()
+customers_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.customers")
 
-# 2. Generate child table with valid FKs
+# 2. Read back for FK lookups
+customer_lookup = spark.table(f"{CATALOG}.{SCHEMA}.customers").select("customer_id", "tier")
+
+# 3. Generate child table with valid FKs
 orders_df = spark.range(0, N_ORDERS).join(
     customer_lookup,
     on=<mapping_condition>,
     how="left"
 )
-
-# 3. Clean up
-customer_lookup.unpersist()
 ```
+
+> **WARNING:** Do NOT use `.cache()` or `.persist()` with serverless compute. See the dedicated section above.
 
 ---
 
