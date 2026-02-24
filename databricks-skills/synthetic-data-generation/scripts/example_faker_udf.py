@@ -81,20 +81,21 @@ else:
 use_auto_dependencies = (not on_runtime) and db_version and db_version >= (16, 4)
 
 if use_auto_dependencies:
-    print("✓ Using DatabricksEnv with auto-dependencies")
+    print("✓ Using DatabricksEnv with managed dependencies")
     print("=" * 80)
     from databricks.connect import DatabricksSession, DatabricksEnv
 
-    env = DatabricksEnv().withAutoDependencies(upload_local=True, use_index=True)
+    # Pass dependencies as simple package name strings
+    env = DatabricksEnv().withDependencies("faker", "pandas", "numpy", "holidays")
 
     if USE_SERVERLESS:
         spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
-        print("✓ Connected to serverless compute with auto-dependencies!")
+        print("✓ Connected to serverless compute with managed dependencies!")
     else:
         if not CLUSTER_ID:
             raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
         spark = DatabricksSession.builder.withEnvironment(env).clusterId(CLUSTER_ID).getOrCreate()
-        print(f"✓ Connected to cluster {CLUSTER_ID} with auto-dependencies!")
+        print(f"✓ Connected to cluster {CLUSTER_ID} with managed dependencies!")
 else:
     print("⚠ Using standard session (dependencies must be pre-installed)")
     print("=" * 80)

@@ -92,10 +92,11 @@ spark = DatabricksSession.builder.serverless(True).getOrCreate()
 **Install locally (one-time setup):**
 ```bash
 # Python 3.10 or 3.11:
-pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas holidays
+pip install "databricks-connect>=15.1,<16.2" faker numpy pandas holidays
 
 # Python 3.12+:
-pip install "databricks-connect>=16.4,<18.0" faker polars numpy pandas holidays
+# IMPORTANT: Use 16.4.x for stable withDependencies API (17.x has breaking changes)
+pip install "databricks-connect>=16.4,<17.0" faker numpy pandas holidays
 
 # Configure ~/.databrickscfg
 [DEFAULT]
@@ -110,10 +111,37 @@ auth_type = databricks-cli
 ```python
 from databricks.connect import DatabricksSession, DatabricksEnv
 
-env = DatabricksEnv().withAutoDependencies(upload_local=True, use_index=True)
-spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
+# Pass dependencies as simple package name strings
+env = DatabricksEnv().withDependencies("faker", "pandas", "numpy", "holidays")
 
-# Spark operations now execute on serverless compute with auto-managed dependencies
+# Create session
+spark = (
+    DatabricksSession.builder
+    .withEnvironment(env)
+    .serverless(True)
+    .getOrCreate()
+)
+
+# Spark operations now execute on serverless compute with managed dependencies
+```
+
+**Version Detection (if needed in your script):**
+```python
+import importlib.metadata
+
+def get_databricks_connect_version():
+    """Get databricks-connect version as (major, minor) tuple."""
+    try:
+        version_str = importlib.metadata.version('databricks-connect')
+        parts = version_str.split('.')
+        return (int(parts[0]), int(parts[1]))
+    except Exception:
+        return None
+
+db_version = get_databricks_connect_version()
+if db_version and db_version >= (16, 4):
+    # Use DatabricksEnv with withDependencies
+    pass
 ```
 
 **For Python < 3.12 or databricks-connect < 16.4:**
