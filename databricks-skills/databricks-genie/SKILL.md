@@ -126,3 +126,29 @@ Use these skills in sequence:
 - **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - Generate raw parquet data to populate tables for Genie
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs, schemas, and tables Genie queries
+
+---
+
+## Advanced: Full Genie Configuration via serialized_space
+
+The `create_or_update_genie` tool only sets basic fields (title, description, tables, sample questions). To populate **all** Genie UI sections, use `PATCH /api/2.0/genie/spaces/{id}` with the `serialized_space` field.
+
+### Sections that require serialized_space
+
+| UI Section | serialized_space field |
+|---|---|
+| General Instructions | `instructions.text_instructions` (max 1 item) |
+| SQL queries & functions | `instructions.example_question_sqls` |
+| Common SQL Expressions | `instructions.sql_snippets.{filters,expressions,measures}` |
+| Benchmarks | `benchmarks.questions` |
+
+### Workflow for full configuration
+
+```
+1. create_or_update_genie(...)  → creates space with tables + sample_questions
+2. GET /api/2.0/genie/spaces/{id}?include_serialized_space=true  → fetch existing data
+3. Build serialized_space dict with all sections
+4. PATCH /api/2.0/genie/spaces/{id}  → apply with {"serialized_space": json.dumps(ss)}
+```
+
+See [spaces.md](spaces.md#advanced-serialized_space-api) for the complete code example, JSON schema, and constraints.
