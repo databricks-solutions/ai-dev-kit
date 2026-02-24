@@ -30,6 +30,35 @@ class SkillTask(TypedDict, total=False):
     metadata: dict[str, Any]  # Category, difficulty, etc.
 
 
+def _summarize_expectations(expectations: dict[str, Any]) -> str:
+    """Produce a human-readable summary of what a task tests.
+
+    Included in additional_context so GEPA's reflection LM understands
+    what each test case is checking without parsing JSON.
+    """
+    parts = []
+
+    patterns = expectations.get("expected_patterns", [])
+    if patterns:
+        descs = []
+        for p in patterns:
+            if isinstance(p, str):
+                descs.append(p[:40])
+            elif isinstance(p, dict):
+                descs.append(p.get("description", p.get("pattern", "")[:40]))
+        parts.append(f"Patterns: {', '.join(descs)}")
+
+    facts = expectations.get("expected_facts", [])
+    if facts:
+        parts.append(f"Facts: {', '.join(str(f) for f in facts)}")
+
+    guidelines = expectations.get("guidelines", [])
+    if guidelines:
+        parts.append(f"Guidelines: {'; '.join(str(g) for g in guidelines[:3])}")
+
+    return " | ".join(parts) if parts else "No specific expectations"
+
+
 def _record_to_task(record: EvalRecord) -> SkillTask:
     """Convert an EvalRecord to our internal task format."""
     task: SkillTask = {
@@ -45,6 +74,10 @@ def _record_to_task(record: EvalRecord) -> SkillTask:
         task["expectations"] = record.expectations
         # Also encode expectations into additional_context for GEPA reflection
         task["additional_context"]["expectations"] = json.dumps(record.expectations)
+        # Human-readable summary for GEPA's reflection LM
+        task["additional_context"]["evaluation_criteria"] = _summarize_expectations(
+            record.expectations
+        )
     return task
 
 

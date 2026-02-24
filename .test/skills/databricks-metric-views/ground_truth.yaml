@@ -1,0 +1,346 @@
+metadata:
+  skill_name: databricks-metric-views
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: metric-views_create_sql_001
+  inputs:
+    prompt: "Create a metric view for order analytics with revenue and order count measures"
+  outputs:
+    response: |
+      Here's a metric view for order analytics:
+
+      ```sql
+      CREATE OR REPLACE VIEW catalog.schema.orders_metrics
+      WITH METRICS
+      LANGUAGE YAML
+      AS $$
+        version: 1.1
+        comment: "Orders KPIs for sales analysis"
+        source: catalog.schema.orders
+        filter: order_date > '2020-01-01'
+        dimensions:
+          - name: Order Month
+            expr: DATE_TRUNC('MONTH', order_date)
+            comment: "Month of order"
+          - name: Order Status
+            expr: CASE
+              WHEN status = 'O' THEN 'Open'
+              WHEN status = 'P' THEN 'Processing'
+              WHEN status = 'F' THEN 'Fulfilled'
+              END
+        measures:
+          - name: Order Count
+            expr: COUNT(1)
+          - name: Total Revenue
+            expr: SUM(total_price)
+          - name: Revenue per Customer
+            expr: SUM(total_price) / COUNT(DISTINCT customer_id)
+      $$
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses CREATE OR REPLACE VIEW with WITH METRICS LANGUAGE YAML
+    - Defines dimensions for grouping data
+    - Defines measures for aggregations
+    - Uses YAML version 1.1
+    expected_patterns:
+    - pattern: CREATE OR REPLACE VIEW
+      min_count: 1
+      description: Must use CREATE OR REPLACE VIEW syntax
+    - pattern: WITH METRICS
+      min_count: 1
+      description: Must include WITH METRICS clause
+    - pattern: LANGUAGE YAML
+      min_count: 1
+      description: Must specify LANGUAGE YAML
+    - pattern: dimensions
+      min_count: 1
+      description: Must define dimensions
+    - pattern: measures
+      min_count: 1
+      description: Must define measures
+    guidelines:
+    - SQL must follow Databricks SQL syntax
+    - Must use YAML version 1.1 for DBR 17.2+
+    - Must include both dimensions and measures
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: metric-views_query_measure_002
+  inputs:
+    prompt: "Query a metric view to get total revenue and order count by month"
+  outputs:
+    response: |
+      All measures must use the MEASURE() function. SELECT * is NOT supported.
+
+      ```sql
+      SELECT
+        `Order Month`,
+        `Order Status`,
+        MEASURE(`Total Revenue`) AS total_revenue,
+        MEASURE(`Order Count`) AS order_count
+      FROM catalog.schema.orders_metrics
+      WHERE extract(year FROM `Order Month`) = 2024
+      GROUP BY ALL
+      ORDER BY ALL
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Must wrap measures in MEASURE() function
+    - SELECT * is not supported on metric views
+    - Dimension names with spaces need backtick quoting
+    expected_patterns:
+    - pattern: MEASURE\(
+      min_count: 1
+      description: Must use MEASURE() function for measures
+    - pattern: GROUP BY
+      min_count: 1
+      description: Must include GROUP BY clause
+    guidelines:
+    - SQL must use MEASURE() for all measure references
+    - Must not use SELECT * on metric views
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: metric-views_create_mcp_003
+  inputs:
+    prompt: "Use the manage_metric_views tool to create a metric view for order analytics"
+  outputs:
+    response: |
+      ```python
+      manage_metric_views(
+          action="create",
+          full_name="catalog.schema.orders_metrics",
+          source="catalog.schema.orders",
+          or_replace=True,
+          comment="Orders KPIs for sales analysis",
+          filter_expr="order_date > '2020-01-01'",
+          dimensions=[
+              {"name": "Order Month", "expr": "DATE_TRUNC('MONTH', order_date)", "comment": "Month of order"},
+              {"name": "Order Status", "expr": "status"},
+          ],
+          measures=[
+              {"name": "Order Count", "expr": "COUNT(1)"},
+              {"name": "Total Revenue", "expr": "SUM(total_price)", "comment": "Sum of total price"},
+          ],
+      )
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses manage_metric_views MCP tool
+    - Sets action to create
+    - Specifies source table
+    expected_patterns:
+    - pattern: manage_metric_views
+      min_count: 1
+      description: Must use manage_metric_views tool
+    - pattern: action.*create
+      min_count: 1
+      description: Must set action to create
+    - pattern: dimensions
+      min_count: 1
+      description: Must define dimensions
+    - pattern: measures
+      min_count: 1
+      description: Must define measures
+    guidelines:
+    - Must use manage_metric_views with action="create"
+    - Code must be valid Python syntax
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: metric-views_query_mcp_004
+  inputs:
+    prompt: "Query the orders_metrics metric view using the MCP tool to get revenue by month"
+  outputs:
+    response: |
+      ```python
+      manage_metric_views(
+          action="query",
+          full_name="catalog.schema.orders_metrics",
+          query_measures=["Total Revenue", "Order Count"],
+          query_dimensions=["Order Month"],
+          where="extract(year FROM `Order Month`) = 2024",
+          order_by="ALL",
+          limit=100,
+      )
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses manage_metric_views with action query
+    - Specifies query_measures and query_dimensions
+    expected_patterns:
+    - pattern: manage_metric_views
+      min_count: 1
+      description: Must use manage_metric_views tool
+    - pattern: action.*query
+      min_count: 1
+      description: Must set action to query
+    - pattern: query_measures
+      min_count: 1
+      description: Must specify measures to query
+    - pattern: query_dimensions
+      min_count: 1
+      description: Must specify dimensions to group by
+    guidelines:
+    - Must use manage_metric_views with action="query"
+    - Code must be valid Python syntax
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: metric-views_yaml_spec_005
+  inputs:
+    prompt: "Show me the full YAML specification for a metric view definition"
+  outputs:
+    response: |
+      ```yaml
+      version: 1.1                    # Required: "1.1" for DBR 17.2+
+      comment: "Description"          # Optional
+      source: catalog.schema.table    # Required: source table/view
+      filter: column > value          # Optional: global WHERE filter
+
+      dimensions:                     # Required: at least one
+        - name: Display Name
+          expr: sql_expression
+          comment: "Description"
+
+      measures:                       # Required: at least one
+        - name: Display Name
+          expr: AGG_FUNC(column)
+          comment: "Description"
+
+      joins:                          # Optional: star/snowflake schema
+        - name: dim_table
+          source: catalog.schema.dim_table
+          on: source.fk = dim_table.pk
+
+      materialization:                # Optional (experimental)
+        schedule: every 6 hours
+        mode: relaxed
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Version 1.1 required for DBR 17.2+
+    - Must have at least one dimension
+    - Must have at least one measure
+    - Joins are optional for star/snowflake schema
+    expected_patterns:
+    - pattern: version
+      min_count: 1
+      description: Must include version field
+    - pattern: dimensions
+      min_count: 1
+      description: Must include dimensions section
+    - pattern: measures
+      min_count: 1
+      description: Must include measures section
+    - pattern: joins
+      min_count: 1
+      description: Should show joins syntax
+    guidelines:
+    - Must show the complete YAML specification structure
+    - Must indicate which fields are required vs optional
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: metric-views_star_schema_006
+  inputs:
+    prompt: "Create a metric view with joins for a star schema (fact orders + dim customers)"
+  outputs:
+    response: |
+      ```sql
+      CREATE OR REPLACE VIEW catalog.schema.sales_metrics
+      WITH METRICS
+      LANGUAGE YAML
+      AS $$
+        version: 1.1
+        source: catalog.schema.fact_orders
+        joins:
+          - name: customers
+            source: catalog.schema.dim_customers
+            on: fact_orders.customer_id = customers.customer_id
+        dimensions:
+          - name: Customer Region
+            expr: customers.region
+          - name: Order Month
+            expr: DATE_TRUNC('MONTH', order_date)
+        measures:
+          - name: Total Revenue
+            expr: SUM(amount)
+          - name: Unique Customers
+            expr: COUNT(DISTINCT customers.customer_id)
+      $$
+      ```
+
+      Joins must be declared in the YAML definition, not in the SELECT query.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Joins are declared in the YAML definition
+    - Can reference columns from joined tables in dimensions and measures
+    expected_patterns:
+    - pattern: joins
+      min_count: 1
+      description: Must use joins section in YAML
+    - pattern: "on:"
+      min_count: 1
+      description: Must specify join condition
+    guidelines:
+    - Joins must be in the YAML definition, not in the SELECT query
+    - Must use correct join syntax with source and on fields
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: metric-views_grant_access_007
+  inputs:
+    prompt: "Grant SELECT access on a metric view to the data-consumers group"
+  outputs:
+    response: |
+      ```python
+      manage_metric_views(
+          action="grant",
+          full_name="catalog.schema.orders_metrics",
+          principal="data-consumers",
+          privileges=["SELECT"],
+      )
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses manage_metric_views with action grant
+    - Specifies principal and privileges
+    expected_patterns:
+    - pattern: manage_metric_views
+      min_count: 1
+      description: Must use manage_metric_views tool
+    - pattern: action.*grant
+      min_count: 1
+      description: Must set action to grant
+    - pattern: principal
+      min_count: 1
+      description: Must specify principal
+    guidelines:
+    - Must use manage_metric_views with action="grant"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: auto_generated

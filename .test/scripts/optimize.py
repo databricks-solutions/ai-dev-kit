@@ -66,12 +66,19 @@ def main():
     parser.add_argument(
         "--task-lm",
         default=None,
-        help="LLM model for generative mode (e.g., openai/gpt-4o)",
+        help="(Deprecated, use --gen-model) LLM model for generative mode",
+    )
+    parser.add_argument(
+        "--gen-model",
+        default=None,
+        help="LLM model for generative evaluation (default: GEPA_GEN_LM env or "
+             "databricks/databricks-claude-sonnet-4-6). The evaluator sends the "
+             "candidate SKILL.md to this model and scores the generated response.",
     )
     parser.add_argument(
         "--reflection-lm",
         default=None,
-        help="Override GEPA reflection model (default: GEPA_REFLECTION_LM env or databricks/databricks-gpt-5-2)",
+        help="Override GEPA reflection model (default: GEPA_REFLECTION_LM env or databricks/databricks-claude-opus-4-6)",
     )
     parser.add_argument(
         "--dry-run",
@@ -98,6 +105,20 @@ def main():
         "--tools-only",
         action="store_true",
         help="Optimize ONLY tool descriptions, not the SKILL.md",
+    )
+    parser.add_argument(
+        "--max-passes",
+        type=int,
+        default=5,
+        help="Maximum optimization passes per component (default: 5). "
+             "Each pass re-seeds from the previous best. Stops early if no improvement.",
+    )
+    parser.add_argument(
+        "--max-metric-calls",
+        type=int,
+        default=None,
+        help="Override max metric calls per pass (default: auto-scaled by preset × components, "
+             "capped at 300 for non-Opus models). Example: --max-metric-calls 100",
     )
 
     args = parser.parse_args()
@@ -129,11 +150,14 @@ def main():
                     mode=args.mode,
                     preset=args.preset,
                     task_lm=args.task_lm,
+                    gen_model=args.gen_model,
                     reflection_lm=args.reflection_lm,
                     include_tools=args.include_tools,
                     tool_modules=args.tool_modules,
                     tools_only=args.tools_only,
                     dry_run=args.dry_run,
+                    max_passes=args.max_passes,
+                    max_metric_calls=args.max_metric_calls,
                 )
                 review_optimization(result)
                 if args.apply and not args.dry_run:
@@ -161,11 +185,14 @@ def main():
                 mode=args.mode,
                 preset=args.preset,
                 task_lm=args.task_lm,
+                gen_model=args.gen_model,
                 reflection_lm=args.reflection_lm,
                 include_tools=args.include_tools,
                 tool_modules=args.tool_modules,
                 tools_only=args.tools_only,
                 dry_run=args.dry_run,
+                max_passes=args.max_passes,
+                max_metric_calls=args.max_metric_calls,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:

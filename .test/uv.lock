@@ -838,7 +838,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -1147,6 +1147,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d5/7d/5df2650c57d47c57232af5ef4b4fdbff182070421e405e0d62c6cdbfaa87/fsspec-2026.1.0.tar.gz", hash = "sha256:e987cb0496a0d81bba3a9d1cee62922fb395e7d4c3b575e57f547953334fe07b", size = 310496, upload-time = "2026-01-09T15:21:35.562Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/01/c9/97cc5aae1648dcb851958a3ddf73ccd7dbe5650d95203ecb4d7720b4cdbf/fsspec-2026.1.0-py3-none-any.whl", hash = "sha256:cb76aa913c2285a3b49bdd5fc55b1d7c708d7208126b60f2eb8194fe1b4cbdcc", size = 201838, upload-time = "2026-01-09T15:21:34.041Z" },
+]
+
+[[package]]
+name = "gepa"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/30/511e52916956508f56eca721260fcd524cfffd580e57782dd471be925f7e/gepa-0.1.0.tar.gz", hash = "sha256:f8b3d7918d4cdcf8593f39ef1cc757c4ba1a4e6793e3ffb622e6c0bc60a1efd9", size = 226064, upload-time = "2026-02-19T19:43:08.272Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/32/fe8afb3d2a6605a6bcbc8f119f0a2adae96e9e5d57ebed055490219956a8/gepa-0.1.0-py3-none-any.whl", hash = "sha256:4e3f8fe8ca20169e60518b2e9d416e8c4a579459848adffdcad12223fbf9643e", size = 191392, upload-time = "2026-02-19T19:43:07.065Z" },
 ]
 
 [[package]]
@@ -3919,8 +3928,10 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "databricks-sdk" },
+    { name = "gepa" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "tiktoken" },
 ]
 databricks = [
     { name = "databricks-sdk" },
@@ -3929,18 +3940,24 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
+optimize = [
+    { name = "gepa" },
+    { name = "tiktoken" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "databricks-sdk", marker = "extra == 'databricks'", specifier = ">=0.20.0" },
+    { name = "gepa", marker = "extra == 'optimize'", specifier = ">=0.1.0" },
     { name = "mlflow", extras = ["databricks"], specifier = ">=3.6.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "skill-test", extras = ["databricks", "dev"], marker = "extra == 'all'" },
+    { name = "skill-test", extras = ["databricks", "dev", "optimize"], marker = "extra == 'all'" },
+    { name = "tiktoken", marker = "extra == 'optimize'", specifier = ">=0.7.0" },
 ]
-provides-extras = ["databricks", "dev", "all"]
+provides-extras = ["databricks", "dev", "optimize", "all"]
 
 [[package]]
 name = "skops"

@@ -1,0 +1,255 @@
+metadata:
+  skill_name: databricks-unity-catalog
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: uc_volume_operations_001
+  inputs:
+    prompt: "How do I upload, download, and list files in a Unity Catalog Volume?"
+  outputs:
+    response: |
+      Use MCP tools for Volume file operations:
+
+      ```python
+      # List files in a volume
+      list_volume_files(volume_path="/Volumes/catalog/schema/volume/folder/")
+
+      # Upload file to volume
+      upload_to_volume(
+          local_path="/tmp/data.csv",
+          volume_path="/Volumes/catalog/schema/volume/data.csv"
+      )
+
+      # Download file from volume
+      download_from_volume(
+          volume_path="/Volumes/catalog/schema/volume/data.csv",
+          local_path="/tmp/downloaded.csv"
+      )
+
+      # Create directory
+      create_volume_directory(volume_path="/Volumes/catalog/schema/volume/new_folder")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Volume paths follow the pattern /Volumes/{catalog}/{schema}/{volume}"
+    - "list_volume_files, upload_to_volume, download_from_volume, and create_volume_directory are available MCP tools"
+    expected_patterns:
+    - pattern: "list_volume_files"
+      min_count: 1
+      description: "Uses list_volume_files MCP tool"
+    - pattern: "upload_to_volume"
+      min_count: 1
+      description: "Uses upload_to_volume MCP tool"
+    - pattern: "download_from_volume"
+      min_count: 1
+      description: "Uses download_from_volume MCP tool"
+    - pattern: "/Volumes/"
+      min_count: 3
+      description: "Uses Unity Catalog Volume paths"
+    guidelines:
+    - "Must show at least list, upload, and download operations"
+    - "Volume paths must follow the /Volumes/{catalog}/{schema}/{volume} pattern"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: uc_table_lineage_002
+  inputs:
+    prompt: "How do I query table lineage to find which tables feed into my target table?"
+  outputs:
+    response: |
+      ```sql
+      -- Table lineage: What tables feed into this table?
+      SELECT source_table_full_name, source_column_name
+      FROM system.access.table_lineage
+      WHERE target_table_full_name = 'catalog.schema.table'
+        AND event_date >= current_date() - 7;
+      ```
+
+      System table lineage is captured automatically by Unity Catalog. Query `system.access.table_lineage` for table-level dependencies and `system.access.column_lineage` for column-level lineage.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Table lineage is stored in system.access.table_lineage"
+    - "Column lineage is available in system.access.column_lineage"
+    - "Lineage is captured automatically by Unity Catalog"
+    expected_patterns:
+    - pattern: "system\\.access\\.table_lineage"
+      min_count: 1
+      description: "Queries the table lineage system table"
+    - pattern: "target_table_full_name"
+      min_count: 1
+      description: "Filters by target table name"
+    - pattern: "source_table_full_name"
+      min_count: 1
+      description: "Returns source table names"
+    guidelines:
+    - "Must query system.access.table_lineage"
+    - "Must show filtering by target table name"
+    - "Should mention that lineage is captured automatically"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: uc_audit_logs_003
+  inputs:
+    prompt: "How do I check recent permission changes using Unity Catalog audit logs?"
+  outputs:
+    response: |
+      ```sql
+      -- Audit: Recent permission changes
+      SELECT event_time, user_identity.email, action_name, request_params
+      FROM system.access.audit
+      WHERE action_name LIKE '%GRANT%' OR action_name LIKE '%REVOKE%'
+      ORDER BY event_time DESC
+      LIMIT 100;
+      ```
+
+      The `system.access.audit` table records all access control changes. Filter by action_name to find GRANT, REVOKE, or other permission-related events.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Audit logs are stored in system.access.audit"
+    - "Permission changes include GRANT and REVOKE actions"
+    - "user_identity.email identifies who made the change"
+    expected_patterns:
+    - pattern: "system\\.access\\.audit"
+      min_count: 1
+      description: "Queries the audit log system table"
+    - pattern: "action_name"
+      min_count: 1
+      description: "Filters by action type"
+    - pattern: "GRANT"
+      min_count: 1
+      description: "Checks for GRANT operations"
+    - pattern: "REVOKE"
+      min_count: 1
+      description: "Checks for REVOKE operations"
+    guidelines:
+    - "Must query system.access.audit"
+    - "Must filter for permission-related actions"
+    - "Must include user identity in the output"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: uc_billing_usage_004
+  inputs:
+    prompt: "How do I query DBU usage and billing data across workspaces?"
+  outputs:
+    response: |
+      ```sql
+      -- Billing: DBU usage by workspace
+      SELECT workspace_id, sku_name, SUM(usage_quantity) AS total_dbus
+      FROM system.billing.usage
+      WHERE usage_date >= current_date() - 30
+      GROUP BY workspace_id, sku_name;
+      ```
+
+      The `system.billing.usage` table provides DBU consumption data. Use it to track costs by workspace, SKU type, or time period.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Billing data is stored in system.billing.usage"
+    - "usage_quantity contains the DBU consumption"
+    - "Data can be filtered by usage_date for time-based analysis"
+    expected_patterns:
+    - pattern: "system\\.billing\\.usage"
+      min_count: 1
+      description: "Queries the billing system table"
+    - pattern: "SUM\\(usage_quantity\\)"
+      min_count: 1
+      description: "Aggregates DBU usage"
+    - pattern: "sku_name"
+      min_count: 1
+      description: "Groups by SKU type"
+    guidelines:
+    - "Must query system.billing.usage"
+    - "Must aggregate by meaningful dimensions like workspace or SKU"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: uc_grant_system_access_005
+  inputs:
+    prompt: "How do I grant a group access to Unity Catalog system tables?"
+  outputs:
+    response: |
+      ```sql
+      -- Grant access to system tables
+      GRANT USE CATALOG ON CATALOG system TO `data_engineers`;
+      GRANT USE SCHEMA ON SCHEMA system.access TO `data_engineers`;
+      GRANT SELECT ON SCHEMA system.access TO `data_engineers`;
+      ```
+
+      Three grants are needed: USE CATALOG on the `system` catalog, USE SCHEMA on the specific schema (e.g., `system.access`), and SELECT for read access.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "System table access requires three levels of grants: USE CATALOG, USE SCHEMA, and SELECT"
+    - "The system catalog contains built-in system tables"
+    - "system.access schema contains lineage and audit tables"
+    expected_patterns:
+    - pattern: "GRANT USE CATALOG"
+      min_count: 1
+      description: "Grants USE CATALOG permission"
+    - pattern: "GRANT USE SCHEMA"
+      min_count: 1
+      description: "Grants USE SCHEMA permission"
+    - pattern: "GRANT SELECT"
+      min_count: 1
+      description: "Grants SELECT permission"
+    guidelines:
+    - "Must show all three required GRANT statements"
+    - "Must explain why three separate grants are needed"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: uc_mcp_execute_sql_006
+  inputs:
+    prompt: "How do I query system tables using the MCP SQL execution tool?"
+  outputs:
+    response: |
+      ```python
+      # Query lineage via MCP
+      mcp__databricks__execute_sql(
+          sql_query="""
+              SELECT source_table_full_name, target_table_full_name
+              FROM system.access.table_lineage
+              WHERE event_date >= current_date() - 7
+          """,
+          catalog="system"
+      )
+      ```
+
+      Use `mcp__databricks__execute_sql` to execute system table queries. Set the `catalog` parameter to "system" for system table access.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "mcp__databricks__execute_sql is the MCP tool for running SQL queries"
+    - "The catalog parameter should be set to 'system' for system table queries"
+    expected_patterns:
+    - pattern: "mcp__databricks__execute_sql"
+      min_count: 1
+      description: "Uses the MCP SQL execution tool"
+    - pattern: "catalog=\"system\""
+      min_count: 1
+      description: "Sets catalog to system"
+    - pattern: "system\\.access"
+      min_count: 1
+      description: "Queries system access tables"
+    guidelines:
+    - "Must show the mcp__databricks__execute_sql tool call"
+    - "Must set catalog parameter to 'system'"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated

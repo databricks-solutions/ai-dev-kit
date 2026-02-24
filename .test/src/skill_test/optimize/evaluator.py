@@ -140,6 +140,40 @@ def _validate_skill_structure(candidate_text: str) -> list[Feedback]:
     return feedbacks
 
 
+def _score_skill_content(candidate_text: str, expectations: dict[str, Any]) -> list[Feedback]:
+    """Score the SKILL.md candidate itself for pattern/fact coverage.
+
+    Runs pattern_adherence and expected_facts_present against the skill text
+    (not the response). This gives GEPA immediate dynamic signal: if a key
+    pattern is removed from SKILL.md, the score drops.
+
+    Feedback names are prefixed with ``skill_content_`` to distinguish from
+    response-level scores.
+    """
+    outputs = {"response": candidate_text}
+    feedbacks = []
+
+    # Pattern adherence on skill content
+    pa_results = _run_scorer(pattern_adherence, outputs, expectations, {})
+    for fb in pa_results:
+        feedbacks.append(Feedback(
+            name=f"skill_content_{fb.name}",
+            value=fb.value,
+            rationale=f"(skill content) {fb.rationale or ''}",
+        ))
+
+    # Expected facts on skill content
+    ef_results = _run_scorer(expected_facts_present, outputs, expectations, {})
+    for fb in ef_results:
+        feedbacks.append(Feedback(
+            name=f"skill_content_{fb.name}",
+            value=fb.value,
+            rationale=f"(skill content) {fb.rationale or ''}",
+        ))
+
+    return feedbacks
+
+
 # ---------------------------------------------------------------------------
 # Evaluator factory (optimize_anything compatible)
 # ---------------------------------------------------------------------------
@@ -151,6 +185,7 @@ def create_skill_evaluator(
     skill_name: str,
     mode: Literal["static", "generative"] = "static",
     task_lm: str | None = None,
+    gen_model: str | None = None,
     original_token_counts: dict[str, int] | None = None,
 ) -> Callable:
     """Create an optimize_anything-compatible evaluator for a skill.
@@ -159,8 +194,23 @@ def create_skill_evaluator(
 
     The candidate is dict[str, str] (may have "skill_md" + "tools_*" keys).
     The example is a task dict from the dataset.
+
+    Evaluation layers:
+        1. Skill-content scoring: pattern/fact presence in SKILL.md itself
+        2. Generative evaluation: LLM generates response from skill, scored
+        3. Reference response check: fixed ground truth scoring (sanity)
+        4. Structure validation: syntax, no hallucinated APIs on SKILL.md
+        5. Token efficiency: conciseness vs original
+
+    Args:
+        skill_name: Name of the skill being evaluated
+        mode: "static" uses ground truth response, "generative" generates fresh
+        task_lm: LLM for generative mode (deprecated, use gen_model)
+        gen_model: LLM model for generative evaluation
+        original_token_counts: Token counts of original artifacts
     """
     scorer_config = load_scorer_config(skill_name)
+    effective_gen_model = gen_model or task_lm
 
     # Compute original token count for efficiency scoring
     if original_token_counts is None:
@@ -169,6 +219,10 @@ def create_skill_evaluator(
             SKILL_KEY: count_tokens(skill_path.read_text()) if skill_path else 0
         }
     total_original_tokens = sum(original_token_counts.values())
+
+    # Mutable closure state: per-task baseline scorer scores for comparison.
+    # Populated via evaluator.set_baseline() after evaluating the seed.
+    _baseline: dict[str, dict[str, float | None]] = {}
 
     def evaluator(candidate: dict[str, str], example: dict) -> tuple[float, dict]:
         """Evaluate a candidate against a single task example.
@@ -181,7 +235,6 @@ def create_skill_evaluator(
             (score, side_info) tuple for optimize_anything
         """
         candidate_text = candidate.get(SKILL_KEY, "")
-        all_feedbacks: list[Feedback] = []
 
         # Decode expectations from additional_context
         expectations = {}
@@ -193,32 +246,78 @@ def create_skill_evaluator(
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        response = example.get("answer", "")
+        # ------------------------------------------------------------------
+        # Layer 1: Skill-content scoring (pattern/fact presence in SKILL.md)
+        # ------------------------------------------------------------------
+        skill_content_feedbacks: list[Feedback] = []
+        if candidate_text and expectations:
+            skill_content_feedbacks = _score_skill_content(candidate_text, expectations)
 
-        if mode == "generative" and task_lm:
+        skill_content_composite, skill_content_si = feedback_to_asi(skill_content_feedbacks)
+
+        # ------------------------------------------------------------------
+        # Layer 2: Generative evaluation (LLM generates from skill, score that)
+        # ------------------------------------------------------------------
+        generated_response = None
+        gen_feedbacks: list[Feedback] = []
+        gen_composite = 0.0
+
+        if effective_gen_model and candidate_text and example.get("input"):
             import litellm
             messages = [
-                {"role": "system", "content": f"Skill documentation:\n\n{candidate_text}\n\nAnswer the user's question."},
+                {
+                    "role": "system",
+                    "content": (
+                        "Use ONLY the following skill documentation to answer "
+                        "the user's question. Do not use any other knowledge.\n\n"
+                        f"{candidate_text}"
+                    ),
+                },
                 {"role": "user", "content": example.get("input", "")},
             ]
-            resp = litellm.completion(model=task_lm, messages=messages)
-            response = resp.choices[0].message.content
+            try:
+                resp = litellm.completion(model=effective_gen_model, messages=messages)
+                generated_response = resp.choices[0].message.content
+            except Exception as e:
+                generated_response = None
+                gen_feedbacks.append(Feedback(
+                    name="generation_error",
+                    value="no",
+                    rationale=f"LLM generation failed: {e}",
+                ))
 
-        # 1. Score the response against test expectations
-        response_feedbacks = _run_deterministic_scorers(
-            response, expectations, example.get("input", ""), scorer_config
-        )
-        all_feedbacks.extend(response_feedbacks)
+            if generated_response:
+                gen_feedbacks = _run_deterministic_scorers(
+                    generated_response, expectations, example.get("input", ""), scorer_config
+                )
 
-        # 2. Validate skill structure
+            gen_composite, gen_si = feedback_to_asi(gen_feedbacks)
+
+        # ------------------------------------------------------------------
+        # Layer 3: Reference response check (ground truth — sanity baseline)
+        # ------------------------------------------------------------------
+        reference_response = example.get("answer", "")
+        ref_feedbacks: list[Feedback] = []
+        ref_composite = 0.0
+
+        if reference_response:
+            ref_feedbacks = _run_deterministic_scorers(
+                reference_response, expectations, example.get("input", ""), scorer_config
+            )
+            ref_composite, _ = feedback_to_asi(ref_feedbacks)
+
+        # ------------------------------------------------------------------
+        # Layer 4: Validate skill structure
+        # ------------------------------------------------------------------
+        structure_feedbacks: list[Feedback] = []
         if candidate_text:
             structure_feedbacks = _validate_skill_structure(candidate_text)
-            all_feedbacks.extend(structure_feedbacks)
 
-        # 3. Convert to score + side_info (with oa.log() for failures)
-        composite, side_info = feedback_to_asi(all_feedbacks)
+        structure_composite, _ = feedback_to_asi(structure_feedbacks)
 
-        # 4. Token efficiency across ALL components
+        # ------------------------------------------------------------------
+        # Layer 5: Token efficiency across ALL components
+        # ------------------------------------------------------------------
         total_candidate_tokens = sum(count_tokens(v) for v in candidate.values())
         if total_original_tokens > 0:
             ratio = total_candidate_tokens / total_original_tokens
@@ -226,20 +325,100 @@ def create_skill_evaluator(
         else:
             efficiency = 1.0
 
-        # Weighted composite: 80% quality, 20% token efficiency
-        final_score = 0.8 * composite + 0.2 * efficiency
+        # ------------------------------------------------------------------
+        # Weighted final score
+        # ------------------------------------------------------------------
+        # When generative eval is available, it gets the dominant weight.
+        # When no gen_model, fall back to reference-heavy weighting.
+        if effective_gen_model and generated_response is not None:
+            # Full layered evaluation
+            final_score = (
+                0.40 * gen_composite          # Generated response quality
+                + 0.25 * skill_content_composite  # Skill content coverage
+                + 0.05 * ref_composite            # Reference response (sanity)
+                + 0.10 * structure_composite      # Structure validation
+                + 0.20 * efficiency               # Token efficiency
+            )
+        else:
+            # Fallback: no generative eval, emphasize skill content + reference
+            final_score = (
+                0.35 * skill_content_composite  # Skill content coverage
+                + 0.35 * ref_composite            # Reference response
+                + 0.10 * structure_composite      # Structure validation
+                + 0.20 * efficiency               # Token efficiency
+            )
+
+        # ------------------------------------------------------------------
+        # Build unified side_info for GEPA reflection
+        # ------------------------------------------------------------------
+        # Merge all feedbacks for the side_info dict
+        all_feedbacks = skill_content_feedbacks + gen_feedbacks + ref_feedbacks + structure_feedbacks
+        _, side_info = feedback_to_asi(all_feedbacks)
 
         side_info["scores"] = {
-            "quality": composite,
+            "generated_response_quality": gen_composite,
+            "skill_content_coverage": skill_content_composite,
+            "reference_response_check": ref_composite,
+            "structure_validation": structure_composite,
             "token_efficiency": efficiency,
+            "final": final_score,
         }
         side_info["token_counts"] = {
             "candidate_total": total_candidate_tokens,
             "original_total": total_original_tokens,
         }
 
+        # Enrich ASI for GEPA reflection (Step 4 from plan)
+        if generated_response is not None:
+            side_info["_generated_response"] = generated_response[:2000]
+        side_info["_task_prompt"] = example.get("input", "")[:500]
+
+        # Skill coverage summary
+        if skill_content_feedbacks:
+            found = [fb.name for fb in skill_content_feedbacks if fb.value == "yes"]
+            missing = [fb.name for fb in skill_content_feedbacks if fb.value == "no"]
+            side_info["_skill_coverage"] = {
+                "found": found,
+                "missing": missing,
+                "coverage_ratio": len(found) / max(len(found) + len(missing), 1),
+            }
+
+        # Baseline comparison -- show GEPA's reflection LM what improved/regressed
+        task_key = example.get("input", "")
+        if task_key and task_key in _baseline:
+            comparisons = []
+            for scorer_name, baseline_val in _baseline[task_key].items():
+                current_val = side_info.get(scorer_name, {}).get("score")
+                if current_val is None or baseline_val is None:
+                    continue
+                if current_val > baseline_val + 0.01:
+                    comparisons.append(
+                        f"Improved on {scorer_name} ({baseline_val:.2f} -> {current_val:.2f})"
+                    )
+                elif current_val < baseline_val - 0.01:
+                    comparisons.append(
+                        f"Regressed on {scorer_name} ({baseline_val:.2f} -> {current_val:.2f})"
+                    )
+            if comparisons:
+                side_info["_baseline_comparison"] = "; ".join(comparisons)
+
         return final_score, side_info
 
+    def set_baseline(per_task_side_info: dict[str, dict]) -> None:
+        """Cache per-task per-scorer scores from the seed evaluation.
+
+        Args:
+            per_task_side_info: {task_input_text: side_info_dict} from seed eval.
+        """
+        for task_key, info in per_task_side_info.items():
+            _baseline[task_key] = {
+                name: data.get("score")
+                for name, data in info.items()
+                if isinstance(data, dict) and "score" in data
+                and not name.startswith("_")
+            }
+
+    evaluator.set_baseline = set_baseline  # type: ignore[attr-defined]
     return evaluator
 
 
@@ -247,8 +426,18 @@ def build_optimization_background(
     skill_name: str,
     original_token_count: int,
     component_names: list[str] | None = None,
+    baseline_scores: dict[str, float] | None = None,
+    baseline_side_info: dict[str, dict] | None = None,
 ) -> str:
-    """Build the background context string for GEPA's reflection LM."""
+    """Build the background context string for GEPA's reflection LM.
+
+    Args:
+        skill_name: Name of the skill being optimized.
+        original_token_count: Total token count of the original artifacts.
+        component_names: Names of the candidate components (e.g. "skill_md", "tools_*").
+        baseline_scores: Per-task overall scores from evaluating the seed candidate.
+        baseline_side_info: Per-task side_info dicts from evaluating the seed candidate.
+    """
     components_desc = ""
     if component_names and any(c.startswith("tools_") for c in component_names):
         tool_modules = [c.replace("tools_", "") for c in component_names if c.startswith("tools_")]
@@ -259,20 +448,65 @@ def build_optimization_background(
             "accurate, concise, and action-oriented.\n"
         )
 
+    # Build baseline performance summary
+    baseline_desc = ""
+    if baseline_scores:
+        mean_score = sum(baseline_scores.values()) / len(baseline_scores)
+        perfect = [tid for tid, s in baseline_scores.items() if s >= 0.99]
+        weak = sorted(
+            [(tid, s) for tid, s in baseline_scores.items() if s < 0.99],
+            key=lambda x: x[1],
+        )
+
+        baseline_desc = (
+            f"\n\nBASELINE PERFORMANCE (seed candidate):\n"
+            f"  Mean score: {mean_score:.3f} across {len(baseline_scores)} test cases.\n"
+        )
+        if perfect:
+            baseline_desc += f"  Perfect/near-perfect ({len(perfect)}): {', '.join(perfect)}\n"
+        if weak:
+            baseline_desc += "  Needs improvement:\n"
+            for tid, score in weak:
+                baseline_desc += f"    - {tid}: {score:.3f}"
+                # Add per-scorer detail if available
+                if baseline_side_info and tid in baseline_side_info:
+                    info = baseline_side_info[tid]
+                    failing = [
+                        name for name, data in info.items()
+                        if isinstance(data, dict) and data.get("status") == "fail"
+                        and not name.startswith("_")
+                    ]
+                    if failing:
+                        baseline_desc += f" (failing: {', '.join(failing)})"
+                baseline_desc += "\n"
+
+        baseline_desc += (
+            "\n  PRIORITY: Focus optimization effort on the weak test cases above. "
+            "Do NOT break test cases that already score well.\n"
+        )
+
     return (
-        f"You are optimizing a SKILL.md file for the '{skill_name}' Databricks skill. "
+        f"You are REFINING an existing, working SKILL.md file for the '{skill_name}' "
+        "Databricks skill. The seed candidate is a production skill that already works -- "
+        "preserve what already works and improve what doesn't.\n\n"
         "SKILL.md files teach AI agents (like Claude Code) how to use specific Databricks features. "
         "They contain patterns, code examples, API references, and best practices.\n\n"
-        "The skill is evaluated against test cases that check:\n"
-        "- Python/SQL code syntax validity\n"
-        "- Adherence to expected patterns (regex matches)\n"
-        "- Absence of hallucinated/deprecated APIs\n"
-        "- Presence of expected factual information\n"
-        "- Overall structural quality of the skill document\n\n"
+        "EVALUATION: The skill is evaluated by having a small LLM generate responses from it. "
+        "Better skill documentation produces more correct responses. Scores come from:\n"
+        "- Generated response quality (40%): An LLM reads ONLY the skill and answers a test prompt. "
+        "Its response is scored against expected patterns and facts.\n"
+        "- Skill content coverage (25%): Does the SKILL.md itself contain the patterns and facts "
+        "needed to answer test prompts? Removing key content directly drops this score.\n"
+        "- Reference response check (5%): Sanity check against a known-good response.\n"
+        "- Structure validation (10%): Python/SQL syntax, no hallucinated APIs.\n"
+        "- Token efficiency (20%): Conciseness vs original -- smaller is better.\n\n"
+        "KEY INSIGHT: If the skill is missing a pattern or fact, the LLM cannot generate it. "
+        "The most impactful changes add missing patterns/facts and remove incorrect ones.\n\n"
         f"IMPORTANT: The current artifacts total {original_token_count:,} tokens. "
         "Optimized versions should be MORE CONCISE, not larger. "
         "Remove redundant examples, consolidate similar patterns, "
         "and eliminate verbose explanations that don't add value. "
         "Every token consumed is agent context window budget -- keep skills lean and focused."
+        f"{baseline_desc}"
         f"{components_desc}"
     )

@@ -1,0 +1,30 @@
+skill_name: databricks-unstructured-pdf-generation
+description: Generate synthetic PDF documents for RAG and unstructured data use cases. Use when creating test PDFs, demo documents,
+  or evaluation datasets for retrieval systems.
+scorers:
+  enabled:
+  - python_syntax
+  - pattern_adherence
+  - no_hallucinated_apis
+  - expected_facts_present
+  llm_scorers:
+  - Safety
+  - guidelines_from_expectations
+  default_guidelines:
+  - Response must address the user's request completely
+  - Code examples must follow documented best practices
+  - Response must use modern APIs (not deprecated ones)
+  trace_expectations:
+    tool_limits:
+      Bash: 10
+      Read: 20
+    token_budget:
+      max_total: 100000
+    required_tools:
+    - Read
+    banned_tools: []
+    expected_files: []
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+  execution_success: 0.8

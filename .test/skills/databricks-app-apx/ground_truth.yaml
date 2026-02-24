@@ -1,0 +1,311 @@
+metadata:
+  skill_name: databricks-app-apx
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: apx_initialize_project_001
+  inputs:
+    prompt: "I want to start building a new full-stack Databricks app. How do I initialize an APX project?"
+  outputs:
+    response: |
+      To initialize an APX project, use the APX MCP tools:
+
+      ```bash
+      # Start the APX development server
+      mcp-cli call apx/start '{}'
+
+      # Check that the server is running
+      mcp-cli call apx/status '{}'
+      ```
+
+      After initialization, APX scaffolds a FastAPI backend and React frontend with TypeScript support.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "APX uses MCP tools invoked via mcp-cli call"
+    - "apx/start initializes the development server"
+    - "apx/status checks the current server status"
+    expected_patterns:
+    - pattern: "apx/start"
+      min_count: 1
+      description: "Mentions the apx/start MCP tool"
+    - pattern: "apx/status"
+      min_count: 1
+      description: "Mentions the apx/status MCP tool"
+    guidelines:
+    - "Response must show the MCP CLI commands for starting APX"
+    - "Response should explain what happens after initialization"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: apx_pydantic_models_002
+  inputs:
+    prompt: "What is the recommended pattern for defining backend data models in an APX app?"
+  outputs:
+    response: |
+      In `src/{app_name}/backend/models.py`, follow the 3-model pattern:
+
+      ```python
+      from pydantic import BaseModel
+
+      # Input validation - what the client sends
+      class EntityIn(BaseModel):
+          name: str
+          description: str
+
+      # Database record - stored internally
+      class EntityRecord(EntityIn):
+          id: str
+          created_at: datetime
+
+      # API response - what the client receives
+      class EntityOut(EntityRecord):
+          pass
+      ```
+
+      - `EntityIn` handles input validation
+      - `EntityRecord` extends with database fields
+      - `EntityOut` controls API response shape
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "APX backend models live in src/{app_name}/backend/models.py"
+    - "The 3-model pattern uses EntityIn, EntityRecord, and EntityOut"
+    - "Models are built with Pydantic BaseModel"
+    expected_patterns:
+    - pattern: "class\\s+\\w+In\\("
+      min_count: 1
+      description: "Defines an input model class"
+    - pattern: "class\\s+\\w+Record\\("
+      min_count: 1
+      description: "Defines a record model class"
+    - pattern: "BaseModel"
+      min_count: 1
+      description: "Uses Pydantic BaseModel"
+    guidelines:
+    - "Response must show the 3-model pattern with EntityIn, EntityRecord, and EntityOut"
+    - "Code must be valid Python with Pydantic imports"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: apx_api_routes_003
+  inputs:
+    prompt: "How should I define API routes in my APX backend?"
+  outputs:
+    response: |
+      In `src/{app_name}/backend/router.py`, define FastAPI routes with these requirements:
+
+      ```python
+      from fastapi import APIRouter
+
+      router = APIRouter(prefix="/api/entities", tags=["entities"])
+
+      @router.get("/", response_model=list[EntityOut])
+      async def list_entities():
+          return entities
+
+      @router.get("/{entity_id}", response_model=EntityOut)
+      async def get_entity(entity_id: str):
+          return find_entity(entity_id)
+
+      @router.post("/", response_model=EntityOut)
+      async def create_entity(entity: EntityIn):
+          return save_entity(entity)
+      ```
+
+      Always include `response_model` on every route, as this enables OpenAPI spec generation for the frontend client.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "API routes are defined in src/{app_name}/backend/router.py"
+    - "Every route must include response_model for OpenAPI generation"
+    - "Routes use FastAPI's APIRouter"
+    expected_patterns:
+    - pattern: "response_model"
+      min_count: 2
+      description: "Includes response_model on route decorators"
+    - pattern: "APIRouter"
+      min_count: 1
+      description: "Uses FastAPI APIRouter"
+    - pattern: "@router\\.(get|post|put|delete)"
+      min_count: 2
+      description: "Defines HTTP method route decorators"
+    guidelines:
+    - "Response must emphasize the requirement for response_model on every route"
+    - "Code must show standard CRUD route patterns"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: apx_add_ui_components_004
+  inputs:
+    prompt: "How do I add shadcn UI components to my APX frontend?"
+  outputs:
+    response: |
+      Use the shadcn MCP tool to add components:
+
+      ```bash
+      mcp-cli call shadcn/get_add_command_for_items '{
+        "items": ["@shadcn/button", "@shadcn/card", "@shadcn/table",
+                  "@shadcn/badge", "@shadcn/select", "@shadcn/skeleton"]
+      }'
+      ```
+
+      This generates the install command for the specified shadcn components. Run the output command to add them to your frontend.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "shadcn components are added via the shadcn MCP tool"
+    - "The tool is invoked with shadcn/get_add_command_for_items"
+    expected_patterns:
+    - pattern: "shadcn/get_add_command_for_items"
+      min_count: 1
+      description: "Uses the shadcn MCP tool"
+    - pattern: "@shadcn/"
+      min_count: 2
+      description: "References shadcn component packages"
+    guidelines:
+    - "Response must show the MCP tool call with JSON parameters"
+    - "Response should list common UI components like button, card, table"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: apx_testing_endpoints_005
+  inputs:
+    prompt: "How do I test my APX app's backend API endpoints and run type checks?"
+  outputs:
+    response: |
+      APX provides built-in testing and type checking:
+
+      ```bash
+      # Run type checks on both backend and frontend
+      mcp-cli call apx/dev_check '{}'
+
+      # Test API endpoints manually
+      curl http://localhost:8000/api/{entities} | jq .
+      curl http://localhost:8000/api/{entities}/{id} | jq .
+
+      # Get the frontend development URL
+      mcp-cli call apx/get_frontend_url '{}'
+      ```
+
+      Fix any Python type errors reported by basedpyright before deploying.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "apx/dev_check runs type checks on both backend and frontend"
+    - "Backend API runs on localhost:8000"
+    - "APX uses basedpyright for Python type checking"
+    expected_patterns:
+    - pattern: "apx/dev_check"
+      min_count: 1
+      description: "Uses the dev_check MCP tool"
+    - pattern: "curl.*localhost:8000"
+      min_count: 1
+      description: "Tests endpoints via curl on localhost"
+    - pattern: "apx/get_frontend_url"
+      min_count: 1
+      description: "Uses the get_frontend_url MCP tool"
+    guidelines:
+    - "Response must include both type checking and API testing commands"
+    - "Response should mention basedpyright for Python type checking"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: apx_deployment_006
+  inputs:
+    prompt: "How do I deploy my APX app to Databricks and check the logs?"
+  outputs:
+    response: |
+      Deploy and monitor your APX app:
+
+      ```bash
+      # Deploy the app to Databricks
+      mcp-cli call apx/deploy '{}'
+
+      # Check deployed application logs
+      databricks apps logs <app-name> --profile <profile-name>
+      ```
+
+      The APX MCP server can also automatically check deployed application logs. Simply ask: "Please check the deployed app logs for <app-name>".
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "APX apps are deployed using the apx/deploy MCP tool"
+    - "Application logs are accessed via databricks apps logs CLI command"
+    expected_patterns:
+    - pattern: "apx/deploy"
+      min_count: 1
+      description: "Uses the deploy MCP tool"
+    - pattern: "databricks apps logs"
+      min_count: 1
+      description: "Uses the databricks apps logs CLI command"
+    guidelines:
+    - "Response must show both deployment and log monitoring commands"
+    - "Response should mention the APX MCP automatic log checking feature"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: apx_full_workflow_007
+  inputs:
+    prompt: "Walk me through the complete APX development workflow from start to deployment."
+  outputs:
+    response: |
+      The APX development workflow has 5 phases:
+
+      **Phase 1: Initialize**
+      ```bash
+      mcp-cli call apx/start '{}'
+      mcp-cli call apx/status '{}'
+      ```
+
+      **Phase 2: Backend** - Create Pydantic models in `models.py` and FastAPI routes in `router.py`
+
+      **Phase 3: Frontend** - Add shadcn components and build React UI
+
+      **Phase 4: Testing**
+      ```bash
+      mcp-cli call apx/dev_check '{}'
+      curl http://localhost:8000/api/{entities} | jq .
+      ```
+
+      **Phase 5: Deploy**
+      ```bash
+      mcp-cli call apx/deploy '{}'
+      databricks apps logs <app-name> --profile <profile-name>
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "APX development follows 5 phases: Initialize, Backend, Frontend, Testing, Deploy"
+    - "Backend uses Pydantic models and FastAPI routes"
+    - "Frontend uses React with shadcn components"
+    expected_patterns:
+    - pattern: "apx/start"
+      min_count: 1
+      description: "Includes initialization step"
+    - pattern: "apx/dev_check"
+      min_count: 1
+      description: "Includes testing step"
+    - pattern: "apx/deploy"
+      min_count: 1
+      description: "Includes deployment step"
+    guidelines:
+    - "Response must cover all 5 phases of the APX workflow"
+    - "Response should include code examples for key phases"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: auto_generated

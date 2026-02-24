@@ -1,0 +1,366 @@
+metadata:
+  skill_name: databricks-dbsql
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: dbsql_sql_scripting_etl_001
+  inputs:
+    prompt: "Write a SQL script that conditionally processes new orders into a processed table using Databricks SQL scripting."
+  outputs:
+    response: |
+      ```sql
+      BEGIN
+        DECLARE v_count INT;
+        DECLARE v_status STRING DEFAULT 'pending';
+
+        SET v_count = (SELECT COUNT(*) FROM catalog.schema.raw_orders WHERE status = 'new');
+
+        IF v_count > 0 THEN
+          INSERT INTO catalog.schema.processed_orders
+          SELECT *, current_timestamp() AS processed_at
+          FROM catalog.schema.raw_orders
+          WHERE status = 'new';
+
+          SET v_status = 'completed';
+        ELSE
+          SET v_status = 'skipped';
+        END IF;
+
+        SELECT v_status AS result, v_count AS rows_processed;
+      END
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Databricks SQL scripting uses BEGIN/END blocks for procedural logic"
+    - "Variables are declared with DECLARE and assigned with SET"
+    - "IF/ELSE conditional logic is supported in SQL scripts"
+    expected_patterns:
+    - pattern: "BEGIN"
+      min_count: 1
+      description: "Uses SQL scripting BEGIN block"
+    - pattern: "DECLARE"
+      min_count: 1
+      description: "Declares variables using DECLARE"
+    - pattern: "IF.*THEN"
+      min_count: 1
+      description: "Uses IF/THEN conditional logic"
+    - pattern: "current_timestamp\\(\\)"
+      min_count: 1
+      description: "Uses current_timestamp() function"
+    guidelines:
+    - "SQL must use Databricks SQL scripting syntax with BEGIN/END blocks"
+    - "Response must include variable declarations and conditional logic"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: dbsql_stored_procedure_002
+  inputs:
+    prompt: "Create a stored procedure that upserts customer data with error handling."
+  outputs:
+    response: |
+      ```sql
+      CREATE OR REPLACE PROCEDURE catalog.schema.upsert_customers(
+        IN p_source STRING,
+        OUT p_rows_affected INT
+      )
+      LANGUAGE SQL
+      SQL SECURITY INVOKER
+      BEGIN
+        DECLARE EXIT HANDLER FOR SQLEXCEPTION
+        BEGIN
+          SET p_rows_affected = -1;
+          SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = concat('Upsert failed for source: ', p_source);
+        END;
+
+        MERGE INTO catalog.schema.dim_customer AS t
+        USING (SELECT * FROM identifier(p_source)) AS s
+        ON t.customer_id = s.customer_id
+        WHEN MATCHED THEN UPDATE SET *
+        WHEN NOT MATCHED THEN INSERT *;
+
+        SET p_rows_affected = (SELECT COUNT(*) FROM identifier(p_source));
+      END;
+
+      -- Invoke the procedure:
+      CALL catalog.schema.upsert_customers('catalog.schema.staging_customers', ?);
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Stored procedures are created with CREATE OR REPLACE PROCEDURE"
+    - "SQL SECURITY INVOKER runs with the caller's permissions"
+    - "The identifier() function dynamically resolves table names from string parameters"
+    - "Error handling uses DECLARE EXIT HANDLER FOR SQLEXCEPTION"
+    expected_patterns:
+    - pattern: "CREATE OR REPLACE PROCEDURE"
+      min_count: 1
+      description: "Creates a stored procedure"
+    - pattern: "MERGE INTO"
+      min_count: 1
+      description: "Uses MERGE for upsert logic"
+    - pattern: "identifier\\("
+      min_count: 1
+      description: "Uses identifier() for dynamic table references"
+    - pattern: "DECLARE EXIT HANDLER"
+      min_count: 1
+      description: "Includes error handling with exit handler"
+    guidelines:
+    - "Procedure must include IN/OUT parameters"
+    - "Must include error handling with SQLEXCEPTION handler"
+    - "Must use MERGE INTO for upsert pattern"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: dbsql_materialized_view_003
+  inputs:
+    prompt: "Create a materialized view that refreshes hourly and aggregates daily revenue by region."
+  outputs:
+    response: |
+      ```sql
+      CREATE OR REPLACE MATERIALIZED VIEW catalog.schema.daily_revenue
+        CLUSTER BY (order_date)
+        SCHEDULE EVERY 1 HOUR
+        COMMENT 'Hourly-refreshed daily revenue by region'
+      AS SELECT
+          order_date,
+          region,
+          SUM(amount) AS total_revenue,
+          COUNT(DISTINCT customer_id) AS unique_customers
+      FROM catalog.schema.fact_orders
+      JOIN catalog.schema.dim_store USING (store_id)
+      GROUP BY order_date, region;
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Materialized views support scheduled refresh with SCHEDULE EVERY syntax"
+    - "CLUSTER BY optimizes data layout for query performance"
+    - "Materialized views are created with CREATE OR REPLACE MATERIALIZED VIEW"
+    expected_patterns:
+    - pattern: "CREATE OR REPLACE MATERIALIZED VIEW"
+      min_count: 1
+      description: "Creates a materialized view"
+    - pattern: "SCHEDULE EVERY"
+      min_count: 1
+      description: "Configures scheduled refresh"
+    - pattern: "CLUSTER BY"
+      min_count: 1
+      description: "Uses CLUSTER BY for data layout optimization"
+    - pattern: "GROUP BY"
+      min_count: 1
+      description: "Aggregates data with GROUP BY"
+    guidelines:
+    - "Must include SCHEDULE EVERY for automated refresh"
+    - "Must include CLUSTER BY for performance optimization"
+    - "Response should use realistic aggregation patterns"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: dbsql_pipe_syntax_004
+  inputs:
+    prompt: "Show me how to use Databricks SQL pipe syntax to transform and filter order data."
+  outputs:
+    response: |
+      ```sql
+      -- Pipe syntax: read left-to-right instead of inside-out
+      FROM catalog.schema.fact_orders
+        |> WHERE order_date >= current_date() - INTERVAL 30 DAYS
+        |> AGGREGATE SUM(amount) AS total, COUNT(*) AS cnt GROUP BY region, product_category
+        |> WHERE total > 10000
+        |> ORDER BY total DESC
+        |> LIMIT 20;
+      ```
+
+      Pipe syntax starts with FROM and chains transformations with `|>`, making complex queries more readable than nested subqueries.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Pipe syntax uses |> to chain transformations left-to-right"
+    - "Queries start with FROM instead of SELECT when using pipe syntax"
+    - "AGGREGATE replaces GROUP BY in pipe syntax context"
+    expected_patterns:
+    - pattern: "\\|>"
+      min_count: 3
+      description: "Uses pipe operator |> for chaining"
+    - pattern: "^FROM"
+      min_count: 1
+      description: "Starts the query with FROM"
+    - pattern: "AGGREGATE"
+      min_count: 1
+      description: "Uses AGGREGATE keyword in pipe syntax"
+    guidelines:
+    - "Response must demonstrate the pipe |> operator"
+    - "Query must start with FROM, not SELECT"
+    - "Response should explain the readability benefit of pipe syntax"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: dbsql_ai_functions_005
+  inputs:
+    prompt: "How can I use Databricks AI functions to classify and analyze text data in SQL?"
+  outputs:
+    response: |
+      ```sql
+      -- Classify support tickets
+      SELECT
+        ticket_id,
+        description,
+        ai_classify(description, ARRAY('billing', 'technical', 'account', 'feature_request')) AS category,
+        ai_analyze_sentiment(description) AS sentiment
+      FROM catalog.schema.support_tickets
+      LIMIT 100;
+
+      -- Extract structured entities from text
+      SELECT
+        doc_id,
+        ai_extract(content, ARRAY('person_name', 'company', 'dollar_amount')) AS entities
+      FROM catalog.schema.contracts;
+
+      -- General-purpose AI query with typed output
+      SELECT ai_query(
+        'databricks-meta-llama-3-3-70b-instruct',
+        concat('Summarize this feedback in JSON: ', feedback),
+        returnType => 'STRUCT<topic STRING, sentiment STRING, action_items ARRAY<STRING>>'
+      ) AS analysis
+      FROM catalog.schema.customer_feedback
+      LIMIT 50;
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "ai_classify() categorizes text into predefined labels"
+    - "ai_analyze_sentiment() returns sentiment analysis of text"
+    - "ai_extract() extracts structured entities from unstructured text"
+    - "ai_query() calls an LLM endpoint with optional structured return types"
+    expected_patterns:
+    - pattern: "ai_classify"
+      min_count: 1
+      description: "Uses ai_classify() for text classification"
+    - pattern: "ai_analyze_sentiment"
+      min_count: 1
+      description: "Uses ai_analyze_sentiment() for sentiment analysis"
+    - pattern: "ai_extract"
+      min_count: 1
+      description: "Uses ai_extract() for entity extraction"
+    - pattern: "ai_query"
+      min_count: 1
+      description: "Uses ai_query() for general LLM queries"
+    guidelines:
+    - "Response must demonstrate at least three different AI functions"
+    - "ai_query must include the returnType parameter for structured output"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: dbsql_geospatial_h3_006
+  inputs:
+    prompt: "Write a query that finds all stores within 5km of each customer using H3 geospatial indexing."
+  outputs:
+    response: |
+      ```sql
+      -- Find stores within 5km using H3 spatial indexing
+      WITH customer_h3 AS (
+        SELECT *, h3_longlatash3(longitude, latitude, 7) AS h3_cell
+        FROM catalog.schema.customers
+      ),
+      store_h3 AS (
+        SELECT *, h3_longlatash3(longitude, latitude, 7) AS h3_cell
+        FROM catalog.schema.stores
+      )
+      SELECT
+        c.customer_id,
+        s.store_id,
+        ST_Distance(
+          ST_Point(c.longitude, c.latitude),
+          ST_Point(s.longitude, s.latitude)
+        ) AS distance_m
+      FROM customer_h3 c
+      JOIN store_h3 s ON h3_ischildof(c.h3_cell, h3_toparent(s.h3_cell, 5))
+      WHERE ST_Distance(
+        ST_Point(c.longitude, c.latitude),
+        ST_Point(s.longitude, s.latitude)
+      ) < 5000;
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "h3_longlatash3() converts longitude/latitude to H3 cell index at a given resolution"
+    - "ST_Distance() calculates distance in meters between two geometric points"
+    - "ST_Point() creates a geometric point from longitude and latitude"
+    - "h3_ischildof() and h3_toparent() navigate the H3 hierarchy for spatial joins"
+    expected_patterns:
+    - pattern: "h3_longlatash3"
+      min_count: 1
+      description: "Uses H3 cell indexing function"
+    - pattern: "ST_Distance"
+      min_count: 1
+      description: "Uses ST_Distance for distance calculation"
+    - pattern: "ST_Point"
+      min_count: 1
+      description: "Uses ST_Point for point geometry"
+    - pattern: "h3_ischildof"
+      min_count: 1
+      description: "Uses H3 hierarchy for efficient spatial join"
+    guidelines:
+    - "Must use H3 indexing for efficient spatial join instead of brute-force distance"
+    - "Must include ST_Distance for final distance filtering"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: auto_generated
+
+- id: dbsql_collation_007
+  inputs:
+    prompt: "How do I create a table with case-insensitive text columns in Databricks SQL?"
+  outputs:
+    response: |
+      ```sql
+      -- Create table with case-insensitive collation
+      CREATE TABLE catalog.schema.products (
+        product_id BIGINT GENERATED ALWAYS AS IDENTITY,
+        name STRING COLLATE UTF8_LCASE,
+        category STRING COLLATE UTF8_LCASE,
+        price DECIMAL(10, 2)
+      );
+
+      -- Queries are automatically case-insensitive (no LOWER() needed)
+      SELECT * FROM catalog.schema.products
+      WHERE name = 'MacBook Pro';  -- matches 'macbook pro', 'MACBOOK PRO', etc.
+      ```
+
+      The `UTF8_LCASE` collation makes string comparisons case-insensitive at the column level, eliminating the need for `LOWER()` or `UPPER()` in WHERE clauses.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "UTF8_LCASE collation enables case-insensitive comparisons at the column level"
+    - "Collation is specified with COLLATE keyword in column definitions"
+    - "Case-insensitive collation eliminates the need for LOWER() or UPPER() in queries"
+    expected_patterns:
+    - pattern: "COLLATE UTF8_LCASE"
+      min_count: 1
+      description: "Uses UTF8_LCASE collation"
+    - pattern: "CREATE TABLE"
+      min_count: 1
+      description: "Creates a table with collation"
+    - pattern: "GENERATED ALWAYS AS IDENTITY"
+      min_count: 1
+      description: "Uses auto-generated identity column"
+    guidelines:
+    - "Response must show COLLATE UTF8_LCASE in column definitions"
+    - "Response should explain the benefit over using LOWER() in queries"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated

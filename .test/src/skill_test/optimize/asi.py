@@ -1,12 +1,12 @@
 """ASI diagnostics: convert MLflow Feedback to optimize_anything SideInfo.
 
-Routes failure diagnostics through oa.log() so GEPA's reflection LM gets
-actionable context about what went wrong with each scorer.
+Builds an Actionable Side Information dict from scorer feedback so GEPA's
+reflection LM gets structured context about what went wrong with each scorer.
+Failure details are surfaced via the ``_failures`` key in the returned dict.
 """
 
 from typing import Any
 
-import gepa.optimize_anything as oa
 from mlflow.entities import Feedback
 
 
@@ -37,8 +37,9 @@ def feedback_to_asi(feedbacks: list[Feedback]) -> tuple[float, dict[str, Any]]:
     """Convert MLflow Feedback objects to optimize_anything (score, SideInfo).
 
     Computes the mean score across non-skipped feedbacks and builds a
-    SideInfo dict. Logs failures via oa.log() so GEPA's reflection LM
-    sees actionable failure context.
+    SideInfo dict.  Failure diagnostics are collected in the ``_failures``
+    key so GEPA's reflection LM sees actionable context directly in the
+    side_info dict (no ``oa.log()`` needed).
 
     Args:
         feedbacks: List of MLflow Feedback objects from running scorers
@@ -48,6 +49,7 @@ def feedback_to_asi(feedbacks: list[Feedback]) -> tuple[float, dict[str, Any]]:
     """
     scores = []
     side_info: dict[str, Any] = {}
+    failures: list[str] = []
 
     for fb in feedbacks:
         score = feedback_to_score(fb)
@@ -70,9 +72,11 @@ def feedback_to_asi(feedbacks: list[Feedback]) -> tuple[float, dict[str, Any]]:
             "status": "pass" if score >= 0.5 else "fail",
         }
 
-        # Route failures through oa.log() for GEPA reflection
+        # Collect failure diagnostics for GEPA reflection
         if score < 1.0:
-            oa.log(f"Scorer '{name}' returned {fb.value}: {fb.rationale or 'no rationale'}")
+            failures.append(
+                f"Scorer '{name}' returned {fb.value}: {fb.rationale or 'no rationale'}"
+            )
 
     composite = sum(scores) / len(scores) if scores else 0.0
 
@@ -84,5 +88,72 @@ def feedback_to_asi(feedbacks: list[Feedback]) -> tuple[float, dict[str, Any]]:
         "passed": sum(1 for s in scores if s >= 0.5),
         "failed": sum(1 for s in scores if s < 0.5),
     }
+
+    if failures:
+        side_info["_failures"] = "\n".join(failures)
+
+    return composite, side_info
+
+
+def build_rich_asi(
+    feedbacks: list[Feedback],
+    *,
+    generated_response: str | None = None,
+    skill_coverage: dict[str, Any] | None = None,
+    task_prompt: str | None = None,
+    per_dimension_scores: dict[str, float] | None = None,
+) -> tuple[float, dict[str, Any]]:
+    """Build enriched ASI with categorized diagnostics for GEPA reflection.
+
+    Extends ``feedback_to_asi()`` with additional context that helps GEPA's
+    reflection LM understand *why* scores changed and make better edits.
+
+    Args:
+        feedbacks: MLflow Feedback objects from all scoring layers
+        generated_response: Truncated LLM output (so reflection sees what skill produced)
+        skill_coverage: Which patterns/facts found vs missing in SKILL.md
+        task_prompt: The test prompt (so reflection understands context)
+        per_dimension_scores: Per-dimension scores dict for Pareto-frontier selection
+
+    Returns:
+        Tuple of (composite_score, enriched_side_info_dict)
+    """
+    composite, side_info = feedback_to_asi(feedbacks)
+
+    # Categorize feedbacks by layer
+    categories: dict[str, list[str]] = {
+        "skill_content": [],
+        "generated_response": [],
+        "reference": [],
+        "structure": [],
+    }
+    for fb in feedbacks:
+        name = fb.name or ""
+        score = feedback_to_score(fb)
+        if score is None:
+            continue
+        entry = f"{name}: {'pass' if score >= 0.5 else 'FAIL'} ({fb.rationale or ''})"
+        if name.startswith("skill_content_"):
+            categories["skill_content"].append(entry)
+        elif name.startswith("skill_"):
+            categories["structure"].append(entry)
+        else:
+            categories["generated_response"].append(entry)
+
+    side_info["_diagnostics_by_layer"] = {
+        k: v for k, v in categories.items() if v
+    }
+
+    if generated_response is not None:
+        side_info["_generated_response"] = generated_response[:2000]
+
+    if skill_coverage:
+        side_info["_skill_coverage"] = skill_coverage
+
+    if task_prompt:
+        side_info["_task_prompt"] = task_prompt[:500]
+
+    if per_dimension_scores:
+        side_info["scores"] = per_dimension_scores
 
     return composite, side_info

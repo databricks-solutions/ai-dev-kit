@@ -1,0 +1,199 @@
+metadata:
+  skill_name: databricks-config
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: databricks-config_setup_default_profile_001
+  inputs:
+    prompt: Configure my Databricks profile for the DEFAULT workspace
+  outputs:
+    response: |
+      I'll help you configure your Databricks DEFAULT profile. First, let's authenticate:
+
+      ```bash
+      databricks auth login -p DEFAULT
+      ```
+
+      This will open a browser for OAuth authentication. After authenticating, I'll update your `~/.databrickscfg` with the compute configuration.
+
+      Would you like to use:
+      - **Cluster ID**: A specific interactive/all-purpose cluster
+      - **Serverless**: Serverless compute (`serverless_compute_id = auto`)
+
+      Example configuration with a cluster:
+      ```
+      [DEFAULT]
+      host       = https://adb-123456789.11.azuredatabricks.net/
+      cluster_id = 1217-064531-c9c3ngyn
+      auth_type  = databricks-cli
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses databricks auth login command
+    - Configures ~/.databrickscfg file
+    - Offers choice between cluster_id and serverless
+    expected_patterns:
+    - pattern: databricks auth login
+      min_count: 1
+      description: Must use databricks auth login command
+    - pattern: databrickscfg
+      min_count: 1
+      description: Must reference the config file
+    guidelines:
+    - Must run databricks auth login for authentication
+    - Must offer choice between cluster_id and serverless compute
+    - Must never print token values in plain text
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: databricks-config_serverless_config_002
+  inputs:
+    prompt: Set up my Databricks profile to use serverless compute
+  outputs:
+    response: |
+      I'll configure your profile with serverless compute.
+
+      ```bash
+      databricks auth login -p DEFAULT
+      ```
+
+      Then update ~/.databrickscfg:
+      ```
+      [DEFAULT]
+      host                  = https://adb-123456789.11.azuredatabricks.net/
+      serverless_compute_id = auto
+      auth_type             = databricks-cli
+      ```
+
+      Note: For serverless, set `serverless_compute_id = auto` (not just `serverless = true`).
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Sets serverless_compute_id to auto
+    - Does not use cluster_id with serverless
+    expected_patterns:
+    - pattern: serverless_compute_id
+      min_count: 1
+      description: Must use serverless_compute_id parameter
+    - pattern: auto
+      min_count: 1
+      description: Must set serverless to auto
+    guidelines:
+    - Must use serverless_compute_id = auto, not serverless = true
+    - Must not combine cluster_id and serverless_compute_id
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: databricks-config_workspace_url_003
+  inputs:
+    prompt: Configure Databricks profile using workspace URL https://adb-1234567890123456.7.azuredatabricks.net/
+  outputs:
+    response: |
+      I'll extract the profile name from the workspace URL and configure it.
+
+      Profile name: `adb-1234567890123456`
+
+      ```bash
+      databricks auth login -p adb-1234567890123456 --host https://adb-1234567890123456.7.azuredatabricks.net/
+      ```
+
+      After authentication, choose your compute option and I'll update ~/.databrickscfg.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Extracts profile name from workspace URL
+    - Uses --host flag with the URL
+    expected_patterns:
+    - pattern: databricks auth login
+      min_count: 1
+      description: Must use databricks auth login
+    - pattern: "\\-\\-host"
+      min_count: 1
+      description: Must pass --host when URL is provided
+    guidelines:
+    - Must extract profile name from workspace URL
+    - Must pass --host flag when workspace URL is provided
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: databricks-config_cluster_id_004
+  inputs:
+    prompt: Configure my Databricks profile with cluster ID 0123-456789-abcdef12
+  outputs:
+    response: |
+      I'll configure your profile with the specified cluster ID.
+
+      ```bash
+      databricks auth login -p DEFAULT
+      ```
+
+      Updated ~/.databrickscfg:
+      ```
+      [DEFAULT]
+      host       = https://adb-123456789.11.azuredatabricks.net/
+      cluster_id = 0123-456789-abcdef12
+      auth_type  = databricks-cli
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Sets cluster_id in configuration
+    - Preserves existing host and auth settings
+    expected_patterns:
+    - pattern: cluster_id
+      min_count: 1
+      description: Must set cluster_id
+    - pattern: 0123-456789-abcdef12
+      min_count: 1
+      description: Must use the specified cluster ID
+    guidelines:
+    - Must set cluster_id, not serverless_compute_id
+    - Must preserve existing profile settings
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: databricks-config_token_security_005
+  inputs:
+    prompt: Show me my Databricks profile configuration
+  outputs:
+    response: |
+      Here's your current profile configuration:
+
+      ```
+      [DEFAULT]
+      host       = https://adb-123456789.11.azuredatabricks.net/
+      token      = [REDACTED]
+      cluster_id = 1217-064531-c9c3ngyn
+      ```
+
+      View full configuration at: ~/.databrickscfg
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Token values must be redacted
+    - Directs user to ~/.databrickscfg for full config
+    expected_patterns:
+    - pattern: REDACTED
+      min_count: 1
+      description: Must redact token values
+    - pattern: databrickscfg
+      min_count: 1
+      description: Must reference config file location
+    guidelines:
+    - Must NEVER print token values in plain text
+    - Must redact any token field values
+    - Must inform user they can view full config at ~/.databrickscfg
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
