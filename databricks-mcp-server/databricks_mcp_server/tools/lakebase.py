@@ -21,6 +21,7 @@ from databricks_tools_core.lakebase import (
     create_synced_table as _create_synced_table,
     get_synced_table as _get_synced_table,
     delete_synced_table as _delete_synced_table,
+    execute_lakebase_query as _execute_query,
 )
 
 # Autoscale core functions
@@ -524,3 +525,62 @@ def generate_lakebase_credential(
         return _generate_autoscale_credential(endpoint=endpoint)
     else:
         return {"error": "Provide either instance_names (provisioned) or endpoint (autoscale)."}
+
+
+# ============================================================================
+# Tool 9: query_lakebase
+# ============================================================================
+
+
+@mcp.tool
+def query_lakebase(
+    sql_query: str,
+    instance_name: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    database: str = "databricks_postgres",
+    timeout: int = 60,
+) -> Dict[str, Any]:
+    """
+    Execute a SQL query against a Lakebase PostgreSQL instance.
+    
+    Supports both Provisioned and Autoscale Lakebase instances.
+    Provide either instance_name (for provisioned) or endpoint (for autoscale).
+
+    Args:
+        sql_query: SQL query to execute (SELECT, INSERT, UPDATE, DELETE, etc.)
+        instance_name: Name of a Provisioned Lakebase instance (e.g., "my-instance")
+        endpoint: Autoscale endpoint - either full resource name 
+            (e.g., "projects/xxx/branches/yyy/endpoints/zzz") or just the host
+            (e.g., "ep-xxx.database.eastus2.azuredatabricks.net")
+        database: PostgreSQL database name (default: "databricks_postgres")
+        timeout: Query timeout in seconds (default: 60)
+
+    Returns:
+        Dictionary with:
+        - columns: List of column names
+        - data: List of rows (each row is a list of values)
+        - row_count: Number of rows returned
+        - type: "provisioned" or "autoscale"
+        - target: instance_name or endpoint used
+
+    Examples:
+        # Provisioned instance
+        >>> query_lakebase("SELECT * FROM users", instance_name="my-instance")
+        
+        # Autoscale endpoint (by host)
+        >>> query_lakebase("SELECT 1", endpoint="ep-xxx.database.eastus2.azuredatabricks.net")
+        
+        # Autoscale endpoint (by resource name)
+        >>> query_lakebase("SELECT 1", endpoint="projects/abc/branches/main/endpoints/primary")
+    """
+    try:
+        return _execute_query(
+            sql_query=sql_query,
+            instance_name=instance_name,
+            endpoint=endpoint,
+            database=database,
+            timeout=timeout,
+        )
+    except Exception as e:
+        target = instance_name or endpoint or "unknown"
+        return {"error": str(e), "target": target}

@@ -23,6 +23,10 @@ from .synced_tables import (
     get_synced_table,
     delete_synced_table,
 )
+from .query import (
+    execute_lakebase_query,
+    LakebaseQueryError,
+)
 
 __all__ = [
     # Instances
@@ -40,4 +44,7 @@ __all__ = [
     "create_synced_table",
     "get_synced_table",
     "delete_synced_table",
+    # Query
+    "execute_lakebase_query",
+    "LakebaseQueryError",
 ]
