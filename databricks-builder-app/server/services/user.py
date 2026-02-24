@@ -2,6 +2,7 @@
 
 In production (Databricks Apps):
 - User email is available in the X-Forwarded-User header
+- X-Forwarded-Email header is accepted from M2M callers forwarding real user identity
 - Access token is available in the X-Forwarded-Access-Token header
 - Bearer tokens from other Databricks Apps (M2M OAuth) are also accepted
 
@@ -61,8 +62,9 @@ async def get_current_user(request: Request) -> str:
 
   Auth priority:
     1. X-Forwarded-User header (browser users via Databricks Apps proxy)
-    2. Authorization: Bearer token (M2M OAuth from other Databricks Apps)
-    3. WorkspaceClient dev fallback (local development only)
+    2. X-Forwarded-Email header (M2M callers forwarding real user identity)
+    3. Authorization: Bearer token (M2M OAuth from other Databricks Apps)
+    4. WorkspaceClient dev fallback (local development only)
 
   Args:
       request: FastAPI Request object
@@ -73,13 +75,19 @@ async def get_current_user(request: Request) -> str:
   Raises:
       ValueError: If user cannot be determined
   """
-  # 1. Try to get user from header first (production mode - browser users)
+  # 1. X-Forwarded-User (Databricks Apps proxy for browser users)
   user = request.headers.get('X-Forwarded-User')
   if user:
     logger.debug(f'Got user from X-Forwarded-User header: {user}')
     return user
 
-  # 2. Try Bearer token (M2M OAuth from other Databricks Apps)
+  # 2. X-Forwarded-Email (M2M callers forwarding real user identity)
+  forwarded_email = request.headers.get('X-Forwarded-Email')
+  if forwarded_email:
+    logger.debug(f'Got user from X-Forwarded-Email header: {forwarded_email}')
+    return forwarded_email
+
+  # 3. Bearer token (M2M OAuth from other Databricks Apps)
   auth_header = request.headers.get('Authorization', '')
   if auth_header.startswith('Bearer '):
     token = auth_header[7:]
@@ -92,14 +100,14 @@ async def get_current_user(request: Request) -> str:
         logger.warning(f'Bearer token identity resolution failed: {e}')
         # Fall through to dev fallback if in development mode
 
-  # 3. Fall back to WorkspaceClient for development
+  # 4. Fall back to WorkspaceClient for development
   if _is_local_development():
     return await _get_dev_user()
 
-  # Production without header - this shouldn't happen
+  # Production without any identity source
   raise ValueError(
-    'No X-Forwarded-User header found, no valid Bearer token, and not in development mode. '
-    'Ensure the app is deployed with user authentication enabled.'
+    'No X-Forwarded-User/X-Forwarded-Email header found, no valid Bearer token, '
+    'and not in development mode. Ensure the app is deployed with user authentication enabled.'
   )
 
 
