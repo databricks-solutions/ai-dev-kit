@@ -142,6 +142,240 @@ Optional overrides: `GEPA_REFLECTION_LM` (reflection model), `GEPA_GEN_LM` (gene
 
 ---
 
+## How Evaluation Works
+
+The evaluation system answers a single question: **does this SKILL.md teach an AI agent the right things?** A skill that scores well means an agent reading it will produce correct code with the right APIs and patterns. A skill that scores poorly means the agent will hallucinate, use deprecated APIs, or miss important patterns.
+
+Understanding evaluation is important because it drives everything else — GEPA uses scores to decide which skill mutations to keep, and you use scores to know if your skill is good enough to ship.
+
+### Why These Files Exist
+
+Each skill under `.test/skills/<skill-name>/` has two key files:
+
+**`ground_truth.yaml`** — The test cases. Each entry is a prompt ("Create a ResponsesAgent") paired with the expected response and expectations (patterns, facts, guidelines). These define *what the skill should teach*. Without test cases, the evaluator has nothing to score against and GEPA has no signal to optimize toward.
+
+**`manifest.yaml`** — The scorer configuration. Controls *which scorers run* and *what thresholds apply*. Think of it as the grading rubric: which checks are enabled, what guidelines the LLM judge enforces, and what trace expectations exist. If you don't provide one, the system uses sensible defaults (syntax + patterns + facts + hallucination checks).
+
+The test cases in `ground_truth.yaml` are also what gets split into train/val sets for GEPA — the optimizer converts each test case into a GEPA dataset instance:
+
+| ground_truth.yaml field | GEPA field | Purpose |
+|------------------------|------------|---------|
+| `inputs.prompt` | `input` | The task the reflection LM sees |
+| `outputs.response` | `answer` | Reference response for sanity-check scoring |
+| `expectations.*` | `additional_context` | Encoded as JSON; scorers extract patterns and facts |
+| `metadata.category` | (stratification) | Ensures balanced train/val split |
+
+### The Layered Evaluation
+
+Rather than scoring a single static response, the evaluator runs five layers that give GEPA progressively richer signal:
+
+| Layer | Weight | What it does | Source |
+|-------|--------|-------------|--------|
+| **Generated response quality** | 40% | An LLM reads ONLY the SKILL.md and answers the test prompt. Its response is scored for patterns/facts. | `evaluator.py` → litellm generation |
+| **Skill content coverage** | 25% | Checks if the SKILL.md itself contains the patterns and facts needed. If a pattern is missing from the skill, this drops immediately. | `evaluator.py` → `_score_skill_content()` |
+| **Reference response check** | 5% | Scores the ground truth response as a sanity baseline. This is mostly static — it ensures the test case itself is valid. | `evaluator.py` → `_run_deterministic_scorers()` |
+| **Structure validation** | 10% | Validates Python/SQL syntax in code blocks and checks for hallucinated APIs (deprecated `@dlt.table`, old `mlflow.evaluate`, etc). | `evaluator.py` → `_validate_skill_structure()` |
+| **Token efficiency** | 20% | Penalizes bloated skill content. Same size or smaller = 1.0, linear decay to 0.0 at 2x original size. | `evaluator.py` → token counting |
+
+**Why this works:** The key insight is that Layer 1 (generated response) creates a causal chain — if the SKILL.md is missing a pattern, the generation model cannot produce it, so the pattern scorer fails, so the score drops. This gives GEPA immediate, dynamic signal when content changes, unlike the old approach where ~80% of the score came from an immutable ground truth string.
+
+**Fallback mode:** When no generation model is available (no `GEPA_GEN_LM`), the weights shift to 35% skill content + 35% reference + 10% structure + 20% efficiency.
+
+### Built-in Scorers
+
+The system ships with four tiers of scorers:
+
+**Tier 1: Deterministic (fast, reliable, ~$0/eval)**
+
+| Scorer | What it checks | Configured via |
+|--------|---------------|----------------|
+| `python_syntax` | Python code blocks parse with `ast.parse()` | `manifest.yaml` → `scorers.enabled` |
+| `sql_syntax` | SQL blocks have valid structure (balanced parens, recognizable statements) | `manifest.yaml` → `scorers.enabled` |
+| `pattern_adherence` | Required regex patterns appear in response (e.g., `ResponsesAgent`, `CLUSTER BY`) | `ground_truth.yaml` → `expectations.expected_patterns` |
+| `no_hallucinated_apis` | No deprecated/invented APIs (`@dlt.table`, `dlt.read`, `PARTITION BY`, old `mlflow.evaluate`) | `manifest.yaml` → `scorers.enabled` |
+| `expected_facts_present` | Required facts mentioned in response (case-insensitive substring match) | `ground_truth.yaml` → `expectations.expected_facts` |
+
+**Tier 2: Trace-based (for session evaluation)**
+
+| Scorer | What it checks |
+|--------|---------------|
+| `tool_count` | Tool usage within limits (e.g., max 5 Bash calls) |
+| `token_budget` | Token usage within budget |
+| `required_tools` | Required tools were called |
+| `banned_tools` | Banned tools were NOT called |
+| `file_existence` | Expected files were created |
+| `tool_sequence` | Tools used in expected order |
+| `category_limits` | Tool category limits (bash, file_ops, mcp) |
+
+These are configured in `manifest.yaml` under `trace_expectations`.
+
+**Tier 3: LLM judges (expensive, nuanced, ~$0.01/eval)**
+
+| Scorer | What it checks |
+|--------|---------------|
+| `Safety` | MLflow's built-in safety scorer |
+| `Guidelines` | LLM judges response against `default_guidelines` from manifest |
+| `guidelines_from_expectations` | Per-test-case guidelines from `expectations.guidelines` in ground_truth.yaml |
+
+### Adding a Custom Scorer
+
+There are three ways to add custom evaluation, from easiest to most flexible:
+
+#### Option 1: Per-test-case guidelines (no code required)
+
+Add `guidelines` to any test case in `ground_truth.yaml`. An LLM judge evaluates the response against these:
+
+```yaml
+test_cases:
+  - id: my_test_001
+    inputs:
+      prompt: "Deploy a model to serving"
+    expectations:
+      guidelines:
+        - "Must use Unity Catalog three-level namespace"
+        - "Must recommend job-based deployment over synchronous"
+        - "Should warn about cold start latency"
+      expected_facts:
+        - "ResponsesAgent"
+```
+
+Then enable the scorer in `manifest.yaml`:
+
+```yaml
+scorers:
+  enabled:
+    - python_syntax
+    - pattern_adherence
+    - expected_facts_present
+  llm_scorers:
+    - guidelines_from_expectations
+```
+
+#### Option 2: Skill-wide guidelines (no code required)
+
+Set `default_guidelines` in `manifest.yaml` to apply rules to ALL test cases for a skill:
+
+```yaml
+scorers:
+  enabled:
+    - python_syntax
+    - pattern_adherence
+    - no_hallucinated_apis
+    - expected_facts_present
+  llm_scorers:
+    - Guidelines
+  default_guidelines:
+    - "Must use ResponsesAgent pattern, not ChatAgent"
+    - "Must use self.create_text_output_item() for output"
+    - "Code must be deployable to Databricks Model Serving"
+```
+
+You can also create multiple named guideline sets:
+
+```yaml
+  llm_scorers:
+    - Guidelines:api_correctness
+    - Guidelines:deployment_quality
+  default_guidelines:
+    - "Your guidelines here"
+```
+
+#### Option 3: Custom Python scorer (full flexibility)
+
+Create a new scorer function in `.test/src/skill_test/scorers/` and register it. Scorers use the MLflow `@scorer` decorator and return `Feedback` objects:
+
+```python
+# .test/src/skill_test/scorers/my_custom.py
+from mlflow.genai.scorers import scorer
+from mlflow.entities import Feedback
+from typing import Dict, Any
+
+@scorer
+def my_custom_check(outputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feedback:
+    """Check for something specific to my use case."""
+    response = outputs.get("response", "")
+
+    # Your custom logic here
+    issues = []
+    if "spark.sql(" in response and "spark.read.table(" not in response:
+        issues.append("Should prefer spark.read.table() over spark.sql() for reads")
+
+    if issues:
+        return Feedback(
+            name="my_custom_check",
+            value="no",
+            rationale=f"Issues: {'; '.join(issues)}",
+        )
+
+    return Feedback(name="my_custom_check", value="yes", rationale="All custom checks passed")
+```
+
+Then register it in `runners/evaluate.py` → `build_scorers()`:
+
+```python
+SCORER_MAP = {
+    # ... existing scorers ...
+    "my_custom_check": my_custom_check,
+}
+```
+
+And enable it in your skill's `manifest.yaml`:
+
+```yaml
+scorers:
+  enabled:
+    - python_syntax
+    - pattern_adherence
+    - my_custom_check  # your new scorer
+```
+
+**Scorer function signatures:** The system auto-detects which parameters your scorer accepts:
+- `outputs: Dict[str, Any]` — always available, contains `{"response": "..."}`
+- `expectations: Dict[str, Any]` — from ground_truth.yaml `expectations` field
+- `inputs: Dict[str, Any]` — contains `{"prompt": "..."}`
+
+Return either a single `Feedback` or a `list[Feedback]` (for scorers that produce multiple checks like `pattern_adherence`).
+
+### Manifest Configuration Examples
+
+Here are manifest patterns for different skill types:
+
+**Python SDK skill** — emphasizes syntax and API correctness:
+```yaml
+scorers:
+  enabled: [python_syntax, pattern_adherence, no_hallucinated_apis, expected_facts_present]
+  llm_scorers: [guidelines_from_expectations]
+  default_guidelines:
+    - "Must use ResponsesAgent pattern for GenAI agents"
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+```
+
+**SQL-heavy skill** — adds SQL validation:
+```yaml
+scorers:
+  enabled: [python_syntax, sql_syntax, pattern_adherence, no_hallucinated_apis, expected_facts_present]
+  default_guidelines:
+    - "Must use SDP syntax (CREATE OR REFRESH STREAMING TABLE)"
+```
+
+**Skill with trace expectations** — limits tool usage during session evaluation:
+```yaml
+scorers:
+  enabled: [python_syntax, pattern_adherence, no_hallucinated_apis, expected_facts_present]
+  default_guidelines:
+    - "Must use correct MCP tools (manage_ka, manage_mas)"
+  trace_expectations:
+    tool_limits:
+      manage_ka: 10
+      manage_mas: 10
+    required_tools: [Read]
+    banned_tools: []
+```
+
+---
+
 ## Best Practices for Optimization
 
 These practices are derived from the [optimize_anything API guide](https://gepa-ai.github.io/gepa/blog/2026/02/18/introducing-optimize-anything/) and help you get the most out of GEPA-powered optimization.
@@ -483,102 +717,6 @@ The simplest possible test case -- just a prompt and expected facts:
     metadata:
       category: happy_path
       difficulty: easy
-```
-
-### How Test Cases Map to GEPA
-
-The optimizer converts each test case into a GEPA dataset instance:
-
-| ground_truth.yaml field | GEPA field | Used by |
-|------------------------|------------|---------|
-| `inputs.prompt` | `input` | Reflection LM sees the task |
-| `outputs.response` | `answer` | Deterministic scorers compare against this |
-| `expectations.*` | `additional_context` | Encoded as JSON; scorers extract patterns and facts |
-| `metadata.category` | (stratification) | Ensures balanced train/val split |
-
-**Scoring pipeline per test case (layered evaluation):**
-
-| Layer | Weight | What it does |
-|-------|--------|-------------|
-| Generated response quality | 40% | An LLM reads ONLY the SKILL.md and answers the test prompt. Its response is scored against expected patterns/facts. |
-| Skill content coverage | 25% | Checks if the SKILL.md itself contains the patterns and facts needed to answer test prompts. |
-| Reference response check | 5% | Scores the ground truth response as a sanity baseline. |
-| Structure validation | 10% | Python/SQL syntax in code blocks, no hallucinated APIs. |
-| Token efficiency | 20% | Penalizes bloated skill content (smaller is better). |
-
-The key insight: if a pattern or fact is missing from the SKILL.md, the generation model cannot produce it. This gives GEPA immediate, dynamic signal when content changes.
-
----
-
-## Manifest Configuration Examples
-
-The `manifest.yaml` controls which scorers run and what trace expectations apply. Here are patterns for different skill types:
-
-### Python SDK Skill
-
-```yaml
-skill_name: databricks-model-serving
-description: Deploy and query Databricks Model Serving endpoints
-
-scorers:
-  enabled:
-    - python_syntax
-    - pattern_adherence
-    - no_hallucinated_apis
-    - expected_facts_present
-  default_guidelines:
-    - "Must use ResponsesAgent pattern for GenAI agents"
-    - "Must use self.create_text_output_item() for ChatAgent responses"
-    - "Job-based deployment preferred over synchronous"
-
-quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-```
-
-### SQL-Heavy Skill
-
-```yaml
-skill_name: databricks-spark-declarative-pipelines
-description: Create SDP/LDP pipelines with streaming tables and materialized views
-
-scorers:
-  enabled:
-    - python_syntax
-    - sql_syntax
-    - pattern_adherence
-    - no_hallucinated_apis
-    - expected_facts_present
-  default_guidelines:
-    - "Must use SDP syntax (CREATE OR REFRESH STREAMING TABLE)"
-
-quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-  execution_success: 0.8
-```
-
-### Skill with Trace Expectations
-
-```yaml
-skill_name: databricks-agent-bricks
-description: Create Agent Bricks (Knowledge Assistants, Genie, Multi-Agent)
-
-scorers:
-  enabled:
-    - python_syntax
-    - pattern_adherence
-    - no_hallucinated_apis
-    - expected_facts_present
-  default_guidelines:
-    - "Must use correct MCP tools (manage_ka, manage_mas)"
-    - "Must use ka_tile_id not endpoint_name for Knowledge Assistants"
-    - "Must use find_by_name helper for entity lookups"
-  trace_expectations:
-    tool_limits:
-      manage_ka: 10
-      manage_mas: 10
-      create_or_update_genie: 5
 ```
 
 ---
