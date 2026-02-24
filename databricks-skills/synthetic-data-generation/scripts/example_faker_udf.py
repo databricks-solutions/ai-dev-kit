@@ -5,14 +5,18 @@ This approach is best for:
 - Generating realistic text data with Faker providers
 - Writing directly to Unity Catalog volumes
 - Complex conditional logic in data generation
+
+This script automatically detects the environment and uses:
+- DatabricksEnv with auto-dependencies if databricks-connect >= 16.4 and running locally
+- Standard session creation if running on Databricks Runtime or older databricks-connect
 """
+import sys
+import os
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from pyspark.sql.types import StringType, DoubleType, DateType
-from faker import Faker
+from pyspark.sql.types import StringType, DoubleType
 import numpy as np
 from datetime import datetime, timedelta
-from databricks.connect import DatabricksSession
 
 # =============================================================================
 # CONFIGURATION
@@ -39,17 +43,117 @@ START_DATE = END_DATE - timedelta(days=180)
 SEED = 42
 
 # =============================================================================
-# SETUP
+# SETUP - Environment Detection and Session Creation
 # =============================================================================
-print("Connecting to Databricks...")
-if USE_SERVERLESS:
-    spark = DatabricksSession.builder.serverless(True).getOrCreate()
-    print("Connected to serverless compute!")
+
+# Detect if running on Databricks Runtime vs locally with Databricks Connect
+def is_databricks_runtime():
+    """Check if running on Databricks Runtime (notebook/job) vs locally."""
+    return "DATABRICKS_RUNTIME_VERSION" in os.environ
+
+# Get databricks-connect version if available
+def get_databricks_connect_version():
+    """Get databricks-connect version as (major, minor) tuple or None."""
+    try:
+        import databricks.connect
+        version_str = databricks.connect.__version__
+        parts = version_str.split('.')
+        return (int(parts[0]), int(parts[1]))
+    except (ImportError, AttributeError, ValueError, IndexError):
+        return None
+
+# Determine session creation strategy
+on_runtime = is_databricks_runtime()
+db_version = get_databricks_connect_version()
+
+print("=" * 80)
+print("ENVIRONMENT DETECTION")
+print("=" * 80)
+print(f"Running on Databricks Runtime: {on_runtime}")
+if db_version:
+    print(f"databricks-connect version: {db_version[0]}.{db_version[1]}")
 else:
-    if not CLUSTER_ID:
-        raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
-    spark = DatabricksSession.builder.clusterId(CLUSTER_ID).getOrCreate()
-    print(f"Connected to cluster {CLUSTER_ID}!")
+    print("databricks-connect: not available")
+
+# Use DatabricksEnv with auto-dependencies if:
+# - Running locally (not on Databricks Runtime)
+# - databricks-connect >= 16.4
+use_auto_dependencies = (not on_runtime) and db_version and db_version >= (16, 4)
+
+if use_auto_dependencies:
+    print("✓ Using DatabricksEnv with auto-dependencies")
+    print("=" * 80)
+    from databricks.connect import DatabricksSession, DatabricksEnv
+
+    env = DatabricksEnv().withAutoDependencies(upload_local=True, use_index=True)
+
+    if USE_SERVERLESS:
+        spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
+        print("✓ Connected to serverless compute with auto-dependencies!")
+    else:
+        if not CLUSTER_ID:
+            raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
+        spark = DatabricksSession.builder.withEnvironment(env).clusterId(CLUSTER_ID).getOrCreate()
+        print(f"✓ Connected to cluster {CLUSTER_ID} with auto-dependencies!")
+else:
+    print("⚠ Using standard session (dependencies must be pre-installed)")
+    print("=" * 80)
+
+    # Try to import libraries that will be used in UDFs
+    print("\nChecking UDF dependencies...")
+    missing_deps = []
+
+    try:
+        from faker import Faker
+        print("  ✓ faker")
+    except ImportError:
+        missing_deps.append("faker")
+        print("  ✗ faker - NOT INSTALLED")
+
+    try:
+        import pandas as pd
+        print("  ✓ pandas")
+    except ImportError:
+        missing_deps.append("pandas")
+        print("  ✗ pandas - NOT INSTALLED")
+
+    if missing_deps:
+        print("\n" + "=" * 80)
+        print("⚠ WARNING: Missing dependencies for UDFs")
+        print("=" * 80)
+        print(f"Missing libraries: {', '.join(missing_deps)}")
+        print("\nThese libraries are required in UDFs and must be installed:")
+
+        if on_runtime:
+            print("\n→ SOLUTION: Install on the cluster or job:")
+            print("   - For interactive cluster: Run %pip install faker pandas numpy holidays")
+            print("   - For job: Add to job libraries or use init script")
+        else:
+            print("\n→ SOLUTION: Use one of these approaches:")
+            print("   1. Upgrade databricks-connect to >= 16.4 (enables auto-dependencies)")
+            print("   2. Create a job with environment settings in the task definition")
+            print("   3. Use a classic cluster with libraries pre-installed")
+
+        print("=" * 80)
+        sys.exit(1)
+
+    print("\n✓ All UDF dependencies available")
+    print("=" * 80)
+
+    # Create standard session
+    from databricks.connect import DatabricksSession
+
+    if USE_SERVERLESS:
+        spark = DatabricksSession.builder.serverless(True).getOrCreate()
+        print("✓ Connected to serverless compute")
+    else:
+        if not CLUSTER_ID:
+            raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
+        spark = DatabricksSession.builder.clusterId(CLUSTER_ID).getOrCreate()
+        print(f"✓ Connected to cluster {CLUSTER_ID}")
+
+# Import Faker for UDF definitions (already checked above)
+from faker import Faker
 
 # =============================================================================
 # DEFINE FAKER UDFs

@@ -70,6 +70,14 @@ Faker.seed(SEED)
 fake = Faker()
 
 print("Connecting to Databricks...")
+
+# NOTE: This script uses Faker locally with Pandas (not in Spark UDFs), so it
+# does NOT require DatabricksEnv or auto-dependencies. It works with all versions:
+# - Python 3.10, 3.11, 3.12+
+# - databricks-connect 15.1+ (any version)
+#
+# If you need to use Faker in Spark UDFs, see example_faker_udf.py instead.
+
 if USE_SERVERLESS:
     spark = DatabricksSession.builder.serverless(True).getOrCreate()
     print("Connected to serverless compute!")

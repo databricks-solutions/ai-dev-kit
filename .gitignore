@@ -1,7 +1,7 @@
 # Databricks AI Dev Kit
 .ai-dev-kit/
 .claude/
-
+.local
 
 # Python
 __pycache__/

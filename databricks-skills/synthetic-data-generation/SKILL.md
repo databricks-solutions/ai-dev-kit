@@ -94,8 +94,8 @@ spark = DatabricksSession.builder.serverless(True).getOrCreate()
 # Python 3.10 or 3.11:
 pip install "databricks-connect>=15.1,<16.2" faker polars numpy pandas holidays
 
-# Python 3.12:
-pip install "databricks-connect>=16.2,<18.0" faker polars numpy pandas holidays
+# Python 3.12+:
+pip install "databricks-connect>=16.4,<18.0" faker polars numpy pandas holidays
 
 # Configure ~/.databrickscfg
 [DEFAULT]
@@ -104,13 +104,27 @@ serverless_compute_id = auto
 auth_type = databricks-cli
 ```
 
-**In your script:**
-```python
-from databricks.connect import DatabricksSession
+**In your script (version-dependent):**
 
-spark = DatabricksSession.builder.serverless(True).getOrCreate()
-# Spark operations now execute on serverless compute
+**For Python 3.12+ with databricks-connect >= 16.4:**
+```python
+from databricks.connect import DatabricksSession, DatabricksEnv
+
+env = DatabricksEnv().withAutoDependencies(upload_local=True, use_index=True)
+spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
+
+# Spark operations now execute on serverless compute with auto-managed dependencies
 ```
+
+**For Python < 3.12 or databricks-connect < 16.4:**
+
+`DatabricksEnv()` and `withEnvironment()` are NOT available in older versions. You must use one of these alternatives:
+
+**Create a job with environment settings**
+
+Create a Databricks job with environment settings on the task. See **Option 2: Serverless Job** section below.
+
+**Note:** If you're using Polars for local generation (not Spark with Faker UDFs), these workarounds are NOT needed since dependencies run locally.
 
 **Benefits:** Instant start, local debugging, fast iteration (edit file, re-run immediately)
 
@@ -180,15 +194,6 @@ Generate data with Spark + Faker with Pandas UDFs, save to Databricks.
 
 **Example:**
 ```python
-from pyspark.sql import functions as F
-from pyspark.sql.functions import pandas_udf
-from pyspark.sql.types import StringType
-import pandas as pd
-from faker import Faker
-from databricks.connect import DatabricksSession
-
-spark = DatabricksSession.builder.serverless(True).getOrCreate()
-
 # Define Pandas UDFs for Faker data (batch processing for parallelism)
 @pandas_udf(StringType())
 def fake_name(ids: pd.Series) -> pd.Series:
@@ -505,58 +510,6 @@ N_CUSTOMERS = 2500  # Each has ~3 tickets on average
 N_ORDERS = 25000    # ~10 orders per customer average
 ```
 
-## Script Structure
-
-Always structure scripts with configuration variables at the top:
-
-```python
-"""Generate synthetic data for [use case]."""
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
-from faker import Faker
-import holidays
-from databricks.connect import DatabricksSession
-
-# =============================================================================
-# CONFIGURATION - Edit these values
-# =============================================================================
-CATALOG = "my_catalog"
-SCHEMA = "my_schema"
-VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
-
-# Data sizes - enough for aggregation patterns to survive
-N_CUSTOMERS = 2500
-N_ORDERS = 25000
-N_TICKETS = 8000
-
-# Date range - last 6 months from today
-END_DATE = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-START_DATE = END_DATE - timedelta(days=180)
-
-# Special events (within the date range)
-INCIDENT_END = END_DATE - timedelta(days=21)
-INCIDENT_START = INCIDENT_END - timedelta(days=10)
-
-# Holiday calendar for realistic patterns
-US_HOLIDAYS = holidays.US(years=[START_DATE.year, END_DATE.year])
-
-# Reproducibility
-SEED = 42
-
-# =============================================================================
-# SETUP
-# =============================================================================
-# IMPORTANT: Always use DatabricksSession, NOT SparkSession!
-
-np.random.seed(SEED)
-Faker.seed(SEED)
-fake = Faker()
-spark = DatabricksSession.builder.serverless(True).getOrCreate()
-
-# ... rest of script
-```
-
 ## Business Integrity Requirements
 
 Generated data MUST reflect business reality. Data should be realistic and tell a coherent story.
@@ -646,12 +599,6 @@ When generating data for specific domains, consider these realistic patterns:
 Generate data with Spark + Faker for all use cases. This provides scalability, parallelism, and direct integration with Unity Catalog.
 
 ```python
-from pyspark.sql import functions as F
-from pyspark.sql.functions import pandas_udf
-from pyspark.sql.types import StringType
-import pandas as pd
-from faker import Faker
-
 @pandas_udf(StringType())
 def fake_company(ids: pd.Series) -> pd.Series:
     fake = Faker()
@@ -885,22 +832,6 @@ Generate synthetic data locally without Spark dependency, then upload to Databri
 - Outputs parquet files to local directory
 - Requires manual upload to volumes with `databricks fs cp`
 
-**Key pattern:**
-
-```python
-import polars as pl
-from faker import Faker
-
-# Generate with Polars
-customers = pl.DataFrame({
-    "customer_id": [f"CUST-{i:05d}" for i in range(N_CUSTOMERS)],
-    "name": [fake.name() for _ in range(N_CUSTOMERS)],
-    "tier": np.random.choice(["Free", "Pro", "Enterprise"], N_CUSTOMERS, p=[0.6, 0.3, 0.1]),
-})
-
-# Save locally
-customers.write_parquet("./output/customers.parquet")
-```
 
 **Usage:** Run locally, then upload: `databricks fs cp -r ./output dbfs:/Volumes/{catalog}/{schema}/raw_data/`
 
@@ -916,54 +847,9 @@ Use Faker with Spark UDFs for realistic text data with parallelism. Best for dat
 - Realistic text data (company names, addresses, emails)
 - Tier-based amount generation
 
-**Key pattern - Faker UDFs for realistic data:**
-
-```python
-@F.udf(returnType=StringType())
-def generate_company():
-    return Faker().company()
-
-@F.udf(returnType=DoubleType())
-def generate_lognormal_amount(tier):
-    np.random.seed(hash(str(tier)) % (2**32))
-    if tier == "Enterprise":
-        return float(np.random.lognormal(mean=9, sigma=0.8))
-    elif tier == "Pro":
-        return float(np.random.lognormal(mean=7, sigma=0.7))
-    else:
-        return float(np.random.lognormal(mean=5, sigma=0.6))
-
-# Use UDFs in Spark operations
-customers_df = (
-    spark.range(0, N_CUSTOMERS, numPartitions=PARTITIONS)
-    .select(
-        generate_company().alias("name"),
-        # ... other columns
-    )
-    .withColumn("arr", generate_lognormal_amount(F.col("tier")))
-)
-```
 
 **Usage:** Copy `example_faker_udf.py` to your scripts folder and customize the UDFs and configuration.
 
-### Example 4: Legacy Approach (Faker + Pandas)
-
-For smaller datasets or when you need complex time-based patterns with row-level logic.
-This approach uses Pandas for generation (single-threaded) and Spark for saving.
-
-**Note:** For datasets over 100K rows, prefer Faker UDFs for better performance.
-
-**Full implementation:** See `scripts/example_pandas.py` in this skill folder.
-
-**Key pattern:** Generate master table (customers) first, create lookups for foreign keys, then generate related tables (orders) with weighted sampling. See **Key Principles → Iterate on DataFrames for Referential Integrity** for detailed pattern.
-
-**Usage:** Copy `example_pandas.py` to your scripts folder and customize the configuration and patterns.
-
-**To use any example script:**
-
-1. Copy the example file to your scripts directory
-2. Update the CONFIGURATION section with your catalog/schema
-3. Execute using one of the methods below
 
 **Execute with Databricks Connect:**
 ```bash
@@ -1001,17 +887,17 @@ This returns schema, row counts, and column statistics to confirm the data was w
 12. **Time patterns**: Weekday/weekend, holidays, seasonality, event spikes
 13. **Row coherence**: Priority affects resolution time affects CSAT
 14. **Volume for aggregation**: 10K-50K rows minimum so patterns survive GROUP BY
-15. **Always use files**: Write to local file, execute, edit if error, re-execute
-16. **Context reuse**: Pass `cluster_id` and `context_id` for faster iterations (classic cluster only)
+
+15. **Context reuse**: Pass `cluster_id` and `context_id` for faster iterations (classic cluster only)
 
 ## Related Skills
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for managing catalogs, schemas, and volumes where data is stored
 
 ### Output
-17. **Create infrastructure in script**: Use `CREATE SCHEMA/VOLUME IF NOT EXISTS` - do NOT create catalogs
-18. **Assume catalogs exist**: Never auto-create catalogs, only create schema and volume
-19. **Choose output format** based on downstream needs (Parquet/JSON/CSV/Delta)
-20. **Configuration at top**: All sizes, dates, and paths as variables
+16. **Create infrastructure in script**: Use `CREATE SCHEMA/VOLUME IF NOT EXISTS` - do NOT create catalogs
+17. **Assume catalogs exist**: Never auto-create catalogs, only create schema and volume
+18. **Choose output format** based on downstream needs (Parquet/JSON/CSV/Delta)
+19. **Configuration at top**: All sizes, dates, and paths as variables
 
 ## Common Issues
 
@@ -1021,9 +907,6 @@ This returns schema, row counts, and column statistics to confirm the data was w
 | **"ModuleNotFoundError"** for faker/polars/etc. | See **Execution Options & Installation** section for dependency setup per execution mode |
 | **Serverless job fails to start** | Verify workspace has serverless compute enabled; check Unity Catalog permissions |
 | **Faker UDF is slow** | Use `pandas_udf` for batched operations; adjust `numPartitions` |
-| **Classic cluster startup is slow (3-8 min)** | Switch to Databricks Connect with serverless for instant start |
+| **Classic cluster startup is slow (3-8 min)** | Prompt user to check if cluster is running and suggest a replacement. |
 | **Out of memory with large data** | Increase `partitions` parameter in `spark.range()` |
-| **Foreign keys don't match across tables** | Use same random seed across all generators |
-| **Delta table write fails** | Ensure `CREATE SCHEMA IF NOT EXISTS` runs before `saveAsTable()` |
-| **Databricks Connect issues** | Verify correct version for your Python (see **Execution Options & Installation**), check `~/.databrickscfg` has `serverless_compute_id = auto` |
 | **Context corrupted on classic cluster** | Omit `context_id` to create fresh context, reinstall libraries |
