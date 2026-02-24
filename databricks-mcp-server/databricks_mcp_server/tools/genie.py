@@ -306,7 +306,7 @@ def ask_genie(
                 timeout=timedelta(seconds=timeout_seconds),
             )
 
-        return _format_genie_response(question, result, space_id)
+        return _format_genie_response(question, result, space_id, w)
     except TimeoutError:
         return {
             "question": question,
@@ -328,13 +328,14 @@ def ask_genie(
 # ============================================================================
 
 
-def _format_genie_response(question: str, genie_message: Any, space_id: str) -> Dict[str, Any]:
+def _format_genie_response(question: str, genie_message: Any, space_id: str, w: Any) -> Dict[str, Any]:
     """Format a Genie SDK response into a clean dictionary.
 
     Args:
         question: The original question asked
         genie_message: The GenieMessage object from the SDK
         space_id: The Genie Space ID (needed to fetch query results)
+        w: The WorkspaceClient instance to use for fetching query results
     """
     result = {
         "question": question,
@@ -358,7 +359,6 @@ def _format_genie_response(question: str, genie_message: Any, space_id: str) -> 
                 # Fetch actual data (columns and rows)
                 if attachment.attachment_id:
                     try:
-                        w = get_workspace_client()
                         data_result = w.genie.get_message_query_result_by_attachment(
                             space_id=space_id,
                             conversation_id=genie_message.conversation_id,

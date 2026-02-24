@@ -959,7 +959,7 @@ class AgentBricksManager:
 
         # Delete existing
         for question_id in existing_ids:
-            actions.append({"action_type": "DELETE", "curated_question_id": question_id})
+            actions.append({"action_type": "DELETE", "curated_question": {"id": question_id}})
 
         # Create new
         for question_text in questions:
