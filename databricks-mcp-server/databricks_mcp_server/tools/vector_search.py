@@ -249,20 +249,19 @@ def get_vs_index(
     endpoint_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Get Vector Search index details, or list indexes.
+    Get Vector Search index details, or list indexes on an endpoint.
 
-    Pass index_name to get one index's details. Pass only endpoint_name
-    to list indexes on that endpoint. Omit both to list all indexes
-    across all endpoints.
+    Pass index_name to get one index's details. Pass endpoint_name to list
+    all indexes on that endpoint. Omit both to list all endpoints (use
+    the endpoint names to then list indexes).
 
     Args:
         index_name: Fully qualified index name (catalog.schema.index_name).
             If provided, returns detailed index info.
-        endpoint_name: Endpoint name. If index_name is omitted, lists
-            indexes on this endpoint. If both omitted, lists all.
+        endpoint_name: Endpoint name. Lists all indexes on this endpoint.
 
     Returns:
-        Single index dict (if index_name provided) or {"indexes": [...]}.
+        Single index dict, {"indexes": [...]}, or {"endpoints": [...]}.
 
     Example:
         >>> get_vs_index(index_name="catalog.schema.docs_index")
@@ -270,7 +269,7 @@ def get_vs_index(
         >>> get_vs_index(endpoint_name="my-endpoint")
         {"indexes": [{"name": "catalog.schema.docs_index", ...}]}
         >>> get_vs_index()
-        {"indexes": [...all indexes across all endpoints...]}
+        {"endpoints": [{"name": "my-endpoint", ...}], "hint": "Pass endpoint_name to list indexes"}
     """
     if index_name:
         return _get_vs_index(index_name=index_name)
@@ -278,17 +277,11 @@ def get_vs_index(
     if endpoint_name:
         return {"indexes": _list_vs_indexes(endpoint_name=endpoint_name)}
 
-    # List all indexes across all endpoints
-    all_indexes = []
-    endpoints = _list_vs_endpoints()
-    for ep in endpoints:
-        ep_name = ep.get("name") if isinstance(ep, dict) else getattr(ep, "name", None)
-        if ep_name:
-            try:
-                all_indexes.extend(_list_vs_indexes(endpoint_name=ep_name))
-            except Exception:
-                pass
-    return {"indexes": all_indexes}
+    # No args: list endpoints so the caller knows which to drill into
+    return {
+        "endpoints": _list_vs_endpoints(),
+        "hint": "Pass endpoint_name to list indexes on a specific endpoint, or index_name to get details.",
+    }
 
 
 # ============================================================================
