@@ -93,12 +93,19 @@ def create_or_update_vs_endpoint(
         return {**existing, "created": False}
 
     result = _create_vs_endpoint(name=name, endpoint_type=endpoint_type)
+
+    try:
+        from ..manifest import track_resource
+
+        track_resource(
+            resource_type="vs_endpoint",
+            name=name,
+            resource_id=name,
+        )
+    except Exception:
+        pass  # best-effort tracking
+
     return {**result, "created": True}
-
-
-# ============================================================================
-# Tool 2: get_vs_endpoint
-# ============================================================================
 
 
 @mcp.tool
@@ -235,12 +242,18 @@ def create_or_update_vs_index(
             logger.warning("Failed to trigger initial sync for index '%s': %s", name, e)
             result["sync_triggered"] = False
 
+    try:
+        from ..manifest import track_resource
+
+        track_resource(
+            resource_type="vs_index",
+            name=name,
+            resource_id=name,
+        )
+    except Exception:
+        pass  # best-effort tracking
+
     return {**result, "created": True}
-
-
-# ============================================================================
-# Tool 5: get_vs_index
-# ============================================================================
 
 
 @mcp.tool

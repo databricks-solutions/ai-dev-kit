@@ -17,6 +17,7 @@ from databricks_tools_core.apps.apps import (
     delete_app as _delete_app,
     get_app_logs as _get_app_logs,
 )
+from databricks_tools_core.identity import with_description_footer
 
 from ..manifest import register_deleter
 from ..server import mcp
@@ -91,7 +92,7 @@ def create_or_update_app(
     if existing:
         result = {**existing, "created": False}
     else:
-        app_result = _create_app(name=name, description=description)
+        app_result = _create_app(name=name, description=with_description_footer(description))
         result = {**app_result, "created": True}
 
         # Track resource on successful create

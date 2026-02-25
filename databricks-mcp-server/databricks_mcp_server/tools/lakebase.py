@@ -122,6 +122,12 @@ def create_or_update_lakebase_database(
             return {**result, "created": False, "type": "provisioned"}
         else:
             result = _create_instance(name=name, capacity=capacity, stopped=stopped)
+            try:
+                from ..manifest import track_resource
+
+                track_resource(resource_type="lakebase_instance", name=name, resource_id=name)
+            except Exception:
+                pass
             return {**result, "created": True, "type": "provisioned"}
 
     elif db_type == "autoscale":
@@ -135,6 +141,12 @@ def create_or_update_lakebase_database(
                 display_name=display_name,
                 pg_version=pg_version,
             )
+            try:
+                from ..manifest import track_resource
+
+                track_resource(resource_type="lakebase_project", name=name, resource_id=name)
+            except Exception:
+                pass
             return {**result, "created": True, "type": "autoscale"}
 
     else:

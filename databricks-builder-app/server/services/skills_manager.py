@@ -24,8 +24,7 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
     'delete_dashboard', 'publish_dashboard',
   ],
   'databricks-genie': [
-    'list_genie', 'create_or_update_genie', 'get_genie', 'delete_genie',
-    'ask_genie', 'ask_genie_followup',
+    'create_or_update_genie', 'get_genie', 'delete_genie', 'ask_genie',
   ],
   'databricks-spark-declarative-pipelines': [
     'create_or_update_pipeline', 'get_pipeline',

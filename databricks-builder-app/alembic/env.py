@@ -88,8 +88,9 @@ def get_url_and_connect_args():
     # Generate token using Databricks SDK
     import uuid
     from databricks.sdk import WorkspaceClient
+    from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
 
-    w = WorkspaceClient()
+    w = WorkspaceClient(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
     instance = w.database.get_database_instance(name=instance_name)
     cred = w.database.generate_database_credential(
       request_id=str(uuid.uuid4()),

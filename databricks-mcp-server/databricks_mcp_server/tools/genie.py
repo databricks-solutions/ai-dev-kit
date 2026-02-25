@@ -35,42 +35,6 @@ register_deleter("genie_space", _delete_genie_resource)
 
 
 @mcp.tool
-def list_genie() -> List[Dict[str, Any]]:
-    """
-    List all Genie Spaces accessible to the current user.
-
-    Returns:
-        List of Genie Space summaries, each containing:
-        - space_id: The Genie space ID
-        - title: The space title/name
-        - description: The description (if set)
-
-    Example:
-        >>> list_genie()
-        [
-            {"space_id": "abc123...", "title": "Sales Analytics", "description": "..."},
-            {"space_id": "def456...", "title": "HR Metrics", "description": "..."}
-        ]
-    """
-    try:
-        w = get_workspace_client()
-        response = w.genie.list_spaces()
-        result = []
-        if response.spaces:
-            for space in response.spaces:
-                result.append(
-                    {
-                        "space_id": space.space_id,
-                        "title": space.title or "",
-                        "description": space.description or "",
-                    }
-                )
-        return result
-    except Exception as e:
-        return [{"error": str(e)}]
-
-
-@mcp.tool
 def create_or_update_genie(
     display_name: str,
     table_identifiers: List[str],
@@ -112,123 +76,143 @@ def create_or_update_genie(
         ... )
         {"space_id": "abc123...", "display_name": "Sales Analytics", "operation": "created", ...}
     """
-    description = with_description_footer(description)
-    manager = _get_manager()
-
-    # Auto-detect warehouse if not provided
-    if warehouse_id is None:
-        warehouse_id = manager.get_best_warehouse_id()
-        if warehouse_id is None:
-            return {"error": "No SQL warehouses available. Please provide a warehouse_id or create a warehouse."}
-
-    operation = "created"
-
-    if space_id:
-        # Update existing space by ID
-        existing = manager.genie_get(space_id)
-        if existing:
-            operation = "updated"
-            manager.genie_update(
-                space_id=space_id,
-                display_name=display_name,
-                description=description,
-                warehouse_id=warehouse_id,
-                table_identifiers=table_identifiers,
-                sample_questions=sample_questions,
-            )
-        else:
-            return {"error": f"Genie space {space_id} not found"}
-    else:
-        # Check if exists by name first
-        existing = manager.genie_find_by_name(display_name)
-        if existing:
-            operation = "updated"
-            manager.genie_update(
-                space_id=existing.space_id,
-                display_name=display_name,
-                description=description,
-                warehouse_id=warehouse_id,
-                table_identifiers=table_identifiers,
-                sample_questions=sample_questions,
-            )
-            space_id = existing.space_id
-        else:
-            # Create new
-            result = manager.genie_create(
-                display_name=display_name,
-                warehouse_id=warehouse_id,
-                table_identifiers=table_identifiers,
-                description=description,
-            )
-            space_id = result.get("space_id", "")
-
-            # Add sample questions if provided
-            if sample_questions and space_id:
-                manager.genie_add_sample_questions_batch(space_id, sample_questions)
-
-    response = {
-        "space_id": space_id,
-        "display_name": display_name,
-        "operation": operation,
-        "warehouse_id": warehouse_id,
-        "table_count": len(table_identifiers),
-    }
-
-    # Track resource on successful create/update
     try:
+        description = with_description_footer(description)
+        manager = _get_manager()
+
+        # Auto-detect warehouse if not provided
+        if warehouse_id is None:
+            warehouse_id = manager.get_best_warehouse_id()
+            if warehouse_id is None:
+                return {"error": "No SQL warehouses available. Please provide a warehouse_id or create a warehouse."}
+
+        operation = "created"
+
         if space_id:
-            from ..manifest import track_resource
+            existing = manager.genie_get(space_id)
+            if existing:
+                operation = "updated"
+                manager.genie_update(
+                    space_id=space_id,
+                    display_name=display_name,
+                    description=description,
+                    warehouse_id=warehouse_id,
+                    table_identifiers=table_identifiers,
+                    sample_questions=sample_questions,
+                )
+            else:
+                return {"error": f"Genie space {space_id} not found"}
+        else:
+            existing = manager.genie_find_by_name(display_name)
+            if existing:
+                operation = "updated"
+                manager.genie_update(
+                    space_id=existing.space_id,
+                    display_name=display_name,
+                    description=description,
+                    warehouse_id=warehouse_id,
+                    table_identifiers=table_identifiers,
+                    sample_questions=sample_questions,
+                )
+                space_id = existing.space_id
+            else:
+                result = manager.genie_create(
+                    display_name=display_name,
+                    warehouse_id=warehouse_id,
+                    table_identifiers=table_identifiers,
+                    description=description,
+                )
+                space_id = result.get("space_id", "")
 
-            track_resource(
-                resource_type="genie_space",
-                name=display_name,
-                resource_id=space_id,
-            )
-    except Exception:
-        pass  # best-effort tracking
+                if sample_questions and space_id:
+                    manager.genie_add_sample_questions_batch(space_id, sample_questions)
 
-    return response
+        response = {
+            "space_id": space_id,
+            "display_name": display_name,
+            "operation": operation,
+            "warehouse_id": warehouse_id,
+            "table_count": len(table_identifiers),
+        }
+
+        try:
+            if space_id:
+                from ..manifest import track_resource
+
+                track_resource(
+                    resource_type="genie_space",
+                    name=display_name,
+                    resource_id=space_id,
+                )
+        except Exception:
+            pass
+
+        return response
+
+    except Exception as e:
+        return {"error": f"Failed to create/update Genie space '{display_name}': {e}"}
 
 
 @mcp.tool
-def get_genie(space_id: str) -> Dict[str, Any]:
+def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Get a Genie Space by ID.
+    Get details of a Genie Space, or list all spaces.
+
+    Pass a space_id to get one space's details (including tables, sample
+    questions). Omit space_id to list all accessible spaces.
 
     Args:
-        space_id: The Genie space ID
+        space_id: The Genie space ID. If omitted, lists all spaces.
 
     Returns:
-        Dictionary with Genie space details including:
-        - space_id: The space ID
-        - display_name: The display name
-        - description: The description
-        - warehouse_id: The SQL warehouse ID
-        - table_identifiers: List of configured tables
-        - sample_questions: List of sample questions
+        Single space dict (if space_id provided) or {"spaces": [...]}.
 
     Example:
         >>> get_genie("abc123...")
         {"space_id": "abc123...", "display_name": "Sales Analytics", ...}
+
+        >>> get_genie()
+        {"spaces": [{"space_id": "abc123...", "title": "Sales Analytics", ...}, ...]}
     """
-    manager = _get_manager()
-    result = manager.genie_get(space_id)
+    if space_id:
+        try:
+            manager = _get_manager()
+            result = manager.genie_get(space_id)
 
-    if not result:
-        return {"error": f"Genie space {space_id} not found"}
+            if not result:
+                return {"error": f"Genie space {space_id} not found"}
 
-    # Get sample questions
-    questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
-    sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
+            questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
+            sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
 
-    return {
-        "space_id": result.get("space_id", space_id),
-        "display_name": result.get("display_name", ""),
-        "description": result.get("description", ""),
-        "warehouse_id": result.get("warehouse_id", ""),
-        "table_identifiers": result.get("table_identifiers", []),
-        "sample_questions": sample_questions,
-    }
+            return {
+                "space_id": result.get("space_id", space_id),
+                "display_name": result.get("display_name", ""),
+                "description": result.get("description", ""),
+                "warehouse_id": result.get("warehouse_id", ""),
+                "table_identifiers": result.get("table_identifiers", []),
+                "sample_questions": sample_questions,
+            }
+        except Exception as e:
+            return {"error": f"Failed to get Genie space {space_id}: {e}"}
+
+    # List all spaces
+    try:
+        w = get_workspace_client()
+        response = w.genie.list_spaces()
+        spaces = []
+        if response.spaces:
+            for space in response.spaces:
+                spaces.append(
+                    {
+                        "space_id": space.space_id,
+                        "title": space.title or "",
+                        "description": space.description or "",
+                    }
+                )
+        return {"spaces": spaces}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @mcp.tool
@@ -271,17 +255,21 @@ def delete_genie(space_id: str) -> Dict[str, Any]:
 def ask_genie(
     space_id: str,
     question: str,
+    conversation_id: Optional[str] = None,
     timeout_seconds: int = 120,
 ) -> Dict[str, Any]:
     """
     Ask a natural language question to a Genie Space and get the answer.
 
-    This tool sends a question to a Genie Space, which generates SQL,
-    executes it, and returns the results.
+    Starts a new conversation, or continues an existing one if conversation_id
+    is provided. Genie generates SQL, executes it, and returns the results.
 
     Args:
         space_id: The Genie Space ID to query
         question: The natural language question to ask
+        conversation_id: Optional ID from a previous ask_genie response.
+            If provided, continues that conversation (follow-up question).
+            If omitted, starts a new conversation.
         timeout_seconds: Maximum time to wait for response (default 120)
 
     Returns:
@@ -299,67 +287,28 @@ def ask_genie(
         - error: Error message (if failed)
 
     Example:
-        >>> ask_genie(space_id="abc123", question="What were total sales last month?")
-        {"question": "...", "status": "COMPLETED", "sql": "SELECT ...", "data": [[125430.50]], ...}
+        >>> result = ask_genie(space_id="abc123", question="What were total sales?")
+        >>> ask_genie(space_id="abc123", question="Break that down by region",
+        ...           conversation_id=result["conversation_id"])
     """
     try:
         w = get_workspace_client()
-        result = w.genie.start_conversation_and_wait(
-            space_id=space_id,
-            content=question,
-            timeout=timedelta(seconds=timeout_seconds),
-        )
-        return _format_genie_response(question, result, space_id)
-    except TimeoutError:
-        return {
-            "question": question,
-            "status": "TIMEOUT",
-            "error": f"Genie response timed out after {timeout_seconds}s",
-        }
-    except Exception as e:
-        return {
-            "question": question,
-            "status": "ERROR",
-            "error": str(e),
-        }
 
+        if conversation_id:
+            result = w.genie.create_message_and_wait(
+                space_id=space_id,
+                conversation_id=conversation_id,
+                content=question,
+                timeout=timedelta(seconds=timeout_seconds),
+            )
+        else:
+            result = w.genie.start_conversation_and_wait(
+                space_id=space_id,
+                content=question,
+                timeout=timedelta(seconds=timeout_seconds),
+            )
 
-@mcp.tool
-def ask_genie_followup(
-    space_id: str,
-    conversation_id: str,
-    question: str,
-    timeout_seconds: int = 120,
-) -> Dict[str, Any]:
-    """
-    Ask a follow-up question in an existing Genie conversation.
-
-    Use this to ask follow-up questions that reference the previous context.
-    For example, after asking "What were total sales?", you could follow up
-    with "Break that down by region" without repeating the context.
-
-    Args:
-        space_id: The Genie Space ID
-        conversation_id: The conversation_id from a previous ask_genie response
-        question: The follow-up question
-        timeout_seconds: Maximum time to wait for response (default 120)
-
-    Returns:
-        Same format as ask_genie
-
-    Example:
-        >>> result = ask_genie(space_id, "What were total sales last month?")
-        >>> ask_genie_followup(space_id, result["conversation_id"], "Break that down by region")
-    """
-    try:
-        w = get_workspace_client()
-        result = w.genie.create_message_and_wait(
-            space_id=space_id,
-            conversation_id=conversation_id,
-            content=question,
-            timeout=timedelta(seconds=timeout_seconds),
-        )
-        return _format_genie_response(question, result, space_id)
+        return _format_genie_response(question, result, space_id, w)
     except TimeoutError:
         return {
             "question": question,
@@ -381,13 +330,14 @@ def ask_genie_followup(
 # ============================================================================
 
 
-def _format_genie_response(question: str, genie_message: Any, space_id: str) -> Dict[str, Any]:
+def _format_genie_response(question: str, genie_message: Any, space_id: str, w: Any) -> Dict[str, Any]:
     """Format a Genie SDK response into a clean dictionary.
 
     Args:
         question: The original question asked
         genie_message: The GenieMessage object from the SDK
         space_id: The Genie Space ID (needed to fetch query results)
+        w: The WorkspaceClient instance to use for fetching query results
     """
     result = {
         "question": question,
@@ -411,7 +361,6 @@ def _format_genie_response(question: str, genie_message: Any, space_id: str) -> 
                 # Fetch actual data (columns and rows)
                 if attachment.attachment_id:
                     try:
-                        w = get_workspace_client()
                         data_result = w.genie.get_message_query_result_by_attachment(
                             space_id=space_id,
                             conversation_id=genie_message.conversation_id,

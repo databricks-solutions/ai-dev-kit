@@ -10,6 +10,7 @@ from databricks_tools_core.agent_bricks import (
     EndpointStatus,
     get_tile_example_queue,
 )
+from databricks_tools_core.identity import with_description_footer
 
 from ..manifest import register_deleter
 from ..server import mcp
@@ -57,6 +58,7 @@ def _ka_create_or_update(
     if not volume_path:
         return {"error": "Missing required parameter 'volume_path' for create_or_update action"}
 
+    description = with_description_footer(description)
     manager = _get_manager()
 
     # Build knowledge source from volume path
@@ -218,6 +220,7 @@ def _mas_create_or_update(
     if not agents:
         return {"error": "Missing required parameter 'agents' for create_or_update action"}
 
+    description = with_description_footer(description)
     manager = _get_manager()
 
     # Validate and build agent list for API
