@@ -33,9 +33,25 @@ Generate realistic, story-driven synthetic data for Databricks using **Spark + F
 
 **Before generating any code, you MUST present a plan for user approval.**
 
+### ⚠️ MUST DO: Confirm Catalog Before Proceeding
+
+**You MUST explicitly ask the user which catalog to use.** Do not assume or proceed without confirmation.
+
+Example prompt to user:
+> "Which Unity Catalog should I use for this data? Default is `ai_dev_kit` but you can specify any catalog you have access to."
+
+When presenting your plan, always show the selected catalog prominently:
+```
+📍 Output Location: catalog_name.schema_name
+   Volume: /Volumes/catalog_name/schema_name/raw_data/
+```
+
+This makes it easy for the user to spot and correct if needed.
+
 ### Step 1: Gather Requirements
 
 Ask the user about:
+- **Catalog/Schema** - Which catalog to use? (default: `ai_dev_kit.<user_schema>`)
 - What domain/scenario? (e-commerce, support tickets, IoT sensors, etc.)
 - How many tables? What relationships between them?
 - Approximate row counts per table?
@@ -43,7 +59,14 @@ Ask the user about:
 
 ### Step 2: Present Table Specification
 
-Show a clear specification with **YOUR ASSUMPTIONS surfaced**:
+Show a clear specification with **YOUR ASSUMPTIONS surfaced**. Always start with the output location:
+
+```
+📍 Output Location: ai_dev_kit.ecommerce_demo
+   Volume: /Volumes/ai_dev_kit/ecommerce_demo/raw_data/
+
+   ⬆️ Change this? Just let me know which catalog.schema to use instead.
+```
 
 | Table | Columns | Rows | Key Assumptions |
 |-------|---------|------|-----------------|
@@ -54,7 +77,7 @@ Show a clear specification with **YOUR ASSUMPTIONS surfaced**:
 - Amount distribution: log-normal by tier (Enterprise ~$1800, Pro ~$245, Free ~$55)
 - Status: 65% delivered, 15% shipped, 10% processing, 5% pending, 5% cancelled
 
-**Ask user**: "Does this look correct? Any adjustments needed?"
+**Ask user**: "Does this look correct? Any adjustments to the catalog, tables, or distributions?"
 
 ### Step 3: Ask About Data Features
 
@@ -66,13 +89,14 @@ Show a clear specification with **YOUR ASSUMPTIONS surfaced**:
 
 ### Pre-Generation Checklist
 
-- [ ] User confirmed compute preference (serverless recommended)
+- [ ] **Catalog confirmed** - User explicitly approved which catalog to use
+- [ ] Output location shown prominently in plan (easy to spot/change)
 - [ ] Table specification shown and approved
 - [ ] Assumptions about distributions confirmed
-- [ ] Output location confirmed (catalog.schema)
+- [ ] User confirmed compute preference (serverless recommended)
 - [ ] Data features selected
 
-**Do NOT proceed to code generation until user approves the plan.**
+**Do NOT proceed to code generation until user approves the plan, including the catalog.**
 
 ## Quick Start: Spark + Faker + Pandas UDFs
 

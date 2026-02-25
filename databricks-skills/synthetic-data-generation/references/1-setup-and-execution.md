@@ -77,24 +77,46 @@ if db_version and db_version >= (16, 4):
 
 `DatabricksEnv()` and `withEnvironment()` are NOT available in older versions. Use serverless jobs with environments parameter instead.
 
-**Install locally:**
-```bash
-pip install "databricks-connect>=15.1,<16.2" faker numpy pandas holidays
-```
+### Serverless Job Configuration Requirements
 
-**Create a serverless job with environment settings:**
-```python
-# Use create_job MCP tool with:
+**MUST use `"client": "4"` in the Environment Spec:**
+
+```json
 {
-  "name": "generate_synthetic_data",
-  "tasks": [{ "environment_key": "datagen_env", ... }],
   "environments": [{
     "environment_key": "datagen_env",
     "spec": {
       "client": "4",
-      "dependencies": ["faker", "numpy", "pandas", "holidays"]
+      "dependencies": ["faker", "numpy", "pandas"]
     }
   }]
+}
+```
+
+> **Note:** Using `"client": "1"` will fail with environment configuration errors.
+
+### Script Deployment: Must Be FILE Type (Not Notebook)
+
+When deploying Python scripts for serverless jobs, the script MUST be imported as a FILE type. Using `--language PYTHON` creates a NOTEBOOK, which fails with `spark_python_task`.
+
+```bash
+# Correct - imports as FILE type
+databricks workspace import /Users/<user>@databricks.com/scripts/my_script.py \
+  --file ./my_script.py --format AUTO
+
+# Verify it's FILE type (not NOTEBOOK)
+databricks workspace list /Users/<user>@databricks.com/scripts/
+# Should show: FILE  (not NOTEBOOK)
+```
+
+**Job config must reference the workspace path:**
+
+```json
+{
+  "spark_python_task": {
+    "python_file": "/Users/<user>@databricks.com/scripts/my_script.py"
+  },
+  "environment_key": "datagen_env"
 }
 ```
 
@@ -125,23 +147,81 @@ environments:
         - holidays
 ```
 
-## Option 3: Classic Cluster (Fallback Only)
+## Option 3: Classic Cluster
 
-**Use only when:** Serverless unavailable, or specific cluster features needed (GPUs, custom init scripts)
+**Use when:** Serverless unavailable, or specific cluster features needed (GPUs, custom init scripts)
 
-**Warning:** Classic clusters take 3-8 minutes to start. Always prefer serverless.
+### Step 1: Check Python Version Compatibility
 
-**Install dependencies in cluster:**
-```python
-# In notebook or using execute_databricks_command tool:
-%pip install faker numpy pandas holidays
+Pandas UDFs require matching Python minor versions between local and cluster.
+
+```bash
+# Check local Python
+python --version
+
+# Check cluster DBR version → Python version
+# DBR 17.x = Python 3.12
+# DBR 15.4 LTS = Python 3.11
+# DBR 14.3 LTS = Python 3.10
+databricks clusters get <cluster-id> | grep spark_version
 ```
 
-**Connect from local script:**
+### Step 2a: If Versions Match → Use Databricks Connect
+
+```bash
+# Install matching databricks-connect version (must match DBR major.minor)
+uv pip install "databricks-connect==17.3.*" faker numpy pandas holidays
+```
+
+```bash
+# Install libraries on cluster
+databricks libraries install --json '{
+  "cluster_id": "<cluster-id>",
+  "libraries": [{"pypi": {"package": "faker"}}]
+}'
+
+# Wait for INSTALLED status
+databricks libraries cluster-status <cluster-id>
+```
+
 ```python
+# Run locally via Databricks Connect
 from databricks.connect import DatabricksSession
 
-spark = DatabricksSession.builder.clusterId("your-cluster-id").getOrCreate()
+spark = DatabricksSession.builder.clusterId("<cluster-id>").getOrCreate()
+# Your Spark code runs on the cluster
+```
+
+### Step 2b: If Versions Don't Match → Submit as Job
+
+**Ask user for approval before submitting.** Example prompt:
+> "Your local Python (3.11) doesn't match the cluster (3.12). Pandas UDFs require matching versions. Should I submit this as a job to run directly on the cluster instead?"
+
+```bash
+# Import notebook to workspace
+databricks workspace import /Users/you@company.com/my_notebook \
+  --file script.py --language PYTHON --overwrite
+
+# Submit job to run on cluster
+databricks jobs submit --json '{
+  "run_name": "Generate Data",
+  "tasks": [{
+    "task_key": "generate",
+    "existing_cluster_id": "<cluster-id>",
+    "notebook_task": {
+      "notebook_path": "/Users/you@company.com/my_notebook"
+    }
+  }]
+}'
+```
+
+### Classic Cluster Decision Flow
+
+```
+Local Python == Cluster Python?
+  ├─ YES → Install libs on cluster, run via Databricks Connect
+  └─ NO  → Ask user: "Submit as job instead?"
+           └─ Import notebook + submit job
 ```
 
 ## Required Libraries
