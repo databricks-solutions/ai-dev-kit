@@ -81,11 +81,11 @@ MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace
 MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 
 # Output helpers
-msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
-ok()   { [ "$SILENT" = true ] || echo -e "  ${G}✓${N} $*"; }
-warn() { [ "$SILENT" = true ] || echo -e "  ${Y}!${N} $*"; }
+msg()  { [ "$SILENT" = false ] && echo -e "  $*"; }
+ok()   { [ "$SILENT" = false ] && echo -e "  ${G}✓${N} $*"; }
+warn() { [ "$SILENT" = false ] && echo -e "  ${Y}!${N} $*"; }
 die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
-step() { [ "$SILENT" = true ] || echo -e "\n${B}$*${N}"; }
+step() { [ "$SILENT" = false ] && echo -e "\n${B}$*${N}"; }
 
 # Parse arguments
 while [ $# -gt 0 ]; do
@@ -856,10 +856,7 @@ save_version() {
     # Validate version format
     [[ "$ver" =~ (404|Not Found|error) ]] && ver="dev"
     echo "$ver" > "$INSTALL_DIR/version"
-    if [ "$SCOPE" = "project" ]; then 
-        mkdir -p ".ai-dev-kit"
-        echo "$ver" > ".ai-dev-kit/version"
-    }
+    [ "$SCOPE" = "project" ] && { mkdir -p ".ai-dev-kit"; echo "$ver" > ".ai-dev-kit/version"; }
 }
 
 # Print summary
