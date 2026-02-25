@@ -859,7 +859,7 @@ save_version() {
     if [ "$SCOPE" = "project" ]; then 
         mkdir -p ".ai-dev-kit"
         echo "$ver" > ".ai-dev-kit/version"
-    }
+    fi
 }
 
 # Print summary
