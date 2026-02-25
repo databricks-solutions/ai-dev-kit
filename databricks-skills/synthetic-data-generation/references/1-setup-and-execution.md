@@ -8,7 +8,6 @@ This guide covers all execution modes for synthetic data generation, organized b
 |------------------|---------------------|
 | Python 3.12+ with databricks-connect >= 16.4 | DatabricksEnv with withDependencies API |
 | Python 3.10/3.11 with older databricks-connect | Serverless job with environments parameter |
-| Running on Databricks Runtime (notebook/job) | Dependencies pre-installed or %pip install |
 | Classic compute (fallback only) | Manual cluster setup |
 
 ## Option 1: Databricks Connect 16.4+ with Serverless (Recommended)
@@ -175,10 +174,7 @@ uv pip install "databricks-connect==17.3.*" faker numpy pandas holidays
 
 ```bash
 # Install libraries on cluster
-databricks libraries install --json '{
-  "cluster_id": "<cluster-id>",
-  "libraries": [{"pypi": {"package": "faker"}}]
-}'
+`databricks libraries install --json '{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}'`
 
 # Wait for INSTALLED status
 databricks libraries cluster-status <cluster-id>

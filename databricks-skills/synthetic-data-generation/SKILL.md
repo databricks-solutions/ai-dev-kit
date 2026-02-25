@@ -190,7 +190,7 @@ spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
 |------|----------|-------|
 | **DB Connect 16.4+ Serverless** | Local dev, Python 3.12+ | `DatabricksEnv().withDependencies(...)` |
 | **Serverless Job** | Production, scheduled | Job with `environments` parameter |
-| **Classic Cluster** | Fallback only | Manual `%pip install` |
+| **Classic Cluster** | Fallback only | Use Databricks CLI to install libraries. `databricks libraries install --json '{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}'` |
 
 See [references/1-setup-and-execution.md](references/1-setup-and-execution.md) for detailed setup instructions.
 

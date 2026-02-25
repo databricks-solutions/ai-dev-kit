@@ -13,9 +13,9 @@ Common issues and solutions for synthetic data generation.
 | Mode | Solution |
 |------|----------|
 | **DB Connect 16.4+** | Use `DatabricksEnv().withDependencies("faker", "pandas", ...)` |
-| **Older DB Connect** | Create job with `environments` parameter |
-| **Databricks Runtime** | Run `%pip install faker numpy pandas holidays` |
-| **Classic cluster** | Add to cluster libraries or init script |
+| **Older DB Connect with Serverless** | Create job with `environments` parameter |
+| **Databricks Runtime** | Use Databricks CLI to  install `faker holidays` |
+| **Classic cluster** | Use Databricks CLI to install libraries. `databricks libraries install --json '{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}'` |
 
 ```python
 # For DB Connect 16.4+

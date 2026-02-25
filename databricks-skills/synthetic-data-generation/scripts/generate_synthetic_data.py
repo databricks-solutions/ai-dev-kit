@@ -110,7 +110,7 @@ if use_managed_deps:
         if not CLUSTER_ID:
             raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
         spark = DatabricksSession.builder.withEnvironment(env).clusterId(CLUSTER_ID).getOrCreate()
-        print(f"Connected to cluster {CLUSTER_ID} with managed dependencies!")
+        print(f"Connected to cluster <cluster_id> with managed dependencies!")
 else:
     print("Using standard session (dependencies must be pre-installed)")
     print("=" * 80)
@@ -139,7 +139,7 @@ else:
         print("=" * 80)
         print(f"Missing: {', '.join(missing_deps)}")
         if on_runtime:
-            print("\nSolution: Run %pip install faker pandas numpy holidays")
+            print("\nSolution: Run install using Databricks CLI: Use Databricks CLI to install libraries: databricks libraries install --json '{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}'")
         else:
             print("\nSolution: Upgrade to databricks-connect >= 16.4 for managed deps")
             print("          Or create a job with environment settings")
@@ -158,7 +158,7 @@ else:
         if not CLUSTER_ID:
             raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
         spark = DatabricksSession.builder.clusterId(CLUSTER_ID).getOrCreate()
-        print(f"Connected to cluster {CLUSTER_ID}")
+        print(f"Connected to cluster <cluster_id>")
 
 # Import Faker for UDF definitions
 from faker import Faker
