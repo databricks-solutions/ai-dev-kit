@@ -1,9 +1,9 @@
 ---
-name: synthetic-data-generation
+name: databricks-data-generation
 description: "Generate realistic synthetic data using Spark + Faker (strongly recommended). Supports serverless execution, multiple output formats (Parquet/JSON/CSV/Delta), and scales from thousands to millions of rows. For small datasets (<10K rows), can optionally generate locally and upload to volumes. Use when user mentions 'synthetic data', 'test data', 'generate data', 'demo dataset', 'Faker', or 'sample data'."
 ---
 
-# Synthetic Data Generation
+# Databricks Synthetic Data Generation
 
 Generate realistic, story-driven synthetic data for Databricks using **Spark + Faker + Pandas UDFs** (strongly recommended).
 

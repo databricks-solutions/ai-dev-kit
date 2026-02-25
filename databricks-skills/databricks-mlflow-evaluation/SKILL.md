@@ -1,6 +1,6 @@
 ---
-name: mlflow-evaluation
-description: "MLflow 3 GenAI agent evaluation. Use when writing mlflow.genai.evaluate() code, creating @scorer functions, using built-in scorers (Guidelines, Correctness, Safety, RetrievalGroundedness), building eval datasets from traces, or setting up instrumenting apps for tracing, trace ingestion and production monitoring."
+name: databricks-mlflow-evaluation
+description: "MLflow 3 GenAI agent evaluation. Use when writing mlflow.genai.evaluate() code, creating @scorer functions, using built-in scorers (Guidelines, Correctness, Safety, RetrievalGroundedness), building eval datasets from traces, setting up trace ingestion and production monitoring, aligning judges with MemAlign from domain expert feedback, or running optimize_prompts() with GEPA for automated prompt improvement."
 ---
 
 # MLflow 3 GenAI Evaluation
@@ -86,6 +86,29 @@ For storing traces in Unity Catalog, instrumenting applications, and enabling co
 | 5 | Enable production monitoring | `patterns-trace-ingestion.md` (Patterns 12-13) |
 | 6 | Query and analyze UC traces | `patterns-trace-ingestion.md` (Pattern 14) |
 
+### Workflow 7: Judge Alignment with MemAlign
+
+For aligning an LLM judge to match domain expert preferences. A well-aligned judge improves every downstream use: evaluation accuracy, production monitoring signal, and prompt optimization quality. This workflow is valuable on its own, independent of prompt optimization.
+
+| Step | Action | Reference Files |
+|------|--------|-----------------|
+| 1 | Design base judge with `make_judge` (any feedback type) | `patterns-judge-alignment.md` (Pattern 1) |
+| 2 | Run evaluate(), tag successful traces | `patterns-judge-alignment.md` (Pattern 2) |
+| 3 | Build UC dataset + create SME labeling session | `patterns-judge-alignment.md` (Pattern 3) |
+| 4 | Align judge with MemAlign after labeling completes | `patterns-judge-alignment.md` (Pattern 4) |
+| 5 | Register aligned judge to experiment | `patterns-judge-alignment.md` (Pattern 5) |
+| 6 | Re-evaluate with aligned judge (baseline) | `patterns-judge-alignment.md` (Pattern 6) |
+
+### Workflow 8: Automated Prompt Optimization with GEPA
+
+For automatically improving a registered system prompt using `optimize_prompts()`. Works with any scorer, but paired with an aligned judge (Workflow 7) gives the most domain-accurate signal. For the full end-to-end loop combining alignment and optimization, see `user-journeys.md` Journey 10.
+
+| Step | Action | Reference Files |
+|------|--------|-----------------|
+| 1 | Build optimization dataset (inputs + expectations) | `patterns-prompt-optimization.md` (Pattern 1) |
+| 2 | Run optimize_prompts() with GEPA + scorer | `patterns-prompt-optimization.md` (Pattern 2) |
+| 3 | Register new version, promote conditionally | `patterns-prompt-optimization.md` (Pattern 3) |
+
 ## Reference Files Quick Lookup
 
 | Reference | Purpose | When to Read |
@@ -98,13 +121,21 @@ For storing traces in Unity Catalog, instrumenting applications, and enabling co
 | `patterns-trace-analysis.md` | Trace debugging | When analyzing agent behavior |
 | `patterns-context-optimization.md` | Token/latency fixes | When agent is slow or expensive |
 | `patterns-trace-ingestion.md` | UC trace setup, monitoring | When setting up trace storage or production monitoring |
-| `user-journeys.md` | High-level workflows | When starting a new evaluation project |
+| `patterns-judge-alignment.md` | MemAlign judge alignment, labeling sessions, SME feedback | When aligning judges to domain expert preferences |
+| `patterns-prompt-optimization.md` | GEPA optimization: build dataset, optimize_prompts(), promote | When running automated prompt improvement |
+| `user-journeys.md` | High-level workflows, full domain-expert optimization loop | When starting a new evaluation project or running the full align + optimize cycle |
 
 ## Critical API Facts
 
 - **Use:** `mlflow.genai.evaluate()` (NOT `mlflow.evaluate()`)
 - **Data format:** `{"inputs": {"query": "..."}}` (nested structure required)
 - **predict_fn:** Receives `**unpacked kwargs` (not a dict)
+- **MemAlign:** Scorer-agnostic (works with any `feedback_value_type` -- float, bool, categorical); token-heavy on the embedding model so set `embedding_model` explicitly
+- **Label schema name matching:** The label schema `name` in the labeling session MUST match the judge `name` used in `evaluate()` for `align()` to pair scores
+- **Aligned judge scores:** May be lower than unaligned judge scores -- this is expected and means the judge is now more accurate, not that the agent regressed
+- **GEPA optimization dataset:** Must have both `inputs` AND `expectations` per record (different from eval dataset)
+- **Episodic memory:** Lazily loaded -- `get_scorer()` results won't show episodic memory on print until the judge is first used
+- **optimize_prompts:** Requires MLflow >= 3.5.0
 
 See `GOTCHAS.md` for complete list.
 

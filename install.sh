@@ -7,7 +7,7 @@
 # Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
 # Examples:
-#   # Basic installation (project scoped, prompts for inputs)
+#   # Basic installation (project scoped, prompts for inputs, uses latest release)
 #   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
 #
 #   # Global installation with force reinstall
@@ -33,7 +33,6 @@ set -e
 PROFILE="${DEVKIT_PROFILE:-DEFAULT}"
 SCOPE="${DEVKIT_SCOPE:-project}"
 SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
-BRANCH="${DEVKIT_BRANCH:-main}"
 FORCE="${DEVKIT_FORCE:-false}"
 IS_UPDATE=false
 SILENT="${DEVKIT_SILENT:-false}"
@@ -48,6 +47,21 @@ USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 # Check if scope was explicitly set via env var
 [ -n "${DEVKIT_SCOPE:-}" ] && SCOPE_EXPLICIT=true
 
+OWNER="databricks-solutions"
+REPO="ai-dev-kit"
+
+if [ -n "${DEVKIT_BRANCH:-}" ]; then
+  BRANCH="$DEVKIT_BRANCH"
+else
+  BRANCH="$(
+    curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" \
+    | grep '"tag_name"' \
+    | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
+  )"
+  # Fallback to main if we couldn't fetch the latest release
+  [ -z "$BRANCH" ] && BRANCH="main"
+fi
+
 # Installation mode defaults
 INSTALL_MCP=true
 INSTALL_SKILLS=true
@@ -60,18 +74,18 @@ MIN_SDK_VERSION="0.85.0"
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
 # Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-metric-views databricks-model-serving databricks-python-sdk databricks-unity-catalog databricks-vector-search databricks-zerobus-ingest lakebase-autoscale lakebase-provisioned mlflow-evaluation spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation"
+SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-generation databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
 MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 
 # Output helpers
-msg()  { [ "$SILENT" = false ] && echo -e "  $*"; }
-ok()   { [ "$SILENT" = false ] && echo -e "  ${G}✓${N} $*"; }
-warn() { [ "$SILENT" = false ] && echo -e "  ${Y}!${N} $*"; }
+msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
+ok()   { [ "$SILENT" = true ] || echo -e "  ${G}✓${N} $*"; }
+warn() { [ "$SILENT" = true ] || echo -e "  ${Y}!${N} $*"; }
 die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
-step() { [ "$SILENT" = false ] && echo -e "\n${B}$*${N}"; }
+step() { [ "$SILENT" = true ] || echo -e "\n${B}$*${N}"; }
 
 # Parse arguments
 while [ $# -gt 0 ]; do
@@ -92,7 +106,7 @@ while [ $# -gt 0 ]; do
             echo ""
             echo "Options:"
             echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
-            echo "  -b, --branch NAME     Git branch to install from (default: main)"
+            echo "  -b, --branch NAME     Git branch/tag to install (default: latest release)"
             echo "  -g, --global          Install globally for all projects"
             echo "  --skills-only         Skip MCP server setup"
             echo "  --mcp-only            Skip skills installation"
@@ -104,9 +118,13 @@ while [ $# -gt 0 ]; do
             echo ""
             echo "Environment Variables (alternative to flags):"
             echo "  DEVKIT_PROFILE        Databricks config profile"
+            echo "  DEVKIT_BRANCH         Git branch/tag to install (default: latest release)"
             echo "  DEVKIT_SCOPE          'project' or 'global'"
             echo "  DEVKIT_TOOLS          Comma-separated list of tools"
             echo "  DEVKIT_FORCE          Set to 'true' to force reinstall"
+            echo "  DEVKIT_MCP_PATH       Path to MCP server installation"
+            echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
+            echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             echo ""
             echo "Examples:"
             echo "  # Using environment variables"
@@ -618,28 +636,37 @@ setup_mcp() {
     
     # Clone or update repo
     if [ -d "$REPO_DIR/.git" ]; then
-        git -C "$REPO_DIR" fetch -q origin "$BRANCH" 2>/dev/null || true
-        git -C "$REPO_DIR" checkout -q "$BRANCH" 2>/dev/null || true
-        git -C "$REPO_DIR" pull -q 2>/dev/null || {
+        git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
+        git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
         }
     else
         mkdir -p "$INSTALL_DIR"
-        git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
     fi
-    ok "Repository cloned"
+    ok "Repository cloned ($BRANCH)"
     
     # Create venv and install
+    # On Apple Silicon under Rosetta, force arm64 to avoid architecture mismatch
+    # with universal2 Python binaries (see: github.com/databricks-solutions/ai-dev-kit/issues/115)
+    local arch_prefix=""
+    if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] && [ "$(uname -m)" = "x86_64" ]; then
+        if arch -arm64 python3 -c "pass" 2>/dev/null; then
+            arch_prefix="arch -arm64"
+            warn "Rosetta detected on Apple Silicon — forcing arm64 for Python"
+        fi
+    fi
+
     msg "Installing Python dependencies..."
     if [ "$PKG" = "uv" ]; then
-        uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || uv venv --allow-existing "$VENV_DIR" -q
-        uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
+        $arch_prefix uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
+        $arch_prefix uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
     else
-        [ ! -d "$VENV_DIR" ] && python3 -m venv "$VENV_DIR"
-        "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
+        [ ! -d "$VENV_DIR" ] && $arch_prefix python3 -m venv "$VENV_DIR"
+        $arch_prefix "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
     fi
-    
+
     "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
     ok "MCP server ready"
 }
@@ -649,21 +676,26 @@ install_skills() {
     step "Installing skills"
 
     local base_dir=$1
-    local dirs=""
+    local dirs=()
 
-    # Determine target directories
+    # Determine target directories (array so paths with spaces work)
     for tool in $TOOLS; do
         case $tool in
-            claude) dirs="$base_dir/.claude/skills" ;;
-            cursor) echo "$TOOLS" | grep -q claude || dirs="$dirs $base_dir/.cursor/skills" ;;
-            copilot) dirs="$dirs $base_dir/.github/skills" ;;
-            codex) dirs="$dirs $base_dir/.agents/skills" ;;
+            claude) dirs=("$base_dir/.claude/skills") ;;
+            cursor) echo "$TOOLS" | grep -q claude || dirs+=("$base_dir/.cursor/skills") ;;
+            copilot) dirs+=("$base_dir/.github/skills") ;;
+            codex) dirs+=("$base_dir/.agents/skills") ;;
         esac
     done
 
-    dirs=$(echo "$dirs" | xargs -n1 | sort -u | xargs)
+    # Dedupe: one element per line, sort -u, read back into array
+    local unique=()
+    while IFS= read -r d; do
+        unique+=("$d")
+    done < <(printf '%s\n' "${dirs[@]}" | sort -u)
+    dirs=("${unique[@]}")
 
-    for dir in $dirs; do
+    for dir in "${dirs[@]}"; do
         mkdir -p "$dir"
         # Install Databricks skills from repo
         for skill in $SKILLS; do
@@ -824,7 +856,10 @@ save_version() {
     # Validate version format
     [[ "$ver" =~ (404|Not Found|error) ]] && ver="dev"
     echo "$ver" > "$INSTALL_DIR/version"
-    [ "$SCOPE" = "project" ] && { mkdir -p ".ai-dev-kit"; echo "$ver" > ".ai-dev-kit/version"; }
+    if [ "$SCOPE" = "project" ]; then 
+        mkdir -p ".ai-dev-kit"
+        echo "$ver" > ".ai-dev-kit/version"
+    }
 }
 
 # Print summary
@@ -1043,8 +1078,8 @@ main() {
     elif [ ! -d "$REPO_DIR" ]; then
         step "Downloading sources"
         mkdir -p "$INSTALL_DIR"
-        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
-        ok "Repository cloned"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        ok "Repository cloned ($BRANCH)"
     fi
     
     # Install skills

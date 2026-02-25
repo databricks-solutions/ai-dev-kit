@@ -5,8 +5,8 @@ from .skills_manager import get_available_skills
 # Mapping of user request patterns to skill names for the selection guide.
 # Only entries whose skill is enabled will be included in the prompt.
 _SKILL_GUIDE_ENTRIES = [
-  ('Generate data, synthetic data, fake data, test data', 'synthetic-data-generation'),
-  ('Pipeline, ETL, bronze/silver/gold, data transformation', 'spark-declarative-pipelines'),
+  ('Generate data, synthetic data, fake data, test data', 'databricks-synthetic-data-generation'),
+  ('Pipeline, ETL, bronze/silver/gold, data transformation', 'databricks-spark-declarative-pipelines'),
   ('Dashboard, visualization, BI, charts', 'databricks-aibi-dashboards'),
   ('Job, workflow, schedule, automation', 'databricks-jobs'),
   ('SDK, API, Databricks client', 'databricks-python-sdk'),

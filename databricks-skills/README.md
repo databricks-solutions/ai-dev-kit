@@ -36,7 +36,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
 - **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
 - **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints
-- **unstructured-pdf-generation** - Generate synthetic PDFs for RAG
+- **databricks-unstructured-pdf-generation** - Generate synthetic PDFs for RAG
 - **databricks-vector-search** - Vector similarity search for RAG and semantic search
 
 ### 📊 MLflow (from [mlflow/skills](https://github.com/mlflow/skills))
@@ -54,9 +54,9 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-unity-catalog** - System tables for lineage, audit, billing
 
 ### 🔧 Data Engineering
-- **spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
+- **databricks-spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
 - **databricks-jobs** - Multi-task workflows, triggers, schedules
-- **synthetic-data-generation** - Realistic test data with Faker
+- **databricks-synthetic-data-generation** - Realistic test data with Faker
 
 ### 🚀 Development & Deployment
 - **databricks-asset-bundles** - DABs for multi-environment deployments
@@ -64,7 +64,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-app-python** - Python web apps (Dash, Streamlit, Flask)
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
 - **databricks-config** - Profile authentication setup
-- **lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
+- **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
 
 ### 📚 Reference
 - **databricks-docs** - Documentation index via llms.txt

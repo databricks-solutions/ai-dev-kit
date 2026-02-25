@@ -27,6 +27,11 @@
 - [Wrong Trace Destination Format](#-wrong-trace-destination-format)
 - [Wrong MLflow Version for Trace Ingestion](#-wrong-mlflow-version-for-trace-ingestion)
 - [Wrong Linking UC Schema Without SQL Warehouse](#-wrong-linking-uc-schema-without-sql-warehouse)
+- [Wrong Label Schema Name — Alignment Will Fail](#-wrong-label-schema-name--alignment-will-fail)
+- [Wrong Aligned Judge Score Interpretation](#-wrong-aligned-judge-score-interpretation)
+- [Wrong MemAlign Embedding Model — Token Costs](#-wrong-memalign-embedding-model--token-costs)
+- [Wrong MemAlign Episodic Memory — Lazy Loading](#-wrong-memalign-episodic-memory--lazy-loading)
+- [Wrong GEPA Optimization Dataset — Missing expectations](#-wrong-gepa-optimization-dataset--missing-expectations)
 - [Summary Checklist](#summary-checklist)
 
 ---
@@ -609,6 +614,178 @@ set_experiment_trace_location(location=UCSchemaLocation(...), ...)
 
 ---
 
+## ❌ WRONG Label Schema Name — Alignment Will Fail
+
+### WRONG: Label schema name does not match the judge name used in evaluate()
+```python
+# ❌ WRONG - Judge name and label schema name don't match
+# Judge is registered as "domain_quality_base" in evaluate()
+domain_quality_judge = make_judge(name="domain_quality_base", ...)
+registered_base_judge = domain_quality_judge.register(experiment_id=EXPERIMENT_ID)
+
+# But label schema uses a different name
+feedback_schema = label_schemas.create_label_schema(
+    name="domain_quality_rating",    # ❌ Does not match judge name
+    type="feedback",
+    ...
+)
+# align() will not be able to pair SME feedback with LLM judge scores
+```
+
+### ✅ CORRECT: Label schema name matches the judge name exactly
+```python
+# ✅ CORRECT - Judge name and label schema name are identical
+JUDGE_NAME = "domain_quality_base"
+
+domain_quality_judge = make_judge(name=JUDGE_NAME, ...)
+registered_base_judge = domain_quality_judge.register(experiment_id=EXPERIMENT_ID)
+
+feedback_schema = label_schemas.create_label_schema(
+    name=JUDGE_NAME,                 # ✅ Matches judge name exactly
+    type="feedback",
+    ...
+)
+```
+
+**Why?** The `align()` function pairs SME feedback with LLM judge scores by matching the label schema name to the judge name on the same traces. If the names differ, `align()` cannot find the corresponding score pairs and alignment will fail or produce incorrect results.
+
+---
+
+## ❌ WRONG Aligned Judge Score Interpretation
+
+### WRONG: Assuming a lower aligned judge score means the agent got worse
+```python
+# ❌ WRONG interpretation - panicking because aligned judge gives lower scores
+# Unaligned judge: 4.2/5.0 average
+# Aligned judge:   3.1/5.0 average
+# "The agent regressed!" — No, the judge got more accurate.
+```
+
+### ✅ CORRECT: Understanding that a lower aligned score reflects more accurate evaluation
+```python
+# ✅ CORRECT interpretation
+# The aligned judge now evaluates with domain-expert standards rather than generic best practices.
+# A lower score from a more accurate judge is a better signal than an inflated score from
+# a judge that doesn't understand your domain. The unaligned judge was underspecified.
+# Use optimize_prompts() with the aligned judge to improve the agent against this standard.
+```
+
+**Why?** An unaligned judge evaluates against generic best practices and often gives inflated scores. Once aligned with SME feedback, the judge applies domain-specific criteria that are harder to satisfy. The lower score is not a regression in agent quality; it is a more honest assessment. The optimization phase (`optimize_prompts()`) will then improve the agent against this more accurate standard.
+
+---
+
+## ❌ WRONG MemAlign Embedding Model — Token Costs
+
+### WRONG: Using the default embedding model without awareness of cost
+```python
+# ❌ COSTLY - Default embedding model may be expensive for large trace sets
+optimizer = MemAlignOptimizer(
+    reflection_lm=REFLECTION_MODEL,
+    retrieval_k=5,
+    # No embedding_model specified → defaults to "openai/text-embedding-3-small"
+)
+```
+
+### ✅ CORRECT: Use a Databricks-hosted embedding model or size your trace set accordingly
+```python
+# ✅ CORRECT - Use a hosted model to control costs; scope trace set to labeled traces only
+optimizer = MemAlignOptimizer(
+    reflection_lm=REFLECTION_MODEL,
+    retrieval_k=5,
+    embedding_model="databricks:/databricks-gte-large-en",
+)
+
+# ✅ ALSO CORRECT - Filter to only labeled/tagged traces, not all experiment traces
+traces = mlflow.search_traces(
+    locations=[EXPERIMENT_ID],
+    filter_string="tag.eval = 'complete'",  # Scope to relevant traces only
+    return_type="list",
+)
+aligned_judge = base_judge.align(traces=traces, optimizer=optimizer)
+```
+
+**Why?** MemAlign embeds every trace for retrieval (`retrieval_k` nearest neighbors per evaluation). Large trace sets with an expensive embedding model multiply quickly. Databricks-hosted models (`databricks:/databricks-gte-large-en`) keep costs on-platform.
+
+---
+
+## ❌ WRONG MemAlign Episodic Memory — Lazy Loading
+
+### WRONG: Expecting episodic memory to be populated immediately after get_scorer()
+```python
+# ❌ WRONG - Episodic memory appears empty, looks like alignment didn't work
+retrieved_judge = get_scorer(name="domain_quality_base", experiment_id=EXPERIMENT_ID)
+print(retrieved_judge._episodic_memory)  # Prints: [] — misleading!
+print(retrieved_judge._semantic_memory)  # Prints: [] — also empty!
+```
+
+### ✅ CORRECT: Episodic memory is lazily loaded — use the judge first, then inspect
+```python
+# ✅ CORRECT - Semantic guidelines ARE loaded; episodic memory loads on first use
+retrieved_judge = get_scorer(name="domain_quality_base", experiment_id=EXPERIMENT_ID)
+
+# The instructions field already contains the distilled guidelines — inspect this instead
+print(retrieved_judge.instructions)  # ✅ Shows full aligned instructions with guidelines
+
+# To verify episodic memory, run the judge on a sample first, then inspect
+# Memory loads lazily when the judge retrieves similar examples during scoring
+```
+
+**Why?** MemAlign's episodic memory (stored examples) is loaded on-demand when the judge needs to retrieve similar examples at scoring time. The `_episodic_memory` list is empty on deserialization. The aligned `instructions` field (which includes distilled semantic guidelines) is the reliable thing to inspect after `get_scorer()`.
+
+---
+
+## ❌ WRONG GEPA Optimization Dataset — Missing expectations
+
+### WRONG: Using eval-style dataset (inputs only) for optimize_prompts()
+```python
+# ❌ WRONG - GEPA requires expectations; optimization will fail or produce poor results
+optimization_dataset = [
+    {"inputs": {"input": [{"role": "user", "content": "How does the offense attack the blitz?"}]}},
+    {"inputs": {"input": [{"role": "user", "content": "What are 3rd down tendencies?"}]}},
+]
+
+result = mlflow.genai.optimize_prompts(
+    predict_fn=predict_fn,
+    train_data=optimization_dataset,   # ❌ Missing expectations
+    prompt_uris=[prompt.uri],
+    optimizer=GepaPromptOptimizer(...),
+    scorers=[aligned_judge],
+)
+```
+
+### ✅ CORRECT: Include expectations in every optimization dataset record
+```python
+# ✅ CORRECT - Each record must have both inputs AND expectations
+optimization_dataset = [
+    {
+        "inputs": {
+            "input": [{"role": "user", "content": "How does the offense attack the blitz?"}]
+        },
+        "expectations": {
+            "expected_response": (
+                "The agent should analyze blitz performance metrics, compare success "
+                "rates across pressure packages, and provide concrete tactical recommendations."
+            )
+        }
+    },
+    {
+        "inputs": {
+            "input": [{"role": "user", "content": "What are 3rd down tendencies?"}]
+        },
+        "expectations": {
+            "expected_response": (
+                "The agent should call the appropriate tool with down=3 parameters, "
+                "summarize the play distribution, and give defensive recommendations."
+            )
+        }
+    },
+]
+```
+
+**Why?** GEPA uses the `expectations` field during reflection — it compares the agent's output against the expected behavior to generate targeted prompt improvement suggestions. Without `expectations`, GEPA cannot reason about *why* the current prompt is underperforming. This is the most common cause of poor optimization results.
+
+---
+
 ## Summary Checklist
 
 Before running evaluation, verify:
@@ -629,3 +806,9 @@ Before running evaluation, verify:
 - [ ] `MLFLOW_TRACING_SQL_WAREHOUSE_ID` set before linking UC schema
 - [ ] `MLFLOW_TRACING_DESTINATION` uses `catalog.schema` format (dot-separated)
 - [ ] Production monitoring scorers are both registered AND started
+- [ ] MemAlign `embedding_model` can be explicitly set (don't rely on default for large trace sets)
+- [ ] After `get_scorer()` for a MemAlign judge, inspect `.instructions` not `._episodic_memory` as episodic memory is lazily loaded
+- [ ] GEPA `train_data` has both `inputs` AND `expectations` per record
+- [ ] Label schema `name` matches the judge `name` used in `evaluate()` (required for `align()` to pair scores)
+- [ ] Aligned judge scores may be lower than unaligned — this is expected if the judge is now more accurate
+- [ ] MemAlign is scorer-agnostic (works with any `feedback_value_type` — float, bool, categorical)

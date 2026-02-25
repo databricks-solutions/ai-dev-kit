@@ -309,7 +309,7 @@ databricks bundle destroy -t prod --auto-approve
 
 ## Related Skills
 
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - pipeline definitions referenced by DABs
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - pipeline definitions referenced by DABs
 - **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - app deployment via DABs
 - **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python app deployment via DABs
 - **[databricks-config](../databricks-config/SKILL.md)** - profile and authentication setup for CLI/SDK

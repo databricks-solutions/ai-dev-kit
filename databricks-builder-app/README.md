@@ -177,9 +177,9 @@ Skills include:
 - **databricks-app-apx**: Full-stack apps with APX framework (FastAPI + React)
 - **databricks-app-python**: Python apps with Dash, Streamlit, Flask
 - **databricks-python-sdk**: Python SDK patterns
-- **mlflow-evaluation**: MLflow evaluation and trace analysis
-- **spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) development
-- **synthetic-data-generation**: Creating test datasets
+- **databricks-mlflow-evaluation**: MLflow evaluation and trace analysis
+- **databricks-spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) development
+- **databricks-synthetic-data-generation**: Creating test datasets
 
 ### 5. Project Persistence
 
@@ -328,8 +328,8 @@ The app supports two authentication modes:
 Skills are loaded from `../databricks-skills/` and filtered by the `ENABLED_SKILLS` environment variable:
 
 - `databricks-python-sdk`: Patterns for using the Databricks Python SDK
-- `spark-declarative-pipelines`: SDP/DLT pipeline development
-- `synthetic-data-generation`: Creating test datasets
+- `databricks-spark-declarative-pipelines`: SDP/DLT pipeline development
+- `databricks-synthetic-data-generation`: Creating test datasets
 - `databricks-app-apx`: Full-stack apps with React (APX framework)
 - `databricks-app-python`: Python apps with Dash, Streamlit, Flask
 
@@ -585,7 +585,7 @@ env:
 
   # Skills to enable (comma-separated)
   - name: ENABLED_SKILLS
-    value: "databricks-agent-bricks,databricks-python-sdk,spark-declarative-pipelines"
+    value: "databricks-agent-bricks,databricks-python-sdk,databricks-spark-declarative-pipelines"
 
   # MLflow tracing (optional)
   - name: MLFLOW_TRACKING_URI

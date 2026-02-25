@@ -41,10 +41,11 @@ print(f"Endpoint: {deployment.endpoint_name}")
 
 ### Step 2: Create Deployment Job (One-Time)
 
-Use the `create_job` MCP tool:
+Use the `manage_jobs` MCP tool with action="create":
 
 ```
-create_job(
+manage_jobs(
+    action="create",
     name="deploy-agent-job",
     tasks=[
         {
@@ -66,10 +67,11 @@ Save the returned `job_id`.
 
 ### Step 3: Run Deployment (Async)
 
-Use `run_job_now` - returns immediately:
+Use `manage_job_runs` with action="run_now" - returns immediately:
 
 ```
-run_job_now(
+manage_job_runs(
+    action="run_now",
     job_id="<job_id>",
     job_parameters={"model_name": "main.agents.my_agent", "version": "1"}
 )
@@ -82,7 +84,7 @@ Save the returned `run_id`.
 Check job run status:
 
 ```
-get_run(run_id="<run_id>")
+manage_job_runs(action="get", run_id="<run_id>")
 ```
 
 Or check endpoint directly:
@@ -142,13 +144,61 @@ endpoint = w.serving_endpoints.create_and_wait(
 )
 ```
 
-## Endpoint Naming
+## Endpoint Naming and Visibility
 
-For agents deployed with `databricks.agents.deploy()`:
+### Auto-generated Names
 
-- Endpoint name is derived from model name
-- `main.agents.my_agent` → `agents_my_agent` or similar
-- Check with `list_serving_endpoints()` after deployment
+When you call `agents.deploy()`, the endpoint name is auto-derived from the UC model path by replacing dots with underscores and prefixing with `agents_`:
+
+| UC Model Path | Auto-generated Endpoint Name |
+|---------------|------------------------------|
+| `main.agents.my_agent` | `agents_main-agents-my_agent` |
+| `catalog.schema.model` | `agents_catalog-schema-model` |
+| `users.jane.demo_bot` | `agents_users-jane-demo_bot` |
+
+The exact format can vary. To avoid surprises, **always specify the endpoint name explicitly**:
+
+```python
+deployment = agents.deploy(
+    "main.agents.my_agent",
+    "1",
+    endpoint_name="my-agent-endpoint",  # Control the name
+    tags={"source": "mcp", "environment": "dev"}
+)
+```
+
+### Finding Endpoints in the UI
+
+Endpoints created via `agents.deploy()` appear under **Serving** in the Databricks UI. If you don't see your endpoint:
+
+1. **Check the filter** - The Serving page defaults to "Owned by me". If the deployment ran as a service principal (e.g., via a job), switch to "All" to see it.
+2. **Verify via API** - Use `list_serving_endpoints()` or `get_serving_endpoint_status(name="...")` to confirm the endpoint exists and check its state.
+3. **Check the name** - The auto-generated name may not be what you expect. Print `deployment.endpoint_name` in the deploy script or check the job run output.
+
+### Deployment Script with Explicit Naming
+
+```python
+# deploy_agent.py - recommended pattern
+import sys
+from databricks import agents
+
+model_name = sys.argv[1] if len(sys.argv) > 1 else "main.agents.my_agent"
+version = sys.argv[2] if len(sys.argv) > 2 else "1"
+endpoint_name = sys.argv[3] if len(sys.argv) > 3 else None
+
+deploy_kwargs = {
+    "tags": {"source": "mcp", "environment": "dev"}
+}
+if endpoint_name:
+    deploy_kwargs["endpoint_name"] = endpoint_name
+
+print(f"Deploying {model_name} version {version}...")
+deployment = agents.deploy(model_name, version, **deploy_kwargs)
+
+print(f"Deployment complete!")
+print(f"Endpoint name: {deployment.endpoint_name}")
+print(f"Query URL: {deployment.query_endpoint}")
+```
 
 ## Deployment Job Template
 
@@ -214,9 +264,9 @@ client.update_endpoint(
 | Step | MCP Tool | Waits? |
 |------|----------|--------|
 | Upload deploy script | `upload_folder` | Yes |
-| Create job (one-time) | `create_job` | Yes |
-| Run deployment | `run_job_now` | **No** - returns immediately |
-| Check job status | `get_run` | Yes |
+| Create job (one-time) | `manage_jobs` (action="create") | Yes |
+| Run deployment | `manage_job_runs` (action="run_now") | **No** - returns immediately |
+| Check job status | `manage_job_runs` (action="get") | Yes |
 | Check endpoint status | `get_serving_endpoint_status` | Yes |
 
 ## After Deployment

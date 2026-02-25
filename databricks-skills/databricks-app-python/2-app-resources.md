@@ -31,16 +31,13 @@ Use `valueFrom` to reference resources — never hardcode IDs:
 ```yaml
 env:
   - name: DATABRICKS_WAREHOUSE_ID
-    valueFrom:
-      resource: sql-warehouse
+    valueFrom: sql-warehouse
 
   - name: SERVING_ENDPOINT_NAME
-    valueFrom:
-      resource: serving-endpoint
+    valueFrom: serving-endpoint
 
   - name: DB_CONNECTION_STRING
-    valueFrom:
-      resource: database
+    valueFrom: database
 ```
 
 Add resources via the Databricks Apps UI when creating or editing an app:

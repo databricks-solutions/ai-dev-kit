@@ -20,17 +20,15 @@ logger = logging.getLogger(__name__)
 SKILL_TOOL_MAPPING: dict[str, list[str]] = {
   'databricks-agent-bricks': ['manage_ka', 'manage_mas'],
   'databricks-aibi-dashboards': [
-    'create_or_update_dashboard', 'get_dashboard', 'list_dashboards',
-    'trash_dashboard', 'publish_dashboard', 'unpublish_dashboard',
+    'create_or_update_dashboard', 'get_dashboard',
+    'delete_dashboard', 'publish_dashboard',
   ],
   'databricks-genie': [
-    'list_genie', 'create_or_update_genie', 'get_genie', 'delete_genie',
-    'ask_genie', 'ask_genie_followup',
+    'create_or_update_genie', 'get_genie', 'delete_genie', 'ask_genie',
   ],
-  'spark-declarative-pipelines': [
-    'create_pipeline', 'get_pipeline', 'update_pipeline', 'delete_pipeline',
-    'start_update', 'get_update', 'stop_pipeline', 'get_pipeline_events',
-    'create_or_update_pipeline', 'find_pipeline_by_name',
+  'databricks-spark-declarative-pipelines': [
+    'create_or_update_pipeline', 'get_pipeline',
+    'delete_pipeline', 'run_pipeline',
   ],
   'databricks-model-serving': [
     'get_serving_endpoint_status', 'query_serving_endpoint', 'list_serving_endpoints',
@@ -51,10 +49,10 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
   # APX (FastAPI+React) and Python (Dash/Streamlit/etc.) share the same
   # app lifecycle tools — the skill content differs, not the MCP operations.
   'databricks-app-apx': [
-    'create_app', 'get_app', 'list_apps', 'deploy_app', 'delete_app', 'get_app_logs',
+    'create_or_update_app', 'get_app', 'delete_app',
   ],
   'databricks-app-python': [
-    'create_app', 'get_app', 'list_apps', 'deploy_app', 'delete_app', 'get_app_logs',
+    'create_or_update_app', 'get_app', 'delete_app',
   ],
 }
 

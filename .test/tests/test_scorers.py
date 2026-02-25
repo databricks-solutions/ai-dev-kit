@@ -10,16 +10,16 @@ class TestDetectSkillsFromPrompt:
     """Tests for skill detection from prompts."""
 
     def test_detect_streaming_table(self):
-        """Test detection of spark-declarative-pipelines skill."""
+        """Test detection of databricks-spark-declarative-pipelines skill."""
         prompt = "Create a streaming table for ingesting data"
         skills = detect_skills_from_prompt(prompt)
-        assert "spark-declarative-pipelines" in skills
+        assert "databricks-spark-declarative-pipelines" in skills
 
     def test_detect_medallion(self):
         """Test detection via medallion architecture keywords."""
         prompt = "Build a bronze-silver-gold medallion architecture"
         skills = detect_skills_from_prompt(prompt)
-        assert "spark-declarative-pipelines" in skills
+        assert "databricks-spark-declarative-pipelines" in skills
 
     def test_detect_python_sdk(self):
         """Test detection of databricks-python-sdk skill."""
@@ -46,16 +46,16 @@ class TestDetectSkillsFromPrompt:
         assert "databricks-asset-bundles" in skills
 
     def test_detect_mlflow_evaluation(self):
-        """Test detection of mlflow-evaluation skill."""
+        """Test detection of databricks-mlflow-evaluation skill."""
         prompt = "Evaluate my agent using genai.evaluate"
         skills = detect_skills_from_prompt(prompt)
-        assert "mlflow-evaluation" in skills
+        assert "databricks-mlflow-evaluation" in skills
 
     def test_detect_synthetic_data(self):
-        """Test detection of synthetic-data-generation skill."""
+        """Test detection of databricks-synthetic-data-generation skill."""
         prompt = "Generate synthetic data for testing"
         skills = detect_skills_from_prompt(prompt)
-        assert "synthetic-data-generation" in skills
+        assert "databricks-synthetic-data-generation" in skills
 
     def test_detect_agent_bricks(self):
         """Test detection of databricks-agent-bricks skill."""
@@ -118,10 +118,10 @@ class TestDetectSkillsFromPrompt:
         assert "databricks-app-python" in skills
 
     def test_detect_lakebase(self):
-        """Test detection of lakebase-provisioned skill."""
+        """Test detection of databricks-lakebase-provisioned skill."""
         prompt = "Create an app that stores data in Lakebase"
         skills = detect_skills_from_prompt(prompt)
-        assert "lakebase-provisioned" in skills
+        assert "databricks-lakebase-provisioned" in skills
 
     def test_detect_model_serving(self):
         """Test detection of databricks-model-serving skill."""
@@ -133,7 +133,7 @@ class TestDetectSkillsFromPrompt:
         """Test detection of multiple skills."""
         prompt = "Create streaming tables and deploy with DABs"
         skills = detect_skills_from_prompt(prompt)
-        assert "spark-declarative-pipelines" in skills
+        assert "databricks-spark-declarative-pipelines" in skills
         assert "databricks-asset-bundles" in skills
 
     def test_detect_multi_app_lakebase(self):
@@ -141,7 +141,7 @@ class TestDetectSkillsFromPrompt:
         prompt = "Create a Streamlit app that stores data in Lakebase"
         skills = detect_skills_from_prompt(prompt)
         assert "databricks-app-python" in skills
-        assert "lakebase-provisioned" in skills
+        assert "databricks-lakebase-provisioned" in skills
 
     def test_detect_multi_app_serving(self):
         """Test detection of app + model serving."""
@@ -160,7 +160,7 @@ class TestDetectSkillsFromPrompt:
         """Test that detection is case insensitive."""
         prompt = "CREATE A STREAMING TABLE"
         skills = detect_skills_from_prompt(prompt)
-        assert "spark-declarative-pipelines" in skills
+        assert "databricks-spark-declarative-pipelines" in skills
 
 
 class TestSkillTriggers:
@@ -169,16 +169,16 @@ class TestSkillTriggers:
     def test_all_skills_have_triggers(self):
         """Verify all expected skills have trigger keywords."""
         expected_skills = [
-            "spark-declarative-pipelines",
+            "databricks-spark-declarative-pipelines",
             "databricks-app-apx",
             "databricks-app-python",
             "databricks-asset-bundles",
             "databricks-python-sdk",
             "databricks-jobs",
-            "synthetic-data-generation",
-            "mlflow-evaluation",
+            "databricks-synthetic-data-generation",
+            "databricks-mlflow-evaluation",
             "databricks-agent-bricks",
-            "lakebase-provisioned",
+            "databricks-lakebase-provisioned",
             "databricks-model-serving",
         ]
         for skill in expected_skills:

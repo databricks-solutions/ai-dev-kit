@@ -106,9 +106,9 @@ mcp__databricks__execute_sql(
 
 ## Related Skills
 
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - for pipelines that write to Unity Catalog tables
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - for pipelines that write to Unity Catalog tables
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - for job execution data visible in system tables
-- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - for generating data stored in Unity Catalog Volumes
+- **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - for generating data stored in Unity Catalog Volumes
 - **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - for building dashboards on top of Unity Catalog data
 
 ## Resources

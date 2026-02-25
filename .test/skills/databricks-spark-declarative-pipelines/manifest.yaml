@@ -1,6 +1,6 @@
 skill:
-  name: "spark-declarative-pipelines"
-  source_path: "databricks-skills/spark-declarative-pipelines"
+  name: "databricks-spark-declarative-pipelines"
+  source_path: "databricks-skills/databricks-spark-declarative-pipelines"
   description: "Streaming tables, CDC, medallion architecture"
 
 evaluation:

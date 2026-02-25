@@ -19,8 +19,7 @@ command:
 
 env:
   - name: DATABRICKS_WAREHOUSE_ID
-    valueFrom:
-      resource: sql-warehouse
+    valueFrom: sql-warehouse
   - name: USE_MOCK_BACKEND
     value: "false"
 ```
@@ -30,7 +29,7 @@ env:
 | Framework | Command |
 |-----------|---------|
 | Dash | `["python", "app.py"]` |
-| Streamlit | `["streamlit", "run", "app.py", "--server.port", "8080", "--server.address", "0.0.0.0", "--server.headless", "true"]` |
+| Streamlit | `["streamlit", "run", "app.py"]` |
 | Gradio | `["python", "app.py"]` |
 | Flask | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8080"]` |
 | FastAPI | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]` |

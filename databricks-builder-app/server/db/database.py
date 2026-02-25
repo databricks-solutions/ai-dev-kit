@@ -103,16 +103,19 @@ def _get_workspace_client():
     try:
         import os
         from databricks.sdk import WorkspaceClient
+        from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
 
+        product_kwargs = dict(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
         if _has_oauth_credentials():
             # Explicitly configure OAuth M2M to prevent auth conflicts
             return WorkspaceClient(
                 host=os.environ.get('DATABRICKS_HOST', ''),
                 client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
                 client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+                **product_kwargs,
             )
         # Development mode - use default SDK auth
-        return WorkspaceClient()
+        return WorkspaceClient(**product_kwargs)
     except Exception as e:
         logger.debug(f"Could not create WorkspaceClient: {e}")
         return None

@@ -216,9 +216,9 @@ The timestamp generation must use microseconds for Databricks.
 ## Related Skills
 
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - General SDK patterns and WorkspaceClient for table/schema management
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - Downstream pipeline processing of ingested data
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Downstream pipeline processing of ingested data
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Managing catalogs, schemas, and tables that Zerobus writes to
-- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - Generate test data to feed into Zerobus producers
+- **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - Generate test data to feed into Zerobus producers
 - **[databricks-config](../databricks-config/SKILL.md)** - Profile and authentication setup
 
 ## Resources

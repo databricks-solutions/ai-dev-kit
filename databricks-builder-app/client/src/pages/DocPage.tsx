@@ -93,7 +93,7 @@ function OverviewSection() {
                   Skills explain <em>how</em> to do things and reference the tools from databricks-tools-core.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {['databricks-asset-bundles/', 'databricks-app-apx/', 'databricks-app-python/', 'databricks-python-sdk/', 'mlflow-evaluation/', 'spark-declarative-pipelines/', 'synthetic-data-generation/'].map((skill) => (
+                  {['databricks-asset-bundles/', 'databricks-app-apx/', 'databricks-app-python/', 'databricks-python-sdk/', 'databricks-mlflow-evaluation/', 'databricks-spark-declarative-pipelines/', 'databricks-synthetic-data-generation/'].map((skill) => (
                     <span key={skill} className="text-xs px-2 py-1 rounded bg-[var(--color-accent-primary)]/10 text-[var(--color-text-secondary)] font-mono">
                       {skill}
                     </span>
@@ -205,7 +205,7 @@ function OverviewSection() {
               <div>
                 <p className="font-medium text-[var(--color-text-heading)]">Read Skill</p>
                 <p className="text-sm text-[var(--color-text-muted)] mt-1">
-                  Claude reads <code className="px-1 py-0.5 rounded bg-[var(--color-background)] text-xs">synthetic-data-generation/</code> skill to learn best practices
+                  Claude reads <code className="px-1 py-0.5 rounded bg-[var(--color-background)] text-xs">databricks-synthetic-data-generation/</code> skill to learn best practices
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {['Non-linear distributions', 'Referential integrity', 'Time patterns', 'Row coherence'].map((item) => (

@@ -6,7 +6,7 @@ from typing import Dict, Any, Set
 
 # Skill trigger patterns (extracted from SKILL.md description fields)
 SKILL_TRIGGERS = {
-    "spark-declarative-pipelines": [
+    "databricks-spark-declarative-pipelines": [
         "streaming table",
         "dlt",
         "delta live",
@@ -52,14 +52,14 @@ SKILL_TRIGGERS = {
         "rest api",
     ],
     "databricks-jobs": ["job", "workflow", "task", "schedule", "trigger"],
-    "synthetic-data-generation": [
+    "databricks-synthetic-data-generation": [
         "synthetic data",
         "fake data",
         "generate data",
         "mock data",
         "faker",
     ],
-    "mlflow-evaluation": [
+    "databricks-mlflow-evaluation": [
         "mlflow eval",
         "evaluate agent",
         "scorer",
@@ -73,7 +73,7 @@ SKILL_TRIGGERS = {
         "multi-agent",
         "supervisor",
     ],
-    "lakebase-provisioned": ["lakebase", "postgresql", "postgres"],
+    "databricks-lakebase-provisioned": ["lakebase", "postgresql", "postgres"],
     "databricks-model-serving": ["model serving", "serving endpoint", "inference endpoint"],
 }
 

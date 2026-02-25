@@ -294,7 +294,7 @@ Write a data source for REST API with OAuth2 authentication and pagination
 ## Related
 
 - databricks-testing: Test data sources on Databricks clusters
-- spark-declarative-pipelines: Use custom sources in DLT pipelines
+- databricks-spark-declarative-pipelines: Use custom sources in DLT pipelines
 - python-dev: Python development best practices
 
 ## References
