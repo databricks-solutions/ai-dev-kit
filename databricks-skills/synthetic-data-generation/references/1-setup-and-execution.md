@@ -16,6 +16,10 @@ This guide covers all execution modes for synthetic data generation, organized b
 
 **Install locally:**
 ```bash
+# Preferred
+uv pip install "databricks-connect>=16.4,<17.0" faker numpy pandas holidays
+
+# Fallback if uv not available
 pip install "databricks-connect>=16.4,<17.0" faker numpy pandas holidays
 ```
 
@@ -94,18 +98,15 @@ if db_version and db_version >= (16, 4):
 
 > **Note:** Using `"client": "1"` will fail with environment configuration errors.
 
-### Script Deployment: Must Be FILE Type (Not Notebook)
+### Script Deployment
 
-When deploying Python scripts for serverless jobs, the script MUST be imported as a FILE type. Using `--language PYTHON` creates a NOTEBOOK, which fails with `spark_python_task`.
+Deploy Python files (.py) to the workspace for serverless jobs:
 
 ```bash
-# Correct - imports as FILE type
 databricks workspace import /Users/<user>@databricks.com/scripts/my_script.py \
   --file ./my_script.py --format AUTO
 
-# Verify it's FILE type (not NOTEBOOK)
 databricks workspace list /Users/<user>@databricks.com/scripts/
-# Should show: FILE  (not NOTEBOOK)
 ```
 
 **Job config must reference the workspace path:**
@@ -156,7 +157,7 @@ Pandas UDFs require matching Python minor versions between local and cluster.
 
 ```bash
 # Check local Python
-python --version
+uv run python --version  # or: python --version
 
 # Check cluster DBR version → Python version
 # DBR 17.x = Python 3.12
@@ -194,9 +195,9 @@ spark = DatabricksSession.builder.clusterId("<cluster-id>").getOrCreate()
 > "Your local Python (3.11) doesn't match the cluster (3.12). Pandas UDFs require matching versions. Should I submit this as a job to run directly on the cluster instead?"
 
 ```bash
-# Import notebook to workspace
-databricks workspace import /Users/you@company.com/my_notebook \
-  --file script.py --language PYTHON --overwrite
+# Upload script to workspace
+databricks workspace import /Users/you@company.com/scripts/generate_data.py \
+  --file generate_data.py --format AUTO --overwrite
 
 # Submit job to run on cluster
 databricks jobs submit --json '{
@@ -204,8 +205,8 @@ databricks jobs submit --json '{
   "tasks": [{
     "task_key": "generate",
     "existing_cluster_id": "<cluster-id>",
-    "notebook_task": {
-      "notebook_path": "/Users/you@company.com/my_notebook"
+    "spark_python_task": {
+      "python_file": "/Users/you@company.com/scripts/generate_data.py"
     }
   }]
 }'
@@ -217,7 +218,7 @@ databricks jobs submit --json '{
 Local Python == Cluster Python?
   ├─ YES → Install libs on cluster, run via Databricks Connect
   └─ NO  → Ask user: "Submit as job instead?"
-           └─ Import notebook + submit job
+           └─ Upload script + submit job
 ```
 
 ## Required Libraries

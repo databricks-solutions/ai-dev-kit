@@ -65,7 +65,7 @@ REGION_PROBS = [0.4, 0.25, 0.2, 0.15]
 # =============================================================================
 
 def is_databricks_runtime():
-    """Check if running on Databricks Runtime (notebook/job) vs locally."""
+    """Check if running on Databricks Runtime vs locally."""
     return "DATABRICKS_RUNTIME_VERSION" in os.environ
 
 def get_databricks_connect_version():

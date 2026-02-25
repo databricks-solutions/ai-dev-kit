@@ -134,7 +134,7 @@ customers_df.write \
 **When to use:**
 - User wants data ready to query immediately
 - Skip the SDP bronze/silver/gold pipeline
-- Direct notebook or SQL analytics
+- Direct SQL analytics
 
 ---
 

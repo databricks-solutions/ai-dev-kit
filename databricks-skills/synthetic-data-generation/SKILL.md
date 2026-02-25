@@ -19,6 +19,20 @@ Generate realistic, story-driven synthetic data for Databricks using **Spark + F
 | **Troubleshooting** | [references/6-troubleshooting.md](references/6-troubleshooting.md) | Fixing errors, debugging issues |
 | **Example Script** | [scripts/generate_synthetic_data.py](scripts/generate_synthetic_data.py) | Complete Spark + Pandas UDF example |
 
+## Package Manager
+
+Prefer `uv` for all Python operations. Fall back to `pip` only if `uv` is not available.
+
+```bash
+# Preferred
+uv pip install "databricks-connect>=16.4,<17.0" faker numpy pandas holidays
+uv run python generate_data.py
+
+# Fallback if uv not available
+pip install "databricks-connect>=16.4,<17.0" faker numpy pandas holidays
+python generate_data.py
+```
+
 ## Critical Rules
 
 1. **Always use Spark + Faker + Pandas UDFs** for data generation (scalable, parallel)

@@ -32,8 +32,9 @@ spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCre
 **Solution:** Upgrade to 16.4+ or use job-based approach:
 
 ```bash
-# Upgrade
-pip install "databricks-connect>=16.4,<17.0"
+# Upgrade (prefer uv, fall back to pip)
+uv pip install "databricks-connect>=16.4,<17.0"
+# or: pip install "databricks-connect>=16.4,<17.0"
 
 # Or use job with environments parameter instead
 ```
