@@ -308,8 +308,11 @@ async def stream_agent_response(
   default_schema: str | None = None,
   warehouse_id: str | None = None,
   workspace_folder: str | None = None,
+  fmapi_host: str | None = None,
+  fmapi_token: str | None = None,
   databricks_host: str | None = None,
   databricks_token: str | None = None,
+  is_cross_workspace: bool = False,
   is_cancelled_fn: callable = None,
   enabled_skills: list[str] | None = None,
   mlflow_experiment_name: str | None = None,
@@ -328,8 +331,12 @@ async def stream_agent_response(
       default_schema: Optional default schema name
       warehouse_id: Optional Databricks SQL warehouse ID for queries
       workspace_folder: Optional workspace folder for file uploads
-      databricks_host: Databricks workspace URL for auth context
-      databricks_token: User's Databricks access token for auth context
+      fmapi_host: Builder App workspace URL for Claude API (FMAPI)
+      fmapi_token: Builder App token for Claude API authentication
+      databricks_host: Target workspace URL for Databricks tool operations
+      databricks_token: Target workspace token for Databricks tool auth
+      is_cross_workspace: When True, tool operations target a different workspace
+          than the Builder App. Enables force_token in auth context.
       is_cancelled_fn: Optional callable that returns True if request is cancelled
       enabled_skills: Optional list of enabled skill names. None means all skills.
 
@@ -347,8 +354,10 @@ async def stream_agent_response(
   logger.info(f'Agent working directory (cwd): {project_dir}')
   logger.info(f'Workspace folder (remote): {workspace_folder}')
 
-  # Set auth context for this request (enables per-user Databricks auth)
-  set_databricks_auth(databricks_host, databricks_token)
+  # Set auth context for tool operations (targets the specified workspace)
+  # When cross-workspace, force_token ensures the target credentials are used
+  # even when OAuth M2M credentials exist in environment
+  set_databricks_auth(databricks_host, databricks_token, force_token=is_cross_workspace)
 
   try:
     # Build allowed tools list
@@ -394,22 +403,24 @@ async def stream_agent_response(
     claude_env = _load_claude_settings()
 
     # Log auth state for debugging
-    logger.info(f'Auth state: databricks_host={databricks_host}, token_present={databricks_token is not None and len(str(databricks_token)) > 0}')
+    logger.info(
+      f'Auth state: fmapi_host={fmapi_host}, databricks_host={databricks_host}, '
+      f'is_cross_workspace={is_cross_workspace}'
+    )
 
-    # Ensure Databricks model serving endpoint is used
-    # Pass OAuth/PAT token for authentication with Databricks FMAPI
-    if databricks_host and databricks_token:
-      # Build the Anthropic base URL from Databricks host
-      # Format: https://<workspace>/serving-endpoints/anthropic
-      host = databricks_host.replace('https://', '').replace('http://', '').rstrip('/')
+    # Configure Claude subprocess to use Databricks FMAPI on the Builder App's
+    # workspace. FMAPI auth always points at the Builder App, even when tool
+    # operations target a different workspace (cross-workspace mode).
+    # Fall back to databricks_host/token for callers that don't split FMAPI creds.
+    effective_fmapi_host = fmapi_host or databricks_host
+    effective_fmapi_token = fmapi_token or databricks_token
+    if effective_fmapi_host and effective_fmapi_token:
+      host = effective_fmapi_host.replace('https://', '').replace('http://', '').rstrip('/')
       anthropic_base_url = f'https://{host}/serving-endpoints/anthropic'
 
-      # Set environment variables for Claude Code subprocess
-      # These ensure Claude Code uses Databricks model serving
-      # Note: Claude SDK uses ANTHROPIC_API_KEY for authentication
       claude_env['ANTHROPIC_BASE_URL'] = anthropic_base_url
-      claude_env['ANTHROPIC_API_KEY'] = databricks_token
-      claude_env['ANTHROPIC_AUTH_TOKEN'] = databricks_token
+      claude_env['ANTHROPIC_API_KEY'] = effective_fmapi_token
+      claude_env['ANTHROPIC_AUTH_TOKEN'] = effective_fmapi_token
 
       # Set the model to use (required for Databricks FMAPI)
       anthropic_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-5')
