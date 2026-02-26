@@ -151,4 +151,4 @@ def get_table_details(
         warehouse_id=warehouse_id,
     )
     # Convert to dict for JSON serialization
-    return result.model_dump() if hasattr(result, "model_dump") else result
+    return result.model_dump(exclude_none=True) if hasattr(result, "model_dump") else result
