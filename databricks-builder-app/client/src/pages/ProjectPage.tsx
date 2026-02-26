@@ -733,6 +733,14 @@ export default function ProjectPage() {
           if (type === 'conversation.created') {
             conversationId = event.conversation_id as string;
             streamingConversationIdRef.current = conversationId;
+            // Set currentConversation immediately so isStreamingHere stays true
+            setCurrentConversation((prev) => prev ?? {
+              id: conversationId,
+              project_id: projectId,
+              title: 'New Chat',
+              created_at: new Date().toISOString(),
+              conversation_count: 0,
+            } as unknown as Conversation);
             fetchConversations(projectId).then(setConversations);
           } else if (type === 'text_delta') {
             // Token-by-token streaming - accumulate and display for live updates
@@ -877,9 +885,11 @@ export default function ProjectPage() {
           setTodos([]);
           streamingConversationIdRef.current = null;
 
-          if (conversationId && !currentConversation?.id) {
+          // Fetch full conversation to get updated title and messages
+          if (conversationId) {
             const conv = await fetchConversation(projectId, conversationId);
             setCurrentConversation(conv);
+            fetchConversations(projectId).then(setConversations);
           }
         },
       });
