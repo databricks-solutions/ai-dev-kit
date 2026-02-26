@@ -1037,6 +1037,7 @@ def manage_metric_views(
             or_replace=or_replace,
             warehouse_id=warehouse_id,
         )
+        _auto_tag("metric_view", full_name)
         try:
             from ..manifest import track_resource
 

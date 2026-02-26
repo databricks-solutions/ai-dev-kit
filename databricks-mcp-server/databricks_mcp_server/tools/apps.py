@@ -1,6 +1,13 @@
-"""App tools - Manage Databricks Apps lifecycle."""
+"""App tools - Manage Databricks Apps lifecycle.
 
-from typing import Any, Dict, List, Optional
+Provides 3 workflow-oriented tools following the Lakebase pattern:
+- create_or_update_app: idempotent create + optional deploy
+- get_app: get details by name (with optional logs), or list all
+- delete_app: delete by name
+"""
+
+import logging
+from typing import Any, Dict, Optional
 
 from databricks_tools_core.apps.apps import (
     create_app as _create_app,
@@ -10,9 +17,12 @@ from databricks_tools_core.apps.apps import (
     delete_app as _delete_app,
     get_app_logs as _get_app_logs,
 )
+from databricks_tools_core.identity import with_description_footer
 
 from ..manifest import register_deleter
 from ..server import mcp
+
+logger = logging.getLogger(__name__)
 
 
 def _delete_app_resource(resource_id: str) -> None:
@@ -22,98 +32,156 @@ def _delete_app_resource(resource_id: str) -> None:
 register_deleter("app", _delete_app_resource)
 
 
+# ============================================================================
+# Helpers
+# ============================================================================
+
+
+def _find_app_by_name(name: str) -> Optional[Dict[str, Any]]:
+    """Find an app by name, returns None if not found."""
+    try:
+        result = _get_app(name=name)
+        if result.get("error"):
+            return None
+        return result
+    except Exception:
+        return None
+
+
+# ============================================================================
+# Tool 1: create_or_update_app
+# ============================================================================
+
+
 @mcp.tool
-def create_app(
+def create_or_update_app(
     name: str,
+    source_code_path: Optional[str] = None,
     description: Optional[str] = None,
+    mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Create a new Databricks App.
+    Create a Databricks App if it doesn't exist, and optionally deploy it.
+
+    If the app already exists and source_code_path is provided, deploys
+    the latest code. This is the standard workflow: "make this app exist
+    and be running the latest code."
 
     Args:
         name: App name (must be unique within the workspace).
-        description: Optional human-readable description.
+        source_code_path: Workspace path to deploy from
+            (e.g., /Workspace/Users/user@example.com/my_app).
+            If provided, deploys after create/find.
+        description: Optional human-readable description (used on create only).
+        mode: Optional deployment mode (e.g., "snapshot").
 
     Returns:
-        Dictionary with app details including name, url, and status.
+        Dictionary with:
+        - name: App name
+        - created: True if newly created, False if already existed
+        - url: App URL
+        - status: App status
+        - deployment: Deployment details (if source_code_path provided)
+
+    Example:
+        >>> create_or_update_app("my-app", "/Workspace/Users/me/my_app")
+        {"name": "my-app", "created": True, "url": "...", "deployment": {...}}
     """
-    result = _create_app(name=name, description=description)
+    existing = _find_app_by_name(name)
 
-    # Track resource on successful create
-    try:
-        if result.get("name"):
-            from ..manifest import track_resource
+    if existing:
+        result = {**existing, "created": False}
+    else:
+        app_result = _create_app(name=name, description=with_description_footer(description))
+        result = {**app_result, "created": True}
 
-            track_resource(
-                resource_type="app",
-                name=result["name"],
-                resource_id=result["name"],
+        # Track resource on successful create
+        try:
+            if result.get("name"):
+                from ..manifest import track_resource
+
+                track_resource(
+                    resource_type="app",
+                    name=result["name"],
+                    resource_id=result["name"],
+                )
+        except Exception:
+            pass  # best-effort tracking
+
+    # Deploy if source_code_path provided
+    if source_code_path:
+        try:
+            deployment = _deploy_app(
+                app_name=name,
+                source_code_path=source_code_path,
+                mode=mode,
             )
-    except Exception:
-        pass  # best-effort tracking
+            result["deployment"] = deployment
+        except Exception as e:
+            logger.warning("Failed to deploy app '%s': %s", name, e)
+            result["deployment_error"] = str(e)
 
     return result
 
 
-@mcp.tool
-def get_app(name: str) -> Dict[str, Any]:
-    """
-    Get details for a Databricks App.
-
-    Args:
-        name: App name.
-
-    Returns:
-        Dict with app details: name, url, status, active deployment.
-    """
-    return _get_app(name=name)
+# ============================================================================
+# Tool 2: get_app
+# ============================================================================
 
 
 @mcp.tool
-def list_apps(
+def get_app(
+    name: Optional[str] = None,
     name_contains: Optional[str] = None,
-    limit: int = 20,
-) -> List[Dict[str, Any]]:
-    """
-    List Databricks Apps in the workspace.
-
-    Returns a limited set of apps (default 20). Use name_contains to
-    search for a specific app by name substring.
-
-    Args:
-        name_contains: Optional substring to filter app names
-            (case-insensitive).
-        limit: Max apps to return (default 20, 0 for all).
-
-    Returns:
-        List of dictionaries with app details.
-    """
-    return _list_apps(name_contains=name_contains, limit=limit)
-
-
-@mcp.tool
-def deploy_app(
-    app_name: str,
-    source_code_path: str,
-    mode: Optional[str] = None,
+    include_logs: bool = False,
+    deployment_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Deploy a Databricks App from a workspace source path.
+    Get app details by name, or list all apps.
+
+    Pass a name to get one app's details (optionally with recent logs).
+    Omit name to list all apps (with optional name_contains filter).
 
     Args:
-        app_name: Name of the app to deploy.
-        source_code_path: Workspace path to the app source code
-            (e.g., /Workspace/Users/user@example.com/my_app).
-        mode: Optional deployment mode (e.g., "snapshot").
+        name: App name. If provided, returns detailed app info.
+        name_contains: Filter apps by name substring (for listing).
+        include_logs: If True and name is provided, include deployment logs.
+        deployment_id: Specific deployment ID for logs. If omitted, uses
+            the active deployment.
 
     Returns:
-        Dictionary with deployment details including deployment_id and status.
+        Single app dict (if name provided) or {"apps": [...]}.
+
+    Example:
+        >>> get_app("my-app")
+        {"name": "my-app", "url": "...", "status": "RUNNING", ...}
+        >>> get_app("my-app", include_logs=True)
+        {"name": "my-app", ..., "logs": "..."}
+        >>> get_app()
+        {"apps": [{"name": "my-app", ...}, ...]}
     """
-    return _deploy_app(
-        app_name=app_name,
-        source_code_path=source_code_path,
-        mode=mode,
-    )
+    if name:
+        result = _get_app(name=name)
+
+        if include_logs:
+            try:
+                logs = _get_app_logs(
+                    app_name=name,
+                    deployment_id=deployment_id,
+                )
+                result["logs"] = logs.get("logs", "")
+                result["logs_deployment_id"] = logs.get("deployment_id")
+            except Exception as e:
+                result["logs_error"] = str(e)
+
+        return result
+
+    return {"apps": _list_apps(name_contains=name_contains)}
+
+
+# ============================================================================
+# Tool 3: delete_app
+# ============================================================================
 
 
 @mcp.tool
@@ -138,24 +206,3 @@ def delete_app(name: str) -> Dict[str, str]:
         pass  # best-effort tracking
 
     return result
-
-
-@mcp.tool
-def get_app_logs(
-    app_name: str,
-    deployment_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Get logs for a Databricks App deployment.
-
-    If deployment_id is not provided, gets logs for the active deployment.
-
-    Args:
-        app_name: App name.
-        deployment_id: Optional specific deployment ID. If None, uses the
-            active deployment.
-
-    Returns:
-        Dictionary with deployment logs.
-    """
-    return _get_app_logs(app_name=app_name, deployment_id=deployment_id)

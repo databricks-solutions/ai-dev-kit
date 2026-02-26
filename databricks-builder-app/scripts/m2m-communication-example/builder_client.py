@@ -30,11 +30,19 @@ class BuilderClient:
   Args:
       builder_app_url: Base URL of the builder app (e.g. https://workspace.cloud.databricks.com/apps/my-app)
       token: Explicit Bearer token (for local dev). Falls back to DATABRICKS_TOKEN env var.
+      user_email: Real user email to forward via X-Forwarded-Email. When set, the builder
+          app uses this as the identity instead of resolving the SP from the Bearer token.
   """
 
-  def __init__(self, builder_app_url: str, token: Optional[str] = None) -> None:
+  def __init__(
+    self,
+    builder_app_url: str,
+    token: Optional[str] = None,
+    user_email: Optional[str] = None,
+  ) -> None:
     self.base_url = builder_app_url.rstrip('/')
     self._explicit_token = token or os.environ.get('DATABRICKS_TOKEN')
+    self._user_email = user_email
 
     # Cached auth headers from WorkspaceClient (for Databricks Apps runtime)
     self._auth_headers_cache: Optional[dict[str, str]] = None
@@ -48,17 +56,28 @@ class BuilderClient:
       2. Remote workspace credentials (BUILDER_DATABRICKS_HOST + token or SP creds)
       3. Same-workspace auto-auth via WorkspaceClient().config.authenticate()
 
+    If user_email was provided at construction, X-Forwarded-Email is included
+    so the builder app resolves the real user instead of the SP identity.
+
     Returns:
-        Dict with Authorization header.
+        Dict with Authorization and (optionally) X-Forwarded-Email headers.
     """
+    headers: dict[str, str] = {}
+
     # 1. Local dev / explicit token path
     if self._explicit_token:
-      return {'Authorization': f'Bearer {self._explicit_token}'}
+      headers['Authorization'] = f'Bearer {self._explicit_token}'
+      if self._user_email:
+        headers['X-Forwarded-Email'] = self._user_email
+      return headers
 
     # Check cached headers (applies to both remote and same-workspace paths)
     now = time.time()
     if self._auth_headers_cache and now < self._auth_expires_at:
-      return self._auth_headers_cache
+      headers.update(self._auth_headers_cache)
+      if self._user_email:
+        headers['X-Forwarded-Email'] = self._user_email
+      return headers
 
     # Import here to avoid hard dependency when using explicit token
     from databricks.sdk import WorkspaceClient
@@ -71,30 +90,37 @@ class BuilderClient:
       client_secret = os.environ.get('BUILDER_DATABRICKS_CLIENT_SECRET')
 
       if remote_token:
-        # Static token — no caching needed, return directly
         logger.info('Using BUILDER_DATABRICKS_TOKEN for remote workspace auth')
-        return {'Authorization': f'Bearer {remote_token}'}
+        headers['Authorization'] = f'Bearer {remote_token}'
+        if self._user_email:
+          headers['X-Forwarded-Email'] = self._user_email
+        return headers
       elif client_id and client_secret:
-        # SP credentials for the remote workspace — generate OAuth token
         logger.info(f'Refreshing auth via SP credentials for {remote_host}')
         client = WorkspaceClient(
           host=remote_host,
           client_id=client_id,
           client_secret=client_secret,
         )
-        headers = client.config.authenticate()
-        self._auth_headers_cache = headers
+        auth_headers = client.config.authenticate()
+        self._auth_headers_cache = auth_headers
         self._auth_expires_at = now + 3000
+        headers.update(auth_headers)
+        if self._user_email:
+          headers['X-Forwarded-Email'] = self._user_email
         return headers
 
     # 3. Same-workspace auto-auth (default)
     logger.info('Refreshing auth headers via WorkspaceClient.config.authenticate()')
     client = WorkspaceClient()
-    headers = client.config.authenticate()
+    auth_headers = client.config.authenticate()
 
-    self._auth_headers_cache = headers
+    self._auth_headers_cache = auth_headers
     # Cache for 50 min (tokens typically last 60 min)
     self._auth_expires_at = now + 3000
+    headers.update(auth_headers)
+    if self._user_email:
+      headers['X-Forwarded-Email'] = self._user_email
     return headers
 
   def _api_url(self, path: str) -> str:

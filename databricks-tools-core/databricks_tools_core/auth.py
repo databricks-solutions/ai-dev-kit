@@ -15,6 +15,9 @@ Usage in FastAPI:
     finally:
         clear_databricks_auth()
 
+Cross-workspace (force explicit token over env OAuth):
+    set_databricks_auth(target_host, target_token, force_token=True)
+
 Usage in functions:
     from databricks_tools_core.auth import get_workspace_client
 
@@ -47,9 +50,15 @@ def _has_oauth_credentials() -> bool:
 # Context variables for per-request authentication
 _host_ctx: ContextVar[Optional[str]] = ContextVar("databricks_host", default=None)
 _token_ctx: ContextVar[Optional[str]] = ContextVar("databricks_token", default=None)
+_force_token_ctx: ContextVar[bool] = ContextVar("force_token", default=False)
 
 
-def set_databricks_auth(host: Optional[str], token: Optional[str]) -> None:
+def set_databricks_auth(
+    host: Optional[str],
+    token: Optional[str],
+    *,
+    force_token: bool = False,
+) -> None:
     """Set Databricks authentication for the current async context.
 
     Call this at the start of a request to set per-user credentials.
@@ -59,9 +68,13 @@ def set_databricks_auth(host: Optional[str], token: Optional[str]) -> None:
     Args:
         host: Databricks workspace URL (e.g., https://xxx.cloud.databricks.com)
         token: Databricks access token
+        force_token: When True, the explicit token takes priority over
+            environment OAuth credentials. Use for cross-workspace requests
+            where the token belongs to a different workspace's SP.
     """
     _host_ctx.set(host)
     _token_ctx.set(token)
+    _force_token_ctx.set(force_token)
 
 
 def clear_databricks_auth() -> None:
@@ -71,25 +84,33 @@ def clear_databricks_auth() -> None:
     """
     _host_ctx.set(None)
     _token_ctx.set(None)
+    _force_token_ctx.set(False)
 
 
 def get_workspace_client() -> WorkspaceClient:
     """Get a WorkspaceClient using context auth or environment variables.
 
     Authentication priority:
-    1. If OAuth credentials exist in env, use explicit OAuth M2M auth (Databricks Apps)
+    1. If force_token is set (cross-workspace), use the explicit token from context
+    2. If OAuth credentials exist in env, use explicit OAuth M2M auth (Databricks Apps)
        - This explicitly sets auth_type to prevent conflicts with other auth methods
-    2. Context variables with explicit token (PAT auth for development)
-    3. Fall back to default authentication (env vars, config file)
+    3. Context variables with explicit token (PAT auth for development)
+    4. Fall back to default authentication (env vars, config file)
 
     Returns:
         Configured WorkspaceClient instance
     """
     host = _host_ctx.get()
     token = _token_ctx.get()
+    force = _force_token_ctx.get()
 
     # Common kwargs for product identification in user-agent
     product_kwargs = dict(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
+
+    # Cross-workspace: explicit token overrides env OAuth so tool operations
+    # target the caller-specified workspace instead of the app's own workspace
+    if force and host and token:
+        return tag_client(WorkspaceClient(host=host, token=token, **product_kwargs))
 
     # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M
     # This prevents the SDK from detecting other auth methods like PAT or config file
