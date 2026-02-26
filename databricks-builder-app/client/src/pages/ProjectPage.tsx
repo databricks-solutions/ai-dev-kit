@@ -425,6 +425,7 @@ export default function ProjectPage() {
     executionId: string | null;
     abortController: AbortController | null;
     isReconnecting: boolean;
+    pendingMessages: Message[]; // messages not yet saved to DB (user msg + partial assistant)
   }>>({});
 
   // Keep currentConvIdRef in sync with state
@@ -521,6 +522,7 @@ export default function ProjectPage() {
             executionId: active.id,
             abortController: controller,
             isReconnecting: true,
+            pendingMessages: [],
           };
           setStreamingConvIds(prev => [...prev, reconConvId]);
           setIsReconnecting(true);
@@ -645,23 +647,31 @@ export default function ProjectPage() {
   const handleSelectConversation = async (conversationId: string) => {
     if (!projectId || currentConversation?.id === conversationId) return;
 
+    // Update ref immediately so stream callbacks target the right conversation
+    currentConvIdRef.current = conversationId;
     // Reset reconnect tracking for the new conversation
     reconnectAttemptedRef.current = null;
 
     try {
       const conv = await fetchConversation(projectId, conversationId);
       setCurrentConversation(conv);
-      setMessages(conv.messages || []);
 
       // Sync streaming UI state for the new conversation
       const stream = allStreamsRef.current[conversationId];
       if (stream) {
+        // Merge API messages with pending messages not yet saved to DB
+        const apiMessages = conv.messages || [];
+        const pending = stream.pendingMessages || [];
+        const apiIds = new Set(apiMessages.map(m => m.content + m.role));
+        const missingPending = pending.filter(m => !apiIds.has(m.content + m.role));
+        setMessages([...missingPending, ...apiMessages]);
         setStreamingText(stream.fullText);
         setActivityItems([...stream.activityItems]);
         setTodos([...stream.todos]);
         setActiveExecutionId(stream.executionId);
         setIsReconnecting(stream.isReconnecting);
       } else {
+        setMessages(conv.messages || []);
         setStreamingText('');
         setActivityItems([]);
         setTodos([]);
@@ -690,6 +700,7 @@ export default function ProjectPage() {
 
     try {
       const conv = await createConversation(projectId);
+      currentConvIdRef.current = conv.id; // Update ref immediately
       setConversations((prev) => [conv, ...prev]);
       setCurrentConversation(conv);
       setMessages([]);
@@ -780,6 +791,7 @@ export default function ProjectPage() {
       executionId: null,
       abortController,
       isReconnecting: false,
+      pendingMessages: [tempUserMessage],
     };
     setStreamingConvIds(prev => [...prev, effectiveConvId]);
 
@@ -818,6 +830,7 @@ export default function ProjectPage() {
             allStreamsRef.current[newConvId] = oldStream || {
               fullText: '', activityItems: [], todos: [], tools: [],
               executionId: null, abortController, isReconnecting: false,
+              pendingMessages: [],
             };
             conversationId = newConvId;
             // Update streamingConvIds from old key to new key
@@ -1246,7 +1259,7 @@ export default function ProjectPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto">
-          {messages.length === 0 && !(isStreamingHere && streamingText) ? (
+          {messages.length === 0 && !isStreamingHere ? (
             /* Empty State */
             <div className="flex h-full items-center justify-center px-6">
               <div className="text-center max-w-xl w-full">
