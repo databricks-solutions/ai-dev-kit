@@ -741,7 +741,7 @@ import json, sys
 try:
     with open('$path') as f: cfg = json.load(f)
 except: cfg = {}
-cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'defer_loading': True, 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
 with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 " 2>/dev/null && return
     fi
@@ -752,6 +752,7 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
     "databricks": {
       "command": "$VENV_PYTHON",
       "args": ["$MCP_ENTRY"],
+      "defer_loading": true,
       "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
     }
   }
