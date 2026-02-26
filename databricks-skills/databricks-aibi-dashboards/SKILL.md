@@ -332,7 +332,11 @@ y=12: Table (w=6, h=6) - Detailed data
 - `widgetType`: "line" or "bar"
 - Use `x`, `y`, optional `color` encodings
 - `scale.type`: `"temporal"` (dates), `"quantitative"` (numbers), `"categorical"` (strings)
-- Use `"disaggregated": true` with pre-aggregated dataset data
+- **ALWAYS use `"disaggregated": false` with explicit aggregation expressions** (e.g., `SUM(\`col\`)`) for the y-axis metric
+
+> ⚠️ **CRITICAL — MISSING_GROUP_BY error**: If you use `"disaggregated": true` on a chart (bar/line/pie), Databricks generates SQL with an implicit aggregation but WITHOUT a GROUP BY clause → `[MISSING_GROUP_BY] SQLSTATE: 42803`.
+> **Rule**: charts always need `"disaggregated": false` + explicit `SUM()`/`AVG()`/`COUNT()` in the field expression. The field `name` must then match the aggregation pattern, e.g., `"name": "sum(revenue)"` with `"expression": "SUM(\`revenue\`)"`, and `"fieldName": "sum(revenue)"` in encodings.
+> `"disaggregated": true` is **only** safe for **tables** (raw row display without aggregation).
 
 **Multiple Lines - Two Approaches:**
 
@@ -357,6 +361,36 @@ y=12: Table (w=6, h=6) - Detailed data
 - **Stacked** (default): No `mark` field - bars stack on top of each other
 - **Grouped**: Add `"mark": {"layout": "group"}` - bars side-by-side for comparison
 
+**Correct bar chart example (disaggregated: false + SUM):**
+```json
+{
+  "widget": {
+    "name": "revenue-by-region",
+    "queries": [{
+      "name": "main_query",
+      "query": {
+        "datasetName": "sales_ds",
+        "fields": [
+          {"name": "region", "expression": "`region`"},
+          {"name": "sum(revenue)", "expression": "SUM(`revenue`)"}
+        ],
+        "disaggregated": false
+      }
+    }],
+    "spec": {
+      "version": 3,
+      "widgetType": "bar",
+      "encodings": {
+        "x": {"fieldName": "region", "scale": {"type": "categorical"}, "displayName": "Region"},
+        "y": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}
+      },
+      "frame": {"showTitle": true, "title": "Revenue by Region"}
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 3, "height": 5}
+}
+```
+
 **Pie Chart:**
 - `version`: **3**
 - `widgetType`: "pie"
@@ -379,23 +413,33 @@ y=12: Table (w=6, h=6) - Detailed data
 
 ---
 
+#### 🔴 CRITICAL: A Filter ONLY Affects Datasets in Its `queries` Array
+
+> **THIS IS THE MOST COMMON MISTAKE WITH FILTERS.**
+>
+> A filter widget does **NOT** automatically apply to all datasets or all pages.
+> **A filter ONLY filters the datasets explicitly listed in its `queries` array.**
+>
+> - If a dataset is not in `queries`, the filter has **zero effect** on widgets using that dataset.
+> - For global filters to work across all pages, you **MUST** include every dataset in the filter's `queries` list.
+> - For page-level filters to work on all widgets on that page, every dataset used on that page must be listed.
+
+**Practical rule:** Every dataset that has the filter column must be added to the filter's `queries` array (with its own entry). One entry = one dataset.
+
+---
+
 #### Global Filters vs Page-Level Filters
 
 | Type | Placement | Scope | Use Case |
 |------|-----------|-------|----------|
-| **Global Filter** | Dedicated page with `"pageType": "PAGE_TYPE_GLOBAL_FILTERS"` | Affects ALL pages that have datasets with the filter field | Cross-dashboard filtering (e.g., date range, campaign) |
-| **Page-Level Filter** | Regular page with `"pageType": "PAGE_TYPE_CANVAS"` | Affects ONLY widgets on that same page | Page-specific filtering (e.g., platform filter on breakdown page only) |
-
-**Key Insight**: A filter only affects datasets that contain the filter field. To have a filter affect only specific pages:
-1. Include the filter dimension in datasets for pages that should be filtered
-2. Exclude the filter dimension from datasets for pages that should NOT be filtered
+| **Global Filter** | Dedicated page with `"pageType": "PAGE_TYPE_GLOBAL_FILTERS"` | Affects ONLY datasets listed in its `queries` array | Cross-dashboard filtering (e.g., region, bodega) |
+| **Page-Level Filter** | Regular page with `"pageType": "PAGE_TYPE_CANVAS"` | Affects ONLY datasets listed in its `queries` array, on that same page | Page-specific filtering (e.g., month selector on one page) |
 
 ---
 
-#### Filter Widget Structure
+#### Filter Widget Structure — Single Dataset
 
-> **CRITICAL**: Do NOT use `associative_filter_predicate_group` - it causes SQL errors!
-> Use a simple field expression instead.
+Use this when the filter only needs to affect one dataset (e.g., a page-level filter for a unique field):
 
 ```json
 {
@@ -430,9 +474,12 @@ y=12: Table (w=6, h=6) - Detailed data
 
 ---
 
-#### Global Filter Example
+#### Filter Widget Structure — Multiple Datasets (REQUIRED for most real filters)
 
-Place on a dedicated filter page:
+When a filter must apply to many datasets (e.g., a global REGION filter that should work on all pages), you **must** list every target dataset in `queries`. Each dataset gets:
+1. A **unique query name** (use pattern `q_{dataset_name}_{field_name}`)
+2. An extra `{field}_associativity` field: `"expression": "COUNT_IF(\`associative_filter_predicate_group\`)"` — this enables cross-dataset associativity and **is required** in the multi-dataset pattern
+3. A corresponding entry in `encodings.fields` pointing to that query
 
 ```json
 {
@@ -470,11 +517,75 @@ Place on a dedicated filter page:
 }
 ```
 
+> **Note on `associative_filter_predicate_group`**: This is a Databricks internal virtual column used only in the `COUNT_IF(...)` expression within the `_associativity` field. It is **required** in the multi-dataset pattern — do NOT omit it. It is NOT a regular column in the dataset SQL and does NOT cause errors.
+
+**Python helper pattern for multi-dataset filters:**
+
+```python
+def filt(name, title, primary_ds, field_name, ftype="filter-multi-select",
+         w=2, h=2, x=0, y=0, extra_datasets=None):
+    """
+    extra_datasets: list of additional dataset names to apply the filter to.
+    If None or empty, uses simple single-dataset pattern (no associativity).
+    If provided, uses multi-dataset pattern with associativity fields.
+    CRITICAL: every dataset that uses this filter field must be in this list.
+    """
+    all_datasets = [primary_ds] + (extra_datasets or [])
+    if len(all_datasets) == 1:
+        # Single dataset: simple pattern, queryName = "main_query"
+        queries = [{"name": "main_query", "query": {
+            "datasetName": primary_ds, "disaggregated": False,
+            "fields": [{"name": field_name, "expression": f"`{field_name}`"}]}}]
+        enc_fields = [{"fieldName": field_name, "displayName": title, "queryName": "main_query"}]
+    else:
+        # Multi-dataset: unique query names + associativity field per dataset
+        queries = []
+        enc_fields = []
+        for ds in all_datasets:
+            qname = f"q_{ds}_{field_name}"
+            queries.append({"name": qname, "query": {
+                "datasetName": ds, "disaggregated": False,
+                "fields": [
+                    {"name": field_name, "expression": f"`{field_name}`"},
+                    {"name": f"{field_name}_associativity",
+                     "expression": f"COUNT_IF(`associative_filter_predicate_group`)"}
+                ]}})
+            enc_fields.append({"fieldName": field_name, "queryName": qname})
+    return {
+        "position": {"x": x, "y": y, "width": w, "height": h},
+        "widget": {
+            "name": name,
+            "queries": queries,
+            "spec": {
+                "version": 2, "widgetType": ftype,
+                "encodings": {"fields": enc_fields},
+                "frame": {"showTitle": True, "title": title}
+            }
+        }
+    }
+```
+
+---
+
+#### Global Filter Example
+
+```json
+{
+  "name": "filters",
+  "displayName": "Filters",
+  "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+  "layout": [
+    // Filter applying to ALL datasets that have the 'region' column
+    // The widget must list every such dataset in its queries array
+  ]
+}
+```
+
 ---
 
 #### Page-Level Filter Example
 
-Place directly on a canvas page (affects only that page):
+Place directly on a canvas page (affects only that page). Still must list all datasets on that page:
 
 ```json
 {
@@ -484,38 +595,31 @@ Place directly on a canvas page (affects only that page):
   "layout": [
     {
       "widget": {
-        "name": "page-title",
-        "multilineTextboxSpec": {"lines": ["## Platform Breakdown"]}
-      },
-      "position": {"x": 0, "y": 0, "width": 4, "height": 1}
-    },
-    {
-      "widget": {
         "name": "filter_platform",
-        "queries": [{
-          "name": "ds_platform",
-          "query": {
-            "datasetName": "platform_data",
-            "fields": [{"name": "platform", "expression": "`platform`"}],
-            "disaggregated": false
+        "queries": [
+          {
+            "name": "q_ds_platform_platform",
+            "query": {
+              "datasetName": "ds_platform",
+              "fields": [
+                {"name": "platform", "expression": "`platform`"},
+                {"name": "platform_associativity", "expression": "COUNT_IF(`associative_filter_predicate_group`)"}
+              ],
+              "disaggregated": false
+            }
           }
-        }],
+        ],
         "spec": {
           "version": 2,
           "widgetType": "filter-multi-select",
           "encodings": {
-            "fields": [{
-              "fieldName": "platform",
-              "displayName": "Platform",
-              "queryName": "ds_platform"
-            }]
+            "fields": [{"fieldName": "platform", "queryName": "q_ds_platform_platform"}]
           },
           "frame": {"showTitle": true, "title": "Platform"}
         }
       },
       "position": {"x": 4, "y": 0, "width": 2, "height": 2}
     }
-    // ... other widgets on this page
   ]
 }
 ```
@@ -536,10 +640,17 @@ Before deploying, verify:
 4. Chart dimensions have ≤8 distinct values
 5. All widget fieldNames match dataset columns exactly
 6. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
-7. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
-8. Percent values are 0-1 (not 0-100)
-9. SQL uses Spark syntax (date_sub, not INTERVAL)
-10. **All SQL queries tested via `execute_sql` and return expected data**
+7. **`disaggregated` rules (CRITICAL)**:
+   - **Charts (bar/line/pie)**: ALWAYS `disaggregated: false` + explicit aggregation (`SUM`, `AVG`, `COUNT`) in the y-axis field expression. Using `disaggregated: true` on charts causes `[MISSING_GROUP_BY] SQLSTATE: 42803`.
+   - **Counters with multi-row datasets**: `disaggregated: false` + aggregation expression
+   - **Counters with 1-row pre-aggregated datasets**: `disaggregated: true` + simple field reference
+   - **Tables**: `disaggregated: true` + simple field references (raw row display)
+   - **Filters**: `disaggregated: false` + simple field reference (for DISTINCT values)
+8. `widgetType` and `frame` ALWAYS go inside the `spec` block — never at the widget root
+9. Text widgets: use `multilineTextboxSpec: {lines: [...]}` at widget root — NO `spec` block at all
+10. Percent values are 0-1 (not 0-100)
+11. SQL uses Spark syntax (date_sub, not INTERVAL)
+12. **All SQL queries tested via `execute_sql` and return expected data**
 
 ---
 
@@ -676,7 +787,7 @@ dashboard = {
                 },
                 "position": {"x": 4, "y": 2, "width": 2, "height": 3}
             },
-            # Bar chart - version 3
+            # Bar chart - version 3, ALWAYS disaggregated=False + explicit SUM/COUNT
             {
                 "widget": {
                     "name": "trips-by-zip",
@@ -686,9 +797,11 @@ dashboard = {
                             "datasetName": "by_zip",
                             "fields": [
                                 {"name": "pickup_zip", "expression": "`pickup_zip`"},
-                                {"name": "trip_count", "expression": "`trip_count`"}
+                                # CRITICAL: use SUM/COUNT with disaggregated=False, NOT disaggregated=True with raw field
+                                # Using disaggregated=True on charts causes [MISSING_GROUP_BY] SQLSTATE: 42803
+                                {"name": "sum(trip_count)", "expression": "SUM(`trip_count`)"}
                             ],
-                            "disaggregated": True
+                            "disaggregated": False  # ALWAYS False for charts
                         }
                     }],
                     "spec": {
@@ -696,7 +809,8 @@ dashboard = {
                         "widgetType": "bar",
                         "encodings": {
                             "x": {"fieldName": "pickup_zip", "scale": {"type": "categorical"}, "displayName": "ZIP"},
-                            "y": {"fieldName": "trip_count", "scale": {"type": "quantitative"}, "displayName": "Trips"}
+                            # fieldName must match exactly the "name" in fields above
+                            "y": {"fieldName": "sum(trip_count)", "scale": {"type": "quantitative"}, "displayName": "Trips"}
                         },
                         "frame": {"title": "Trips by Pickup ZIP", "showTitle": True}
                     }
@@ -882,10 +996,15 @@ print(result["url"])
 - Use `version: 2` (NOT 3)
 - Ensure dataset returns exactly 1 row
 
-### Dashboard shows empty widgets
+### Dashboard shows empty widgets or [MISSING_GROUP_BY] SQLSTATE: 42803
 - Run the dataset SQL query directly to check data exists
 - Verify column aliases match widget field expressions
-- Check `disaggregated` flag (should be `true` for pre-aggregated data)
+- Check `disaggregated` flag per widget type:
+  - **Charts (bar/line/pie)**: MUST be `false` + explicit aggregation in y-field (`SUM(...)`, etc.). `true` causes `[MISSING_GROUP_BY]` error.
+  - **Tables**: MUST be `true` (raw row display)
+  - **Counters (multi-row dataset)**: `false` + aggregation
+  - **Counters (1-row dataset)**: `true` + simple reference
+- Verify `widgetType` and `frame` are inside `spec`, NOT at the widget root level
 
 ### Layout has gaps
 - Ensure each row sums to width=6
