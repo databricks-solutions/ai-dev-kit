@@ -271,7 +271,7 @@ class TableStatsCollector:
                 timeout=45,
             )
             column_details: Dict[str, ColumnDetail] = {}
-            for col in (describe_result or []):
+            for col in describe_result or []:
                 col_name = col.get("col_name")
                 data_type = col.get("data_type", "string").lower()
                 if not col_name or col_name.startswith("#") or col_name == "":
@@ -705,9 +705,7 @@ class TableStatsCollector:
 
             try:
                 if collect_stats:
-                    column_details, total_rows, sample_data = self.collect_column_stats(
-                        catalog, schema, table_name
-                    )
+                    column_details, total_rows, sample_data = self.collect_column_stats(catalog, schema, table_name)
                 else:
                     column_details = self._describe_columns(catalog, schema, table_name)
             except Exception as e:

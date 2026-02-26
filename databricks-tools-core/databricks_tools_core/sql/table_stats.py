@@ -135,9 +135,7 @@ def get_table_details(
             except Exception as e:
                 logger.warning(f"Failed to fetch metadata for {catalog}.{schema}.{name}: {e}")
                 # Fall back to minimal info so stats collection can still proceed
-                tables_to_fetch.append(
-                    {"name": name, "updated_at": None, "comment": None}
-                )
+                tables_to_fetch.append({"name": name, "updated_at": None, "comment": None})
 
     if not tables_to_fetch:
         return TableSchemaResult(catalog=catalog, schema_name=schema, tables=[])
