@@ -62,7 +62,7 @@ get_skill_description() {
         "databricks-config") echo "Profile authentication setup for Databricks" ;;
         "databricks-dbsql") echo "Databricks SQL - SQL scripting, MVs, geospatial, AI functions, federation" ;;
         "databricks-docs") echo "Documentation reference via llms.txt" ;;
-        "databricks-genie") echo "Genie Spaces - create, curate, and query via Conversation API" ;;
+        "databricks-genie") echo "Genie Spaces - create, query, analyze, benchmark, and optimize via Genie API" ;;
         "databricks-iceberg") echo "Apache Iceberg - managed tables, UniForm, IRC, Snowflake interop, migration" ;;
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
@@ -97,7 +97,7 @@ get_skill_extra_files() {
     case "$1" in
         "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
         "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
-        "databricks-genie") echo "spaces.md conversation.md" ;;
+        "databricks-genie") echo "spaces.md conversation.md references/best-practices-checklist.md references/space-schema.md references/workflow-analyze.md references/workflow-benchmark.md references/workflow-optimize.md scripts/create_optimized_space.py scripts/fetch_space.py scripts/run_benchmark.py" ;;
         "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
