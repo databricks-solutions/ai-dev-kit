@@ -17,6 +17,7 @@ Use this skill when:
 - Tracking **compute resources** (cluster usage, warehouse metrics)
 - Reviewing **job execution** (run history, success rates, failures)
 - Analyzing **query performance** (slow queries, warehouse utilization)
+- Profiling **data quality** (lakehouse monitors, drift detection, metric tables)
 
 ## Reference Files
 
@@ -24,6 +25,7 @@ Use this skill when:
 |-------|------|-------------|
 | System Tables | [5-system-tables.md](5-system-tables.md) | Lineage, audit, billing, compute, jobs, query history |
 | Volumes | [6-volumes.md](6-volumes.md) | Volume file operations, permissions, best practices |
+| Lakehouse Monitoring | [7-lakehouse-monitoring.md](7-lakehouse-monitoring.md) | Quality monitors, drift detection, profile metrics |
 
 ## Quick Start
 
