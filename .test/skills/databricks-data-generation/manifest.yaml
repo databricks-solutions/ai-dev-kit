@@ -1,0 +1,45 @@
+skill_name: databricks-data-generation
+description: Tests for Databricks synthetic data generation skill covering Spark + Faker + Pandas UDFs, execution methods, output formats, and referential integrity
+version: 1.0.0
+
+scorers:
+  enabled:
+    - python_syntax            # Check Python code blocks for syntax errors
+    - no_hallucinated_apis     # Detect deprecated/wrong APIs
+    - pattern_adherence        # Regex match against expected patterns
+    - expected_facts_present   # Check if required facts mentioned
+
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations
+
+  default_guidelines:
+    - "Response must generate complete, runnable Python code"
+    - "Code must use the execution method specified in the prompt"
+    - "Code must save data in the output format specified"
+    - "When generating multiple tables, foreign key columns must use consistent ID formats"
+    - "Must use non-uniform distributions (log-normal, exponential, weighted) for realistic data"
+    - "Must include configuration section at top of script with CATALOG, SCHEMA, and size variables"
+    - "Must create catalog, schema, and volume infrastructure within the Python script"
+    - "Child tables must reference valid IDs from parent tables for referential integrity"
+
+quality_gates:
+  syntax_valid: 1.0           # 100% - all Python syntax must be valid
+  pattern_adherence: 0.9      # 90% - follow expected patterns
+  execution_success: 0.8      # 80% - code execution success rate
+  no_hallucinations: 1.0      # 100% - no deprecated/invalid APIs
+
+trace_expectations:
+  tool_limits:
+    Bash: 10
+    Read: 20
+    Write: 15
+    Edit: 15
+    mcp__databricks__run_python_file_on_databricks: 5
+    mcp__databricks__execute_databricks_command: 5
+    mcp__databricks__create_job: 3
+    mcp__databricks__run_job_now: 3
+  token_budget:
+    max_total: 200000
+  required_tools: []
+  banned_tools: []
