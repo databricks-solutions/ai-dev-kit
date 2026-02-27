@@ -81,11 +81,11 @@ MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace
 MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 
 # Output helpers
-msg()  { [ "$SILENT" = false ] && echo -e "  $*"; }
-ok()   { [ "$SILENT" = false ] && echo -e "  ${G}✓${N} $*"; }
-warn() { [ "$SILENT" = false ] && echo -e "  ${Y}!${N} $*"; }
+msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
+ok()   { [ "$SILENT" = true ] || echo -e "  ${G}✓${N} $*"; }
+warn() { [ "$SILENT" = true ] || echo -e "  ${Y}!${N} $*"; }
 die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
-step() { [ "$SILENT" = false ] && echo -e "\n${B}$*${N}"; }
+step() { [ "$SILENT" = true ] || echo -e "\n${B}$*${N}"; }
 
 # Parse arguments
 while [ $# -gt 0 ]; do
@@ -741,7 +741,7 @@ import json, sys
 try:
     with open('$path') as f: cfg = json.load(f)
 except: cfg = {}
-cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'defer_loading': True, 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
 with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 " 2>/dev/null && return
     fi
@@ -752,6 +752,7 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
     "databricks": {
       "command": "$VENV_PYTHON",
       "args": ["$MCP_ENTRY"],
+      "defer_loading": true,
       "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
     }
   }
@@ -856,7 +857,10 @@ save_version() {
     # Validate version format
     [[ "$ver" =~ (404|Not Found|error) ]] && ver="dev"
     echo "$ver" > "$INSTALL_DIR/version"
-    [ "$SCOPE" = "project" ] && { mkdir -p ".ai-dev-kit"; echo "$ver" > ".ai-dev-kit/version"; }
+    if [ "$SCOPE" = "project" ]; then
+        mkdir -p ".ai-dev-kit"
+        echo "$ver" > ".ai-dev-kit/version"
+    fi
 }
 
 # Print summary

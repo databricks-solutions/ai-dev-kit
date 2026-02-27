@@ -38,11 +38,9 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 | `execute_sql` | **STEP 3**: Test SQL queries - MANDATORY before deployment! |
 | `get_best_warehouse` | Get available warehouse ID |
 | `create_or_update_dashboard` | **STEP 5**: Deploy dashboard JSON (only after validation!) |
-| `get_dashboard` | Get dashboard details by ID |
-| `list_dashboards` | List dashboards in workspace |
-| `trash_dashboard` | Move dashboard to trash |
-| `publish_dashboard` | Publish dashboard for viewers |
-| `unpublish_dashboard` | Unpublish a dashboard |
+| `get_dashboard` | Get dashboard details by ID, or list all dashboards (omit dashboard_id) |
+| `delete_dashboard` | Move dashboard to trash |
+| `publish_dashboard` | Publish (`publish=True`) or unpublish (`publish=False`) a dashboard |
 
 ---
 
