@@ -3,6 +3,8 @@ name: databricks-data-generation
 description: "Generate realistic synthetic data using Spark + Faker (strongly recommended). Supports serverless execution, multiple output formats (Parquet/JSON/CSV/Delta), and scales from thousands to millions of rows. For small datasets (<10K rows), can optionally generate locally and upload to volumes. Use when user mentions 'synthetic data', 'test data', 'generate data', 'demo dataset', 'Faker', or 'sample data'."
 ---
 
+> Catalog and schema are **always user-supplied** — never default to any value. If the user hasn't provided them, ask. For any UC write, **always create the schema if it doesn't exist** before writing data.
+
 # Databricks Synthetic Data Generation
 
 Generate realistic, story-driven synthetic data for Databricks using **Spark + Faker + Pandas UDFs** (strongly recommended).
@@ -37,7 +39,7 @@ python generate_data.py
 
 1. **Always use Spark + Faker + Pandas UDFs** for data generation (scalable, parallel)
 2. **Present a plan for user approval** before generating any code
-3. **Ask for catalog/schema** - default to `ai_dev_kit.<user_schema>`
+3. **Ask for catalog/schema** - do not default
 4. **Use serverless compute** unless user explicitly requests classic cluster
 5. **Generate raw data only** - no pre-aggregated fields (unless user requests)
 6. **Create master tables first** - then generate related tables with valid FKs
@@ -52,7 +54,7 @@ python generate_data.py
 **You MUST explicitly ask the user which catalog to use.** Do not assume or proceed without confirmation.
 
 Example prompt to user:
-> "Which Unity Catalog should I use for this data? Default is `ai_dev_kit` but you can specify any catalog you have access to."
+> "Which Unity Catalog should I use for this data?"
 
 When presenting your plan, always show the selected catalog prominently:
 ```
@@ -65,21 +67,19 @@ This makes it easy for the user to spot and correct if needed.
 ### Step 1: Gather Requirements
 
 Ask the user about:
-- **Catalog/Schema** - Which catalog to use? (default: `ai_dev_kit.<user_schema>`)
+- **Catalog/Schema** - Which catalog to use?
 - What domain/scenario? (e-commerce, support tickets, IoT sensors, etc.)
 - How many tables? What relationships between them?
 - Approximate row counts per table?
-- Output format preference? (Parquet to Volume is default)
+- Output format preference? (Delta table is default)
 
 ### Step 2: Present Table Specification
 
 Show a clear specification with **YOUR ASSUMPTIONS surfaced**. Always start with the output location:
 
 ```
-📍 Output Location: ai_dev_kit.ecommerce_demo
-   Volume: /Volumes/ai_dev_kit/ecommerce_demo/raw_data/
-
-   ⬆️ Change this? Just let me know which catalog.schema to use instead.
+📍 Output Location: {user_catalog}.ecommerce_demo
+   Volume: /Volumes/{user_catalog}/ecommerce_demo/raw_data/
 ```
 
 | Table | Columns | Rows | Key Assumptions |
@@ -158,9 +158,9 @@ customers_df = (
 )
 
 # Save to Unity Catalog
-spark.sql("CREATE SCHEMA IF NOT EXISTS ai_dev_kit.my_schema")
-spark.sql("CREATE VOLUME IF NOT EXISTS ai_dev_kit.my_schema.raw_data")
-customers_df.write.mode("overwrite").parquet("/Volumes/ai_dev_kit/my_schema/raw_data/customers")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
+customers_df.write.mode("overwrite").parquet(f"/Volumes/{CATALOG}/{SCHEMA}/raw_data/customers")
 ```
 
 ## Common Patterns
@@ -223,7 +223,7 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 
 ### Execution
 - Use serverless (instant start, no cluster wait)
-- Ask for catalog/schema (default `ai_dev_kit`)
+- Ask for catalog/schema
 - Present plan before generating
 
 ### Data Generation
@@ -236,7 +236,7 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 ### Output
 - Create infrastructure in script (`CREATE SCHEMA/VOLUME IF NOT EXISTS`)
 - Do NOT create catalogs - assume they exist
-- Parquet to volumes as default
+- Delta tables as default
 
 ## Related Skills
 

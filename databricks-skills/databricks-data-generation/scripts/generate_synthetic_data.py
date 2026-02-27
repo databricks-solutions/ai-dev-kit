@@ -27,8 +27,8 @@ USE_SERVERLESS = True  # Set to False and provide CLUSTER_ID for classic compute
 CLUSTER_ID = None  # Only used if USE_SERVERLESS=False
 
 # Storage - Update these for your environment
-CATALOG = "ai_dev_kit"  # Change to your catalog
-SCHEMA = "synthetic_data"  # Change to your schema
+CATALOG = "<YOUR_CATALOG>"  # REQUIRED: replace with your catalog
+SCHEMA = "<YOUR_SCHEMA>"  # REQUIRED: replace with your schema
 VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
 
 # Data sizes

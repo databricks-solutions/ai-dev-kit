@@ -184,17 +184,17 @@ Otherwise, **always use Spark + Faker + Pandas UDFs**.
 
 ### Ask for Catalog and Schema
 
-By default, use the `ai_dev_kit` catalog. Ask the user which schema to use:
+Ask the user which catalog and schema to use:
 
-> "I'll save the data to `ai_dev_kit.<schema>`. What schema name would you like to use? (You can also specify a different catalog if needed.)"
+> "What catalog and schema name would you like to use?"
 
 ### Create Infrastructure in Script
 
 Always create the schema and volume **inside the Python script** using `spark.sql()`:
 
 ```python
-CATALOG = "ai_dev_kit"
-SCHEMA = "synthetic_data"
+CATALOG = "<user-provided-catalog>"  # MUST ask user - never default
+SCHEMA = "<user-provided-schema>"
 VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
 
 # Note: Assume catalog exists - do NOT create it

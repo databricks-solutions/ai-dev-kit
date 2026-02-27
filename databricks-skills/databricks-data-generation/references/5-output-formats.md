@@ -2,23 +2,13 @@
 
 Where and how to save generated synthetic data.
 
-## Storage Destination
-
-### Ask for Catalog and Schema
-
-By default, use the `ai_dev_kit` catalog. Ask the user which schema to use:
-
-> "I'll save the data to `ai_dev_kit.<schema>`. What schema name would you like to use? (You can also specify a different catalog if needed.)"
-
-If the user provides just a schema name, use `ai_dev_kit.{schema}`. If they provide `catalog.schema`, use that instead.
-
-### Create Infrastructure in Script
+## Create Infrastructure in Script
 
 Always create the schema and volume **inside the Python script** using `spark.sql()`. Do NOT make separate MCP SQL calls - it's much slower.
 
 ```python
-CATALOG = "ai_dev_kit"
-SCHEMA = "synthetic_data"
+CATALOG = "<user-provided-catalog>"  # MUST ask user - never default
+SCHEMA = "<user-provided-schema>"
 VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
 
 # Note: Assume catalog exists - do NOT create it
@@ -34,10 +24,10 @@ spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
 
 | Format | Use Case | Extension | Best For |
 |--------|----------|-----------|----------|
-| **Parquet** | Default - SDP pipeline input | `.parquet` or none | Best compression, query performance |
+| **Parquet** | SDP pipeline input | `.parquet` or none | Best compression, query performance |
 | **JSON** | Log-style ingestion | `.json` | Simulating external data feeds |
 | **CSV** | Legacy systems | `.csv` | Human-readable, spreadsheet import |
-| **Delta Table** | Direct analytics | N/A | Skip SDP, query immediately |
+| **Delta Table** | Default - Direct analytics | N/A | Treat as bronze tables for ETL or skip ETL and query immediately |
 
 ---
 
