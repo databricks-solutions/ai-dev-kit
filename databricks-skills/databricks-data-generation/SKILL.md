@@ -252,5 +252,6 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 | Out of memory | Increase `numPartitions` in `spark.range()` |
 | Referential integrity errors | Write master table to Delta first, read back for FK joins |
 | `PERSIST TABLE is not supported on serverless` | **NEVER use `.cache()` or `.persist()` with serverless** - write to Delta table first, then read back |
+| `F.window` vs `Window` confusion | Use `from pyspark.sql.window import Window` for `row_number()`, `rank()`, etc. `F.window` is for streaming only. |
 
 See [references/6-troubleshooting.md](references/6-troubleshooting.md) for full troubleshooting guide.

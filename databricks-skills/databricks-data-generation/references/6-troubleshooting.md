@@ -139,6 +139,35 @@ spark = DatabricksSession.builder.serverless(True).getOrCreate()
 
 ## Data Generation Issues
 
+### AttributeError: 'function' object has no attribute 'partitionBy'
+
+**Problem:** Using `F.window` instead of `Window` for analytical window functions.
+
+```python
+# WRONG - F.window is for time-based tumbling/sliding windows (streaming)
+window_spec = F.window.partitionBy("account_id").orderBy("contact_id")
+# Error: AttributeError: 'function' object has no attribute 'partitionBy'
+
+# CORRECT - Window is for analytical window specifications
+from pyspark.sql.window import Window
+window_spec = Window.partitionBy("account_id").orderBy("contact_id")
+```
+
+**When to use Window:** For analytical functions like `row_number()`, `rank()`, `lead()`, `lag()`:
+
+```python
+from pyspark.sql.window import Window
+
+# Mark first contact per account as primary
+window_spec = Window.partitionBy("account_id").orderBy("contact_id")
+contacts_df = contacts_df.withColumn(
+    "is_primary",
+    F.row_number().over(window_spec) == 1
+)
+```
+
+---
+
 ### Faker UDF is slow
 
 **Problem:** Single-row UDFs don't parallelize well.
