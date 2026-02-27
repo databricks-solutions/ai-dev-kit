@@ -1,18 +1,36 @@
-run_id: '20260226_161521'
-created_at: '2026-02-26T16:15:21.384113'
+run_id: '20260226_220320'
+created_at: '2026-02-26T22:03:20.645758'
 skill_name: databricks-data-generation
 metrics:
   pass_rate: 1.0
-  total_tests: 3
-  passed_tests: 3
+  total_tests: 9
+  passed_tests: 9
   failed_tests: 0
 test_results:
-- id: sdg_dbconnect_small_parquet_exec_001
+- id: gen_dbconnect_small_parquet_exec_001
   passed: true
   execution_mode: local
-- id: sdg_serverless_job_catalog_json_009
+- id: gen_dbconnect_large_delta_exec_002
   passed: true
   execution_mode: local
-- id: sdg_dbconnect_large_delta_exec_002
+- id: gen_serverless_job_catalog_json_003
+  passed: true
+  execution_mode: local
+- id: gen_serverless_job_large_delta_financial_004
+  passed: true
+  execution_mode: local
+- id: gen_classic_small_delta_hr_005
+  passed: true
+  execution_mode: local
+- id: gen_classic_large_parquet_supply_chain_006
+  passed: true
+  execution_mode: local
+- id: gen_dbconnect_medium_csv_3tables_retail_007
+  passed: true
+  execution_mode: local
+- id: gen_serverless_job_medium_json_3tables_crm_008
+  passed: true
+  execution_mode: local
+- id: gen_dbconnect_incremental_delta_variant_009
   passed: true
   execution_mode: local
