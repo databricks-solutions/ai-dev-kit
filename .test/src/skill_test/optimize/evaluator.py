@@ -5,6 +5,7 @@ and a task example, run existing scorers, and return (score, SideInfo).
 """
 
 import inspect
+import re
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -21,6 +22,10 @@ from ..scorers.universal import (
     expected_facts_present,
 )
 from .asi import feedback_to_asi
+from .skillbench_evaluator import (  # noqa: F401 — re-exported for runner.py
+    create_skillbench_evaluator,
+    build_skillbench_background,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -63,16 +68,20 @@ def count_tokens(text: str) -> int:
 
 
 def token_efficiency_score(candidate_text: str, original_token_count: int) -> float:
-    """Score 0-1 based on how concise the candidate is vs. the original.
+    """Score based on how concise the candidate is vs. the original.
 
-    Same size or smaller = 1.0, linear penalty up to 0.0 at 2x.
+    Smaller than original = bonus up to 1.15, same size = 1.0,
+    larger = linear penalty to 0.0 at 2x.
     """
     if original_token_count <= 0:
         return 1.0
     enc = tiktoken.get_encoding("cl100k_base")
     candidate_tokens = len(enc.encode(candidate_text))
     ratio = candidate_tokens / original_token_count
-    return max(0.0, min(1.0, 2.0 - ratio))
+    if ratio <= 1.0:
+        return 1.0 + 0.15 * (1.0 - ratio)
+    else:
+        return max(0.0, 2.0 - ratio)
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +149,45 @@ def _validate_skill_structure(candidate_text: str) -> list[Feedback]:
     return feedbacks
 
 
+_STOP_WORDS = frozenset({
+    "the", "and", "for", "with", "that", "this", "from", "are", "was",
+    "were", "been", "being", "have", "has", "had", "does", "did", "but",
+    "not", "you", "all", "can", "her", "his", "its", "may", "our",
+    "out", "use", "uses", "will", "how", "who", "get", "which", "would",
+    "make", "like", "into", "than", "them", "then", "each", "other",
+    "should", "could",
+})
+
+
+def _keyword_fact_score(fact: str, text: str) -> float:
+    """Score 0-1 based on keyword overlap between a fact and text."""
+    words = [w for w in re.findall(r'\w{3,}', fact.lower()) if w not in _STOP_WORDS]
+    if not words:
+        return 1.0
+    text_lower = text.lower()
+    found = sum(1 for w in words if w in text_lower)
+    return found / len(words)
+
+
+def _score_skill_content_facts(candidate_text: str, expected_facts: list[str]) -> list[Feedback]:
+    """Score SKILL.md content against expected facts using keyword matching.
+
+    Unlike the universal ``expected_facts_present`` scorer which requires exact
+    substring matches, this uses keyword extraction so descriptive facts like
+    "Uses CREATE OR REPLACE VIEW with WITH METRICS LANGUAGE YAML" match when
+    the individual keywords appear in the skill text.
+    """
+    feedbacks = []
+    for fact in expected_facts:
+        score = _keyword_fact_score(fact, candidate_text)
+        feedbacks.append(Feedback(
+            name=f"skill_content_fact_{fact[:40]}",
+            value=score,  # continuous 0.0-1.0
+            rationale=f"(skill content) Keyword match {score:.0%} for: {fact}",
+        ))
+    return feedbacks
+
+
 def _score_skill_content(candidate_text: str, expectations: dict[str, Any]) -> list[Feedback]:
     """Score the SKILL.md candidate itself for pattern/fact coverage.
 
@@ -162,14 +210,10 @@ def _score_skill_content(candidate_text: str, expectations: dict[str, Any]) -> l
             rationale=f"(skill content) {fb.rationale or ''}",
         ))
 
-    # Expected facts on skill content
-    ef_results = _run_scorer(expected_facts_present, outputs, expectations, {})
-    for fb in ef_results:
-        feedbacks.append(Feedback(
-            name=f"skill_content_{fb.name}",
-            value=fb.value,
-            rationale=f"(skill content) {fb.rationale or ''}",
-        ))
+    # Expected facts on skill content (keyword matching for descriptive facts)
+    expected_facts = expectations.get("expected_facts", [])
+    if expected_facts:
+        feedbacks.extend(_score_skill_content_facts(candidate_text, expected_facts))
 
     return feedbacks
 
@@ -211,6 +255,9 @@ def create_skill_evaluator(
     """
     scorer_config = load_scorer_config(skill_name)
     effective_gen_model = gen_model or task_lm
+
+    # Track whether we've warned about generation failure
+    _gen_warned = [False]
 
     # Compute original token count for efficiency scoring
     if original_token_counts is None:
@@ -262,6 +309,7 @@ def create_skill_evaluator(
         gen_feedbacks: list[Feedback] = []
         gen_composite = 0.0
 
+        _gen_available = False  # Track if generation actually worked
         if effective_gen_model and candidate_text and example.get("input"):
             import litellm
             messages = [
@@ -276,8 +324,10 @@ def create_skill_evaluator(
                 {"role": "user", "content": example.get("input", "")},
             ]
             try:
-                resp = litellm.completion(model=effective_gen_model, messages=messages)
+                from .skillbench_evaluator import _completion_with_backoff
+                resp = _completion_with_backoff(model=effective_gen_model, messages=messages)
                 generated_response = resp.choices[0].message.content
+                _gen_available = True
             except Exception as e:
                 generated_response = None
                 gen_feedbacks.append(Feedback(
@@ -285,6 +335,17 @@ def create_skill_evaluator(
                     value="no",
                     rationale=f"LLM generation failed: {e}",
                 ))
+                if not _gen_warned[0]:
+                    _gen_warned[0] = True
+                    import warnings
+                    warnings.warn(
+                        f"\nGeneration model '{effective_gen_model}' failed: {e}\n"
+                        "Falling back to skill-content + reference scoring (no generative eval).\n"
+                        "The 20% 'generated response quality' layer will be inactive.\n"
+                        "Fix: set DATABRICKS_API_KEY + DATABRICKS_API_BASE, or use "
+                        "--gen-model with a working provider (e.g., --gen-model openai/gpt-4o).\n",
+                        stacklevel=2,
+                    )
 
             if generated_response:
                 gen_feedbacks = _run_deterministic_scorers(
@@ -321,31 +382,36 @@ def create_skill_evaluator(
         total_candidate_tokens = sum(count_tokens(v) for v in candidate.values())
         if total_original_tokens > 0:
             ratio = total_candidate_tokens / total_original_tokens
-            efficiency = max(0.0, min(1.0, 2.0 - ratio))
+            if ratio <= 1.0:
+                efficiency = 1.0 + 0.15 * (1.0 - ratio)
+            else:
+                efficiency = max(0.0, 2.0 - ratio)
         else:
             efficiency = 1.0
 
         # ------------------------------------------------------------------
         # Weighted final score
         # ------------------------------------------------------------------
-        # When generative eval is available, it gets the dominant weight.
-        # When no gen_model, fall back to reference-heavy weighting.
-        if effective_gen_model and generated_response is not None:
+        # When generative eval succeeds, it gets the dominant weight.
+        # When gen fails (auth error, timeout, etc), fall back to
+        # skill-content-heavy weighting — this is the only layer that
+        # changes dynamically as GEPA mutates the skill.
+        if _gen_available and generated_response is not None:
             # Full layered evaluation
             final_score = (
-                0.40 * gen_composite          # Generated response quality
-                + 0.25 * skill_content_composite  # Skill content coverage
+                0.20 * gen_composite          # Generated response quality
+                + 0.35 * skill_content_composite  # Skill content coverage
                 + 0.05 * ref_composite            # Reference response (sanity)
                 + 0.10 * structure_composite      # Structure validation
-                + 0.20 * efficiency               # Token efficiency
+                + 0.30 * efficiency               # Token efficiency
             )
         else:
-            # Fallback: no generative eval, emphasize skill content + reference
+            # Fallback: no generative eval, emphasize skill content + efficiency
             final_score = (
-                0.35 * skill_content_composite  # Skill content coverage
-                + 0.35 * ref_composite            # Reference response
+                0.40 * skill_content_composite  # Skill content coverage
+                + 0.20 * ref_composite            # Reference response
                 + 0.10 * structure_composite      # Structure validation
-                + 0.20 * efficiency               # Token efficiency
+                + 0.30 * efficiency               # Token efficiency
             )
 
         # ------------------------------------------------------------------
@@ -493,19 +559,22 @@ def build_optimization_background(
         "They contain patterns, code examples, API references, and best practices.\n\n"
         "EVALUATION: The skill is evaluated by having a small LLM generate responses from it. "
         "Better skill documentation produces more correct responses. Scores come from:\n"
-        "- Generated response quality (40%): An LLM reads ONLY the skill and answers a test prompt. "
+        "- Generated response quality (20%): An LLM reads ONLY the skill and answers a test prompt. "
         "Its response is scored against expected patterns and facts.\n"
-        "- Skill content coverage (25%): Does the SKILL.md itself contain the patterns and facts "
+        "- Skill content coverage (35%): Does the SKILL.md itself contain the patterns and facts "
         "needed to answer test prompts? Removing key content directly drops this score.\n"
         "- Reference response check (5%): Sanity check against a known-good response.\n"
         "- Structure validation (10%): Python/SQL syntax, no hallucinated APIs.\n"
-        "- Token efficiency (20%): Conciseness vs original -- smaller is better.\n\n"
-        "KEY INSIGHT: If the skill is missing a pattern or fact, the LLM cannot generate it. "
-        "The most impactful changes add missing patterns/facts and remove incorrect ones.\n\n"
+        "- Token efficiency (30%): Conciseness vs original -- smaller is ACTIVELY REWARDED. "
+        "Shrinking the skill below its original size gives a bonus score (up to 1.15x at 0% of original). "
+        "Growing the skill is penalized linearly to 0.0 at 2x original size.\n\n"
+        "KEY INSIGHT: Token efficiency is the second-highest weight. Every token you remove "
+        "directly improves the score. SkillsBench research shows long skills hurt agent performance "
+        "via 'cognitive overhead' -- agents get confused by verbose docs. Be ruthlessly concise.\n\n"
         f"IMPORTANT: The current artifacts total {original_token_count:,} tokens. "
-        "Optimized versions should be MORE CONCISE, not larger. "
+        "Optimized versions MUST be MORE CONCISE. Target at least 10-20% token reduction. "
         "Remove redundant examples, consolidate similar patterns, "
-        "and eliminate verbose explanations that don't add value. "
+        "eliminate verbose explanations, and merge overlapping sections. "
         "Every token consumed is agent context window budget -- keep skills lean and focused."
         f"{baseline_desc}"
         f"{components_desc}"

@@ -125,20 +125,20 @@ def no_hallucinated_apis(outputs: Dict[str, Any]) -> Feedback:
 
 
 @scorer
-def expected_facts_present(outputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feedback:
-    """Check if expected facts are mentioned in response."""
+def expected_facts_present(outputs: Dict[str, Any], expectations: Dict[str, Any]) -> List[Feedback]:
+    """Check if expected facts are mentioned in response (per-fact granularity)."""
     response = outputs.get("response", "").lower()
     expected_facts = expectations.get("expected_facts", [])
 
     if not expected_facts:
-        return Feedback(name="expected_facts", value="skip", rationale="No expected_facts defined")
+        return [Feedback(name="expected_facts", value="skip", rationale="No expected_facts defined")]
 
-    missing = []
+    feedbacks = []
     for fact in expected_facts:
-        if fact.lower() not in response:
-            missing.append(fact)
-
-    if missing:
-        return Feedback(name="expected_facts", value="no", rationale=f"Missing facts: {missing}")
-
-    return Feedback(name="expected_facts", value="yes", rationale=f"All {len(expected_facts)} expected facts present")
+        found = fact.lower() in response
+        feedbacks.append(Feedback(
+            name=f"fact_{fact[:40]}",
+            value="yes" if found else "no",
+            rationale=f"{'Found' if found else 'Missing'}: {fact}",
+        ))
+    return feedbacks

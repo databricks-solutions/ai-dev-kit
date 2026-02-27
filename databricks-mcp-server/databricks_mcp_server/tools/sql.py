@@ -28,9 +28,8 @@ def execute_sql(
     If no warehouse_id is provided, automatically selects the best available warehouse.
 
     IMPORTANT: For creating or dropping schemas, catalogs, and volumes, use the
-    manage_uc_objects tool instead of SQL DDL. It handles resource tracking and
-    auto-tagging. Only use execute_sql for queries (SELECT, INSERT, UPDATE) and
-    table DDL (CREATE TABLE, DROP TABLE).
+    manage_uc_objects tool instead of SQL DDL. Only use execute_sql for queries
+    (SELECT, INSERT, UPDATE) and table DDL (CREATE TABLE, DROP TABLE).
 
     Args:
         sql_query: SQL query to execute
@@ -67,9 +66,8 @@ def execute_sql_multi(
     in optimal order. Independent queries run in parallel.
 
     IMPORTANT: For creating or dropping schemas, catalogs, and volumes, use the
-    manage_uc_objects tool instead of SQL DDL. It handles resource tracking and
-    auto-tagging. Only use execute_sql/execute_sql_multi for queries (SELECT,
-    INSERT, UPDATE) and table DDL (CREATE TABLE, DROP TABLE).
+    manage_uc_objects tool instead of SQL DDL. Only use execute_sql/execute_sql_multi
+    for queries (SELECT, INSERT, UPDATE) and table DDL (CREATE TABLE, DROP TABLE).
 
     Args:
         sql_content: SQL content with multiple statements separated by ;

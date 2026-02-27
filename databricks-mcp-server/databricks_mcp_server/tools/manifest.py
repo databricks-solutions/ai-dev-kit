@@ -30,7 +30,8 @@ def _delete_from_databricks(resource_type: str, resource_id: str) -> Optional[st
 
 @mcp.tool
 def list_tracked_resources(type: Optional[str] = None) -> Dict[str, Any]:
-    """List resources tracked in the project manifest.
+    """
+    List resources tracked in the project manifest.
 
     The manifest records every resource created through the MCP server
     (dashboards, jobs, pipelines, Genie spaces, KAs, MAS, schemas, volumes, etc.).
@@ -60,7 +61,8 @@ def delete_tracked_resource(
     resource_id: str,
     delete_from_databricks: bool = False,
 ) -> Dict[str, Any]:
-    """Delete a resource from the project manifest, and optionally from Databricks.
+    """
+    Delete a resource from the project manifest, and optionally from Databricks.
 
     Use this to clean up resources that were created during development/testing.
 

@@ -16,6 +16,10 @@ DEFAULT_GEN_LM = os.environ.get(
     "GEPA_GEN_LM", "databricks/databricks-claude-sonnet-4-6"
 )
 
+DEFAULT_TOKEN_BUDGET: int | None = int(
+    os.environ.get("GEPA_TOKEN_BUDGET", "0")
+) or None
+
 # ---------------------------------------------------------------------------
 # Register Databricks models with litellm so it knows their true context
 # windows.  Without this, litellm may fuzzy-match to a similar model with
@@ -33,11 +37,21 @@ def _configure_litellm_retries() -> None:
     GEPA calls litellm.completion() without passing num_retries, so we
     set it globally.  This handles Anthropic 529 "Overloaded" errors,
     rate limits, and other transient failures with exponential backoff.
+
+    Rate-limit retries get extra attempts (10) since --include-tools sends
+    large contexts that easily hit token-per-minute ceilings on Opus.
     """
     try:
         import litellm
+        from litellm import RetryPolicy
+
         litellm.num_retries = 5
-        litellm.request_timeout = 120  # seconds per attempt
+        litellm.request_timeout = 180  # seconds per attempt
+        litellm.retry_policy = RetryPolicy(
+            RateLimitErrorRetries=10,
+            InternalServerErrorRetries=5,
+            TimeoutErrorRetries=5,
+        )
         # Drop log noise from retries
         litellm.suppress_debug_info = True
     except ImportError:
@@ -99,12 +113,18 @@ PRESETS: dict[str, GEPAConfig] = {
     ),
     "standard": GEPAConfig(
         engine=EngineConfig(max_metric_calls=50, parallel=True),
-        reflection=ReflectionConfig(reflection_lm=DEFAULT_REFLECTION_LM),
+        reflection=ReflectionConfig(
+            reflection_lm=DEFAULT_REFLECTION_LM,
+            reflection_minibatch_size=3,
+        ),
         refiner=RefinerConfig(max_refinements=1),
     ),
     "thorough": GEPAConfig(
         engine=EngineConfig(max_metric_calls=150, parallel=True),
-        reflection=ReflectionConfig(reflection_lm=DEFAULT_REFLECTION_LM),
+        reflection=ReflectionConfig(
+            reflection_lm=DEFAULT_REFLECTION_LM,
+            reflection_minibatch_size=3,
+        ),
         refiner=RefinerConfig(max_refinements=1),
     ),
 }

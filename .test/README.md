@@ -36,6 +36,9 @@ export GEPA_GEN_LM="openai/gpt-4o"
 
 # Optional: override generation model (default: databricks/databricks-claude-sonnet-4-6)
 # export GEPA_GEN_LM="databricks/databricks-claude-sonnet-4-6"
+
+# Optional: set a global token budget ceiling for optimization
+# export GEPA_TOKEN_BUDGET=50000
 ```
 
 ---
@@ -57,7 +60,10 @@ uv run python .test/scripts/optimize.py <skill-name> --preset thorough
 # Dry run: see scores and config without calling GEPA
 uv run python .test/scripts/optimize.py <skill-name> --dry-run
 
-# Optimize and apply the result
+# Apply the last saved result (no re-run!)
+uv run python .test/scripts/optimize.py <skill-name> --apply-last
+
+# Run optimization and immediately apply
 uv run python .test/scripts/optimize.py <skill-name> --apply
 
 # Use a specific generation model for evaluation
@@ -66,9 +72,14 @@ uv run python .test/scripts/optimize.py <skill-name> --gen-model "openai/gpt-4o"
 # Control iteration depth (default: 5 passes)
 uv run python .test/scripts/optimize.py <skill-name> --max-passes 3
 
+# Set a token budget ceiling (candidates exceeding this are penalized)
+uv run python .test/scripts/optimize.py <skill-name> --token-budget 50000
+
 # Optimize all skills that have test cases
 uv run python .test/scripts/optimize.py --all --preset quick
 ```
+
+After each run, the optimized result is automatically saved to `.test/skills/<skill-name>/optimized_SKILL.md`. You can review it, diff it against the original, and apply when ready with `--apply-last` — no need to re-run the optimization.
 
 ### Optimize MCP Tool Descriptions
 
@@ -92,6 +103,8 @@ uv run python .test/scripts/optimize.py databricks-model-serving --include-tools
 ```
 
 When `--include-tools` is used, GEPA creates one component per tool module (e.g., `tools_sql`, `tools_serving`) and round-robins through them alongside `skill_md`. The `--apply` flag writes optimized docstrings back to the MCP server source files.
+
+**Note:** The SkillBench evaluator (default) automatically includes tools even without `--include-tools`, since tool descriptions are the primary token consumer (~17K tokens across 88 tools). Use `--tools-only` to optimize only tool descriptions without the SKILL.md.
 
 The iteration budget (`max_metric_calls`) is automatically scaled by the number of components so each one gets the preset's full budget. Additionally, the optimizer runs **up to 5 passes** (configurable with `--max-passes`), re-seeding from the previous best each time. It stops early if a pass produces no improvement.
 
@@ -138,7 +151,7 @@ Model strings use [litellm provider prefixes](https://docs.litellm.ai/docs/provi
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
 
-Optional overrides: `GEPA_REFLECTION_LM` (reflection model), `GEPA_GEN_LM` (generation model for evaluation).
+Optional overrides: `GEPA_REFLECTION_LM` (reflection model), `GEPA_GEN_LM` (generation model for evaluation), `GEPA_TOKEN_BUDGET` (token ceiling for optimization).
 
 ---
 
@@ -171,15 +184,38 @@ Rather than scoring a single static response, the evaluator runs five layers tha
 
 | Layer | Weight | What it does | Source |
 |-------|--------|-------------|--------|
-| **Generated response quality** | 40% | An LLM reads ONLY the SKILL.md and answers the test prompt. Its response is scored for patterns/facts. | `evaluator.py` → litellm generation |
-| **Skill content coverage** | 25% | Checks if the SKILL.md itself contains the patterns and facts needed. If a pattern is missing from the skill, this drops immediately. | `evaluator.py` → `_score_skill_content()` |
+| **Generated response quality** | 20% | An LLM reads ONLY the SKILL.md and answers the test prompt. Its response is scored for patterns/facts. | `evaluator.py` → litellm generation |
+| **Skill content coverage** | 35% | Checks if the SKILL.md itself contains the patterns and facts needed. If a pattern is missing from the skill, this drops immediately. | `evaluator.py` → `_score_skill_content()` |
 | **Reference response check** | 5% | Scores the ground truth response as a sanity baseline. This is mostly static — it ensures the test case itself is valid. | `evaluator.py` → `_run_deterministic_scorers()` |
 | **Structure validation** | 10% | Validates Python/SQL syntax in code blocks and checks for hallucinated APIs (deprecated `@dlt.table`, old `mlflow.evaluate`, etc). | `evaluator.py` → `_validate_skill_structure()` |
-| **Token efficiency** | 20% | Penalizes bloated skill content. Same size or smaller = 1.0, linear decay to 0.0 at 2x original size. | `evaluator.py` → token counting |
+| **Token efficiency** | 30% | Rewards concise skill content. Shrinking below original size earns a bonus (up to 1.15x), same size = 1.0, linear penalty to 0.0 at 2x original. | `evaluator.py` → token counting |
 
 **Why this works:** The key insight is that Layer 1 (generated response) creates a causal chain — if the SKILL.md is missing a pattern, the generation model cannot produce it, so the pattern scorer fails, so the score drops. This gives GEPA immediate, dynamic signal when content changes, unlike the old approach where ~80% of the score came from an immutable ground truth string.
 
-**Fallback mode:** When no generation model is available (no `GEPA_GEN_LM`), the weights shift to 35% skill content + 35% reference + 10% structure + 20% efficiency.
+**Fallback mode:** When no generation model is available (no `GEPA_GEN_LM`), the weights shift to 40% skill content + 20% reference + 10% structure + 30% efficiency.
+
+### SkillBench Evaluator (Default)
+
+The default evaluator (`--evaluator skillbench`) measures **skill effectiveness**: how much does the skill help an agent answer correctly? It runs each test case twice — once WITH the skill and once WITHOUT — then scores the delta.
+
+| Weight | Dimension | What it measures |
+|--------|-----------|-----------------|
+| **45%** | Skill Effectiveness | `pass_rate_with - pass_rate_without` — the delta. Only rewards content the agent doesn't already know. |
+| **25%** | Absolute Quality | `pass_rate_with` — overall correctness with the skill present. |
+| **5%** | Structure | Syntax validity (Python/SQL) and no hallucinated APIs. |
+| **25%** | Token Efficiency | Smaller candidates score higher. Linear penalty for growth (0.0 at 2x original). Bonus for reduction (up to 1.15 at 0% of original). |
+
+**Key difference from the legacy evaluator:** SkillBench uses binary pass/fail assertions (from `expectations` in `ground_truth.yaml`) rather than fuzzy scorer scores. Assertions are classified as:
+- **NEEDS_SKILL** — fails both with and without the skill (the skill must teach this)
+- **REGRESSION** — passes without, fails with (the skill confuses the agent — simplify or remove)
+- **POSITIVE** — fails without, passes with (the skill is helping — keep it)
+- **NEUTRAL** — same result either way (the agent already knows this — adding it wastes tokens)
+
+The reflection LM sees these labels in the `Error` field of each example's side info, guiding it to add NEEDS_SKILL content and remove REGRESSION content.
+
+**Token budget:** Use `--token-budget N` to set a hard ceiling. Candidates exceeding the budget receive a steep penalty on top of the normal efficiency score. Set via CLI or `GEPA_TOKEN_BUDGET` env var.
+
+To use the legacy evaluator instead: `--evaluator legacy`.
 
 ### Built-in Scorers
 
@@ -796,15 +832,18 @@ uv run python .test/scripts/optimize.py my-new-skill --dry-run
 
 Output:
 ```
-=== Dry Run: my-new-skill ===
+=== Dry Run: my-new-skill (skillbench) ===
 SKILL.md path: .claude/skills/my-new-skill/SKILL.md
-Components: ['skill_md']
-Total original tokens: 2,847
+[SkillBench] Auto-including tools: 16 modules, 88 tools, 64,675 chars
+Components: ['skill_md', 'tools_sql', 'tools_serving', ...]
+Total original tokens: 20,147
   skill_md: 2,847 tokens
+  tools_sql: 3,200 tokens
+  ...
 Train tasks: 4
 Val tasks: None (single-task mode)
-Mode: static
-Preset: standard (max_metric_calls=50, scaled for 1 component(s))
+Evaluator type: skillbench
+Preset: standard (max_metric_calls=850, scaled for 17 component(s))
 Max passes: 5
 Reflection LM: databricks/databricks-claude-opus-4-6
 Current score: 0.723
@@ -816,7 +855,14 @@ Current score: 0.723
 # Quick first pass to see if GEPA can improve
 uv run python .test/scripts/optimize.py my-new-skill --preset quick
 
-# If score improves, run standard for better results
+# Review the saved result
+cat .test/skills/my-new-skill/optimized_SKILL.md
+diff .claude/skills/my-new-skill/SKILL.md .test/skills/my-new-skill/optimized_SKILL.md
+
+# Happy with it? Apply without re-running
+uv run python .test/scripts/optimize.py my-new-skill --apply-last
+
+# Or run standard for better results and apply immediately
 uv run python .test/scripts/optimize.py my-new-skill --preset standard --apply
 ```
 
@@ -885,9 +931,11 @@ mlflow autolog claude -u databricks -n "$MLFLOW_EXPERIMENT_NAME" .
 
 ```
 .test/skills/<skill-name>/
-├── manifest.yaml       # Scorers, guidelines, trace expectations
-├── ground_truth.yaml   # Verified test cases
-└── candidates.yaml     # Pending review
+├── manifest.yaml           # Scorers, guidelines, trace expectations
+├── ground_truth.yaml       # Verified test cases
+├── candidates.yaml         # Pending review
+├── optimized_SKILL.md      # Last optimization output (auto-saved)
+└── last_optimization.json  # Metadata for --apply-last
 
 .test/baselines/<skill-name>/
 └── baseline.yaml       # Regression baseline

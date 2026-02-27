@@ -11,14 +11,14 @@ Usage:
     # Thorough optimization (150 iterations)
     uv run python .test/scripts/optimize.py databricks-metric-views --preset thorough
 
-    # Generative mode (generates fresh responses, more expensive)
-    uv run python .test/scripts/optimize.py databricks-metric-views --mode generative
-
-    # Apply the optimized result
-    uv run python .test/scripts/optimize.py databricks-metric-views --apply
-
     # Dry run (show config, dataset info, estimate cost)
     uv run python .test/scripts/optimize.py databricks-metric-views --dry-run
+
+    # Review the saved result then apply (no re-run needed)
+    uv run python .test/scripts/optimize.py databricks-metric-views --apply-last
+
+    # Run optimization and immediately apply
+    uv run python .test/scripts/optimize.py databricks-metric-views --apply
 
     # Optimize all skills that have ground_truth.yaml test cases
     uv run python .test/scripts/optimize.py --all
@@ -88,7 +88,13 @@ def main():
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="Apply the optimized SKILL.md and/or tool descriptions",
+        help="Run optimization and immediately apply the result",
+    )
+    parser.add_argument(
+        "--apply-last",
+        action="store_true",
+        help="Apply the last saved optimization result without re-running "
+             "(reads from .test/skills/<skill>/optimized_SKILL.md)",
     )
     parser.add_argument(
         "--include-tools",
@@ -120,6 +126,43 @@ def main():
         help="Override max metric calls per pass (default: auto-scaled by preset × components, "
              "capped at 300 for non-Opus models). Example: --max-metric-calls 100",
     )
+    parser.add_argument(
+        "--evaluator",
+        choices=["legacy", "skillbench"],
+        default="skillbench",
+        help="Evaluator type: 'skillbench' (measures skill effectiveness via WITH vs "
+             "WITHOUT comparison, default) or 'legacy' (weighted scoring with keyword "
+             "matching and token efficiency)",
+    )
+    parser.add_argument(
+        "--token-budget",
+        type=int,
+        default=None,
+        help="Token budget ceiling. Candidates exceeding this are penalized. "
+             "Recommended: 50000. Default: GEPA_TOKEN_BUDGET env or disabled.",
+    )
+    parser.add_argument(
+        "--use-judges",
+        action="store_true",
+        help="Enable MLflow LLM judges (Correctness + Guidelines) for richer NL "
+             "feedback to GEPA's reflection LM. Adds ~10%% judge_quality weight.",
+    )
+    parser.add_argument(
+        "--generate-from",
+        type=str,
+        default=None,
+        metavar="REQUIREMENTS_FILE",
+        help="Generate test cases from a requirements file before optimizing. "
+             "Each line in the file is a requirement.",
+    )
+    parser.add_argument(
+        "--requirement",
+        action="append",
+        default=None,
+        dest="requirements",
+        help="Inline requirement for test case generation (repeatable). "
+             "Example: --requirement 'Must explain MEASURE() wrapping'",
+    )
 
     args = parser.parse_args()
 
@@ -127,7 +170,57 @@ def main():
         parser.error("Either provide a skill name or use --all")
 
     from skill_test.optimize.runner import optimize_skill
-    from skill_test.optimize.review import review_optimization, apply_optimization
+    from skill_test.optimize.review import review_optimization, apply_optimization, load_last_result
+
+    # Handle requirements-driven example generation
+    if args.generate_from or args.requirements:
+        if not args.skill_name:
+            parser.error("Test case generation requires a skill name")
+        requirements = []
+        if args.generate_from:
+            req_path = Path(args.generate_from)
+            if not req_path.exists():
+                print(f"Error: requirements file not found: {req_path}")
+                sys.exit(1)
+            requirements.extend(
+                line.strip() for line in req_path.read_text().splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            )
+        if args.requirements:
+            requirements.extend(args.requirements)
+        if requirements:
+            from generate_examples import run_generation
+            gen_model = args.gen_model
+            if gen_model is None:
+                from skill_test.optimize.config import DEFAULT_GEN_LM
+                gen_model = DEFAULT_GEN_LM
+            run_generation(
+                skill_name=args.skill_name,
+                requirements=requirements,
+                gen_model=gen_model,
+                trust=True,  # append directly since we're about to optimize
+            )
+            print()
+
+    # Handle --apply-last: load saved result and apply without re-running
+    if args.apply_last:
+        if not args.skill_name:
+            parser.error("--apply-last requires a skill name")
+        result = load_last_result(args.skill_name)
+        if result is None:
+            print(f"No saved optimization found for '{args.skill_name}'.")
+            print(f"Run optimization first: uv run python .test/scripts/optimize.py {args.skill_name}")
+            sys.exit(1)
+        print(f"Applying saved optimization for '{args.skill_name}':")
+        print(f"  Score: {result.original_score:.3f} -> {result.optimized_score:.3f} "
+              f"({result.improvement:+.3f})")
+        print(f"  Tokens: {result.original_token_count:,} -> {result.optimized_token_count:,}")
+        try:
+            apply_optimization(result)
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error applying: {e}")
+            sys.exit(1)
 
     if args.all:
         # Find all skills with ground_truth.yaml
@@ -158,6 +251,9 @@ def main():
                     dry_run=args.dry_run,
                     max_passes=args.max_passes,
                     max_metric_calls=args.max_metric_calls,
+                    evaluator_type=args.evaluator,
+                    token_budget=args.token_budget,
+                    use_judges=args.use_judges,
                 )
                 review_optimization(result)
                 if args.apply and not args.dry_run:
@@ -193,6 +289,9 @@ def main():
                 dry_run=args.dry_run,
                 max_passes=args.max_passes,
                 max_metric_calls=args.max_metric_calls,
+                evaluator_type=args.evaluator,
+                token_budget=args.token_budget,
+                use_judges=args.use_judges,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:

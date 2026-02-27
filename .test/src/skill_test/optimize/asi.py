@@ -3,11 +3,27 @@
 Builds an Actionable Side Information dict from scorer feedback so GEPA's
 reflection LM gets structured context about what went wrong with each scorer.
 Failure details are surfaced via the ``_failures`` key in the returned dict.
+
+Also provides ``skillbench_to_asi()`` for the SkillBench-style evaluator,
+which produces GEPA-optimized side info with standard diagnostic keys
+(Error, Expected, Actual) and ``skill_md_specific_info`` for per-component
+routing.
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import Any, TYPE_CHECKING
 
 from mlflow.entities import Feedback
+
+if TYPE_CHECKING:
+    from .assertions import AssertionResult
+
+from .assertions import (
+    summarize_failures as _summarize_failures,
+    _classify_assertion,
+    _extract_content,
+)
 
 
 def feedback_to_score(feedback: Feedback) -> float | None:
@@ -157,3 +173,97 @@ def build_rich_asi(
         side_info["scores"] = per_dimension_scores
 
     return composite, side_info
+
+
+# ---------------------------------------------------------------------------
+# SkillBench → GEPA side info
+# ---------------------------------------------------------------------------
+
+
+def skillbench_to_asi(
+    with_results: list[AssertionResult],
+    without_results: list[AssertionResult],
+    *,
+    task_prompt: str | None = None,
+    scores: dict[str, float] | None = None,
+    with_response: str | None = None,
+    without_response: str | None = None,
+    reference_answer: str | None = None,
+    candidate: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Convert SkillBench assertion results to GEPA-optimized side info.
+
+    Produces a flat dict with GEPA's standard diagnostic keys plus actual
+    agent output and reference answers so the reflection LM can make
+    targeted SKILL.md edits.
+
+    Budget: ~1480 chars/example (Task 200 + Error ~80 + Expected 500 +
+    Actual 500 + scores ~200). With minibatch=3: ~4440 chars (~1100 tokens).
+
+    Keys produced (all optional, only non-empty included):
+        ``Task``     — the task prompt (truncated at 200 chars)
+        ``Error``    — compact NEEDS_SKILL/REGRESSION assertion labels
+        ``Expected`` — reference answer from ground_truth.yaml (truncated at 500 chars)
+        ``Actual``   — agent response WITH skill (truncated at 500 chars)
+        ``skill_md_specific_info`` — sub-dict with ``Regressions`` for per-component routing
+        ``scores``   — score breakdown promoted to objective_scores by GEPA
+
+    Args:
+        with_results: Assertion results from the WITH-skill run.
+        without_results: Assertion results from the WITHOUT-skill run.
+        task_prompt: The test prompt (for reflection context).
+        scores: Score breakdown dict (effectiveness, pass_with, structure, final).
+        with_response: Agent output WITH skill (truncated at 500 chars).
+        without_response: Agent output WITHOUT skill (reserved for future use).
+        reference_answer: Ground truth answer from ground_truth.yaml.
+        candidate: Full candidate dict for tool-specific diagnostic routing.
+
+    Returns:
+        Side info dict for optimize_anything.
+    """
+    diag = _summarize_failures(with_results, without_results)
+
+    side_info: dict[str, Any] = {}
+
+    # 1. Task context (short — just enough for the reflection LM)
+    if task_prompt:
+        side_info["Task"] = task_prompt[:200]
+
+    # 2. Error: what specific assertions fail (from assertions.py)
+    if diag.get("Error"):
+        side_info["Error"] = diag["Error"]
+
+    # 3. Expected: reference answer (what correct output looks like)
+    if reference_answer:
+        side_info["Expected"] = reference_answer[:500]
+
+    # 4. Actual: agent response WITH skill (what was produced)
+    if with_response is not None:
+        side_info["Actual"] = with_response[:500]
+
+    # 5. Regressions: routed to skill_md component
+    if diag.get("Regressions"):
+        side_info["skill_md_specific_info"] = {"Regressions": diag["Regressions"]}
+
+    # 5b. Route tool-specific failures to {component}_specific_info
+    if candidate:
+        tool_components = {k: v for k, v in candidate.items() if k.startswith("tools_")}
+        for comp_name, comp_text in tool_components.items():
+            comp_text_lower = comp_text.lower()
+            tool_failures = []
+            for w, wo in zip(with_results, without_results):
+                label = _classify_assertion(w, wo)
+                if label in ("NEEDS_SKILL", "REGRESSION"):
+                    content = _extract_content(w)
+                    if content.lower() in comp_text_lower:
+                        tool_failures.append(f"{label}: {w.assertion_type} — '{content}'")
+            if tool_failures:
+                side_info[f"{comp_name}_specific_info"] = {
+                    "Related_assertions": "\n".join(tool_failures)
+                }
+
+    # 6. Scores: needed for GEPA Pareto tracking
+    if scores:
+        side_info["scores"] = scores
+
+    return side_info
