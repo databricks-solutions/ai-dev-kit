@@ -1,0 +1,227 @@
+metadata:
+  skill_name: databricks-spark-structured-streaming
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: spark-streaming_kafka_to_delta_001
+  inputs:
+    prompt: Create a streaming pipeline that reads from Kafka and writes to a Delta table
+  outputs:
+    response: |
+      Here's a basic Kafka to Delta streaming pipeline:
+
+      ```python
+      from pyspark.sql.functions import col, from_json
+
+      # Read from Kafka
+      df = (spark
+          .readStream
+          .format("kafka")
+          .option("kafka.bootstrap.servers", "broker:9092")
+          .option("subscribe", "topic")
+          .load()
+          .select(from_json(col("value").cast("string"), schema).alias("data"))
+          .select("data.*")
+      )
+
+      # Write to Delta
+      df.writeStream \
+          .format("delta") \
+          .outputMode("append") \
+          .option("checkpointLocation", "/Volumes/catalog/checkpoints/stream") \
+          .trigger(processingTime="30 seconds") \
+          .start("/delta/target_table")
+      ```
+
+      Key points:
+      - Use a persistent checkpoint location (UC volumes, not DBFS)
+      - Each stream needs a unique checkpoint path
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Reads from Kafka using readStream
+    - Writes to Delta table format
+    - Includes checkpoint location
+    expected_patterns:
+    - pattern: readStream
+      min_count: 1
+      description: Must use readStream for streaming source
+    - pattern: writeStream
+      min_count: 1
+      description: Must use writeStream for streaming sink
+    - pattern: checkpointLocation
+      min_count: 1
+      description: Must specify checkpoint location
+    - pattern: format.*kafka
+      min_count: 1
+      description: Must specify Kafka format
+    guidelines:
+    - Code must be valid Python syntax
+    - Must include checkpoint location for fault tolerance
+    - Checkpoint should use UC volumes, not DBFS
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: spark-streaming_trigger_modes_002
+  inputs:
+    prompt: What are the different trigger modes for Spark Structured Streaming?
+  outputs:
+    response: |
+      Spark Structured Streaming supports several trigger modes:
+
+      ```python
+      # Fixed interval processing
+      .trigger(processingTime="30 seconds")
+
+      # Process all available data once
+      .trigger(availableNow=True)
+
+      # Continuous processing (low latency)
+      .trigger(continuous="1 second")
+      ```
+
+      - **processingTime**: Fixed interval micro-batches. Best for most workloads.
+      - **availableNow**: Processes all available data then stops. Good for batch-like streaming.
+      - **continuous**: Low-latency mode (~1ms). Limited operator support.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - processingTime trigger for fixed interval
+    - availableNow trigger processes all data then stops
+    - continuous trigger for low latency
+    expected_patterns:
+    - pattern: processingTime
+      min_count: 1
+      description: Must mention processingTime trigger
+    - pattern: trigger
+      min_count: 1
+      description: Must use trigger configuration
+    guidelines:
+    - Must explain multiple trigger modes
+    - Code must be valid Python syntax
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: spark-streaming_checkpoint_practices_003
+  inputs:
+    prompt: What are best practices for Spark Structured Streaming checkpoints?
+  outputs:
+    response: |
+      Checkpoint best practices:
+
+      1. **Use persistent storage**: UC volumes, not DBFS
+      2. **Unique per stream**: Each stream needs its own checkpoint path
+      3. **Never delete**: Checkpoints track stream state and offsets
+      4. **Use volumes**: `/Volumes/catalog/schema/checkpoints/stream_name`
+
+      ```python
+      df.writeStream \
+          .format("delta") \
+          .outputMode("append") \
+          .option("checkpointLocation", "/Volumes/catalog/schema/checkpoints/my_stream") \
+          .start("catalog.schema.target_table")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Checkpoint location should be persistent (UC volumes)
+    - Each stream needs a unique checkpoint
+    expected_patterns:
+    - pattern: checkpointLocation
+      min_count: 1
+      description: Must reference checkpointLocation
+    - pattern: /Volumes/
+      min_count: 1
+      description: Should use UC volumes path
+    guidelines:
+    - Must recommend persistent storage for checkpoints
+    - Must warn about unique checkpoints per stream
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: spark-streaming_production_checklist_004
+  inputs:
+    prompt: What is the production checklist for Spark Structured Streaming?
+  outputs:
+    response: |
+      Production checklist for Spark Structured Streaming:
+
+      - Checkpoint location is persistent (UC volumes, not DBFS)
+      - Unique checkpoint per stream
+      - Fixed-size cluster (no autoscaling for streaming)
+      - Monitoring configured (input rate, lag, batch duration)
+      - Exactly-once verified (txnVersion/txnAppId)
+      - Watermark configured for stateful operations
+      - Left joins for stream-static (not inner)
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Use persistent checkpoint location
+    - Fixed-size cluster, no autoscaling
+    - Configure monitoring for streaming
+    expected_patterns:
+    - pattern: checkpoint
+      min_count: 1
+      description: Must mention checkpoint requirements
+    - pattern: autoscal
+      min_count: 1
+      description: Must mention autoscaling restriction
+    guidelines:
+    - Must cover checkpoint, cluster, and monitoring requirements
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: spark-streaming_stream_joins_005
+  inputs:
+    prompt: How do I join a streaming DataFrame with a static table?
+  outputs:
+    response: |
+      For stream-static joins, use a left join (not inner) to avoid dropping streaming rows when the static side has no match:
+
+      ```python
+      # Read streaming source
+      stream_df = spark.readStream.format("delta").table("catalog.schema.events")
+
+      # Read static dimension table
+      dim_df = spark.read.table("catalog.schema.dimensions")
+
+      # Left join: stream on left, static on right
+      joined = stream_df.join(dim_df, "join_key", "left")
+
+      joined.writeStream \
+          .format("delta") \
+          .outputMode("append") \
+          .option("checkpointLocation", "/Volumes/catalog/schema/checkpoints/joined_stream") \
+          .start("catalog.schema.enriched_events")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Use left join for stream-static joins
+    - Static table is on the right side
+    expected_patterns:
+    - pattern: readStream
+      min_count: 1
+      description: Must use streaming read
+    - pattern: join
+      min_count: 1
+      description: Must demonstrate join operation
+    - pattern: left
+      min_count: 1
+      description: Must use left join
+    guidelines:
+    - Must use left join for stream-static joins, not inner
+    - Code must be valid Python syntax
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated

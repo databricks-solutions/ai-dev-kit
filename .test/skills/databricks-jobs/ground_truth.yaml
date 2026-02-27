@@ -1,0 +1,348 @@
+metadata:
+  skill_name: databricks-jobs
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: jobs_create_sdk_001
+  inputs:
+    prompt: "How do I create a Databricks job using the Python SDK?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+      from databricks.sdk.service.jobs import Task, NotebookTask, Source
+
+      w = WorkspaceClient()
+
+      job = w.jobs.create(
+          name="my-etl-job",
+          tasks=[
+              Task(
+                  task_key="extract",
+                  notebook_task=NotebookTask(
+                      notebook_path="/Workspace/Users/user@example.com/extract",
+                      source=Source.WORKSPACE
+                  )
+              )
+          ]
+      )
+      print(f"Created job: {job.job_id}")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Jobs are created using w.jobs.create() from the Databricks Python SDK"
+    - "Each task requires a task_key and a task type such as NotebookTask"
+    - "WorkspaceClient auto-detects authentication from the environment"
+    expected_patterns:
+    - pattern: "WorkspaceClient"
+      min_count: 1
+      description: "Uses WorkspaceClient for SDK access"
+    - pattern: "w\\.jobs\\.create"
+      min_count: 1
+      description: "Calls jobs.create() method"
+    - pattern: "NotebookTask"
+      min_count: 1
+      description: "Uses NotebookTask for notebook-based tasks"
+    - pattern: "task_key"
+      min_count: 1
+      description: "Specifies task_key identifier"
+    guidelines:
+    - "Code must be valid Python using the databricks-sdk package"
+    - "Must import Task and NotebookTask from databricks.sdk.service.jobs"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: jobs_create_cli_002
+  inputs:
+    prompt: "Show me how to create a job using the Databricks CLI."
+  outputs:
+    response: |
+      ```bash
+      databricks jobs create --json '{
+        "name": "my-etl-job",
+        "tasks": [{
+          "task_key": "extract",
+          "notebook_task": {
+            "notebook_path": "/Workspace/Users/user@example.com/extract",
+            "source": "WORKSPACE"
+          }
+        }]
+      }'
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "The Databricks CLI creates jobs with databricks jobs create --json"
+    - "Job configuration is passed as a JSON payload"
+    expected_patterns:
+    - pattern: "databricks jobs create"
+      min_count: 1
+      description: "Uses the databricks jobs create CLI command"
+    - pattern: "task_key"
+      min_count: 1
+      description: "Includes task_key in JSON payload"
+    - pattern: "notebook_task"
+      min_count: 1
+      description: "Includes notebook_task configuration"
+    guidelines:
+    - "Response must show the databricks jobs create command with --json flag"
+    - "JSON payload must include task_key and notebook_task fields"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: jobs_dabs_config_003
+  inputs:
+    prompt: "How do I define a Databricks job in a DABs (Databricks Asset Bundles) YAML file?"
+  outputs:
+    response: |
+      ```yaml
+      # resources/jobs.yml
+      resources:
+        jobs:
+          my_etl_job:
+            name: "[${bundle.target}] My ETL Job"
+            tasks:
+              - task_key: extract
+                notebook_task:
+                  notebook_path: ../src/notebooks/extract.py
+      ```
+
+      The `${bundle.target}` variable is replaced with the deployment target (e.g., dev, staging, prod) at deploy time.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "DABs jobs are defined in YAML under resources.jobs"
+    - "bundle.target variable enables environment-specific job naming"
+    - "notebook_path uses relative paths from the bundle root"
+    expected_patterns:
+    - pattern: "resources:"
+      min_count: 1
+      description: "Uses DABs resources block"
+    - pattern: "jobs:"
+      min_count: 1
+      description: "Defines jobs section"
+    - pattern: "bundle\\.target"
+      min_count: 1
+      description: "Uses bundle.target variable for environment naming"
+    - pattern: "notebook_task:"
+      min_count: 1
+      description: "Configures a notebook task"
+    guidelines:
+    - "YAML must follow DABs resource configuration structure"
+    - "Response should explain the bundle.target variable"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: jobs_multi_task_workflow_004
+  inputs:
+    prompt: "How do I set up a multi-task ETL workflow with dependencies between tasks?"
+  outputs:
+    response: |
+      ```yaml
+      tasks:
+        - task_key: extract
+          notebook_task:
+            notebook_path: ../src/extract.py
+
+        - task_key: transform
+          depends_on:
+            - task_key: extract
+          notebook_task:
+            notebook_path: ../src/transform.py
+
+        - task_key: load
+          depends_on:
+            - task_key: transform
+          run_if: ALL_SUCCESS
+          notebook_task:
+            notebook_path: ../src/load.py
+      ```
+
+      Tasks form a DAG (directed acyclic graph). Use `depends_on` to define execution order and `run_if` to control conditional execution (ALL_SUCCESS, AT_LEAST_ONE_SUCCESS, etc.).
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Multi-task workflows use depends_on to define task dependencies"
+    - "Tasks form a DAG (directed acyclic graph) for execution ordering"
+    - "run_if controls conditional execution with values like ALL_SUCCESS"
+    expected_patterns:
+    - pattern: "depends_on:"
+      min_count: 2
+      description: "Uses depends_on for task ordering"
+    - pattern: "run_if:"
+      min_count: 1
+      description: "Uses run_if for conditional execution"
+    - pattern: "task_key:"
+      min_count: 3
+      description: "Defines at least three tasks in the workflow"
+    guidelines:
+    - "Must show at least 3 tasks with dependencies forming a pipeline"
+    - "Must include run_if to demonstrate conditional execution"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: jobs_compute_config_005
+  inputs:
+    prompt: "What are the options for configuring compute resources for Databricks jobs?"
+  outputs:
+    response: |
+      **Option 1: Job Clusters (recommended for most jobs)**
+      ```yaml
+      job_clusters:
+        - job_cluster_key: shared_cluster
+          new_cluster:
+            spark_version: "15.4.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+            spark_conf:
+              spark.speculation: "true"
+
+      tasks:
+        - task_key: my_task
+          job_cluster_key: shared_cluster
+          notebook_task:
+            notebook_path: ../src/notebook.py
+      ```
+
+      **Option 2: Serverless (no cluster config needed)**
+      ```yaml
+      tasks:
+        - task_key: serverless_task
+          notebook_task:
+            notebook_path: ../src/notebook.py
+          # No cluster config = serverless
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Job clusters are reusable cluster configurations shared across tasks"
+    - "Omitting cluster configuration enables serverless compute"
+    - "job_cluster_key links tasks to shared cluster definitions"
+    expected_patterns:
+    - pattern: "job_clusters:"
+      min_count: 1
+      description: "Defines job cluster configuration"
+    - pattern: "job_cluster_key:"
+      min_count: 1
+      description: "References a shared job cluster"
+    - pattern: "spark_version:"
+      min_count: 1
+      description: "Specifies Spark runtime version"
+    - pattern: "node_type_id:"
+      min_count: 1
+      description: "Specifies instance type"
+    guidelines:
+    - "Response must show both job cluster and serverless options"
+    - "Job cluster example must include spark_version and node_type_id"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: jobs_permissions_006
+  inputs:
+    prompt: "How do I configure permissions on a Databricks job in DABs?"
+  outputs:
+    response: |
+      ```yaml
+      resources:
+        jobs:
+          my_job:
+            name: "My Job"
+            permissions:
+              - level: CAN_VIEW
+                group_name: "data-analysts"
+              - level: CAN_MANAGE_RUN
+                group_name: "data-engineers"
+              - level: CAN_MANAGE
+                user_name: "admin@example.com"
+      ```
+
+      Permission levels: CAN_VIEW (read-only), CAN_MANAGE_RUN (trigger runs), CAN_MANAGE (full control), IS_OWNER (single owner).
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Job permissions are set in the permissions block under the job resource"
+    - "Permission levels include CAN_VIEW, CAN_MANAGE_RUN, CAN_MANAGE, and IS_OWNER"
+    - "Permissions can be assigned to group_name or user_name"
+    expected_patterns:
+    - pattern: "permissions:"
+      min_count: 1
+      description: "Defines permissions block"
+    - pattern: "level:"
+      min_count: 2
+      description: "Specifies permission levels"
+    - pattern: "group_name:"
+      min_count: 1
+      description: "Assigns permissions to a group"
+    - pattern: "user_name:"
+      min_count: 1
+      description: "Assigns permissions to a user"
+    guidelines:
+    - "Response must show at least three different permission levels"
+    - "Must demonstrate both group and user permission assignments"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: jobs_triggers_007
+  inputs:
+    prompt: "What trigger options are available for scheduling Databricks jobs?"
+  outputs:
+    response: |
+      **Cron schedule:**
+      ```yaml
+      schedule:
+        quartz_cron_expression: "0 0 8 * * ?"  # Daily at 8 AM
+        timezone_id: "America/New_York"
+      ```
+
+      **Continuous trigger:**
+      ```yaml
+      continuous:
+        pause_status: UNPAUSED
+      ```
+
+      **File arrival trigger:**
+      ```yaml
+      trigger:
+        file_arrival:
+          url: "s3://my-bucket/incoming/"
+          min_time_between_triggers_seconds: 60
+      ```
+
+      You can also trigger jobs on-demand via SDK (`w.jobs.run_now(job_id=123)`) or CLI (`databricks jobs run-now --job-id 123`).
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Jobs support cron scheduling with quartz_cron_expression"
+    - "Continuous trigger runs the job repeatedly without pause"
+    - "File arrival trigger monitors a cloud storage path for new files"
+    expected_patterns:
+    - pattern: "quartz_cron_expression"
+      min_count: 1
+      description: "Shows cron schedule configuration"
+    - pattern: "continuous:"
+      min_count: 1
+      description: "Shows continuous trigger option"
+    - pattern: "file_arrival:"
+      min_count: 1
+      description: "Shows file arrival trigger option"
+    guidelines:
+    - "Response must show at least three different trigger types"
+    - "Cron example must include timezone_id"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated

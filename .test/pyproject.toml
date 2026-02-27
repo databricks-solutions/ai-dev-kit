@@ -17,7 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 databricks = ["databricks-sdk>=0.20.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
-all = ["skill-test[databricks,dev]"]
+optimize = ["gepa>=0.1.0", "tiktoken>=0.7.0"]
+all = ["skill-test[databricks,dev,optimize]"]
 
 [project.scripts]
 skill-test = "skill_test.cli:main"

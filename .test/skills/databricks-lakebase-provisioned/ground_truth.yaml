@@ -1,0 +1,387 @@
+metadata:
+  skill_name: databricks-lakebase-provisioned
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: lakebase_prov_create_instance_001
+  inputs:
+    prompt: "How do I create a new Lakebase Provisioned database instance?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+      import uuid
+
+      w = WorkspaceClient()
+
+      # Create a database instance
+      instance = w.database.create_database_instance(
+          name="my-lakebase-instance",
+          capacity="CU_1",  # CU_1, CU_2, CU_4, CU_8
+          stopped=False
+      )
+      print(f"Instance created: {instance.name}")
+      print(f"DNS endpoint: {instance.read_write_dns}")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Instances are created with w.database.create_database_instance()"
+    - "Capacity options are CU_1, CU_2, CU_4, and CU_8"
+    - "The instance provides a read_write_dns endpoint for connections"
+    expected_patterns:
+    - pattern: "create_database_instance"
+      min_count: 1
+      description: "Uses create_database_instance() method"
+    - pattern: "capacity"
+      min_count: 1
+      description: "Specifies instance capacity"
+    - pattern: "read_write_dns"
+      min_count: 1
+      description: "References the DNS endpoint"
+    - pattern: "WorkspaceClient"
+      min_count: 1
+      description: "Uses WorkspaceClient for SDK access"
+    guidelines:
+    - "Must show available capacity options (CU_1 through CU_8)"
+    - "Must reference the read_write_dns endpoint"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: lakebase_prov_connect_notebook_002
+  inputs:
+    prompt: "Show me how to connect to Lakebase Provisioned from a Databricks notebook using psycopg."
+  outputs:
+    response: |
+      ```python
+      import psycopg
+      from databricks.sdk import WorkspaceClient
+      import uuid
+
+      # Get instance details
+      w = WorkspaceClient()
+      instance = w.database.get_database_instance(name="my-lakebase-instance")
+
+      # Generate OAuth token
+      cred = w.database.generate_database_credential(
+          request_id=str(uuid.uuid4()),
+          instance_names=["my-lakebase-instance"]
+      )
+
+      # Connect using psycopg3
+      conn_string = (
+          f"host={instance.read_write_dns} "
+          f"dbname=postgres "
+          f"user={w.current_user.me().user_name} "
+          f"password={cred.token} "
+          f"sslmode=require"
+      )
+      with psycopg.connect(conn_string) as conn:
+          with conn.cursor() as cur:
+              cur.execute("SELECT version()")
+              print(cur.fetchone())
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Connections use psycopg3 (psycopg, not psycopg2)"
+    - "OAuth tokens require a unique request_id via uuid.uuid4()"
+    - "generate_database_credential() takes instance_names as a list"
+    - "The token is used as the password in the connection string"
+    expected_patterns:
+    - pattern: "psycopg\\.connect"
+      min_count: 1
+      description: "Connects using psycopg3"
+    - pattern: "generate_database_credential"
+      min_count: 1
+      description: "Generates OAuth token for authentication"
+    - pattern: "uuid\\.uuid4"
+      min_count: 1
+      description: "Uses uuid4 for unique request_id"
+    - pattern: "sslmode=require"
+      min_count: 1
+      description: "Requires SSL for the connection"
+    guidelines:
+    - "Must use psycopg (not psycopg2)"
+    - "Must include request_id with uuid4"
+    - "Connection must include sslmode=require"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: lakebase_prov_oauth_token_003
+  inputs:
+    prompt: "How do I generate an OAuth token for Lakebase Provisioned?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+      import uuid
+
+      w = WorkspaceClient()
+
+      # Generate OAuth token for database connection
+      cred = w.database.generate_database_credential(
+          request_id=str(uuid.uuid4()),
+          instance_names=["my-lakebase-instance"]
+      )
+      token = cred.token  # Use this as password in connection string
+      ```
+
+      Tokens expire after 1 hour. For long-running applications, implement a token refresh loop.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Tokens are generated with w.database.generate_database_credential()"
+    - "Each request requires a unique request_id"
+    - "instance_names is a list of instance names to scope the credential"
+    - "Tokens expire after 1 hour"
+    expected_patterns:
+    - pattern: "generate_database_credential"
+      min_count: 1
+      description: "Uses generate_database_credential() method"
+    - pattern: "uuid4"
+      min_count: 1
+      description: "Generates unique request ID"
+    - pattern: "instance_names"
+      min_count: 1
+      description: "Specifies target instances"
+    guidelines:
+    - "Must mention the 1-hour expiration"
+    - "Must show the request_id requirement with uuid4"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: lakebase_prov_sqlalchemy_token_refresh_004
+  inputs:
+    prompt: "How do I set up SQLAlchemy with automatic token refresh for Lakebase Provisioned?"
+  outputs:
+    response: |
+      ```python
+      import asyncio
+      import uuid
+      from sqlalchemy import event
+      from sqlalchemy.ext.asyncio import create_async_engine
+      from databricks.sdk import WorkspaceClient
+
+      _current_token = None
+      TOKEN_REFRESH_INTERVAL = 50 * 60  # 50 minutes (before 1-hour expiry)
+
+      def _generate_token(instance_name: str) -> str:
+          w = WorkspaceClient()
+          cred = w.database.generate_database_credential(
+              request_id=str(uuid.uuid4()),
+              instance_names=[instance_name]
+          )
+          return cred.token
+
+      async def _token_refresh_loop(instance_name: str):
+          global _current_token
+          while True:
+              await asyncio.sleep(TOKEN_REFRESH_INTERVAL)
+              _current_token = await asyncio.to_thread(
+                  _generate_token, instance_name
+              )
+
+      def init_database(instance_name, database_name, username):
+          global _current_token
+          w = WorkspaceClient()
+          instance = w.database.get_database_instance(name=instance_name)
+          _current_token = _generate_token(instance_name)
+
+          url = f"postgresql+psycopg://{username}@{instance.read_write_dns}:5432/{database_name}"
+          engine = create_async_engine(
+              url,
+              pool_size=5,
+              max_overflow=10,
+              pool_recycle=3600,
+              connect_args={"sslmode": "require"}
+          )
+
+          @event.listens_for(engine.sync_engine, "do_connect")
+          def provide_token(dialect, conn_rec, cargs, cparams):
+              cparams["password"] = _current_token
+
+          return engine
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Token refresh should happen every 50 minutes, before the 1-hour expiry"
+    - "SQLAlchemy do_connect event injects the current token on each connection"
+    - "create_async_engine is used for async SQLAlchemy with psycopg"
+    - "pool_recycle=3600 prevents stale connections"
+    expected_patterns:
+    - pattern: "do_connect"
+      min_count: 1
+      description: "Uses SQLAlchemy do_connect event for token injection"
+    - pattern: "create_async_engine"
+      min_count: 1
+      description: "Creates async SQLAlchemy engine"
+    - pattern: "_token_refresh_loop"
+      min_count: 1
+      description: "Implements background token refresh"
+    - pattern: "generate_database_credential"
+      min_count: 1
+      description: "Generates OAuth tokens for refresh"
+    guidelines:
+    - "Must implement background token refresh before expiry"
+    - "Must use SQLAlchemy event to inject tokens on each connection"
+    - "Must use async engine with psycopg driver"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: auto_generated
+
+- id: lakebase_prov_apps_integration_005
+  inputs:
+    prompt: "How do I integrate Lakebase Provisioned with a Databricks App?"
+  outputs:
+    response: |
+      Databricks Apps use environment variables for Lakebase configuration:
+
+      ```python
+      import os
+
+      def is_lakebase_configured() -> bool:
+          """Check if Lakebase is configured for this app."""
+          return bool(
+              os.environ.get("LAKEBASE_PG_URL") or
+              (os.environ.get("LAKEBASE_INSTANCE_NAME") and
+               os.environ.get("LAKEBASE_DATABASE_NAME"))
+          )
+      ```
+
+      Register the database resource with your app:
+      ```bash
+      databricks apps add-resource $APP_NAME \
+          --resource-type database \
+          --resource-name lakebase \
+          --database-instance my-lakebase-instance
+      ```
+
+      Environment variables set by Databricks Apps: `LAKEBASE_INSTANCE_NAME`, `LAKEBASE_DATABASE_NAME`, `LAKEBASE_USERNAME`, `LAKEBASE_PG_URL`.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Databricks Apps set LAKEBASE_INSTANCE_NAME and LAKEBASE_DATABASE_NAME environment variables"
+    - "Database resources are registered with databricks apps add-resource"
+    - "LAKEBASE_PG_URL provides a ready-to-use connection string"
+    expected_patterns:
+    - pattern: "LAKEBASE_INSTANCE_NAME"
+      min_count: 1
+      description: "References the instance name environment variable"
+    - pattern: "LAKEBASE_DATABASE_NAME"
+      min_count: 1
+      description: "References the database name environment variable"
+    - pattern: "databricks apps add-resource"
+      min_count: 1
+      description: "Shows the CLI command to register database resource"
+    guidelines:
+    - "Must list the environment variables set by Databricks Apps"
+    - "Must show the CLI command to register the database resource"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: lakebase_prov_cli_reference_006
+  inputs:
+    prompt: "What Databricks CLI commands are available for managing Lakebase Provisioned instances?"
+  outputs:
+    response: |
+      ```bash
+      # Create instance
+      databricks database create-database-instance \
+          --name my-lakebase-instance \
+          --capacity CU_1
+
+      # Get instance details
+      databricks database get-database-instance --name my-lakebase-instance
+
+      # Generate credentials
+      databricks database generate-database-credential \
+          --request-id $(uuidgen) \
+          --json '{"instance_names": ["my-lakebase-instance"]}'
+
+      # List instances
+      databricks database list-database-instances
+
+      # Stop instance (saves cost)
+      databricks database stop-database-instance --name my-lakebase-instance
+
+      # Start instance
+      databricks database start-database-instance --name my-lakebase-instance
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Lakebase Provisioned CLI commands are under databricks database"
+    - "Instances can be stopped and started to save costs"
+    - "Credential generation requires a unique request-id"
+    expected_patterns:
+    - pattern: "databricks database create-database-instance"
+      min_count: 1
+      description: "Shows instance creation command"
+    - pattern: "databricks database stop-database-instance"
+      min_count: 1
+      description: "Shows instance stop command"
+    - pattern: "databricks database generate-database-credential"
+      min_count: 1
+      description: "Shows credential generation command"
+    guidelines:
+    - "Must show at least 5 different CLI subcommands"
+    - "Must include stop/start commands for cost management"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: lakebase_prov_register_unity_catalog_007
+  inputs:
+    prompt: "How do I register a Lakebase Provisioned instance with Unity Catalog?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+
+      w = WorkspaceClient()
+
+      # Register database in Unity Catalog
+      w.database.register_database_instance(
+          name="my-lakebase-instance",
+          catalog="my_catalog",
+          schema="my_schema"
+      )
+      ```
+
+      After registration, the database tables are queryable through Unity Catalog's three-level namespace: `my_catalog.my_schema.table_name`.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Instances are registered with w.database.register_database_instance()"
+    - "Registration requires a catalog and schema name"
+    - "After registration, tables are accessible via Unity Catalog namespace"
+    expected_patterns:
+    - pattern: "register_database_instance"
+      min_count: 1
+      description: "Uses register_database_instance() method"
+    - pattern: "catalog"
+      min_count: 1
+      description: "Specifies Unity Catalog catalog name"
+    - pattern: "schema"
+      min_count: 1
+      description: "Specifies Unity Catalog schema name"
+    guidelines:
+    - "Must show the registration method with catalog and schema"
+    - "Must explain the three-level namespace after registration"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated

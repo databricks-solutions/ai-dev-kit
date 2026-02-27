@@ -17,6 +17,7 @@ from .commands import (
     review,
     trace_eval,
     list_traces,
+    optimize,
 )
 
 
@@ -36,6 +37,7 @@ def main():
         review      - Review pending candidates interactively
         trace-eval  - Evaluate trace against skill expectations
         list-traces - List available trace runs from MLflow
+        optimize    - Optimize a skill using GEPA
     """
     args = sys.argv[1:]
 
@@ -51,6 +53,7 @@ def main():
         print("  review      Review pending candidates interactively")
         print("  trace-eval  Evaluate trace against skill expectations")
         print("  list-traces List available trace runs from MLflow")
+        print("  optimize    Optimize a skill using GEPA")
         sys.exit(0)
 
     skill_name = args[0]
@@ -142,6 +145,44 @@ def main():
             }
         else:
             result = list_traces(experiment, ctx, limit)
+    elif subcommand == "optimize":
+        # Parse optimize-specific arguments
+        opt_preset = "standard"
+        opt_mode = "static"
+        opt_task_lm = None
+        opt_reflection_lm = None
+        opt_dry_run = False
+        opt_apply = False
+
+        i = 2
+        while i < len(args):
+            if args[i] in ("--preset", "-p") and i + 1 < len(args):
+                opt_preset = args[i + 1]
+                i += 2
+            elif args[i] in ("--mode", "-m") and i + 1 < len(args):
+                opt_mode = args[i + 1]
+                i += 2
+            elif args[i] == "--task-lm" and i + 1 < len(args):
+                opt_task_lm = args[i + 1]
+                i += 2
+            elif args[i] == "--reflection-lm" and i + 1 < len(args):
+                opt_reflection_lm = args[i + 1]
+                i += 2
+            elif args[i] == "--dry-run":
+                opt_dry_run = True
+                i += 1
+            elif args[i] == "--apply":
+                opt_apply = True
+                i += 1
+            else:
+                i += 1
+
+        result = optimize(
+            skill_name, ctx,
+            preset=opt_preset, mode=opt_mode, task_lm=opt_task_lm,
+            reflection_lm=opt_reflection_lm,
+            dry_run=opt_dry_run, apply=opt_apply,
+        )
     else:
         print(f"Unknown subcommand: {subcommand}")
         sys.exit(1)
@@ -171,5 +212,6 @@ __all__ = [
     "review",
     "trace_eval",
     "list_traces",
+    "optimize",
     "main",
 ]

@@ -16,7 +16,7 @@ greenlet>=3.0.0
 psycopg2-binary>=2.9.11
 
 # Claude Agent SDK
-claude-agent-sdk>=0.1.19
+claude-agent-sdk>=0.1.39
 anthropic>=0.42.0
 
 # MLflow for tracing Claude Code conversations

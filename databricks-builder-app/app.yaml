@@ -92,9 +92,9 @@ env:
   # instead of hitting Anthropic directly. The app dynamically sets ANTHROPIC_BASE_URL
   # and ANTHROPIC_AUTH_TOKEN from the user's Databricks credentials at runtime.
   - name: ANTHROPIC_MODEL
-    value: "databricks-claude-opus-4-5"
+    value: "databricks-claude-opus-4-6"
   - name: ANTHROPIC_MODEL_MINI
-    value: "databricks-claude-sonnet-4-5"
+    value: "databricks-claude-sonnet-4-6"
   - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
     value: "3600000"
 

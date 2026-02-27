@@ -1399,3 +1399,84 @@ def list_traces(
             "experiment_name": experiment_name,
             "hint": "Check experiment name and MLflow connection",
         }
+
+
+def optimize(
+    skill_name: str,
+    ctx: CLIContext,
+    preset: str = "standard",
+    mode: str = "static",
+    task_lm: Optional[str] = None,
+    reflection_lm: Optional[str] = None,
+    dry_run: bool = False,
+    apply: bool = False,
+) -> Dict[str, Any]:
+    """Optimize a skill using GEPA.
+
+    Runs the full optimization pipeline: evaluate -> optimize -> review.
+    Optionally applies the optimized result to the SKILL.md.
+
+    Args:
+        skill_name: Name of the skill to optimize
+        ctx: CLI context
+        preset: GEPA preset ("quick", "standard", "thorough")
+        mode: "static" (uses ground truth) or "generative" (generates fresh responses)
+        task_lm: LLM model for generative mode
+        reflection_lm: Override GEPA reflection model
+        dry_run: Show config and estimate cost without running
+        apply: Apply the optimized result to SKILL.md
+
+    Returns:
+        Dictionary with optimization results
+    """
+    try:
+        from ..optimize.runner import optimize_skill
+        from ..optimize.review import review_optimization, apply_optimization
+    except ImportError as e:
+        return {
+            "success": False,
+            "error": f"GEPA optimization requires the 'optimize' extra: {e}",
+            "hint": "Install with: pip install skill-test[optimize]",
+        }
+
+    try:
+        result = optimize_skill(
+            skill_name=skill_name,
+            mode=mode,
+            preset=preset,
+            task_lm=task_lm,
+            reflection_lm=reflection_lm,
+            dry_run=dry_run,
+        )
+
+        review_optimization(result)
+
+        if apply and not dry_run:
+            apply_optimization(result)
+
+        return {
+            "success": True,
+            "skill_name": skill_name,
+            "original_score": result.original_score,
+            "optimized_score": result.optimized_score,
+            "improvement": result.improvement,
+            "original_tokens": result.original_token_count,
+            "optimized_tokens": result.optimized_token_count,
+            "token_reduction_pct": result.token_reduction_pct,
+            "applied": apply and not dry_run,
+            "dry_run": dry_run,
+            "mlflow_run_id": result.mlflow_run_id,
+        }
+    except FileNotFoundError as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "skill_name": skill_name,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "skill_name": skill_name,
+            "hint": "Check GEPA installation and API keys",
+        }

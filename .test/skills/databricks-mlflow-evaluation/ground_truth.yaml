@@ -1,0 +1,365 @@
+metadata:
+  skill_name: databricks-mlflow-evaluation
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: mlflow_eval_basic_evaluate_001
+  inputs:
+    prompt: "How do I run a basic evaluation of my GenAI agent using MLflow?"
+  outputs:
+    response: |
+      ```python
+      import mlflow
+
+      # Define your agent function
+      def my_agent(query: str) -> str:
+          # Your agent logic here
+          return response
+
+      # Prepare evaluation data (nested input structure required)
+      eval_data = [
+          {"inputs": {"query": "What is MLflow?"}, "expectations": {"expected_response": "MLflow is..."}},
+          {"inputs": {"query": "How do I log a model?"}, "expectations": {"expected_response": "Use mlflow.log_model..."}}
+      ]
+
+      # Run evaluation with built-in scorers
+      results = mlflow.genai.evaluate(
+          predict_fn=my_agent,
+          data=eval_data,
+          scorers=[
+              mlflow.genai.scorers.RelevanceScorer(),
+              mlflow.genai.scorers.SafetyScorer()
+          ]
+      )
+      print(results.tables["eval_results"])
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Use mlflow.genai.evaluate(), not mlflow.evaluate()"
+    - "Data must use nested structure: {inputs: {query: ...}}"
+    - "predict_fn receives unpacked kwargs, not a dict"
+    expected_patterns:
+    - pattern: "mlflow\\.genai\\.evaluate"
+      min_count: 1
+      description: "Uses the correct mlflow.genai.evaluate() API"
+    - pattern: "predict_fn"
+      min_count: 1
+      description: "Passes the agent function as predict_fn"
+    - pattern: "scorers"
+      min_count: 1
+      description: "Specifies scorers for evaluation"
+    - pattern: "\"inputs\""
+      min_count: 1
+      description: "Uses nested inputs structure in data"
+    guidelines:
+    - "Must use mlflow.genai.evaluate(), NOT mlflow.evaluate()"
+    - "Data format must use nested {inputs: {query: ...}} structure"
+    - "Must include at least one scorer"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: mlflow_eval_custom_scorer_002
+  inputs:
+    prompt: "How do I create a custom scorer for MLflow GenAI evaluation?"
+  outputs:
+    response: |
+      ```python
+      from mlflow.genai.scorers import Scorer
+
+      class ConcisenessScorer(Scorer):
+          name = "conciseness"
+
+          def score(self, *, output, expectations=None, **kwargs):
+              if output is None:
+                  return {"score": 0, "justification": "No output"}
+
+              word_count = len(output.split())
+              if word_count <= 50:
+                  return {"score": 1, "justification": f"Concise: {word_count} words"}
+              elif word_count <= 150:
+                  return {"score": 0.5, "justification": f"Moderate: {word_count} words"}
+              else:
+                  return {"score": 0, "justification": f"Verbose: {word_count} words"}
+
+      # Use in evaluation
+      results = mlflow.genai.evaluate(
+          predict_fn=my_agent,
+          data=eval_data,
+          scorers=[ConcisenessScorer()]
+      )
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Custom scorers extend the Scorer base class"
+    - "The score method receives output and expectations as keyword arguments"
+    - "Scores should return a dict with score and justification"
+    expected_patterns:
+    - pattern: "class.*Scorer"
+      min_count: 1
+      description: "Defines a custom scorer class"
+    - pattern: "def score\\(self"
+      min_count: 1
+      description: "Implements the score method"
+    - pattern: "justification"
+      min_count: 1
+      description: "Includes justification in score result"
+    guidelines:
+    - "Custom scorer must extend Scorer base class"
+    - "score method must accept **kwargs for forward compatibility"
+    - "Return value should include both score and justification"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: mlflow_eval_dataset_from_traces_003
+  inputs:
+    prompt: "How do I build an evaluation dataset from production traces in MLflow?"
+  outputs:
+    response: |
+      ```python
+      import mlflow
+
+      # Search for production traces
+      traces = mlflow.search_traces(
+          experiment_ids=["123"],
+          filter_string="status = 'OK'",
+          max_results=100
+      )
+
+      # Convert traces to evaluation dataset
+      eval_data = []
+      for trace in traces:
+          eval_data.append({
+              "inputs": {"query": trace.request["query"]},
+              "expectations": {"expected_response": trace.response}
+          })
+
+      # Run evaluation on the collected data
+      results = mlflow.genai.evaluate(
+          predict_fn=my_agent,
+          data=eval_data,
+          scorers=[mlflow.genai.scorers.RelevanceScorer()]
+      )
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "mlflow.search_traces() retrieves production traces for evaluation"
+    - "Traces can be filtered by status and other attributes"
+    - "Trace data is converted to the nested {inputs, expectations} format"
+    expected_patterns:
+    - pattern: "search_traces"
+      min_count: 1
+      description: "Uses search_traces to retrieve production data"
+    - pattern: "filter_string"
+      min_count: 1
+      description: "Filters traces by criteria"
+    - pattern: "\"inputs\""
+      min_count: 1
+      description: "Converts to required nested data format"
+    guidelines:
+    - "Must show the full workflow from trace retrieval to evaluation"
+    - "Data must be converted to the correct nested format"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: mlflow_eval_gotchas_004
+  inputs:
+    prompt: "What are the critical gotchas I should know before writing MLflow evaluation code?"
+  outputs:
+    response: |
+      Key gotchas for MLflow GenAI evaluation:
+
+      1. **Use `mlflow.genai.evaluate()`** - NOT `mlflow.evaluate()`. The genai module is required for LLM evaluation.
+
+      2. **Data format must be nested**: `{"inputs": {"query": "..."}}`, not `{"query": "..."}`.
+
+      3. **predict_fn receives unpacked kwargs** - Your function gets `query="..."` not `{"query": "..."}`.
+
+      4. **Always read GOTCHAS.md first** - Contains 15+ common mistakes that cause failures.
+
+      5. **Always read CRITICAL-interfaces.md** - Contains exact API signatures and data schemas.
+
+      6. **Scorer names matter** - Built-in scorers have specific names; custom scorers need unique names.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Use mlflow.genai.evaluate(), not mlflow.evaluate()"
+    - "Data format requires nested structure: {inputs: {query: ...}}"
+    - "predict_fn receives unpacked kwargs, not a dict"
+    - "GOTCHAS.md documents 15+ common mistakes"
+    expected_patterns:
+    - pattern: "mlflow\\.genai\\.evaluate"
+      min_count: 1
+      description: "Specifies the correct API"
+    - pattern: "GOTCHAS"
+      min_count: 1
+      description: "References the GOTCHAS.md file"
+    - pattern: "inputs"
+      min_count: 1
+      description: "Mentions the nested inputs requirement"
+    guidelines:
+    - "Must warn against using mlflow.evaluate() instead of mlflow.genai.evaluate()"
+    - "Must explain the nested data format requirement"
+    - "Must mention GOTCHAS.md and CRITICAL-interfaces.md reference files"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: mlflow_eval_compare_runs_005
+  inputs:
+    prompt: "How do I compare evaluation results across multiple agent versions?"
+  outputs:
+    response: |
+      ```python
+      import mlflow
+
+      # Evaluate version A
+      with mlflow.start_run(run_name="agent-v1"):
+          results_v1 = mlflow.genai.evaluate(
+              predict_fn=agent_v1,
+              data=eval_data,
+              scorers=[mlflow.genai.scorers.RelevanceScorer()]
+          )
+
+      # Evaluate version B
+      with mlflow.start_run(run_name="agent-v2"):
+          results_v2 = mlflow.genai.evaluate(
+              predict_fn=agent_v2,
+              data=eval_data,
+              scorers=[mlflow.genai.scorers.RelevanceScorer()]
+          )
+
+      # Compare in the MLflow UI or programmatically
+      print(f"V1 avg relevance: {results_v1.metrics['relevance/mean']}")
+      print(f"V2 avg relevance: {results_v2.metrics['relevance/mean']}")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Each evaluation should run in its own MLflow run for comparison"
+    - "Metrics are accessible via results.metrics dictionary"
+    - "The MLflow UI provides visual comparison across runs"
+    expected_patterns:
+    - pattern: "start_run"
+      min_count: 2
+      description: "Creates separate MLflow runs for each version"
+    - pattern: "mlflow\\.genai\\.evaluate"
+      min_count: 2
+      description: "Evaluates both versions"
+    - pattern: "\\.metrics\\["
+      min_count: 1
+      description: "Accesses metrics from results"
+    guidelines:
+    - "Must show evaluation in separate MLflow runs"
+    - "Must demonstrate how to access and compare metrics"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: mlflow_eval_builtin_scorers_006
+  inputs:
+    prompt: "What built-in scorers are available in MLflow GenAI evaluation?"
+  outputs:
+    response: |
+      MLflow provides several built-in scorers in `mlflow.genai.scorers`:
+
+      ```python
+      from mlflow.genai.scorers import (
+          RelevanceScorer,       # Is the response relevant to the query?
+          SafetyScorer,          # Is the response safe and appropriate?
+          GroundednessScorer,    # Is the response grounded in provided context?
+          CorrectnessScorer,     # Does the response match expected output?
+      )
+
+      results = mlflow.genai.evaluate(
+          predict_fn=my_agent,
+          data=eval_data,
+          scorers=[
+              RelevanceScorer(),
+              SafetyScorer(),
+              GroundednessScorer(),
+              CorrectnessScorer()
+          ]
+      )
+      ```
+
+      Use `RelevanceScorer` and `SafetyScorer` for all evaluations. Add `CorrectnessScorer` when you have expected responses, and `GroundednessScorer` for RAG applications.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Built-in scorers include RelevanceScorer, SafetyScorer, GroundednessScorer, and CorrectnessScorer"
+    - "Scorers are imported from mlflow.genai.scorers"
+    - "GroundednessScorer is specifically useful for RAG applications"
+    expected_patterns:
+    - pattern: "RelevanceScorer"
+      min_count: 1
+      description: "Lists RelevanceScorer"
+    - pattern: "SafetyScorer"
+      min_count: 1
+      description: "Lists SafetyScorer"
+    - pattern: "GroundednessScorer"
+      min_count: 1
+      description: "Lists GroundednessScorer"
+    - pattern: "CorrectnessScorer"
+      min_count: 1
+      description: "Lists CorrectnessScorer"
+    guidelines:
+    - "Must list at least four built-in scorers"
+    - "Must explain when to use each scorer"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: mlflow_eval_reference_files_007
+  inputs:
+    prompt: "Which reference files should I read before writing MLflow evaluation code?"
+  outputs:
+    response: |
+      Read these reference files in order:
+
+      | Reference | Purpose | When to Read |
+      |-----------|---------|--------------|
+      | `GOTCHAS.md` | Common mistakes | **Always read first** before writing code |
+      | `CRITICAL-interfaces.md` | API signatures, schemas | When writing any evaluation code |
+      | `patterns-evaluation.md` | Running evals, comparing | When executing evaluations |
+      | `patterns-scorers.md` | Custom scorer creation | When built-in scorers aren't enough |
+      | `patterns-datasets.md` | Dataset building | When preparing evaluation data |
+
+      Always read GOTCHAS.md and CRITICAL-interfaces.md before writing any evaluation code.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "GOTCHAS.md must be read first before writing any code"
+    - "CRITICAL-interfaces.md contains API signatures and data schemas"
+    - "patterns-evaluation.md covers running and comparing evaluations"
+    - "patterns-scorers.md covers custom scorer creation"
+    - "patterns-datasets.md covers dataset preparation"
+    expected_patterns:
+    - pattern: "GOTCHAS\\.md"
+      min_count: 1
+      description: "References GOTCHAS.md"
+    - pattern: "CRITICAL-interfaces\\.md"
+      min_count: 1
+      description: "References CRITICAL-interfaces.md"
+    - pattern: "patterns-evaluation\\.md"
+      min_count: 1
+      description: "References patterns-evaluation.md"
+    guidelines:
+    - "Must list all five reference files"
+    - "Must emphasize reading GOTCHAS.md first"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
