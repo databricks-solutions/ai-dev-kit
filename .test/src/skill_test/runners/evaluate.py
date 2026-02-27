@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 import yaml
 import mlflow
-from mlflow.genai.scorers import Guidelines, Safety
+from mlflow.genai.scorers import Safety
 
 from ..config import SkillTestConfig
 from ..dataset import get_dataset_source
@@ -25,7 +25,6 @@ from ..scorers.trace import (
     file_existence,
     tool_sequence,
     category_limits,
-    get_trace_scorers,
 )
 
 

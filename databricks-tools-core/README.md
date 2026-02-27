@@ -12,7 +12,7 @@ The `databricks-tools-core` package provides reusable, opinionated functions for
 |--------|-------------|
 | **sql/** | SQL execution, warehouse management, and table statistics |
 | **jobs/** | Job management and run operations (serverless by default) |
-| **unity_catalog/** | Unity Catalog operations (catalogs, schemas, tables) |
+| **unity_catalog/** | Unity Catalog operations (catalogs, schemas, tables, FGAC policies) |
 | **compute/** | Compute and execution context operations |
 | **spark_declarative_pipelines/** | Spark Declarative Pipeline management |
 | **synthetic_data_generation/** | Test data generation utilities |

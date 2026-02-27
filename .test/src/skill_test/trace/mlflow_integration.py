@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from .models import TraceMetrics, ToolCall, FileOperation
+from .models import TraceMetrics, ToolCall
 from .parser import parse_and_compute_metrics
 
 

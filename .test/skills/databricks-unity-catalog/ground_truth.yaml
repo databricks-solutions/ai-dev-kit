@@ -1,0 +1,1718 @@
+test_cases:
+  # ============================================================================
+  # SQL Generation — Column Mask
+  # ============================================================================
+  - id: "fgac_column_mask_sql_001"
+    inputs:
+      prompt: "Create a column mask policy for SSN columns at schema level"
+    outputs:
+      response: |
+        Here's a column mask policy that masks SSN columns across all tables in a schema:
+
+        ```sql
+        -- Step 1: Ensure the masking UDF exists
+        CREATE OR REPLACE FUNCTION my_catalog.my_schema.mask_ssn(ssn STRING)
+        RETURNS STRING
+        DETERMINISTIC
+        COMMENT 'Masks SSN showing only last 4 digits in XXX-XX-XXXX format'
+        RETURN CASE
+            WHEN ssn IS NULL THEN NULL
+            WHEN LENGTH(REGEXP_REPLACE(ssn, '[^0-9]', '')) >= 4
+                THEN CONCAT('***-**-', RIGHT(REGEXP_REPLACE(ssn, '[^0-9]', ''), 4))
+            ELSE '***-**-****'
+        END;
+
+        -- Step 2: Create the FGAC column mask policy
+        CREATE OR REPLACE POLICY mask_ssn_schema
+        ON SCHEMA my_catalog.my_schema
+        COMMENT 'Mask SSN columns schema-wide'
+        COLUMN MASK my_catalog.my_schema.mask_ssn
+        TO `analysts`, `data_scientists`
+        EXCEPT `gov_admin`
+        FOR TABLES
+        MATCH COLUMNS hasTagValue('pii_type', 'ssn') AS masked_col
+        ON COLUMN masked_col;
+        ```
+
+        This policy:
+        - Creates a deterministic masking UDF that shows only the last 4 digits
+        - Uses `CREATE OR REPLACE POLICY` at schema scope
+        - Matches columns tagged with `pii_type = ssn` using `hasTagValue()`
+        - Applies to all tables in the schema via `FOR TABLES`
+        - Excludes `gov_admin` to preserve admin access
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "CREATE OR REPLACE POLICY"
+        - "COLUMN MASK"
+        - "hasTagValue"
+        - "EXCEPT `gov_admin`"
+        - "FOR TABLES"
+      expected_patterns:
+        - pattern: "CREATE OR REPLACE POLICY"
+          min_count: 1
+          description: "policy creation syntax"
+        - pattern: "COLUMN MASK"
+          min_count: 1
+          description: "column mask type"
+        - pattern: "hasTagValue\\s*\\(\\s*'pii_type'\\s*,\\s*'ssn'\\s*\\)"
+          min_count: 1
+          description: "tag-based column matching"
+        - pattern: "EXCEPT\\s+`gov_admin`"
+          min_count: 1
+          description: "gov_admin exclusion"
+        - pattern: "FOR TABLES"
+          min_count: 1
+          description: "for_securable_type = TABLE"
+      guidelines:
+        - "Must use CREATE OR REPLACE POLICY syntax"
+        - "Must include COLUMN MASK with fully qualified UDF name"
+        - "Must match columns via hasTagValue('pii_type', 'ssn')"
+        - "Must include EXCEPT `gov_admin`"
+        - "Must include FOR TABLES"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "column-mask", "schema-scope", "ssn"]
+
+  # ============================================================================
+  # SQL Generation — Row Filter
+  # ============================================================================
+  - id: "fgac_row_filter_sql_001"
+    inputs:
+      prompt: "Create a row filter policy to hide EU data from the US team"
+    outputs:
+      response: |
+        Here's a row filter policy that hides EU data from the US team:
+
+        ```sql
+        -- Step 1: Create the row filter UDF
+        CREATE OR REPLACE FUNCTION my_catalog.my_schema.is_not_eu_region(region_value STRING)
+        RETURNS BOOLEAN
+        DETERMINISTIC
+        COMMENT 'Row filter - returns FALSE for EU regions'
+        RETURN CASE
+            WHEN region_value IS NULL THEN TRUE
+            WHEN LOWER(region_value) LIKE '%eu%' THEN FALSE
+            WHEN LOWER(region_value) LIKE '%europe%' THEN FALSE
+            ELSE TRUE
+        END;
+
+        -- Step 2: Create the FGAC row filter policy
+        CREATE OR REPLACE POLICY filter_eu_data_schema
+        ON SCHEMA my_catalog.my_schema
+        COMMENT 'Filter EU rows for US team'
+        ROW FILTER my_catalog.my_schema.is_not_eu_region
+        TO `us_team`
+        EXCEPT `gov_admin`
+        FOR TABLES
+        MATCH COLUMNS hasTagValue('region', 'eu') AS filter_col
+        USING COLUMNS (filter_col);
+        ```
+
+        This policy:
+        - Creates a deterministic UDF that returns FALSE for EU regions (filtering them out)
+        - Uses `ROW FILTER` with `USING COLUMNS` syntax (not `ON COLUMN`)
+        - Matches columns tagged with `region = eu` via `hasTagValue()`
+        - Applies only to the `us_team` principal group
+        - Excludes `gov_admin` to preserve admin access
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "ROW FILTER"
+        - "hasTagValue"
+        - "USING COLUMNS"
+        - "EXCEPT `gov_admin`"
+      expected_patterns:
+        - pattern: "CREATE OR REPLACE POLICY"
+          min_count: 1
+          description: "policy creation syntax"
+        - pattern: "ROW FILTER"
+          min_count: 1
+          description: "row filter type"
+        - pattern: "hasTagValue\\s*\\(\\s*'region'\\s*,\\s*'eu'\\s*\\)"
+          min_count: 1
+          description: "tag-based column matching"
+        - pattern: "EXCEPT\\s+`gov_admin`"
+          min_count: 1
+          description: "gov_admin exclusion"
+        - pattern: "USING COLUMNS"
+          min_count: 1
+          description: "row filter USING COLUMNS syntax"
+      guidelines:
+        - "Must use ROW FILTER syntax, not COLUMN MASK"
+        - "Must use USING COLUMNS (not ON COLUMN) for row filters"
+        - "Must include EXCEPT `gov_admin`"
+        - "Row filter UDF must return BOOLEAN"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "row-filter", "region-based", "schema-scope"]
+
+  # ============================================================================
+  # SQL Generation — Masking UDF
+  # ============================================================================
+  - id: "fgac_masking_udf_sql_001"
+    inputs:
+      prompt: "Write a masking UDF that partially masks email addresses"
+    outputs:
+      response: |
+        Here's a masking UDF that partially masks email addresses, showing only the first character and the domain:
+
+        ```sql
+        CREATE OR REPLACE FUNCTION my_catalog.my_schema.mask_email(email STRING)
+        RETURNS STRING
+        DETERMINISTIC
+        COMMENT 'Masks email showing first char and domain'
+        RETURN CASE
+            WHEN email IS NULL THEN NULL
+            WHEN INSTR(email, '@') > 1
+                THEN CONCAT(LEFT(email, 1), '***@', SUBSTRING(email, INSTR(email, '@') + 1))
+            ELSE '***@***.***'
+        END;
+        ```
+
+        Example outputs:
+        - `john.doe@example.com` → `j***@example.com`
+        - `a@b.com` → `a***@b.com`
+        - `NULL` → `NULL`
+        - `invalid-email` → `***@***.***`
+
+        Key requirements for masking UDFs:
+        - Must be `DETERMINISTIC` — same input always produces same output
+        - Uses simple `CASE` statements — no external calls or nested UDFs
+        - Handles NULL values explicitly
+        - Handles edge cases (missing @ sign)
+        - Uses fully qualified name: `catalog.schema.function_name`
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "DETERMINISTIC"
+        - "CASE"
+        - "CREATE OR REPLACE FUNCTION"
+        - "RETURNS STRING"
+      expected_patterns:
+        - pattern: "CREATE OR REPLACE FUNCTION"
+          min_count: 1
+          description: "UDF creation syntax"
+        - pattern: "RETURNS STRING"
+          min_count: 1
+          description: "return type"
+        - pattern: "DETERMINISTIC"
+          min_count: 1
+          description: "deterministic requirement"
+        - pattern: "CASE\\s+WHEN"
+          min_count: 1
+          description: "CASE statement pattern"
+        - pattern: "INSTR\\s*\\(.*@.*\\)"
+          min_count: 1
+          description: "email @ detection"
+      guidelines:
+        - "Masking UDF must be DETERMINISTIC"
+        - "Must use simple CASE statements, no external calls"
+        - "Must handle NULL values"
+        - "Must use fully qualified function name (catalog.schema.function)"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["sql", "masking-udf", "email", "partial-mask"]
+
+  # ============================================================================
+  # SQL Generation — Cross-Catalog UDF
+  # ============================================================================
+  - id: "fgac_cross_catalog_sql_001"
+    inputs:
+      prompt: "Create a column mask policy on prod.finance using a UDF from governance.masking_udfs"
+    outputs:
+      response: |
+        Here's a cross-catalog column mask policy using a shared governance UDF:
+
+        ```sql
+        -- The masking UDF already exists in the shared governance schema:
+        -- governance.masking_udfs.mask_ssn
+
+        -- Create policy on prod.finance, referencing UDF from governance catalog
+        CREATE OR REPLACE POLICY mask_ssn_finance
+        ON SCHEMA prod.finance
+        COMMENT 'Mask SSN using shared governance UDF'
+        COLUMN MASK governance.masking_udfs.mask_ssn
+        TO `analysts`
+        EXCEPT `gov_admin`
+        FOR TABLES
+        MATCH COLUMNS hasTagValue('pii_type', 'ssn') AS masked_col
+        ON COLUMN masked_col;
+        ```
+
+        Key points about cross-catalog UDFs:
+        - The UDF (`governance.masking_udfs.mask_ssn`) can live in a different catalog/schema than the policy scope (`prod.finance`)
+        - The UDF name must always be fully qualified: `catalog.schema.function`
+        - A common pattern is a shared governance schema containing all masking functions
+        - The policy executor needs `EXECUTE` on the UDF and `MANAGE` on the target securable
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "governance.masking_udfs.mask_ssn"
+        - "prod.finance"
+        - "cross-catalog"
+        - "fully qualified"
+      expected_patterns:
+        - pattern: "CREATE OR REPLACE POLICY"
+          min_count: 1
+          description: "policy creation"
+        - pattern: "COLUMN MASK governance\\.masking_udfs\\.mask_ssn"
+          min_count: 1
+          description: "cross-catalog UDF reference"
+        - pattern: "ON SCHEMA prod\\.finance"
+          min_count: 1
+          description: "policy scope on prod.finance"
+        - pattern: "EXCEPT\\s+`gov_admin`"
+          min_count: 1
+          description: "gov_admin exclusion"
+      guidelines:
+        - "Must use fully qualified UDF name from governance catalog"
+        - "Policy scope must be on prod.finance"
+        - "Must explain cross-catalog UDF pattern"
+        - "Must include EXCEPT `gov_admin`"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["sql", "cross-catalog", "column-mask", "governance"]
+
+  # ============================================================================
+  # SDK/Python — Create Column Mask Policy
+  # ============================================================================
+  - id: "fgac_sdk_create_policy_001"
+    inputs:
+      prompt: "Create a column mask FGAC policy using the Python SDK"
+    outputs:
+      response: |
+        Here's how to create a column mask FGAC policy using the Databricks Python SDK:
+
+        ```python
+        from databricks.sdk import WorkspaceClient
+        from databricks.sdk.service.catalog import (
+            ColumnMaskOptions,
+            MatchColumn,
+            PolicyInfo,
+            PolicyType,
+            SecurableType,
+        )
+
+        w = WorkspaceClient()
+
+        policy_info = PolicyInfo(
+            name="mask_pii_ssn_schema",
+            policy_type=PolicyType.POLICY_TYPE_COLUMN_MASK,
+            on_securable_type=SecurableType.SCHEMA,
+            on_securable_fullname="my_catalog.my_schema",
+            for_securable_type=SecurableType.TABLE,
+            to_principals=["analysts", "data_scientists"],
+            except_principals=["gov_admin"],
+            comment="Mask SSN columns in schema",
+            column_mask=ColumnMaskOptions(
+                function_name="my_catalog.my_schema.mask_ssn",
+                on_column="masked_col",
+            ),
+            match_columns=[
+                MatchColumn(
+                    alias="masked_col",
+                    condition="hasTagValue('pii_type', 'ssn')",
+                )
+            ],
+        )
+        policy = w.policies.create_policy(policy_info=policy_info)
+        print(f"Created policy: {policy.name}")
+        ```
+
+        Key points:
+        - `policy_type` must be `PolicyType.POLICY_TYPE_COLUMN_MASK`
+        - `for_securable_type` is always `SecurableType.TABLE`
+        - `except_principals` must include `"gov_admin"` to protect admin access
+        - `function_name` must be fully qualified (catalog.schema.function)
+        - `MatchColumn.alias` must match `ColumnMaskOptions.on_column`
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "PolicyInfo"
+        - "PolicyType.POLICY_TYPE_COLUMN_MASK"
+        - "ColumnMaskOptions"
+        - "MatchColumn"
+        - "for_securable_type"
+        - "except_principals"
+      expected_patterns:
+        - pattern: "PolicyInfo\\("
+          min_count: 1
+          description: "PolicyInfo construction"
+        - pattern: "PolicyType\\.POLICY_TYPE_COLUMN_MASK"
+          min_count: 1
+          description: "column mask policy type"
+        - pattern: "ColumnMaskOptions\\("
+          min_count: 1
+          description: "column mask options"
+        - pattern: "MatchColumn\\("
+          min_count: 1
+          description: "match column configuration"
+        - pattern: "for_securable_type.*=.*SecurableType\\.TABLE"
+          min_count: 1
+          description: "for_securable_type always TABLE"
+        - pattern: "except_principals.*gov_admin"
+          min_count: 1
+          description: "gov_admin in except_principals"
+      guidelines:
+        - "Must use PolicyInfo with all required fields"
+        - "Must set for_securable_type to SecurableType.TABLE"
+        - "Must include gov_admin in except_principals"
+        - "Must use ColumnMaskOptions and MatchColumn"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["python", "sdk", "column-mask", "create-policy"]
+
+  # ============================================================================
+  # SDK/Python — List Policies
+  # ============================================================================
+  - id: "fgac_sdk_list_policies_001"
+    inputs:
+      prompt: "List all FGAC policies on my catalog and filter by type"
+    outputs:
+      response: |
+        Here's how to list and filter FGAC policies using the Python SDK:
+
+        ```python
+        from databricks.sdk import WorkspaceClient
+
+        w = WorkspaceClient()
+
+        # List all policies on a catalog (including inherited from schemas/tables)
+        policies = list(w.policies.list_policies(
+            on_securable_type="CATALOG",
+            on_securable_fullname="my_catalog",
+            include_inherited=True,
+        ))
+
+        print(f"Total policies: {len(policies)}")
+
+        # Filter by policy type
+        column_masks = [p for p in policies if p.policy_type == "COLUMN_MASK"]
+        row_filters = [p for p in policies if p.policy_type == "ROW_FILTER"]
+
+        print(f"Column masks: {len(column_masks)}")
+        print(f"Row filters: {len(row_filters)}")
+
+        # Print details for each policy
+        for p in policies:
+            print(f"  {p.name}: {p.policy_type} on {p.on_securable_fullname}")
+        ```
+
+        Key points:
+        - Use `w.policies.list_policies()` — there is no SQL equivalent (`SHOW POLICIES` does not exist)
+        - `include_inherited=True` shows policies from parent scopes
+        - Filter by `policy_type` string: `"COLUMN_MASK"` or `"ROW_FILTER"`
+        - `on_securable_type` can be `"CATALOG"`, `"SCHEMA"`, or `"TABLE"`
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "w.policies.list_policies"
+        - "on_securable_type"
+        - "include_inherited"
+        - "COLUMN_MASK"
+        - "ROW_FILTER"
+      expected_patterns:
+        - pattern: "w\\.policies\\.list_policies\\("
+          min_count: 1
+          description: "list_policies API call"
+        - pattern: "on_securable_type"
+          min_count: 1
+          description: "securable type parameter"
+        - pattern: "include_inherited"
+          min_count: 1
+          description: "inherited policies flag"
+        - pattern: "policy_type.*COLUMN_MASK"
+          min_count: 1
+          description: "filter by column mask type"
+      guidelines:
+        - "Must use w.policies.list_policies() SDK method"
+        - "Must show filtering by policy_type"
+        - "Must mention include_inherited parameter"
+        - "Should note SHOW POLICIES does not exist in SQL"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["python", "sdk", "list-policies", "discovery"]
+
+  # ============================================================================
+  # SDK/Python — Create Row Filter Policy
+  # ============================================================================
+  - id: "fgac_sdk_row_filter_001"
+    inputs:
+      prompt: "Create a row filter policy using the SDK with a 0-argument UDF"
+    outputs:
+      response: |
+        Here's how to create a row filter policy using the Python SDK:
+
+        ```python
+        from databricks.sdk import WorkspaceClient
+        from databricks.sdk.service.catalog import (
+            MatchColumn,
+            PolicyInfo,
+            PolicyType,
+            RowFilterOptions,
+            SecurableType,
+        )
+
+        w = WorkspaceClient()
+
+        policy_info = PolicyInfo(
+            name="filter_eu_data_schema",
+            policy_type=PolicyType.POLICY_TYPE_ROW_FILTER,
+            on_securable_type=SecurableType.SCHEMA,
+            on_securable_fullname="my_catalog.my_schema",
+            for_securable_type=SecurableType.TABLE,
+            to_principals=["us_team"],
+            except_principals=["gov_admin"],
+            comment="Filter EU rows in schema",
+            row_filter=RowFilterOptions(
+                function_name="my_catalog.my_schema.is_not_eu_region",
+            ),
+            match_columns=[
+                MatchColumn(
+                    alias="filter_col",
+                    condition="hasTagValue('region', 'eu')",
+                )
+            ],
+        )
+        policy = w.policies.create_policy(policy_info=policy_info)
+        print(f"Created policy: {policy.name}")
+        ```
+
+        Key differences from column mask:
+        - `policy_type` is `PolicyType.POLICY_TYPE_ROW_FILTER`
+        - Uses `RowFilterOptions` instead of `ColumnMaskOptions`
+        - Row filter UDFs take the matched column as input and return `BOOLEAN`
+        - `TRUE` includes the row, `FALSE` excludes it
+        - `for_securable_type` is still always `SecurableType.TABLE`
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "PolicyType.POLICY_TYPE_ROW_FILTER"
+        - "RowFilterOptions"
+        - "MatchColumn"
+        - "for_securable_type"
+        - "BOOLEAN"
+      expected_patterns:
+        - pattern: "PolicyType\\.POLICY_TYPE_ROW_FILTER"
+          min_count: 1
+          description: "row filter policy type"
+        - pattern: "RowFilterOptions\\("
+          min_count: 1
+          description: "row filter options"
+        - pattern: "MatchColumn\\("
+          min_count: 1
+          description: "match column"
+        - pattern: "for_securable_type.*=.*SecurableType\\.TABLE"
+          min_count: 1
+          description: "for_securable_type always TABLE"
+        - pattern: "except_principals.*gov_admin"
+          min_count: 1
+          description: "gov_admin in except_principals"
+      guidelines:
+        - "Must use POLICY_TYPE_ROW_FILTER, not COLUMN_MASK"
+        - "Must use RowFilterOptions, not ColumnMaskOptions"
+        - "Must include gov_admin in except_principals"
+        - "Should explain that row filter UDFs return BOOLEAN"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["python", "sdk", "row-filter", "create-policy"]
+
+  # ============================================================================
+  # MCP Tool Workflow — Human-in-the-Loop
+  # ============================================================================
+  - id: "fgac_mcp_workflow_001"
+    inputs:
+      prompt: "Walk me through the human-in-the-loop workflow to create a column mask policy using MCP tools"
+    outputs:
+      response: |
+        Here's the complete human-in-the-loop workflow for creating an FGAC column mask policy:
+
+        **Step 1: ANALYZE** — Discover current state
+
+        ```
+        list_fgac_policies(
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance"
+        )
+
+        get_masking_functions(
+            catalog="prod",
+            schema="finance"
+        )
+
+        get_column_tags_api(
+            catalog="prod",
+            schema="finance",
+            table="customers"
+        )
+        ```
+
+        **Step 2: RECOMMEND** — Generate policy proposal based on discovered tags and UDFs.
+
+        **Step 3: PREVIEW** — Get approval token
+
+        ```
+        result = preview_policy_changes(
+            action="CREATE",
+            policy_name="mask_ssn_finance",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance",
+            policy_type="COLUMN_MASK",
+            function_name="prod.finance.mask_ssn",
+            to_principals=["analysts"],
+            tag_name="pii_type",
+            tag_value="ssn"
+        )
+        # Returns: approval_token, equivalent SQL, warnings
+        ```
+
+        **Step 4: APPROVE** — Human reviews the preview and replies "approve"
+
+        **Step 5: EXECUTE** — Pass approval token to create
+
+        ```
+        create_fgac_policy(
+            policy_name="mask_ssn_finance",
+            policy_type="COLUMN_MASK",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance",
+            function_name="prod.finance.mask_ssn",
+            to_principals=["analysts"],
+            tag_name="pii_type",
+            tag_value="ssn",
+            approval_token=result["approval_token"]
+        )
+        ```
+
+        **Step 6: VERIFY** — Confirm the policy was applied
+
+        ```
+        get_fgac_policy(
+            policy_name="mask_ssn_finance",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance"
+        )
+        ```
+
+        The workflow is: ANALYZE -> RECOMMEND -> PREVIEW -> APPROVE -> EXECUTE -> VERIFY.
+        Never auto-execute policy changes — always preview and wait for human approval.
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "preview_policy_changes"
+        - "approval_token"
+        - "create_fgac_policy"
+        - "ANALYZE"
+        - "PREVIEW"
+        - "APPROVE"
+        - "EXECUTE"
+      expected_patterns:
+        - pattern: "preview_policy_changes\\("
+          min_count: 1
+          description: "preview step"
+        - pattern: "approval_token"
+          min_count: 2
+          description: "approval token in preview and execute"
+        - pattern: "create_fgac_policy\\("
+          min_count: 1
+          description: "create execution step"
+        - pattern: "list_fgac_policies\\("
+          min_count: 1
+          description: "discovery step"
+      guidelines:
+        - "Must show complete ANALYZE -> PREVIEW -> APPROVE -> EXECUTE workflow"
+        - "Must include preview_policy_changes with approval_token"
+        - "Must pass approval_token to create_fgac_policy"
+        - "Must include discovery step (list_fgac_policies or get_masking_functions)"
+        - "Must emphasize never auto-executing policy changes"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["mcp", "workflow", "human-in-the-loop", "approval-token"]
+
+  # ============================================================================
+  # MCP Tool Workflow — Cross-Catalog Discovery
+  # ============================================================================
+  - id: "fgac_mcp_cross_catalog_001"
+    inputs:
+      prompt: "Discover masking UDFs in a shared governance schema and create a policy using MCP tools"
+    outputs:
+      response: |
+        Here's how to discover UDFs from a shared governance schema and create a cross-catalog policy:
+
+        **Step 1: Discover masking UDFs in the governance catalog**
+
+        ```
+        get_masking_functions(
+            catalog="prod",
+            schema="finance",
+            udf_catalog="governance",
+            udf_schema="masking_udfs"
+        )
+        # Returns: governance.masking_udfs.mask_ssn, governance.masking_udfs.mask_email, etc.
+        ```
+
+        **Step 2: Check existing policies**
+
+        ```
+        list_fgac_policies(
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance"
+        )
+        ```
+
+        **Step 3: Preview the policy with cross-catalog UDF**
+
+        ```
+        result = preview_policy_changes(
+            action="CREATE",
+            policy_name="mask_ssn_finance",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance",
+            policy_type="COLUMN_MASK",
+            function_name="governance.masking_udfs.mask_ssn",
+            to_principals=["analysts"],
+            tag_name="pii_type",
+            tag_value="ssn"
+        )
+        ```
+
+        **Step 4: After human approval, execute**
+
+        ```
+        create_fgac_policy(
+            policy_name="mask_ssn_finance",
+            policy_type="COLUMN_MASK",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance",
+            function_name="governance.masking_udfs.mask_ssn",
+            to_principals=["analysts"],
+            tag_name="pii_type",
+            tag_value="ssn",
+            approval_token=result["approval_token"]
+        )
+        ```
+
+        Key points:
+        - Use `udf_catalog` and `udf_schema` parameters to discover UDFs in a different catalog
+        - The `function_name` in the policy must be fully qualified: `governance.masking_udfs.mask_ssn`
+        - The UDF does not need to be in the same catalog/schema as the policy scope
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "udf_catalog"
+        - "udf_schema"
+        - "governance.masking_udfs"
+        - "cross-catalog"
+        - "get_masking_functions"
+      expected_patterns:
+        - pattern: "get_masking_functions\\("
+          min_count: 1
+          description: "UDF discovery tool"
+        - pattern: "udf_catalog.*=.*governance"
+          min_count: 1
+          description: "cross-catalog UDF discovery"
+        - pattern: "udf_schema.*=.*masking_udfs"
+          min_count: 1
+          description: "cross-schema UDF discovery"
+        - pattern: "function_name.*governance\\.masking_udfs\\."
+          min_count: 1
+          description: "fully qualified cross-catalog function reference"
+      guidelines:
+        - "Must use get_masking_functions with udf_catalog and udf_schema"
+        - "Must show fully qualified function_name from governance catalog"
+        - "Must follow human-in-the-loop workflow with preview and approval"
+        - "Should explain the cross-catalog UDF pattern"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["mcp", "cross-catalog", "discovery", "governance"]
+
+  # ============================================================================
+  # Error/Edge Cases — Invalid SQL
+  # ============================================================================
+  - id: "fgac_error_invalid_sql_001"
+    inputs:
+      prompt: "How do I list all FGAC policies using SQL?"
+    outputs:
+      response: |
+        **Important: `SHOW POLICIES` does not exist in Databricks SQL.**
+
+        There is no SQL command to list FGAC policies. The following SQL statements are **not valid**:
+
+        | Invalid SQL | Status |
+        |---|---|
+        | `SHOW POLICIES` | Does not exist |
+        | `DESCRIBE POLICY` | Does not exist |
+        | `ALTER POLICY` | Does not exist |
+
+        Instead, use the **Python SDK** or **REST API**:
+
+        ```python
+        from databricks.sdk import WorkspaceClient
+
+        w = WorkspaceClient()
+
+        # List all policies on a catalog
+        policies = list(w.policies.list_policies(
+            on_securable_type="CATALOG",
+            on_securable_fullname="my_catalog",
+            include_inherited=True,
+        ))
+
+        for p in policies:
+            print(f"{p.name}: {p.policy_type} on {p.on_securable_fullname}")
+        ```
+
+        Or use the **MCP tool**:
+
+        ```
+        list_fgac_policies(
+            securable_type="CATALOG",
+            securable_fullname="my_catalog",
+            include_inherited=True
+        )
+        ```
+
+        Policy management is API-only. Use `w.policies.list_policies()` for listing,
+        `w.policies.get_policy()` for details, and `CREATE OR REPLACE POLICY` SQL only for creation/deletion.
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "SHOW POLICIES"
+        - "does not exist"
+        - "w.policies.list_policies"
+        - "REST API"
+      expected_patterns:
+        - pattern: "SHOW POLICIES.*not"
+          min_count: 1
+          description: "explains SHOW POLICIES does not exist"
+        - pattern: "w\\.policies\\.list_policies\\("
+          min_count: 1
+          description: "recommends SDK alternative"
+        - pattern: "list_fgac_policies\\("
+          min_count: 1
+          description: "recommends MCP tool alternative"
+      guidelines:
+        - "Must clearly state SHOW POLICIES does not exist"
+        - "Must recommend w.policies.list_policies() as the alternative"
+        - "Must not generate SHOW POLICIES, DESCRIBE POLICY, or ALTER POLICY"
+        - "Should mention MCP tool alternative"
+    metadata:
+      category: "error_handling"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["error", "invalid-sql", "show-policies", "edge-case"]
+
+  # ============================================================================
+  # MCP Tool — Analyze FGAC Coverage
+  # ============================================================================
+  - id: "fgac_mcp_analyze_coverage_001"
+    inputs:
+      prompt: "Analyze FGAC policy coverage for the prod.finance schema and identify gaps"
+    outputs:
+      response: |
+        Here's how to analyze FGAC policy coverage and identify gaps:
+
+        **Step 1: Run coverage analysis**
+
+        ```
+        analyze_fgac_coverage(
+            catalog="prod",
+            schema="finance"
+        )
+        ```
+
+        This returns:
+        - `summary` — tables scanned, tagged columns, existing policies, available UDFs
+        - `covered_tags` — tag/value pairs already covered by policies
+        - `uncovered_tags` — tag/value pairs with tagged columns but no policy
+        - `gaps` — detailed list of uncovered tags with affected columns and suggestions
+        - `existing_policies` — current FGAC policies
+        - `available_udfs` — masking functions available in the schema
+
+        **Step 2: Review gaps**
+
+        Each gap entry identifies:
+        - The uncovered `tag_name` and `tag_value`
+        - Which `columns` (table + column) have that tag but no policy
+        - A `suggestion` for what kind of policy to create
+
+        **Step 3: For each gap, create policies using the human-in-the-loop workflow**
+
+        ```
+        result = preview_policy_changes(
+            action="CREATE",
+            policy_name="mask_email_finance",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance",
+            policy_type="COLUMN_MASK",
+            function_name="prod.finance.mask_email",
+            to_principals=["analysts"],
+            tag_name="pii_type",
+            tag_value="email"
+        )
+
+        # After human approval:
+        create_fgac_policy(
+            ...,
+            approval_token=result["approval_token"]
+        )
+        ```
+
+        You can also analyze an entire catalog by omitting the schema:
+        ```
+        analyze_fgac_coverage(catalog="prod")
+        ```
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "analyze_fgac_coverage"
+        - "gaps"
+        - "uncovered_tags"
+        - "covered_tags"
+        - "summary"
+      expected_patterns:
+        - pattern: "analyze_fgac_coverage\\("
+          min_count: 1
+          description: "coverage analysis tool"
+        - pattern: "gaps"
+          min_count: 1
+          description: "identifies coverage gaps"
+        - pattern: "uncovered_tags"
+          min_count: 1
+          description: "uncovered tags in output"
+        - pattern: "preview_policy_changes\\("
+          min_count: 1
+          description: "follows up with human-in-the-loop workflow"
+      guidelines:
+        - "Must use analyze_fgac_coverage as the primary analysis tool"
+        - "Must explain the output structure (summary, gaps, covered/uncovered tags)"
+        - "Must show follow-up with human-in-the-loop workflow to create policies for gaps"
+        - "Should mention catalog-level analysis option"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["mcp", "analyze-coverage", "gap-analysis", "discovery"]
+
+  # ============================================================================
+  # MCP Tool — Discovery: Column Tags, Schema Info, Table Policies
+  # ============================================================================
+  - id: "fgac_mcp_discovery_tools_001"
+    inputs:
+      prompt: "Discover the current FGAC state of prod.finance — what tags exist, what policies are applied, and what UDFs are available"
+    outputs:
+      response: |
+        Here's how to discover the full FGAC state of a schema using MCP tools:
+
+        **1. Get schema metadata**
+
+        ```
+        get_schema_info(catalog="prod", schema="finance")
+        ```
+        Returns: schema name, owner, comment, creation/update timestamps.
+
+        **2. Get catalog metadata**
+
+        ```
+        get_catalog_info(catalog="prod")
+        ```
+        Returns: catalog name, owner, comment, creation/update timestamps.
+
+        **3. List all tables with their current policies**
+
+        ```
+        list_table_policies_in_schema(catalog="prod", schema="finance")
+        ```
+        Returns: each table with its `column_masks` and `row_filters`.
+
+        **4. Check column tags on a specific table**
+
+        ```
+        get_column_tags_api(catalog="prod", schema="finance", table="customers")
+        ```
+        Returns: column-level tags (tag_name, tag_value, column_name) for the table.
+
+        **5. List available masking UDFs**
+
+        ```
+        get_masking_functions(catalog="prod", schema="finance")
+        ```
+        Returns: functions with name, full_name, return_type, comment.
+
+        **6. List existing FGAC policies**
+
+        ```
+        list_fgac_policies(
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance"
+        )
+        ```
+        Returns: all policies on the schema with their configuration.
+
+        Or use `analyze_fgac_coverage(catalog="prod", schema="finance")` to get a combined analysis with gap detection in a single call.
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "get_schema_info"
+        - "get_column_tags_api"
+        - "list_table_policies_in_schema"
+        - "get_masking_functions"
+        - "list_fgac_policies"
+      expected_patterns:
+        - pattern: "get_schema_info\\("
+          min_count: 1
+          description: "schema metadata discovery"
+        - pattern: "get_column_tags_api\\("
+          min_count: 1
+          description: "column tag discovery"
+        - pattern: "list_table_policies_in_schema\\("
+          min_count: 1
+          description: "schema-wide policy discovery"
+        - pattern: "get_masking_functions\\("
+          min_count: 1
+          description: "UDF discovery"
+        - pattern: "list_fgac_policies\\("
+          min_count: 1
+          description: "policy listing"
+      guidelines:
+        - "Must show get_schema_info or get_catalog_info for metadata"
+        - "Must use get_column_tags_api to discover column tags"
+        - "Must use list_table_policies_in_schema for schema-wide policy view"
+        - "Must include get_masking_functions for UDF discovery"
+        - "Should mention analyze_fgac_coverage as a combined alternative"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["mcp", "discovery", "column-tags", "schema-info", "table-policies"]
+
+  # ============================================================================
+  # SQL Generation — Tag Application
+  # ============================================================================
+  - id: "fgac_tag_application_sql_001"
+    inputs:
+      prompt: "Apply PII governed tags to columns on my customers table"
+    outputs:
+      response: |
+        Here's how to apply governed tags to columns:
+
+        ```sql
+        -- Modern syntax (DBR 16.1+)
+        SET TAG ON COLUMN my_catalog.my_schema.customers.ssn 'pii_type' = 'ssn';
+        SET TAG ON COLUMN my_catalog.my_schema.customers.email 'pii_type' = 'email';
+        SET TAG ON COLUMN my_catalog.my_schema.customers.phone 'pii_type' = 'phone';
+
+        -- Legacy syntax (all versions)
+        ALTER TABLE my_catalog.my_schema.customers
+        ALTER COLUMN ssn SET TAGS ('pii_type' = 'ssn');
+        ```
+
+        To verify tags were applied:
+        ```sql
+        SELECT tag_name, tag_value, column_name
+        FROM system.information_schema.column_tags
+        WHERE catalog_name = 'my_catalog'
+          AND schema_name = 'my_schema'
+          AND table_name = 'customers';
+        ```
+
+        Important: Tags must be **governed tags** (created via the Databricks UI, not SQL).
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "SET TAG"
+        - "pii_type"
+        - "governed tags"
+      expected_patterns:
+        - pattern: "SET TAG|SET TAGS"
+          min_count: 1
+          description: "tag application syntax"
+        - pattern: "pii_type"
+          min_count: 2
+          description: "PII tag key usage"
+        - pattern: "column_tags"
+          min_count: 1
+          description: "information_schema query for verification"
+      guidelines:
+        - "Must use SET TAG ON COLUMN or ALTER TABLE ALTER COLUMN SET TAGS syntax"
+        - "Must mention governed tags cannot be created via SQL"
+        - "Should show how to verify tags via information_schema"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "tags", "column-tags", "pii"]
+
+  # ============================================================================
+  # SQL Generation — Drop Policy
+  # ============================================================================
+  - id: "fgac_drop_policy_sql_001"
+    inputs:
+      prompt: "Drop an FGAC policy from a schema"
+    outputs:
+      response: |
+        Here's how to drop an FGAC policy:
+
+        ```sql
+        -- Drop at schema level
+        DROP POLICY mask_pii_schema ON SCHEMA my_catalog.my_schema;
+
+        -- Drop at catalog level
+        DROP POLICY mask_pii_catalog ON CATALOG my_catalog;
+
+        -- Drop at table level
+        DROP POLICY mask_pii_table ON TABLE my_catalog.my_schema.my_table;
+        ```
+
+        Important notes:
+        - `DROP POLICY` is **irreversible** — the policy is permanently removed
+        - There is no `ALTER POLICY` — to change a policy, drop and recreate it
+        - Use `preview_policy_changes(action="DELETE", ...)` for the human-in-the-loop workflow
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "DROP POLICY"
+        - "irreversible"
+      expected_patterns:
+        - pattern: "DROP POLICY"
+          min_count: 1
+          description: "drop policy syntax"
+        - pattern: "ON (SCHEMA|CATALOG|TABLE)"
+          min_count: 1
+          description: "scope specifier"
+      guidelines:
+        - "Must use DROP POLICY ... ON <scope> syntax"
+        - "Must warn that the operation is irreversible"
+        - "Must mention ALTER POLICY does not exist"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "drop-policy", "delete"]
+
+  # ============================================================================
+  # Error/Edge Cases — Governed Tags Cannot Be Created via SQL
+  # ============================================================================
+  - id: "fgac_error_governed_tags_001"
+    inputs:
+      prompt: "How do I create a governed tag using SQL?"
+    outputs:
+      response: |
+        **Governed tags cannot be created via SQL.** They must be created through the Databricks UI.
+
+        To create a governed tag:
+        1. Navigate to **Catalog** in your workspace
+        2. Select **Governed Tags** from the left panel
+        3. Click **Create governed tag**
+        4. Configure the tag key and allowed values
+
+        Example configuration:
+        - **Tag Key**: `pii_type`
+        - **Allowed Values**: `ssn`, `email`, `phone`, `credit_card`
+
+        Once the governed tag exists, you can **apply** it to columns via SQL:
+        ```sql
+        SET TAG ON COLUMN catalog.schema.table.column 'pii_type' = 'ssn';
+        ```
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "cannot be created via SQL"
+        - "Databricks UI"
+        - "Governed Tags"
+      expected_patterns:
+        - pattern: "cannot.*SQL|not.*SQL|UI"
+          min_count: 1
+          description: "explains SQL limitation"
+        - pattern: "SET TAG"
+          min_count: 1
+          description: "shows SQL tag application as alternative"
+      guidelines:
+        - "Must clearly state governed tags cannot be created via SQL"
+        - "Must describe the UI workflow for creating governed tags"
+        - "Should show how to apply tags via SQL after creation"
+    metadata:
+      category: "error_handling"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["error", "governed-tags", "ui-only"]
+
+  # ============================================================================
+  # SQL Generation — hasTag vs hasTagValue
+  # ============================================================================
+  - id: "fgac_has_tag_vs_value_001"
+    inputs:
+      prompt: "What is the difference between hasTag and hasTagValue in FGAC policies?"
+    outputs:
+      response: |
+        `hasTag` and `hasTagValue` are used in FGAC policies to match columns based on governed tags:
+
+        **`hasTagValue('tag_name', 'tag_value')`** — Matches columns with a specific tag AND value:
+        ```sql
+        MATCH COLUMNS hasTagValue('pii_type', 'ssn') AS masked_col
+        ```
+        This only matches columns tagged with `pii_type = ssn`.
+
+        **`hasTag('tag_name')`** — Matches columns with a specific tag, regardless of value:
+        ```sql
+        MATCH COLUMNS hasTag('pii_type') AS masked_col
+        ```
+        This matches ALL columns tagged with `pii_type`, regardless of whether the value is `ssn`, `email`, `phone`, etc.
+
+        Best practices:
+        - Use `hasTagValue` when different tag values need different masking (e.g., SSN mask vs email mask)
+        - Use `hasTag` when all values should be masked the same way (e.g., full redaction for any PII)
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "hasTag"
+        - "hasTagValue"
+        - "regardless of value"
+      expected_patterns:
+        - pattern: "hasTagValue\\s*\\("
+          min_count: 1
+          description: "hasTagValue example"
+        - pattern: "hasTag\\s*\\("
+          min_count: 1
+          description: "hasTag example"
+        - pattern: "MATCH COLUMNS"
+          min_count: 2
+          description: "both match patterns shown"
+      guidelines:
+        - "Must explain the difference between hasTag and hasTagValue"
+        - "Must show SQL examples for both"
+        - "Should explain when to use each"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "has-tag", "tag-matching", "fgac"]
+
+  # ============================================================================
+  # MCP Tool — Delete Policy Workflow
+  # ============================================================================
+  - id: "fgac_mcp_delete_workflow_001"
+    inputs:
+      prompt: "Delete an FGAC policy using the human-in-the-loop MCP workflow"
+    outputs:
+      response: |
+        Here's the human-in-the-loop workflow for deleting an FGAC policy:
+
+        **Step 1: PREVIEW** — Get a delete preview and approval token
+
+        ```
+        result = preview_policy_changes(
+            action="DELETE",
+            policy_name="mask_ssn_finance",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance"
+        )
+        ```
+
+        This returns:
+        - `equivalent_sql`: `DROP POLICY mask_ssn_finance ON SCHEMA prod.finance;`
+        - `warnings`: ["This action is irreversible. The policy will be permanently removed."]
+        - `approval_token`: Token to authorize the deletion
+
+        **Step 2: APPROVE** — Human reviews the preview and confirms
+
+        **Step 3: EXECUTE** — Delete with the approval token
+
+        ```
+        delete_fgac_policy(
+            policy_name="mask_ssn_finance",
+            securable_type="SCHEMA",
+            securable_fullname="prod.finance",
+            approval_token=result["approval_token"]
+        )
+        ```
+
+        The approval token ensures the deletion matches exactly what was previewed.
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "preview_policy_changes"
+        - "DELETE"
+        - "delete_fgac_policy"
+        - "approval_token"
+        - "irreversible"
+      expected_patterns:
+        - pattern: 'action.*=.*"DELETE"'
+          min_count: 1
+          description: "DELETE action in preview"
+        - pattern: "delete_fgac_policy\\("
+          min_count: 1
+          description: "delete execution step"
+        - pattern: "approval_token"
+          min_count: 2
+          description: "token in both preview and execute"
+      guidelines:
+        - "Must use preview_policy_changes with action=DELETE first"
+        - "Must pass approval_token to delete_fgac_policy"
+        - "Must warn the action is irreversible"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["mcp", "delete", "workflow", "human-in-the-loop"]
+
+  # ============================================================================
+  # SQL Generation — Catalog-Scope Policy
+  # ============================================================================
+  - id: "fgac_catalog_scope_sql_001"
+    inputs:
+      prompt: "Create a column mask policy at catalog level to mask all PII across the entire catalog"
+    outputs:
+      response: |
+        Here's a catalog-level column mask policy:
+
+        ```sql
+        CREATE OR REPLACE POLICY mask_pii_catalog
+        ON CATALOG my_catalog
+        COMMENT 'Mask PII columns catalog-wide'
+        COLUMN MASK my_catalog.governance.mask_full
+        TO `analysts`, `data_scientists`
+        EXCEPT `gov_admin`
+        FOR TABLES
+        MATCH COLUMNS hasTag('pii_type') AS masked_col
+        ON COLUMN masked_col;
+        ```
+
+        Key points:
+        - `ON CATALOG` applies the policy to ALL tables in ALL schemas within the catalog
+        - Uses `hasTag('pii_type')` (without value) to match any PII column regardless of type
+        - Policy quotas: max 10 policies per catalog
+        - `EXCEPT `gov_admin`` protects admin access
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "ON CATALOG"
+        - "COLUMN MASK"
+        - "FOR TABLES"
+        - "EXCEPT `gov_admin`"
+      expected_patterns:
+        - pattern: "ON CATALOG"
+          min_count: 1
+          description: "catalog scope"
+        - pattern: "COLUMN MASK"
+          min_count: 1
+          description: "column mask type"
+        - pattern: "EXCEPT\\s+`gov_admin`"
+          min_count: 1
+          description: "admin exclusion"
+      guidelines:
+        - "Must use ON CATALOG scope"
+        - "Must include EXCEPT `gov_admin`"
+        - "Must include FOR TABLES"
+        - "Should mention catalog-level policy quotas"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["sql", "column-mask", "catalog-scope"]
+
+  # ============================================================================
+  # Error/Edge Cases — Policy Quota
+  # ============================================================================
+  - id: "fgac_error_quota_001"
+    inputs:
+      prompt: "I'm getting POLICY_QUOTA_EXCEEDED when creating a policy on my table. How do I fix this?"
+    outputs:
+      response: |
+        The `POLICY_QUOTA_EXCEEDED` error means you've reached the maximum number of policies on that securable.
+
+        **Policy quotas:**
+        | Scope | Max Policies |
+        |-------|-------------|
+        | Per Catalog | 10 |
+        | Per Schema | 10 |
+        | Per Table | 5 |
+
+        **How to fix:**
+
+        1. **Check current quota** using MCP:
+        ```
+        check_policy_quota(
+            securable_type="TABLE",
+            securable_fullname="my_catalog.my_schema.my_table"
+        )
+        ```
+
+        2. **Consolidate policies** — Combine multiple policies that use the same UDF into one with broader tag matching (`hasTag` instead of multiple `hasTagValue` policies)
+
+        3. **Move to broader scope** — Instead of 5 table-level policies, create 1 schema-level policy
+
+        4. **Remove unused policies**:
+        ```sql
+        DROP POLICY old_policy_name ON TABLE my_catalog.my_schema.my_table;
+        ```
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "POLICY_QUOTA_EXCEEDED"
+        - "10"
+        - "5"
+        - "check_policy_quota"
+      expected_patterns:
+        - pattern: "10"
+          min_count: 1
+          description: "catalog/schema quota"
+        - pattern: "5"
+          min_count: 1
+          description: "table quota"
+        - pattern: "check_policy_quota|consolidat|broader scope"
+          min_count: 1
+          description: "solution recommendation"
+      guidelines:
+        - "Must list quota limits for all three scopes"
+        - "Must suggest consolidation or broader scope as solutions"
+        - "Should show check_policy_quota MCP tool"
+    metadata:
+      category: "error_handling"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["error", "quota", "policy-limits"]
+
+  # ============================================================================
+  # UC ACLs — Ownership Transfer
+  # ============================================================================
+  - id: "uc_acl_ownership_001"
+    inputs:
+      prompt: "Transfer ownership of a schema to a new group"
+    outputs:
+      response: |
+        Here's how to transfer ownership of a schema:
+
+        ```sql
+        ALTER SCHEMA my_catalog.my_schema OWNER TO `platform_team`;
+        ```
+
+        You can also transfer ownership of other securables:
+        ```sql
+        -- Catalog ownership
+        ALTER CATALOG my_catalog OWNER TO `platform_team`;
+
+        -- Table ownership
+        ALTER TABLE my_catalog.my_schema.my_table OWNER TO `platform_team`;
+
+        -- Volume ownership
+        ALTER VOLUME my_catalog.my_schema.my_volume OWNER TO `platform_team`;
+        ```
+
+        Key points:
+        - Only the current owner or a metastore admin can transfer ownership
+        - The owner has all privileges on the object
+        - The owner can grant/revoke privileges to others
+        - There is exactly one owner per securable
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "ALTER"
+        - "OWNER TO"
+      expected_patterns:
+        - pattern: "ALTER SCHEMA.*OWNER TO"
+          min_count: 1
+          description: "schema ownership transfer"
+        - pattern: "OWNER TO"
+          min_count: 1
+          description: "ownership transfer syntax"
+      guidelines:
+        - "Must use ALTER ... OWNER TO syntax"
+        - "Must explain who can transfer ownership"
+        - "Should show examples for multiple securable types"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "acl", "ownership", "transfer"]
+
+  # ============================================================================
+  # UC ACLs — Read-Only Access Pattern
+  # ============================================================================
+  - id: "uc_acl_read_only_001"
+    inputs:
+      prompt: "Grant the data_readers group read-only access to the analytics.gold schema"
+    outputs:
+      response: |
+        Here's how to grant read-only access to a schema:
+
+        ```sql
+        -- Step 1: Grant catalog access (required to see anything inside)
+        GRANT USE CATALOG ON CATALOG analytics TO `data_readers`;
+
+        -- Step 2: Grant schema access
+        GRANT USE SCHEMA ON SCHEMA analytics.gold TO `data_readers`;
+
+        -- Step 3: Grant SELECT on all tables in the schema
+        GRANT SELECT ON SCHEMA analytics.gold TO `data_readers`;
+        ```
+
+        Key points:
+        - `USE CATALOG` is required before any schema-level access
+        - `USE SCHEMA` is required before any table-level access
+        - `SELECT` at schema level applies to all current and future tables in the schema
+        - Grant to **groups**, not individual users — easier to manage and audit
+
+        To verify the grants:
+        ```sql
+        SHOW GRANTS ON SCHEMA analytics.gold;
+        ```
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "USE CATALOG"
+        - "USE SCHEMA"
+        - "SELECT"
+        - "GRANT"
+      expected_patterns:
+        - pattern: "GRANT USE CATALOG"
+          min_count: 1
+          description: "catalog access grant"
+        - pattern: "GRANT USE SCHEMA"
+          min_count: 1
+          description: "schema access grant"
+        - pattern: "GRANT SELECT"
+          min_count: 1
+          description: "read access grant"
+        - pattern: "data_readers"
+          min_count: 2
+          description: "principal group reference"
+      guidelines:
+        - "Must include USE CATALOG, USE SCHEMA, and SELECT grants"
+        - "Must use group name, not individual user"
+        - "Should explain privilege inheritance"
+        - "Should show how to verify grants"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "acl", "grant", "read-only", "schema"]
+
+  # ============================================================================
+  # UC ACLs — Data Engineer Access Pattern
+  # ============================================================================
+  - id: "uc_acl_data_engineer_001"
+    inputs:
+      prompt: "Set up data engineer access to the analytics.silver schema with read, write, and create table privileges"
+    outputs:
+      response: |
+        Here's how to set up data engineer access with read, write, and create table privileges:
+
+        ```sql
+        -- Catalog access
+        GRANT USE CATALOG ON CATALOG analytics TO `data_engineers`;
+
+        -- Schema access
+        GRANT USE SCHEMA ON SCHEMA analytics.silver TO `data_engineers`;
+
+        -- Read access
+        GRANT SELECT ON SCHEMA analytics.silver TO `data_engineers`;
+
+        -- Write access (insert, update, delete)
+        GRANT MODIFY ON SCHEMA analytics.silver TO `data_engineers`;
+
+        -- Create new tables
+        GRANT CREATE TABLE ON SCHEMA analytics.silver TO `data_engineers`;
+        ```
+
+        Key points:
+        - `MODIFY` allows INSERT, UPDATE, DELETE operations on tables
+        - `CREATE TABLE` allows creating new tables and views in the schema
+        - Granting at schema level covers all current and future tables
+        - For volume access, add `GRANT CREATE VOLUME` and `GRANT WRITE VOLUME` separately
+
+        To verify:
+        ```sql
+        SHOW GRANTS ON SCHEMA analytics.silver;
+        ```
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "USE CATALOG"
+        - "USE SCHEMA"
+        - "SELECT"
+        - "MODIFY"
+        - "CREATE TABLE"
+      expected_patterns:
+        - pattern: "GRANT USE CATALOG"
+          min_count: 1
+          description: "catalog access"
+        - pattern: "GRANT MODIFY"
+          min_count: 1
+          description: "write access"
+        - pattern: "GRANT CREATE TABLE"
+          min_count: 1
+          description: "table creation privilege"
+      guidelines:
+        - "Must include USE CATALOG, USE SCHEMA, SELECT, MODIFY, and CREATE TABLE"
+        - "Must explain what MODIFY allows (insert, update, delete)"
+        - "Should mention schema-level grants cover all tables"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "acl", "grant", "data-engineer", "schema"]
+
+  # ============================================================================
+  # UC ACLs — Revoke and Show Grants
+  # ============================================================================
+  - id: "uc_acl_revoke_001"
+    inputs:
+      prompt: "Revoke write access from the contractors group on analytics.silver and show remaining grants"
+    outputs:
+      response: |
+        Here's how to revoke write access and verify the remaining grants:
+
+        ```sql
+        -- Revoke write access
+        REVOKE MODIFY ON SCHEMA analytics.silver FROM `contractors`;
+
+        -- Optionally also revoke CREATE TABLE if they shouldn't create new tables
+        REVOKE CREATE TABLE ON SCHEMA analytics.silver FROM `contractors`;
+
+        -- Verify remaining grants
+        SHOW GRANTS ON SCHEMA analytics.silver;
+
+        -- Check grants for specific principal
+        SHOW GRANTS `contractors` ON SCHEMA analytics.silver;
+        ```
+
+        Key points:
+        - `REVOKE` removes only the specified privilege — other grants remain
+        - `SHOW GRANTS` lists all grants on the securable
+        - `SHOW GRANTS <principal>` filters to a specific user or group
+        - To fully remove access, revoke `USE SCHEMA` and `USE CATALOG` as well
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "REVOKE"
+        - "MODIFY"
+        - "SHOW GRANTS"
+      expected_patterns:
+        - pattern: "REVOKE MODIFY"
+          min_count: 1
+          description: "revoke write access"
+        - pattern: "SHOW GRANTS"
+          min_count: 1
+          description: "verify grants"
+        - pattern: "FROM `contractors`"
+          min_count: 1
+          description: "revoke from correct principal"
+      guidelines:
+        - "Must use REVOKE with FROM syntax"
+        - "Must show how to verify remaining grants with SHOW GRANTS"
+        - "Should explain that REVOKE only removes the specified privilege"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "manual"
+      tags: ["sql", "acl", "revoke", "show-grants"]
+
+  # ============================================================================
+  # UC ACLs — SDK Grant/Revoke
+  # ============================================================================
+  - id: "uc_acl_sdk_001"
+    inputs:
+      prompt: "Grant SELECT on a table to a group using the Python SDK"
+    outputs:
+      response: |
+        Here's how to grant SELECT on a table using the Databricks Python SDK:
+
+        ```python
+        from databricks.sdk import WorkspaceClient
+        from databricks.sdk.service.catalog import Privilege, PermissionsChange, SecurableType
+
+        w = WorkspaceClient()
+
+        # Grant SELECT to data_readers
+        w.grants.update(
+            securable_type=SecurableType.TABLE,
+            full_name="my_catalog.my_schema.my_table",
+            changes=[PermissionsChange(
+                principal="data_readers",
+                add=[Privilege.SELECT],
+            )]
+        )
+        ```
+
+        To verify the grant:
+
+        ```python
+        # Get current grants
+        grants = w.grants.get(
+            securable_type=SecurableType.TABLE,
+            full_name="my_catalog.my_schema.my_table"
+        )
+        for assignment in grants.privilege_assignments:
+            print(f"{assignment.principal}: {assignment.privileges}")
+        ```
+
+        To revoke:
+
+        ```python
+        w.grants.update(
+            securable_type=SecurableType.TABLE,
+            full_name="my_catalog.my_schema.my_table",
+            changes=[PermissionsChange(
+                principal="data_readers",
+                remove=[Privilege.SELECT],
+            )]
+        )
+        ```
+
+        Key points:
+        - `w.grants.update()` handles both grant (via `add`) and revoke (via `remove`)
+        - Use `SecurableType` enum: `CATALOG`, `SCHEMA`, `TABLE`, `VOLUME`, `FUNCTION`
+        - Use `Privilege` enum: `SELECT`, `MODIFY`, `CREATE_TABLE`, etc.
+        - Use `PermissionsChange` objects instead of raw dicts
+        - `w.grants.get()` returns current grants; `w.grants.get_effective()` includes inherited
+      execution_success: null
+    expectations:
+      expected_facts:
+        - "w.grants.update"
+        - "PermissionsChange"
+        - "SecurableType"
+        - "Privilege"
+        - "SELECT"
+      expected_patterns:
+        - pattern: "w\\.grants\\.update\\("
+          min_count: 1
+          description: "SDK grant update call"
+        - pattern: "PermissionsChange\\("
+          min_count: 1
+          description: "typed permissions change object"
+        - pattern: "Privilege\\.SELECT"
+          min_count: 1
+          description: "typed privilege enum"
+        - pattern: "w\\.grants\\.get\\("
+          min_count: 1
+          description: "verify grants"
+      guidelines:
+        - "Must use w.grants.update() with PermissionsChange objects"
+        - "Must use SecurableType and Privilege enums, not raw strings/dicts"
+        - "Should show how to verify grants with w.grants.get()"
+        - "Should show how to revoke with remove list"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "manual"
+      tags: ["python", "sdk", "acl", "grant", "table"]

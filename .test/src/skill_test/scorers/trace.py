@@ -12,8 +12,6 @@ from typing import Any, Dict, List
 from mlflow.entities import Feedback
 from mlflow.genai.scorers import scorer
 
-from ..trace.models import TraceMetrics
-
 
 @scorer
 def tool_count(

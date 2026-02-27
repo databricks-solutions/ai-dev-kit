@@ -44,7 +44,8 @@ def sql_syntax(outputs: Dict[str, Any]) -> Feedback:
 
     errors = []
     for i, block in enumerate(sql_blocks):
-        if not re.search(r"(SELECT|CREATE|INSERT|UPDATE|DELETE|WITH|MERGE)", block, re.I):
+        sql_kw = r"(SELECT|CREATE|INSERT|UPDATE|DELETE|WITH|MERGE|ALTER|DROP|GRANT|REVOKE|SET|SHOW|DESCRIBE|MATCH)"
+        if not re.search(sql_kw, block, re.I):
             errors.append(f"Block {i + 1}: No recognizable SQL statement")
         if block.count("(") != block.count(")"):
             errors.append(f"Block {i + 1}: Unbalanced parentheses")
