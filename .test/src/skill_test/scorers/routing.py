@@ -123,9 +123,7 @@ def detect_skills_from_prompt(prompt: str) -> Set[str]:
 
 
 @scorer
-def skill_routing_accuracy(
-    inputs: Dict[str, Any], expectations: Dict[str, Any]
-) -> Feedback:
+def skill_routing_accuracy(inputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feedback:
     """
     Score skill routing accuracy.
 

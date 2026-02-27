@@ -91,9 +91,7 @@ def verify_python_syntax(code: str) -> Tuple[bool, Optional[str]]:
         return False, f"Line {e.lineno}: {e.msg}"
 
 
-def execute_python_block(
-    code: str, timeout_seconds: int = 30, verify_imports: bool = True
-) -> ExecutionResult:
+def execute_python_block(code: str, timeout_seconds: int = 30, verify_imports: bool = True) -> ExecutionResult:
     """
     Execute Python code block.
 
@@ -573,7 +571,5 @@ def execute_code_blocks_on_databricks(
         passed_blocks=passed,
         details=details,
         context_id=current_context_id,
-        execution_mode="databricks"
-        if any(d.get("execution_mode") == "databricks" for d in details)
-        else "local",
+        execution_mode="databricks" if any(d.get("execution_mode") == "databricks" for d in details) else "local",
     )
