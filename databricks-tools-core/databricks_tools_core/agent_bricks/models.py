@@ -22,7 +22,7 @@ class TileType(Enum):
     T2T = 2  # Text to Text
     KA = 3  # Knowledge Assistant
     MAO = 4  # Deprecated
-    MAS = 5  # Multi-Agent Supervisor
+    MAS = 5  # Supervisor Agent (formerly Multi-Agent Supervisor)
 
 
 class EndpointStatus(Enum):
@@ -67,7 +67,7 @@ class GenieIds:
 
 @dataclass(frozen=True)
 class MASIds:
-    """Multi-Agent Supervisor identifiers."""
+    """Supervisor Agent identifiers."""
 
     tile_id: str
     name: str
@@ -140,11 +140,12 @@ class BaseAgentDict(TypedDict, total=False):
 
     name: str
     description: str
-    agent_type: str  # genie, ka, app, etc.
+    agent_type: str  # genie, serving_endpoint, unity_catalog_function, external_mcp_server
     genie_space: Optional[Dict[str, str]]  # {id: ...}
     serving_endpoint: Optional[Dict[str, str]]  # {name: ...}
     app: Optional[Dict[str, str]]  # {name: ...}
-    unity_catalog_function: Optional[Dict[str, Any]]
+    unity_catalog_function: Optional[Dict[str, Any]]  # {uc_path: {catalog, schema, name}}
+    external_mcp_server: Optional[Dict[str, str]]  # {connection_name: ...}
 
 
 class MultiAgentSupervisorStatusDict(TypedDict):
@@ -154,7 +155,7 @@ class MultiAgentSupervisorStatusDict(TypedDict):
 
 
 class MultiAgentSupervisorDict(TypedDict, total=False):
-    """Complete Multi-Agent Supervisor response."""
+    """Complete Supervisor Agent response."""
 
     tile: TileDict
     agents: List[BaseAgentDict]

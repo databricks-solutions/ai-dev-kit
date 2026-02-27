@@ -6,8 +6,8 @@ Defines skill metadata, evaluation datasets, scorers by tier, and quality gates.
 
 ```yaml
 skill:
-  name: "spark-declarative-pipelines"
-  source_path: "databricks-skills/spark-declarative-pipelines"
+  name: "databricks-spark-declarative-pipelines"
+  source_path: "databricks-skills/databricks-spark-declarative-pipelines"
   description: "Streaming tables, CDC, medallion architecture"
 
 evaluation:
@@ -91,7 +91,7 @@ test_cases:
     inputs:
       prompt: "Create a streaming table for ingesting JSON events"
     expectations:
-      expected_skills: ["spark-declarative-pipelines"]
+      expected_skills: ["databricks-spark-declarative-pipelines"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -114,8 +114,8 @@ test_cases:
       prompt: "Create a data pipeline with streaming tables and deploy it using DABs"
     expectations:
       expected_skills:
-        - "spark-declarative-pipelines"
-        - "asset-bundles"
+        - "databricks-spark-declarative-pipelines"
+        - "databricks-asset-bundles"
       is_multi_skill: true
     metadata:
       category: "multi_skill"

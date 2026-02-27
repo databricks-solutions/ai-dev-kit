@@ -1,0 +1,15 @@
+evaluation_type: app_deployment
+metrics:
+  deploy_success_rate: 1.0
+  failed: 0.0
+  passed: 1.0
+  skipped: 0.0
+  total_tests: 1.0
+results_summary:
+- id: app_lakebase_001
+  status: RUNNING
+  success: true
+run_id: 1fb85925959b453090dce7d3317559cf
+skill_name: databricks-app-python
+test_count: 1
+timestamp: '2026-02-12T20:17:59Z'

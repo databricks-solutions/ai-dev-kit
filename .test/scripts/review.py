@@ -27,13 +27,13 @@ def main():
         epilog="""
 Examples:
     # Interactive review
-    python review.py spark-declarative-pipelines
+    python review.py databricks-spark-declarative-pipelines
 
     # Batch approve all pending candidates
-    python review.py spark-declarative-pipelines --batch
+    python review.py databricks-spark-declarative-pipelines --batch
 
     # Batch approve only successful candidates
-    python review.py spark-declarative-pipelines --batch --filter-success
+    python review.py databricks-spark-declarative-pipelines --batch --filter-success
 """
     )
     parser.add_argument("skill_name", help="Name of skill to review candidates for")

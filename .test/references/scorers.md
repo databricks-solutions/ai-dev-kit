@@ -28,7 +28,21 @@ Regex pattern matching against expected patterns.
 
 - **Input**: `outputs.response`, `expectations.expected_patterns`
 - **Returns**: One `Feedback` per pattern with `yes`/`no` based on match count
-- **Pattern spec**: Can be string or `{pattern, min_count, description}`
+- **Pattern spec**: Can be string or `{pattern, min_count, max_count, description}`
+  - `min_count` (default: 1): Minimum number of matches required
+  - `max_count` (optional): Maximum number of matches allowed
+  - When `max_count: 0`, validates pattern is absent (useful for negative checks)
+- **Example**:
+  ```yaml
+  expected_patterns:
+    - pattern: "notebook_task:"
+      min_count: 1
+      description: "Uses notebook task"
+    - pattern: "new_cluster:"
+      max_count: 0
+      min_count: 0
+      description: "No cluster config for serverless"
+  ```
 
 ### no_hallucinated_apis
 

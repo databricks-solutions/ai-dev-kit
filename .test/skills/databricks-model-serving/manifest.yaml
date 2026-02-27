@@ -1,0 +1,49 @@
+---
+skill_name: databricks-model-serving
+description: "Deploy and query Databricks Model Serving endpoints"
+
+scorers:
+  # Deterministic scorers
+  enabled:
+    - python_syntax
+    - pattern_adherence
+    - no_hallucinated_apis
+
+  # LLM-based scorers with guidelines
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations
+
+  # Default evaluation guidelines
+  default_guidelines:
+    - "Response must address the user's request completely"
+    - "Code examples must follow documented best practices"
+    - "Must use mlflow.pyfunc.log_model or mlflow.<flavor>.log_model for model logging"
+    - "Agent deployments must use ResponsesAgent pattern with proper output formatting"
+    - "Must use self.create_text_output_item() for agent responses, not raw dicts"
+    - "Job-based deployment pattern should be recommended for endpoints to avoid timeouts"
+    - "Must specify correct DBR version requirements (16.1+ for GenAI agents)"
+    - "Unity Catalog paths must follow catalog.schema.model_name format"
+
+  # Trace expectations for session evaluation
+  trace_expectations:
+    tool_limits:
+      Bash: 20
+      mcp__databricks__execute_databricks_command: 15
+      mcp__databricks__run_python_file_on_databricks: 10
+      mcp__databricks__upload_folder: 5
+      mcp__databricks__query_serving_endpoint: 10
+      mcp__databricks__get_serving_endpoint_status: 10
+    token_budget:
+      max_total: 150000
+    required_tools:
+      - Read  # Should read skill documentation
+    banned_patterns:
+      - "synchronous endpoint deployment"  # Should use job-based deployment
+      - "raw dict in ResponsesAgentResponse"  # Should use helper methods
+
+quality_gates:
+  syntax_valid: 1.0  # 100% - all code must be syntactically valid
+  pattern_adherence: 0.90  # 90% - follow documented patterns
+  no_hallucinated_apis: 1.0  # 100% - no made-up APIs
+  execution_success: 0.80  # 80% - code should execute successfully

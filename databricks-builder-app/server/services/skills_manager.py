@@ -18,24 +18,19 @@ logger = logging.getLogger(__name__)
 # available regardless of which skills are enabled.
 # ---------------------------------------------------------------------------
 SKILL_TOOL_MAPPING: dict[str, list[str]] = {
-  'agent-bricks': [
-    'create_or_update_ka', 'get_ka', 'find_ka_by_name', 'delete_ka',
-    'create_or_update_mas', 'get_mas', 'find_mas_by_name', 'delete_mas',
-  ],
-  'aibi-dashboards': [
-    'create_or_update_dashboard', 'get_dashboard', 'list_dashboards',
-    'trash_dashboard', 'publish_dashboard', 'unpublish_dashboard',
+  'databricks-agent-bricks': ['manage_ka', 'manage_mas'],
+  'databricks-aibi-dashboards': [
+    'create_or_update_dashboard', 'get_dashboard',
+    'delete_dashboard', 'publish_dashboard',
   ],
   'databricks-genie': [
-    'list_genie', 'create_or_update_genie', 'get_genie', 'delete_genie',
-    'ask_genie', 'ask_genie_followup',
+    'create_or_update_genie', 'get_genie', 'delete_genie', 'ask_genie',
   ],
-  'spark-declarative-pipelines': [
-    'create_pipeline', 'get_pipeline', 'update_pipeline', 'delete_pipeline',
-    'start_update', 'get_update', 'stop_pipeline', 'get_pipeline_events',
-    'create_or_update_pipeline', 'find_pipeline_by_name',
+  'databricks-spark-declarative-pipelines': [
+    'create_or_update_pipeline', 'get_pipeline',
+    'delete_pipeline', 'run_pipeline',
   ],
-  'model-serving': [
+  'databricks-model-serving': [
     'get_serving_endpoint_status', 'query_serving_endpoint', 'list_serving_endpoints',
   ],
   'databricks-jobs': [
@@ -50,6 +45,14 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
     'list_volume_files', 'upload_to_volume', 'download_from_volume',
     'delete_volume_file', 'delete_volume_directory', 'create_volume_directory',
     'get_volume_file_info',
+  ],
+  # APX (FastAPI+React) and Python (Dash/Streamlit/etc.) share the same
+  # app lifecycle tools — the skill content differs, not the MCP operations.
+  'databricks-app-apx': [
+    'create_or_update_app', 'get_app', 'delete_app',
+  ],
+  'databricks-app-python': [
+    'create_or_update_app', 'get_app', 'delete_app',
   ],
 }
 

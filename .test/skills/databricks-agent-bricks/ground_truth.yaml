@@ -1,0 +1,382 @@
+metadata:
+  skill_name: databricks-agent-bricks
+  version: 0.1.0
+  created_at: '2026-02-13T16:00:00.000000'
+test_cases:
+- id: grp_20260213_161355
+  inputs:
+    prompt: Create a Knowledge Assistant for HR policy documents stored in /Volumes/my_catalog/my_schema/raw_data/hr_docs
+  outputs:
+    response: "I'll create a Knowledge Assistant for your HR policy documents using\
+      \ the `manage_ka` tool.\n\n```python\nmanage_ka(\n    action=\"create_or_update\"\
+      ,\n    name=\"HR_Policy_Assistant\",\n    volume_path=\"/Volumes/my_catalog/my_schema/raw_data/hr_docs\"\
+      ,\n    description=\"Answers questions about HR policies and procedures from\
+      \ indexed documents\",\n    instructions=\"Be helpful and professional. When\
+      \ answering:\\n1. Always cite the specific document and section\\n2. If multiple\
+      \ documents are relevant, mention all of them\\n3. If the information isn't\
+      \ in the documents, clearly say so\\n4. Use bullet points for multi-part answers\"\
+      \n)\n```\n\nThis will:\n1. Create a Knowledge Assistant that indexes all PDF\
+      \ and text files in the volume\n2. Automatically scan for JSON files with example\
+      \ question/guideline pairs and add them as examples\n3. Begin provisioning the\
+      \ endpoint (takes 2-5 minutes to reach `ONLINE` status)\n\nYou can check the\
+      \ status using `manage_ka(action=\"get\", tile_id=...)` with the returned `tile_id`.\
+      \ The endpoint status will progress from `PROVISIONING` to `ONLINE`."
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses manage_ka tool with action="create_or_update"
+    - Includes volume_path parameter
+    - Includes description for the KA
+    - Includes instructions for answer quality
+    expected_patterns:
+    - pattern: manage_ka
+      min_count: 1
+      description: Must use the manage_ka MCP tool
+    - pattern: create_or_update
+      min_count: 1
+      description: Must specify action="create_or_update"
+    - pattern: volume_path
+      min_count: 1
+      description: Must specify volume_path parameter
+    - pattern: /Volumes/my_catalog/my_schema/raw_data/hr_docs
+      min_count: 1
+      description: Must reference the specified volume path
+    - pattern: name
+      min_count: 1
+      description: Must provide a name for the KA
+    guidelines:
+    - Must use manage_ka with action="create_or_update" and volume_path pointing to
+      the specified volume
+    - Should include a meaningful description for the KA
+    - Should include instructions to guide the KA's answer behavior
+    - Should explain provisioning timeline (PROVISIONING to ONLINE)
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: interactive
+    tags:
+    - ka
+    - create
+    - knowledge-assistant
+    created_at: '2026-02-13T16:13:55.785471'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'
+- id: grp_20260213_161954
+  inputs:
+    prompt: Create a Multi-Agent Supervisor with a KA for policy docs (tile_id 'abc123'),
+      a Genie space for sales data (space_id 'def456'), and an external MCP server
+      via UC connection 'erp_mcp_connection' for invoice operations
+  outputs:
+    response: "I'll create a Multi-Agent Supervisor that combines a Knowledge Assistant,\
+      \ a Genie Space, and an external MCP server using the `manage_mas` tool.\n\n\
+      ```python\nmanage_mas(\n    action=\"create_or_update\",\n    name=\"Enterprise_Support_Supervisor\"\
+      ,\n    agents=[\n        {\n            \"name\": \"policy_agent\",\n      \
+      \      \"ka_tile_id\": \"abc123\",\n            \"description\": \"Answers questions\
+      \ about company policies, procedures, and compliance requirements from indexed\
+      \ policy documents\"\n        },\n        {\n            \"name\": \"sales_analytics\"\
+      ,\n            \"genie_space_id\": \"def456\",\n            \"description\"\
+      : \"SQL analytics on sales data: revenue trends, customer metrics, order history,\
+      \ and pipeline analysis\"\n        },\n        {\n            \"name\": \"erp_operations\"\
+      ,\n            \"connection_name\": \"erp_mcp_connection\",\n  \
+      \          \"description\": \"Execute ERP invoice operations: create, approve,\
+      \ reject, and search invoices, retrieve vendor details, and trigger batch processing\
+      \ workflows\"\n        }\n    ],\n    description=\"Unified enterprise assistant\
+      \ combining policy guidance, sales analytics, and ERP invoice operations\",\n\
+      \    instructions=\"Route queries as follows:\\n- Policy and compliance questions\
+      \ -> policy_agent\\n- Sales data, metrics, and analytics questions -> sales_analytics\\\
+      n- Invoice actions (create, approve, reject, search) and ERP operations -> erp_operations\\\
+      n\\nIf a query spans multiple domains, address the primary intent first.\"\n\
+      )\n```\n\nThis creates a Supervisor Agent with three specialized agents:\n\n\
+      1. **policy_agent** - Uses the Knowledge Assistant (tile_id `abc123`) for document-based\
+      \ Q&A on policies\n2. **sales_analytics** - Uses the Genie Space (space_id `def456`)\
+      \ for natural language SQL queries on sales data\n3. **erp_operations** - Connects\
+      \ to an external MCP server via the UC HTTP connection `erp_mcp_connection`\
+      \ for invoice operations\n\nThe endpoint will take 2-5 minutes to provision.\
+      \ Check status with `manage_mas(action=\"get\", tile_id=...)` using the returned\
+      \ `tile_id`. Each agent type uses a different identifier field:\n- `ka_tile_id`\
+      \ for Knowledge Assistants\n- `genie_space_id` for Genie Spaces\n- `connection_name`\
+      \ for external MCP servers (UC HTTP connection name)"
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses manage_mas tool with action="create_or_update"
+    - Includes ka_tile_id for the Knowledge Assistant agent
+    - Includes genie_space_id for the Genie Space agent
+    - Uses connection_name for external MCP server agent
+    - Each agent has a name and description
+    expected_patterns:
+    - pattern: manage_mas
+      min_count: 1
+      description: Must use the manage_mas MCP tool
+    - pattern: create_or_update
+      min_count: 1
+      description: Must specify action="create_or_update"
+    - pattern: ka_tile_id
+      min_count: 1
+      description: Must use ka_tile_id for the KA agent
+    - pattern: genie_space_id
+      min_count: 1
+      description: Must use genie_space_id for the Genie agent
+    - pattern: connection_name
+      min_count: 1
+      description: Must use connection_name field for external MCP server agent
+    - pattern: erp_mcp_connection
+      min_count: 1
+      description: Must reference the specified UC connection name
+    guidelines:
+    - Must use manage_mas with action="create_or_update" and an agents list containing
+      all three agent types
+    - KA agent must use ka_tile_id (not endpoint_name) with the provided tile_id
+    - Genie agent must use genie_space_id with the provided space_id
+    - MCP server agent must use connection_name field with the UC connection name
+    - Each agent must have a specific, routing-quality description
+    - Should include routing instructions that map query types to agents
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: interactive
+    tags:
+    - mas
+    - create
+    - multi-agent
+    - mcp-server
+    - genie
+    - ka
+    - connection-name
+    created_at: '2026-02-13T16:19:54.625799'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'
+- id: grp_20260213_162137
+  inputs:
+    prompt: Create a Supervisor Agent that includes a UC function sales_analytics.utils.enrich_customer_data
+      for data enrichment alongside a KA for product documentation
+  outputs:
+    response: "I'll create a Supervisor Agent that combines a Unity Catalog function\
+      \ for data enrichment with a Knowledge Assistant for product documentation using\
+      \ the `manage_mas` tool.\n\n```python\nmanage_mas(\n    action=\"create_or_update\"\
+      ,\n    name=\"Product_Support_Supervisor\",\n    agents=[\n        {\n      \
+      \    \"name\": \"product_docs\",\n            \"ka_tile_id\": \"<your_ka_tile_id>\"\
+      ,\n            \"description\": \"Answers questions about product features,\
+      \ specifications, release notes, and usage guides from indexed product documentation\"\
+      \n        },\n        {\n            \"name\": \"data_enrichment\",\n      \
+      \      \"uc_function_name\": \"sales_analytics.utils.enrich_customer_data\"\
+      ,\n            \"description\": \"Enriches customer records with demographic\
+      \ and purchase history data. Use when the user asks to enrich, augment, or enhance\
+      \ customer data.\"\n        }\n    ],\n    description=\"Product support assistant\
+      \ with documentation Q&A and customer data enrichment capabilities\",\n    instructions=\"\
+      Route queries as follows:\\n- Product questions, feature inquiries, and documentation\
+      \ lookups -> product_docs\\n- Requests to enrich, augment, or look up customer\
+      \ data -> data_enrichment\\n\\nIf the user asks about a customer in the context\
+      \ of a product, use product_docs first.\"\n)\n```\n\nThis creates a Supervisor\
+      \ Agent with two specialized agents:\n\n1. **product_docs** - Uses a Knowledge\
+      \ Assistant (`ka_tile_id`) for document-based Q&A on product documentation\n\
+      2. **data_enrichment** - Calls the UC function `sales_analytics.utils.enrich_customer_data`\
+      \ directly for data operations\n\n**Important**: The UC function must already\
+      \ exist and the agent service principal needs `EXECUTE` privilege on `sales_analytics.utils.enrich_customer_data`.\n\
+      \nReplace `<your_ka_tile_id>` with the actual tile ID of your product documentation\
+      \ KA. You can find it using `manage_ka(action=\"find_by_name\", name=...)` if\
+      \ you know the KA name.\n\nThe endpoint will take 2-5 minutes to provision.\
+      \ Check status with `manage_mas(action=\"get\", tile_id=...)` using the returned\
+      \ `tile_id`."
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses manage_mas tool with action="create_or_update"
+    - Includes uc_function_name for the UC function agent
+    - Includes ka_tile_id for the Knowledge Assistant agent
+    - References sales_analytics.utils.enrich_customer_data
+    - Mentions EXECUTE privilege requirement
+    expected_patterns:
+    - pattern: manage_mas
+      min_count: 1
+      description: Must use the manage_mas MCP tool
+    - pattern: create_or_update
+      min_count: 1
+      description: Must specify action="create_or_update"
+    - pattern: uc_function_name
+      min_count: 1
+      description: Must use uc_function_name field for UC function agent
+    - pattern: sales_analytics\.utils\.enrich_customer_data
+      min_count: 1
+      description: Must reference the fully-qualified UC function name
+    - pattern: ka_tile_id
+      min_count: 1
+      description: Must use ka_tile_id for the KA agent
+    guidelines:
+    - Must use manage_mas with action="create_or_update" and an agents list containing
+      both agent types
+    - UC function agent must use uc_function_name field (not endpoint_name)
+    - UC function name must be fully qualified as catalog.schema.function_name
+    - KA agent must use ka_tile_id field
+    - Should mention that the UC function must already exist and EXECUTE privilege
+      is needed
+    - Each agent must have a specific, routing-quality description
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: interactive
+    tags:
+    - mas
+    - create
+    - uc-function
+    - ka
+    - multi-agent
+    created_at: '2026-02-13T16:21:37.882361'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'
+- id: grp_20260213_162338
+  inputs:
+    prompt: Find the Knowledge Assistant named 'HR_Policy_Assistant' and use it as
+      an agent in a new Supervisor Agent called 'Support MAS' alongside a Genie space
+  outputs:
+    response: "I'll first look up the Knowledge Assistant by name, then create the\
+      \ Supervisor Agent using the returned tile_id.\n\n**Step 1: Find the KA by name**\n\
+      \n```python\nmanage_ka(\n    action=\"find_by_name\",\n    name=\"HR_Policy_Assistant\"\
+      \n)\n```\n\nThis returns the KA details including `tile_id`, `endpoint_name`,\
+      \ and `endpoint_status` (e.g., `{\"found\": true, \"tile_id\": \"f32c5f73-...\"\
+      , \"name\": \"HR_Policy_Assistant\"}`).\n\n**Step 2: Create the Supervisor Agent**\n\
+      \nUsing the `tile_id` from the lookup, create the MAS with `ka_tile_id` for\
+      \ the KA agent and `genie_space_id` for the Genie space:\n\n```python\nmanage_mas(\n\
+      \    action=\"create_or_update\",\n    name=\"Support_MAS\",\n    agents=[\n\
+      \        {\n            \"name\": \"hr_policy_agent\",\n            \"ka_tile_id\"\
+      : \"<tile_id from manage_ka find_by_name>\",\n            \"description\": \"\
+      Answers questions about HR policies, procedures, benefits, and employee handbook\
+      \ from indexed policy documents\"\n        },\n        {\n            \"name\"\
+      : \"data_analyst\",\n            \"genie_space_id\": \"<your_genie_space_id>\"\
+      ,\n            \"description\": \"SQL analytics on operational data: headcount\
+      \ metrics, department statistics, and workforce trends\"\n        }\n    ],\n\
+      \    description=\"Unified support assistant combining HR policy guidance and\
+      \ workforce analytics\",\n    instructions=\"Route queries as follows:\\n- HR\
+      \ policy, benefits, PTO, and handbook questions -> hr_policy_agent\\n- Data\
+      \ questions, metrics, headcount, and workforce statistics -> data_analyst\\n\\\
+      nIf unclear, ask the user to clarify whether they need a policy answer or a\
+      \ data lookup.\"\n)\n```\n\nThe two-step workflow ensures you reference the\
+      \ correct KA by its `tile_id` rather than guessing the ID. The `manage_ka(action=\"\
+      find_by_name\")` tool is the recommended way to look up a KA when you know its\
+      \ name but not its tile ID."
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses manage_ka with action="find_by_name" to look up the KA
+    - Uses manage_mas with action="create_or_update" to create the Supervisor Agent
+    - Uses ka_tile_id from the manage_ka find_by_name result
+    - Includes genie_space_id for the Genie space agent
+    - 'Two-step workflow: lookup first, then create'
+    expected_patterns:
+    - pattern: manage_ka
+      min_count: 1
+      description: Must use manage_ka with action="find_by_name" to look up the KA
+    - pattern: find_by_name
+      min_count: 1
+      description: Must use the find_by_name action
+    - pattern: HR_Policy_Assistant
+      min_count: 1
+      description: Must reference the specified KA name
+    - pattern: manage_mas
+      min_count: 1
+      description: Must use manage_mas with action="create_or_update" to create the MAS
+    - pattern: ka_tile_id
+      min_count: 1
+      description: Must use ka_tile_id for the KA agent in the MAS
+    - pattern: genie_space_id
+      min_count: 1
+      description: Must use genie_space_id for the Genie agent
+    guidelines:
+    - Must use manage_ka with action="find_by_name" first to look up the KA tile_id,
+      not hardcode an ID
+    - Must use ka_tile_id (not endpoint_name) when adding a KA to the MAS
+    - Must use genie_space_id for the Genie space agent
+    - 'Should show a clear two-step workflow: lookup then create'
+    - Each agent must have a specific, routing-quality description
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: interactive
+    tags:
+    - mas
+    - ka
+    - genie
+    - find-by-name
+    - multi-step
+    - lookup
+    created_at: '2026-02-13T16:23:38.755002'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'
+- id: grp_20260213_162501
+  inputs:
+    prompt: Update an existing MAS named 'Customer_Support' to add a new agent that
+      connects to an external CRM system via UC HTTP connection 'crm_mcp_server'
+  outputs:
+    response: "I'll look up the existing MAS by name, retrieve its current configuration,\
+      \ then update it with the new CRM agent.\n\n**Step 1: Find the existing MAS**\n\
+      \n```python\nmanage_mas(\n    action=\"find_by_name\",\n    name=\"Customer_Support\"\
+      \n)\n```\n\nThis returns the MAS details including `tile_id` and `agents_count`\
+      \ (e.g., `{\"found\": true, \"tile_id\": \"01xyz...\", \"name\": \"Customer_Support\"\
+      , \"agents_count\": 2}`).\n\n**Step 2: Get current configuration**\n\n```python\n\
+      manage_mas(\n    action=\"get\",\n    tile_id=\"<tile_id from find_by_name>\"\
+      \n)\n```\n\nThis returns the full MAS configuration including the existing agents\
+      \ list, description, and instructions.\n\n**Step 3: Update the MAS with the\
+      \ new CRM agent**\n\nInclude all existing agents plus the new one. The `manage_mas`\
+      \ tool with `action=\"create_or_update\"` finds the existing MAS by name and\
+      \ updates it:\n\n```python\nmanage_mas(\n    action=\"create_or_update\",\n\
+      \    name=\"Customer_Support\",\n    agents=[\n        # ... include existing\
+      \ agents from manage_mas get response ...\n        {\n            \"name\": \"\
+      crm_operations\",\n            \"connection_name\": \"crm_mcp_server\"\
+      ,\n            \"description\": \"Interact with the CRM system: look up customer\
+      \ profiles, create and update support tickets, view interaction history, and\
+      \ manage account details\"\n        }\n    ],\n    description=\"Customer support\
+      \ assistant with CRM integration\",\n    instructions=\"Route queries as follows:\\\
+      n- CRM lookups, ticket creation, customer profiles, and account management ->\
+      \ crm_operations\\n- Route other queries to existing agents based on their descriptions.\"\
+      \n)\n```\n\n**Important**: When updating a MAS, you must include all agents\
+      \ in the `agents` list -- both the existing ones from `manage_mas(action=\"get\"\
+      )` and the new CRM agent. Omitting existing agents will remove them from the\
+      \ configuration.\n\nThe `manage_mas` tool with `action=\"create_or_update\"`\
+      \ matches by name and performs an update rather than creating a duplicate."
+    execution_success: true
+  expectations:
+    expected_facts:
+      - "Uses manage_mas with action=\"find_by_name\" to look up the existing MAS"
+      - "Uses manage_mas with action=\"get\" to retrieve the current configuration"
+      - "Uses manage_mas with action=\"create_or_update\" to update the MAS"
+      - "Uses connection_name for the external MCP server agent"
+      - "Warns that all existing agents must be included in the update"
+    expected_patterns:
+      - pattern: "manage_mas"
+        min_count: 3
+        description: "Must use manage_mas for find_by_name, get, and create_or_update"
+      - pattern: "find_by_name"
+        min_count: 1
+        description: "Must use the find_by_name action to look up the MAS"
+      - pattern: "Customer_Support"
+        min_count: 1
+        description: "Must reference the specified MAS name"
+      - pattern: "action"
+        min_count: 3
+        description: "Must specify action parameter for each manage_mas call"
+      - pattern: "connection_name"
+        min_count: 1
+        description: "Must use connection_name field for external MCP server agent"
+      - pattern: "crm_mcp_server"
+        min_count: 1
+        description: "Must reference the specified UC connection name"
+    guidelines:
+      - "Must follow a multi-step workflow: find by name, get current config, then update"
+      - "Must use manage_mas with action=\"find_by_name\" (not hardcode a tile_id) to locate the existing MAS"
+      - "Must use manage_mas with action=\"get\" to read the current agents before updating"
+      - "New MCP agent must use connection_name field with the UC connection name"
+      - "Must warn that omitting existing agents from the update will remove them"
+      - "Should preserve the original MAS name when updating"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: interactive
+    tags: ["mas", "update", "mcp-server", "connection-name", "find-by-name", "multi-step"]
+    created_at: '2026-02-13T16:25:01.420945'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'

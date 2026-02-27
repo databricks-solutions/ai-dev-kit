@@ -4,7 +4,7 @@ test_cases:
     inputs:
       prompt: "Create a streaming table for ingesting JSON events"
     expectations:
-      expected_skills: ["spark-declarative-pipelines"]
+      expected_skills: ["databricks-spark-declarative-pipelines"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -15,7 +15,7 @@ test_cases:
     inputs:
       prompt: "Build a bronze-silver-gold medallion architecture for customer data"
     expectations:
-      expected_skills: ["spark-declarative-pipelines"]
+      expected_skills: ["databricks-spark-declarative-pipelines"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -26,7 +26,7 @@ test_cases:
     inputs:
       prompt: "Implement CDC with SCD Type 2 for tracking customer changes"
     expectations:
-      expected_skills: ["spark-declarative-pipelines"]
+      expected_skills: ["databricks-spark-declarative-pipelines"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -61,7 +61,7 @@ test_cases:
     inputs:
       prompt: "Create a databricks asset bundle for deploying my pipeline"
     expectations:
-      expected_skills: ["asset-bundles"]
+      expected_skills: ["databricks-asset-bundles"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -73,7 +73,7 @@ test_cases:
     inputs:
       prompt: "How do I evaluate my agent using mlflow genai.evaluate?"
     expectations:
-      expected_skills: ["mlflow-evaluation"]
+      expected_skills: ["databricks-mlflow-evaluation"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -198,8 +198,8 @@ test_cases:
       prompt: "Create a data pipeline with streaming tables and deploy it using DABs"
     expectations:
       expected_skills:
-        - "spark-declarative-pipelines"
-        - "asset-bundles"
+        - "databricks-spark-declarative-pipelines"
+        - "databricks-asset-bundles"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
@@ -211,8 +211,8 @@ test_cases:
       prompt: "Generate synthetic customer data and evaluate the agent quality with MLflow scorers"
     expectations:
       expected_skills:
-        - "synthetic-data-generation"
-        - "mlflow-evaluation"
+        - "databricks-synthetic-data-generation"
+        - "databricks-mlflow-evaluation"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
@@ -224,13 +224,146 @@ test_cases:
       prompt: "Build a medallion architecture with bronze ingestion and create a Genie space for SQL exploration"
     expectations:
       expected_skills:
-        - "spark-declarative-pipelines"
-        - "agent-bricks"
+        - "databricks-spark-declarative-pipelines"
+        - "databricks-agent-bricks"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
       difficulty: "hard"
-      reasoning: "Combines 'medallion' (SDP) with 'Genie space' (agent-bricks)"
+      reasoning: "Combines 'medallion' (SDP) with 'Genie space' (databricks-agent-bricks)"
+
+  # Single-skill routing - Databricks App APX
+  - id: "routing_apx_001"
+    inputs:
+      prompt: "Build an APX app with a FastAPI React frontend"
+    expectations:
+      expected_skills: ["databricks-app-apx"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'APX' and 'FastAPI React' - clear APX trigger"
+
+  - id: "routing_apx_002"
+    inputs:
+      prompt: "Create a full-stack app with APX"
+    expectations:
+      expected_skills: ["databricks-app-apx"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'APX' and 'full-stack app' - APX triggers"
+
+  # Single-skill routing - Databricks App Python
+  - id: "routing_app_python_001"
+    inputs:
+      prompt: "Create a Streamlit app that shows sales data"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Streamlit' - Python app trigger"
+
+  - id: "routing_app_python_002"
+    inputs:
+      prompt: "Build a Dash app with interactive charts"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Dash' - Python app trigger"
+
+  - id: "routing_app_python_003"
+    inputs:
+      prompt: "Create a Gradio app for testing my ML model"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Gradio' - Python app trigger"
+
+  - id: "routing_app_python_004"
+    inputs:
+      prompt: "Build a FastAPI app that serves data from a warehouse"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'FastAPI' - Python app trigger"
+
+  - id: "routing_app_python_005"
+    inputs:
+      prompt: "Create a Reflex app for managing inventory"
+    expectations:
+      expected_skills: ["databricks-app-python"]
+      is_multi_skill: false
+    metadata:
+      category: "single_skill"
+      difficulty: "easy"
+      reasoning: "Mentions 'Reflex' - Python app trigger"
+
+  # Multi-skill routing - Apps + other skills
+  - id: "routing_multi_app_dabs_001"
+    inputs:
+      prompt: "Build a Dash app and deploy it using DABs"
+    expectations:
+      expected_skills:
+        - "databricks-app-python"
+        - "databricks-asset-bundles"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'Dash' (app-python) with 'DABs' (asset bundles)"
+
+  - id: "routing_multi_app_lakebase_001"
+    inputs:
+      prompt: "Create a Streamlit app that stores data in Lakebase"
+    expectations:
+      expected_skills:
+        - "databricks-app-python"
+        - "databricks-lakebase-provisioned"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'Streamlit' (app-python) with 'Lakebase' (databricks-lakebase-provisioned)"
+
+  - id: "routing_multi_app_serving_001"
+    inputs:
+      prompt: "Build a Gradio app that queries a model serving endpoint"
+    expectations:
+      expected_skills:
+        - "databricks-app-python"
+        - "model-serving"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "Combines 'Gradio' (app-python) with 'model serving' (model-serving)"
+
+  # Edge case - FastAPI React matches both APX and Python app
+  - id: "routing_multi_fastapi_react_001"
+    inputs:
+      prompt: "Create a FastAPI React app for my dashboard"
+    expectations:
+      expected_skills:
+        - "databricks-app-apx"
+        - "databricks-app-python"
+      is_multi_skill: true
+    metadata:
+      category: "multi_skill"
+      difficulty: "medium"
+      reasoning: "'fastapi react' triggers APX, bare 'fastapi' also triggers app-python. Router picks best fit."
 
   # No skill match
   - id: "routing_no_match_001"

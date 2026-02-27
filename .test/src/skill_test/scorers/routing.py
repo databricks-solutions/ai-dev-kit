@@ -6,7 +6,7 @@ from typing import Dict, Any, Set
 
 # Skill trigger patterns (extracted from SKILL.md description fields)
 SKILL_TRIGGERS = {
-    "spark-declarative-pipelines": [
+    "databricks-spark-declarative-pipelines": [
         "streaming table",
         "dlt",
         "delta live",
@@ -22,14 +22,68 @@ SKILL_TRIGGERS = {
         "scd",
         "auto loader",
     ],
-    "databricks-app-apx": ["databricks app", "apx", "fastapi", "react", "full-stack app"],
-    "databricks-app-python": ["python app", "streamlit", "dash", "flask", "gradio"],
-    "asset-bundles": ["dabs", "databricks asset bundle", "deploy", "bundle.yaml"],
-    "databricks-python-sdk": ["python sdk", "databricks-sdk", "workspaceclient", "databricks connect", "rest api"],
+    # APX = FastAPI + React full-stack. "fastapi react" triggers APX specifically;
+    # bare "fastapi" triggers python skill. A prompt mentioning both (e.g. "FastAPI React app")
+    # will correctly match both skills, letting the router pick the best fit.
+    "databricks-app-apx": [
+        "databricks app",
+        "apx",
+        "full-stack app",
+        "fastapi react",
+        "react frontend",
+    ],
+    "databricks-app-python": [
+        "python app",
+        "streamlit",
+        "dash",
+        "flask",
+        "gradio",
+        "fastapi",
+        "reflex",
+        "dashboard app",
+        "data app",
+    ],
+    "databricks-asset-bundles": [
+        "dabs",
+        "databricks asset bundle",
+        "deploy",
+        "bundle.yaml",
+    ],
+    "databricks-python-sdk": [
+        "python sdk",
+        "databricks-sdk",
+        "workspaceclient",
+        "databricks connect",
+        "rest api",
+    ],
     "databricks-jobs": ["job", "workflow", "task", "schedule", "trigger"],
-    "synthetic-data-generation": ["synthetic data", "fake data", "generate data", "mock data", "faker"],
-    "mlflow-evaluation": ["mlflow eval", "evaluate agent", "scorer", "genai.evaluate", "llm judge"],
-    "agent-bricks": ["agent brick", "knowledge assistant", "genie", "multi-agent", "supervisor"],
+    "databricks-synthetic-data-generation": [
+        "synthetic data",
+        "fake data",
+        "generate data",
+        "mock data",
+        "faker",
+    ],
+    "databricks-mlflow-evaluation": [
+        "mlflow eval",
+        "evaluate agent",
+        "scorer",
+        "genai.evaluate",
+        "llm judge",
+    ],
+    "databricks-agent-bricks": [
+        "agent brick",
+        "knowledge assistant",
+        "genie",
+        "multi-agent",
+        "supervisor",
+    ],
+    "databricks-lakebase-provisioned": ["lakebase", "postgresql", "postgres"],
+    "databricks-model-serving": [
+        "model serving",
+        "serving endpoint",
+        "inference endpoint",
+    ],
     "databricks-unity-catalog": [
         "fgac",
         "column mask",
@@ -69,7 +123,9 @@ def detect_skills_from_prompt(prompt: str) -> Set[str]:
 
 
 @scorer
-def skill_routing_accuracy(inputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feedback:
+def skill_routing_accuracy(
+    inputs: Dict[str, Any], expectations: Dict[str, Any]
+) -> Feedback:
     """
     Score skill routing accuracy.
 
@@ -84,18 +140,26 @@ def skill_routing_accuracy(inputs: Dict[str, Any], expectations: Dict[str, Any])
 
     # Both empty = correct (no skill should match)
     if not expected_skills and not detected_skills:
-        return Feedback(name="routing_accuracy", value="yes", rationale="Correctly identified no skill match")
+        return Feedback(
+            name="routing_accuracy",
+            value="yes",
+            rationale="Correctly identified no skill match",
+        )
 
     # Expected none but got some
     if not expected_skills:
         return Feedback(
-            name="routing_accuracy", value="no", rationale=f"Expected no skills but detected: {detected_skills}"
+            name="routing_accuracy",
+            value="no",
+            rationale=f"Expected no skills but detected: {detected_skills}",
         )
 
     # Expected some but got none
     if not detected_skills:
         return Feedback(
-            name="routing_accuracy", value="no", rationale=f"Expected {expected_skills} but no skills detected"
+            name="routing_accuracy",
+            value="no",
+            rationale=f"Expected {expected_skills} but no skills detected",
         )
 
     # Check overlap
@@ -104,11 +168,15 @@ def skill_routing_accuracy(inputs: Dict[str, Any], expectations: Dict[str, Any])
         missing = expected_skills - detected_skills
         if not missing:
             return Feedback(
-                name="routing_accuracy", value="yes", rationale=f"All expected skills detected: {detected_skills}"
+                name="routing_accuracy",
+                value="yes",
+                rationale=f"All expected skills detected: {detected_skills}",
             )
         else:
             return Feedback(
-                name="routing_accuracy", value="no", rationale=f"Missing skills: {missing}. Detected: {detected_skills}"
+                name="routing_accuracy",
+                value="no",
+                rationale=f"Missing skills: {missing}. Detected: {detected_skills}",
             )
     else:
         # For single-skill: expected should be subset of detected
@@ -135,14 +203,18 @@ def routing_precision(inputs: Dict[str, Any], expectations: Dict[str, Any]) -> F
 
     if not detected_skills:
         return Feedback(
-            name="routing_precision", value=1.0, rationale="No skills detected (no false positives possible)"
+            name="routing_precision",
+            value=1.0,
+            rationale="No skills detected (no false positives possible)",
         )
 
     correct = expected_skills & detected_skills
     precision = len(correct) / len(detected_skills)
 
     return Feedback(
-        name="routing_precision", value=precision, rationale=f"Precision: {len(correct)}/{len(detected_skills)}"
+        name="routing_precision",
+        value=precision,
+        rationale=f"Precision: {len(correct)}/{len(detected_skills)}",
     )
 
 
@@ -153,10 +225,18 @@ def routing_recall(inputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feed
     expected_skills = set(expectations.get("expected_skills", []))
 
     if not expected_skills:
-        return Feedback(name="routing_recall", value=1.0, rationale="No expected skills (recall not applicable)")
+        return Feedback(
+            name="routing_recall",
+            value=1.0,
+            rationale="No expected skills (recall not applicable)",
+        )
 
     detected_skills = detect_skills_from_prompt(prompt)
     correct = expected_skills & detected_skills
     recall = len(correct) / len(expected_skills)
 
-    return Feedback(name="routing_recall", value=recall, rationale=f"Recall: {len(correct)}/{len(expected_skills)}")
+    return Feedback(
+        name="routing_recall",
+        value=recall,
+        rationale=f"Recall: {len(correct)}/{len(expected_skills)}",
+    )

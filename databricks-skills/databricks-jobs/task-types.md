@@ -618,7 +618,7 @@ Define reusable Python environments for serverless tasks with custom pip depende
 > **IMPORTANT:** The `client` field is **required** in the environment `spec`. It specifies the
 > base serverless environment version. Use `"4"` as the value. Without it, the API returns:
 > `"Either base environment or version must be provided for environment"`.
-> The MCP `create_job` tool auto-injects `client: "4"` if omitted, but CLI/SDK calls require it explicitly.
+> The MCP `manage_jobs` tool (action="create") auto-injects `client: "4"` if omitted, but CLI/SDK calls require it explicitly.
 
 ### DABs YAML
 

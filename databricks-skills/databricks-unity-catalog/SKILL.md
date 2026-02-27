@@ -226,6 +226,13 @@ See [7-fgac-overview.md](7-fgac-overview.md) for the full FGAC workflow, policy 
 11. **Preview before executing** any FGAC policy change
 12. **Use governed tags** (not ad-hoc tags) for FGAC policy matching
 
+## Related Skills
+
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - for pipelines that write to Unity Catalog tables
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** - for job execution data visible in system tables
+- **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - for generating data stored in Unity Catalog Volumes
+- **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - for building dashboards on top of Unity Catalog data
+
 ## Resources
 
 ### System Tables & Volumes

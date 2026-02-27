@@ -7,7 +7,7 @@
 #        .\install.ps1 [OPTIONS]
 #
 # Examples:
-#   # Basic installation (uses DEFAULT profile, project scope)
+#   # Basic installation (uses DEFAULT profile, project scope, latest release)
 #   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex
 #
 #   # Download and run with options
@@ -25,12 +25,31 @@
 #   # Skills only (skip MCP server)
 #   .\install.ps1 -SkillsOnly
 #
+#   # Install specific branch or tag
+#   $env:AIDEVKIT_BRANCH = '0.1.0'; .\install.ps1
+#
 
 $ErrorActionPreference = "Stop"
 
 # ─── Configuration ────────────────────────────────────────────
-$RepoUrl   = "https://github.com/databricks-solutions/ai-dev-kit.git"
-$RawUrl    = "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
+$Owner = "databricks-solutions"
+$Repo  = "ai-dev-kit"
+
+# Determine branch/tag to use
+if ($env:AIDEVKIT_BRANCH) {
+    $Branch = $env:AIDEVKIT_BRANCH
+} else {
+    try {
+        $latestReleaseUri = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
+        $latestRelease = Invoke-WebRequest -Uri $latestReleaseUri -Headers @{ "Accept" = "application/json" } -UseBasicParsing -ErrorAction Stop
+        $Branch = ($latestRelease.Content | ConvertFrom-Json).tag_name
+    } catch {
+        $Branch = "main"
+    }
+}
+
+$RepoUrl   = "https://github.com/$Owner/$Repo.git"
+$RawUrl    = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
 $InstallDir = if ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $env:USERPROFILE ".ai-dev-kit" }
 $RepoDir   = Join-Path $InstallDir "repo"
 $VenvDir   = Join-Path $InstallDir ".venv"
@@ -57,11 +76,13 @@ $script:ProfileProvided = $false
 
 # Databricks skills (bundled in repo)
 $script:Skills = @(
-    "agent-bricks", "aibi-dashboards", "asset-bundles", "databricks-app-apx",
-    "databricks-app-python", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
-    "databricks-jobs", "databricks-python-sdk", "databricks-unity-catalog",
-    "lakebase-provisioned", "model-serving", "spark-declarative-pipelines",
-    "synthetic-data-generation", "unstructured-pdf-generation"
+    "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-app-apx", "databricks-app-python",
+    "databricks-asset-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
+    "databricks-jobs", "databricks-metric-views", "databricks-model-serving", "databricks-python-sdk",
+    "databricks-unity-catalog", "databricks-vector-search", "databricks-zerobus-ingest",
+    "databricks-lakebase-autoscale", "databricks-lakebase-provisioned", "databricks-mlflow-evaluation",
+    "databricks-spark-declarative-pipelines", "spark-python-data-source", "databricks-spark-structured-streaming",
+    "databricks-synthetic-data-generation", "databricks-unstructured-pdf-generation"
 )
 
 # MLflow skills (fetched from mlflow/skills repo)
@@ -124,6 +145,10 @@ while ($i -lt $args.Count) {
             Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
+            Write-Host ""
+            Write-Host "Environment Variables:"
+            Write-Host "  AIDEVKIT_BRANCH       Branch or tag to install (default: latest release)"
+            Write-Host "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             Write-Host ""
             Write-Host "Examples:"
             Write-Host "  # Basic installation"
@@ -640,22 +665,23 @@ function Install-McpServer {
 
     # Clone or update repo
     if (Test-Path (Join-Path $script:RepoDir ".git")) {
-        & git -C $script:RepoDir pull -q 2>&1 | Out-Null
+        & git -C $script:RepoDir fetch -q --depth 1 origin $Branch 2>&1 | Out-Null
+        & git -C $script:RepoDir reset --hard FETCH_HEAD 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Remove-Item -Recurse -Force $script:RepoDir -ErrorAction SilentlyContinue
-            & git clone -q --depth 1 $RepoUrl $script:RepoDir 2>&1 | Out-Null
+            & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
         }
     } else {
         if (-not (Test-Path $script:InstallDir)) {
             New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
         }
-        & git clone -q --depth 1 $RepoUrl $script:RepoDir 2>&1 | Out-Null
+        & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
     }
     if ($LASTEXITCODE -ne 0) {
         $ErrorActionPreference = $prevEAP
         Write-Err "Failed to clone repository"
     }
-    Write-Ok "Repository cloned"
+    Write-Ok "Repository cloned ($Branch)"
 
     # Create venv and install
     Write-Msg "Installing Python dependencies..."
@@ -1215,9 +1241,9 @@ function Invoke-Main {
             New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
         }
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        & git clone -q --depth 1 $RepoUrl $script:RepoDir 2>&1 | Out-Null
+        & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
         $ErrorActionPreference = $prevEAP
-        Write-Ok "Repository cloned"
+        Write-Ok "Repository cloned ($Branch)"
     }
 
     # Install skills

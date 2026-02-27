@@ -6,16 +6,16 @@ Usage:
 
 Examples:
     # List MLflow traces (if configured) or local traces
-    python list_traces.py spark-declarative-pipelines
+    python list_traces.py databricks-spark-declarative-pipelines
 
     # Force local trace listing
-    python list_traces.py spark-declarative-pipelines --local
+    python list_traces.py databricks-spark-declarative-pipelines --local
 
     # Limit results
-    python list_traces.py spark-declarative-pipelines --limit 5
+    python list_traces.py databricks-spark-declarative-pipelines --limit 5
 
     # Custom MLflow experiment
-    python list_traces.py spark-declarative-pipelines --experiment "/Users/user@example.com/traces"
+    python list_traces.py databricks-spark-declarative-pipelines --experiment "/Users/user@example.com/traces"
 
 Environment Variables:
     DATABRICKS_HOST - Databricks workspace URL

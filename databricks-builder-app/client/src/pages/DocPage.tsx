@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Home,
   Database,
@@ -13,8 +12,9 @@ import {
   Terminal,
   Sparkles
 } from 'lucide-react';
+import { MainLayout } from '@/components/layout/MainLayout';
 
-type DocSection = 'overview' | 'tools-skills' | 'app';
+type DocSection = 'overview' | 'app';
 
 interface NavItem {
   id: DocSection;
@@ -24,7 +24,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: <Home className="h-4 w-4" /> },
-  { id: 'tools-skills', label: 'Tools & Skills', icon: <Database className="h-4 w-4" /> },
   { id: 'app', label: 'MCP App', icon: <Sparkles className="h-4 w-4" /> },
 ];
 
@@ -93,7 +92,7 @@ function OverviewSection() {
                   Skills explain <em>how</em> to do things and reference the tools from databricks-tools-core.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {['asset-bundles/', 'databricks-app-apx/', 'databricks-app-python/', 'databricks-python-sdk/', 'mlflow-evaluation/', 'spark-declarative-pipelines/', 'synthetic-data-generation/'].map((skill) => (
+                  {['databricks-asset-bundles/', 'databricks-app-apx/', 'databricks-app-python/', 'databricks-python-sdk/', 'databricks-mlflow-evaluation/', 'databricks-spark-declarative-pipelines/', 'databricks-synthetic-data-generation/'].map((skill) => (
                     <span key={skill} className="text-xs px-2 py-1 rounded bg-[var(--color-accent-primary)]/10 text-[var(--color-text-secondary)] font-mono">
                       {skill}
                     </span>
@@ -205,7 +204,7 @@ function OverviewSection() {
               <div>
                 <p className="font-medium text-[var(--color-text-heading)]">Read Skill</p>
                 <p className="text-sm text-[var(--color-text-muted)] mt-1">
-                  Claude reads <code className="px-1 py-0.5 rounded bg-[var(--color-background)] text-xs">synthetic-data-generation/</code> skill to learn best practices
+                  Claude reads <code className="px-1 py-0.5 rounded bg-[var(--color-background)] text-xs">databricks-synthetic-data-generation/</code> skill to learn best practices
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {['Non-linear distributions', 'Referential integrity', 'Time patterns', 'Row coherence'].map((item) => (
@@ -350,162 +349,6 @@ function OverviewSection() {
               Use tools natively (LangChain, Claude SDK, OpenAI) or via MCP. With or without skills. For any agent framework.
             </p>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type CoverageStatus = 'done' | 'in-progress' | 'not-started' | 'tbd';
-
-interface CoverageItem {
-  product: string;
-  skills: CoverageStatus;
-  mcpFunctions: CoverageStatus;
-  tested: CoverageStatus;
-  functionalInApp?: CoverageStatus;
-  owner?: string;
-  testLink?: string;
-  date?: string;
-  comments?: string;
-}
-
-interface CoverageSection {
-  title: string;
-  items: CoverageItem[];
-}
-
-const coverageSections: CoverageSection[] = [
-  {
-    title: 'Ingestion / ETL',
-    items: [
-      { product: 'Lakeflow Spark Declarative Pipelines', skills: 'done', mcpFunctions: 'done', tested: 'done', functionalInApp: 'in-progress', owner: 'Cal Reynolds', date: 'Jan 13', comments: 'Tested with State Street example. Successful locally in deploying pipelines of python, sql and modifiable varieties (SCP, Iceberg, Clustering). \n\nNeeds claude-agent-sdk bug to be fixed to work with app' },
-      { product: 'Lakeflow Jobs', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
-      { product: 'Synthetic Data Generation', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '' },
-      { product: 'PDF / Unstructured Data Generation', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: 'Quentin', comments: 'Generate realistic PDFs (invoices, contracts, reports) and unstructured data files. Uses LLM for content generation.' },
-    ],
-  },
-  {
-    title: 'ML / AI',
-    items: [
-      { product: 'Agent Bricks - Knowledge Assistant', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '', comments: 'Knowledge Assistant tile management' },
-      { product: 'Agent Bricks - Multi Agent Supervisor', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '', comments: 'Multi Agent Supervisor tile management' },
-      { product: 'Agent Bricks - Genie', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '', comments: 'Genie tile management' },
-      { product: 'Model Serving', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
-      { product: 'Classic ML and MLFlow', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
-    ],
-  },
-  {
-    title: 'AI/BI - SQL',
-    items: [
-      { product: 'DBSQL', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '' },
-      { product: 'Unity Catalog', skills: 'done', mcpFunctions: 'done', tested: 'done', owner: '' },
-      { product: 'AI/BI Dashboards', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
-    ],
-  },
-  {
-    title: 'Other',
-    items: [
-      { product: 'Databricks Asset Bundles', skills: 'done', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
-      { product: 'Notebook Creation', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
-      { product: 'Lakebase', skills: 'not-started', mcpFunctions: 'not-started', tested: 'not-started', owner: '' },
-      { product: 'Apps', skills: 'tbd', mcpFunctions: 'tbd', tested: 'tbd', owner: 'Ivan' },
-    ],
-  },
-];
-
-function StatusBadge({ status }: { status: CoverageStatus }) {
-  const config = {
-    'done': { label: 'Initial Coverage', bg: 'bg-green-500/20', text: 'text-green-400', dot: 'bg-green-400' },
-    'in-progress': { label: 'In Progress', bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400' },
-    'not-started': { label: 'Not Started', bg: 'bg-[var(--color-text-muted)]/20', text: 'text-[var(--color-text-muted)]', dot: 'bg-[var(--color-text-muted)]' },
-    'tbd': { label: 'TBD', bg: 'bg-purple-500/20', text: 'text-purple-400', dot: 'bg-purple-400' },
-  };
-  const { label, bg, text, dot } = config[status];
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${bg} ${text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-      {label}
-    </span>
-  );
-}
-
-function ToolsSkillsSection() {
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-[var(--color-text-heading)]">
-          Tools & Skills Coverage
-        </h1>
-        <p className="mt-2 text-lg text-[var(--color-text-muted)]">
-          Current status of Databricks product coverage in the AI Dev Kit
-        </p>
-      </div>
-
-      {/* Coverage Table */}
-      <div className="rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
-              <th className="text-left px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">Product</th>
-              <th className="text-center px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">Skills</th>
-              <th className="text-center px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">MCP Functions</th>
-              <th className="text-center px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">Tested on Local Terminal</th>
-              <th className="text-center px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">Functional in App</th>
-              <th className="text-left px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">Owner</th>
-              <th className="text-left px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">Date</th>
-              <th className="text-left px-6 py-4 text-sm font-semibold text-[var(--color-text-heading)]">Comments</th>
-            </tr>
-          </thead>
-          <tbody>
-            {coverageSections.map((section) => (
-              <React.Fragment key={section.title}>
-                {/* Section Header */}
-                <tr className="bg-[var(--color-accent-primary)]/10 border-b border-[var(--color-border)]">
-                  <td colSpan={8} className="px-6 py-3 text-sm font-semibold text-[var(--color-accent-primary)]">
-                    {section.title}
-                  </td>
-                </tr>
-                {/* Section Items */}
-                {section.items.map((item, idx) => (
-                  <tr
-                    key={item.product}
-                    className={`border-b border-[var(--color-border)] last:border-b-0 ${idx % 2 === 0 ? 'bg-[var(--color-background)]' : 'bg-[var(--color-bg-secondary)]/50'}`}
-                  >
-                    <td className="px-6 py-4 text-sm text-[var(--color-text-primary)]">{item.product}</td>
-                    <td className="px-6 py-4 text-center"><StatusBadge status={item.skills} /></td>
-                    <td className="px-6 py-4 text-center"><StatusBadge status={item.mcpFunctions} /></td>
-                    <td className="px-6 py-4 text-center"><StatusBadge status={item.tested} /></td>
-                    <td className="px-6 py-4 text-center">{item.functionalInApp ? <StatusBadge status={item.functionalInApp} /> : '-'}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--color-text-muted)]">{item.owner || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--color-text-muted)]">{item.date || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--color-text-muted)] whitespace-pre-line max-w-md">{item.comments || '-'}</td>
-                  </tr>
-                ))}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-6 text-sm text-[var(--color-text-muted)]">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-green-400" />
-          <span>Initial Coverage</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-yellow-400" />
-          <span>In Progress</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[var(--color-text-muted)]" />
-          <span>Not Started</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-purple-400" />
-          <span>TBD</span>
         </div>
       </div>
     </div>
@@ -840,8 +683,6 @@ export default function DocPage() {
     switch (activeSection) {
       case 'overview':
         return <OverviewSection />;
-      case 'tools-skills':
-        return <ToolsSkillsSection />;
       case 'app':
         return <AppSection />;
       default:
@@ -849,63 +690,34 @@ export default function DocPage() {
     }
   };
 
-  return (
-    <div className="h-screen bg-[var(--color-background)] flex flex-col overflow-hidden">
-      {/* Top Bar */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-[var(--header-height)] border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-        <div className="h-full px-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="h-8 w-8 rounded-lg bg-[var(--color-accent-primary)] flex items-center justify-center">
-                <Database className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-semibold text-[var(--color-text-heading)]">AI Dev Kit</span>
-            </Link>
-            <span className="text-[var(--color-text-muted)]">/</span>
-            <span className="text-[var(--color-text-secondary)]">Documentation</span>
-          </div>
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-heading)] transition-colors"
+  const docSidebar = (
+    <nav className="w-64 h-full border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] overflow-y-auto">
+      <div className="p-4 space-y-1">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveSection(item.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+              activeSection === item.id
+                ? 'bg-[var(--color-accent-primary)]/10 text-[var(--color-accent-primary)]'
+                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-background)] hover:text-[var(--color-text-heading)]'
+            }`}
           >
-            <Home className="h-4 w-4" />
-            Back to Projects
-          </Link>
-        </div>
-      </header>
-
-      {/* Spacer for fixed header */}
-      <div className="flex-shrink-0 h-[var(--header-height)]" />
-
-      {/* Main Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Navigation */}
-        <nav className="w-64 flex-shrink-0 border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] overflow-y-auto">
-          <div className="p-4 space-y-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  activeSection === item.id
-                    ? 'bg-[var(--color-accent-primary)]/10 text-[var(--color-accent-primary)]'
-                    : 'text-[var(--color-text-muted)] hover:bg-[var(--color-background)] hover:text-[var(--color-text-heading)]'
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {/* Content Area */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-8 py-8">
-            {renderSection()}
-          </div>
-        </main>
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
       </div>
-    </div>
+    </nav>
+  );
+
+  return (
+    <MainLayout sidebar={docSidebar}>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-8 py-8">
+          {renderSection()}
+        </div>
+      </div>
+    </MainLayout>
   );
 }

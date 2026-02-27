@@ -388,6 +388,9 @@ def query_vs_index(
         raise ValueError("Must provide either query_text or query_vector")
 
     if filters_json is not None:
+        # Ensure filters_json is a string — callers may pass a dict
+        if isinstance(filters_json, dict):
+            filters_json = json.dumps(filters_json)
         kwargs["filters_json"] = filters_json
 
     if filter_string is not None:
@@ -451,8 +454,12 @@ def upsert_vs_data(
     client = get_workspace_client()
 
     try:
-        # Parse to validate JSON and count records
-        records = json.loads(inputs_json) if isinstance(inputs_json, str) else inputs_json
+        # Ensure inputs_json is a string — callers may pass a list/dict
+        if isinstance(inputs_json, (dict, list)):
+            records = inputs_json
+            inputs_json = json.dumps(inputs_json)
+        else:
+            records = json.loads(inputs_json)
         num_records = len(records) if isinstance(records, list) else 1
 
         response = client.vector_search_indexes.upsert_data_vector_index(

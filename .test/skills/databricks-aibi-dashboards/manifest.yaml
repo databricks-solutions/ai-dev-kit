@@ -1,0 +1,134 @@
+# Test Manifest for databricks-aibi-dashboards Skill
+#
+# This manifest defines how to evaluate the databricks-aibi-dashboards skill.
+# It specifies scorers, trace expectations, and quality gates.
+
+skill_name: databricks-aibi-dashboards
+version: 1.0.0
+
+# Scorers evaluate different aspects of the skill's output
+scorers:
+  # Verify SQL validation workflow is followed
+  - name: sql_validation_workflow
+    type: trace
+    description: "Verify that SQL queries are tested via execute_sql before create_or_update_dashboard"
+    enabled: true
+    weight: 1.0
+    guidelines: |
+      PASS if:
+      - execute_sql is called for each dataset query before create_or_update_dashboard
+      - All execute_sql calls succeed without errors
+
+      FAIL if:
+      - create_or_update_dashboard is called without prior execute_sql calls
+      - execute_sql calls fail and deployment proceeds anyway
+
+  # Verify field name matching between query.fields and encodings
+  - name: field_name_matching
+    type: output
+    description: "Verify that field names in query.fields match fieldNames in encodings exactly"
+    enabled: true
+    weight: 1.0
+    guidelines: |
+      PASS if:
+      - For every widget, the 'name' in query.fields matches 'fieldName' in encodings
+      - Aggregation names match (e.g., both "sum(spend)" not "spend" vs "sum(spend)")
+
+      FAIL if:
+      - Field name mismatches exist (causes "no selected fields to visualize" error)
+
+  # Verify correct widget version numbers
+  - name: widget_versions
+    type: output
+    description: "Verify correct version numbers for each widget type"
+    enabled: true
+    weight: 1.0
+    guidelines: |
+      PASS if:
+      - Counters use version: 2
+      - Tables use version: 2
+      - Filters use version: 2
+      - Bar/Line/Pie charts use version: 3
+      - Text widgets have NO spec block
+
+      FAIL if:
+      - Wrong version numbers used
+      - Text widgets include spec block
+
+  # Verify layout follows 6-column grid
+  - name: layout_grid
+    type: output
+    description: "Verify layout follows 6-column grid with no gaps"
+    enabled: true
+    weight: 0.5
+    guidelines: |
+      PASS if:
+      - Each row sums to width=6 exactly
+      - No gaps in y positions
+      - Widget sizes follow recommendations (KPIs h=3-4, charts h=5-6)
+
+      FAIL if:
+      - Rows don't sum to width=6
+      - Significant layout gaps exist
+
+  # Overall quality checklist
+  - name: quality_checklist
+    type: llm_judge
+    description: "Overall quality evaluation using the skill's checklist"
+    enabled: true
+    weight: 0.5
+    guidelines: |
+      Evaluate the dashboard creation against these criteria:
+      1. Widget names use only alphanumeric + hyphens + underscores
+      2. All rows sum to width=6 with no gaps
+      3. KPIs use height 3-4, charts use height 5-6
+      4. Chart dimensions have ≤8 distinct values (if applicable)
+      5. All widget fieldNames match dataset columns exactly
+      6. Counter datasets use correct disaggregated setting
+      7. SQL uses Spark syntax (date_sub, not INTERVAL)
+      8. All SQL queries tested via execute_sql
+
+      Rate 1-5 based on how many criteria are met.
+
+# Trace expectations define the expected MCP tool call sequence
+trace_expectations:
+  required_tools:
+    - get_table_details  # STEP 1: Get schema
+    - execute_sql        # STEP 3: Test queries (MANDATORY)
+    - create_or_update_dashboard  # STEP 5: Deploy
+
+  optional_tools:
+    - get_best_warehouse  # Often used to get warehouse ID
+    - list_warehouses
+    - get_dashboard
+    - publish_dashboard
+
+  forbidden_patterns:
+    - name: deploy_without_testing
+      description: "Dashboard deployed without testing SQL queries"
+      pattern: "create_or_update_dashboard called before execute_sql"
+      severity: critical
+
+  call_order:
+    - pattern: "get_table_details -> execute_sql -> create_or_update_dashboard"
+      description: "Expected workflow: schema lookup -> query testing -> deployment"
+      required: true
+
+# Quality gates determine pass/fail thresholds
+quality_gates:
+  min_score: 3.5  # Minimum average score across all scorers
+  required_scorers:
+    - sql_validation_workflow  # Must pass SQL validation
+    - field_name_matching      # Must pass field matching
+    - widget_versions          # Must pass version check
+
+# Default guidelines for LLM judges (if not specified per scorer)
+default_guidelines: |
+  Evaluate the dashboard creation output for:
+  1. Adherence to mandatory validation workflow
+  2. Correctness of widget specifications
+  3. Quality of SQL queries and data model
+  4. Layout and visual design best practices
+
+  Be strict about critical requirements (SQL testing, field matching, versions).
+  Be lenient about stylistic choices within documented patterns.

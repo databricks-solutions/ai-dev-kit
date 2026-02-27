@@ -1,0 +1,103 @@
+# Ground Truth Test Cases for databricks-aibi-dashboards Skill
+#
+# This file contains verified test cases that represent expected skill behavior.
+# Test cases promoted from candidates.yaml after batch review on 2026-02-13
+
+test_cases:
+  - id: "basic-dashboard-nyctaxi"
+    inputs:
+      prompt: "Create a dashboard showing NYC taxi trip statistics from samples.nyctaxi.trips"
+    expectations:
+      expected_facts:
+        - "Should call mcp__databricks__get_table_details"
+        - "Should call mcp__databricks__execute_sql to test queries"
+        - "Should call mcp__databricks__create_or_update_dashboard"
+        - "Should include counter widgets (version 2)"
+        - "Should include bar chart (version 3)"
+        - "Should include table widget (version 2)"
+        - "Should follow 6-column grid layout"
+        - "Should test SQL queries before deployment"
+      unexpected_facts:
+        - "Should not show 'Invalid widget definition' errors"
+        - "Should not deploy without testing queries"
+    metadata:
+      category: basic_dashboard
+      complexity: simple
+      data_source: samples.nyctaxi.trips
+      widget_types: ["text", "counter", "bar", "table"]
+      validation_workflow_followed: true
+      sql_queries_tested: true
+
+  - id: "global-filter-dashboard"
+    inputs:
+      prompt: "Create a sales dashboard with revenue by region and a global region filter"
+    expectations:
+      expected_facts:
+        - "Should call mcp__databricks__execute_sql to test queries"
+        - "Should call mcp__databricks__create_or_update_dashboard"
+        - "Should create PAGE_TYPE_GLOBAL_FILTERS page"
+        - "Should use filter-multi-select widget (version 2)"
+        - "Should include counter widgets (version 2)"
+        - "Should include bar chart (version 3)"
+        - "Should set disaggregated: false for filter queries"
+        - "Should include frame with showTitle for filters"
+      unexpected_facts:
+        - "Should not use widgetType: 'filter'"
+        - "Should not skip SQL query testing"
+    metadata:
+      category: dashboard_with_filters
+      complexity: medium
+      data_source: samples.tpcds_sf1.store_sales
+      widget_types: ["text", "counter", "bar", "filter-multi-select"]
+      pages: ["overview", "filters"]
+      filter_type: global_filter
+
+  - id: "page-level-filter-dashboard"
+    inputs:
+      prompt: "Create a dashboard with two pages: one for overall metrics and one for regional breakdown with a page-level region filter"
+    expectations:
+      expected_facts:
+        - "Should call mcp__databricks__execute_sql to test queries"
+        - "Should call mcp__databricks__create_or_update_dashboard"
+        - "Should create PAGE_TYPE_CANVAS pages (not PAGE_TYPE_GLOBAL_FILTERS)"
+        - "Should place filter on same page as charts it affects"
+        - "Should use filter-multi-select widget (version 2)"
+        - "Should create datasets with and without region dimension"
+        - "Overview page should not be affected by filter"
+        - "Regional page should be affected by filter"
+      unexpected_facts:
+        - "Should not use PAGE_TYPE_GLOBAL_FILTERS for page-level filters"
+        - "Should not affect all pages (only same page)"
+    metadata:
+      category: multi_page_with_page_level_filter
+      complexity: medium
+      data_source: samples.tpcds_sf1.store_sales
+      widget_types: ["text", "counter", "bar", "filter-multi-select"]
+      pages: ["overview", "regional_breakdown"]
+      filter_type: page_level_filter
+      filter_scope: affects_only_same_page
+
+  - id: "line-chart-time-series"
+    inputs:
+      prompt: "Create a dashboard showing daily trip trends over time from samples.nyctaxi.trips"
+    expectations:
+      expected_facts:
+        - "Should call mcp__databricks__execute_sql to test queries"
+        - "Should call mcp__databricks__create_or_update_dashboard"
+        - "Should use DATE_TRUNC for daily aggregation"
+        - "Should create line chart widget (version 3)"
+        - "Should use scale.type: 'temporal' for x-axis with dates"
+        - "Should use scale.type: 'quantitative' for y-axis with numbers"
+        - "Should use disaggregated: true for pre-aggregated data"
+        - "Should include counter widgets (version 2)"
+      unexpected_facts:
+        - "Should not use INTERVAL syntax (use date functions)"
+        - "Should not skip DATE_TRUNC for daily aggregation"
+    metadata:
+      category: line_chart_time_series
+      complexity: medium
+      data_source: samples.nyctaxi.trips
+      widget_types: ["text", "counter", "line"]
+      temporal_data: true
+      date_truncation: "DATE_TRUNC('DAY', ...)"
+      scale_types: ["temporal", "quantitative"]

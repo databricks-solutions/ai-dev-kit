@@ -14,7 +14,7 @@ import json
 import logging
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -29,32 +29,37 @@ app = FastAPI(title='Builder App Demo Client')
 # Client singleton
 # ---------------------------------------------------------------------------
 
-_client: BuilderClient | None = None
 # Cache project ID so we don't create one per request
 _project_id: str | None = None
 
 
-def get_client() -> BuilderClient:
-  """Get or create the BuilderClient singleton."""
-  global _client
-  if _client is None:
-    url = os.environ.get('BUILDER_APP_URL', '')
-    if not url:
-      raise RuntimeError(
-        'BUILDER_APP_URL environment variable is required. '
-        'Set it to the base URL of the deployed builder app.'
-      )
-    _client = BuilderClient(builder_app_url=url)
-  return _client
+def _get_builder_url() -> str:
+  """Get the builder app URL from environment."""
+  url = os.environ.get('BUILDER_APP_URL', '')
+  if not url:
+    raise RuntimeError(
+      'BUILDER_APP_URL environment variable is required. '
+      'Set it to the base URL of the deployed builder app.'
+    )
+  return url
 
 
-async def get_or_create_project() -> str:
+def get_client(request: Request | None = None) -> BuilderClient:
+  """Create a BuilderClient, forwarding the real user's email when available.
+
+  When this app is deployed as a Databricks App, the proxy sets X-Forwarded-User
+  for browser users. We pass that through as user_email so the builder app
+  attributes work to the real user instead of this app's service principal.
+  """
+  user_email = request.headers.get('X-Forwarded-User') if request else None
+  return BuilderClient(builder_app_url=_get_builder_url(), user_email=user_email)
+
+
+async def get_or_create_project(client: BuilderClient) -> str:
   """Get or create a shared demo project."""
   global _project_id
   if _project_id:
     return _project_id
-
-  client = get_client()
 
   # Try to find an existing demo project
   try:
@@ -105,14 +110,14 @@ async def index() -> str:
 
 
 @app.post('/ask', response_model=AskResponse)
-async def ask(body: AskRequest) -> AskResponse:
+async def ask(body: AskRequest, request: Request) -> AskResponse:
   """Send a message to the builder app agent and return the full response.
 
   Creates a project and conversation automatically, invokes the agent,
   streams the response to completion, and returns the full text.
   """
-  client = get_client()
-  project_id = await get_or_create_project()
+  client = get_client(request)
+  project_id = await get_or_create_project(client)
 
   # Invoke the agent (creates a new conversation automatically)
   try:
@@ -155,13 +160,13 @@ async def ask(body: AskRequest) -> AskResponse:
 
 
 @app.get('/stream/{execution_id}')
-async def stream_proxy(execution_id: str) -> StreamingResponse:
+async def stream_proxy(execution_id: str, request: Request) -> StreamingResponse:
   """Proxy SSE events from the builder app to the demo frontend.
 
   This allows the frontend to display streaming output in real time
   instead of waiting for the full response.
   """
-  client = get_client()
+  client = get_client(request)
 
   async def generate():
     try:
@@ -184,13 +189,13 @@ async def stream_proxy(execution_id: str) -> StreamingResponse:
 
 
 @app.post('/invoke')
-async def invoke(body: AskRequest) -> dict:
+async def invoke(body: AskRequest, request: Request) -> dict:
   """Invoke the agent and return the execution_id for streaming.
 
   Use this with GET /stream/{execution_id} for real-time streaming.
   """
-  client = get_client()
-  project_id = await get_or_create_project()
+  client = get_client(request)
+  project_id = await get_or_create_project(client)
 
   try:
     result = await client.invoke_agent(
@@ -204,9 +209,9 @@ async def invoke(body: AskRequest) -> dict:
 
 
 @app.get('/health')
-async def health() -> dict:
+async def health(request: Request) -> dict:
   """Health check — also pings the builder app."""
-  client = get_client()
+  client = get_client(request)
   try:
     builder_health = await client.health()
   except Exception as e:

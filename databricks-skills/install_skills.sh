@@ -10,11 +10,11 @@
 #   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 #
 #   # Install specific skills (can mix Databricks and MLflow skills)
-#   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- asset-bundles agent-evaluation
+#   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-asset-bundles agent-evaluation
 #
 #   # Or run locally
 #   ./install_skills.sh                              # Install all skills
-#   ./install_skills.sh asset-bundles agent-evaluation  # Install specific skills
+#   ./install_skills.sh databricks-asset-bundles agent-evaluation  # Install specific skills
 #   ./install_skills.sh --mlflow-version v1.0.0      # Pin MLflow skills version
 #   ./install_skills.sh --local                      # Install Databricks skills from local directory
 #   ./install_skills.sh --list                       # List available skills
@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-autoscale lakebase-provisioned metric-views mlflow-evaluation model-serving spark-declarative-pipelines spark-structured-streaming synthetic-data-generation unstructured-pdf-generation vector-search"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-generation databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -54,27 +54,31 @@ ALL_SKILLS="$DATABRICKS_SKILLS $MLFLOW_SKILLS"
 get_skill_description() {
     case "$1" in
         # Databricks skills
-        "agent-bricks") echo "Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors" ;;
-        "aibi-dashboards") echo "AI/BI Dashboards - create and manage dashboards" ;;
-        "asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
+        "databricks-agent-bricks") echo "Knowledge Assistants, Genie Spaces, Supervisor Agents" ;;
+        "databricks-aibi-dashboards") echo "Databricks AI/BI Dashboards - create and manage dashboards" ;;
+        "databricks-asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
         "databricks-config") echo "Profile authentication setup for Databricks" ;;
         "databricks-dbsql") echo "Databricks SQL - SQL scripting, MVs, geospatial, AI functions, federation" ;;
         "databricks-docs") echo "Documentation reference via llms.txt" ;;
         "databricks-genie") echo "Genie Spaces - create, curate, and query via Conversation API" ;;
+        "databricks-iceberg") echo "Apache Iceberg - managed tables, UniForm, IRC, Snowflake interop, migration" ;;
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
-        "databricks-unity-catalog") echo "System tables, volumes, and FGAC policy governance" ;;
-        "lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
-        "lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
-        "metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
-        "model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
-        "spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
-        "spark-structured-streaming") echo "Spark Structured Streaming patterns and best practices" ;;
-        "synthetic-data-generation") echo "Synthetic test data generation" ;;
-        "unstructured-pdf-generation") echo "Generate synthetic PDFs for RAG" ;;
-        "vector-search") echo "Vector Search - endpoints, indexes, and queries for RAG" ;;
+        "databricks-unity-catalog") echo "System tables, volumes, access controls, and FGAC policy governance" ;;
+        "databricks-lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
+        "databricks-lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
+        "databricks-metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
+        "databricks-model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
+        "databricks-mlflow-evaluation") echo "MLflow evaluation and trace analysis" ;;
+        "databricks-spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
+        "spark-python-data-source") echo "Spark custom Python data sources" ;;
+        "databricks-spark-structured-streaming") echo "Spark Structured Streaming patterns and best practices" ;;
+        "databricks-synthetic-data-generation") echo "Synthetic test data generation" ;;
+        "databricks-unstructured-pdf-generation") echo "Generate synthetic PDFs for RAG" ;;
+        "databricks-vector-search") echo "Vector Search - endpoints, indexes, and queries for RAG" ;;
+        "databricks-zerobus-ingest") echo "Zerobus Ingest - gRPC data ingestion into Delta tables" ;;
         # MLflow skills (from mlflow/skills repo)
         "agent-evaluation") echo "End-to-end agent evaluation workflow" ;;
         "analyze-mlflow-chat-session") echo "Debug multi-turn conversations" ;;
@@ -91,23 +95,25 @@ get_skill_description() {
 # Get extra files for a Databricks skill (besides SKILL.md)
 get_skill_extra_files() {
     case "$1" in
-        "agent-bricks") echo "1-knowledge-assistants.md 3-multi-agent-supervisors.md" ;;
-        "aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
+        "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
+        "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
         "databricks-genie") echo "spaces.md conversation.md" ;;
-        "asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
+        "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
+        "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
         "databricks-unity-catalog") echo "5-system-tables.md 6-volumes.md 7-fgac-overview.md 8-fgac-sql-generation.md 9-fgac-sdk-and-tools.md 10-uc-acls.md" ;;
-        "lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
-        "lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
-        "metric-views") echo "yaml-reference.md patterns.md" ;;
-        "mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
-        "model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
-        "spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;
-        "spark-structured-streaming") echo "checkpoint-best-practices.md kafka-streaming.md merge-operations.md multi-sink-writes.md stateful-operations.md stream-static-joins.md stream-stream-joins.md streaming-best-practices.md trigger-and-cost-optimization.md" ;;
-        "vector-search") echo "index-types.md" ;;
+        "databricks-lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
+        "databricks-lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
+        "databricks-metric-views") echo "yaml-reference.md patterns.md" ;;
+        "databricks-model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
+        "databricks-mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
+        "databricks-spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;
+        "databricks-spark-structured-streaming") echo "checkpoint-best-practices.md kafka-streaming.md merge-operations.md multi-sink-writes.md stateful-operations.md stream-static-joins.md stream-stream-joins.md streaming-best-practices.md trigger-and-cost-optimization.md" ;;
+        "databricks-vector-search") echo "index-types.md" ;;
+        "databricks-zerobus-ingest") echo "1-setup-and-authentication.md 2-python-client.md 3-multilanguage-clients.md 4-protobuf-schema.md 5-operations-and-limits.md" ;;
         *) echo "" ;;
     esac
 }
@@ -154,9 +160,9 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  ./install_skills.sh                          # Install all skills"
-    echo "  ./install_skills.sh spark-declarative-pipelines  # Install specific Databricks skill"
+    echo "  ./install_skills.sh databricks-spark-declarative-pipelines  # Install specific Databricks skill"
     echo "  ./install_skills.sh agent-evaluation         # Install specific MLflow skill"
-    echo "  ./install_skills.sh asset-bundles agent-evaluation  # Mix of both sources"
+    echo "  ./install_skills.sh databricks-asset-bundles agent-evaluation  # Mix of both sources"
     echo "  ./install_skills.sh --mlflow-version v1.0.0  # Pin MLflow skills version"
     echo "  ./install_skills.sh --local                  # Install all from local directory"
     echo "  ./install_skills.sh --list                   # List available skills"

@@ -31,7 +31,7 @@ ctx = CLIContext(
 ```python
 from skill_test.runners import evaluate_skill
 
-results = evaluate_skill("spark-declarative-pipelines")
+results = evaluate_skill("databricks-spark-declarative-pipelines")
 # Loads .test/skills/{skill}/ground_truth.yaml, runs scorers, reports to MLflow
 ```
 
@@ -51,7 +51,7 @@ from skill_test.cli import CLIContext, interactive, run, regression, init, revie
 
 # Interactive test generation
 result = interactive(
-    skill_name="spark-declarative-pipelines",
+    skill_name="databricks-spark-declarative-pipelines",
     prompt="Create a bronze ingestion pipeline",
     response=skill_response,
     ctx=ctx,
@@ -59,16 +59,16 @@ result = interactive(
 )
 
 # Run evaluation
-results = run("spark-declarative-pipelines", ctx)
+results = run("databricks-spark-declarative-pipelines", ctx)
 
 # Check for regressions
-comparison = regression("spark-declarative-pipelines", ctx)
+comparison = regression("databricks-spark-declarative-pipelines", ctx)
 
 # Review pending candidates (interactive)
-result = review("spark-declarative-pipelines", ctx)
+result = review("databricks-spark-declarative-pipelines", ctx)
 
 # Batch approve candidates with execution_success=True
-result = review("spark-declarative-pipelines", ctx, batch=True, filter_success=True)
+result = review("databricks-spark-declarative-pipelines", ctx, batch=True, filter_success=True)
 ```
 
 ## Generate-Review-Promote Pipeline
@@ -81,18 +81,18 @@ from skill_test.grp.reviewer import review_candidates_file
 from pathlib import Path
 
 # 1. Generate candidate from skill output
-candidate = generate_candidate("spark-declarative-pipelines", prompt, response)
+candidate = generate_candidate("databricks-spark-declarative-pipelines", prompt, response)
 
 # 2. Save for review
-save_candidates([candidate], Path(".test/skills/spark-declarative-pipelines/candidates.yaml"))
+save_candidates([candidate], Path(".test/skills/databricks-spark-declarative-pipelines/candidates.yaml"))
 
 # 3. Interactive review
-review_candidates_file(Path(".test/skills/spark-declarative-pipelines/candidates.yaml"))
+review_candidates_file(Path(".test/skills/databricks-spark-declarative-pipelines/candidates.yaml"))
 
 # 4. Promote approved to ground truth
 promote_approved(
-    Path(".test/skills/spark-declarative-pipelines/candidates.yaml"),
-    Path(".test/skills/spark-declarative-pipelines/ground_truth.yaml")
+    Path(".test/skills/databricks-spark-declarative-pipelines/candidates.yaml"),
+    Path(".test/skills/databricks-spark-declarative-pipelines/ground_truth.yaml")
 )
 ```
 

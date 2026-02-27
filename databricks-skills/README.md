@@ -11,7 +11,7 @@ Run in your project root:
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 
 # Install specific skills
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- asset-bundles agent-evaluation
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-asset-bundles agent-evaluation
 
 # Pin MLflow skills to a specific version
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --mlflow-version v1.0.0
@@ -27,17 +27,17 @@ This creates `.claude/skills/` and downloads all skills. Claude Code loads them 
 **Manual install:**
 ```bash
 mkdir -p .claude/skills
-cp -r ai-dev-kit/databricks-skills/agent-bricks .claude/skills/
+cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ```
 
 ## Available Skills
 
 ### 🤖 AI & Agents
-- **agent-bricks** - Knowledge Assistants, Genie Spaces, Multi-Agent Supervisors
+- **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
 - **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
-- **model-serving** - Deploy MLflow models and AI agents to endpoints
-- **unstructured-pdf-generation** - Generate synthetic PDFs for RAG
-- **vector-search** - Vector similarity search for RAG and semantic search
+- **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints
+- **databricks-unstructured-pdf-generation** - Generate synthetic PDFs for RAG
+- **databricks-vector-search** - Vector similarity search for RAG and semantic search
 
 ### 📊 MLflow (from [mlflow/skills](https://github.com/mlflow/skills))
 - **agent-evaluation** - End-to-end agent evaluation workflow
@@ -50,21 +50,22 @@ cp -r ai-dev-kit/databricks-skills/agent-bricks .claude/skills/
 - **searching-mlflow-docs** - Search MLflow documentation
 
 ### 📊 Analytics & Dashboards
-- **aibi-dashboards** - AI/BI dashboards (with SQL validation workflow)
+- **databricks-aibi-dashboards** - Databricks AI/BI dashboards (with SQL validation workflow)
 - **databricks-unity-catalog** - System tables for lineage, audit, billing
 
 ### 🔧 Data Engineering
-- **spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
+- **databricks-iceberg** - Apache Iceberg tables (Managed/Foreign), UniForm, Iceberg REST Catalog, Iceberg Clients Interoperability
+- **databricks-spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
 - **databricks-jobs** - Multi-task workflows, triggers, schedules
-- **synthetic-data-generation** - Realistic test data with Faker
+- **databricks-synthetic-data-generation** - Realistic test data with Faker
 
 ### 🚀 Development & Deployment
-- **asset-bundles** - DABs for multi-environment deployments
+- **databricks-asset-bundles** - DABs for multi-environment deployments
 - **databricks-app-apx** - Full-stack apps (FastAPI + React)
 - **databricks-app-python** - Python web apps (Dash, Streamlit, Flask)
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
 - **databricks-config** - Profile authentication setup
-- **lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
+- **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
 
 ### 📚 Reference
 - **databricks-docs** - Documentation index via llms.txt
@@ -83,7 +84,7 @@ cp -r ai-dev-kit/databricks-skills/agent-bricks .claude/skills/
 ```
 
 **Example:** User says "Create a sales dashboard"
-1. Claude loads `aibi-dashboards` skill → learns validation workflow
+1. Claude loads `databricks-aibi-dashboards` skill → learns validation workflow
 2. Calls `get_table_details()` → gets schemas
 3. Calls `execute_sql()` → tests queries
 4. Calls `create_or_update_dashboard()` → deploys

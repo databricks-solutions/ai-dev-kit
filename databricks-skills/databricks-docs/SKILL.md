@@ -16,7 +16,7 @@ This is a **reference skill**, not an action skill. Use it to:
 - Find detailed information to inform how you use MCP tools
 - Discover features and capabilities you may not know about
 
-**Always prefer using MCP tools for actions** (execute_sql, create_or_update_pipeline, etc.) and **load specific skills for workflows** (databricks-python-sdk, spark-declarative-pipelines, etc.). Use this skill when you need reference documentation.
+**Always prefer using MCP tools for actions** (execute_sql, create_or_update_pipeline, etc.) and **load specific skills for workflows** (databricks-python-sdk, databricks-spark-declarative-pipelines, etc.). Use this skill when you need reference documentation.
 
 ## How to Use
 
@@ -45,7 +45,7 @@ The llms.txt file is organized by category:
 
 **Scenario:** User wants to create a Delta Live Tables pipeline
 
-1. Load `spark-declarative-pipelines` skill for workflow patterns
+1. Load `databricks-spark-declarative-pipelines` skill for workflow patterns
 2. Use this skill to fetch docs if you need clarification on specific DLT features
 3. Use `create_or_update_pipeline` MCP tool to actually create the pipeline
 
@@ -54,3 +54,11 @@ The llms.txt file is organized by category:
 1. Fetch llms.txt to find relevant documentation
 2. Read the specific docs to understand the feature
 3. Determine which skill/tools apply, then use them
+
+## Related Skills
+
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns for programmatic Databricks access
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - DLT / Lakeflow pipeline workflows
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Governance and catalog management
+- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Serving endpoints and model deployment
+- **[databricks-mlflow-evaluation](../databricks-mlflow-evaluation/SKILL.md)** - MLflow 3 GenAI evaluation workflows

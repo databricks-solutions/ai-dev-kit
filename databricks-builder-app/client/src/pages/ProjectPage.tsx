@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
 import {
+  ArrowUp,
+  Check,
   ChevronDown,
+  ClipboardCopy,
   ExternalLink,
   Loader2,
-  MessageSquare,
-  Send,
+  Settings2,
   Square,
+  Sparkles,
   Wrench,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -17,7 +21,6 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SkillsExplorer } from '@/components/SkillsExplorer';
 import { FunLoader } from '@/components/FunLoader';
-import { Button } from '@/components/ui/Button';
 import {
   createConversation,
   deleteConversation,
@@ -45,7 +48,72 @@ interface ActivityItem {
   timestamp: number;
 }
 
-// Minimal activity indicator - shows only current tool being executed
+// Databricks logo mark SVG
+function DatabricksLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <path d="M18 2L3 10.5V12.5L18 21L33 12.5V10.5L18 2Z" fill="currentColor" />
+      <path d="M18 24.5L3 16V18L18 27L33 18V16L18 24.5Z" fill="currentColor" />
+      <path d="M18 30.5L3 22V24L18 33L33 24V22L18 30.5Z" fill="currentColor" opacity="0.7" />
+    </svg>
+  );
+}
+
+// Expandable tools list for a message
+function ToolsUsedBadge({ tools }: { tools: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (tools.length === 0) return null;
+
+  // Deduplicate and clean tool names
+  const uniqueTools = [...new Set(tools.map(t => t.replace('mcp__databricks__', '').replace(/_/g, ' ')))];
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="inline-flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+      >
+        <Wrench className="h-3 w-3" />
+        <span>{uniqueTools.length} tool{uniqueTools.length !== 1 ? 's' : ''} used</span>
+        <ChevronDown className={cn('h-3 w-3 transition-transform', expanded && 'rotate-180')} />
+      </button>
+      {expanded && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {uniqueTools.map((tool, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/40 text-[11px] text-[var(--color-text-muted)] capitalize"
+            >
+              <Wrench className="h-2.5 w-2.5" />
+              {tool}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Copy button for code blocks
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="absolute top-2 right-2 p-1.5 rounded-md bg-[var(--color-bg-secondary)]/80 border border-[var(--color-border)]/50 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] opacity-0 group-hover/code:opacity-100 transition-all"
+      title={copied ? 'Copied!' : 'Copy code'}
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-[var(--color-success)]" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+// Activity indicator - shows current tool with animated dots
 function ActivitySection({
   items,
 }: {
@@ -54,17 +122,244 @@ function ActivitySection({
 }) {
   if (items.length === 0) return null;
 
-  // Get the most recent tool_use item (current activity)
   const currentTool = [...items].reverse().find((item) => item.type === 'tool_use');
-
   if (!currentTool) return null;
 
+  const toolName = currentTool.toolName?.replace('mcp__databricks__', '').replace(/_/g, ' ') || 'working';
+
   return (
-    <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-      <Wrench className="h-3 w-3 text-[var(--color-accent-primary)] animate-pulse" />
-      <span className="truncate">
-        Using {currentTool.toolName?.replace('mcp__databricks__', '')}...
-      </span>
+    <div className="flex items-start gap-3 max-w-3xl">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-accent-primary)] to-[var(--color-accent-secondary)] flex items-center justify-center shadow-sm mt-0.5">
+        <DatabricksLogo className="h-4 w-4 text-white" />
+      </div>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--color-bg-secondary)]/60 border border-[var(--color-border)]/30">
+        <Wrench className="h-3.5 w-3.5 text-[var(--color-accent-primary)] animate-pulse" />
+        <span className="text-xs text-[var(--color-text-muted)] capitalize">
+          {toolName}
+        </span>
+        <span className="flex gap-0.5">
+          <span className="w-1 h-1 rounded-full bg-[var(--color-text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1 h-1 rounded-full bg-[var(--color-text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1 h-1 rounded-full bg-[var(--color-text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Custom dropdown for cluster/warehouse selection with status indicators
+function ResourceDropdown<T extends { state: string }>({
+  label,
+  items,
+  selectedId,
+  onSelect,
+  nameKey,
+  idKey,
+}: {
+  label: string;
+  items: T[];
+  selectedId?: string;
+  onSelect: (id: string | undefined) => void;
+  nameKey: keyof T;
+  idKey: keyof T;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) { document.addEventListener('mousedown', handler); return () => document.removeEventListener('mousedown', handler); }
+  }, [open]);
+
+  const selected = items.find((i) => String(i[idKey]) === selectedId);
+  const selectedName = selected ? String(selected[nameKey] || '') : '';
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="mt-1.5 w-full flex items-center justify-between h-10 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm hover:border-[var(--color-accent-primary)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/30 transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {selected && (
+            <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-[var(--color-background)]',
+              selected.state === 'RUNNING' ? 'bg-[var(--color-success)] ring-[var(--color-success)]/30' : 'bg-[var(--color-text-muted)]/50 ring-[var(--color-text-muted)]/20'
+            )} />
+          )}
+          <span className={cn('truncate', selected ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]')}>
+            {selectedName || `Select ${label.toLowerCase()}...`}
+          </span>
+        </div>
+        <ChevronDown className={cn('h-4 w-4 text-[var(--color-text-muted)] transition-transform flex-shrink-0', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-lg z-[60]">
+          {items.map((item) => {
+            const id = String(item[idKey]);
+            const name = String(item[nameKey] || '');
+            const isSelected = id === selectedId;
+            return (
+              <button
+                key={id}
+                onClick={() => { onSelect(id); setOpen(false); }}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors',
+                  isSelected ? 'bg-[var(--color-accent-primary)]/5 text-[var(--color-accent-primary)]' : 'text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]'
+                )}
+              >
+                <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-[var(--color-bg-elevated)]',
+                  item.state === 'RUNNING' ? 'bg-[var(--color-success)] ring-[var(--color-success)]/30' : 'bg-[var(--color-text-muted)]/50 ring-[var(--color-text-muted)]/20'
+                )} />
+                <div className="flex-1 min-w-0">
+                  <span className="truncate block">{name}</span>
+                  <span className={cn('text-[10px] uppercase tracking-wider', item.state === 'RUNNING' ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]')}>
+                    {item.state}
+                  </span>
+                </div>
+                {isSelected && <Check className="h-4 w-4 flex-shrink-0 text-[var(--color-accent-primary)]" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Configuration panel component
+function ConfigPanel({
+  isOpen,
+  onClose,
+  defaultCatalog,
+  setDefaultCatalog,
+  defaultSchema,
+  setDefaultSchema,
+  clusters,
+  selectedClusterId,
+  setSelectedClusterId,
+  warehouses,
+  selectedWarehouseId,
+  setSelectedWarehouseId,
+  workspaceFolder,
+  setWorkspaceFolder,
+  mlflowExperimentName,
+  setMlflowExperimentName,
+  workspaceUrl,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  defaultCatalog: string;
+  setDefaultCatalog: (v: string) => void;
+  defaultSchema: string;
+  setDefaultSchema: (v: string) => void;
+  clusters: Cluster[];
+  selectedClusterId?: string;
+  setSelectedClusterId: (v: string | undefined) => void;
+  warehouses: Warehouse[];
+  selectedWarehouseId?: string;
+  setSelectedWarehouseId: (v: string | undefined) => void;
+  workspaceFolder: string;
+  setWorkspaceFolder: (v: string) => void;
+  mlflowExperimentName: string;
+  setMlflowExperimentName: (v: string) => void;
+  workspaceUrl: string | null;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="absolute right-0 top-full mt-2 w-96 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-2xl z-50 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-border)]/50 bg-[var(--color-bg-secondary)]/30">
+        <h3 className="text-sm font-semibold text-[var(--color-text-heading)]">Configuration</h3>
+        <button onClick={onClose} className="p-1 rounded-md hover:bg-[var(--color-bg-secondary)] transition-colors">
+          <X className="h-4 w-4 text-[var(--color-text-muted)]" />
+        </button>
+      </div>
+      <div className="p-5 space-y-5">
+        {/* Catalog & Schema - stacked for more room */}
+        <div>
+          <label className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Catalog / Schema</label>
+          <div className="mt-1.5 flex items-center gap-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--color-accent-primary)]/30 focus-within:border-[var(--color-accent-primary)]/50">
+            <input
+              type="text"
+              value={defaultCatalog}
+              onChange={(e) => setDefaultCatalog(e.target.value)}
+              placeholder="catalog"
+              className="flex-1 h-10 px-3 bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]/50 focus:outline-none min-w-0"
+            />
+            <span className="text-[var(--color-text-muted)] font-bold text-lg leading-none select-none">.</span>
+            <input
+              type="text"
+              value={defaultSchema}
+              onChange={(e) => setDefaultSchema(e.target.value)}
+              placeholder="schema"
+              className="flex-1 h-10 px-3 bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]/50 focus:outline-none min-w-0"
+            />
+            {workspaceUrl && defaultCatalog && defaultSchema && (
+              <a
+                href={`${workspaceUrl}/explore/data/${defaultCatalog}/${defaultSchema}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center h-10 w-10 flex-shrink-0 border-l border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent-primary)] hover:bg-[var(--color-bg-secondary)]/50 transition-colors"
+                title="Open in Catalog Explorer"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Cluster - custom dropdown */}
+        {clusters.length > 0 && (
+          <ResourceDropdown
+            label="Cluster"
+            items={clusters}
+            selectedId={selectedClusterId}
+            onSelect={setSelectedClusterId}
+            nameKey="cluster_name"
+            idKey="cluster_id"
+          />
+        )}
+
+        {/* Warehouse - custom dropdown */}
+        {warehouses.length > 0 && (
+          <ResourceDropdown
+            label="SQL Warehouse"
+            items={warehouses}
+            selectedId={selectedWarehouseId}
+            onSelect={setSelectedWarehouseId}
+            nameKey="warehouse_name"
+            idKey="warehouse_id"
+          />
+        )}
+
+        {/* Workspace Folder */}
+        <div>
+          <label className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">Workspace Folder</label>
+          <input
+            type="text"
+            value={workspaceFolder}
+            onChange={(e) => setWorkspaceFolder(e.target.value)}
+            placeholder="/Workspace/Users/..."
+            className="mt-1.5 w-full h-10 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/30 focus:border-[var(--color-accent-primary)]/50"
+          />
+        </div>
+
+        {/* MLflow Experiment */}
+        <div>
+          <label className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">MLflow Experiment</label>
+          <input
+            type="text"
+            value={mlflowExperimentName}
+            onChange={(e) => setMlflowExperimentName(e.target.value)}
+            placeholder="Experiment ID or name"
+            className="mt-1.5 w-full h-10 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/30 focus:border-[var(--color-accent-primary)]/50"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -96,16 +391,14 @@ export default function ProjectPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingConvIds, setStreamingConvIds] = useState<string[]>([]);
   const [streamingText, setStreamingText] = useState('');
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [selectedClusterId, setSelectedClusterId] = useState<string | undefined>();
-  const [clusterDropdownOpen, setClusterDropdownOpen] = useState(false);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>();
-  const [warehouseDropdownOpen, setWarehouseDropdownOpen] = useState(false);
   const [defaultCatalog, setDefaultCatalog] = useState<string>('ai_dev_kit');
   const [defaultSchema, setDefaultSchema] = useState<string>('');
   const [workspaceFolder, setWorkspaceFolder] = useState<string>('');
@@ -113,6 +406,7 @@ export default function ProjectPage() {
   const [skillsExplorerOpen, setSkillsExplorerOpen] = useState(false);
   const [activeExecutionId, setActiveExecutionId] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [messageTools, setMessageTools] = useState<Record<string, string[]>>({});
 
   // Calculate default schema from user email + project name once available
   const userDefaultSchema = useMemo(() => toSchemaName(user, project?.name ?? null), [user, project?.name]);
@@ -120,10 +414,22 @@ export default function ProjectPage() {
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const clusterDropdownRef = useRef<HTMLDivElement>(null);
-  const warehouseDropdownRef = useRef<HTMLDivElement>(null);
-  const reconnectAttemptedRef = useRef<string | null>(null); // Track which conversation we've checked
+  const reconnectAttemptedRef = useRef<string | null>(null);
+  const currentConvIdRef = useRef<string | undefined>(undefined);
+  // Per-conversation streaming data (supports concurrent streams)
+  const allStreamsRef = useRef<Record<string, {
+    fullText: string;
+    activityItems: ActivityItem[];
+    todos: TodoItem[];
+    tools: string[];
+    executionId: string | null;
+    abortController: AbortController | null;
+    isReconnecting: boolean;
+    pendingMessages: Message[]; // messages not yet saved to DB (user msg + partial assistant)
+  }>>({});
+
+  // Keep currentConvIdRef in sync with state
+  useEffect(() => { currentConvIdRef.current = currentConversation?.id; }, [currentConversation?.id]);
 
   // Load project and conversations
   useEffect(() => {
@@ -194,7 +500,7 @@ export default function ProjectPage() {
 
   // Check for active execution when conversation loads and reconnect if needed
   useEffect(() => {
-    if (!projectId || !currentConversation?.id || isLoading || isStreaming) return;
+    if (!projectId || !currentConversation?.id || isLoading || allStreamsRef.current[currentConversation.id]) return;
 
     // Skip if we've already checked this conversation
     if (reconnectAttemptedRef.current === currentConversation.id) return;
@@ -206,26 +512,38 @@ export default function ProjectPage() {
 
         if (active && active.status === 'running') {
           console.log('[RECONNECT] Found active execution:', active.id);
+          const reconConvId = currentConversation.id;
+          const controller = new AbortController();
+          allStreamsRef.current[reconConvId] = {
+            fullText: '',
+            activityItems: [],
+            todos: [],
+            tools: [],
+            executionId: active.id,
+            abortController: controller,
+            isReconnecting: true,
+            pendingMessages: [],
+          };
+          setStreamingConvIds(prev => [...prev, reconConvId]);
           setIsReconnecting(true);
-          setIsStreaming(true);
           setActiveExecutionId(active.id);
-
-          // Create abort controller for reconnection
-          abortControllerRef.current = new AbortController();
 
           let fullText = '';
 
           await reconnectToExecution({
             executionId: active.id,
             storedEvents: active.events,
-            signal: abortControllerRef.current.signal,
+            signal: controller.signal,
             onEvent: (event) => {
               const type = event.type as string;
+              const stream = allStreamsRef.current[reconConvId];
+              const isForeground = currentConvIdRef.current === reconConvId;
 
               if (type === 'text_delta') {
                 const text = event.text as string;
                 fullText += text;
-                setStreamingText(fullText);
+                if (stream) stream.fullText = fullText;
+                if (isForeground) setStreamingText(fullText);
               } else if (type === 'text') {
                 const text = event.text as string;
                 if (text) {
@@ -233,35 +551,38 @@ export default function ProjectPage() {
                     fullText += '\n\n';
                   }
                   fullText += text;
-                  setStreamingText(fullText);
+                  if (stream) stream.fullText = fullText;
+                  if (isForeground) setStreamingText(fullText);
                 }
               } else if (type === 'tool_use') {
-                setActivityItems((prev) => [
-                  ...prev,
-                  {
-                    id: event.tool_id as string,
-                    type: 'tool_use',
-                    content: '',
-                    toolName: event.tool_name as string,
-                    toolInput: event.tool_input as Record<string, unknown>,
-                    timestamp: Date.now(),
-                  },
-                ]);
+                const newItem: ActivityItem = {
+                  id: event.tool_id as string,
+                  type: 'tool_use',
+                  content: '',
+                  toolName: event.tool_name as string,
+                  toolInput: event.tool_input as Record<string, unknown>,
+                  timestamp: Date.now(),
+                };
+                if (stream) {
+                  stream.activityItems = [...stream.activityItems, newItem];
+                  stream.tools = [...stream.tools, event.tool_name as string];
+                }
+                if (isForeground) setActivityItems(prev => [...prev, newItem]);
               } else if (type === 'tool_result') {
-                setActivityItems((prev) => [
-                  ...prev,
-                  {
-                    id: `result-${event.tool_use_id}`,
-                    type: 'tool_result',
-                    content: typeof event.content === 'string' ? event.content : JSON.stringify(event.content),
-                    isError: event.is_error as boolean,
-                    timestamp: Date.now(),
-                  },
-                ]);
+                const newItem: ActivityItem = {
+                  id: `result-${event.tool_use_id}`,
+                  type: 'tool_result',
+                  content: typeof event.content === 'string' ? event.content : JSON.stringify(event.content),
+                  isError: event.is_error as boolean,
+                  timestamp: Date.now(),
+                };
+                if (stream) stream.activityItems = [...stream.activityItems, newItem];
+                if (isForeground) setActivityItems(prev => [...prev, newItem]);
               } else if (type === 'todos') {
                 const todoItems = event.todos as TodoItem[];
                 if (todoItems) {
-                  setTodos(todoItems);
+                  if (stream) stream.todos = todoItems;
+                  if (isForeground) setTodos(todoItems);
                 }
               } else if (type === 'error') {
                 toast.error(event.error as string, { duration: 8000 });
@@ -272,16 +593,20 @@ export default function ProjectPage() {
               toast.error('Failed to reconnect to execution');
             },
             onDone: async () => {
-              // Reload conversation to get the final messages from DB
-              const conv = await fetchConversation(projectId, currentConversation.id);
-              setCurrentConversation(conv);
-              setMessages(conv.messages || []);
-              setStreamingText('');
-              setIsStreaming(false);
-              setIsReconnecting(false);
-              setActiveExecutionId(null);
-              setActivityItems([]);
-              setTodos([]);
+              delete allStreamsRef.current[reconConvId];
+              setStreamingConvIds(prev => prev.filter(id => id !== reconConvId));
+
+              const conv = await fetchConversation(projectId, reconConvId);
+              if (currentConvIdRef.current === reconConvId) {
+                setCurrentConversation(conv);
+                setMessages(conv.messages || []);
+                setStreamingText('');
+                setIsReconnecting(false);
+                setActiveExecutionId(null);
+                setActivityItems([]);
+                setTodos([]);
+              }
+              fetchConversations(projectId).then(setConversations);
             },
           });
         }
@@ -298,20 +623,6 @@ export default function ProjectPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText, activityItems]);
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (clusterDropdownRef.current && !clusterDropdownRef.current.contains(event.target as Node)) {
-        setClusterDropdownOpen(false);
-      }
-      if (warehouseDropdownRef.current && !warehouseDropdownRef.current.contains(event.target as Node)) {
-        setWarehouseDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Set default schema from user email once when first available
   const schemaDefaultApplied = useRef(false);
@@ -336,14 +647,37 @@ export default function ProjectPage() {
   const handleSelectConversation = async (conversationId: string) => {
     if (!projectId || currentConversation?.id === conversationId) return;
 
+    // Update ref immediately so stream callbacks target the right conversation
+    currentConvIdRef.current = conversationId;
     // Reset reconnect tracking for the new conversation
     reconnectAttemptedRef.current = null;
 
     try {
       const conv = await fetchConversation(projectId, conversationId);
       setCurrentConversation(conv);
-      setMessages(conv.messages || []);
-      setActivityItems([]);
+
+      // Sync streaming UI state for the new conversation
+      const stream = allStreamsRef.current[conversationId];
+      if (stream) {
+        // Merge API messages with pending messages not yet saved to DB
+        const apiMessages = conv.messages || [];
+        const pending = stream.pendingMessages || [];
+        const apiIds = new Set(apiMessages.map(m => m.content + m.role));
+        const missingPending = pending.filter(m => !apiIds.has(m.content + m.role));
+        setMessages([...missingPending, ...apiMessages]);
+        setStreamingText(stream.fullText);
+        setActivityItems([...stream.activityItems]);
+        setTodos([...stream.todos]);
+        setActiveExecutionId(stream.executionId);
+        setIsReconnecting(stream.isReconnecting);
+      } else {
+        setMessages(conv.messages || []);
+        setStreamingText('');
+        setActivityItems([]);
+        setTodos([]);
+        setActiveExecutionId(null);
+        setIsReconnecting(false);
+      }
       // Restore cluster selection from conversation, or default to first cluster
       setSelectedClusterId(conv.cluster_id || (clusters.length > 0 ? clusters[0].cluster_id : undefined));
       // Restore warehouse selection from conversation, or default to first warehouse
@@ -366,10 +700,16 @@ export default function ProjectPage() {
 
     try {
       const conv = await createConversation(projectId);
+      currentConvIdRef.current = conv.id; // Update ref immediately
       setConversations((prev) => [conv, ...prev]);
       setCurrentConversation(conv);
       setMessages([]);
+      // Clear streaming UI (new conv isn't streaming yet)
+      setStreamingText('');
       setActivityItems([]);
+      setTodos([]);
+      setActiveExecutionId(null);
+      setIsReconnecting(false);
       inputRef.current?.focus();
     } catch (error) {
       console.error('Failed to create conversation:', error);
@@ -385,6 +725,14 @@ export default function ProjectPage() {
       await deleteConversation(projectId, conversationId);
       setConversations((prev) => prev.filter((c) => c.id !== conversationId));
 
+      // Clean up any active stream for this conversation
+      const stream = allStreamsRef.current[conversationId];
+      if (stream) {
+        stream.abortController?.abort();
+        delete allStreamsRef.current[conversationId];
+        setStreamingConvIds(prev => prev.filter(id => id !== conversationId));
+      }
+
       if (currentConversation?.id === conversationId) {
         const remaining = conversations.filter((c) => c.id !== conversationId);
         if (remaining.length > 0) {
@@ -395,7 +743,10 @@ export default function ProjectPage() {
           setCurrentConversation(null);
           setMessages([]);
         }
+        setStreamingText('');
         setActivityItems([]);
+        setTodos([]);
+        setActiveExecutionId(null);
       }
       toast.success('Conversation deleted');
     } catch (error) {
@@ -406,11 +757,13 @@ export default function ProjectPage() {
 
   // Send message
   const handleSendMessage = useCallback(async () => {
-    if (!projectId || !input.trim() || isStreaming) return;
+    if (!projectId || !input.trim()) return;
+    const convId = currentConversation?.id;
+    // Block only if THIS conversation is already streaming
+    if (convId && allStreamsRef.current[convId]) return;
 
     const userMessage = input.trim();
     setInput('');
-    setIsStreaming(true);
     setStreamingText('');
     setActivityItems([]);
     setTodos([]);
@@ -418,7 +771,7 @@ export default function ProjectPage() {
     // Add user message to UI immediately
     const tempUserMessage: Message = {
       id: `temp-${Date.now()}`,
-      conversation_id: currentConversation?.id || '',
+      conversation_id: convId || '',
       role: 'user',
       content: userMessage,
       timestamp: new Date().toISOString(),
@@ -426,11 +779,24 @@ export default function ProjectPage() {
     };
     setMessages((prev) => [...prev, tempUserMessage]);
 
-    // Create abort controller
-    abortControllerRef.current = new AbortController();
+    // Create abort controller and initialize stream tracking
+    const abortController = new AbortController();
+    const effectiveConvId = convId || '';
+    let streamKey = effectiveConvId;
+    allStreamsRef.current[streamKey] = {
+      fullText: '',
+      activityItems: [],
+      todos: [],
+      tools: [],
+      executionId: null,
+      abortController,
+      isReconnecting: false,
+      pendingMessages: [tempUserMessage],
+    };
+    setStreamingConvIds(prev => [...prev, effectiveConvId]);
 
     try {
-      let conversationId = currentConversation?.id;
+      let conversationId = convId;
       let fullText = '';
 
       await invokeAgent({
@@ -443,42 +809,61 @@ export default function ProjectPage() {
         warehouseId: selectedWarehouseId,
         workspaceFolder,
         mlflowExperimentName: mlflowExperimentName || null,
-        signal: abortControllerRef.current.signal,
-        onExecutionId: (executionId) => setActiveExecutionId(executionId),
+        signal: abortController.signal,
+        onExecutionId: (executionId) => {
+          const stream = allStreamsRef.current[streamKey];
+          if (stream) stream.executionId = executionId;
+          if (currentConvIdRef.current === streamKey) setActiveExecutionId(executionId);
+        },
         onEvent: (event) => {
           const type = event.type as string;
+          const stream = allStreamsRef.current[streamKey];
+          const isForeground = currentConvIdRef.current === streamKey;
 
           if (type === 'conversation.created') {
-            conversationId = event.conversation_id as string;
+            const newConvId = event.conversation_id as string;
+            // Move stream entry from old key to new key
+            const oldStream = allStreamsRef.current[streamKey];
+            delete allStreamsRef.current[streamKey];
+            const oldKey = streamKey;
+            streamKey = newConvId;
+            allStreamsRef.current[newConvId] = oldStream || {
+              fullText: '', activityItems: [], todos: [], tools: [],
+              executionId: null, abortController, isReconnecting: false,
+              pendingMessages: [],
+            };
+            conversationId = newConvId;
+            // Update streamingConvIds from old key to new key
+            setStreamingConvIds(prev => prev.filter(id => id !== oldKey).concat(newConvId));
+            // Set currentConversation immediately so UI stays consistent
+            setCurrentConversation((prev) => prev ?? {
+              id: newConvId,
+              project_id: projectId,
+              title: 'New Chat',
+              created_at: new Date().toISOString(),
+              conversation_count: 0,
+            } as unknown as Conversation);
+            currentConvIdRef.current = newConvId;
             fetchConversations(projectId).then(setConversations);
           } else if (type === 'text_delta') {
-            // Token-by-token streaming - accumulate and display for live updates
             const text = event.text as string;
             fullText += text;
-            console.log('[STREAM] text_delta received, fullText length:', fullText.length);
-            setStreamingText(fullText);
+            if (stream) stream.fullText = fullText;
+            if (isForeground) setStreamingText(fullText);
           } else if (type === 'text') {
-            // Complete text block from AssistantMessage - the authoritative final content
-            // This event contains the COMPLETE text for this response segment
-            // We always use it to ensure final responses after tool execution are captured
             const text = event.text as string;
-            console.log('[STREAM] text event received, text length:', text?.length, 'current fullText length:', fullText.length);
             if (text) {
-              // Append to fullText (there may be multiple text blocks in a conversation)
-              // Add separator if needed
               if (fullText && !fullText.endsWith('\n') && !text.startsWith('\n')) {
                 fullText += '\n\n';
               }
               fullText += text;
-              console.log('[STREAM] fullText updated, new length:', fullText.length);
-              setStreamingText(fullText);
+              if (stream) stream.fullText = fullText;
+              if (isForeground) setStreamingText(fullText);
             }
           } else if (type === 'thinking' || type === 'thinking_delta') {
-            // Handle both complete thinking blocks and streaming thinking deltas
             const thinking = (event.thinking as string) || '';
             if (thinking) {
-              setActivityItems((prev) => {
-                // For deltas, append to the last thinking item if it exists
+              const updateThinking = (prev: ActivityItem[]) => {
                 if (type === 'thinking_delta' && prev.length > 0 && prev[prev.length - 1].type === 'thinking') {
                   const updated = [...prev];
                   updated[updated.length - 1] = {
@@ -487,159 +872,186 @@ export default function ProjectPage() {
                   };
                   return updated;
                 }
-                // For complete blocks or first delta, add new item
                 return [
                   ...prev,
                   {
                     id: `thinking-${Date.now()}`,
-                    type: 'thinking',
+                    type: 'thinking' as const,
                     content: thinking,
                     timestamp: Date.now(),
                   },
                 ];
-              });
+              };
+              if (stream) stream.activityItems = updateThinking(stream.activityItems);
+              if (isForeground) setActivityItems(updateThinking);
             }
           } else if (type === 'tool_use') {
-            setActivityItems((prev) => [
-              ...prev,
-              {
-                id: event.tool_id as string,
-                type: 'tool_use',
-                content: '',
-                toolName: event.tool_name as string,
-                toolInput: event.tool_input as Record<string, unknown>,
-                timestamp: Date.now(),
-              },
-            ]);
+            const toolName = event.tool_name as string;
+            const newItem: ActivityItem = {
+              id: event.tool_id as string,
+              type: 'tool_use',
+              content: '',
+              toolName,
+              toolInput: event.tool_input as Record<string, unknown>,
+              timestamp: Date.now(),
+            };
+            if (stream) {
+              stream.tools = [...stream.tools, toolName];
+              stream.activityItems = [...stream.activityItems, newItem];
+            }
+            if (isForeground) setActivityItems(prev => [...prev, newItem]);
           } else if (type === 'tool_result') {
             let content = event.content as string;
 
-            // Parse and improve error messages
             if (event.is_error && typeof content === 'string') {
-              // Extract error from XML-style tags like <tool_use_error>...</tool_use_error>
               const errorMatch = content.match(/<tool_use_error>(.*?)<\/tool_use_error>/s);
               if (errorMatch) {
                 content = errorMatch[1].trim();
               }
-
-              // Improve generic "Stream closed" errors
               if (content === 'Stream closed' || content.includes('Stream closed')) {
                 content = 'Tool execution interrupted: The operation took too long or the connection was lost. This may happen when operations exceed the 50-second timeout window. Check backend logs for details.';
               }
             }
 
-            setActivityItems((prev) => [
-              ...prev,
-              {
-                id: `result-${event.tool_use_id}`,
-                type: 'tool_result',
-                content: typeof content === 'string' ? content : JSON.stringify(content),
-                isError: event.is_error as boolean,
-                timestamp: Date.now(),
-              },
-            ]);
+            const newItem: ActivityItem = {
+              id: `result-${event.tool_use_id}`,
+              type: 'tool_result',
+              content: typeof content === 'string' ? content : JSON.stringify(content),
+              isError: event.is_error as boolean,
+              timestamp: Date.now(),
+            };
+            if (stream) stream.activityItems = [...stream.activityItems, newItem];
+            if (isForeground) setActivityItems(prev => [...prev, newItem]);
           } else if (type === 'error') {
             let errorMsg = event.error as string;
-
-            // Improve generic error messages
             if (errorMsg === 'Stream closed' || errorMsg.includes('Stream closed')) {
               errorMsg = 'Execution interrupted: The operation took too long or the connection was lost. Operations exceeding 50 seconds may be interrupted. Check backend logs for details.';
             }
-
-            toast.error(errorMsg, {
-              duration: 8000,
-            });
+            toast.error(errorMsg, { duration: 8000 });
           } else if (type === 'cancelled') {
-            // Agent was cancelled by user - show a toast notification
             toast.info('Generation stopped');
           } else if (type === 'todos') {
-            // Update todo list from agent
             const todoItems = event.todos as TodoItem[];
             if (todoItems) {
-              setTodos(todoItems);
+              if (stream) stream.todos = todoItems;
+              if (isForeground) setTodos(todoItems);
             }
           }
         },
         onError: (error) => {
           console.error('Stream error:', error);
-          // Show the actual error message instead of generic text
           const errorMessage = error.message || 'Failed to get response';
-          toast.error(errorMessage, {
-            duration: 8000, // Show error for 8 seconds
-          });
+          toast.error(errorMessage, { duration: 8000 });
         },
         onDone: async () => {
+          const finalStreamKey = streamKey;
+          const stream = allStreamsRef.current[finalStreamKey];
+          const tools = stream?.tools || [];
+
           if (fullText) {
+            const msgId = `msg-${Date.now()}`;
             const assistantMessage: Message = {
-              id: `msg-${Date.now()}`,
+              id: msgId,
               conversation_id: conversationId || '',
               role: 'assistant',
               content: fullText,
               timestamp: new Date().toISOString(),
               is_error: false,
             };
-            setMessages((prev) => [...prev, assistantMessage]);
+            // Only update messages if user is viewing this conversation
+            if (currentConvIdRef.current === finalStreamKey) {
+              setMessages((prev) => [...prev, assistantMessage]);
+            }
+            if (tools.length > 0) {
+              setMessageTools((prev) => ({ ...prev, [msgId]: tools }));
+            }
           }
-          setStreamingText('');
-          setIsStreaming(false);
-          setActiveExecutionId(null);
-          // Clear activity items after response is finalized - only show final answer
-          setActivityItems([]);
-          setTodos([]);
 
-          if (conversationId && !currentConversation?.id) {
+          // Clean up stream
+          delete allStreamsRef.current[finalStreamKey];
+          setStreamingConvIds(prev => prev.filter(id => id !== finalStreamKey));
+
+          if (currentConvIdRef.current === finalStreamKey) {
+            setStreamingText('');
+            setActiveExecutionId(null);
+            setActivityItems([]);
+            setTodos([]);
+          }
+
+          // Fetch full conversation to get updated title and messages
+          if (conversationId) {
             const conv = await fetchConversation(projectId, conversationId);
-            setCurrentConversation(conv);
+            if (currentConvIdRef.current === finalStreamKey) {
+              setCurrentConversation(conv);
+            }
+            fetchConversations(projectId).then(setConversations);
           }
         },
       });
     } catch (error) {
-      // Ignore AbortError — handleStopGeneration handles cleanup for user-initiated stops
       if (error instanceof Error && error.name === 'AbortError') return;
       console.error('Failed to send message:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-      toast.error(errorMessage, {
-        duration: 8000,
-      });
-      setIsStreaming(false);
+      toast.error(errorMessage, { duration: 8000 });
+      // Clean up stream on error
+      delete allStreamsRef.current[streamKey];
+      setStreamingConvIds(prev => prev.filter(id => id !== streamKey));
+      if (currentConvIdRef.current === streamKey) {
+        setStreamingText('');
+        setActiveExecutionId(null);
+        setActivityItems([]);
+        setTodos([]);
+      }
     }
-  }, [projectId, input, isStreaming, currentConversation?.id, selectedClusterId, defaultCatalog, defaultSchema, selectedWarehouseId, workspaceFolder, mlflowExperimentName]);
+  }, [projectId, input, currentConversation?.id, selectedClusterId, defaultCatalog, defaultSchema, selectedWarehouseId, workspaceFolder, mlflowExperimentName]);
 
   // Stop generation - abort client stream AND tell backend to cancel
   const handleStopGeneration = useCallback(async () => {
-    abortControllerRef.current?.abort();
+    const targetId = currentConversation?.id;
+    if (!targetId) return;
+
+    const stream = allStreamsRef.current[targetId];
+    if (!stream) return;
+
+    // Abort the fetch
+    stream.abortController?.abort();
 
     // Tell the backend to cancel the agent execution
-    if (activeExecutionId) {
+    if (stream.executionId) {
       try {
-        await stopExecution(activeExecutionId);
+        await stopExecution(stream.executionId);
       } catch (error) {
         console.error('Failed to stop execution on backend:', error);
       }
     }
 
-    // Finalize UI: keep user message and save whatever partial response we have
-    setStreamingText((currentText) => {
-      if (currentText) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `msg-stopped-${Date.now()}`,
-            conversation_id: '',
-            role: 'assistant' as const,
-            content: currentText,
-            timestamp: new Date().toISOString(),
-            is_error: false,
-          },
-        ]);
+    // Save partial response
+    if (stream.fullText) {
+      const msgId = `msg-stopped-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: msgId,
+          conversation_id: targetId,
+          role: 'assistant' as const,
+          content: stream.fullText,
+          timestamp: new Date().toISOString(),
+          is_error: false,
+        },
+      ]);
+      if (stream.tools.length > 0) {
+        setMessageTools((prev) => ({ ...prev, [msgId]: stream.tools }));
       }
-      return '';
-    });
-    setIsStreaming(false);
+    }
+
+    // Clean up stream
+    delete allStreamsRef.current[targetId];
+    setStreamingConvIds(prev => prev.filter(id => id !== targetId));
+    setStreamingText('');
     setActiveExecutionId(null);
     setActivityItems([]);
     setTodos([]);
-  }, [activeExecutionId]);
+  }, [currentConversation?.id]);
 
   // Handle keyboard submit
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -653,6 +1065,113 @@ export default function ProjectPage() {
   const handleViewSkills = () => {
     setSkillsExplorerOpen(true);
   };
+
+  // Config panel state
+  const [configPanelOpen, setConfigPanelOpen] = useState(false);
+  const configPanelRef = useRef<HTMLDivElement>(null);
+
+  // Close config panel on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (configPanelRef.current && !configPanelRef.current.contains(event.target as Node)) {
+        setConfigPanelOpen(false);
+      }
+    };
+    if (configPanelOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [configPanelOpen]);
+
+  // Auto-resize textarea
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  };
+
+  // Markdown components shared between messages and streaming
+  const markdownComponents = useMemo(() => ({
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[var(--color-accent-primary)] underline decoration-[var(--color-accent-primary)]/30 hover:decoration-[var(--color-accent-primary)] hover:text-[var(--color-accent-secondary)] transition-colors"
+      >
+        {children}
+      </a>
+    ),
+    pre: ({ children }: { children?: React.ReactNode }) => {
+      // Extract text content from children for copy button
+      const getTextContent = (node: React.ReactNode): string => {
+        if (typeof node === 'string') return node;
+        if (!node) return '';
+        if (Array.isArray(node)) return node.map(getTextContent).join('');
+        if (typeof node === 'object' && 'props' in (node as React.ReactElement)) {
+          return getTextContent((node as React.ReactElement).props.children);
+        }
+        return '';
+      };
+      const text = getTextContent(children);
+      return (
+        <div className="relative group/code my-3">
+          <pre className="!bg-[var(--color-bg-tertiary)] !rounded-lg !border !border-[var(--color-border)]/50 !p-4 overflow-x-auto">
+            {children}
+          </pre>
+          <CopyButton text={text} />
+        </div>
+      );
+    },
+    code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+      // Inline code (no language class)
+      if (!className) {
+        return (
+          <code className="px-1.5 py-0.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]/30 text-[0.875em] font-mono">
+            {children}
+          </code>
+        );
+      }
+      // Block code inside pre
+      return <code className={cn(className, 'font-mono text-[12px]')}>{children}</code>;
+    },
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <div className="my-3 overflow-x-auto rounded-lg border border-[var(--color-border)]/50">
+        <table className="w-full text-sm">{children}</table>
+      </div>
+    ),
+    th: ({ children }: { children?: React.ReactNode }) => (
+      <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--color-text-heading)] bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]/50">
+        {children}
+      </th>
+    ),
+    td: ({ children }: { children?: React.ReactNode }) => (
+      <td className="px-3 py-2 text-sm border-b border-[var(--color-border)]/30">
+        {children}
+      </td>
+    ),
+  }), []);
+
+  // Config summary for header chips
+  const configChips = useMemo(() => {
+    const chips: { label: string; color: string }[] = [];
+    if (defaultCatalog && defaultSchema) {
+      chips.push({ label: `${defaultCatalog}.${defaultSchema}`, color: 'text-[var(--color-accent-primary)]' });
+    }
+    const cluster = clusters.find(c => c.cluster_id === selectedClusterId);
+    if (cluster) {
+      chips.push({ label: cluster.cluster_name || 'Cluster', color: cluster.state === 'RUNNING' ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]' });
+    }
+    const warehouse = warehouses.find(w => w.warehouse_id === selectedWarehouseId);
+    if (warehouse) {
+      chips.push({ label: warehouse.warehouse_name || 'Warehouse', color: warehouse.state === 'RUNNING' ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]' });
+    }
+    return chips;
+  }, [defaultCatalog, defaultSchema, clusters, selectedClusterId, warehouses, selectedWarehouseId]);
+
+  // Only show streaming UI if viewing a conversation that is actively streaming
+  const isStreamingHere = streamingConvIds.includes(currentConversation?.id || '');
 
   if (isLoading) {
     return (
@@ -679,312 +1198,167 @@ export default function ProjectPage() {
   return (
     <MainLayout projectName={project?.name} sidebar={sidebar}>
       <div className="flex flex-1 flex-col h-full">
-        {/* Chat Header - always show configuration controls */}
-        <div className="flex h-14 items-center justify-between border-b border-[var(--color-border)] px-6 bg-[var(--color-bg-secondary)]/50">
-          <h2 className="font-medium text-[var(--color-text-heading)] truncate max-w-[150px] flex-shrink-0">
-            {currentConversation?.title || 'New Chat'}
-          </h2>
-          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-              {/* Catalog.Schema Input */}
-              <div className="flex items-center h-8 w-[200px] flex-shrink-0 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] focus-within:ring-2 focus-within:ring-[var(--color-accent-primary)]/50">
-                <div className="flex items-center justify-center w-8 h-full border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 rounded-l-md flex-shrink-0">
-                  <svg className="w-4 h-4 text-[var(--color-text-muted)]" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="currentColor" fillRule="evenodd" d="M8.646.368a.75.75 0 0 0-1.292 0l-3.25 5.5A.75.75 0 0 0 4.75 7h6.5a.75.75 0 0 0 .646-1.132zM8 2.224 9.936 5.5H6.064zM8.5 9.25a.75.75 0 0 1 .75-.75h5a.75.75 0 0 1 .75.75v5a.75.75 0 0 1-.75.75h-5a.75.75 0 0 1-.75-.75zM10 10v3.5h3.5V10zM1 11.75a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0M4.25 10a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={defaultCatalog}
-                  onChange={(e) => setDefaultCatalog(e.target.value)}
-                  placeholder="catalog"
-                  className="h-full w-[70px] flex-shrink-0 px-2 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none overflow-hidden text-ellipsis"
-                  title={defaultCatalog || 'Default catalog'}
-                />
-                <span className="text-[var(--color-text-muted)] text-xs flex-shrink-0">.</span>
-                <input
-                  type="text"
-                  value={defaultSchema}
-                  onChange={(e) => setDefaultSchema(e.target.value)}
-                  placeholder="schema"
-                  className="h-full w-[90px] flex-shrink-0 px-2 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none overflow-hidden text-ellipsis"
-                  title={defaultSchema || 'Default schema'}
-                />
-              </div>
-              {/* Open Catalog Button */}
-              {workspaceUrl && defaultCatalog && defaultSchema && (
-                <a
-                  href={`${workspaceUrl}/explore/data/${defaultCatalog}/${defaultSchema}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center h-8 w-8 flex-shrink-0 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/50 transition-colors"
-                  title="Open in Catalog Explorer"
+        {/* Chat Header */}
+        <div className="flex h-14 items-center justify-between border-b border-[var(--color-border)]/60 px-6 bg-[var(--color-bg-secondary)]/20">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--color-accent-primary)]/10 to-[var(--color-accent-secondary)]/10 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-[var(--color-accent-primary)]" />
+            </div>
+            <h2 className="font-semibold text-[15px] text-[var(--color-text-heading)] truncate">
+              {currentConversation?.title || 'New Chat'}
+            </h2>
+          </div>
+          <div className="flex items-center gap-2.5">
+            {/* Config summary chips */}
+            <div className="hidden md:flex items-center gap-1.5">
+              {configChips.map((chip, i) => (
+                <span
+                  key={i}
+                  className={cn('text-[11px] font-medium px-2.5 py-1 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/40 truncate max-w-[160px]', chip.color)}
                 >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              )}
-              {/* Cluster Dropdown */}
-              {clusters.length > 0 && (
-              <div className="relative" ref={clusterDropdownRef}>
-                <button
-                  onClick={() => setClusterDropdownOpen(!clusterDropdownOpen)}
-                  className="flex items-center h-8 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]/30 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/50 transition-colors"
-                  title="Cluster for code execution"
-                >
-                  <div className="flex items-center justify-center w-8 h-full border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 rounded-l-md">
-                    <svg className="w-4 h-4 text-[var(--color-text-muted)]" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path fill="currentColor" fillRule="evenodd" d="M3.394 5.586a4.752 4.752 0 0 1 9.351.946 3.75 3.75 0 0 1-.668 7.464L12 14H4a.8.8 0 0 1-.179-.021 4.25 4.25 0 0 1-.427-8.393m.72 6.914h7.762a.8.8 0 0 1 .186-.008q.092.008.188.008a2.25 2.25 0 0 0 0-4.5H12a.75.75 0 0 1-.75-.75v-.5a3.25 3.25 0 0 0-6.475-.402.75.75 0 0 1-.698.657 2.75 2.75 0 0 0-.024 5.488z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="flex items-center gap-2 px-2">
-                    {(() => {
-                      const selected = clusters.find(c => c.cluster_id === selectedClusterId);
-                      return selected ? (
-                        <>
-                          <span className={cn(
-                            'w-2 h-2 rounded-full',
-                            selected.state === 'RUNNING' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'
-                          )} />
-                          <span className="max-w-[100px] truncate">{selected.cluster_name}</span>
-                        </>
-                      ) : (
-                        <span className="text-[var(--color-text-muted)]">Cluster...</span>
-                      );
-                    })()}
-                    <ChevronDown className={cn('w-3 h-3 transition-transform', clusterDropdownOpen && 'rotate-180')} />
-                  </div>
-                </button>
-                {clusterDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-72 max-h-64 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-background)] shadow-lg z-50">
-                    {clusters.map((cluster) => (
-                      <button
-                        key={cluster.cluster_id}
-                        onClick={() => {
-                          setSelectedClusterId(cluster.cluster_id);
-                          setClusterDropdownOpen(false);
-                        }}
-                        className={cn(
-                          'w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-[var(--color-bg-secondary)] transition-colors',
-                          selectedClusterId === cluster.cluster_id && 'bg-[var(--color-bg-secondary)]'
-                        )}
-                      >
-                        <span className={cn(
-                          'w-2 h-2 rounded-full flex-shrink-0',
-                          cluster.state === 'RUNNING' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'
-                        )} />
-                        <span className="truncate text-[var(--color-text-primary)]">{cluster.cluster_name}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {chip.label}
+                </span>
+              ))}
+            </div>
+            {/* Settings button */}
+            <div className="relative" ref={configPanelRef}>
+              <button
+                onClick={() => setConfigPanelOpen(!configPanelOpen)}
+                className={cn(
+                  'flex items-center justify-center h-9 w-9 rounded-lg transition-all',
+                  configPanelOpen
+                    ? 'bg-[var(--color-accent-primary)]/10 text-[var(--color-accent-primary)] ring-2 ring-[var(--color-accent-primary)]/20'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]'
                 )}
-              </div>
-              )}
-              {/* Warehouse Dropdown */}
-              {warehouses.length > 0 && (
-              <div className="relative" ref={warehouseDropdownRef}>
-                <button
-                  onClick={() => setWarehouseDropdownOpen(!warehouseDropdownOpen)}
-                  className="flex items-center h-8 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]/30 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/50 transition-colors"
-                  title="SQL Warehouse for queries"
-                >
-                  <div className="flex items-center justify-center w-8 h-full border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 rounded-l-md">
-                    <svg className="w-4 h-4 text-[var(--color-text-muted)]" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M13 13.75C13 14.5784 11.6569 15.25 10 15.25C8.34315 15.25 7 14.5784 7 13.75" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M3.39373 5.58639C3.91293 3.52534 5.77786 2 8 2C10.5504 2 12.6314 4.01005 12.7451 6.5324C14.1591 6.7189 15.3247 7.69323 15.7866 9H14.1211C13.7175 8.39701 13.0301 8 12.25 8H12C11.5858 8 11.25 7.66421 11.25 7.25V6.75C11.25 4.95507 9.79493 3.5 8 3.5C6.34131 3.5 4.97186 4.74324 4.7745 6.34833C4.73041 6.70685 4.43704 6.98301 4.07651 7.00536C2.63892 7.09448 1.5 8.28952 1.5 9.75C1.5 11.1845 2.59873 12.3629 4 12.4888V14C3.93845 14 3.87864 13.9926 3.8214 13.9786C1.67511 13.7633 0 11.9526 0 9.75C0 7.69604 1.45669 5.98279 3.39373 5.58639Z" fill="currentColor" />
-                      <path d="M7 11.5V13.7769" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M13 11.5V13.7769" stroke="currentColor" strokeWidth="1.5" />
-                      <ellipse cx="10" cy="11.5" rx="3" ry="1.5" stroke="currentColor" strokeWidth="1.5" />
-                    </svg>
-                  </div>
-                  <div className="flex items-center gap-2 px-2">
-                    {(() => {
-                      const selected = warehouses.find(w => w.warehouse_id === selectedWarehouseId);
-                      return selected ? (
-                        <>
-                          <span className={cn(
-                            'w-2 h-2 rounded-full',
-                            selected.state === 'RUNNING' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'
-                          )} />
-                          <span className="max-w-[100px] truncate">{selected.warehouse_name}</span>
-                        </>
-                      ) : (
-                        <span className="text-[var(--color-text-muted)]">Warehouse...</span>
-                      );
-                    })()}
-                    <ChevronDown className={cn('w-3 h-3 transition-transform', warehouseDropdownOpen && 'rotate-180')} />
-                  </div>
-                </button>
-                {warehouseDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-72 max-h-64 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-background)] shadow-lg z-50">
-                    {warehouses.map((warehouse) => (
-                      <button
-                        key={warehouse.warehouse_id}
-                        onClick={() => {
-                          setSelectedWarehouseId(warehouse.warehouse_id);
-                          setWarehouseDropdownOpen(false);
-                        }}
-                        className={cn(
-                          'w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-[var(--color-bg-secondary)] transition-colors',
-                          selectedWarehouseId === warehouse.warehouse_id && 'bg-[var(--color-bg-secondary)]'
-                        )}
-                      >
-                        <span className={cn(
-                          'w-2 h-2 rounded-full flex-shrink-0',
-                          warehouse.state === 'RUNNING' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'
-                        )} />
-                        <span className="truncate text-[var(--color-text-primary)]">{warehouse.warehouse_name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              )}
-              {/* Workspace Folder Input */}
-              <div className="flex items-center h-8 w-[280px] flex-shrink-0 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] focus-within:ring-2 focus-within:ring-[var(--color-accent-primary)]/50">
-                <div className="flex items-center justify-center w-8 h-full border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 rounded-l-md flex-shrink-0">
-                  <svg className="w-4 h-4 text-[var(--color-text-muted)]" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="currentColor" fillRule="evenodd" d="M3 1.75A.75.75 0 0 1 3.75 1h10.5a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75H3.75a.75.75 0 0 1-.75-.75V12.5H1V11h2V8.75H1v-1.5h2V5H1V3.5h2zm1.5.75v11H6v-11zm3 0v11h6v-11z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={workspaceFolder}
-                  onChange={(e) => setWorkspaceFolder(e.target.value)}
-                  placeholder="/Workspace/Users/..."
-                  className="h-full w-[240px] flex-shrink-0 px-2 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none overflow-hidden text-ellipsis"
-                  title={workspaceFolder || 'Workspace working folder for uploading files and pipelines'}
-                />
-              </div>
-              {/* MLflow Experiment Input */}
-              <div className="flex items-center h-8 w-[280px] flex-shrink-0 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] focus-within:ring-2 focus-within:ring-[var(--color-accent-primary)]/50">
-                <div className="flex items-center justify-center w-8 h-full border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 rounded-l-md flex-shrink-0">
-                  <svg className="w-4 h-4 text-[var(--color-text-muted)]" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="currentColor" d="M8 1a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5A.75.75 0 0 1 8 1M3.343 3.343a.75.75 0 0 1 1.061 0l1.768 1.768a.75.75 0 1 1-1.061 1.06L3.343 4.404a.75.75 0 0 1 0-1.06M1 8a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5A.75.75 0 0 1 1 8m2.343 4.657a.75.75 0 0 1 0-1.06l1.768-1.768a.75.75 0 1 1 1.06 1.06l-1.767 1.768a.75.75 0 0 1-1.061 0M8 11a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5A.75.75 0 0 1 8 11m4.657-2.343a.75.75 0 0 1 0 1.06l-1.768 1.768a.75.75 0 0 1-1.06-1.06l1.767-1.768a.75.75 0 0 1 1.061 0M11 8a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5A.75.75 0 0 1 11 8m.829-4.657a.75.75 0 0 1 0 1.06L10.06 6.172a.75.75 0 1 1-1.06-1.061l1.768-1.768a.75.75 0 0 1 1.06 0" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={mlflowExperimentName}
-                  onChange={(e) => setMlflowExperimentName(e.target.value)}
-                  placeholder="MLflow Experiment ID or Name"
-                  className="h-full w-[240px] flex-shrink-0 px-2 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none overflow-hidden text-ellipsis"
-                  title={mlflowExperimentName || 'MLflow experiment ID (e.g. 2452310130108632) or name (e.g. /Users/you@company.com/traces)'}
-                />
-              </div>
+                title="Configuration"
+              >
+                <Settings2 className="h-4.5 w-4.5" />
+              </button>
+              <ConfigPanel
+                isOpen={configPanelOpen}
+                onClose={() => setConfigPanelOpen(false)}
+                defaultCatalog={defaultCatalog}
+                setDefaultCatalog={setDefaultCatalog}
+                defaultSchema={defaultSchema}
+                setDefaultSchema={setDefaultSchema}
+                clusters={clusters}
+                selectedClusterId={selectedClusterId}
+                setSelectedClusterId={setSelectedClusterId}
+                warehouses={warehouses}
+                selectedWarehouseId={selectedWarehouseId}
+                setSelectedWarehouseId={setSelectedWarehouseId}
+                workspaceFolder={workspaceFolder}
+                setWorkspaceFolder={setWorkspaceFolder}
+                mlflowExperimentName={mlflowExperimentName}
+                setMlflowExperimentName={setMlflowExperimentName}
+                workspaceUrl={workspaceUrl}
+              />
+            </div>
           </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {messages.length === 0 && !streamingText ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center max-w-2xl">
-                <MessageSquare className="mx-auto h-12 w-12 text-[var(--color-text-muted)]/40" />
-                <h3 className="mt-4 text-lg font-medium text-[var(--color-text-heading)]">
+        <div className="flex-1 overflow-y-auto">
+          {messages.length === 0 && !isStreamingHere ? (
+            /* Empty State */
+            <div className="flex h-full items-center justify-center px-6">
+              <div className="text-center max-w-xl w-full">
+                {/* Decorative gradient orb */}
+                <div className="relative inline-flex items-center justify-center w-20 h-20 mb-6">
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[var(--color-accent-primary)]/15 to-[var(--color-accent-secondary)]/10 blur-md" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-accent-primary)]/10 to-[var(--color-accent-secondary)]/5 border border-[var(--color-accent-primary)]/10 flex items-center justify-center">
+                    <Sparkles className="h-8 w-8 text-[var(--color-accent-primary)]" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-[var(--color-text-heading)]">
                   What can I help you build?
                 </h3>
-                <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                  I can help you build data pipelines, generate synthetic data, create dashboards, and more on Databricks.
+                <p className="mt-3 text-sm text-[var(--color-text-muted)] max-w-md mx-auto leading-relaxed">
+                  Build data pipelines, generate synthetic data, create dashboards, and more on Databricks.
                 </p>
 
-                {/* Example prompts */}
-                <div className="mt-6 grid gap-2 text-left">
-                  <button
-                    onClick={() => setInput('Generate synthetic customer data with orders and support tickets')}
-                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
-                  >
-                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Generate synthetic data</span>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Create realistic test datasets with customers, orders, and tickets</p>
-                  </button>
-                  <button
-                    onClick={() => setInput('Create a data pipeline to transform raw data into bronze, silver, and gold layers')}
-                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
-                  >
-                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Build a data pipeline</span>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Create ETL workflows with bronze/silver/gold medallion architecture</p>
-                  </button>
-                  <button
-                    onClick={() => setInput('Create a dashboard to visualize customer metrics and trends')}
-                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
-                  >
-                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Create a dashboard</span>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Build interactive visualizations with AI/BI dashboards</p>
-                  </button>
-                  <button
-                    onClick={() => setInput('What tables and data do I have in my project?')}
-                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 hover:bg-[var(--color-bg-secondary)] text-left transition-colors"
-                  >
-                    <span className="text-sm font-medium text-[var(--color-text-primary)]">Explore my data</span>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">See what tables, volumes, and resources exist in your project</p>
-                  </button>
+                {/* Example prompts - 2x2 grid */}
+                <div className="mt-10 grid grid-cols-2 gap-3 text-left">
+                  {[
+                    { title: 'Generate synthetic data', desc: 'Realistic test datasets with customers, orders, and tickets', prompt: 'Generate synthetic customer data with orders and support tickets' },
+                    { title: 'Build a data pipeline', desc: 'ETL workflows with medallion architecture', prompt: 'Create a data pipeline to transform raw data into bronze, silver, and gold layers' },
+                    { title: 'Create a dashboard', desc: 'Interactive AI/BI visualizations', prompt: 'Create a dashboard to visualize customer metrics and trends' },
+                    { title: 'Explore my data', desc: 'Tables, volumes, and resources in your project', prompt: 'What tables and data do I have in my project?' },
+                  ].map((item) => (
+                    <button
+                      key={item.title}
+                      onClick={() => setInput(item.prompt)}
+                      className="group p-4 rounded-xl border border-[var(--color-border)]/50 bg-[var(--color-background)] hover:border-[var(--color-accent-primary)]/30 hover:shadow-lg hover:shadow-[var(--color-accent-primary)]/5 hover:-translate-y-0.5 text-left transition-all duration-200"
+                    >
+                      <span className="text-sm font-semibold text-[var(--color-text-heading)] group-hover:text-[var(--color-accent-primary)] transition-colors">{item.title}</span>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-1.5 leading-relaxed">{item.desc}</p>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="mx-auto max-w-5xl space-y-4">
+            /* Message Thread */
+            <div className="mx-auto max-w-3xl px-6 py-8 space-y-1">
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'flex',
-                    message.role === 'user' ? 'justify-end' : 'justify-start'
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'max-w-[85%] rounded-lg px-3 py-2 shadow-sm',
-                      message.role === 'user'
-                        ? 'bg-[var(--color-accent-primary)] text-white'
-                        : 'bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50',
-                      message.is_error && 'bg-[var(--color-error)]/10 border-[var(--color-error)]/30'
-                    )}
-                  >
-                    {message.role === 'assistant' ? (
-                      <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            a: ({ href, children }) => (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[var(--color-accent-primary)] underline hover:text-[var(--color-accent-secondary)]"
-                              >
-                                {children}
-                              </a>
-                            ),
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
+                <div key={message.id}>
+                  {message.role === 'assistant' ? (
+                    /* Assistant message - left aligned with Databricks avatar */
+                    <div className="flex items-start gap-3 group/msg mb-4">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-accent-primary)] to-[var(--color-accent-secondary)] flex items-center justify-center shadow-sm shadow-[var(--color-accent-primary)]/20 mt-0.5">
+                        <DatabricksLogo className="h-4 w-4 text-white" />
                       </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap text-[13px]">{message.content}</p>
-                    )}
-                  </div>
+                      <div className={cn('flex-1 min-w-0', message.is_error && 'text-[var(--color-error)]')}>
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[var(--color-text-heading)]">Assistant</span>
+                          {message.timestamp && (
+                            <span className="text-[10px] text-[var(--color-text-muted)]/60 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                              {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[14px] leading-[1.7]">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                        <ToolsUsedBadge tools={messageTools[message.id] || []} />
+                      </div>
+                    </div>
+                  ) : (
+                    /* User message - right aligned like iMessage */
+                    <div className="flex justify-end mb-4 group/msg">
+                      <div className="max-w-[80%]">
+                        <div className="mb-1 flex items-center justify-end gap-2">
+                          {message.timestamp && (
+                            <span className="text-[10px] text-[var(--color-text-muted)]/60 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                              {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="rounded-2xl rounded-br-md bg-[var(--color-accent-primary)] text-white px-4 py-2.5 shadow-sm">
+                          <p className="whitespace-pre-wrap text-[14px] leading-[1.6]">{message.content}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
-              {/* Streaming response - show accumulated text as it arrives */}
-              {isStreaming && streamingText && (
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-lg px-3 py-2 shadow-sm bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50">
-                    <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          a: ({ href, children }) => (
-                            <a
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[var(--color-accent-primary)] underline hover:text-[var(--color-accent-secondary)]"
-                            >
-                              {children}
-                            </a>
-                          ),
-                        }}
-                      >
+              {/* Streaming response */}
+              {isStreamingHere && streamingText && (
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-accent-primary)] to-[var(--color-accent-secondary)] flex items-center justify-center shadow-sm shadow-[var(--color-accent-primary)]/20 mt-0.5">
+                    <DatabricksLogo className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="mb-1">
+                      <span className="text-xs font-semibold text-[var(--color-text-heading)]">
+                        Assistant
+                      </span>
+                    </div>
+                    <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[14px] leading-[1.7]">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                         {streamingText}
                       </ReactMarkdown>
                     </div>
@@ -992,22 +1366,32 @@ export default function ProjectPage() {
                 </div>
               )}
 
-              {/* Activity section (thinking, tools) - shown below streaming text */}
-              {activityItems.length > 0 && (
-                <ActivitySection items={activityItems} isStreaming={isStreaming} />
+              {/* Activity section */}
+              {isStreamingHere && activityItems.length > 0 && (
+                <ActivitySection items={activityItems} isStreaming={isStreamingHere} />
               )}
 
-              {/* Fun loader with progress - shown while streaming before text arrives */}
-              {isStreaming && !streamingText && (
-                <div className="flex justify-start">
-                  {isReconnecting ? (
-                    <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] py-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Reconnecting to agent...</span>
+              {/* Loader */}
+              {isStreamingHere && !streamingText && (
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-accent-primary)] to-[var(--color-accent-secondary)] flex items-center justify-center shadow-sm shadow-[var(--color-accent-primary)]/20 mt-0.5">
+                    <DatabricksLogo className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="mb-1">
+                      <span className="text-xs font-semibold text-[var(--color-text-heading)]">
+                        Assistant
+                      </span>
                     </div>
-                  ) : (
-                    <FunLoader todos={todos} className="py-2" />
-                  )}
+                    {isReconnecting ? (
+                      <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] py-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Reconnecting to agent...</span>
+                      </div>
+                    ) : (
+                      <FunLoader todos={todos} className="py-1" />
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1017,40 +1401,49 @@ export default function ProjectPage() {
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-[var(--color-border)] p-4 bg-[var(--color-bg-secondary)]/30">
-          <div className="mx-auto max-w-5xl">
-            <div className="flex gap-3">
+        <div className="px-6 pb-5 pt-3">
+          <div className="mx-auto max-w-3xl">
+            <div className="relative rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] shadow-sm shadow-black/[0.03] focus-within:border-[var(--color-accent-primary)]/40 focus-within:shadow-lg focus-within:shadow-[var(--color-accent-primary)]/[0.06] transition-all duration-300">
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask Claude to help with code..."
+                placeholder="Message the assistant..."
                 rows={1}
-                className="flex-1 resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/50 focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-                disabled={isStreaming}
+                className="w-full resize-none bg-transparent px-5 pt-4 pb-14 text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ maxHeight: 200 }}
+                disabled={isStreamingHere}
               />
-              {isStreaming ? (
-                <Button
-                  onClick={handleStopGeneration}
-                  className="h-12 w-12 rounded-xl bg-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/90"
-                  title="Stop generation"
-                >
-                  <Square className="h-5 w-5" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!input.trim()}
-                  className="h-12 w-12 rounded-xl"
-                >
-                  <Send className="h-5 w-5" />
-                </Button>
-              )}
+              <div className="absolute bottom-3 left-5 right-3 flex items-center justify-between">
+                <span className="text-[11px] text-[var(--color-text-muted)]/40 select-none">
+                  <kbd className="px-1.5 py-0.5 rounded border border-[var(--color-border)]/40 bg-[var(--color-bg-secondary)]/50 text-[10px] font-mono">Enter</kbd> to send
+                </span>
+                {isStreamingHere ? (
+                  <button
+                    onClick={handleStopGeneration}
+                    className="flex items-center justify-center h-9 w-9 rounded-xl bg-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/90 text-white transition-all shadow-sm hover:shadow-md"
+                    title="Stop generation"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!input.trim()}
+                    className={cn(
+                      'flex items-center justify-center h-9 w-9 rounded-xl transition-all',
+                      input.trim()
+                        ? 'bg-[var(--color-accent-primary)] hover:bg-[var(--color-accent-primary)]/90 text-white shadow-sm shadow-[var(--color-accent-primary)]/30 hover:shadow-md hover:shadow-[var(--color-accent-primary)]/40'
+                        : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]/40 cursor-not-allowed'
+                    )}
+                    title="Send message"
+                  >
+                    <ArrowUp className="h-4.5 w-4.5" />
+                  </button>
+                )}
+              </div>
             </div>
-            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-              Press Enter to send, Shift+Enter for new line
-            </p>
           </div>
         </div>
       </div>

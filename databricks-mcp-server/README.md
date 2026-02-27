@@ -123,25 +123,16 @@ Claude now has both:
 
 | Tool | Description |
 |------|-------------|
-| `create_pipeline` | Create a new SDP pipeline |
-| `get_pipeline` | Get pipeline details and configuration |
-| `update_pipeline` | Update pipeline configuration |
-| `delete_pipeline` | Delete a pipeline |
-| `start_update` | Start pipeline run or dry-run validation |
-| `get_update` | Get update status (QUEUED, RUNNING, COMPLETED, FAILED) |
-| `stop_pipeline` | Stop a running pipeline |
-| `get_pipeline_events` | Get error messages for debugging |
 | `create_or_update_pipeline` | Create or update pipeline by name (auto-detects existing) |
-| `find_pipeline_by_name` | Find pipeline by name, returns pipeline ID |
+| `get_pipeline` | Get pipeline details by ID or name; enriched with latest update status and events. Omit args to list all. |
+| `delete_pipeline` | Delete a pipeline |
+| `run_pipeline` | Start, stop, or wait for pipeline runs |
 
 ### Knowledge Assistants (KA)
 
 | Tool | Description |
 |------|-------------|
-| `create_or_update_ka` | Create or update a Knowledge Assistant with document sources |
-| `get_ka` | Get KA details by tile ID |
-| `find_ka_by_name` | Find KA by name, returns tile ID |
-| `delete_ka` | Delete a Knowledge Assistant |
+| `manage_ka` | Manage Knowledge Assistants (create/update, get, find by name, delete) |
 
 ### Genie Spaces
 
@@ -152,25 +143,20 @@ Claude now has both:
 | `find_genie_by_name` | Find Genie Space by name, returns space ID |
 | `delete_genie` | Delete a Genie Space |
 
-### Multi-Agent Supervisor (MAS)
+### Supervisor Agent (MAS)
 
 | Tool | Description |
 |------|-------------|
-| `create_or_update_mas` | Create or update a Multi-Agent Supervisor |
-| `get_mas` | Get MAS details by tile ID |
-| `find_mas_by_name` | Find MAS by name, returns tile ID |
-| `delete_mas` | Delete a Multi-Agent Supervisor |
+| `manage_mas` | Manage Supervisor Agents (create/update, get, find by name, delete) |
 
 ### AI/BI Dashboards
 
 | Tool | Description |
 |------|-------------|
 | `create_or_update_dashboard` | Create or update an AI/BI dashboard from JSON content |
-| `get_dashboard` | Get dashboard details by ID |
-| `list_dashboards` | List all dashboards in the workspace |
-| `trash_dashboard` | Move a dashboard to trash |
-| `publish_dashboard` | Publish a dashboard to make it accessible |
-| `unpublish_dashboard` | Unpublish a dashboard |
+| `get_dashboard` | Get dashboard details by ID, or list all dashboards (omit dashboard_id) |
+| `delete_dashboard` | Soft-delete a dashboard (moves to trash) |
+| `publish_dashboard` | Publish or unpublish a dashboard (`publish=True/False`) |
 
 ### Unity Catalog FGAC Governance
 
@@ -197,7 +183,7 @@ Claude now has both:
 │  Skills (knowledge)          MCP Tools (actions)            │
 │  └── .claude/skills/         └── .claude/mcp.json           │
 │      ├── sdp-writer              └── databricks server      │
-│      ├── asset-bundles                                      │
+│      ├── databricks-asset-bundles                          │
 │      └── ...                                                │
 └──────────────────────────────┬──────────────────────────────┘
                                │ MCP Protocol (stdio)
