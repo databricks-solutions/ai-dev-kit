@@ -25,7 +25,7 @@ Before creating a KA, you need documents in a Unity Catalog Volume:
 - Upload PDFs/text files to a Volume manually or via SDK
 
 **Option 2: Generate synthetic documents**
-- Use the `unstructured-pdf-generation` skill to create realistic PDF documents
+- Use the `databricks-unstructured-pdf-generation` skill to create realistic PDF documents
 - Each PDF gets a companion JSON file with question/guideline pairs for evaluation
 
 ## Creating a Knowledge Assistant
@@ -106,7 +106,7 @@ To update the indexed documents:
 
 ## Example Workflow
 
-1. **Generate PDF documents** using `unstructured-pdf-generation` skill:
+1. **Generate PDF documents** using `databricks-unstructured-pdf-generation` skill:
    - Creates PDFs in `/Volumes/catalog/schema/raw_data/pdf_documents`
    - Creates JSON files with question/guideline pairs
 

@@ -202,17 +202,27 @@ class TableSchemaResult(BaseModel):
         )
 
     def remove_stats(self) -> "TableSchemaResult":
-        """Return a new TableSchemaResult with column_details removed.
+        """Return a new TableSchemaResult with column statistics removed.
 
-        Creates a minimal version with just DDL/structure.
+        Keeps column names and types but removes all numeric/histogram stats.
         """
         tables_no_stats = []
         for table in self.tables:
+            # Strip stats from column details if they exist
+            basic_columns = None
+            if table.column_details:
+                basic_columns = {}
+                for col_name, col_detail in table.column_details.items():
+                    basic_columns[col_name] = ColumnDetail(
+                        name=col_detail.name,
+                        data_type=col_detail.data_type,
+                    )
+
             table_no_stats = DataSourceInfo(
                 name=table.name,
                 comment=table.comment,
                 ddl=table.ddl,
-                column_details=None,
+                column_details=basic_columns,
                 updated_at=None,
                 error=table.error,
                 total_rows=None,

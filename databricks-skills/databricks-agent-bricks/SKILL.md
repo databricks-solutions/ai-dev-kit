@@ -23,13 +23,13 @@ Before creating Agent Bricks, ensure you have the required data:
 
 ### For Knowledge Assistants
 - **Documents in a Volume**: PDF, text, or other files stored in a Unity Catalog volume
-- Generate synthetic documents using the `unstructured-pdf-generation` skill if needed
+- Generate synthetic documents using the `databricks-unstructured-pdf-generation` skill if needed
 
 ### For Genie Spaces
 - **See the `databricks-genie` skill** for comprehensive Genie Space guidance
 - Tables in Unity Catalog with the data to explore
-- Generate raw data using the `synthetic-data-generation` skill
-- Create tables using the `spark-declarative-pipelines` skill
+- Generate raw data using the `databricks-synthetic-data-generation` skill
+- Create tables using the `databricks-spark-declarative-pipelines` skill
 
 ### For Supervisor Agents
 - **Model Serving Endpoints**: Deployed agent endpoints (KA endpoints, custom agents, fine-tuned models)
@@ -113,14 +113,14 @@ Before creating Agent Bricks, generate the required source data:
 
 **For KA (document Q&A)**:
 ```
-1. Use `unstructured-pdf-generation` skill to generate PDFs
+1. Use `databricks-unstructured-pdf-generation` skill to generate PDFs
 2. PDFs are saved to a Volume with companion JSON files (question/guideline pairs)
 ```
 
 **For Genie (SQL exploration)**:
 ```
-1. Use `synthetic-data-generation` skill to create raw parquet data
-2. Use `spark-declarative-pipelines` skill to create bronze/silver/gold tables
+1. Use `databricks-synthetic-data-generation` skill to create raw parquet data
+2. Use `databricks-spark-declarative-pipelines` skill to create bronze/silver/gold tables
 ```
 
 ### 2. Create the Agent Brick
@@ -198,9 +198,9 @@ manage_mas(
 ## Related Skills
 
 - **[databricks-genie](../databricks-genie/SKILL.md)** - Comprehensive Genie Space creation, curation, and Conversation API guidance
-- **[unstructured-pdf-generation](../unstructured-pdf-generation/SKILL.md)** - Generate synthetic PDFs to feed into Knowledge Assistants
-- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - Create raw data for Genie Space tables
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
+- **[databricks-unstructured-pdf-generation](../databricks-unstructured-pdf-generation/SKILL.md)** - Generate synthetic PDFs to feed into Knowledge Assistants
+- **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - Create raw data for Genie Space tables
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy custom agent endpoints used as MAS agents
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Build vector indexes for RAG applications paired with KAs
 

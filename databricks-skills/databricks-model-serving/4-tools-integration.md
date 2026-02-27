@@ -39,7 +39,6 @@ uc_toolkit = UCFunctionToolkit(
 | Function | Purpose |
 |----------|---------|
 | `system.ai.python_exec` | Execute Python code |
-| `system.ai.similarity_search` | Vector similarity search |
 
 ### Creating a UC Function
 

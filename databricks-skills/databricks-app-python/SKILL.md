@@ -36,7 +36,7 @@ Copy this checklist and verify each item:
 | Framework | Best For | app.yaml Command |
 |-----------|----------|------------------|
 | **Dash** | Production dashboards, BI tools, complex interactivity | `["python", "app.py"]` |
-| **Streamlit** | Rapid prototyping, data science apps, internal tools | `["streamlit", "run", "app.py", "--server.port", "8080", "--server.address", "0.0.0.0", "--server.headless", "true"]` |
+| **Streamlit** | Rapid prototyping, data science apps, internal tools | `["streamlit", "run", "app.py"]` |
 | **Gradio** | ML demos, model interfaces, chat UIs | `["python", "app.py"]` |
 | **Flask** | Custom REST APIs, lightweight apps, webhooks | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8080"]` |
 | **FastAPI** | Async APIs, auto-generated OpenAPI docs | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]` |
@@ -204,5 +204,5 @@ class EntityIn(BaseModel):
 - **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps with FastAPI + React
 - **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps via DABs
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - backend SDK integration
-- **[lakebase-provisioned](../lakebase-provisioned/SKILL.md)** - adding persistent PostgreSQL state
+- **[databricks-lakebase-provisioned](../databricks-lakebase-provisioned/SKILL.md)** - adding persistent PostgreSQL state
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving ML models for app integration

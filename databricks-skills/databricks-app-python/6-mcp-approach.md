@@ -29,46 +29,32 @@ upload_folder(
 )
 ```
 
-### Step 3: Create App
+### Step 3: Create and Deploy App
 
 ```python
-# MCP Tool: create_app
-result = create_app(
+# MCP Tool: create_or_update_app (creates if needed + deploys)
+result = create_or_update_app(
     name="my-dashboard",
-    description="Customer analytics dashboard"
-)
-# Returns: {"name": "my-dashboard", "url": "https://..."}
-```
-
-### Step 4: Deploy
-
-```python
-# MCP Tool: deploy_app
-result = deploy_app(
-    app_name="my-dashboard",
+    description="Customer analytics dashboard",
     source_code_path="/Workspace/Users/user@example.com/my_app"
 )
-# Returns: {"deployment_id": "...", "status": "PENDING", ...}
+# Returns: {"name": "my-dashboard", "url": "...", "created": True, "deployment": {...}}
 ```
 
-### Step 5: Verify
+### Step 4: Verify
 
 ```python
-# MCP Tool: get_app
-app = get_app(name="my-dashboard")
-# Returns: {"name": "...", "url": "...", "status": "RUNNING", ...}
-
-# MCP Tool: get_app_logs
-logs = get_app_logs(app_name="my-dashboard")
-# Returns: {"logs": "...", ...}
+# MCP Tool: get_app (with logs)
+app = get_app(name="my-dashboard", include_logs=True)
+# Returns: {"name": "...", "url": "...", "status": "RUNNING", "logs": "...", ...}
 ```
 
-### Step 6: Iterate
+### Step 5: Iterate
 
 1. Fix issues in local files
 2. Re-upload with `upload_folder`
-3. Re-deploy with `deploy_app`
-4. Check `get_app_logs` for errors
+3. Re-deploy with `create_or_update_app` (will update existing + deploy)
+4. Check `get_app(name=..., include_logs=True)` for errors
 5. Repeat until app is healthy
 
 ---
@@ -77,12 +63,9 @@ logs = get_app_logs(app_name="my-dashboard")
 
 | Tool | Description |
 |------|-------------|
-| **`create_app`** | Create a new Databricks App |
-| **`get_app`** | Get app details and status |
-| **`list_apps`** | List all apps in the workspace |
-| **`deploy_app`** | Deploy app from workspace source path |
+| **`create_or_update_app`** | Create app if it doesn't exist, optionally deploy (pass `source_code_path`) |
+| **`get_app`** | Get app details by name (with `include_logs=True` for logs), or list all apps |
 | **`delete_app`** | Delete an app |
-| **`get_app_logs`** | Get app deployment and runtime logs |
 | **`upload_folder`** | Upload local folder to workspace (shared tool) |
 
 ---

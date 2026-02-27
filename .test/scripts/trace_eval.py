@@ -6,22 +6,22 @@ Usage:
 
 Examples:
     # Auto-detect best source (MLflow if configured, else local)
-    python trace_eval.py spark-declarative-pipelines
+    python trace_eval.py databricks-spark-declarative-pipelines
 
     # Force local trace evaluation
-    python trace_eval.py spark-declarative-pipelines --local
+    python trace_eval.py databricks-spark-declarative-pipelines --local
 
     # Evaluate from MLflow run ID (from mlflow.search_runs)
-    python trace_eval.py spark-declarative-pipelines --run-id abc123def456
+    python trace_eval.py databricks-spark-declarative-pipelines --run-id abc123def456
 
     # Evaluate from MLflow trace ID (from mlflow.get_trace)
-    python trace_eval.py spark-declarative-pipelines --trace-id tr-d416fccdab46e2dea6bad1d0bd8aaaa8
+    python trace_eval.py databricks-spark-declarative-pipelines --trace-id tr-d416fccdab46e2dea6bad1d0bd8aaaa8
 
     # Evaluate a specific local trace file
-    python trace_eval.py spark-declarative-pipelines --trace ~/.claude/projects/.../session.jsonl
+    python trace_eval.py databricks-spark-declarative-pipelines --trace ~/.claude/projects/.../session.jsonl
 
     # Evaluate all traces in a directory
-    python trace_eval.py spark-declarative-pipelines --trace-dir /path/to/traces/
+    python trace_eval.py databricks-spark-declarative-pipelines --trace-dir /path/to/traces/
 
 Environment Variables:
     DATABRICKS_HOST - Databricks workspace URL

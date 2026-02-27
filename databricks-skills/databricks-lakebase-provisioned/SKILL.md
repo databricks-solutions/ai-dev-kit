@@ -1,5 +1,5 @@
 ---
-name: lakebase-provisioned
+name: databricks-lakebase-provisioned
 description: "Patterns and best practices for using Lakebase Provisioned (Databricks managed PostgreSQL) for OLTP workloads."
 ---
 

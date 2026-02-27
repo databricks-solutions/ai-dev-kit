@@ -80,9 +80,9 @@ $script:Skills = @(
     "databricks-asset-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-jobs", "databricks-metric-views", "databricks-model-serving", "databricks-python-sdk",
     "databricks-unity-catalog", "databricks-vector-search", "databricks-zerobus-ingest",
-    "lakebase-autoscale", "lakebase-provisioned", "mlflow-evaluation", "spark-declarative-pipelines",
-    "spark-python-data-source", "spark-structured-streaming", "synthetic-data-generation", 
-    "unstructured-pdf-generation"
+    "databricks-lakebase-autoscale", "databricks-lakebase-provisioned", "databricks-mlflow-evaluation",
+    "databricks-spark-declarative-pipelines", "spark-python-data-source", "databricks-spark-structured-streaming",
+    "databricks-synthetic-data-generation", "databricks-unstructured-pdf-generation"
 )
 
 # MLflow skills (fetched from mlflow/skills repo)
@@ -666,7 +666,7 @@ function Install-McpServer {
     # Clone or update repo
     if (Test-Path (Join-Path $script:RepoDir ".git")) {
         & git -C $script:RepoDir fetch -q --depth 1 origin $Branch 2>&1 | Out-Null
-        & git -c advice.detachedHead=false -C $script:RepoDir checkout -q $Branch 2>&1 | Out-Null
+        & git -C $script:RepoDir reset --hard FETCH_HEAD 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Remove-Item -Recurse -Force $script:RepoDir -ErrorAction SilentlyContinue
             & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null

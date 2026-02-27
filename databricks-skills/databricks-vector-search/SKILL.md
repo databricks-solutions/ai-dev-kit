@@ -317,29 +317,24 @@ The following MCP tools are available for managing Vector Search infrastructure.
 
 | Tool | Description |
 |------|-------------|
-| `create_vs_endpoint` | Create a Vector Search endpoint (STANDARD or STORAGE_OPTIMIZED) |
-| `get_vs_endpoint` | Get endpoint status and details |
-| `list_vs_endpoints` | List all endpoints in the workspace |
+| `create_or_update_vs_endpoint` | Create endpoint if it doesn't exist, or return existing (STANDARD or STORAGE_OPTIMIZED) |
+| `get_vs_endpoint` | Get endpoint details by name, or list all endpoints (omit name) |
 | `delete_vs_endpoint` | Delete an endpoint (indexes must be deleted first) |
 
 ### Index Management
 
 | Tool | Description |
 |------|-------------|
-| `create_vs_index` | Create a Delta Sync or Direct Access index |
-| `get_vs_index` | Get index status and configuration |
-| `list_vs_indexes` | List all indexes on an endpoint |
+| `create_or_update_vs_index` | Create index if it doesn't exist; auto-triggers initial sync for DELTA_SYNC |
+| `get_vs_index` | Get index details by name, or list indexes on endpoint (pass endpoint_name only) |
 | `delete_vs_index` | Delete an index |
-| `sync_vs_index` | Trigger sync for TRIGGERED pipeline indexes |
 
 ### Query and Data
 
 | Tool | Description |
 |------|-------------|
 | `query_vs_index` | Query index with text, vector, or hybrid search (for testing) |
-| `upsert_vs_data` | Upsert vectors into a Direct Access index |
-| `delete_vs_data` | Delete vectors from a Direct Access index |
-| `scan_vs_index` | Scan/export index entries (for debugging) |
+| `manage_vs_data` | Upsert, delete, scan, or sync index data (operation: "upsert", "delete", "scan", or "sync") |
 
 ## Notes
 
@@ -352,6 +347,6 @@ The following MCP tools are available for managing Vector Search infrastructure.
 
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy agents that use VectorSearchRetrieverTool
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Knowledge Assistants use RAG over indexed documents
-- **[unstructured-pdf-generation](../unstructured-pdf-generation/SKILL.md)** - Generate documents to index in Vector Search
+- **[databricks-unstructured-pdf-generation](../databricks-unstructured-pdf-generation/SKILL.md)** - Generate documents to index in Vector Search
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs and tables that back Delta Sync indexes
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - Build Delta tables used as Vector Search sources
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build Delta tables used as Vector Search sources

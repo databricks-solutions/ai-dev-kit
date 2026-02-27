@@ -1,5 +1,5 @@
 ---
-name: synthetic-data-generation
+name: databricks-synthetic-data-generation
 description: "Generate realistic synthetic data using Faker and Spark, with non-linear distributions, integrity constraints, and save to Databricks. Use when creating test data, demo datasets, or synthetic tables."
 ---
 
@@ -655,6 +655,6 @@ This returns schema, row counts, and column statistics to confirm the data was w
 
 ## Related Skills
 
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - for building bronze/silver/gold pipelines on top of generated data
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - for building bronze/silver/gold pipelines on top of generated data
 - **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - for visualizing the generated data in dashboards
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for managing catalogs, schemas, and volumes where data is stored

@@ -1,5 +1,5 @@
 ---
-name: unstructured-pdf-generation
+name: databricks-unstructured-pdf-generation
 description: "Generate synthetic PDF documents for RAG and unstructured data use cases. Use when creating test PDFs, demo documents, or evaluation datasets for retrieval systems."
 ---
 
@@ -190,5 +190,5 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o
 
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Create Knowledge Assistants that ingest the generated PDFs
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Index generated documents for semantic search and RAG
-- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - Generate structured tabular data (complement to unstructured PDFs)
-- **[mlflow-evaluation](../mlflow-evaluation/SKILL.md)** - Evaluate RAG systems using the generated question/guideline pairs
+- **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - Generate structured tabular data (complement to unstructured PDFs)
+- **[databricks-mlflow-evaluation](../databricks-mlflow-evaluation/SKILL.md)** - Evaluate RAG systems using the generated question/guideline pairs

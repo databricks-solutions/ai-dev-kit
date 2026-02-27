@@ -402,6 +402,198 @@ Before implementing evaluation, confirm:
 
 ---
 
+## Journey 10: Domain Expert Optimization Loop
+
+**Starting Point**: You have an agent and want to incorporate domain expert feedback to continuously improve quality.
+**Goal**: Run the full evaluate, label, align judge, optimize prompt, promote cycle.
+
+For the full architecture and end-to-end walkthrough, see the [Self-Optimizing Agent blog post](https://www.databricks.com/blog/self-optimizing-football-chatbot-guided-domain-experts-databricks). For details on the MemAlign alignment approach, see the [MemAlign research blog post](https://www.databricks.com/blog/memalign-building-better-llm-judges-human-feedback-scalable-memory).
+
+### The Loop at a Glance
+
+```
+1. Run evaluate()          -> Generate traces, score with base judge
+2. Tag traces              -> Mark successfully evaluated traces for dataset
+3. Build eval dataset      -> Persist traces to UC for labeling
+4. Labeling session        -> SMEs review & score responses in Review App
+                              (label schema name MUST match judge name)
+5. Align judge (MemAlign)  -> Distill SME feedback into judge guidelines
+6. Re-evaluate             -> Baseline with aligned judge (score may decrease, that's OK)
+7. Build optim dataset     -> inputs + expectations (required for GEPA)
+8. optimize_prompts()      -> GEPA iteratively improves system prompt
+9. Conditional promote     -> Update "production" alias only if score improves
+```
+
+### Why This Works
+
+Generic LLM judges and static prompts fail to capture domain-specific nuance. Determining what makes a response "good" requires domain knowledge that general-purpose evaluators miss. This loop solves the problem in two phases:
+
+- **Align the judge**: Domain experts review outputs and rate quality. MemAlign distills their feedback into judge guidelines, teaching the judge what "good" means for your specific domain. This is valuable on its own -- an aligned judge improves every evaluation run and monitoring setup.
+- **Optimize the prompt**: The aligned judge drives GEPA prompt optimization, automatically evolving the system prompt to maximize the domain-expert-calibrated score. Only improvements get promoted to production.
+
+### Steps
+
+**Phase 1: Evaluate and Collect Feedback**
+
+1. **Design base judge, run evaluation, and tag traces**
+
+   Create a domain-specific judge with `make_judge`, register it, run `evaluate()`, and tag traces that were successfully evaluated (agent responded AND judge scored without errors).
+
+   See `patterns-judge-alignment.md` Patterns 1-2
+
+2. **Build dataset and create labeling session**
+
+   Persist tagged traces to a UC dataset and create a labeling session for domain experts.
+
+   **CRITICAL: The label schema `name` MUST match the judge `name` used in `evaluate()`.** This is how `align()` pairs SME feedback with LLM judge scores. If they don't match, alignment will fail.
+
+   See `patterns-judge-alignment.md` Pattern 3
+
+3. **Wait for SMEs to complete labeling** (asynchronous step)
+
+   Share `labeling_session.url` with domain experts. They review agent responses and submit ratings using the Review App.
+
+**Phase 2: Align the Judge**
+
+4. **Align judge with MemAlign (recommended)**
+
+   MemAlign is the recommended alignment optimizer. It is the fastest (seconds vs. minutes for alternatives), most cost-effective ($0.03 vs. $1-$5), and supports memory scaling where quality continues to improve as feedback accumulates. Other optimizers (e.g., SIMBA) are also supported.
+
+   See `patterns-judge-alignment.md` Patterns 4-5
+
+5. **Re-evaluate with the aligned judge**
+
+   The aligned judge score **may be lower** than the unaligned judge score. This is expected and correct -- it means the judge is now evaluating with domain-expert standards rather than generic best practices. A lower score from a more accurate judge is a better signal than an inflated score from a judge that doesn't understand your domain.
+
+   See `patterns-judge-alignment.md` Pattern 6
+
+6. **(Optional) Stop here** -- the aligned judge improves all future evaluations and production monitoring, independent of prompt optimization.
+
+**Phase 3: Optimize the Prompt**
+
+7. **Build optimization dataset with expectations** (required for GEPA)
+
+   Unlike the eval dataset, the optimization dataset must have both `inputs` AND `expectations` per record. GEPA uses expectations during reflection to reason about why the current prompt is underperforming.
+
+   See `patterns-prompt-optimization.md` Pattern 1
+
+8. **Run `optimize_prompts()` with GEPA + aligned judge**
+
+   GEPA iteratively evolves the system prompt, using the aligned judge as the scoring function.
+
+   See `patterns-prompt-optimization.md` Pattern 2
+
+9. **Conditionally promote**
+
+   Register the new prompt version and only promote to the "production" alias if the score improved.
+
+   See `patterns-prompt-optimization.md` Pattern 3
+
+10. **Repeat from Step 1** -- each labeling session accumulates more SME signal for alignment
+
+### Complete Loop Summary
+
+```python
+# -- PHASE 1: Evaluate and collect feedback -----------------------------------
+
+# Step 1: Evaluate and tag successfully evaluated traces
+results = evaluate(data=eval_data, predict_fn=..., scorers=[base_judge])
+ok_trace_ids = results.result_df.loc[results.result_df["state"] == "OK", "trace_id"]
+for trace_id in ok_trace_ids:
+    mlflow.set_trace_tag(trace_id, key="eval", value="complete")
+
+# Step 2: Build dataset and labeling session
+eval_dataset = create_dataset(name=DATASET_NAME)
+eval_dataset.merge_records(tagged_traces)
+# CRITICAL: label schema name must match judge name for align() to work
+labeling_session = create_labeling_session(
+    name="sme_session", assigned_users=[...], label_schemas=[JUDGE_NAME]
+)
+labeling_session.add_dataset(dataset_name=DATASET_NAME)
+# -> Share labeling_session.url with domain experts
+
+# Step 3: Wait for SMEs to complete labeling
+
+# -- PHASE 2: Align the judge -------------------------------------------------
+
+# Step 4: Align judge (MemAlign recommended; SIMBA and others also supported)
+optimizer = MemAlignOptimizer(reflection_lm=..., retrieval_k=5, embedding_model=...)
+aligned_judge = base_judge.align(traces=traces, optimizer=optimizer)
+aligned_judge.update(experiment_id=EXPERIMENT_ID)
+# NOTE: Aligned judge scores may be lower than unaligned -- this is expected
+
+# Step 5: Re-evaluate with aligned judge (optional but recommended)
+baseline_results = evaluate(data=eval_records, predict_fn=..., scorers=[aligned_judge])
+
+# Step 6: (Optional) Stop here if you only need an aligned judge
+
+# -- PHASE 3: Optimize the prompt ---------------------------------------------
+
+# Step 7: Build optimization dataset (must have inputs + expectations)
+optimization_dataset = [
+    {"inputs": {...}, "expectations": {"expected_response": "..."}}
+]
+
+# Step 8: Optimize prompt with GEPA + aligned judge
+result = mlflow.genai.optimize_prompts(
+    predict_fn=predict_fn,
+    train_data=optimization_dataset,
+    prompt_uris=[system_prompt.uri],
+    optimizer=GepaPromptOptimizer(reflection_model=..., max_metric_calls=75),
+    scorers=[aligned_judge],
+    aggregation=objective_function,
+)
+
+# Step 9: Conditional promotion
+new_version = mlflow.genai.register_prompt(
+    name=PROMPT_NAME, template=result.optimized_prompts[0].template
+)
+if result.final_eval_score > result.initial_eval_score:
+    mlflow.genai.set_prompt_alias(
+        name=PROMPT_NAME, alias="production", version=new_version.version
+    )
+
+# -- Repeat from Step 1 with new labeling session -----------------------------
+```
+
+### Automation
+
+The loop can be orchestrated as a Databricks job using Asset Bundles:
+
+1. SMEs label agent outputs through the MLflow Labeling Session UI
+2. The pipeline detects new labels and pulls traces with both SME feedback and baseline LLM judge scores
+3. Judge alignment runs with MemAlign, producing a new judge version
+4. Prompt optimization runs with GEPA, using the aligned judge
+5. Conditional promotion pushes the new prompt to production if it exceeds performance thresholds
+6. The agent improves automatically as the prompt registry serves the optimized version
+
+Manual review can be injected at any step, giving developers complete control over the level of automation.
+
+### Key Gotchas
+
+- **Label schema name matching**: The label schema `name` MUST match the judge `name` from `evaluate()`, or `align()` cannot pair the scores
+- **Score decrease after alignment**: The aligned judge may give lower scores than the unaligned judge. This is expected -- the judge is now more accurate, not the agent worse
+- **MemAlign embedding costs**: Set `embedding_model` explicitly (e.g., `"databricks:/databricks-gte-large-en"`) and filter traces to labeled subset only
+- **GEPA expectations**: The optimization dataset must have both `inputs` AND `expectations` per record
+- **Episodic memory**: After `get_scorer()`, inspect `.instructions` not `._episodic_memory` (lazy loaded)
+
+See `GOTCHAS.md` for the complete list.
+
+### Reference Files
+
+- `patterns-judge-alignment.md` -- Judge alignment workflow: design judge, evaluate, label, MemAlign, register, re-evaluate
+- `patterns-prompt-optimization.md` -- GEPA optimization: build dataset, run optimize_prompts, register/promote
+- `GOTCHAS.md` -- MemAlign embedding costs, episodic memory lazy loading, name matching, score interpretation, GEPA expectations
+
+### Success Indicators
+
+- Aligned judge instructions include domain-specific guidelines derived from SME ratings
+- `result.final_eval_score > result.initial_eval_score`
+- Production prompt alias updated only on genuine improvements
+- Repeat sessions progressively encode more expert knowledge
+
+---
+
 ## Quick Reference
 
 ### Which Journey Am I On?
@@ -412,6 +604,7 @@ Before implementing evaluation, confirm:
 | "It's too slow" | Journey 7 (Performance) |
 | "It's not accurate enough" | Journey 8 (Prompt Optimization) |
 | "I need traces in Unity Catalog" | Journey 9 (Trace Ingestion) |
+| "I want SMEs to improve my judge and prompt" | Journey 10 (Domain Expert Loop) |
 
 ### Common Tools Across Journeys
 

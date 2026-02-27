@@ -75,13 +75,23 @@ def list_volume_files(volume_path: str, max_results: Optional[int] = None) -> Li
 
     results = []
     for entry in w.files.list_directory_contents(volume_path):
+        # Handle last_modified - can be datetime, int (Unix timestamp), or None
+        last_modified = None
+        if entry.last_modified is not None:
+            if isinstance(entry.last_modified, int):
+                # Unix timestamp - convert to ISO format string
+                last_modified = str(entry.last_modified)
+            else:
+                # datetime object - convert to ISO format string
+                last_modified = entry.last_modified.isoformat()
+
         results.append(
             VolumeFileInfo(
                 name=entry.name,
                 path=entry.path,
                 is_directory=entry.is_directory,
                 file_size=entry.file_size,
-                last_modified=entry.last_modified.isoformat() if entry.last_modified else None,
+                last_modified=last_modified,
             )
         )
         # Early exit if we've hit the limit

@@ -19,42 +19,42 @@ Run `/skill-test databricks-python-sdk add` with these prompts."
 ## Running Evaluation (default)
 
 ```
-User: /skill-test spark-declarative-pipelines run
+User: /skill-test databricks-spark-declarative-pipelines run
 
 Claude: [Creates CLIContext with MCP tools]
-Claude: [Calls run("spark-declarative-pipelines", ctx)]
+Claude: [Calls run("databricks-spark-declarative-pipelines", ctx)]
 Claude: [Displays results table showing passed/failed tests]
 ```
 
 ## Adding a Test Case
 
 ```
-User: /skill-test spark-declarative-pipelines add
+User: /skill-test databricks-spark-declarative-pipelines add
 
 Claude: What prompt would you like to test?
 User: Create a bronze ingestion pipeline for CSV files
 
-Claude: [Invokes spark-declarative-pipelines skill with the prompt]
+Claude: [Invokes databricks-spark-declarative-pipelines skill with the prompt]
 Claude: [Gets response from skill invocation]
-Claude: [Calls interactive("spark-declarative-pipelines", prompt, response, ctx)]
+Claude: [Calls interactive("databricks-spark-declarative-pipelines", prompt, response, ctx)]
 Claude: [Reports: "3/3 code blocks passed. Saved to ground_truth.yaml"]
 ```
 
 ## Creating Baseline
 
 ```
-User: /skill-test spark-declarative-pipelines baseline
+User: /skill-test databricks-spark-declarative-pipelines baseline
 
-Claude: [Creates CLIContext, calls baseline("spark-declarative-pipelines", ctx)]
-Claude: [Displays "Baseline saved to baselines/spark-declarative-pipelines/baseline.yaml"]
+Claude: [Creates CLIContext, calls baseline("databricks-spark-declarative-pipelines", ctx)]
+Claude: [Displays "Baseline saved to baselines/databricks-spark-declarative-pipelines/baseline.yaml"]
 ```
 
 ## Checking for Regressions
 
 ```
-User: /skill-test spark-declarative-pipelines regression
+User: /skill-test databricks-spark-declarative-pipelines regression
 
-Claude: [Calls regression("spark-declarative-pipelines", ctx)]
+Claude: [Calls regression("databricks-spark-declarative-pipelines", ctx)]
 Claude: [Compares current pass_rate against baseline]
 Claude: [Reports any regressions or improvements]
 ```
@@ -62,9 +62,9 @@ Claude: [Reports any regressions or improvements]
 ## MLflow Evaluation
 
 ```
-User: /skill-test spark-declarative-pipelines mlflow
+User: /skill-test databricks-spark-declarative-pipelines mlflow
 
-Claude: [Calls mlflow_eval("spark-declarative-pipelines", ctx)]
+Claude: [Calls mlflow_eval("databricks-spark-declarative-pipelines", ctx)]
 Claude: [Runs evaluation with LLM judges, logs to MLflow]
 Claude: [Displays evaluation metrics and MLflow run link]
 ```
@@ -72,7 +72,7 @@ Claude: [Displays evaluation metrics and MLflow run link]
 ## Trace Evaluation
 
 ```
-User: /skill-test spark-declarative-pipelines trace-eval
+User: /skill-test databricks-spark-declarative-pipelines trace-eval
 
 Claude: [Checks if MLflow autolog is configured]
 Claude: [If MLflow enabled, queries experiment for latest trace]
@@ -82,14 +82,14 @@ Claude: [Reports violations: tool limits, token budget, required tools, etc.]
 ```
 
 ```
-User: /skill-test spark-declarative-pipelines trace-eval --local
+User: /skill-test databricks-spark-declarative-pipelines trace-eval --local
 
 Claude: [Forces use of local session trace, skipping MLflow]
 Claude: [Evaluates most recent local trace]
 ```
 
 ```
-User: /skill-test spark-declarative-pipelines add --trace
+User: /skill-test databricks-spark-declarative-pipelines add --trace
 
 Claude: [Runs interactive test addition workflow]
 Claude: [After execution, also evaluates the session trace]
@@ -99,13 +99,13 @@ Claude: [Reports both code execution results and trace metrics]
 ## Viewing and Updating Scorers
 
 ```
-User: /skill-test spark-declarative-pipelines scorers
+User: /skill-test databricks-spark-declarative-pipelines scorers
 
 Claude: [Shows enabled scorers, LLM scorers, and default guidelines]
 ```
 
 ```
-User: /skill-test spark-declarative-pipelines scorers update --add-guideline "Must include CLUSTER BY"
+User: /skill-test databricks-spark-declarative-pipelines scorers update --add-guideline "Must include CLUSTER BY"
 
 Claude: [Updates manifest.yaml with new guideline]
 ```
@@ -113,7 +113,7 @@ Claude: [Updates manifest.yaml with new guideline]
 ## Reviewing Candidates
 
 ```
-User: /skill-test spark-declarative-pipelines review
+User: /skill-test databricks-spark-declarative-pipelines review
 
 Claude: [Opens interactive review for pending candidates]
 Claude: [For each candidate, shows prompt, response, execution results, and diagnosis]
@@ -122,7 +122,7 @@ Claude: [Approved candidates are promoted to ground_truth.yaml]
 ```
 
 ```
-User: /skill-test spark-declarative-pipelines review --batch --filter-success
+User: /skill-test databricks-spark-declarative-pipelines review --batch --filter-success
 
 Claude: [Batch approves all candidates with execution_success=True]
 Claude: [Reports: "Batch approved 5 candidates, promoted 5 to ground_truth.yaml"]

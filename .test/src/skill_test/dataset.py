@@ -8,7 +8,7 @@ import yaml
 
 @dataclass
 class EvalRecord:
-    """Standard evaluation record format (matches mlflow-evaluation patterns)."""
+    """Standard evaluation record format (matches databricks-mlflow-evaluation patterns)."""
 
     id: str
     inputs: Dict[str, Any]

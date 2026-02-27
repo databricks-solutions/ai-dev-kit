@@ -109,25 +109,25 @@ scorers:
 
 ```bash
 # Auto-detect best trace source
-uv run python .test/scripts/trace_eval.py spark-declarative-pipelines
+uv run python .test/scripts/trace_eval.py databricks-spark-declarative-pipelines
 
 # Force local trace
-uv run python .test/scripts/trace_eval.py spark-declarative-pipelines --local
+uv run python .test/scripts/trace_eval.py databricks-spark-declarative-pipelines --local
 
 # Evaluate specific MLflow run (by run ID)
-uv run python .test/scripts/trace_eval.py spark-declarative-pipelines --run-id abc123
+uv run python .test/scripts/trace_eval.py databricks-spark-declarative-pipelines --run-id abc123
 
 # Evaluate specific MLflow trace (by trace ID)
-uv run python .test/scripts/trace_eval.py spark-declarative-pipelines \
+uv run python .test/scripts/trace_eval.py databricks-spark-declarative-pipelines \
   --trace-id tr-d416fccdab46e2dea6bad1d0bd8aaaa8
 
 # Evaluate specific local file
-uv run python .test/scripts/trace_eval.py spark-declarative-pipelines \
+uv run python .test/scripts/trace_eval.py databricks-spark-declarative-pipelines \
   --trace ~/.claude/projects/-Users-name-project/session.jsonl
 
 # List available traces
-uv run python .test/scripts/list_traces.py spark-declarative-pipelines
+uv run python .test/scripts/list_traces.py databricks-spark-declarative-pipelines
 
 # Add test case with trace evaluation
-uv run python .test/scripts/add.py spark-declarative-pipelines --trace --prompt "Create pipeline"
+uv run python .test/scripts/add.py databricks-spark-declarative-pipelines --trace --prompt "Create pipeline"
 ```

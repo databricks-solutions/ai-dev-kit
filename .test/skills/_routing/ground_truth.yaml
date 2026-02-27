@@ -4,7 +4,7 @@ test_cases:
     inputs:
       prompt: "Create a streaming table for ingesting JSON events"
     expectations:
-      expected_skills: ["spark-declarative-pipelines"]
+      expected_skills: ["databricks-spark-declarative-pipelines"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -15,7 +15,7 @@ test_cases:
     inputs:
       prompt: "Build a bronze-silver-gold medallion architecture for customer data"
     expectations:
-      expected_skills: ["spark-declarative-pipelines"]
+      expected_skills: ["databricks-spark-declarative-pipelines"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -26,7 +26,7 @@ test_cases:
     inputs:
       prompt: "Implement CDC with SCD Type 2 for tracking customer changes"
     expectations:
-      expected_skills: ["spark-declarative-pipelines"]
+      expected_skills: ["databricks-spark-declarative-pipelines"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -73,7 +73,7 @@ test_cases:
     inputs:
       prompt: "How do I evaluate my agent using mlflow genai.evaluate?"
     expectations:
-      expected_skills: ["mlflow-evaluation"]
+      expected_skills: ["databricks-mlflow-evaluation"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -86,7 +86,7 @@ test_cases:
       prompt: "Create a data pipeline with streaming tables and deploy it using DABs"
     expectations:
       expected_skills:
-        - "spark-declarative-pipelines"
+        - "databricks-spark-declarative-pipelines"
         - "databricks-asset-bundles"
       is_multi_skill: true
     metadata:
@@ -99,8 +99,8 @@ test_cases:
       prompt: "Generate synthetic customer data and evaluate the agent quality with MLflow scorers"
     expectations:
       expected_skills:
-        - "synthetic-data-generation"
-        - "mlflow-evaluation"
+        - "databricks-synthetic-data-generation"
+        - "databricks-mlflow-evaluation"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
@@ -112,7 +112,7 @@ test_cases:
       prompt: "Build a medallion architecture with bronze ingestion and create a Genie space for SQL exploration"
     expectations:
       expected_skills:
-        - "spark-declarative-pipelines"
+        - "databricks-spark-declarative-pipelines"
         - "databricks-agent-bricks"
       is_multi_skill: true
     metadata:
@@ -219,12 +219,12 @@ test_cases:
     expectations:
       expected_skills:
         - "databricks-app-python"
-        - "lakebase-provisioned"
+        - "databricks-lakebase-provisioned"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
       difficulty: "medium"
-      reasoning: "Combines 'Streamlit' (app-python) with 'Lakebase' (lakebase-provisioned)"
+      reasoning: "Combines 'Streamlit' (app-python) with 'Lakebase' (databricks-lakebase-provisioned)"
 
   - id: "routing_multi_app_serving_001"
     inputs:

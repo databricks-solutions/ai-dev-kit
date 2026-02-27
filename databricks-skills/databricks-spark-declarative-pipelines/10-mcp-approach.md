@@ -65,11 +65,7 @@ upload_folder(
 
 ### Step 3: Create/Update and Run Pipeline
 
-Use **`create_or_update_pipeline`** - the main entry point. It:
-1. Searches for an existing pipeline with the same name (or uses `id` from `extra_settings`)
-2. Creates a new pipeline or updates the existing one
-3. Optionally starts a pipeline run
-4. Optionally waits for completion and returns detailed results
+Use **`create_or_update_pipeline`** to manage the resource, then **`run_pipeline`** to execute it:
 
 ```python
 # MCP Tool: create_or_update_pipeline
@@ -82,11 +78,15 @@ result = create_or_update_pipeline(
         "/Workspace/Users/user@example.com/my_pipeline/bronze/ingest_orders.sql",
         "/Workspace/Users/user@example.com/my_pipeline/silver/clean_orders.sql",
         "/Workspace/Users/user@example.com/my_pipeline/gold/daily_summary.sql"
-    ],
-    start_run=True,           # Start immediately
-    wait_for_completion=True, # Wait and return final status
-    full_refresh=True,        # Full refresh all tables
-    timeout=1800              # 30 minute timeout
+    ]
+)
+
+# MCP Tool: run_pipeline
+run_result = run_pipeline(
+    pipeline_id=result["pipeline_id"],
+    full_refresh=True,            # Full refresh all tables
+    wait_for_completion=True,     # Wait and return final status
+    timeout=1800                  # 30 minute timeout
 )
 ```
 
@@ -122,19 +122,18 @@ if result["success"]:
 
 **On Failure:**
 ```python
-if not result["success"]:
+if not run_result["success"]:
     # Message includes suggested next steps
-    print(result["message"])
-    # "Pipeline created but run failed. State: FAILED. Error: Column 'amount' not found.
-    #  Use get_pipeline_events(pipeline_id='abc-123') for full details."
+    print(run_result["message"])
 
-    # Get detailed errors
-    events = get_pipeline_events(pipeline_id=result["pipeline_id"], max_results=50)
+    # Get detailed errors (get_pipeline enriches with recent events)
+    details = get_pipeline(pipeline_id=result["pipeline_id"])
+    print(details.get("recent_events"))
 ```
 
 ### Step 5: Iterate Until Working
 
-1. Review errors from result or `get_pipeline_events`
+1. Review errors from run result or `get_pipeline`
 2. Fix issues in local files
 3. Re-upload with `upload_folder`
 4. Run `create_or_update_pipeline` again (it will update, not recreate)
@@ -154,12 +153,8 @@ if not result["success"]:
 
 | Tool | Description |
 |------|-------------|
-| `find_pipeline_by_name` | Find existing pipeline by name, returns pipeline_id |
-| `get_pipeline` | Get pipeline configuration and current state |
-| `start_update` | Start pipeline run (`validate_only=True` for dry run) |
-| `get_update` | Poll update status (QUEUED, RUNNING, COMPLETED, FAILED) |
-| `stop_pipeline` | Stop a running pipeline |
-| `get_pipeline_events` | Get error messages for debugging failed runs |
+| `get_pipeline` | Get pipeline details by ID or name; enriched with latest update status and recent events. Omit args to list all. |
+| `run_pipeline` | Start, stop, or wait for pipeline runs (`stop=True` to stop, `validate_only=True` for dry run) |
 | `delete_pipeline` | Delete a pipeline |
 
 ### Supporting Tools

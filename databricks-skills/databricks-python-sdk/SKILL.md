@@ -622,4 +622,4 @@ If I'm unsure about a method, I should:
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - catalog governance
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving endpoint management
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - vector index operations
-- **[lakebase-provisioned](../lakebase-provisioned/SKILL.md)** - managed PostgreSQL via SDK
+- **[databricks-lakebase-provisioned](../databricks-lakebase-provisioned/SKILL.md)** - managed PostgreSQL via SDK

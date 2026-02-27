@@ -29,17 +29,15 @@ Use this skill when:
 
 | Tool | Purpose |
 |------|---------|
-| `list_genie` | List all Genie Spaces accessible to you |
 | `create_or_update_genie` | Create or update a Genie Space |
-| `get_genie` | Get Genie Space details |
+| `get_genie` | Get space details (by ID) or list all spaces (no ID) |
 | `delete_genie` | Delete a Genie Space |
 
 ### Conversation API
 
 | Tool | Purpose |
 |------|---------|
-| `ask_genie` | Ask a question to a Genie Space, get SQL + results |
-| `ask_genie_followup` | Ask follow-up question in existing conversation |
+| `ask_genie` | Ask a question or follow-up (`conversation_id` optional) |
 
 ### Supporting Tools
 
@@ -124,8 +122,8 @@ For optimization scripts (`scripts/*.py`):
 ### Creating Tables
 
 Use these skills in sequence:
-1. `synthetic-data-generation` - Generate raw parquet files
-2. `spark-declarative-pipelines` - Create bronze/silver/gold tables
+1. `databricks-synthetic-data-generation` - Generate raw parquet files
+2. `databricks-spark-declarative-pipelines` - Create bronze/silver/gold tables
 
 ## Common Issues
 
@@ -139,6 +137,6 @@ Use these skills in sequence:
 ## Related Skills
 
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Use Genie Spaces as agents inside Supervisor Agents
-- **[synthetic-data-generation](../synthetic-data-generation/SKILL.md)** - Generate raw parquet data to populate tables for Genie
-- **[spark-declarative-pipelines](../spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
+- **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - Generate raw parquet data to populate tables for Genie
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs, schemas, and tables Genie queries

@@ -64,7 +64,7 @@ def get_connection():
 | Detail | Value |
 |--------|-------|
 | Pre-installed version | 1.38.0 |
-| app.yaml command | `["streamlit", "run", "app.py", "--server.port", "8080", "--server.address", "0.0.0.0", "--server.headless", "true"]` |
+| app.yaml command | `["streamlit", "run", "app.py"]` |
 | Auth header | `st.context.headers.get('x-forwarded-access-token')` |
 
 **Databricks tips**:
