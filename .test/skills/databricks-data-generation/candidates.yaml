@@ -1,0 +1,7 @@
+# Candidates for databricks-data-generation skill
+# Test cases pending review before promotion to ground_truth.yaml
+#
+# Use `/skill-test databricks-data-generation add` to create new candidates
+# Use `/skill-test databricks-data-generation review` to promote candidates to ground truth
+
+candidates: []

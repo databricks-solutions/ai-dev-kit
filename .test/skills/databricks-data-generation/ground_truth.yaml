@@ -1,0 +1,544 @@
+test_cases:
+  # Test 1: Databricks Connect + Small + Parquet + 2 tables with referential integrity
+  # - id: "sdg_dbconnect_small_parquet_001"
+  #   inputs:
+  #     prompt: |
+  #       Generate synthetic e-commerce data using Databricks Connect with serverless compute.
+  #       Create 2 related tables with referential integrity:
+  #       - customers (5,000 rows): customer_id, name, email, tier (Free/Pro/Enterprise weighted 60/30/10), region, created_at
+  #       - orders (15,000 rows): order_id, customer_id (FK to customers), amount (log-normal by tier), order_date, status
+
+  #       Save as Parquet files to a Unity Catalog volume. Use schema name 'sdg_test_small_parquet'.
+  #       Enterprise customers should generate more orders than Free tier (weighted sampling).
+  #   expectations:
+  #     expected_facts:
+  #       - "DatabricksSession"
+  #       - "serverless"
+  #       - "parquet"
+  #       - "customer_id"
+  #       - "referential integrity"
+  #       - "weighted"
+  #       - "log-normal"
+  #     expected_patterns:
+  #       - pattern: "DatabricksSession\\.builder.*serverless.*True"
+  #         min_count: 1
+  #         description: "Databricks Connect serverless configuration"
+  #       - pattern: "\\.write.*parquet"
+  #         min_count: 1
+  #         description: "Parquet output format"
+  #       - pattern: "customer_id"
+  #         min_count: 3
+  #         description: "Foreign key reference in multiple tables"
+  #       - pattern: "lognormal|log-normal|log_normal"
+  #         min_count: 1
+  #         description: "Log-normal distribution for amounts"
+  #     guidelines:
+  #       - "Must use DatabricksSession.builder.serverless(True).getOrCreate()"
+  #       - "Orders table customer_id must only contain IDs from customers table"
+  #       - "Enterprise tier customers must have higher weight for order generation"
+  #       - "Amount distribution must use log-normal, not uniform"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "easy"
+  #     source: "manual"
+  #     tags: ["databricks-connect", "small", "parquet", "referential-integrity"]
+
+  # # Test 2: Databricks Connect + Large + Delta + 2 tables
+  # - id: "sdg_dbconnect_large_delta_002"
+  #   inputs:
+  #     prompt: |
+  #       Generate large-scale synthetic support ticket data using Databricks Connect with serverless.
+  #       Create 2 related tables with referential integrity:
+  #       - customers (100,000 rows): customer_id, company_name, tier, arr (log-normal), region, signup_date
+  #       - tickets (500,000 rows): ticket_id, customer_id (FK), priority (correlates with tier), resolution_hours (exponential), csat_score, created_at
+
+  #       Save as Delta tables registered in Unity Catalog. Use schema name 'sdg_test_large_delta'.
+  #       Use Spark + Faker + Pandas UDFs with appropriate partitioning for this scale.
+  #       Priority should correlate with tier (Enterprise gets more Critical/High priorities).
+  #   expectations:
+  #     expected_facts:
+  #       - "pandas_udf"
+  #       - "DatabricksSession"
+  #       - "Delta"
+  #       - "saveAsTable"
+  #       - "customer_id"
+  #       - "priority"
+  #       - "exponential"
+  #     expected_patterns:
+  #       - pattern: "@F\\.pandas_udf|pandas_udf"
+  #         min_count: 1
+  #         description: "Pandas UDF for Faker parallelism"
+  #       - pattern: "saveAsTable"
+  #         min_count: 2
+  #         description: "Delta table registration"
+  #       - pattern: "numPartitions.*=.*\\d+"
+  #         min_count: 1
+  #         description: "Partitioned generation for scale"
+  #       - pattern: "exponential"
+  #         min_count: 1
+  #         description: "Exponential distribution for resolution times"
+  #     guidelines:
+  #       - "Must use Spark + Faker + Pandas UDFs for scalable generation"
+  #       - "Tickets must reference valid customer_ids from customers table"
+  #       - "Priority distribution must vary by customer tier"
+  #       - "Resolution hours must use exponential distribution"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "medium"
+  #     source: "manual"
+  #     tags: ["databricks-connect", "large", "delta", "pandas-udf", "referential-integrity"]
+
+  # # Test 3: Serverless Job + Small + JSON + 2 tables
+  # - id: "sdg_serverless_job_small_json_003"
+  #   inputs:
+  #     prompt: |
+  #       Generate synthetic product catalog data that will run as a serverless Databricks job.
+  #       Create 2 related tables with referential integrity:
+  #       - products (3,000 rows): product_id, name, category (weighted), price (log-normal), inventory_count
+  #       - sales (10,000 rows): sale_id, product_id (FK to products), quantity, sale_date, discount_pct
+
+  #       Save as JSON files to a Unity Catalog volume. Use schema name 'sdg_test_small_json'.
+  #       Create a job definition with environments for dependencies (faker).
+  #       Popular product categories should have more sales (weighted sampling).
+  #   expectations:
+  #     expected_facts:
+  #       - "serverless"
+  #       - "environments"
+  #       - "dependencies"
+  #       - "json"
+  #       - "product_id"
+  #       - "weighted"
+  #     expected_patterns:
+  #       - pattern: "environments.*spec.*dependencies"
+  #         min_count: 1
+  #         description: "Serverless job environment configuration"
+  #       - pattern: "\\.write.*json"
+  #         min_count: 1
+  #         description: "JSON output format"
+  #       - pattern: "product_id"
+  #         min_count: 3
+  #         description: "Foreign key reference in multiple tables"
+  #       - pattern: "create_job|run_job_now"
+  #         min_count: 1
+  #         description: "Job creation or execution"
+  #     guidelines:
+  #       - "Must create serverless job with environments parameter for dependencies"
+  #       - "Sales table product_id must only reference valid products"
+  #       - "Product categories must be weighted (not uniform)"
+  #       - "Job spec must include spec.client and spec.dependencies"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "medium"
+  #     source: "manual"
+  #     tags: ["serverless-job", "small", "json", "referential-integrity"]
+
+  # # Test 4: Serverless Job + Large + CSV + 2 tables
+  # - id: "sdg_serverless_job_large_csv_004"
+  #   inputs:
+  #     prompt: |
+  #       Generate large-scale synthetic financial transaction data as a serverless Databricks job.
+  #       Create 2 related tables with referential integrity:
+  #       - users (200,000 rows): user_id, username, account_type (Basic/Premium/VIP weighted 70/25/5), country, created_at
+  #       - transactions (1,000,000 rows): txn_id, user_id (FK to users), amount (log-normal varies by account_type), txn_type, timestamp
+
+  #       Save as CSV files with headers to a Unity Catalog volume. Use schema name 'sdg_test_large_csv'.
+  #       Use Spark + Faker + Pandas UDFs with high partition count for this scale.
+  #       VIP users should have larger transaction amounts.
+  #       Create the job with proper environments configuration.
+  #   expectations:
+  #     expected_facts:
+  #       - "pandas_udf"
+  #       - "serverless"
+  #       - "CSV"
+  #       - "header"
+  #       - "user_id"
+  #       - "environments"
+  #       - "log-normal"
+  #     expected_patterns:
+  #       - pattern: "@F\\.pandas_udf|pandas_udf"
+  #         min_count: 1
+  #         description: "Pandas UDF for Faker parallelism"
+  #       - pattern: "\\.csv.*header.*true|\\.option.*header.*true.*\\.csv"
+  #         min_count: 1
+  #         description: "CSV with headers"
+  #       - pattern: "environments.*dependencies"
+  #         min_count: 1
+  #         description: "Job environment configuration"
+  #       - pattern: "numPartitions.*=.*\\d{2,}"
+  #         min_count: 1
+  #         description: "High partition count for 1M rows"
+  #     guidelines:
+  #       - "Must use Spark + Faker + Pandas UDFs for million-row generation"
+  #       - "Transactions must reference valid user_ids"
+  #       - "Transaction amounts must scale with account_type (VIP > Premium > Basic)"
+  #       - "CSV output must include header row"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "hard"
+  #     source: "manual"
+  #     tags: ["serverless-job", "large", "csv", "pandas-udf", "referential-integrity"]
+
+  # # Test 5: Classic Cluster + Small + Delta + 2 tables
+  # - id: "sdg_classic_small_delta_005"
+  #   inputs:
+  #     prompt: |
+  #       Generate synthetic HR data to run on a classic Databricks cluster.
+  #       Create 2 related tables with referential integrity:
+  #       - employees (2,000 rows): employee_id, name, department (weighted), hire_date, salary (log-normal by dept)
+  #       - projects (5,000 rows): project_id, employee_id (FK to employees), project_name, hours_logged, status
+
+  #       Save as Delta tables in Unity Catalog. Use schema name 'sdg_test_classic_delta'.
+  #       First install dependencies with pip, then run the Python script.
+  #       Engineering department should have higher salaries than other departments.
+  #   expectations:
+  #     expected_facts:
+  #       - "classic cluster"
+  #       - "pip install"
+  #       - "Delta"
+  #       - "saveAsTable"
+  #       - "employee_id"
+  #       - "context_id"
+  #     expected_patterns:
+  #       - pattern: "%pip install|pip install"
+  #         min_count: 1
+  #         description: "Dependency installation on classic cluster"
+  #       - pattern: "execute_databricks_command|run_python_file_on_databricks"
+  #         min_count: 1
+  #         description: "Classic cluster execution tools"
+  #       - pattern: "saveAsTable"
+  #         min_count: 2
+  #         description: "Delta table output"
+  #       - pattern: "context_id"
+  #         min_count: 1
+  #         description: "Context reuse for pip + script execution"
+  #     guidelines:
+  #       - "Must use execute_databricks_command for pip install"
+  #       - "Must reuse context_id between pip install and script execution"
+  #       - "Projects must reference valid employee_ids"
+  #       - "Salary must vary by department using log-normal distribution"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "medium"
+  #     source: "manual"
+  #     tags: ["classic-cluster", "small", "delta", "referential-integrity"]
+
+  # # Test 6: Classic Cluster + Large + Parquet + 2 tables
+  # - id: "sdg_classic_large_parquet_006"
+  #   inputs:
+  #     prompt: |
+  #       Generate large-scale synthetic supply chain data to run on a classic Databricks cluster.
+  #       Create 2 related tables with referential integrity:
+  #       - suppliers (50,000 rows): supplier_id, company_name, country, rating (1-5 weighted toward 3-4), active_since
+  #       - inventory (300,000 rows): inventory_id, supplier_id (FK to suppliers), product_sku, quantity (Pareto), unit_cost, last_restock_date
+
+  #       Save as Parquet files to a Unity Catalog volume. Use schema name 'sdg_test_classic_parquet'.
+  #       Use Spark + Faker + Pandas UDFs with appropriate partitioning. Higher-rated suppliers should have more inventory items.
+  #       Install dependencies first, then execute the script with context reuse.
+  #   expectations:
+  #     expected_facts:
+  #       - "classic cluster"
+  #       - "pandas_udf"
+  #       - "parquet"
+  #       - "supplier_id"
+  #       - "Pareto"
+  #       - "pip install"
+  #     expected_patterns:
+  #       - pattern: "@F\\.pandas_udf|pandas_udf"
+  #         min_count: 1
+  #         description: "Pandas UDF for Faker parallelism"
+  #       - pattern: "\\.write.*parquet"
+  #         min_count: 1
+  #         description: "Parquet output"
+  #       - pattern: "supplier_id"
+  #         min_count: 3
+  #         description: "Foreign key across tables"
+  #       - pattern: "pareto|power.*law"
+  #         min_count: 1
+  #         description: "Pareto distribution for quantities"
+  #     guidelines:
+  #       - "Must use Spark + Faker + Pandas UDFs for large-scale generation"
+  #       - "Must install dependencies and reuse context"
+  #       - "Inventory must reference valid supplier_ids"
+  #       - "Quantity must use Pareto/power-law distribution"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "hard"
+  #     source: "manual"
+  #     tags: ["classic-cluster", "large", "parquet", "pandas-udf", "referential-integrity"]
+
+  # # Test 7: Databricks Connect + Medium + CSV + 3 tables (complex referential integrity)
+  # - id: "sdg_dbconnect_medium_csv_3tables_007"
+  #   inputs:
+  #     prompt: |
+  #       Generate synthetic retail order data using Databricks Connect with serverless.
+  #       Create 3 related tables with full referential integrity:
+  #       - customers (10,000 rows): customer_id, name, email, membership_level (Bronze/Silver/Gold/Platinum weighted 50/30/15/5), region
+  #       - orders (50,000 rows): order_id, customer_id (FK to customers), order_date, total_amount, status
+  #       - line_items (150,000 rows): line_item_id, order_id (FK to orders), product_name, quantity, unit_price
+
+  #       Save as CSV files with headers to Unity Catalog volume. Use schema name 'sdg_test_medium_csv'.
+  #       Use Faker with Spark UDFs for realistic product names.
+  #       Higher membership levels should have more orders. Order total_amount should equal sum of line_items.
+  #   expectations:
+  #     expected_facts:
+  #       - "DatabricksSession"
+  #       - "serverless"
+  #       - "CSV"
+  #       - "customer_id"
+  #       - "order_id"
+  #       - "line_item"
+  #       - "Faker"
+  #       - "UDF"
+  #     expected_patterns:
+  #       - pattern: "DatabricksSession.*serverless"
+  #         min_count: 1
+  #         description: "Databricks Connect configuration"
+  #       - pattern: "@F\\.udf|@udf"
+  #         min_count: 1
+  #         description: "Spark UDF for Faker"
+  #       - pattern: "customer_id"
+  #         min_count: 4
+  #         description: "FK in customers and orders"
+  #       - pattern: "order_id"
+  #         min_count: 4
+  #         description: "FK in orders and line_items"
+  #       - pattern: "\\.csv.*header"
+  #         min_count: 1
+  #         description: "CSV with headers"
+  #     guidelines:
+  #       - "Must maintain referential integrity across all 3 tables"
+  #       - "line_items.order_id must reference valid orders"
+  #       - "orders.customer_id must reference valid customers"
+  #       - "Should use Faker UDFs for realistic product names"
+  #       - "Membership level should weight order distribution"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "hard"
+  #     source: "manual"
+  #     tags: ["databricks-connect", "medium", "csv", "faker-udf", "3-tables", "referential-integrity"]
+
+  # # Test 8: Serverless Job + Medium + JSON + 3 tables (CRM data)
+  # - id: "sdg_serverless_job_medium_json_3tables_008"
+  #   inputs:
+  #     prompt: |
+  #       Generate synthetic CRM data as a serverless Databricks job.
+  #       Create 3 related tables with referential integrity:
+  #       - accounts (8,000 rows): account_id, company_name, industry (weighted), annual_revenue (log-normal), tier (SMB/Mid-Market/Enterprise)
+  #       - contacts (25,000 rows): contact_id, account_id (FK to accounts), first_name, last_name, email, title, is_primary
+  #       - activities (80,000 rows): activity_id, contact_id (FK to contacts), activity_type (Call/Email/Meeting weighted), activity_date, duration_minutes (exponential), notes
+
+  #       Save as JSON files to Unity Catalog volume. Use schema name 'sdg_test_medium_json'.
+  #       Create job with environments for faker and holidays dependencies.
+  #       Enterprise accounts should have more contacts. Use realistic time patterns (weekday bias, business hours).
+  #   expectations:
+  #     expected_facts:
+  #       - "serverless"
+  #       - "environments"
+  #       - "JSON"
+  #       - "account_id"
+  #       - "contact_id"
+  #       - "activity"
+  #       - "weekday"
+  #       - "exponential"
+  #     expected_patterns:
+  #       - pattern: "environments.*dependencies"
+  #         min_count: 1
+  #         description: "Serverless job environment"
+  #       - pattern: "\\.write.*json"
+  #         min_count: 1
+  #         description: "JSON output"
+  #       - pattern: "account_id"
+  #         min_count: 4
+  #         description: "FK across tables"
+  #       - pattern: "contact_id"
+  #         min_count: 4
+  #         description: "FK in contacts and activities"
+  #       - pattern: "weekday|weekend|business.*hours"
+  #         min_count: 1
+  #         description: "Time-based patterns"
+  #     guidelines:
+  #       - "Must create job with environments specifying faker and holidays"
+  #       - "contacts.account_id must reference valid accounts"
+  #       - "activities.contact_id must reference valid contacts"
+  #       - "Activity dates should show weekday bias (more on Mon-Fri)"
+  #       - "Duration should use exponential distribution"
+  #   metadata:
+  #     category: "happy_path"
+  #     difficulty: "hard"
+  #     source: "manual"
+  #     tags: ["serverless-job", "medium", "json", "3-tables", "time-patterns", "referential-integrity"]
+
+  # =============================================================================
+  # EXECUTED TEST CASES (with verified outputs)
+  # =============================================================================
+
+  # Test 9: Databricks Connect + Small + Parquet + 2 tables (EXECUTED)
+  - id: "sdg_dbconnect_small_parquet_exec_001"
+    inputs:
+      prompt: |
+        Generate synthetic e-commerce data locally then save it to Unity Catalog.
+        Create 2 related tables with referential integrity:
+        - customers (5,000 rows): customer_id, name, email, tier (Free/Pro/Enterprise weighted 60/30/10), region, created_at
+        - orders (15,000 rows): order_id, customer_id (FK to customers), amount, order_date, status
+
+        Save as Parquet files to a Unity Catalog volume. Use schema name 'devkit_gen1_test_small_parquet'.
+        Enterprise customers should generate more orders than Free tier.
+    expectations:
+      expected_facts:
+        - "DatabricksSession"
+        - "serverless"
+        - "parquet"
+        - "customer_id"
+        - "referential integrity"
+        - "weighted"
+        - "log-normal"
+        - "pandas_udf"
+      expected_patterns:
+        - pattern: "DatabricksSession.*serverless.*True"
+          min_count: 1
+          description: "Databricks Connect serverless configuration"
+        - pattern: "\\.write.*parquet"
+          min_count: 1
+          description: "Parquet output format"
+        - pattern: "customer_id"
+          min_count: 3
+          description: "Foreign key reference in multiple tables"
+        - pattern: "lognormal"
+          min_count: 1
+          description: "Log-normal distribution for amounts"
+        - pattern: "@F\\.pandas_udf|pandas_udf"
+          min_count: 1
+          description: "Pandas UDF for Faker parallelism"
+      guidelines:
+        - "Must use DatabricksSession.builder.serverless(True).getOrCreate()"
+        - "Orders table customer_id must only contain IDs from customers table"
+        - "Enterprise tier customers must have higher weight for order generation"
+        - "Amount distribution must use log-normal, not uniform"
+        - "Must use Spark + Faker + Pandas UDFs approach"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "interactive_execution"
+      execution_date: "2025-02-25"
+      execution_verified: true
+      tags: ["databricks-connect", "small", "parquet", "referential-integrity", "pandas-udf", "executed"]
+
+  # Test 10: Serverless Job + Small + JSON + 2 tables (EXECUTED)
+  - id: "sdg_serverless_job_catalog_json_009"
+    inputs:
+      prompt: |
+        Generate synthetic product catalog data that will run as a serverless Databricks job.
+        Create 2 related tables with referential integrity:
+        - products (3,000 rows): product_id, name, category (weighted), price (log-normal), inventory_count
+        - sales (10,000 rows): sale_id, product_id (FK to products), quantity, sale_date, discount_pct
+
+        Save as JSON files to a Unity Catalog volume. Use schema name 'devkit_gen3_test_small_json'.
+        Create a job definition with environments for dependencies (faker).
+        Popular product categories should have more sales (weighted sampling).
+    expectations:
+      expected_facts:
+        - "serverless"
+        - "environments"
+        - "dependencies"
+        - "client"
+        - "json"
+        - "product_id"
+        - "weighted"
+        - "lognormal"
+        - "pandas_udf"
+      expected_patterns:
+        - pattern: "environments.*spec.*dependencies"
+          min_count: 1
+          description: "Serverless job environment configuration"
+        - pattern: '"client":\\s*"4"'
+          min_count: 1
+          description: "Correct client version for serverless"
+        - pattern: "\\.write.*json"
+          min_count: 1
+          description: "JSON output format"
+        - pattern: "product_id"
+          min_count: 3
+          description: "Foreign key reference in multiple places"
+        - pattern: "@F\\.pandas_udf|pandas_udf"
+          min_count: 1
+          description: "Pandas UDF for Faker parallelism"
+        - pattern: "lognormal|log-normal|log_normal"
+          min_count: 1
+          description: "Log-normal distribution for prices"
+        - pattern: "CREATE SCHEMA IF NOT EXISTS|CREATE VOLUME IF NOT EXISTS"
+          min_count: 1
+          description: "Infrastructure creation in script"
+      guidelines:
+        - "Must create serverless job with environments parameter for dependencies"
+        - "Job spec must include client: 4 (not 1)"
+        - "Sales table product_id must only reference valid products (FK integrity)"
+        - "Product categories must be weighted (not uniform)"
+        - "Price distribution must use log-normal, not uniform"
+        - "Script must create schema and volume infrastructure"
+        - "Must NOT use .cache() or .persist() (serverless incompatible)"
+        - "Popular categories should have more sales (weighted sampling)"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "interactive_execution"
+      execution_date: "2026-02-26"
+      execution_verified: true
+      job_run_id: "560746964795126"
+      tags: ["serverless-job", "small", "json", "referential-integrity", "weighted-sampling", "executed"]
+
+  # Test 11: Databricks Connect + Large + Delta + 2 tables (EXECUTED)
+  - id: "sdg_dbconnect_large_delta_exec_002"
+    inputs:
+      prompt: |
+        Generate large-scale support ticket data.
+        Create 2 related tables with referential integrity:
+        - customers (100,000 rows): customer_id, company_name, tier, arr (log-normal), region, signup_date
+        - tickets (500,000 rows): ticket_id, customer_id (FK), priority (correlates with tier), resolution_hours (exponential), csat_score, created_at
+
+        Save as Delta tables registered in Unity Catalog. Use schema name 'devkit_gen2_test_large_delta'.
+        Priority should correlate with tier (Enterprise gets more Critical/High priorities).
+    expectations:
+      expected_facts:
+        - "pandas_udf"
+        - "DatabricksSession"
+        - "Delta"
+        - "saveAsTable"
+        - "customer_id"
+        - "priority"
+        - "exponential"
+        - "lognormal"
+        - "serverless"
+      expected_patterns:
+        - pattern: "@F\\.pandas_udf|pandas_udf"
+          min_count: 1
+          description: "Pandas UDF for Faker parallelism"
+        - pattern: "saveAsTable"
+          min_count: 2
+          description: "Delta table registration"
+        - pattern: "numPartitions.*=.*\\d+"
+          min_count: 1
+          description: "Partitioned generation for scale"
+        - pattern: "exponential"
+          min_count: 1
+          description: "Exponential distribution for resolution times"
+        - pattern: "lognormal"
+          min_count: 1
+          description: "Log-normal distribution for ARR"
+        - pattern: "DatabricksSession.*serverless.*True"
+          min_count: 1
+          description: "Databricks Connect serverless configuration"
+      guidelines:
+        - "Must use DatabricksSession.builder.serverless(True).getOrCreate()"
+        - "Must use Spark + Faker + Pandas UDFs for scalable generation"
+        - "Tickets must reference valid customer_ids from customers table"
+        - "Priority distribution must vary by customer tier"
+        - "Resolution hours must use exponential distribution"
+        - "ARR must use log-normal distribution"
+        - "Must use high partition count (64+) for large-scale generation"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "interactive_execution"
+      execution_date: "2026-02-26"
+      execution_verified: true
+      tags: ["databricks-connect", "large", "delta", "pandas-udf", "referential-integrity", "executed"]
