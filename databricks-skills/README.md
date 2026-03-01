@@ -52,6 +52,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 
 ### 📊 Analytics & Dashboards
 - **databricks-aibi-dashboards** - Databricks AI/BI dashboards (with SQL validation workflow)
+- **databricks-powerbi-migration** - Power BI to Databricks migration (metric views, DAX-to-SQL, ERD generation, schema mapping)
 - **databricks-unity-catalog** - System tables for lineage, audit, billing
 
 ### 🔧 Data Engineering
