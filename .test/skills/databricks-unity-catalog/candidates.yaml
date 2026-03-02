@@ -1,0 +1,12 @@
+---
+# Candidate test cases pending review for databricks-unity-catalog skill
+# Add new test cases here for review before promoting to ground_truth.yaml
+#
+# Workflow:
+# 1. Generate response for a new prompt
+# 2. Add to candidates with review_status: "pending"
+# 3. Execute on Databricks to verify
+# 4. Run MLflow evaluation
+# 5. If passed, promote to ground_truth.yaml
+
+candidates: []

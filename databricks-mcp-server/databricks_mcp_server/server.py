@@ -153,4 +153,5 @@ from .tools import (  # noqa: F401, E402
     lakebase,
     user,
     apps,
+    fgac_policies,
 )

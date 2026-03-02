@@ -1,0 +1,40 @@
+skill:
+  name: "databricks-unity-catalog"
+  source_path: "databricks-skills/databricks-unity-catalog"
+  description: "Unity Catalog FGAC governance - column masks, row filters, governed tags, masking UDFs"
+
+evaluation:
+  datasets:
+    - path: ground_truth.yaml
+      type: yaml
+
+# Scorer configuration
+scorers:
+  # Built-in deterministic scorers
+  enabled:
+    - python_syntax
+    - sql_syntax
+    - pattern_adherence
+    - no_hallucinated_apis
+    - expected_facts_present
+
+  # LLM-based scorers
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations  # Dynamic from YAML expectations.guidelines
+
+  # Default guidelines (used when test case has no guidelines)
+  default_guidelines:
+    - "Response must address the user's request completely"
+    - "Code examples must follow documented best practices"
+    - "FGAC policies must always include EXCEPT `gov_admin`"
+    - "Masking UDFs must be DETERMINISTIC with simple CASE statements"
+    - "Must use fully qualified names for UDFs (catalog.schema.function)"
+    - "Must never generate SHOW POLICIES, DESCRIBE POLICY, or ALTER POLICY SQL"
+    - "Policy creation must follow human-in-the-loop workflow (preview -> approve -> execute)"
+
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.90
+  no_hallucinated_apis: 1.0
+  execution_success: 0.80

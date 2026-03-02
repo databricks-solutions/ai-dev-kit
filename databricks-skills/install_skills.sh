@@ -66,7 +66,7 @@ get_skill_description() {
         "databricks-iceberg") echo "Apache Iceberg - managed tables, UniForm, IRC, Snowflake interop, migration" ;;
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
-        "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
+        "databricks-unity-catalog") echo "System tables, volumes, access controls, and FGAC policy governance" ;;
         "databricks-lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
         "databricks-lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
         "databricks-metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
@@ -104,7 +104,7 @@ get_skill_extra_files() {
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
-        "databricks-unity-catalog") echo "5-system-tables.md" ;;
+        "databricks-unity-catalog") echo "5-system-tables.md 6-volumes.md 7-fgac-overview.md 8-fgac-sql-generation.md 9-fgac-sdk-and-tools.md 10-uc-acls.md" ;;
         "databricks-lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "databricks-lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
         "databricks-metric-views") echo "yaml-reference.md patterns.md" ;;

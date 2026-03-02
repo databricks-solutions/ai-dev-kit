@@ -117,7 +117,9 @@ def warehouse_id(workspace_client: WorkspaceClient) -> str:
     Get a running SQL warehouse for tests.
 
     Prefers shared endpoints, falls back to any running warehouse.
+    Starts a stopped serverless warehouse if none are running.
     """
+    import time
     from databricks.sdk.service.sql import State
 
     warehouses = list(workspace_client.warehouses.list())
@@ -133,6 +135,18 @@ def warehouse_id(workspace_client: WorkspaceClient) -> str:
         if w.state == State.RUNNING:
             logger.info(f"Using warehouse: {w.name} ({w.id})")
             return w.id
+
+    # Start a stopped serverless warehouse
+    for w in warehouses:
+        if w.state == State.STOPPED and "serverless" in (w.name or "").lower():
+            logger.info(f"Starting stopped serverless warehouse: {w.name} ({w.id})")
+            workspace_client.warehouses.start(w.id)
+            for _ in range(30):
+                wh = workspace_client.warehouses.get(w.id)
+                if wh.state == State.RUNNING:
+                    logger.info(f"Warehouse started: {w.name} ({w.id})")
+                    return w.id
+                time.sleep(10)
 
     # No running warehouse found
     pytest.skip("No running SQL warehouse available for tests")

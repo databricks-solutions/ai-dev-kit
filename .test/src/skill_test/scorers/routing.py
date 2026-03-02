@@ -43,7 +43,12 @@ SKILL_TRIGGERS = {
         "dashboard app",
         "data app",
     ],
-    "databricks-asset-bundles": ["dabs", "databricks asset bundle", "deploy", "bundle.yaml"],
+    "databricks-asset-bundles": [
+        "dabs",
+        "databricks asset bundle",
+        "deploy",
+        "bundle.yaml",
+    ],
     "databricks-python-sdk": [
         "python sdk",
         "databricks-sdk",
@@ -74,7 +79,32 @@ SKILL_TRIGGERS = {
         "supervisor",
     ],
     "databricks-lakebase-provisioned": ["lakebase", "postgresql", "postgres"],
-    "databricks-model-serving": ["model serving", "serving endpoint", "inference endpoint"],
+    "databricks-model-serving": [
+        "model serving",
+        "serving endpoint",
+        "inference endpoint",
+    ],
+    "databricks-unity-catalog": [
+        "fgac",
+        "column mask",
+        "row filter",
+        "governed tag",
+        "masking udf",
+        "create policy",
+        "drop policy",
+        "hastagvalue",
+        "hastag",
+        "pii classification",
+        "grant select",
+        "grant use",
+        "revoke",
+        "permissions",
+        "acl",
+        "access control",
+        "read-only access",
+        "ownership",
+        "owner to",
+    ],
 }
 
 
