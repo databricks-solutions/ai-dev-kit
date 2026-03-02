@@ -31,8 +31,8 @@ env:
 | Dash | `["python", "app.py"]` |
 | Streamlit | `["streamlit", "run", "app.py"]` |
 | Gradio | `["python", "app.py"]` |
-| Flask | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8080"]` |
-| FastAPI | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]` |
+| Flask | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8000"]` |
+| FastAPI | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` |
 | Reflex | `["reflex", "run", "--env", "prod"]` |
 
 ### Step 2: Create and Deploy

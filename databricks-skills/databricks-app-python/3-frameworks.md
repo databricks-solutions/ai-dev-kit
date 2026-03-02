@@ -25,7 +25,7 @@ app = dash.Dash(
 |--------|-------|
 | Pre-installed version | 2.18.1 |
 | app.yaml command | `["python", "app.py"]` |
-| Default port | 8050 (set `DATABRICKS_APP_PORT=8080` or use `app.run(port=8080)`) |
+| Default port | 8050 — override in code: `app.run(port=int(os.environ.get("DATABRICKS_APP_PORT", 8000)))` |
 | Auth header | `request.headers.get('x-forwarded-access-token')` (Flask under the hood) |
 
 **Databricks tips**:
@@ -84,6 +84,7 @@ def get_connection():
 **Critical**: Use `gr.Request` parameter to access auth headers.
 
 ```python
+import os
 import gradio as gr
 import requests
 from databricks.sdk.core import Config
@@ -102,14 +103,15 @@ def predict(message, request: gr.Request):
     return resp.json()["predictions"][0]
 
 demo = gr.Interface(fn=predict, inputs="text", outputs="text")
-demo.launch(server_name="0.0.0.0", server_port=8080)
+port = int(os.environ.get("DATABRICKS_APP_PORT", 8000))
+demo.launch(server_name="0.0.0.0", server_port=port)
 ```
 
 | Detail | Value |
 |--------|-------|
 | Pre-installed version | 4.44.0 |
 | app.yaml command | `["python", "app.py"]` |
-| Default port | 7860 (override with `server_port=8080` or `GRADIO_SERVER_PORT=8080`) |
+| Default port | 7860 — override in code: `server_port=int(os.environ.get("DATABRICKS_APP_PORT", 8000))` |
 | Auth header | `request.headers.get('x-forwarded-access-token')` via `gr.Request` |
 
 **Databricks tips**:
@@ -150,7 +152,7 @@ def get_data():
 | Detail | Value |
 |--------|-------|
 | Pre-installed version | 3.0.3 |
-| app.yaml command | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8080"]` |
+| app.yaml command | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8000"]` |
 | Auth header | `request.headers.get('x-forwarded-access-token')` |
 
 **Databricks tips**:
@@ -190,7 +192,7 @@ async def get_data(request: Request):
 | Detail | Value |
 |--------|-------|
 | Pre-installed version | 0.115.0 |
-| app.yaml command | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]` |
+| app.yaml command | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` |
 | Auth header | `request.headers.get('x-forwarded-access-token')` via `Request` |
 
 **Databricks tips**:
@@ -241,6 +243,6 @@ class State(rx.State):
 - All frameworks are **pre-installed** — no need to add them to `requirements.txt`
 - Add only additional packages your app needs to `requirements.txt`
 - SDK `Config()` auto-detects credentials from injected environment variables
-- Databricks Apps expects apps to listen on **port 8080** (configure your framework accordingly)
+- Apps must bind to `DATABRICKS_APP_PORT` env var (defaults to 8000). Streamlit is auto-configured by the runtime; for other frameworks, read the env var in code or hardcode 8000 in `app.yaml` command. **Never use 8080**
 - For framework-specific deployment commands, see [4-deployment.md](4-deployment.md)
 - For authorization integration, see [1-authorization.md](1-authorization.md)

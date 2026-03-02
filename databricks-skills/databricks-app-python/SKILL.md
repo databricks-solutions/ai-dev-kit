@@ -38,8 +38,8 @@ Copy this checklist and verify each item:
 | **Dash** | Production dashboards, BI tools, complex interactivity | `["python", "app.py"]` |
 | **Streamlit** | Rapid prototyping, data science apps, internal tools | `["streamlit", "run", "app.py"]` |
 | **Gradio** | ML demos, model interfaces, chat UIs | `["python", "app.py"]` |
-| **Flask** | Custom REST APIs, lightweight apps, webhooks | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8080"]` |
-| **FastAPI** | Async APIs, auto-generated OpenAPI docs | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]` |
+| **Flask** | Custom REST APIs, lightweight apps, webhooks | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8000"]` |
+| **FastAPI** | Async APIs, auto-generated OpenAPI docs | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` |
 | **Reflex** | Full-stack Python apps without JavaScript | `["reflex", "run", "--env", "prod"]` |
 
 **Default**: Recommend **Streamlit** for prototypes, **Dash** for production dashboards, **FastAPI** for APIs, **Gradio** for ML demos.
@@ -170,7 +170,7 @@ class EntityIn(BaseModel):
 | **Resource not accessible** | Add resource via UI, verify SP has permissions, use `valueFrom` in app.yaml |
 | **Import error on deploy** | Add missing packages to `requirements.txt` (pre-installed packages don't need listing) |
 | **Lakebase app crashes on start** | `psycopg2`/`asyncpg` are NOT pre-installed — MUST add to `requirements.txt` |
-| **Port conflict** | Databricks Apps expects port 8080; configure your framework accordingly |
+| **Port conflict** | Apps must bind to `DATABRICKS_APP_PORT` env var (defaults to 8000). Never use 8080. Streamlit is auto-configured; for others, read the env var in code or use 8000 in app.yaml command |
 | **Streamlit: set_page_config error** | `st.set_page_config()` must be the first Streamlit command |
 | **Dash: unstyled layout** | Add `dash-bootstrap-components`; use `dbc.themes.BOOTSTRAP` |
 | **Slow queries** | Use Lakebase for transactional/low-latency; SQL warehouse for analytical queries |
