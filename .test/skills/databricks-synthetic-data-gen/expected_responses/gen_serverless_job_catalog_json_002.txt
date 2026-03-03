@@ -311,26 +311,20 @@ To run this as a serverless job, create the job with this configuration:
       "spark_python_task": {
         "python_file": "/Workspace/Users/your_email/generate_product_catalog_data.py"
       },
-      "new_cluster": {
-        "spark_version": "16.4.x-scala2.12",
-        "num_workers": 0,
-        "spark_conf": {
-          "spark.databricks.cluster.profile": "serverless"
-        }
-      },
-      "environments": [
-        {
-          "environment_key": "default",
-          "spec": {
-            "client": "4",
-            "dependencies": [
-              "faker",
-              "pandas",
-              "numpy"
-            ]
-          }
-        }
-      ]
+      "environment_key": "default"
+    }
+  ],
+  "environments": [
+    {
+      "environment_key": "default",
+      "spec": {
+        "client": "4",
+        "dependencies": [
+          "faker",
+          "pandas",
+          "numpy"
+        ]
+      }
     }
   ]
 }
