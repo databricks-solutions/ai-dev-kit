@@ -11,7 +11,7 @@ Run everything (slow, requires API key):
 
 import pytest
 
-from skill_test.optimize.evaluator import token_efficiency_score, count_tokens, SKILL_KEY
+from skill_test.optimize.utils import token_efficiency_score, count_tokens, SKILL_KEY
 from skill_test.optimize.splitter import create_gepa_datasets, generate_bootstrap_tasks, to_gepa_instances
 from skill_test.optimize.asi import feedback_to_score, feedback_to_asi
 
@@ -39,8 +39,11 @@ class TestTokenEfficiency:
         tokens = count_tokens(text)
         assert token_efficiency_score(text, tokens) == 1.0
 
-    def test_smaller_scores_one(self):
-        assert token_efficiency_score("short", 100) == 1.0
+    def test_smaller_scores_bonus(self):
+        # Smaller than original gets a bonus (up to 1.15)
+        score = token_efficiency_score("short", 100)
+        assert score > 1.0
+        assert score <= 1.15
 
     def test_double_size_scores_zero(self):
         text = "word " * 200

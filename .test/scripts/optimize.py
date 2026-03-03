@@ -58,27 +58,20 @@ def main():
         help="GEPA optimization preset (default: standard)",
     )
     parser.add_argument(
-        "--mode", "-m",
-        choices=["static", "generative"],
-        default="static",
-        help="Evaluation mode (default: static)",
-    )
-    parser.add_argument(
-        "--task-lm",
-        default=None,
-        help="(Deprecated, use --gen-model) LLM model for generative mode",
-    )
-    parser.add_argument(
         "--gen-model",
         default=None,
         help="LLM model for generative evaluation (default: GEPA_GEN_LM env or "
-             "databricks/databricks-claude-sonnet-4-6). The evaluator sends the "
-             "candidate SKILL.md to this model and scores the generated response.",
+             "databricks/databricks-claude-sonnet-4-6).",
     )
     parser.add_argument(
         "--reflection-lm",
         default=None,
         help="Override GEPA reflection model (default: GEPA_REFLECTION_LM env or databricks/databricks-claude-opus-4-6)",
+    )
+    parser.add_argument(
+        "--judge-model",
+        default=None,
+        help="Override judge model for quality/effectiveness evaluation (future use)",
     )
     parser.add_argument(
         "--dry-run",
@@ -116,52 +109,38 @@ def main():
         "--max-passes",
         type=int,
         default=5,
-        help="Maximum optimization passes per component (default: 5). "
-             "Each pass re-seeds from the previous best. Stops early if no improvement.",
+        help="Maximum optimization passes per component (default: 5).",
     )
     parser.add_argument(
         "--max-metric-calls",
         type=int,
         default=None,
-        help="Override max metric calls per pass (default: auto-scaled by preset × components, "
-             "capped at 300 for non-Opus models). Example: --max-metric-calls 100",
-    )
-    parser.add_argument(
-        "--evaluator",
-        choices=["legacy", "skillbench"],
-        default="skillbench",
-        help="Evaluator type: 'skillbench' (measures skill effectiveness via WITH vs "
-             "WITHOUT comparison, default) or 'legacy' (weighted scoring with keyword "
-             "matching and token efficiency)",
+        help="Override max metric calls per pass (default: auto-scaled by preset).",
     )
     parser.add_argument(
         "--token-budget",
         type=int,
         default=None,
-        help="Token budget ceiling. Candidates exceeding this are penalized. "
-             "Recommended: 50000. Default: GEPA_TOKEN_BUDGET env or disabled.",
+        help="Token budget ceiling. Candidates exceeding this are penalized.",
     )
     parser.add_argument(
-        "--use-judges",
+        "--align",
         action="store_true",
-        help="Enable MLflow LLM judges (Correctness + Guidelines) for richer NL "
-             "feedback to GEPA's reflection LM. Adds ~10%% judge_quality weight.",
+        help="Use MemAlign to align judges with human feedback (requires alignment traces)",
     )
     parser.add_argument(
         "--generate-from",
         type=str,
         default=None,
         metavar="REQUIREMENTS_FILE",
-        help="Generate test cases from a requirements file before optimizing. "
-             "Each line in the file is a requirement.",
+        help="Generate test cases from a requirements file before optimizing.",
     )
     parser.add_argument(
         "--requirement",
         action="append",
         default=None,
         dest="requirements",
-        help="Inline requirement for test case generation (repeatable). "
-             "Example: --requirement 'Must explain MEASURE() wrapping'",
+        help="Inline requirement for test case generation (repeatable).",
     )
 
     args = parser.parse_args()
@@ -198,7 +177,7 @@ def main():
                 skill_name=args.skill_name,
                 requirements=requirements,
                 gen_model=gen_model,
-                trust=True,  # append directly since we're about to optimize
+                trust=True,
             )
             print()
 
@@ -240,9 +219,7 @@ def main():
             try:
                 result = optimize_skill(
                     skill_name=name,
-                    mode=args.mode,
                     preset=args.preset,
-                    task_lm=args.task_lm,
                     gen_model=args.gen_model,
                     reflection_lm=args.reflection_lm,
                     include_tools=args.include_tools,
@@ -251,9 +228,9 @@ def main():
                     dry_run=args.dry_run,
                     max_passes=args.max_passes,
                     max_metric_calls=args.max_metric_calls,
-                    evaluator_type=args.evaluator,
                     token_budget=args.token_budget,
-                    use_judges=args.use_judges,
+                    judge_model=args.judge_model,
+                    align=args.align,
                 )
                 review_optimization(result)
                 if args.apply and not args.dry_run:
@@ -278,9 +255,7 @@ def main():
         try:
             result = optimize_skill(
                 skill_name=args.skill_name,
-                mode=args.mode,
                 preset=args.preset,
-                task_lm=args.task_lm,
                 gen_model=args.gen_model,
                 reflection_lm=args.reflection_lm,
                 include_tools=args.include_tools,
@@ -289,9 +264,9 @@ def main():
                 dry_run=args.dry_run,
                 max_passes=args.max_passes,
                 max_metric_calls=args.max_metric_calls,
-                evaluator_type=args.evaluator,
                 token_budget=args.token_budget,
-                use_judges=args.use_judges,
+                judge_model=args.judge_model,
+                align=args.align,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:

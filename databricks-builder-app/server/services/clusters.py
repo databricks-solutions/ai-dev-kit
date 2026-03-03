@@ -23,11 +23,14 @@ _cache: dict = {
 _cache_lock = Lock()
 
 
+SERVERLESS_CLUSTER_ID = '__serverless__'
+
+
 def _fetch_clusters_sync(limit: int = 50, timeout: int = 15) -> list[dict]:
   """Synchronously fetch clusters from Databricks using SDK.
 
-  Returns clusters sorted by: running first, "shared" in name second, then alphabetically.
-  Filters out serverless clusters.
+  Returns a "Serverless Compute" entry first (always), followed by real clusters
+  sorted by: running first, "shared" in name second, then alphabetically.
 
   Args:
       limit: Maximum number of clusters to return
@@ -57,7 +60,17 @@ def _fetch_clusters_sync(limit: int = 50, timeout: int = 15) -> list[dict]:
 
   filtered_clusters.sort(key=sort_key)
 
-  return [
+  # Build result with Serverless Compute as the first (default) entry
+  result = [
+    {
+      'cluster_id': SERVERLESS_CLUSTER_ID,
+      'cluster_name': 'Serverless Compute',
+      'state': 'RUNNING',
+      'creator_user_name': None,
+    },
+  ]
+
+  result.extend(
     {
       'cluster_id': c.cluster_id,
       'cluster_name': c.cluster_name,
@@ -65,7 +78,9 @@ def _fetch_clusters_sync(limit: int = 50, timeout: int = 15) -> list[dict]:
       'creator_user_name': c.creator_user_name,
     }
     for c in filtered_clusters[:limit]
-  ]
+  )
+
+  return result
 
 
 async def _refresh_cache(timeout_seconds: int = 30) -> None:

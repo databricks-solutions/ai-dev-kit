@@ -150,6 +150,12 @@ def run_migrations_online():
   """Run migrations in 'online' mode using sync engine."""
   url, connect_args = get_url_and_connect_args()
 
+  # Get schema name from Alembic config or environment
+  schema_name = config.get_main_option('lakebase_schema_name') or os.environ.get('LAKEBASE_SCHEMA_NAME', 'builder_app')
+
+  # Add search_path to connect_args so tables are created in the custom schema
+  connect_args.setdefault('options', f'-c search_path={schema_name},public')
+
   connectable = create_engine(
     url,
     poolclass=pool.NullPool,
@@ -157,6 +163,11 @@ def run_migrations_online():
   )
 
   with connectable.connect() as connection:
+    # Create the schema if it doesn't exist (SP has CREATE on the database)
+    from sqlalchemy import text
+    connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS {schema_name}'))
+    connection.commit()
+
     context.configure(
       connection=connection,
       target_metadata=target_metadata,

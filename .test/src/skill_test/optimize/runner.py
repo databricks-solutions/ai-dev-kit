@@ -1,6 +1,7 @@
 """End-to-end orchestrator for GEPA skill optimization.
 
 Uses optimize_anything API: evaluator function + GEPAConfig.
+Single evaluator path using SkillBench judge-based evaluation.
 """
 
 import copy
@@ -8,19 +9,15 @@ import difflib
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from gepa.optimize_anything import optimize_anything, GEPAConfig
 
 from ..config import SkillTestConfig
 from ..runners.evaluate import setup_mlflow
 from .config import get_preset, validate_reflection_context, estimate_pass_duration, DEFAULT_GEN_LM, DEFAULT_TOKEN_BUDGET
-from .evaluator import (
-    SKILL_KEY,
-    create_skill_evaluator,
-    count_tokens,
-    build_optimization_background,
-    _find_skill_md,
+from .utils import SKILL_KEY, count_tokens, find_skill_md
+from .skillbench_evaluator import (
     create_skillbench_evaluator,
     build_skillbench_background,
 )
@@ -52,7 +49,7 @@ class OptimizationResult:
     components: dict[str, str] | None = None
     original_components: dict[str, str] | None = None
     tool_map: Any = None
-    evaluator_type: str = "legacy"
+    evaluator_type: str = "skillbench"
     skillbench_side_info: dict[str, dict] | None = None
 
 
@@ -93,9 +90,6 @@ def _evaluate_on_tasks(evaluator, candidate, tasks):
 
     Returns:
         (mean_score, per_task_scores, side_info_by_id, side_info_by_input)
-        - per_task_scores: {task_id: float}
-        - side_info_by_id: {task_id: side_info_dict} -- for background builder
-        - side_info_by_input: {input_text: side_info_dict} -- for evaluator baseline
     """
     gepa_instances = to_gepa_instances(tasks)
     per_task = {}
@@ -113,9 +107,7 @@ def _evaluate_on_tasks(evaluator, candidate, tasks):
 
 def optimize_skill(
     skill_name: str,
-    mode: Literal["static", "generative"] = "static",
-    preset: Literal["quick", "standard", "thorough"] = "standard",
-    task_lm: str | None = None,
+    preset: str = "standard",
     gen_model: str | None = None,
     reflection_lm: str | None = None,
     include_tools: bool = False,
@@ -124,37 +116,38 @@ def optimize_skill(
     dry_run: bool = False,
     max_passes: int = 5,
     max_metric_calls: int | None = None,
-    evaluator_type: Literal["legacy", "skillbench"] = "skillbench",
     token_budget: int | None = None,
-    use_judges: bool = False,
+    judge_model: str | None = None,
+    align: bool = False,
+    # Deprecated params kept for backward compat
+    mode: str = "static",
+    task_lm: str | None = None,
+    evaluator_type: str = "skillbench",
+    use_judges: bool = True,
 ) -> OptimizationResult:
     """Run end-to-end GEPA optimization on a skill and/or tools.
 
-    Uses optimize_anything API with a simple evaluator function.
+    Uses optimize_anything API with judge-based evaluation.
     Runs up to ``max_passes`` optimization passes per component, feeding
-    each pass's best candidate as the seed for the next.  Stops early
-    when a pass produces no score improvement.
+    each pass's best candidate as the seed for the next.
 
     Args:
         skill_name: Name of the skill to optimize
-        mode: "static" or "generative"
         preset: "quick" (15), "standard" (50), "thorough" (150)
-        task_lm: LLM for generative mode (deprecated, use gen_model)
-        gen_model: LLM for generative evaluation (default: GEPA_GEN_LM env)
+        gen_model: LLM for generative evaluation
         reflection_lm: Override reflection LM
         include_tools: Include MCP tool descriptions as additional components
         tool_modules: Specific tool modules (None = all)
         tools_only: Optimize ONLY tool descriptions
         dry_run: Show config without running
-        max_passes: Maximum optimization passes (default 5). Each pass
-            re-seeds from the previous best and runs a full GEPA cycle.
-        evaluator_type: "skillbench" (measures skill effectiveness delta) or
-            "legacy" (weighted scoring with keyword/token efficiency).
-        token_budget: Hard token ceiling; candidates exceeding this are penalized.
-        use_judges: Enable MLflow LLM judges (Correctness + Guidelines) for NL feedback.
+        max_passes: Maximum optimization passes (default 5)
+        max_metric_calls: Override max metric calls per pass
+        token_budget: Hard token ceiling
+        judge_model: Override judge model (future use)
+        align: Use MemAlign alignment (future use)
     """
     # 1. Load SKILL.md
-    skill_path = _find_skill_md(skill_name)
+    skill_path = find_skill_md(skill_name)
     if not tools_only and skill_path is None:
         raise FileNotFoundError(f"Could not find SKILL.md for '{skill_name}'")
 
@@ -184,8 +177,8 @@ def optimize_skill(
 
     total_original_tokens = sum(original_token_counts.values())
 
-    # Default --include-tools for SkillBench (tools are the primary token consumer)
-    if evaluator_type == "skillbench" and not tools_only and not include_tools and not tool_components:
+    # Auto-include tools for SkillBench
+    if not tools_only and not include_tools and not tool_components:
         include_tools = True
         tool_map = extract_tool_descriptions(modules=tool_modules)
         tool_components = tools_to_gepa_components(tool_map, per_module=True)
@@ -212,32 +205,22 @@ def optimize_skill(
         print(f"No test cases found. Using {len(train)} auto-generated tasks.")
 
     # 4. Build evaluator
-    # Resolve gen_model: explicit arg > task_lm (deprecated) > env default
     effective_gen_model = gen_model or task_lm or DEFAULT_GEN_LM
     if effective_gen_model:
         print(f"Generation model: {effective_gen_model}")
-    judges_label = " (with LLM judges)" if use_judges else ""
-    print(f"Evaluator: {evaluator_type}{judges_label}")
+    print("Evaluator: skillbench (judge-driven)")
 
-    if evaluator_type == "skillbench":
-        if not effective_gen_model:
-            raise ValueError(
-                "SkillBench evaluator requires a gen_model. "
-                "Pass --gen-model or set GEPA_GEN_LM env var."
-            )
-        evaluator = create_skillbench_evaluator(
-            skill_name,
-            gen_model=effective_gen_model,
-            original_token_counts=original_token_counts,
-            token_budget=token_budget,
-            use_judges=use_judges,
+    if not effective_gen_model:
+        raise ValueError(
+            "SkillBench evaluator requires a gen_model. "
+            "Pass --gen-model or set GEPA_GEN_LM env var."
         )
-    else:
-        evaluator = create_skill_evaluator(
-            skill_name, mode=mode, task_lm=task_lm,
-            gen_model=effective_gen_model,
-            original_token_counts=original_token_counts,
-        )
+    evaluator = create_skillbench_evaluator(
+        skill_name,
+        gen_model=effective_gen_model,
+        original_token_counts=original_token_counts,
+        token_budget=token_budget,
+    )
 
     # 5. Get config (scaled by component count)
     num_components = len(seed_candidate)
@@ -256,7 +239,7 @@ def optimize_skill(
 
     # Dry run
     if dry_run:
-        print(f"\n=== Dry Run: {skill_name} ({evaluator_type}) ===")
+        print(f"\n=== Dry Run: {skill_name} (skillbench) ===")
         if not tools_only:
             print(f"SKILL.md path: {skill_path}")
         print(f"Components: {list(seed_candidate.keys())}")
@@ -265,9 +248,7 @@ def optimize_skill(
             print(f"  {comp}: {tokens:,} tokens")
         print(f"Train tasks: {len(train)}")
         print(f"Val tasks: {len(val) if val else 'None (single-task mode)'}")
-        print(f"Mode: {mode}")
-        print(f"Generation model: {effective_gen_model or 'None (static only)'}")
-        print(f"Evaluator type: {evaluator_type}")
+        print(f"Generation model: {effective_gen_model}")
         print(f"Preset: {preset} (max_metric_calls={config.engine.max_metric_calls}, "
               f"scaled for {num_components} component(s))")
         print(f"Max passes: {max_passes}")
@@ -277,27 +258,16 @@ def optimize_skill(
             evaluator, seed_candidate, train
         )
         print(f"Current score: {original_score:.3f}")
-
-        # Show per-task baseline in dry-run output
         for task_id, score in original_per_task.items():
             print(f"  {task_id}: {score:.3f}")
 
-        if evaluator_type == "skillbench":
-            background = build_skillbench_background(
-                skill_name, total_original_tokens,
-                component_names=list(seed_candidate.keys()),
-                baseline_scores=original_per_task,
-                baseline_side_info=si_by_id,
-                token_budget=token_budget,
-                use_judges=use_judges,
-            )
-        else:
-            background = build_optimization_background(
-                skill_name, total_original_tokens,
-                component_names=list(seed_candidate.keys()),
-                baseline_scores=original_per_task,
-                baseline_side_info=si_by_id,
-            )
+        background = build_skillbench_background(
+            skill_name, total_original_tokens,
+            component_names=list(seed_candidate.keys()),
+            baseline_scores=original_per_task,
+            baseline_side_info=si_by_id,
+            token_budget=token_budget,
+        )
         print(f"\nBackground preview:\n{background[:500]}...")
 
         return OptimizationResult(
@@ -317,8 +287,8 @@ def optimize_skill(
             components=dict(seed_candidate),
             original_components=dict(seed_candidate),
             tool_map=tool_map,
-            evaluator_type=evaluator_type,
-            skillbench_side_info=si_by_id if evaluator_type == "skillbench" else None,
+            evaluator_type="skillbench",
+            skillbench_side_info=si_by_id,
         )
 
     # Evaluate original and capture per-task detail for baseline context
@@ -326,59 +296,37 @@ def optimize_skill(
         evaluator, seed_candidate, train
     )
 
-    # Set baseline on evaluator so future calls include regression/improvement info
-    if hasattr(evaluator, "set_baseline"):
-        evaluator.set_baseline(si_by_input)
-
-    # 6. Build background (with baseline scores) and objective
-    if evaluator_type == "skillbench":
-        background = build_skillbench_background(
-            skill_name, total_original_tokens,
-            component_names=list(seed_candidate.keys()),
-            baseline_scores=original_per_task,
-            baseline_side_info=si_by_id,
-            token_budget=token_budget,
-            use_judges=use_judges,
-        )
-        objective = (
-            f"Refine and improve the existing '{skill_name}' skill. "
-            "Score is based on SKILL EFFECTIVENESS (45%) and TOKEN EFFICIENCY (25%). "
-            "Adding content the agent already knows does NOT help and costs tokens. "
-            "Focus on what the agent would otherwise get wrong. "
-            "Be concise — remove redundant examples and verbose explanations."
-        )
-    else:
-        background = build_optimization_background(
-            skill_name, total_original_tokens,
-            component_names=list(seed_candidate.keys()),
-            baseline_scores=original_per_task,
-            baseline_side_info=si_by_id,
-        )
-        objective = (
-            f"Refine and improve the existing '{skill_name}' skill. "
-            "Preserve patterns and examples that already score well. "
-            "Focus on fixing scorer failures and reducing token count without sacrificing correctness. "
-            "Higher quality scores and fewer tokens are both better."
-        )
+    # 6. Build background and objective
+    background = build_skillbench_background(
+        skill_name, total_original_tokens,
+        component_names=list(seed_candidate.keys()),
+        baseline_scores=original_per_task,
+        baseline_side_info=si_by_id,
+        token_budget=token_budget,
+    )
+    objective = (
+        f"Refine and improve the existing '{skill_name}' skill. "
+        "Score is based on SKILL EFFECTIVENESS (35%) and TOKEN EFFICIENCY (25%). "
+        "Judge rationale in side_info explains exactly what failed. "
+        "Focus on what the agent would otherwise get wrong. "
+        "Be concise — remove redundant examples and verbose explanations."
+    )
 
     # 7. Convert datasets to GEPA format
     trainset = to_gepa_instances(train)
     valset = to_gepa_instances(val) if val else None
 
     # 8. Multi-pass optimization loop
-    #    Each pass feeds the previous best as the new seed.
-    #    Stops early when a pass produces no score improvement.
     current_seed = dict(seed_candidate)
     best = dict(seed_candidate)
     best_score = original_score
     last_result = None
     total_metric_calls = 0
-    improvement_threshold = 0.0005  # minimum improvement to continue
+    improvement_threshold = 0.0005
 
     print(f"\n  Starting multi-pass optimization (up to {max_passes} passes, "
           f"{num_components} component(s), {config.engine.max_metric_calls} metric calls/pass)")
 
-    # Print estimated time per pass
     est_secs = estimate_pass_duration(
         config.engine.max_metric_calls,
         config.reflection.reflection_lm,
@@ -393,9 +341,6 @@ def optimize_skill(
     for pass_num in range(1, max_passes + 1):
         print(f"\n  --- Pass {pass_num}/{max_passes} (best score so far: {best_score:.4f}) ---")
 
-        # Deep-copy config: optimize_anything mutates
-        # config.reflection.reflection_prompt_template when objective/background
-        # are provided, which would cause a "mutually exclusive" error on pass 2+.
         pass_config = copy.deepcopy(config)
 
         result = optimize_anything(
@@ -409,7 +354,6 @@ def optimize_skill(
         )
         total_metric_calls += result.total_metric_calls or 0
 
-        # Evaluate this pass's best candidate
         candidate = result.best_candidate
         pass_score, _, _, _ = _evaluate_on_tasks(evaluator, candidate, train)
         improvement = pass_score - best_score
@@ -421,7 +365,6 @@ def optimize_skill(
             best = dict(candidate)
             best_score = pass_score
             last_result = result
-            # Use the improved candidate as seed for next pass
             current_seed = dict(candidate)
         else:
             print(f"  No significant improvement in pass {pass_num} -- stopping early.")
@@ -458,7 +401,7 @@ def optimize_skill(
         stc = SkillTestConfig()
         setup_mlflow(stc)
         with mlflow.start_run(run_name=f"{skill_name}_optimize_{preset}"):
-            mlflow.set_tags({"optimizer": "gepa", "skill_name": skill_name, "preset": preset, "mode": mode, "evaluator_type": evaluator_type})
+            mlflow.set_tags({"optimizer": "gepa", "skill_name": skill_name, "preset": preset, "evaluator_type": "skillbench"})
             mlflow.log_metrics({
                 "original_score": original_score,
                 "optimized_score": optimized_score,
@@ -472,10 +415,8 @@ def optimize_skill(
     except Exception:
         pass
 
-    # Capture final side_info for skillbench review output
-    final_si_by_id = None
-    if evaluator_type == "skillbench":
-        _, _, final_si_by_id, _ = _evaluate_on_tasks(evaluator, best, train)
+    # Capture final side_info for review output
+    _, _, final_si_by_id, _ = _evaluate_on_tasks(evaluator, best, train)
 
     return OptimizationResult(
         skill_name=skill_name,
@@ -494,6 +435,6 @@ def optimize_skill(
         components=dict(best),
         original_components=dict(seed_candidate),
         tool_map=tool_map,
-        evaluator_type=evaluator_type,
+        evaluator_type="skillbench",
         skillbench_side_info=final_si_by_id,
     )

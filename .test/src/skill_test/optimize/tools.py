@@ -35,9 +35,9 @@ def _find_tools_dir() -> Path:
     if MCP_TOOLS_DIR.exists():
         return MCP_TOOLS_DIR
     # Fallback: search from repo root
-    from .evaluator import _find_repo_root
+    from .utils import find_repo_root
 
-    repo_root = _find_repo_root()
+    repo_root = find_repo_root()
     candidate = repo_root / "databricks-mcp-server" / "databricks_mcp_server" / "tools"
     if candidate.exists():
         return candidate

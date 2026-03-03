@@ -213,6 +213,11 @@ cp -r server "$STAGING_DIR/"
 cp app.yaml "$STAGING_DIR/"
 cp requirements.txt "$STAGING_DIR/"
 
+# Copy Alembic migrations
+echo "  Copying Alembic migrations..."
+cp alembic.ini "$STAGING_DIR/"
+cp -r alembic "$STAGING_DIR/"
+
 # Copy frontend build (server expects it at client/out/)
 echo "  Copying frontend build..."
 mkdir -p "$STAGING_DIR/client"

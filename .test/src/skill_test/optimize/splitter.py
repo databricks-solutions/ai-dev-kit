@@ -174,9 +174,9 @@ def generate_bootstrap_tasks(skill_name: str, base_path: Path | None = None) -> 
     """
     if base_path is None:
         # Find repo root for path resolution
-        from .evaluator import _find_repo_root
+        from .utils import find_repo_root
 
-        repo_root = _find_repo_root()
+        repo_root = find_repo_root()
         skill_md_candidates = [
             repo_root / ".claude" / "skills" / skill_name / "SKILL.md",
             repo_root / "databricks-skills" / skill_name / "SKILL.md",

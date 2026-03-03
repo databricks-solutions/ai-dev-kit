@@ -42,7 +42,7 @@ setup_path()
 
 def _find_skill_md(skill_name: str) -> str:
     """Load SKILL.md content for the given skill."""
-    from skill_test.optimize.evaluator import _find_skill_md as find_md
+    from skill_test.optimize.utils import find_skill_md as find_md
     path = find_md(skill_name)
     if path is None:
         raise FileNotFoundError(f"Could not find SKILL.md for '{skill_name}'")

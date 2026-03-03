@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .runner import OptimizationResult
-from .evaluator import _find_skill_md
+from .utils import find_skill_md as _find_skill_md
 
 
 def _get_results_dir(skill_name: str) -> Path:
@@ -145,16 +145,19 @@ def load_last_result(skill_name: str) -> OptimizationResult | None:
     )
 
 
-def _review_skillbench(result: OptimizationResult) -> None:
-    """Print SkillBench-style effectiveness metrics."""
+def review_optimization(result: OptimizationResult) -> None:
+    """Print optimization summary for human review.
+
+    Shows: score improvement, token reduction, judge-based effectiveness,
+    per-test-case score breakdown, and diff of changes.
+    """
     print(f"\n{'=' * 60}")
-    print(f"  Optimization Results: {result.skill_name} (skillbench)")
+    print(f"  Optimization Results: {result.skill_name}")
     print(f"{'=' * 60}")
 
-    # Aggregate effectiveness metrics from side_info
     si = result.skillbench_side_info or {}
 
-    # Compute aggregate pass rates from per-task scores
+    # Aggregate judge-based scores from per-task side_info
     task_count = 0
     sum_with = 0.0
     sum_without = 0.0
@@ -164,37 +167,29 @@ def _review_skillbench(result: OptimizationResult) -> None:
     for task_id in sorted(si.keys()):
         info = si[task_id]
         scores = info.get("scores", {})
-        pw = scores.get("pass_rate_with", 0.0)
-        pwo = scores.get("pass_rate_without", 0.0)
+        pw = scores.get("quality_with", 0.0)
+        pwo = scores.get("quality_without", 0.0)
         eff = scores.get("skill_effectiveness", 0.0)
         sum_with += pw
         sum_without += pwo
         sum_eff += eff
         task_count += 1
 
-        # Build per-task notes from the new Error key
+        # Build per-task notes
         error = info.get("Error", "")
         notes = []
         if "NEEDS_SKILL" in error:
-            # Extract assertion names from Error lines
-            failing = [
-                line.split(":", 1)[1].strip().split(" — ")[0]
-                for line in error.split("\n")
-                if line.startswith("NEEDS_SKILL")
-            ]
-            notes.append(f"NEEDS: {', '.join(failing[:3])}")
+            notes.append("NEEDS_SKILL")
         if "REGRESSION" in error:
-            reg_count = error.count("REGRESSION")
-            notes.append(f"REGRESSION x{reg_count}")
+            notes.append("REGRESSION")
         if not notes:
-            notes.append("OK/NEUTRAL")
+            notes.append("OK")
         note_str = f"  [{'; '.join(notes)}]"
         per_task_lines.append(
             f"    {task_id:<30s} WITH {pw:.2f}  WITHOUT {pwo:.2f}  "
             f"delta {eff:+.2f}{note_str}"
         )
 
-    # Aggregate rates
     if task_count > 0:
         agg_with = sum_with / task_count
         agg_without = sum_without / task_count
@@ -207,18 +202,16 @@ def _review_skillbench(result: OptimizationResult) -> None:
     print(f"  Score:              {result.original_score:.3f} -> {result.optimized_score:.3f} "
           f"({improvement_sign}{result.improvement:.3f})")
     print(f"  Skill Effectiveness: {agg_eff:.2f}")
-    print(f"  Pass Rate (with):    {agg_with:.2f}")
-    print(f"  Pass Rate (without): {agg_without:.2f} (baseline)")
+    print(f"  Quality (with):      {agg_with:.2f}")
+    print(f"  Quality (without):   {agg_without:.2f} (baseline)")
 
     # Token counts
     reduction_sign = "+" if result.token_reduction_pct >= 0 else ""
     print(f"  Tokens:   {result.original_token_count:,} -> {result.optimized_token_count:,} "
           f"({reduction_sign}{result.token_reduction_pct:.1f}%)")
 
-    # GEPA iterations
     if result.gepa_result and hasattr(result.gepa_result, "iterations"):
         print(f"  Iterations: {result.gepa_result.iterations}")
-
     if result.mlflow_run_id:
         print(f"  MLflow run: {result.mlflow_run_id}")
 
@@ -275,96 +268,6 @@ def _review_skillbench(result: OptimizationResult) -> None:
         print(f"  Apply: uv run python .test/scripts/optimize.py {result.skill_name} --apply-last")
     elif result.original_content == result.optimized_content:
         print(f"  No improvement found -- nothing saved.")
-    print(f"{'=' * 60}\n")
-
-
-def review_optimization(result: OptimizationResult) -> None:
-    """Print optimization summary for human review.
-
-    Automatically saves the result to disk so it can be applied later
-    with ``--apply-last`` without re-running optimization.
-
-    Shows: score improvement, token reduction, diff of changed sections,
-    per-test-case score breakdown, validation set performance.
-
-    Delegates to ``_review_skillbench()`` when ``evaluator_type == "skillbench"``.
-    """
-    if getattr(result, "evaluator_type", "legacy") == "skillbench":
-        return _review_skillbench(result)
-
-    print(f"\n{'=' * 60}")
-    print(f"  Optimization Results: {result.skill_name}")
-    print(f"{'=' * 60}")
-
-    # Quality scores
-    improvement_sign = "+" if result.improvement >= 0 else ""
-    print(f"  Quality:  {result.original_score:.3f} -> {result.optimized_score:.3f} "
-          f"({improvement_sign}{result.improvement:.3f})")
-
-    # Token counts
-    reduction_sign = "+" if result.token_reduction_pct >= 0 else ""
-    print(f"  Tokens:   {result.original_token_count:,} -> {result.optimized_token_count:,} "
-          f"({reduction_sign}{result.token_reduction_pct:.1f}%)")
-
-    # Validation scores
-    if result.val_scores:
-        avg_val = sum(result.val_scores.values()) / len(result.val_scores)
-        print(f"  Validation: avg={avg_val:.3f} ({len(result.val_scores)} cases)")
-
-    # GEPA iterations
-    if result.gepa_result and hasattr(result.gepa_result, "iterations"):
-        print(f"  Iterations: {result.gepa_result.iterations}")
-
-    # MLflow run
-    if result.mlflow_run_id:
-        print(f"  MLflow run: {result.mlflow_run_id}")
-
-    print()
-
-    # Diff summary
-    if result.diff_summary and result.diff_summary != "No changes":
-        print("  Changes:")
-        for line in result.diff_summary.split("\n"):
-            print(f"    {line}")
-        print()
-
-    # Detailed diff (first 50 lines)
-    if result.original_content != result.optimized_content:
-        diff_lines = list(difflib.unified_diff(
-            result.original_content.splitlines(keepends=True),
-            result.optimized_content.splitlines(keepends=True),
-            fromfile="original SKILL.md",
-            tofile="optimized SKILL.md",
-            n=2,
-        ))
-        if len(diff_lines) > 50:
-            print(f"  Diff (first 50 of {len(diff_lines)} lines):")
-            for line in diff_lines[:50]:
-                print(f"    {line}", end="")
-            print(f"\n    ... ({len(diff_lines) - 50} more lines)")
-        else:
-            print("  Diff:")
-            for line in diff_lines:
-                print(f"    {line}", end="")
-        print()
-    else:
-        print("  No changes to SKILL.md content.")
-
-    # Validation breakdown
-    if result.val_scores:
-        print("  Validation scores by test case:")
-        for task_id, score in sorted(result.val_scores.items()):
-            status = "PASS" if score >= 0.5 else "FAIL"
-            print(f"    {status} {task_id}: {score:.3f}")
-        print()
-
-    # Auto-save result to disk
-    saved_skill, saved_meta = save_result(result)
-    if saved_skill:
-        print(f"  Saved: {saved_skill}")
-        print(f"  Apply: uv run python .test/scripts/optimize.py {result.skill_name} --apply-last")
-    elif result.original_content == result.optimized_content:
-        print(f"  No improvement found — nothing saved.")
     print(f"{'=' * 60}\n")
 
 
