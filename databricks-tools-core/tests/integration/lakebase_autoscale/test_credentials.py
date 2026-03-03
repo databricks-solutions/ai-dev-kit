@@ -7,7 +7,6 @@ Tests:
 
 import logging
 
-import pytest
 
 from databricks_tools_core.lakebase_autoscale import (
     generate_credential,

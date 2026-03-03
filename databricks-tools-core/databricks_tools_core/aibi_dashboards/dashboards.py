@@ -8,7 +8,7 @@ The SDK/API still uses the 'lakeview' name internally.
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from databricks.sdk.service.dashboards import Dashboard
 

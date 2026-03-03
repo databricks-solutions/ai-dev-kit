@@ -8,17 +8,12 @@ import warnings
 
 from gepa.optimize_anything import GEPAConfig, EngineConfig, ReflectionConfig, RefinerConfig
 
-DEFAULT_REFLECTION_LM = os.environ.get(
-    "GEPA_REFLECTION_LM", "databricks/databricks-claude-opus-4-6"
-)
+DEFAULT_REFLECTION_LM = os.environ.get("GEPA_REFLECTION_LM", "databricks/databricks-claude-opus-4-6")
 
-DEFAULT_GEN_LM = os.environ.get(
-    "GEPA_GEN_LM", "databricks/databricks-claude-sonnet-4-6"
-)
+DEFAULT_GEN_LM = os.environ.get("GEPA_GEN_LM", "databricks/databricks-claude-sonnet-4-6")
 
-DEFAULT_TOKEN_BUDGET: int | None = int(
-    os.environ.get("GEPA_TOKEN_BUDGET", "0")
-) or None
+DEFAULT_TOKEN_BUDGET: int | None = int(os.environ.get("GEPA_TOKEN_BUDGET", "0")) or None
+
 
 # ---------------------------------------------------------------------------
 # Register Databricks models with litellm so it knows their true context
@@ -62,6 +57,7 @@ def _register_litellm_models() -> None:
     """Register Databricks model context windows with litellm."""
     try:
         import litellm
+
         _models = {
             "databricks/databricks-claude-opus-4-6": {
                 "max_tokens": 32_000,
@@ -232,6 +228,7 @@ def validate_reflection_context(
     """
     try:
         import litellm
+
         info = litellm.get_model_info(reflection_lm)
         limit = info.get("max_input_tokens") or info.get("max_tokens") or 0
     except Exception:

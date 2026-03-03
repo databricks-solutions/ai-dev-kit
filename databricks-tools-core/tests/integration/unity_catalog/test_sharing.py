@@ -21,13 +21,11 @@ from databricks_tools_core.unity_catalog import (
     create_share,
     add_table_to_share,
     remove_table_from_share,
-    delete_share,
     grant_share_to_recipient,
     revoke_share_from_recipient,
     list_recipients,
     get_recipient,
     create_recipient,
-    delete_recipient,
     list_providers,
 )
 

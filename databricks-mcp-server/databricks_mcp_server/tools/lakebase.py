@@ -31,14 +31,12 @@ from databricks_tools_core.lakebase_autoscale import (
     update_project as _update_project,
     delete_project as _delete_project,
     create_branch as _create_branch,
-    get_branch as _get_branch,
     list_branches as _list_branches,
     update_branch as _update_branch,
     delete_branch as _delete_branch,
     create_endpoint as _create_endpoint,
     list_endpoints as _list_endpoints,
     update_endpoint as _update_endpoint,
-    delete_endpoint as _delete_endpoint,
     generate_credential as _generate_autoscale_credential,
 )
 

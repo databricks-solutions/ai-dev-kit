@@ -150,10 +150,7 @@ class SkillBenchEvaluator:
         tool_context: str | None = None,
     ):
         if not gen_model:
-            raise ValueError(
-                "SkillBench evaluator requires a gen_model. "
-                "Pass --gen-model or set GEPA_GEN_LM env var."
-            )
+            raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
         self.gen_model = gen_model
         self._baseline_response_cache: dict[str, str] = {}
         self._baseline_judge_cache: dict[str, JudgeFeedback] = {}
@@ -170,14 +167,16 @@ class SkillBenchEvaluator:
         """Generate a response with or without skill context."""
         messages = []
         if skill_context:
-            messages.append({
-                "role": "system",
-                "content": (
-                    "Use ONLY the following skill documentation to answer "
-                    "the user's question. Do not use any other knowledge.\n\n"
-                    f"{skill_context}"
-                ),
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Use ONLY the following skill documentation to answer "
+                        "the user's question. Do not use any other knowledge.\n\n"
+                        f"{skill_context}"
+                    ),
+                }
+            )
         messages.append({"role": "user", "content": prompt})
 
         resp = _completion_with_backoff(
@@ -196,7 +195,9 @@ class SkillBenchEvaluator:
         return self._baseline_response_cache[key]
 
     def __call__(
-        self, candidate: dict[str, str], example: dict,
+        self,
+        candidate: dict[str, str],
+        example: dict,
     ) -> tuple[float, dict]:
         """Evaluate a candidate skill against a single task example.
 
@@ -246,16 +247,17 @@ class SkillBenchEvaluator:
         # Build flat strings for judge templates — make_judge only supports
         # top-level {{ inputs }}, {{ outputs }}, {{ expectations }} variables.
         facts_str = "\n".join(f"- {f}" for f in facts) if facts else "None specified"
-        patterns_str = "\n".join(
-            f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}"
-            for p in patterns
-        ) if patterns else "None specified"
+        patterns_str = (
+            "\n".join(
+                f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}" for p in patterns
+            )
+            if patterns
+            else "None specified"
+        )
         guidelines_str = "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
 
         expectations_text = (
-            f"Expected facts:\n{facts_str}\n\n"
-            f"Expected patterns:\n{patterns_str}\n\n"
-            f"Guidelines:\n{guidelines_str}"
+            f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
         )
 
         # make_judge requires expectations as dict, inputs/outputs as Any.
@@ -317,12 +319,7 @@ class SkillBenchEvaluator:
             efficiency = 1.0
 
         # Weighted final score
-        final_score = (
-            0.40 * max(0.0, effectiveness_delta)
-            + 0.30 * score_with
-            + 0.05 * structure
-            + 0.25 * efficiency
-        )
+        final_score = 0.40 * max(0.0, effectiveness_delta) + 0.30 * score_with + 0.05 * structure + 0.25 * efficiency
 
         # Build side info with FULL judge rationale (not truncated!)
         reference_answer = example.get("answer", "")
@@ -344,9 +341,7 @@ class SkillBenchEvaluator:
         }
         side_info["Judge_effectiveness"] = {
             "verdict": (
-                "improved" if effectiveness_verdict == 1.0
-                else "regressed" if effectiveness_verdict == 0.0
-                else "same"
+                "improved" if effectiveness_verdict == 1.0 else "regressed" if effectiveness_verdict == 0.0 else "same"
             ),
             "delta": effectiveness_delta,
         }
@@ -387,8 +382,7 @@ class SkillBenchEvaluator:
             }
         elif score_with < 0.5:
             side_info["Error"] = (
-                f"NEEDS_SKILL: quality_with={score_with:.2f}, missing content. "
-                f"Judge: {quality_with_fb.rationale[:200]}"
+                f"NEEDS_SKILL: quality_with={score_with:.2f}, missing content. Judge: {quality_with_fb.rationale[:200]}"
             )
 
         return final_score, side_info
@@ -455,6 +449,7 @@ def create_skillbench_evaluator(
         )
 
     from .judges import DEFAULT_JUDGE_LM
+
     effective_judge_model = judge_model or DEFAULT_JUDGE_LM
     logger.info("Judge model: %s", effective_judge_model)
 
@@ -496,15 +491,9 @@ def build_skillbench_background(
                 if "REGRESSION" in error:
                     regression_ids.append(tid)
             if needs_skill_ids:
-                baseline_desc += (
-                    f"\n  NEEDS_SKILL ({len(needs_skill_ids)} tasks): "
-                    f"{', '.join(needs_skill_ids[:5])}"
-                )
+                baseline_desc += f"\n  NEEDS_SKILL ({len(needs_skill_ids)} tasks): {', '.join(needs_skill_ids[:5])}"
             if regression_ids:
-                baseline_desc += (
-                    f"\n  REGRESSION ({len(regression_ids)} tasks): "
-                    f"{', '.join(regression_ids[:5])}"
-                )
+                baseline_desc += f"\n  REGRESSION ({len(regression_ids)} tasks): {', '.join(regression_ids[:5])}"
 
     components_desc = ""
     if component_names and any(c.startswith("tools_") for c in component_names):
@@ -519,10 +508,7 @@ def build_skillbench_background(
         "Smaller candidates score HIGHER. Be ruthlessly concise."
     )
     if token_budget:
-        token_desc += (
-            f"\nTOKEN BUDGET: {token_budget:,} tokens. Candidates exceeding this "
-            "are heavily penalized."
-        )
+        token_desc += f"\nTOKEN BUDGET: {token_budget:,} tokens. Candidates exceeding this are heavily penalized."
 
     return (
         f"You are refining SKILL.md for '{skill_name}'.\n"

@@ -178,10 +178,14 @@ def main():
                 i += 1
 
         result = optimize(
-            skill_name, ctx,
-            preset=opt_preset, mode=opt_mode, task_lm=opt_task_lm,
+            skill_name,
+            ctx,
+            preset=opt_preset,
+            mode=opt_mode,
+            task_lm=opt_task_lm,
             reflection_lm=opt_reflection_lm,
-            dry_run=opt_dry_run, apply=opt_apply,
+            dry_run=opt_dry_run,
+            apply=opt_apply,
         )
     else:
         print(f"Unknown subcommand: {subcommand}")

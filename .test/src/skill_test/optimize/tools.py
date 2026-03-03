@@ -42,8 +42,7 @@ def _find_tools_dir() -> Path:
     if candidate.exists():
         return candidate
     raise FileNotFoundError(
-        "Could not find MCP tools directory. "
-        "Expected at databricks-mcp-server/databricks_mcp_server/tools/"
+        "Could not find MCP tools directory. Expected at databricks-mcp-server/databricks_mcp_server/tools/"
     )
 
 
@@ -247,19 +246,14 @@ def list_tool_modules(tools_dir: Path | None = None) -> list[str]:
     """List available tool module names."""
     if tools_dir is None:
         tools_dir = _find_tools_dir()
-    return sorted(
-        f.stem for f in tools_dir.glob("*.py")
-        if f.stem != "__init__"
-    )
+    return sorted(f.stem for f in tools_dir.glob("*.py") if f.stem != "__init__")
 
 
 def get_tool_stats(tools_dir: Path | None = None) -> dict[str, Any]:
     """Get statistics about available MCP tools."""
     tool_map = extract_tool_descriptions(tools_dir=tools_dir)
     total_tools = sum(len(tools) for tools in tool_map.values())
-    total_chars = sum(
-        len(td.docstring) for tools in tool_map.values() for td in tools
-    )
+    total_chars = sum(len(td.docstring) for tools in tool_map.values() for td in tools)
     return {
         "modules": len(tool_map),
         "total_tools": total_tools,

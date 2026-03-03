@@ -1,6 +1,6 @@
 """Compute tools - Execute code on Databricks clusters."""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from databricks_tools_core.compute import (
     list_clusters as _list_clusters,

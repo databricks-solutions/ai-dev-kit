@@ -75,7 +75,8 @@ def align_judge(
         if traces:
             logger.info(
                 "Only %d alignment traces for %s (need >=3). Using base judge.",
-                len(traces), skill_name,
+                len(traces),
+                skill_name,
             )
         return judge
 
@@ -86,13 +87,12 @@ def align_judge(
         aligned = judge.align(traces=traces, optimizer=optimizer)
         logger.info(
             "Aligned judge with %d traces for %s",
-            len(traces), skill_name,
+            len(traces),
+            skill_name,
         )
         return aligned
     except ImportError:
-        logger.warning(
-            "MemAlignOptimizer not available. Install mlflow-deepeval for alignment support."
-        )
+        logger.warning("MemAlignOptimizer not available. Install mlflow-deepeval for alignment support.")
         return judge
     except Exception as e:
         logger.warning("MemAlign alignment failed for %s: %s", skill_name, e)

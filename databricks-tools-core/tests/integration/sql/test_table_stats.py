@@ -13,7 +13,6 @@ from databricks_tools_core.sql import (
     get_table_details,
     TableStatLevel,
     TableSchemaResult,
-    TableInfo,
 )
 
 

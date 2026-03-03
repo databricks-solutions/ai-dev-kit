@@ -6,18 +6,19 @@ Single evaluator path using SkillBench judge-based evaluation.
 
 import copy
 import difflib
-import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
-from gepa.optimize_anything import optimize_anything, GEPAConfig
+from gepa.optimize_anything import optimize_anything
 
 from ..config import SkillTestConfig
 from ..runners.evaluate import setup_mlflow
 from .config import (
-    get_preset, validate_reflection_context, estimate_pass_duration,
-    DEFAULT_GEN_LM, DEFAULT_TOKEN_BUDGET,
+    get_preset,
+    validate_reflection_context,
+    estimate_pass_duration,
+    DEFAULT_GEN_LM,
+    DEFAULT_TOKEN_BUDGET,
 )
 from .utils import SKILL_KEY, count_tokens, find_skill_md
 from .skillbench_evaluator import (
@@ -94,7 +95,6 @@ def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating"):
     Returns:
         (mean_score, per_task_scores, side_info_by_id, side_info_by_input)
     """
-    import sys
 
     gepa_instances = to_gepa_instances(tasks)
     total = len(gepa_instances)
@@ -173,16 +173,16 @@ def optimize_skill(
         tool_map = extract_tool_descriptions(modules=tool_modules)
         tool_components = tools_to_gepa_components(tool_map, per_module=True)
         stats = get_tool_stats()
-        print(f"Tool modules: {stats['modules']}, tools: {stats['total_tools']}, "
-              f"description chars: {stats['total_description_chars']:,}")
+        print(
+            f"Tool modules: {stats['modules']}, tools: {stats['total_tools']}, "
+            f"description chars: {stats['total_description_chars']:,}"
+        )
     except FileNotFoundError:
         pass  # No MCP tools directory — skip
 
     # Build read-only tool context string (for skill optimization)
     if tool_components:
-        tool_context_str = "\n\n".join(
-            tool_components[k] for k in sorted(tool_components)
-        )
+        tool_context_str = "\n\n".join(tool_components[k] for k in sorted(tool_components))
 
     # 2. Build seed_candidate (multi-component dict)
     seed_candidate: dict[str, str] = {}
@@ -243,15 +243,13 @@ def optimize_skill(
         print(f"Generation model: {effective_gen_model}")
 
     from .judges import DEFAULT_JUDGE_LM
+
     effective_judge_model = judge_model or DEFAULT_JUDGE_LM
     print(f"Judge model: {effective_judge_model}")
     print("Evaluator: skillbench (judge-driven)")
 
     if not effective_gen_model:
-        raise ValueError(
-            "SkillBench evaluator requires a gen_model. "
-            "Pass --gen-model or set GEPA_GEN_LM env var."
-        )
+        raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
     evaluator = create_skillbench_evaluator(
         skill_name,
         gen_model=effective_gen_model,
@@ -273,7 +271,8 @@ def optimize_skill(
 
     # 5b. Validate reflection model context window
     validate_reflection_context(
-        config.reflection.reflection_lm, total_original_tokens,
+        config.reflection.reflection_lm,
+        total_original_tokens,
     )
 
     # 5c. Replace GEPA's reflection_lm string with a fallback-aware callable.
@@ -281,8 +280,10 @@ def optimize_skill(
     # with no fallback. We pre-convert it so GEPA uses our version with
     # model fallback on rate limit errors.
     from .judges import completion_with_fallback
+
     _reflection_model_name = config.reflection.reflection_lm or ""
     if isinstance(config.reflection.reflection_lm, str):
+
         def _reflection_lm_with_fallback(prompt):
             if isinstance(prompt, str):
                 messages = [{"role": "user", "content": prompt}]
@@ -299,6 +300,7 @@ def optimize_skill(
     # Same for refiner_lm if present
     if config.refiner is not None and isinstance(config.refiner.refiner_lm, str):
         _refiner_model_name = config.refiner.refiner_lm
+
         def _refiner_lm_with_fallback(prompt):
             if isinstance(prompt, str):
                 messages = [{"role": "user", "content": prompt}]
@@ -326,8 +328,10 @@ def optimize_skill(
         print(f"Train tasks: {len(train)}")
         print(f"Val tasks: {len(val) if val else 'None (single-task mode)'}")
         print(f"Generation model: {effective_gen_model}")
-        print(f"Preset: {preset} (max_metric_calls={config.engine.max_metric_calls}, "
-              f"scaled for {num_components} component(s))")
+        print(
+            f"Preset: {preset} (max_metric_calls={config.engine.max_metric_calls}, "
+            f"scaled for {num_components} component(s))"
+        )
         print(f"Max passes: {max_passes}")
         if run_dir:
             print(f"Run dir: {run_dir}")
@@ -342,7 +346,8 @@ def optimize_skill(
             print(f"  {task_id}: {score:.3f}")
 
         background = build_skillbench_background(
-            skill_name, total_original_tokens,
+            skill_name,
+            total_original_tokens,
             component_names=list(seed_candidate.keys()),
             baseline_scores=original_per_task,
             baseline_side_info=si_by_id,
@@ -379,7 +384,8 @@ def optimize_skill(
 
     # 6. Build background and objective
     background = build_skillbench_background(
-        skill_name, total_original_tokens,
+        skill_name,
+        total_original_tokens,
         component_names=list(seed_candidate.keys()),
         baseline_scores=original_per_task,
         baseline_side_info=si_by_id,
@@ -405,8 +411,10 @@ def optimize_skill(
     total_metric_calls = 0
     improvement_threshold = 0.0005
 
-    print(f"\n  Starting multi-pass optimization (up to {max_passes} passes, "
-          f"{num_components} component(s), {config.engine.max_metric_calls} metric calls/pass)")
+    print(
+        f"\n  Starting multi-pass optimization (up to {max_passes} passes, "
+        f"{num_components} component(s), {config.engine.max_metric_calls} metric calls/pass)"
+    )
 
     # estimate_pass_duration expects the model name string, not the callable
     _est_reflection_lm = _reflection_model_name if _reflection_model_name else str(reflection_lm or DEFAULT_GEN_LM)
@@ -420,8 +428,7 @@ def optimize_skill(
         est_mins = est_secs / 60
         if est_mins > 5:
             print(
-                f"  Estimated ~{est_mins:.0f} min/pass "
-                f"({est_mins * max_passes:.0f} min total for {max_passes} passes)"
+                f"  Estimated ~{est_mins:.0f} min/pass ({est_mins * max_passes:.0f} min total for {max_passes} passes)"
             )
 
     for pass_num in range(1, max_passes + 1):
@@ -448,8 +455,7 @@ def optimize_skill(
         pass_score, _, _, _ = _evaluate_on_tasks(evaluator, candidate, train, label=f"Pass {pass_num}")
         improvement = pass_score - best_score
 
-        print(f"  Pass {pass_num} score: {pass_score:.4f} "
-              f"(delta: {'+' if improvement >= 0 else ''}{improvement:.4f})")
+        print(f"  Pass {pass_num} score: {pass_score:.4f} (delta: {'+' if improvement >= 0 else ''}{improvement:.4f})")
 
         if pass_score > best_score + improvement_threshold:
             best = dict(candidate)
@@ -479,7 +485,8 @@ def optimize_skill(
 
     token_reduction_pct = (
         (total_original_tokens - optimized_token_count) / total_original_tokens * 100
-        if total_original_tokens > 0 else 0.0
+        if total_original_tokens > 0
+        else 0.0
     )
 
     diff_summary = _compute_diff_summary(original_content, optimized_content)
@@ -488,22 +495,29 @@ def optimize_skill(
     mlflow_run_id = None
     try:
         import mlflow
+
         stc = SkillTestConfig()
         setup_mlflow(stc)
         with mlflow.start_run(run_name=f"{skill_name}_optimize_{preset}"):
-            mlflow.set_tags({
-                "optimizer": "gepa", "skill_name": skill_name,
-                "preset": preset, "evaluator_type": "skillbench",
-            })
-            mlflow.log_metrics({
-                "original_score": original_score,
-                "optimized_score": optimized_score,
-                "improvement": optimized_score - original_score,
-                "original_tokens": float(total_original_tokens),
-                "optimized_tokens": float(optimized_token_count),
-                "token_reduction_pct": token_reduction_pct,
-                "total_metric_calls": float(total_metric_calls),
-            })
+            mlflow.set_tags(
+                {
+                    "optimizer": "gepa",
+                    "skill_name": skill_name,
+                    "preset": preset,
+                    "evaluator_type": "skillbench",
+                }
+            )
+            mlflow.log_metrics(
+                {
+                    "original_score": original_score,
+                    "optimized_score": optimized_score,
+                    "improvement": optimized_score - original_score,
+                    "original_tokens": float(total_original_tokens),
+                    "optimized_tokens": float(optimized_token_count),
+                    "token_reduction_pct": token_reduction_pct,
+                    "total_metric_calls": float(total_metric_calls),
+                }
+            )
             mlflow_run_id = mlflow.active_run().info.run_id
     except Exception:
         pass

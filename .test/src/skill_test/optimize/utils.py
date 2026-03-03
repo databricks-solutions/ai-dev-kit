@@ -15,6 +15,7 @@ SKILL_KEY = "skill_md"
 # Path utilities
 # ---------------------------------------------------------------------------
 
+
 def find_repo_root() -> Path:
     """Find the repo root by searching upward for .test/src/."""
     current = Path(__file__).resolve().parent
@@ -43,6 +44,7 @@ def find_skill_md(skill_name: str) -> Path | None:
 # ---------------------------------------------------------------------------
 # Token utilities
 # ---------------------------------------------------------------------------
+
 
 def count_tokens(text: str) -> int:
     """Count tokens using cl100k_base encoding."""

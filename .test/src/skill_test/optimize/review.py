@@ -75,9 +75,7 @@ def save_result(result: OptimizationResult) -> tuple[Path | None, Path | None]:
 
     # Save tool components if present
     if result.components:
-        tool_components = {
-            k: v for k, v in result.components.items() if k.startswith("tools_")
-        }
+        tool_components = {k: v for k, v in result.components.items() if k.startswith("tools_")}
         if tool_components:
             metadata["has_tool_components"] = True
             # Save each tool component
@@ -185,10 +183,7 @@ def review_optimization(result: OptimizationResult) -> None:
         if not notes:
             notes.append("OK")
         note_str = f"  [{'; '.join(notes)}]"
-        per_task_lines.append(
-            f"    {task_id:<30s} WITH {pw:.2f}  WITHOUT {pwo:.2f}  "
-            f"delta {eff:+.2f}{note_str}"
-        )
+        per_task_lines.append(f"    {task_id:<30s} WITH {pw:.2f}  WITHOUT {pwo:.2f}  delta {eff:+.2f}{note_str}")
 
     if task_count > 0:
         agg_with = sum_with / task_count
@@ -199,16 +194,20 @@ def review_optimization(result: OptimizationResult) -> None:
 
     # Score summary
     improvement_sign = "+" if result.improvement >= 0 else ""
-    print(f"  Score:              {result.original_score:.3f} -> {result.optimized_score:.3f} "
-          f"({improvement_sign}{result.improvement:.3f})")
+    print(
+        f"  Score:              {result.original_score:.3f} -> {result.optimized_score:.3f} "
+        f"({improvement_sign}{result.improvement:.3f})"
+    )
     print(f"  Skill Effectiveness: {agg_eff:.2f}")
     print(f"  Quality (with):      {agg_with:.2f}")
     print(f"  Quality (without):   {agg_without:.2f} (baseline)")
 
     # Token counts
     reduction_sign = "+" if result.token_reduction_pct >= 0 else ""
-    print(f"  Tokens:   {result.original_token_count:,} -> {result.optimized_token_count:,} "
-          f"({reduction_sign}{result.token_reduction_pct:.1f}%)")
+    print(
+        f"  Tokens:   {result.original_token_count:,} -> {result.optimized_token_count:,} "
+        f"({reduction_sign}{result.token_reduction_pct:.1f}%)"
+    )
 
     if result.gepa_result and hasattr(result.gepa_result, "iterations"):
         print(f"  Iterations: {result.gepa_result.iterations}")
@@ -233,13 +232,15 @@ def review_optimization(result: OptimizationResult) -> None:
 
     # Detailed diff (first 50 lines)
     if result.original_content != result.optimized_content:
-        diff_lines = list(difflib.unified_diff(
-            result.original_content.splitlines(keepends=True),
-            result.optimized_content.splitlines(keepends=True),
-            fromfile="original SKILL.md",
-            tofile="optimized SKILL.md",
-            n=2,
-        ))
+        diff_lines = list(
+            difflib.unified_diff(
+                result.original_content.splitlines(keepends=True),
+                result.optimized_content.splitlines(keepends=True),
+                fromfile="original SKILL.md",
+                tofile="optimized SKILL.md",
+                n=2,
+            )
+        )
         if len(diff_lines) > 50:
             print(f"  Diff (first 50 of {len(diff_lines)} lines):")
             for line in diff_lines[:50]:
@@ -289,8 +290,7 @@ def apply_optimization(result: OptimizationResult) -> Path | None:
     """
     if result.improvement < 0:
         raise ValueError(
-            f"Optimization regressed quality ({result.improvement:+.3f}). "
-            "Refusing to apply. Use --force to override."
+            f"Optimization regressed quality ({result.improvement:+.3f}). Refusing to apply. Use --force to override."
         )
 
     skill_path = None
@@ -319,10 +319,11 @@ def apply_optimization(result: OptimizationResult) -> Path | None:
                 for f in modified:
                     print(f"  {f}")
 
-    print(f"  Quality: {result.original_score:.3f} -> {result.optimized_score:.3f} "
-          f"({result.improvement:+.3f})")
-    print(f"  Tokens: {result.original_token_count:,} -> {result.optimized_token_count:,} "
-          f"({result.token_reduction_pct:+.1f}%)")
+    print(f"  Quality: {result.original_score:.3f} -> {result.optimized_score:.3f} ({result.improvement:+.3f})")
+    print(
+        f"  Tokens: {result.original_token_count:,} -> {result.optimized_token_count:,} "
+        f"({result.token_reduction_pct:+.1f}%)"
+    )
 
     # Try to update baseline
     try:

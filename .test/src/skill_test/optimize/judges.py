@@ -37,9 +37,7 @@ from mlflow.genai.judges import make_judge
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_JUDGE_LM = os.environ.get(
-    "GEPA_JUDGE_LM", "databricks:/databricks-claude-sonnet-4-6"
-)
+DEFAULT_JUDGE_LM = os.environ.get("GEPA_JUDGE_LM", "databricks:/databricks-claude-sonnet-4-6")
 
 # ---------------------------------------------------------------------------
 # Fallback model chain for rate limit errors
@@ -54,6 +52,7 @@ _DEFAULT_FALLBACK_MODELS = [
     "databricks/databricks-claude-sonnet-4-5",
 ]
 
+
 def _get_fallback_models() -> list[str]:
     """Get fallback model chain from env or defaults."""
     custom = os.environ.get("GEPA_FALLBACK_MODELS", "")
@@ -65,15 +64,18 @@ def _get_fallback_models() -> list[str]:
 def _is_rate_limit_error(exc: Exception) -> bool:
     """Check if an exception is a rate limit / request limit exceeded error."""
     msg = str(exc).lower()
-    return any(phrase in msg for phrase in [
-        "rate_limit",
-        "rate limit",
-        "request_limit_exceeded",
-        "request limit exceeded",
-        "too many requests",
-        "429",
-        "token.*per.*minute",
-    ])
+    return any(
+        phrase in msg
+        for phrase in [
+            "rate_limit",
+            "rate limit",
+            "request_limit_exceeded",
+            "request limit exceeded",
+            "too many requests",
+            "429",
+            "token.*per.*minute",
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +114,7 @@ def _to_litellm_model(model: str) -> tuple[str, str | None]:
 # ---------------------------------------------------------------------------
 # URI conversion
 # ---------------------------------------------------------------------------
+
 
 def _to_judge_uri(model: str) -> str:
     """Convert litellm-style model strings to MLflow judge URI format.
@@ -157,6 +160,7 @@ def _to_judge_model_and_params(model: str) -> tuple[str, dict[str, Any] | None]:
 # Completion with fallback
 # ---------------------------------------------------------------------------
 
+
 def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> Any:
     """Call litellm.completion with model fallback on rate limit errors.
 
@@ -169,9 +173,7 @@ def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> A
     """
     import litellm
 
-    models_to_try = [model] + [
-        m for m in _get_fallback_models() if m != model
-    ]
+    models_to_try = [model] + [m for m in _get_fallback_models() if m != model]
 
     last_err: Exception | None = None
     for model_str in models_to_try:
@@ -184,7 +186,7 @@ def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> A
 
         for attempt in range(max_retries):
             if attempt > 0:
-                delay = min(2 ** attempt, 30)
+                delay = min(2**attempt, 30)
                 time.sleep(delay)
             try:
                 return litellm.completion(**call_kwargs)
@@ -194,7 +196,8 @@ def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> A
                     if attempt == max_retries - 1:
                         logger.warning(
                             "Model '%s' rate limited after %d attempts, trying next fallback",
-                            model_str, max_retries,
+                            model_str,
+                            max_retries,
                         )
                     continue
                 # Non-rate-limit error: don't retry, try next model
@@ -207,6 +210,7 @@ def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> A
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class JudgeFeedback:
@@ -297,10 +301,7 @@ def create_skill_quality_judge(
     instructions = _QUALITY_INSTRUCTIONS
     if skill_guidelines:
         principles = "\n".join(f"- {g}" for g in skill_guidelines)
-        instructions += (
-            "\n\n## Domain-Specific Principles\n"
-            f"{principles}\n"
-        )
+        instructions += f"\n\n## Domain-Specific Principles\n{principles}\n"
 
     model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
     return make_judge(
@@ -430,6 +431,7 @@ def create_regression_judge(judge_model: str | None = None) -> Any:
 # ---------------------------------------------------------------------------
 # Helper: run a judge safely with fallback on rate limit
 # ---------------------------------------------------------------------------
+
 
 def run_judge_safe(
     judge: Any,

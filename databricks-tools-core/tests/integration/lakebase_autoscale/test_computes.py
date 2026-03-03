@@ -10,7 +10,6 @@ Tests:
 
 import logging
 import time
-import uuid
 
 import pytest
 

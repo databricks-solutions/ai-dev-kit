@@ -75,9 +75,7 @@ def _record_to_task(record: EvalRecord) -> SkillTask:
         # Also encode expectations into additional_context for GEPA reflection
         task["additional_context"]["expectations"] = json.dumps(record.expectations)
         # Human-readable summary for GEPA's reflection LM
-        task["additional_context"]["evaluation_criteria"] = _summarize_expectations(
-            record.expectations
-        )
+        task["additional_context"]["evaluation_criteria"] = _summarize_expectations(record.expectations)
     return task
 
 
@@ -190,9 +188,7 @@ def create_cross_skill_dataset(
         skill_names = sorted(
             d.name
             for d in base_path.iterdir()
-            if d.is_dir()
-            and (d / "ground_truth.yaml").exists()
-            and not d.name.startswith("_")
+            if d.is_dir() and (d / "ground_truth.yaml").exists() and not d.name.startswith("_")
         )
 
     if not skill_names:

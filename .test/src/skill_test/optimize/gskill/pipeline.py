@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from gepa.optimize_anything import optimize_anything, GEPAConfig, EngineConfig, ReflectionConfig
+from gepa.optimize_anything import optimize_anything
 import gepa.optimize_anything as oa
 
 from ..config import get_preset
@@ -45,10 +45,7 @@ def run_gskill(
     repo_context = _scan_repo(repo_path, context_files)
 
     seed_content = (
-        f"# {skill_name}\n\n"
-        "## Overview\n\n"
-        f"Patterns and best practices for the {skill_name} project.\n\n"
-        + repo_context
+        f"# {skill_name}\n\n## Overview\n\nPatterns and best practices for the {skill_name} project.\n\n" + repo_context
     )
 
     def evaluate(candidate: str, example: dict) -> tuple[float, dict]:

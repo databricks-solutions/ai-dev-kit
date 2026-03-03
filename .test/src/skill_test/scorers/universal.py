@@ -136,9 +136,11 @@ def expected_facts_present(outputs: Dict[str, Any], expectations: Dict[str, Any]
     feedbacks = []
     for fact in expected_facts:
         found = fact.lower() in response
-        feedbacks.append(Feedback(
-            name=f"fact_{fact[:40]}",
-            value="yes" if found else "no",
-            rationale=f"{'Found' if found else 'Missing'}: {fact}",
-        ))
+        feedbacks.append(
+            Feedback(
+                name=f"fact_{fact[:40]}",
+                value="yes" if found else "no",
+                rationale=f"{'Found' if found else 'Missing'}: {fact}",
+            )
+        )
     return feedbacks

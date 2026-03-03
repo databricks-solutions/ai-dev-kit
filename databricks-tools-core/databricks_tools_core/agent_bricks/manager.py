@@ -13,7 +13,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from databricks.sdk import WorkspaceClient
@@ -21,7 +21,6 @@ from databricks.sdk import WorkspaceClient
 from ..auth import get_workspace_client, get_current_username
 from .models import (
     EndpointStatus,
-    EvaluationRunDict,
     GenieIds,
     GenieListInstructionsResponseDict,
     GenieListQuestionsResponseDict,

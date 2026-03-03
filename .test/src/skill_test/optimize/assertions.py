@@ -48,12 +48,14 @@ def _run_pattern_assertions(response: str, expected_patterns: list) -> list[Asse
             passed = matches >= min_count
             rationale = f"Found {matches} matches (need >={min_count})"
 
-        results.append(AssertionResult(
-            name=f"pattern_{description}",
-            passed=passed,
-            rationale=rationale,
-            assertion_type="pattern",
-        ))
+        results.append(
+            AssertionResult(
+                name=f"pattern_{description}",
+                passed=passed,
+                rationale=rationale,
+                assertion_type="pattern",
+            )
+        )
     return results
 
 
@@ -66,12 +68,14 @@ def _run_fact_assertions(response: str, expected_facts: list[str]) -> list[Asser
     results = []
     for fact in expected_facts:
         found = fact.lower() in response_lower
-        results.append(AssertionResult(
-            name=f"fact_{fact[:40]}",
-            passed=found,
-            rationale=f"{'Found' if found else 'Missing'}: {fact}",
-            assertion_type="fact",
-        ))
+        results.append(
+            AssertionResult(
+                name=f"fact_{fact[:40]}",
+                passed=found,
+                rationale=f"{'Found' if found else 'Missing'}: {fact}",
+                assertion_type="fact",
+            )
+        )
     return results
 
 
@@ -130,7 +134,7 @@ def _extract_content(result: AssertionResult) -> str:
     if result.assertion_type == "fact":
         for prefix in ("Missing: ", "Found: "):
             if result.rationale.startswith(prefix):
-                return result.rationale[len(prefix):]
+                return result.rationale[len(prefix) :]
         return result.rationale
     else:
         # Pattern: name is "pattern_{description}", rationale is match count
