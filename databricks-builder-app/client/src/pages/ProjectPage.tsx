@@ -555,17 +555,18 @@ export default function ProjectPage() {
                   if (isForeground) setStreamingText(fullText);
                 }
               } else if (type === 'tool_use') {
+                const toolName = event.tool_name as string;
                 const newItem: ActivityItem = {
                   id: event.tool_id as string,
                   type: 'tool_use',
                   content: '',
-                  toolName: event.tool_name as string,
+                  toolName,
                   toolInput: event.tool_input as Record<string, unknown>,
                   timestamp: Date.now(),
                 };
                 if (stream) {
                   stream.activityItems = [...stream.activityItems, newItem];
-                  stream.tools = [...stream.tools, event.tool_name as string];
+                  stream.tools = [...stream.tools, toolName];
                 }
                 if (isForeground) setActivityItems(prev => [...prev, newItem]);
               } else if (type === 'tool_result') {
