@@ -223,7 +223,7 @@ print(f"Tables: {devices_table}, {readings_table}")
 print(f"Referential integrity: {'PASSED' if orphan_readings == 0 else 'FAILED'}")
 ```
 
-Run with:
+Run with (requires Python 3.12+):
 ```bash
 uv pip install "databricks-connect>=16.4,<17.0" faker numpy pandas
 uv run python generate_manufacturing_data.py
