@@ -90,6 +90,42 @@ def _register_litellm_models() -> None:
                 "input_cost_per_token": 0,
                 "output_cost_per_token": 0,
             },
+            "databricks/databricks-gemini-3-1-pro": {
+                "max_tokens": 65_536,
+                "max_input_tokens": 1_048_576,
+                "max_output_tokens": 65_536,
+                "litellm_provider": "databricks",
+                "mode": "chat",
+                "input_cost_per_token": 0,
+                "output_cost_per_token": 0,
+            },
+            "databricks/databricks-claude-opus-4-5": {
+                "max_tokens": 32_000,
+                "max_input_tokens": 200_000,
+                "max_output_tokens": 32_000,
+                "litellm_provider": "databricks",
+                "mode": "chat",
+                "input_cost_per_token": 0,
+                "output_cost_per_token": 0,
+            },
+            "databricks/databricks-gpt-5": {
+                "max_tokens": 100_000,
+                "max_input_tokens": 1_048_576,
+                "max_output_tokens": 100_000,
+                "litellm_provider": "databricks",
+                "mode": "chat",
+                "input_cost_per_token": 0,
+                "output_cost_per_token": 0,
+            },
+            "databricks/databricks-claude-sonnet-4-5": {
+                "max_tokens": 16_000,
+                "max_input_tokens": 200_000,
+                "max_output_tokens": 16_000,
+                "litellm_provider": "databricks",
+                "mode": "chat",
+                "input_cost_per_token": 0,
+                "output_cost_per_token": 0,
+            },
         }
         for model_name, model_info in _models.items():
             litellm.model_cost[model_name] = model_info
@@ -134,6 +170,14 @@ PRESET_BASE_CALLS: dict[str, int] = {
     "quick": 15,
     "standard": 50,
     "thorough": 150,
+}
+
+# Per-preset caps: safety net so component scaling never exceeds a reasonable
+# ceiling.  Important for --tools-only mode which has many tool components.
+PRESET_MAX_CALLS: dict[str, int] = {
+    "quick": 45,
+    "standard": 150,
+    "thorough": 300,
 }
 
 # Maximum total metric calls per pass to avoid runaway runtimes.
@@ -289,8 +333,14 @@ def get_preset(
     # Apply explicit override if provided
     if max_metric_calls_override is not None:
         scaled_calls = max_metric_calls_override
+    else:
+        # Apply per-preset cap first (safety net for multi-component modes)
+        preset_cap = PRESET_MAX_CALLS[name]
+        if scaled_calls > preset_cap:
+            scaled_calls = preset_cap
+
     # Cap for slower models to avoid multi-hour hangs
-    elif effective_lm not in _FAST_REFLECTION_MODELS and scaled_calls > MAX_METRIC_CALLS_PER_PASS:
+    if max_metric_calls_override is None and effective_lm not in _FAST_REFLECTION_MODELS and scaled_calls > MAX_METRIC_CALLS_PER_PASS:
         warnings.warn(
             f"Capping metric calls from {scaled_calls} to {MAX_METRIC_CALLS_PER_PASS} "
             f"for reflection model '{effective_lm}'. "

@@ -34,13 +34,14 @@ GEPA's reflection LM reads the `side_info` diagnostics, proposes mutations, eval
 
 ### MLflow Judges as the Evaluator
 
-The evaluator uses [MLflow's `make_judge`](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html) to score responses. Three judges replace the previous 6-judge + binary-assertion system:
+The evaluator uses [MLflow's `make_judge`](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html) to score responses. Two judges run by default during optimization:
 
 | Judge | What it does | Returns |
 |-------|-------------|---------|
 | **quality_judge** | Scores a single response against expected facts, patterns, and guidelines | `float` (0.0-1.0) + rationale |
-| **effectiveness_judge** | Compares WITH-skill vs WITHOUT-skill responses | `"improved"` / `"same"` / `"regressed"` + rationale |
 | **regression_judge** | Identifies specific ways the skill harms responses | `bool` + rationale of what to fix |
+
+Effectiveness is derived from the quality delta (`quality_with - quality_without`) — no separate LLM call needed. The `effectiveness_judge` is available in `judges.py` for standalone use but is not called during optimization.
 
 Each judge returns **full rationale** — not truncated — so GEPA's reflection LM sees exactly what failed and why:
 
@@ -59,9 +60,7 @@ side_info = {
     },
     "Judge_effectiveness": {
         "verdict": "improved",
-        "rationale": "The skill successfully teaches WITH METRICS LANGUAGE YAML "
-                     "syntax (+0.45 delta). However, the MEASURE() wrapping example "
-                     "uses incorrect syntax that the model copies."
+        "delta": 0.45,
     }
 }
 ```
@@ -70,9 +69,8 @@ side_info = {
 
 | Weight | Dimension | Source |
 |--------|-----------|--------|
-| **35%** | Skill Effectiveness | `quality_with - quality_without` (the delta) |
-| **25%** | Absolute Quality | `quality_with` score from judge |
-| **10%** | Judge Effectiveness | Effectiveness verdict score |
+| **40%** | Skill Effectiveness | `quality_with - quality_without` (the delta) |
+| **30%** | Absolute Quality | `quality_with` score from judge |
 | **5%** | Structure | Python/SQL syntax validation |
 | **25%** | Token Efficiency | Smaller = higher score (bonus up to 1.15x) |
 
@@ -100,50 +98,49 @@ uv run python .test/scripts/optimize.py databricks-metric-views --preset quick -
 
 ## What Can Be Optimized
 
-GEPA treats any text artifact as a candidate for optimization. The framework supports three types of artifacts, independently or together:
+GEPA treats any text artifact as a candidate for optimization. Skills and tools are optimized **separately** to avoid cross-skill interference.
 
-### Skills (SKILL.md files)
+### Skills (SKILL.md files) — default mode
 
-SKILL.md files teach agents Databricks patterns — API syntax, code examples, best practices. Each skill is a standalone GEPA component (`skill_md`).
+SKILL.md files teach agents Databricks patterns — API syntax, code examples, best practices. Each skill is a standalone GEPA component (`skill_md`). Tool descriptions are loaded as **read-only context** — included in the generation prompt so the evaluator sees realistic agent behavior, but not mutated by GEPA.
+
+This means `--preset quick` always uses **1 component / 15 metric calls per pass**, regardless of how many tool modules exist.
 
 ```bash
-# Optimize a skill
+# Optimize a skill (tools loaded as read-only context)
 uv run python .test/scripts/optimize.py databricks-metric-views --preset quick
 
 # Optimize all skills that have test cases
 uv run python .test/scripts/optimize.py --all --preset quick
 ```
 
-### MCP Tool Descriptions
+### MCP Tool Descriptions — `--tools-only` mode
 
 `@mcp.tool` docstrings in `databricks-mcp-server/` are what the agent sees when deciding which tool to call. Concise, accurate descriptions improve tool selection. Each tool module becomes a separate GEPA component (`tools_sql`, `tools_serving`, etc.).
 
-```bash
-# Optimize tool descriptions ONLY (no SKILL.md)
-uv run python .test/scripts/optimize.py databricks-metric-views --tools-only --tool-modules sql
+Tool optimization uses a **cross-skill dataset** — tasks are sampled from all skills with `ground_truth.yaml` — so optimized docstrings work well across skills, not just one.
 
-# Optimize specific tool modules
+```bash
+# Optimize tool descriptions with cross-skill evaluation
+uv run python .test/scripts/optimize.py databricks-metric-views --tools-only
+
+# Optimize specific tool modules only
 uv run python .test/scripts/optimize.py databricks-metric-views --tools-only --tool-modules sql serving compute
 ```
 
 When applied (`--apply`), optimized docstrings are written back to the MCP server source files via AST, preserving all surrounding code.
 
-### Skills + Tools Together
+### Skills + Tools Together — `--include-tools` (advanced)
 
-The most powerful mode: optimize the skill and its related tool descriptions in a single run. GEPA round-robins across all components, so each gets dedicated reflection and mutation budget.
+For advanced use: optimize both skill and tool descriptions in a single GEPA run. Both are treated as GEPA components (round-robin mutation). Per-preset metric call caps prevent budget blowup.
 
 ```bash
 # Skill + specific tool modules
 uv run python .test/scripts/optimize.py databricks-metric-views --include-tools --tool-modules sql
 
-# Skill + ALL tool modules (auto-scaled budget)
-uv run python .test/scripts/optimize.py databricks-metric-views --include-tools
-
 # Dry run to see all components and their token counts
 uv run python .test/scripts/optimize.py databricks-metric-views --include-tools --dry-run
 ```
-
-By default, **tools are auto-included** even without `--include-tools` — tool descriptions are typically the largest token consumer (~17K tokens across 88 tools in 16 modules). Use `--tools-only` to skip the SKILL.md, or omit `--include-tools` to let the auto-include handle it.
 
 Available tool modules: `agent_bricks`, `aibi_dashboards`, `apps`, `compute`, `file`, `genie`, `jobs`, `lakebase`, `manifest`, `pipelines`, `serving`, `sql`, `unity_catalog`, `user`, `vector_search`, `volume_files`
 
@@ -220,10 +217,13 @@ uv run python .test/scripts/optimize.py databricks-metric-views --dry-run
 ```
 === Dry Run: databricks-metric-views (skillbench) ===
 SKILL.md path: databricks-skills/databricks-metric-views/SKILL.md
-Components: ['skill_md', 'tools_sql', ...]
-Total original tokens: 17,991
+Components: ['skill_md']
+Total original tokens: 1,234
+  skill_md: 1,234 tokens
+Tool context (read-only): 16,757 tokens
 Train tasks: 8
 Evaluator: skillbench (judge-driven)
+Preset: quick (max_metric_calls=15, scaled for 1 component(s))
 Current score: 0.909
   metric-views_create_sql_001:     0.952
   metric-views_query_measure_002:  0.871
@@ -265,7 +265,7 @@ GEPA runs 15 iterations per component across up to 5 passes. Each iteration:
   Skill Effectiveness: 0.42
   Quality (with):      0.78
   Quality (without):   0.36 (baseline)
-  Tokens:   17,991 -> 18,265 (+1.5%)
+  Tokens:   1,234 -> 1,198 (-2.9%)
 
   Per-task:
     metric-views_create_sql_001     WITH 0.85  WITHOUT 0.35  delta +0.50  [OK]
@@ -306,10 +306,11 @@ uv run python .test/scripts/optimize.py <skill> --preset thorough   # 150 iterat
 --reflection-lm "..."   # Override reflection model (default: databricks/databricks-claude-opus-4-6)
 --max-passes N          # Max optimization passes (default: 5)
 --token-budget N        # Hard token ceiling
---include-tools         # Include MCP tool descriptions as components
+--include-tools         # Include MCP tool descriptions as GEPA components (advanced)
 --tool-modules sql ...  # Specific tool modules to include
---tools-only            # Optimize only tool descriptions
+--tools-only            # Optimize only tool descriptions (cross-skill evaluation)
 --all                   # Optimize all skills with ground_truth.yaml
+--run-dir DIR           # Directory for GEPA checkpoints (resumes if dir exists)
 
 # Test case generation
 --generate-from FILE    # Generate test cases from requirements file
@@ -325,6 +326,27 @@ uv run python .test/scripts/optimize.py <skill> --preset thorough   # 150 iterat
 | `GEPA_TOKEN_BUDGET` | none | Hard token ceiling for candidates |
 
 Model strings use [litellm provider prefixes](https://docs.litellm.ai/docs/providers): `databricks/`, `openai/`, `anthropic/`.
+
+---
+
+## Resuming Long Runs
+
+GEPA saves optimization state to a run directory. If interrupted, resume from where you left off:
+
+```bash
+# Start with checkpointing
+uv run python .test/scripts/optimize.py databricks-metric-views \
+    --preset standard --run-dir ./opt_runs/metric-views
+
+# Resume after interruption (same command)
+uv run python .test/scripts/optimize.py databricks-metric-views \
+    --preset standard --run-dir ./opt_runs/metric-views
+
+# Graceful stop (GEPA finishes current iteration then exits)
+touch ./opt_runs/metric-views/pass_1/gepa.stop
+```
+
+Each pass gets its own subdirectory (`pass_1/`, `pass_2/`, ...) so checkpoints are isolated per pass.
 
 ---
 

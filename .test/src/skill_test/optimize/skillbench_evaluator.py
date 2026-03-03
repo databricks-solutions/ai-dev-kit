@@ -6,12 +6,11 @@ provide both scores AND rich rationale for GEPA's reflection LM.
 
   Phase 1: WITH-SKILL  -- LLM generates response with SKILL.md in context
   Phase 2: WITHOUT-SKILL -- LLM generates response with NO skill (cached once)
-  Phase 3: JUDGE -- quality_judge scores both, effectiveness_judge compares
+  Phase 3: JUDGE -- quality_judge scores both, effectiveness derived from delta
 
 Scoring weights:
-  35% Skill Effectiveness (quality_with - quality_without)
-  25% Absolute Quality (quality_with score from judge)
-  10% Judge Effectiveness (effectiveness verdict)
+  40% Skill Effectiveness (quality_with - quality_without delta)
+  30% Absolute Quality (quality_with score from judge)
    5% Structure (syntax validity)
   25% Token Efficiency (smaller candidates score higher)
 """
@@ -25,17 +24,16 @@ import threading
 import time
 from typing import Any, Callable
 
-import litellm
 from mlflow.entities import Feedback
 
 from ..scorers.universal import python_syntax, sql_syntax, no_hallucinated_apis
 from .judges import (
     JudgeFeedback,
     create_skill_quality_judge,
-    create_effectiveness_judge,
     create_regression_judge,
     run_judge_safe,
     _safe_parse_score,
+    completion_with_fallback,
 )
 from .utils import count_tokens
 
@@ -70,29 +68,22 @@ class _RateLimiter:
 
 
 # Module-level rate limiter shared across evaluator instances.
-_rate_limiter = _RateLimiter(max_concurrent=2, min_interval=1.0)
+_rate_limiter = _RateLimiter(max_concurrent=4, min_interval=0.2)
 
 
-def _completion_with_backoff(*, max_retries: int = 6, **kwargs) -> Any:
-    """Call litellm.completion with explicit exponential backoff for rate limits."""
-    last_err: Exception | None = None
-    for attempt in range(max_retries + 1):
-        if attempt > 0:
-            delay = min(2 ** attempt, 60)
-            logger.warning(
-                "Rate limited (attempt %d/%d), backing off %.0fs",
-                attempt, max_retries, delay,
-            )
-            time.sleep(delay)
-        _rate_limiter.acquire()
-        try:
-            result = litellm.completion(**kwargs)
-            return result
-        except litellm.RateLimitError as e:
-            last_err = e
-        finally:
-            _rate_limiter.release()
-    raise last_err  # type: ignore[misc]
+def _completion_with_backoff(*, max_retries: int = 3, **kwargs) -> Any:
+    """Call litellm.completion with rate limiting and model fallback.
+
+    Uses the centralized completion_with_fallback which handles:
+    - Rate limit errors with exponential backoff
+    - Model fallback chain on persistent rate limits
+    - AI Gateway routing when configured
+    """
+    _rate_limiter.acquire()
+    try:
+        return completion_with_fallback(max_retries=max_retries, **kwargs)
+    finally:
+        _rate_limiter.release()
 
 
 def _run_structure_scorers(text: str) -> float:
@@ -145,6 +136,8 @@ class SkillBenchEvaluator:
         original_token_counts: Token counts of original artifacts for efficiency scoring.
         token_budget: Hard token ceiling; candidates exceeding this are penalized.
         skill_guidelines: Deduplicated guidelines from ground_truth.yaml for the quality judge.
+        judge_model: LLM model for judges. Defaults to GEPA_JUDGE_LM env
+            or databricks/databricks-claude-sonnet-4-6.
     """
 
     def __init__(
@@ -153,6 +146,8 @@ class SkillBenchEvaluator:
         original_token_counts: dict[str, int] | None = None,
         token_budget: int | None = None,
         skill_guidelines: list[str] | None = None,
+        judge_model: str | None = None,
+        tool_context: str | None = None,
     ):
         if not gen_model:
             raise ValueError(
@@ -161,14 +156,15 @@ class SkillBenchEvaluator:
             )
         self.gen_model = gen_model
         self._baseline_response_cache: dict[str, str] = {}
+        self._baseline_judge_cache: dict[str, JudgeFeedback] = {}
         self._original_token_counts = original_token_counts or {}
         self._total_original_tokens = sum(self._original_token_counts.values())
         self._token_budget = token_budget
+        self._tool_context = tool_context or ""
 
-        # Create judge instances
-        self._quality_judge = create_skill_quality_judge(skill_guidelines)
-        self._effectiveness_judge = create_effectiveness_judge()
-        self._regression_judge = create_regression_judge()
+        # Create judge instances with configurable model
+        self._quality_judge = create_skill_quality_judge(skill_guidelines, judge_model=judge_model)
+        self._regression_judge = create_regression_judge(judge_model=judge_model)
 
     def _generate_response(self, prompt: str, skill_context: str | None = None) -> str:
         """Generate a response with or without skill context."""
@@ -208,7 +204,9 @@ class SkillBenchEvaluator:
         """
         skill_md = candidate.get("skill_md", "")
 
-        # Build combined context: skill + tool descriptions
+        # Build combined context: skill + read-only tool descriptions
+        # During skill optimization, tools come from self._tool_context (read-only).
+        # During tool optimization, tools come from candidate keys (optimizable).
         tool_parts = []
         for key in sorted(candidate):
             if key.startswith("tools_"):
@@ -217,6 +215,8 @@ class SkillBenchEvaluator:
         full_context = skill_md
         if tool_parts:
             full_context += "\n\n## Available MCP Tools\n\n" + "\n\n".join(tool_parts)
+        elif self._tool_context:
+            full_context += "\n\n## Available MCP Tools\n\n" + self._tool_context
 
         prompt = example.get("input", "")
 
@@ -243,53 +243,59 @@ class SkillBenchEvaluator:
         patterns = expectations.get("expected_patterns", [])
         guidelines = expectations.get("guidelines", [])
 
-        # Build expectations string for judge templates
-        expectations_for_judge = {
-            "expected_facts": "\n".join(f"- {f}" for f in facts) if facts else "None specified",
-            "expected_patterns": "\n".join(
-                f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}"
-                for p in patterns
-            ) if patterns else "None specified",
-            "guidelines": "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified",
-        }
+        # Build flat strings for judge templates — make_judge only supports
+        # top-level {{ inputs }}, {{ outputs }}, {{ expectations }} variables.
+        facts_str = "\n".join(f"- {f}" for f in facts) if facts else "None specified"
+        patterns_str = "\n".join(
+            f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}"
+            for p in patterns
+        ) if patterns else "None specified"
+        guidelines_str = "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
+
+        expectations_text = (
+            f"Expected facts:\n{facts_str}\n\n"
+            f"Expected patterns:\n{patterns_str}\n\n"
+            f"Guidelines:\n{guidelines_str}"
+        )
+
+        # make_judge requires expectations as dict, inputs/outputs as Any.
+        # The template renders {{ expectations }} as the dict's string repr,
+        # so we pack our formatted text into a single-key dict.
+        expectations_dict = {"criteria": expectations_text}
 
         # Quality judge: score WITH response
         quality_with_fb = run_judge_safe(
             self._quality_judge,
-            inputs={"prompt": prompt},
-            outputs={"response": with_response},
-            expectations=expectations_for_judge,
+            inputs=prompt,
+            outputs=with_response,
+            expectations=expectations_dict,
             name="quality_with",
         )
 
-        # Quality judge: score WITHOUT response
-        quality_without_fb = run_judge_safe(
-            self._quality_judge,
-            inputs={"prompt": prompt},
-            outputs={"response": without_response},
-            expectations=expectations_for_judge,
-            name="quality_without",
-        )
-
-        # Effectiveness judge: compare both
-        effectiveness_fb = run_judge_safe(
-            self._effectiveness_judge,
-            inputs={
-                "prompt": prompt,
-                "with_response": with_response,
-                "without_response": without_response,
-            },
-            expectations={
-                "expected_facts": "\n".join(f"- {f}" for f in facts) if facts else "None specified",
-            },
-            name="effectiveness",
-        )
+        # Quality judge: score WITHOUT response (cached — baseline never changes)
+        baseline_key = _prompt_hash(prompt)
+        if baseline_key not in self._baseline_judge_cache:
+            self._baseline_judge_cache[baseline_key] = run_judge_safe(
+                self._quality_judge,
+                inputs=prompt,
+                outputs=without_response,
+                expectations=expectations_dict,
+                name="quality_without",
+            )
+        quality_without_fb = self._baseline_judge_cache[baseline_key]
 
         # Parse scores
         score_with = _safe_parse_score(quality_with_fb.value)
         score_without = _safe_parse_score(quality_without_fb.value)
         effectiveness_delta = score_with - score_without
-        effectiveness_verdict = _effectiveness_score(effectiveness_fb.value)
+
+        # Derive effectiveness verdict from quality delta (no LLM call needed)
+        if effectiveness_delta > 0.05:
+            effectiveness_verdict = 1.0  # improved
+        elif effectiveness_delta < -0.05:
+            effectiveness_verdict = 0.0  # regressed
+        else:
+            effectiveness_verdict = 0.5  # same
 
         # Structure validation on the skill itself
         structure = _run_structure_scorers(skill_md) if skill_md else 1.0
@@ -312,9 +318,8 @@ class SkillBenchEvaluator:
 
         # Weighted final score
         final_score = (
-            0.35 * max(0.0, effectiveness_delta)
-            + 0.25 * score_with
-            + 0.10 * effectiveness_verdict
+            0.40 * max(0.0, effectiveness_delta)
+            + 0.30 * score_with
             + 0.05 * structure
             + 0.25 * efficiency
         )
@@ -338,8 +343,8 @@ class SkillBenchEvaluator:
             "rationale": quality_without_fb.rationale,
         }
         side_info["Judge_effectiveness"] = {
-            "verdict": str(effectiveness_fb.value),
-            "rationale": effectiveness_fb.rationale,
+            "verdict": "improved" if effectiveness_verdict == 1.0 else "regressed" if effectiveness_verdict == 0.0 else "same",
+            "delta": effectiveness_delta,
         }
 
         # Expected vs Actual for GEPA reflection
@@ -374,7 +379,7 @@ class SkillBenchEvaluator:
                 f"(with={score_with:.2f}, without={score_without:.2f})"
             )
             side_info["skill_md_specific_info"] = {
-                "Regressions": effectiveness_fb.rationale,
+                "Regressions": quality_with_fb.rationale,
             }
         elif score_with < 0.5:
             side_info["Error"] = (
@@ -417,6 +422,8 @@ def create_skillbench_evaluator(
     gen_model: str,
     original_token_counts: dict[str, int] | None = None,
     token_budget: int | None = None,
+    judge_model: str | None = None,
+    tool_context: str | None = None,
 ) -> Callable:
     """Factory for SkillBench-style evaluator.
 
@@ -430,6 +437,11 @@ def create_skillbench_evaluator(
         gen_model: LLM model for generating responses. Required.
         original_token_counts: Token counts of original artifacts for efficiency scoring.
         token_budget: Hard token ceiling; candidates exceeding this are penalized.
+        judge_model: LLM model for judges. Defaults to GEPA_JUDGE_LM env
+            or databricks/databricks-claude-sonnet-4-6.
+        tool_context: Read-only tool descriptions included in generation context
+            but not optimized. Used during skill optimization so tools provide
+            context without being GEPA components.
     """
     skill_guidelines = _collect_skill_guidelines(skill_name)
     if skill_guidelines:
@@ -438,11 +450,17 @@ def create_skillbench_evaluator(
             len(skill_guidelines),
         )
 
+    from .judges import DEFAULT_JUDGE_LM
+    effective_judge_model = judge_model or DEFAULT_JUDGE_LM
+    logger.info("Judge model: %s", effective_judge_model)
+
     return SkillBenchEvaluator(
         gen_model=gen_model,
         original_token_counts=original_token_counts,
         token_budget=token_budget,
         skill_guidelines=skill_guidelines,
+        judge_model=judge_model,
+        tool_context=tool_context,
     )
 
 

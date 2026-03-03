@@ -8,11 +8,28 @@ Judges:
     quality_judge   — Scores a single response (0.0-1.0) against expectations.
     effectiveness_judge — Compares WITH vs WITHOUT responses, returns verdict.
     regression_judge — Identifies specific ways a skill harms responses.
+
+Judge model resolution (highest priority first):
+    1. Explicit ``judge_model`` argument to factory functions
+    2. ``GEPA_JUDGE_LM`` environment variable
+    3. ``databricks:/databricks-claude-sonnet-4-6`` (default)
+
+Model fallback:
+    On rate limit errors (REQUEST_LIMIT_EXCEEDED), automatically retries with
+    fallback models. Configure via ``GEPA_FALLBACK_MODELS`` env var (comma-separated)
+    or use the built-in Databricks fallback chain.
+
+AI Gateway support:
+    Set ``DATABRICKS_AI_GATEWAY_URL`` to route calls through Databricks AI Gateway.
+    Example: https://1444828305810485.ai-gateway.cloud.databricks.com/mlflow/v1
+    Works alongside the standard serving endpoint approach.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +37,176 @@ from mlflow.genai.judges import make_judge
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_JUDGE_LM = os.environ.get(
+    "GEPA_JUDGE_LM", "databricks:/databricks-claude-sonnet-4-6"
+)
+
+# ---------------------------------------------------------------------------
+# Fallback model chain for rate limit errors
+# ---------------------------------------------------------------------------
+
+_DEFAULT_FALLBACK_MODELS = [
+    "databricks/databricks-gpt-5-2",
+    "databricks/databricks-gemini-3-1-pro",
+    "databricks/databricks-claude-opus-4-5",
+    "databricks/databricks-gpt-5",
+    "databricks/databricks-claude-sonnet-4-6",
+    "databricks/databricks-claude-sonnet-4-5",
+]
+
+def _get_fallback_models() -> list[str]:
+    """Get fallback model chain from env or defaults."""
+    custom = os.environ.get("GEPA_FALLBACK_MODELS", "")
+    if custom.strip():
+        return [m.strip() for m in custom.split(",") if m.strip()]
+    return list(_DEFAULT_FALLBACK_MODELS)
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """Check if an exception is a rate limit / request limit exceeded error."""
+    msg = str(exc).lower()
+    return any(phrase in msg for phrase in [
+        "rate_limit",
+        "rate limit",
+        "request_limit_exceeded",
+        "request limit exceeded",
+        "too many requests",
+        "429",
+        "token.*per.*minute",
+    ])
+
+
+# ---------------------------------------------------------------------------
+# AI Gateway support
+# ---------------------------------------------------------------------------
+
+DATABRICKS_AI_GATEWAY_URL = os.environ.get("DATABRICKS_AI_GATEWAY_URL", "")
+
+
+def _get_gateway_base_url() -> str | None:
+    """Return the AI Gateway base URL if configured, else None."""
+    url = DATABRICKS_AI_GATEWAY_URL.strip()
+    if not url:
+        return None
+    return url.rstrip("/")
+
+
+def _to_litellm_model(model: str) -> tuple[str, str | None]:
+    """Convert a model string to (litellm_model, base_url) for completion calls.
+
+    If AI Gateway is configured and model is a databricks/ model, routes
+    through the gateway as an OpenAI-compatible endpoint. Otherwise returns
+    the model unchanged with no base_url override.
+
+    Returns:
+        (model_string, base_url_or_None)
+    """
+    gateway = _get_gateway_base_url()
+    if gateway and model.startswith("databricks/"):
+        # Route through AI Gateway as OpenAI-compatible endpoint
+        endpoint_name = model.split("/", 1)[1]
+        return f"openai/{endpoint_name}", gateway
+    return model, None
+
+
+# ---------------------------------------------------------------------------
+# URI conversion
+# ---------------------------------------------------------------------------
+
+def _to_judge_uri(model: str) -> str:
+    """Convert litellm-style model strings to MLflow judge URI format.
+
+    litellm uses ``provider/model`` (e.g. ``databricks/databricks-claude-sonnet-4-6``).
+    MLflow judges use ``provider:/model`` (e.g. ``databricks:/databricks-claude-sonnet-4-6``).
+    """
+    if ":/" in model:
+        return model
+    if "/" in model:
+        provider, name = model.split("/", 1)
+        return f"{provider}:/{name}"
+    return model
+
+
+def _judge_inference_params() -> dict[str, Any] | None:
+    """Build inference_params for make_judge if AI Gateway is configured."""
+    gateway = _get_gateway_base_url()
+    if gateway:
+        return {"base_url": gateway}
+    return None
+
+
+def _to_judge_model_and_params(model: str) -> tuple[str, dict[str, Any] | None]:
+    """Convert a model string to (judge_uri, inference_params) for make_judge.
+
+    If AI Gateway is configured, uses ``openai:/endpoint-name`` with
+    ``inference_params.base_url`` pointing to the gateway. Otherwise
+    uses standard ``provider:/model`` format.
+    """
+    gateway = _get_gateway_base_url()
+    if gateway and (model.startswith("databricks/") or model.startswith("databricks:/")):
+        # Extract the endpoint name
+        if ":/" in model:
+            endpoint_name = model.split(":/", 1)[1]
+        else:
+            endpoint_name = model.split("/", 1)[1]
+        return f"openai:/{endpoint_name}", {"base_url": gateway}
+    return _to_judge_uri(model), _judge_inference_params()
+
+
+# ---------------------------------------------------------------------------
+# Completion with fallback
+# ---------------------------------------------------------------------------
+
+def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> Any:
+    """Call litellm.completion with model fallback on rate limit errors.
+
+    Tries the primary model first. On rate limit errors, cycles through
+    the fallback chain. Each model gets ``max_retries`` attempts with
+    exponential backoff before moving to the next.
+
+    Also supports AI Gateway: if DATABRICKS_AI_GATEWAY_URL is set,
+    databricks/ models are routed through the gateway.
+    """
+    import litellm
+
+    models_to_try = [model] + [
+        m for m in _get_fallback_models() if m != model
+    ]
+
+    last_err: Exception | None = None
+    for model_str in models_to_try:
+        litellm_model, base_url = _to_litellm_model(model_str)
+
+        call_kwargs = dict(kwargs)
+        call_kwargs["model"] = litellm_model
+        if base_url:
+            call_kwargs["base_url"] = base_url
+
+        for attempt in range(max_retries):
+            if attempt > 0:
+                delay = min(2 ** attempt, 30)
+                time.sleep(delay)
+            try:
+                return litellm.completion(**call_kwargs)
+            except Exception as e:
+                last_err = e
+                if _is_rate_limit_error(e):
+                    if attempt == max_retries - 1:
+                        logger.warning(
+                            "Model '%s' rate limited after %d attempts, trying next fallback",
+                            model_str, max_retries,
+                        )
+                    continue
+                # Non-rate-limit error: don't retry, try next model
+                logger.warning("Model '%s' failed (non-rate-limit): %s", model_str, e)
+                break
+
+    raise last_err  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Data types
+# ---------------------------------------------------------------------------
 
 @dataclass
 class JudgeFeedback:
@@ -69,20 +256,14 @@ the user's question using correct, complete, and relevant information.
 4. **Pattern adherence** (does the response follow expected code patterns?)
 5. **API accuracy** (are function names, parameters, and syntax correct?)
 
-## Expected Facts and Patterns
+## Expected Facts, Patterns, and Guidelines
 
-{{ expectations.expected_facts }}
-
-{{ expectations.expected_patterns }}
-
-## Skill-Specific Guidelines
-
-{{ expectations.guidelines }}
+{{ expectations }}
 
 ## Input
 
-Question: {{ inputs.prompt }}
-Response: {{ outputs.response }}
+Question: {{ inputs }}
+Response: {{ outputs }}
 
 ## Instructions
 
@@ -103,19 +284,15 @@ Provide detailed rationale explaining:
 
 def create_skill_quality_judge(
     skill_guidelines: list[str] | None = None,
+    judge_model: str | None = None,
 ) -> Any:
     """Create a universal quality judge for scoring responses.
-
-    Uses ``make_judge`` with float output. Incorporates skill-specific
-    guidelines as "semantic memory" when available.
 
     Args:
         skill_guidelines: Optional per-skill evaluation principles from
             ground_truth.yaml guidelines across all test cases.
-
-    Returns:
-        A callable judge that accepts (inputs, outputs, expectations) and
-        returns an MLflow Feedback object with float value + rationale.
+        judge_model: LLM model for the judge. Defaults to GEPA_JUDGE_LM env
+            or databricks/databricks-claude-sonnet-4-6.
     """
     instructions = _QUALITY_INSTRUCTIONS
     if skill_guidelines:
@@ -125,10 +302,13 @@ def create_skill_quality_judge(
             f"{principles}\n"
         )
 
+    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
     return make_judge(
         name="skill_quality",
+        model=model_uri,
         instructions=instructions,
         feedback_value_type=float,
+        inference_params=inference_params,
     )
 
 
@@ -140,24 +320,20 @@ _EFFECTIVENESS_INSTRUCTIONS = """\
 You are comparing two responses to the same question to determine whether
 a skill document helped or hurt the agent's response quality.
 
-## Context
+The inputs contain three fields separated by markers:
+- QUESTION: the user's question
+- WITH-SKILL RESPONSE: generated with the skill document in context
+- WITHOUT-SKILL RESPONSE: generated without any skill document
 
-- **WITH-skill response**: Generated with the skill document in context.
-- **WITHOUT-skill response**: Generated without any skill document.
+The expectations contain the expected facts and patterns.
+
+## Inputs
+
+{{ inputs }}
 
 ## Expected Information
 
-{{ expectations.expected_facts }}
-
-## Input
-
-Question: {{ inputs.prompt }}
-
-WITH-skill response:
-{{ inputs.with_response }}
-
-WITHOUT-skill response:
-{{ inputs.without_response }}
+{{ expectations }}
 
 ## Instructions
 
@@ -181,17 +357,20 @@ Provide detailed rationale explaining:
 """
 
 
-def create_effectiveness_judge() -> Any:
+def create_effectiveness_judge(judge_model: str | None = None) -> Any:
     """Create a WITH vs WITHOUT comparison judge.
 
-    Returns a judge that evaluates whether the skill helped, hurt, or made
-    no difference. Returns Feedback with value in {"improved", "same", "regressed"}
-    and detailed rationale for GEPA.
+    Args:
+        judge_model: LLM model for the judge. Defaults to GEPA_JUDGE_LM env
+            or databricks/databricks-claude-sonnet-4-6.
     """
+    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
     return make_judge(
         name="skill_effectiveness",
+        model=model_uri,
         instructions=_EFFECTIVENESS_INSTRUCTIONS,
         feedback_value_type=str,
+        inference_params=inference_params,
     )
 
 
@@ -203,20 +382,14 @@ _REGRESSION_INSTRUCTIONS = """\
 You are a regression detector for Databricks skill documents. Your job is
 to identify specific ways that a skill document HARMS agent responses.
 
-## Context
-
-The skill document was added to an agent's context. Compare the agent's
-response WITH the skill to the response WITHOUT it.
+The inputs contain three fields separated by markers:
+- QUESTION: the user's question
+- WITH-SKILL RESPONSE: generated with the skill document in context
+- WITHOUT-SKILL RESPONSE: generated without any skill document
 
 ## Input
 
-Question: {{ inputs.prompt }}
-
-WITH-skill response:
-{{ inputs.with_response }}
-
-WITHOUT-skill response:
-{{ inputs.without_response }}
+{{ inputs }}
 
 ## Instructions
 
@@ -237,35 +410,40 @@ For each regression found, explain:
 """
 
 
-def create_regression_judge() -> Any:
+def create_regression_judge(judge_model: str | None = None) -> Any:
     """Create a regression detection judge.
 
-    Returns structured feedback about what to REMOVE from the skill.
-    Rationale goes directly to GEPA's reflection LM for targeted fixes.
+    Args:
+        judge_model: LLM model for the judge. Defaults to GEPA_JUDGE_LM env
+            or databricks/databricks-claude-sonnet-4-6.
     """
+    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
     return make_judge(
         name="skill_regression",
+        model=model_uri,
         instructions=_REGRESSION_INSTRUCTIONS,
         feedback_value_type=bool,
+        inference_params=inference_params,
     )
 
 
 # ---------------------------------------------------------------------------
-# Helper: run a judge safely and return structured feedback
+# Helper: run a judge safely with fallback on rate limit
 # ---------------------------------------------------------------------------
 
 def run_judge_safe(
     judge: Any,
     *,
-    inputs: dict[str, Any],
-    outputs: dict[str, Any] | None = None,
-    expectations: dict[str, Any] | None = None,
+    inputs: Any,
+    outputs: Any | None = None,
+    expectations: Any | None = None,
     name: str = "judge",
 ) -> JudgeFeedback:
-    """Run a judge with error handling, return JudgeFeedback.
+    """Run a judge with error handling and model fallback.
 
-    Catches exceptions and returns a zero-score feedback with error rationale
-    so that evaluation never crashes from a judge failure.
+    On rate limit errors, recreates the judge with fallback models and
+    retries. On other errors, returns zero-score feedback so evaluation
+    never crashes from a judge failure.
     """
     kwargs: dict[str, Any] = {"inputs": inputs}
     if outputs is not None:
@@ -273,6 +451,7 @@ def run_judge_safe(
     if expectations is not None:
         kwargs["expectations"] = expectations
 
+    # Try the primary judge first
     try:
         fb = judge(**kwargs)
         return JudgeFeedback(
@@ -281,9 +460,42 @@ def run_judge_safe(
             name=name,
         )
     except Exception as e:
-        logger.warning("Judge '%s' failed: %s", name, e)
-        return JudgeFeedback(
-            value=0.0,
-            rationale=f"Judge error: {e}",
-            name=name,
-        )
+        if not _is_rate_limit_error(e):
+            logger.warning("Judge '%s' failed: %s", name, e)
+            return JudgeFeedback(value=0.0, rationale=f"Judge error: {e}", name=name)
+
+    # Rate limit hit — try fallback models
+    logger.warning("Judge '%s' rate limited, trying fallback models", name)
+    fallbacks = _get_fallback_models()
+
+    for fallback_model in fallbacks:
+        model_uri, inference_params = _to_judge_model_and_params(fallback_model)
+        try:
+            fallback_judge = make_judge(
+                name=judge.name,
+                model=model_uri,
+                instructions=judge._instructions,
+                feedback_value_type=judge._feedback_value_type,
+                inference_params=inference_params,
+            )
+            fb = fallback_judge(**kwargs)
+            logger.info("Judge '%s' succeeded with fallback model '%s'", name, fallback_model)
+            return JudgeFeedback(
+                value=fb.value,
+                rationale=fb.rationale or "",
+                name=name,
+            )
+        except Exception as fallback_err:
+            if _is_rate_limit_error(fallback_err):
+                logger.warning("Fallback '%s' also rate limited, trying next", fallback_model)
+                continue
+            logger.warning("Fallback '%s' failed: %s", fallback_model, fallback_err)
+            continue
+
+    # All fallbacks exhausted
+    logger.error("Judge '%s': all models rate limited", name)
+    return JudgeFeedback(
+        value=0.0,
+        rationale="All models rate limited — no judge score available",
+        name=name,
+    )

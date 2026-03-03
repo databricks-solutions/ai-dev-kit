@@ -21,7 +21,7 @@ from .skillbench_evaluator import (
     create_skillbench_evaluator,
     build_skillbench_background,
 )
-from .splitter import create_gepa_datasets, generate_bootstrap_tasks, to_gepa_instances
+from .splitter import create_gepa_datasets, generate_bootstrap_tasks, to_gepa_instances, create_cross_skill_dataset
 from .tools import (
     extract_tool_descriptions,
     tools_to_gepa_components,
@@ -85,23 +85,28 @@ def _compute_diff_summary(original: str, optimized: str) -> str:
     return summary
 
 
-def _evaluate_on_tasks(evaluator, candidate, tasks):
+def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating"):
     """Run evaluator on tasks and return mean score, per-task scores, and per-task side_info.
 
     Returns:
         (mean_score, per_task_scores, side_info_by_id, side_info_by_input)
     """
+    import sys
+
     gepa_instances = to_gepa_instances(tasks)
+    total = len(gepa_instances)
     per_task = {}
     side_info_by_id = {}
     side_info_by_input = {}
     for i, inst in enumerate(gepa_instances):
-        score, side_info = evaluator(candidate, inst)
         task_id = tasks[i].get("id", f"task_{i}")
+        print(f"\r  {label}: {i + 1}/{total} ({task_id})...", end="", flush=True)
+        score, side_info = evaluator(candidate, inst)
         per_task[task_id] = score
         side_info_by_id[task_id] = side_info
         side_info_by_input[inst.get("input", f"task_{i}")] = side_info
     mean = sum(per_task.values()) / len(per_task) if per_task else 0.0
+    print(f"\r  {label}: {total}/{total} done. Mean: {mean:.3f}        ")
     return mean, per_task, side_info_by_id, side_info_by_input
 
 
@@ -119,6 +124,7 @@ def optimize_skill(
     token_budget: int | None = None,
     judge_model: str | None = None,
     align: bool = False,
+    run_dir: str | None = None,
     # Deprecated params kept for backward compat
     mode: str = "static",
     task_lm: str | None = None,
@@ -145,6 +151,7 @@ def optimize_skill(
         token_budget: Hard token ceiling
         judge_model: Override judge model (future use)
         align: Use MemAlign alignment (future use)
+        run_dir: Directory for GEPA checkpoints. Resumes from last state if dir exists.
     """
     # 1. Load SKILL.md
     skill_path = find_skill_md(skill_name)
@@ -156,48 +163,71 @@ def optimize_skill(
     # 1b. Load MCP tool descriptions
     tool_map = None
     tool_components: dict[str, str] = {}
-    if include_tools or tools_only:
+    tool_context_str: str | None = None
+
+    # Always load tool descriptions for context
+    try:
         tool_map = extract_tool_descriptions(modules=tool_modules)
         tool_components = tools_to_gepa_components(tool_map, per_module=True)
         stats = get_tool_stats()
         print(f"Tool modules: {stats['modules']}, tools: {stats['total_tools']}, "
               f"description chars: {stats['total_description_chars']:,}")
+    except FileNotFoundError:
+        pass  # No MCP tools directory — skip
+
+    # Build read-only tool context string (for skill optimization)
+    if tool_components:
+        tool_context_str = "\n\n".join(
+            tool_components[k] for k in sorted(tool_components)
+        )
 
     # 2. Build seed_candidate (multi-component dict)
     seed_candidate: dict[str, str] = {}
     original_token_counts: dict[str, int] = {}
 
-    if not tools_only:
-        seed_candidate[SKILL_KEY] = original_content
-        original_token_counts[SKILL_KEY] = count_tokens(original_content)
-
-    for comp_name, comp_text in tool_components.items():
-        seed_candidate[comp_name] = comp_text
-        original_token_counts[comp_name] = count_tokens(comp_text)
-
-    total_original_tokens = sum(original_token_counts.values())
-
-    # Auto-include tools for SkillBench
-    if not tools_only and not include_tools and not tool_components:
-        include_tools = True
-        tool_map = extract_tool_descriptions(modules=tool_modules)
-        tool_components = tools_to_gepa_components(tool_map, per_module=True)
-        stats = get_tool_stats()
-        print(f"[SkillBench] Auto-including tools: {stats['modules']} modules, "
-              f"{stats['total_tools']} tools, {stats['total_description_chars']:,} chars")
+    if tools_only:
+        # Tools-only mode: tool descriptions ARE the GEPA components
         for comp_name, comp_text in tool_components.items():
             seed_candidate[comp_name] = comp_text
             original_token_counts[comp_name] = count_tokens(comp_text)
-        total_original_tokens = sum(original_token_counts.values())
+        tool_context_str = None  # tools are in candidate, not read-only context
+    elif include_tools:
+        # Explicit --include-tools: both skill and tools are GEPA components
+        seed_candidate[SKILL_KEY] = original_content
+        original_token_counts[SKILL_KEY] = count_tokens(original_content)
+        for comp_name, comp_text in tool_components.items():
+            seed_candidate[comp_name] = comp_text
+            original_token_counts[comp_name] = count_tokens(comp_text)
+        tool_context_str = None  # tools are in candidate, not read-only context
+    else:
+        # Default: skill is the only GEPA component; tools are read-only context
+        seed_candidate[SKILL_KEY] = original_content
+        original_token_counts[SKILL_KEY] = count_tokens(original_content)
+
+    total_original_tokens = sum(original_token_counts.values())
 
     # Resolve token budget
     token_budget = token_budget or DEFAULT_TOKEN_BUDGET
 
     # 3. Load datasets
-    try:
-        train, val = create_gepa_datasets(skill_name)
-    except FileNotFoundError:
-        train, val = [], None
+    if tools_only:
+        # Cross-skill dataset for tool optimization
+        train = create_cross_skill_dataset(max_per_skill=5)
+        val = None
+        if train:
+            source_skills = {t.get("metadata", {}).get("source_skill", "?") for t in train}
+            print(f"Cross-skill dataset: {len(train)} tasks from {len(source_skills)} skill(s)")
+        else:
+            # Fall back to single-skill dataset
+            try:
+                train, val = create_gepa_datasets(skill_name)
+            except FileNotFoundError:
+                train, val = [], None
+    else:
+        try:
+            train, val = create_gepa_datasets(skill_name)
+        except FileNotFoundError:
+            train, val = [], None
 
     if not train:
         train = generate_bootstrap_tasks(skill_name)
@@ -208,6 +238,10 @@ def optimize_skill(
     effective_gen_model = gen_model or task_lm or DEFAULT_GEN_LM
     if effective_gen_model:
         print(f"Generation model: {effective_gen_model}")
+
+    from .judges import DEFAULT_JUDGE_LM
+    effective_judge_model = judge_model or DEFAULT_JUDGE_LM
+    print(f"Judge model: {effective_judge_model}")
     print("Evaluator: skillbench (judge-driven)")
 
     if not effective_gen_model:
@@ -220,6 +254,8 @@ def optimize_skill(
         gen_model=effective_gen_model,
         original_token_counts=original_token_counts,
         token_budget=token_budget,
+        judge_model=judge_model,
+        tool_context=tool_context_str,
     )
 
     # 5. Get config (scaled by component count)
@@ -237,6 +273,42 @@ def optimize_skill(
         config.reflection.reflection_lm, total_original_tokens,
     )
 
+    # 5c. Replace GEPA's reflection_lm string with a fallback-aware callable.
+    # GEPA internally calls make_litellm_lm() which wraps litellm.completion
+    # with no fallback. We pre-convert it so GEPA uses our version with
+    # model fallback on rate limit errors.
+    from .judges import completion_with_fallback
+    _reflection_model_name = config.reflection.reflection_lm or ""
+    if isinstance(config.reflection.reflection_lm, str):
+        def _reflection_lm_with_fallback(prompt):
+            if isinstance(prompt, str):
+                messages = [{"role": "user", "content": prompt}]
+            else:
+                messages = prompt
+            result = completion_with_fallback(
+                model=_reflection_model_name,
+                messages=messages,
+            )
+            return result.choices[0].message.content
+
+        config.reflection.reflection_lm = _reflection_lm_with_fallback
+
+    # Same for refiner_lm if present
+    if config.refiner is not None and isinstance(config.refiner.refiner_lm, str):
+        _refiner_model_name = config.refiner.refiner_lm
+        def _refiner_lm_with_fallback(prompt):
+            if isinstance(prompt, str):
+                messages = [{"role": "user", "content": prompt}]
+            else:
+                messages = prompt
+            result = completion_with_fallback(
+                model=_refiner_model_name,
+                messages=messages,
+            )
+            return result.choices[0].message.content
+
+        config.refiner.refiner_lm = _refiner_lm_with_fallback
+
     # Dry run
     if dry_run:
         print(f"\n=== Dry Run: {skill_name} (skillbench) ===")
@@ -246,16 +318,21 @@ def optimize_skill(
         print(f"Total original tokens: {total_original_tokens:,}")
         for comp, tokens in original_token_counts.items():
             print(f"  {comp}: {tokens:,} tokens")
+        if tool_context_str:
+            print(f"Tool context (read-only): {count_tokens(tool_context_str):,} tokens")
         print(f"Train tasks: {len(train)}")
         print(f"Val tasks: {len(val) if val else 'None (single-task mode)'}")
         print(f"Generation model: {effective_gen_model}")
         print(f"Preset: {preset} (max_metric_calls={config.engine.max_metric_calls}, "
               f"scaled for {num_components} component(s))")
         print(f"Max passes: {max_passes}")
+        if run_dir:
+            print(f"Run dir: {run_dir}")
         print(f"Reflection LM: {config.reflection.reflection_lm}")
 
+        print(f"\nScoring baseline ({len(train)} tasks, ~5 LLM calls each)...")
         original_score, original_per_task, si_by_id, _ = _evaluate_on_tasks(
-            evaluator, seed_candidate, train
+            evaluator, seed_candidate, train, label="Baseline"
         )
         print(f"Current score: {original_score:.3f}")
         for task_id, score in original_per_task.items():
@@ -292,8 +369,9 @@ def optimize_skill(
         )
 
     # Evaluate original and capture per-task detail for baseline context
+    print(f"\nScoring baseline ({len(train)} tasks, ~5 LLM calls each)...")
     original_score, original_per_task, si_by_id, si_by_input = _evaluate_on_tasks(
-        evaluator, seed_candidate, train
+        evaluator, seed_candidate, train, label="Baseline"
     )
 
     # 6. Build background and objective
@@ -327,9 +405,11 @@ def optimize_skill(
     print(f"\n  Starting multi-pass optimization (up to {max_passes} passes, "
           f"{num_components} component(s), {config.engine.max_metric_calls} metric calls/pass)")
 
+    # estimate_pass_duration expects the model name string, not the callable
+    _est_reflection_lm = _reflection_model_name if _reflection_model_name else str(reflection_lm or DEFAULT_GEN_LM)
     est_secs = estimate_pass_duration(
         config.engine.max_metric_calls,
-        config.reflection.reflection_lm,
+        _est_reflection_lm,
         total_original_tokens,
         num_dataset_examples=len(train),
     )
@@ -343,6 +423,10 @@ def optimize_skill(
 
         pass_config = copy.deepcopy(config)
 
+        # Set per-pass checkpoint directory
+        if run_dir:
+            pass_config.engine.run_dir = f"{run_dir}/pass_{pass_num}"
+
         result = optimize_anything(
             seed_candidate=current_seed,
             evaluator=evaluator,
@@ -355,7 +439,7 @@ def optimize_skill(
         total_metric_calls += result.total_metric_calls or 0
 
         candidate = result.best_candidate
-        pass_score, _, _, _ = _evaluate_on_tasks(evaluator, candidate, train)
+        pass_score, _, _, _ = _evaluate_on_tasks(evaluator, candidate, train, label=f"Pass {pass_num}")
         improvement = pass_score - best_score
 
         print(f"  Pass {pass_num} score: {pass_score:.4f} "
@@ -385,7 +469,7 @@ def optimize_skill(
 
     val_scores: dict[str, float] = {}
     if val:
-        _, val_scores, _, _ = _evaluate_on_tasks(evaluator, best, val)
+        _, val_scores, _, _ = _evaluate_on_tasks(evaluator, best, val, label="Validation")
 
     token_reduction_pct = (
         (total_original_tokens - optimized_token_count) / total_original_tokens * 100
@@ -416,7 +500,7 @@ def optimize_skill(
         pass
 
     # Capture final side_info for review output
-    _, _, final_si_by_id, _ = _evaluate_on_tasks(evaluator, best, train)
+    _, _, final_si_by_id, _ = _evaluate_on_tasks(evaluator, best, train, label="Final eval")
 
     return OptimizationResult(
         skill_name=skill_name,

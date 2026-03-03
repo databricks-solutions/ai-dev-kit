@@ -129,6 +129,12 @@ def main():
         help="Use MemAlign to align judges with human feedback (requires alignment traces)",
     )
     parser.add_argument(
+        "--run-dir",
+        type=str,
+        default=None,
+        help="Directory for GEPA checkpoints. Resumes from last state if dir exists.",
+    )
+    parser.add_argument(
         "--generate-from",
         type=str,
         default=None,
@@ -231,6 +237,7 @@ def main():
                     token_budget=args.token_budget,
                     judge_model=args.judge_model,
                     align=args.align,
+                    run_dir=f"{args.run_dir}/{name}" if args.run_dir else None,
                 )
                 review_optimization(result)
                 if args.apply and not args.dry_run:
@@ -267,6 +274,7 @@ def main():
                 token_budget=args.token_budget,
                 judge_model=args.judge_model,
                 align=args.align,
+                run_dir=args.run_dir,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:

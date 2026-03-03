@@ -159,6 +159,73 @@ def create_gepa_datasets(
     return train, val
 
 
+def create_cross_skill_dataset(
+    skill_names: list[str] | None = None,
+    max_per_skill: int = 5,
+    base_path: Path | None = None,
+    seed: int = 42,
+) -> list[SkillTask]:
+    """Create a merged dataset from multiple skills for cross-skill tool optimization.
+
+    If ``skill_names`` is None, discovers all skills that have a ``ground_truth.yaml``.
+    Loads tasks from each, caps at ``max_per_skill``, and tags each task with
+    ``metadata["source_skill"]``.
+
+    Args:
+        skill_names: Specific skills to include. None = auto-discover all.
+        max_per_skill: Maximum tasks per skill to keep the dataset balanced.
+        base_path: Override base path for skills directory.
+        seed: Random seed for reproducible sampling.
+
+    Returns:
+        Merged list of SkillTask dicts, each tagged with source_skill.
+    """
+    if base_path is None:
+        base_path = Path(".test/skills")
+
+    # Auto-discover skills with ground_truth.yaml
+    if skill_names is None:
+        if not base_path.exists():
+            return []
+        skill_names = sorted(
+            d.name
+            for d in base_path.iterdir()
+            if d.is_dir()
+            and (d / "ground_truth.yaml").exists()
+            and not d.name.startswith("_")
+        )
+
+    if not skill_names:
+        return []
+
+    rng = random.Random(seed)
+    merged: list[SkillTask] = []
+
+    for skill_name in skill_names:
+        try:
+            source = get_dataset_source(skill_name, base_path)
+            records = source.load()
+        except Exception:
+            continue
+
+        tasks = [_record_to_task(r) for r in records]
+
+        # Tag with source skill
+        for t in tasks:
+            meta = t.get("metadata", {})
+            meta["source_skill"] = skill_name
+            t["metadata"] = meta
+
+        # Cap per skill
+        if len(tasks) > max_per_skill:
+            rng.shuffle(tasks)
+            tasks = tasks[:max_per_skill]
+
+        merged.extend(tasks)
+
+    return merged
+
+
 def generate_bootstrap_tasks(skill_name: str, base_path: Path | None = None) -> list[SkillTask]:
     """Generate synthetic tasks from a SKILL.md when no ground_truth.yaml exists.
 
