@@ -139,7 +139,8 @@ else:
         print("=" * 80)
         print(f"Missing: {', '.join(missing_deps)}")
         if on_runtime:
-            print("\nSolution: Run install using Databricks CLI: Use Databricks CLI to install libraries: databricks libraries install --json '{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}'")
+            print('\nSolution: Install libraries via Databricks CLI:')
+            print('  databricks libraries install --json \'{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}\'')
         else:
             print("\nSolution: Upgrade to databricks-connect >= 16.4 for managed deps")
             print("          Or create a job with environment settings")
@@ -268,8 +269,10 @@ customers_df.groupBy("tier").count().orderBy("tier").show()
 # =============================================================================
 print(f"\nGenerating {N_ORDERS:,} orders with referential integrity...")
 
-# Cache customer lookup for FK generation
-customer_lookup = customers_df.select("customer_id", "tier").cache()
+# Write customer lookup to temp Delta table (no .cache() on serverless!)
+customers_tmp_table = f"{CATALOG}.{SCHEMA}._tmp_customers_lookup"
+customers_df.select("customer_id", "tier").write.mode("overwrite").saveAsTable(customers_tmp_table)
+customer_lookup = spark.table(customers_tmp_table)
 
 # Generate orders base
 orders_df = (
@@ -370,7 +373,7 @@ orders_final.groupBy("status").count().orderBy("status").show()
 # =============================================================================
 # CLEANUP AND SUMMARY
 # =============================================================================
-customer_lookup.unpersist()
+spark.sql(f"DROP TABLE IF EXISTS {customers_tmp_table}")
 
 print("\n" + "=" * 80)
 print("GENERATION COMPLETE")

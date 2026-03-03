@@ -2,8 +2,6 @@
 
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from concurrent.futures import ProcessPoolExecutor, TimeoutError as FuturesTimeoutError
-import multiprocessing
 import yaml
 import mlflow
 from mlflow.genai.scorers import Guidelines, Safety

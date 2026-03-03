@@ -57,6 +57,9 @@ def main():
     if hasattr(signal, 'SIGALRM'):
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(args.timeout)
+    else:
+        # Windows: SIGALRM not available - no timeout enforcement
+        print("WARNING: Timeout not supported on Windows - test may run indefinitely", file=sys.stderr)
 
     try:
         from skill_test.runners import evaluate_skill

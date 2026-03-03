@@ -1,0 +1,235 @@
+Here's the complete script to generate manufacturing IoT sensor data with streaming-ready batch processing:
+
+```python
+"""
+Manufacturing IoT Sensor Data Generation
+========================================
+2 related tables with referential integrity:
+- sensor_devices (500 rows): Slowly changing dimension
+- sensor_readings (10,000 rows per batch): Streaming incremental
+
+Output: Delta tables registered in Unity Catalog
+Execution: Databricks Connect with serverless compute (Python 3.12+)
+"""
+
+from databricks.connect import DatabricksSession, DatabricksEnv
+from pyspark.sql import functions as F
+from pyspark.sql.types import StringType, DoubleType, TimestampType
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+# Configuration
+CATALOG = "ai_dev_kit"
+SCHEMA = "devkit_gen4_test_large_delta"
+
+# Row counts
+NUM_DEVICES = 500
+NUM_READINGS_PER_BATCH = 10000
+
+# Date range for readings (last 24 hours for streaming simulation)
+END_TIME = datetime.now()
+START_TIME = END_TIME - timedelta(hours=24)
+
+# Setup with managed dependencies (databricks-connect 16.4+)
+env = DatabricksEnv().withDependencies("faker", "pandas", "numpy")
+spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
+
+print(f"Connected to Databricks serverless compute")
+print(f"Output location: {CATALOG}.{SCHEMA}")
+
+# Create schema if not exists
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+print(f"Schema {CATALOG}.{SCHEMA} ready")
+
+
+# =============================================================================
+# Pandas UDFs for data generation
+# =============================================================================
+
+@F.pandas_udf(StringType())
+def fake_device_name(ids: pd.Series) -> pd.Series:
+    """Generate realistic device names like 'SENS-T-00001'."""
+    from faker import Faker
+    fake = Faker()
+    Faker.seed(42)
+
+    prefixes = {"temperature": "T", "pressure": "P", "vibration": "V", "humidity": "H"}
+    names = []
+    for i, _ in enumerate(ids):
+        type_key = list(prefixes.keys())[i % 4]
+        prefix = prefixes[type_key]
+        names.append(f"SENS-{prefix}-{str(i).zfill(5)}")
+    return pd.Series(names)
+
+
+@F.pandas_udf(DoubleType())
+def generate_sensor_value(device_types: pd.Series) -> pd.Series:
+    """Generate realistic sensor values based on device type."""
+    values = []
+    for dtype in device_types:
+        if dtype == "temperature":
+            values.append(float(np.random.normal(70, 15)))  # Fahrenheit
+        elif dtype == "pressure":
+            values.append(float(np.random.normal(100, 10)))  # PSI
+        elif dtype == "vibration":
+            values.append(float(np.random.lognormal(1.5, 0.8)))  # mm/s with spikes
+        elif dtype == "humidity":
+            values.append(float(np.clip(np.random.normal(45, 10), 0, 100)))  # Percentage
+        else:
+            values.append(float(np.random.normal(50, 10)))
+    return pd.Series(values)
+
+
+@F.pandas_udf(StringType())
+def generate_unit(device_types: pd.Series) -> pd.Series:
+    """Generate appropriate unit based on device type."""
+    unit_map = {
+        "temperature": "°F",
+        "pressure": "PSI",
+        "vibration": "mm/s",
+        "humidity": "%"
+    }
+    return pd.Series([unit_map.get(dt, "units") for dt in device_types])
+
+
+# =============================================================================
+# Generate sensor_devices (slowly changing dimension)
+# =============================================================================
+
+print("\nGenerating sensor_devices table (slowly changing dimension)")
+
+# Device type weights: temperature 30%, pressure 25%, vibration 25%, humidity 20%
+devices_df = (
+    spark.range(0, NUM_DEVICES, numPartitions=4)
+    .select(
+        F.concat(F.lit("DEV-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("device_id"),
+        F.col("id").alias("_id")
+    )
+    .withColumn("device_name", fake_device_name(F.col("_id")))
+    .withColumn(
+        "device_type",
+        F.when(F.rand() < 0.30, "temperature")
+         .when(F.rand() < 0.55, "pressure")
+         .when(F.rand() < 0.80, "vibration")
+         .otherwise("humidity")
+    )
+    .withColumn(
+        "location",
+        F.when(F.rand() < 0.40, "Plant_A")
+         .when(F.rand() < 0.70, "Plant_B")
+         .when(F.rand() < 0.90, "Plant_C")
+         .otherwise("Warehouse")
+    )
+    .withColumn(
+        "install_date",
+        F.date_add(F.lit("2020-01-01"), (F.rand() * 1460).cast("int"))
+    )
+    .withColumn(
+        "status",
+        F.when(F.rand() < 0.85, "active")
+         .when(F.rand() < 0.95, "maintenance")
+         .otherwise("inactive")
+    )
+    .drop("_id")
+)
+
+# Write devices table
+devices_table = f"{CATALOG}.{SCHEMA}.sensor_devices"
+devices_df.write.mode("overwrite").saveAsTable(devices_table)
+print(f"Created {devices_table}")
+
+
+# =============================================================================
+# Generate sensor_readings (streaming incremental batch)
+# =============================================================================
+
+print("\nGenerating sensor_readings table (streaming batch)")
+
+# Read devices back for FK join (no .cache() on serverless!)
+devices_for_join = spark.table(devices_table).select("device_id", "device_type")
+
+# Generate readings with valid device_id FK
+readings_df = (
+    spark.range(0, NUM_READINGS_PER_BATCH, numPartitions=16)
+    .select(
+        F.concat(
+            F.lit("RDG-"),
+            F.date_format(F.current_timestamp(), "yyyyMMddHHmmss"),
+            F.lit("-"),
+            F.lpad(F.col("id").cast("string"), 6, "0")
+        ).alias("reading_id"),
+        (F.abs(F.hash(F.col("id"))) % NUM_DEVICES).alias("device_index"),
+        F.from_unixtime(
+            F.unix_timestamp(F.lit(START_TIME)) +
+            (F.rand() * 86400).cast("long")
+        ).cast("timestamp").alias("timestamp")
+    )
+)
+
+# Get device IDs with row numbers for joining
+devices_indexed = (
+    devices_for_join
+    .withColumn("device_index", F.monotonically_increasing_id() % NUM_DEVICES)
+)
+
+# Join to get valid device_id and device_type
+readings_with_device = (
+    readings_df
+    .join(
+        devices_indexed.select("device_id", "device_type", "device_index"),
+        on="device_index",
+        how="inner"
+    )
+    .drop("device_index")
+)
+
+# Add sensor values based on device type
+readings_final = (
+    readings_with_device
+    .withColumn("value", F.round(generate_sensor_value(F.col("device_type")), 2))
+    .withColumn("unit", generate_unit(F.col("device_type")))
+    .withColumn(
+        "quality_flag",
+        F.when(F.rand() < 0.90, "good")
+         .when(F.rand() < 0.97, "warning")
+         .otherwise("error")
+    )
+    .select("reading_id", "device_id", "timestamp", "value", "unit", "quality_flag")
+)
+
+# Write readings table (append mode for streaming simulation)
+readings_table = f"{CATALOG}.{SCHEMA}.sensor_readings"
+readings_final.write.mode("overwrite").saveAsTable(readings_table)
+print(f"Created {readings_table}")
+
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+# Check referential integrity
+orphan_readings = spark.sql(f"""
+    SELECT COUNT(*) as orphan_count
+    FROM {readings_table} r
+    LEFT JOIN {devices_table} d ON r.device_id = d.device_id
+    WHERE d.device_id IS NULL
+""").collect()[0]["orphan_count"]
+
+print(f"Orphan readings (should be 0): {orphan_readings}")
+print(f"\nSUMMARY")
+print(f"Catalog/Schema: {CATALOG}.{SCHEMA}")
+print(f"Tables: {devices_table}, {readings_table}")
+print(f"Referential integrity: {'PASSED' if orphan_readings == 0 else 'FAILED'}")
+```
+
+Run with:
+```bash
+uv pip install "databricks-connect>=16.4,<17.0" faker numpy pandas
+uv run python generate_manufacturing_data.py
+```
+
+For streaming job deployment, this can be scheduled as an incremental job where each run:
+1. Generates a new batch of 10,000 readings with unique timestamps
+2. Appends to the sensor_readings table (change mode to "append")
+3. The sensor_devices table is the slowly-changing dimension that persists

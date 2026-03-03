@@ -121,7 +121,7 @@ class DatabricksExecutionSettings:
     schema: str = field(default_factory=lambda: os.getenv("SKILL_TEST_SCHEMA", "skill_test"))
 
     # Execution settings
-    timeout: int = 480  # seconds
+    timeout: int = 240  # seconds - increased from 120s to handle larger data generation tasks
     preserve_context: bool = True  # Reuse context across code blocks
 
 

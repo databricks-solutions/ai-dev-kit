@@ -1,0 +1,337 @@
+Here's the Python script to generate product catalog data, followed by the serverless job definition:
+
+```python
+"""
+Synthetic Product Catalog Data Generation
+Serverless Databricks Job with JSON Output
+
+Generates:
+- products (3,000 rows): product_id, name, category (weighted), price (log-normal), inventory_count
+- sales (10,000 rows): sale_id, product_id (FK), quantity, sale_date, discount_pct
+
+Popular product categories have more sales (weighted sampling).
+"""
+
+import os
+from pyspark.sql import SparkSession, functions as F
+from pyspark.sql.window import Window
+from pyspark.sql.types import StringType, DoubleType, IntegerType
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+CATALOG = "my_catalog"
+SCHEMA = "devkit_gen2_test_small_json"
+VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
+
+NUM_PRODUCTS = 3_000
+NUM_SALES = 10_000
+NUM_PARTITIONS = 16
+
+END_DATE = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+START_DATE = END_DATE - timedelta(days=180)
+SEED = 42
+
+# =============================================================================
+# SPARK SESSION
+# =============================================================================
+
+def is_databricks_runtime():
+    return "DATABRICKS_RUNTIME_VERSION" in os.environ
+
+if is_databricks_runtime():
+    spark = SparkSession.builder.getOrCreate()
+    print("Running on Databricks Runtime")
+else:
+    from databricks.connect import DatabricksSession
+    spark = DatabricksSession.builder.serverless(True).getOrCreate()
+    print("Running with Databricks Connect (serverless)")
+
+print("=" * 60)
+print("PRODUCT CATALOG DATA GENERATION")
+print("=" * 60)
+print(f"Catalog: {CATALOG}")
+print(f"Schema: {SCHEMA}")
+print(f"Products: {NUM_PRODUCTS:,}")
+print(f"Sales: {NUM_SALES:,}")
+print("=" * 60)
+
+# =============================================================================
+# CREATE INFRASTRUCTURE
+# =============================================================================
+print("\nCreating infrastructure...")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
+
+# =============================================================================
+# PANDAS UDFs
+# =============================================================================
+
+@F.pandas_udf(StringType())
+def fake_product_name(categories: pd.Series) -> pd.Series:
+    from faker import Faker
+    fake = Faker()
+
+    templates = {
+        "Electronics": ["Smart", "Wireless", "Digital", "Pro", "Ultra"],
+        "Home & Garden": ["Premium", "Deluxe", "Classic", "Modern", "Natural"],
+        "Clothing": ["Designer", "Casual", "Comfort", "Luxury", "Sport"],
+        "Sports": ["Pro", "Elite", "Performance", "Outdoor", "Active"],
+        "Books": ["Complete", "Essential", "Ultimate", "Practical", "Advanced"],
+        "Toys": ["Fun", "Creative", "Educational", "Super", "Magic"],
+        "Beauty": ["Natural", "Premium", "Radiance", "Pure", "Glow"],
+        "Automotive": ["Pro", "Heavy-Duty", "Premium", "Performance", "Ultra"],
+    }
+
+    products = {
+        "Electronics": ["Headphones", "Speaker", "Charger", "Watch", "Camera"],
+        "Home & Garden": ["Lamp", "Planter", "Organizer", "Rug", "Vase"],
+        "Clothing": ["T-Shirt", "Jacket", "Pants", "Sweater", "Dress"],
+        "Sports": ["Ball", "Racket", "Mat", "Gloves", "Bag"],
+        "Books": ["Guide", "Handbook", "Manual", "Edition", "Collection"],
+        "Toys": ["Game", "Puzzle", "Building Set", "Robot", "Craft Kit"],
+        "Beauty": ["Serum", "Cream", "Lotion", "Mask", "Oil"],
+        "Automotive": ["Tool Kit", "Cover", "Mat", "Cleaner", "Polish"],
+    }
+
+    names = []
+    for category in categories:
+        template_list = templates.get(category, ["Premium"])
+        product_list = products.get(category, ["Item"])
+        template = np.random.choice(template_list)
+        product = np.random.choice(product_list)
+        color = fake.color_name()
+        names.append(f"{template} {color} {product}")
+
+    return pd.Series(names)
+
+
+@F.pandas_udf(DoubleType())
+def generate_price(categories: pd.Series) -> pd.Series:
+    price_params = {
+        "Electronics": (4.5, 0.8),
+        "Home & Garden": (3.8, 0.7),
+        "Clothing": (3.5, 0.6),
+        "Sports": (4.0, 0.7),
+        "Books": (2.8, 0.4),
+        "Toys": (3.2, 0.6),
+        "Beauty": (3.3, 0.5),
+        "Automotive": (4.2, 0.8),
+    }
+
+    prices = []
+    for category in categories:
+        mu, sigma = price_params.get(category, (3.5, 0.6))
+        price = float(np.random.lognormal(mu, sigma))
+        price = round(price) - 0.01 if price > 1 else round(price, 2)
+        prices.append(max(0.99, price))
+
+    return pd.Series(prices)
+
+
+@F.pandas_udf(IntegerType())
+def generate_inventory(ids: pd.Series) -> pd.Series:
+    inventory = (np.random.pareto(a=2.0, size=len(ids)) + 1) * 20
+    return pd.Series(inventory.astype(int))
+
+
+# =============================================================================
+# GENERATE PRODUCTS TABLE (Master)
+# =============================================================================
+print(f"\nGenerating {NUM_PRODUCTS:,} products...")
+
+products_df = (
+    spark.range(0, NUM_PRODUCTS, numPartitions=NUM_PARTITIONS)
+    .select(
+        F.concat(F.lit("PROD-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("product_id"),
+        F.col("id").alias("_idx"),
+    )
+    .withColumn(
+        "category",
+        F.when(F.rand(SEED) < 0.25, "Electronics")
+         .when(F.rand(SEED + 1) < 0.45, "Home & Garden")
+         .when(F.rand(SEED + 2) < 0.63, "Clothing")
+         .when(F.rand(SEED + 3) < 0.75, "Sports")
+         .when(F.rand(SEED + 4) < 0.85, "Books")
+         .when(F.rand(SEED + 5) < 0.93, "Toys")
+         .when(F.rand(SEED + 6) < 0.98, "Beauty")
+         .otherwise("Automotive")
+    )
+    .withColumn("name", fake_product_name(F.col("category")))
+    .withColumn("price", generate_price(F.col("category")))
+    .withColumn("inventory_count", generate_inventory(F.col("_idx")))
+    .drop("_idx")
+)
+
+products_final = products_df.select(
+    "product_id", "name", "category", "price", "inventory_count"
+)
+
+products_json_path = f"{VOLUME_PATH}/products"
+print(f"Writing products to {products_json_path}...")
+products_final.write.mode("overwrite").json(products_json_path)
+
+products_for_fk = spark.read.json(products_json_path).select("product_id", "category")
+product_count = products_for_fk.count()
+print(f"Products written: {product_count:,}")
+
+# =============================================================================
+# GENERATE SALES TABLE (with Referential Integrity)
+# =============================================================================
+print(f"\nGenerating {NUM_SALES:,} sales with referential integrity...")
+
+product_weights = products_for_fk.select(
+    "product_id",
+    "category",
+    F.when(F.col("category") == "Electronics", 3.0)
+     .when(F.col("category") == "Home & Garden", 2.5)
+     .when(F.col("category") == "Clothing", 2.0)
+     .when(F.col("category") == "Sports", 1.5)
+     .when(F.col("category") == "Books", 1.2)
+     .when(F.col("category") == "Toys", 1.0)
+     .when(F.col("category") == "Beauty", 0.8)
+     .otherwise(0.5).alias("weight")
+)
+
+weighted_products = (
+    product_weights
+    .select(
+        F.col("product_id"),
+        F.col("category"),
+        F.explode(F.array_repeat(F.col("product_id"), F.col("weight").cast("int"))).alias("_dup")
+    )
+    .drop("_dup")
+)
+
+sampled_products = (
+    weighted_products
+    .orderBy(F.rand(SEED + 20))
+    .limit(NUM_SALES)
+    .withColumn("sale_rank", F.row_number().over(Window.orderBy(F.monotonically_increasing_id())))
+    .select("product_id", "category", "sale_rank")
+)
+
+sales_base = (
+    spark.range(0, NUM_SALES, numPartitions=NUM_PARTITIONS)
+    .withColumn("sale_rank", F.row_number().over(Window.orderBy(F.col("id"))))
+    .withColumn(
+        "sale_id",
+        F.concat(F.lit("SALE-"), F.lpad(F.col("id").cast("string"), 6, "0"))
+    )
+)
+
+sales_with_products = sales_base.join(
+    sampled_products,
+    on="sale_rank",
+    how="inner"
+)
+
+sales_df = (
+    sales_with_products
+    .withColumn(
+        "quantity",
+        F.when(F.rand(SEED + 21) < 0.60, 1)
+         .when(F.rand(SEED + 22) < 0.85, 2)
+         .when(F.rand(SEED + 23) < 0.95, 3)
+         .otherwise(F.floor(F.rand(SEED + 24) * 5 + 4).cast("int"))
+    )
+    .withColumn(
+        "sale_date",
+        F.date_add(F.lit(START_DATE.date()), (F.rand(SEED + 25) * 180).cast("int"))
+    )
+    .withColumn(
+        "discount_pct",
+        F.when(F.rand(SEED + 26) < 0.70, 0.0)
+         .when(F.rand(SEED + 27) < 0.85, 0.10)
+         .when(F.rand(SEED + 28) < 0.95, 0.20)
+         .otherwise(0.30)
+    )
+)
+
+sales_final = sales_df.select(
+    "sale_id", "product_id", "quantity", "sale_date", "discount_pct"
+)
+
+sales_json_path = f"{VOLUME_PATH}/sales"
+print(f"Writing sales to {sales_json_path}...")
+sales_final.write.mode("overwrite").json(sales_json_path)
+
+sales_count = spark.read.json(sales_json_path).count()
+print(f"Sales written: {sales_count:,}")
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+print("\n" + "=" * 60)
+print("VALIDATION")
+print("=" * 60)
+
+products_check = spark.read.json(products_json_path)
+sales_check = spark.read.json(sales_json_path)
+
+print(f"\nRow counts:")
+print(f"  Products: {products_check.count():,}")
+print(f"  Sales: {sales_check.count():,}")
+
+print(f"\nSales per category (Electronics should have most):")
+sales_with_category = sales_check.join(
+    products_check.select("product_id", "category"),
+    on="product_id"
+)
+sales_with_category.groupBy("category").agg(
+    F.count("*").alias("total_sales"),
+    F.sum("quantity").alias("total_quantity")
+).orderBy(F.desc("total_sales")).show()
+
+orphan_sales = sales_check.join(
+    products_check.select("product_id"),
+    on="product_id",
+    how="left_anti"
+).count()
+print(f"\nReferential integrity:")
+print(f"  Orphan sales (no matching product): {orphan_sales}")
+
+print("\n" + "=" * 60)
+print("GENERATION COMPLETE")
+print("=" * 60)
+print(f"\nOutput location: {VOLUME_PATH}")
+```
+
+To run this as a serverless job, create the job with this configuration:
+
+```json
+{
+  "name": "generate_product_catalog_data",
+  "tasks": [
+    {
+      "task_key": "generate_data",
+      "spark_python_task": {
+        "python_file": "/Workspace/Users/your_email/generate_product_catalog_data.py"
+      },
+      "new_cluster": {
+        "spark_version": "16.4.x-scala2.12",
+        "num_workers": 0,
+        "spark_conf": {
+          "spark.databricks.cluster.profile": "serverless"
+        }
+      },
+      "environments": [
+        {
+          "environment_key": "default",
+          "spec": {
+            "client": "4",
+            "dependencies": [
+              "faker",
+              "pandas",
+              "numpy"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+```
