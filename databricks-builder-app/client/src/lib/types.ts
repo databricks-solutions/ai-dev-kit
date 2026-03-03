@@ -61,6 +61,7 @@ export interface Warehouse {
   state: string;
   cluster_size?: string | null;
   creator_name?: string | null;
+  is_serverless?: boolean;
 }
 
 /** Todo item from agent TodoWrite tool */

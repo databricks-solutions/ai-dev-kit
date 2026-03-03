@@ -24,17 +24,24 @@ def test_fetch_clusters_sync_performance():
 
 
 def test_clusters_sorted_correctly():
-  """Test that clusters are sorted: running first, shared second, then alphabetically."""
-  from server.services.clusters import _fetch_clusters_sync
+  """Test that clusters are sorted: serverless first, then running, shared, then rest."""
+  from server.services.clusters import _fetch_clusters_sync, SERVERLESS_CLUSTER_ID
 
   clusters = _fetch_clusters_sync(limit=50)
 
-  if len(clusters) < 2:
-    pytest.skip('Not enough clusters to test sorting')
+  # First entry should always be Serverless Compute
+  assert clusters[0]['cluster_id'] == SERVERLESS_CLUSTER_ID
+  assert clusters[0]['cluster_name'] == 'Serverless Compute'
 
-  # Check running clusters come first
+  # Skip the synthetic serverless entry for sort order checking
+  real_clusters = [c for c in clusters if c['cluster_id'] != SERVERLESS_CLUSTER_ID]
+
+  if len(real_clusters) < 2:
+    pytest.skip('Not enough real clusters to test sorting')
+
+  # Check running clusters come first among real clusters
   found_non_running = False
-  for c in clusters:
+  for c in real_clusters:
     if c['state'] != 'RUNNING':
       found_non_running = True
     elif found_non_running:

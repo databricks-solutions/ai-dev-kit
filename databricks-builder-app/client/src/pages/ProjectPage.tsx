@@ -1161,7 +1161,8 @@ export default function ProjectPage() {
     }
     const cluster = clusters.find(c => c.cluster_id === selectedClusterId);
     if (cluster) {
-      chips.push({ label: cluster.cluster_name || 'Cluster', color: cluster.state === 'RUNNING' ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]' });
+      const isServerless = cluster.cluster_id === '__serverless__';
+      chips.push({ label: isServerless ? 'Serverless Compute' : (cluster.cluster_name || 'Cluster'), color: cluster.state === 'RUNNING' ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]' });
     }
     const warehouse = warehouses.find(w => w.warehouse_id === selectedWarehouseId);
     if (warehouse) {

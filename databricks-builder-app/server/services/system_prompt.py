@@ -107,7 +107,17 @@ Use the `Skill` tool to load skills. Available skills:
 """
 
   cluster_section = ''
-  if cluster_id:
+  if cluster_id == 'serverless' or cluster_id == '__serverless__':
+    cluster_section = """
+## Compute: Serverless
+
+You are configured to use **Databricks Serverless Compute** for code execution.
+
+When using `execute_databricks_command` or `run_python_file_on_databricks`:
+- **Do NOT pass a cluster_id parameter** — serverless compute is used automatically when no cluster is specified.
+- Serverless compute starts instantly with no cluster startup wait time.
+"""
+  elif cluster_id:
     cluster_section = f"""
 ## Selected Cluster
 

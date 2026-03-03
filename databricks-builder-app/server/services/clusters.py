@@ -157,4 +157,16 @@ async def list_clusters_async() -> list[dict]:
 
   # No cache - we must wait for the first fetch
   await _refresh_cache()
-  return _get_cached_clusters() or []
+  result = _get_cached_clusters()
+  if result:
+    return result
+
+  # Even if the API call failed, always return the serverless option
+  return [
+    {
+      'cluster_id': SERVERLESS_CLUSTER_ID,
+      'cluster_name': 'Serverless Compute',
+      'state': 'RUNNING',
+      'creator_user_name': None,
+    },
+  ]
