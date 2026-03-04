@@ -28,7 +28,7 @@ Before creating Agent Bricks, ensure you have the required data:
 ### For Genie Spaces
 - **See the `databricks-genie` skill** for comprehensive Genie Space guidance
 - Tables in Unity Catalog with the data to explore
-- Generate raw data using the `databricks-synthetic-data-generation` skill
+- Generate raw data using the `databricks-synthetic-data-gen` skill
 - Create tables using the `databricks-spark-declarative-pipelines` skill
 
 ### For Supervisor Agents
@@ -119,7 +119,7 @@ Before creating Agent Bricks, generate the required source data:
 
 **For Genie (SQL exploration)**:
 ```
-1. Use `databricks-synthetic-data-generation` skill to create raw parquet data
+1. Use `databricks-synthetic-data-gen` skill to create raw parquet data
 2. Use `databricks-spark-declarative-pipelines` skill to create bronze/silver/gold tables
 ```
 
@@ -199,7 +199,7 @@ manage_mas(
 
 - **[databricks-genie](../databricks-genie/SKILL.md)** - Comprehensive Genie Space creation, curation, and Conversation API guidance
 - **[databricks-unstructured-pdf-generation](../databricks-unstructured-pdf-generation/SKILL.md)** - Generate synthetic PDFs to feed into Knowledge Assistants
-- **[databricks-synthetic-data-generation](../databricks-synthetic-data-generation/SKILL.md)** - Create raw data for Genie Space tables
+- **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - Create raw data for Genie Space tables
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy custom agent endpoints used as MAS agents
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Build vector indexes for RAG applications paired with KAs

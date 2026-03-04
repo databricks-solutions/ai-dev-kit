@@ -1,0 +1,327 @@
+test_cases:
+
+- id: grp_20260302_113344
+  inputs:
+    prompt: 'Generate synthetic e-commerce data locally then save it to Unity Catalog.
+
+      Create 2 related tables with referential integrity:
+
+      - customers (5,000 rows): customer_id, name, email, tier (Free/Pro/Enterprise
+      weighted 60/30/10), region, created_at
+
+      - orders (15,000 rows): order_id, customer_id (FK to customers), amount, order_date,
+      status
+
+
+      Save as Parquet then upload to a Unity Catalog volume. Use schema name ''devkit_gen1_test_small_parquet''.
+
+      Enterprise customers should generate more orders than Free tier.'
+  outputs:
+    expected_response_file: expected_responses/grp_20260302_113344.txt
+    execution_success: true
+  expectations:
+    expected_facts:
+      - "parquet"
+      - "customer_id"
+      - "referential integrity"
+      - "weighted"
+      - "log-normal"
+    expected_patterns:
+      - pattern: "\\.write.*parquet"
+        min_count: 1
+        description: "Parquet output format"
+      - pattern: "customer_id"
+        min_count: 3
+        description: "Foreign key reference in multiple tables"
+      - pattern: "lognormal"
+        min_count: 1
+        description: "Log-normal distribution for amounts"
+    guidelines:
+      - "Orders table customer_id must only contain IDs from customers table"
+      - "Enterprise tier customers must have higher weight for order generation"
+      - "Amount distribution must use log-normal, not uniform"
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-03-02T11:33:44.621846'
+    execution_verified:
+      mode: local
+      verified_date: '2026-03-02'
+
+- id: gen_serverless_job_catalog_json_002
+  inputs:
+    prompt: 'Generate synthetic product catalog data that will run as a serverless
+      Databricks job.
+
+      Create 2 related tables with referential integrity:
+
+      - products (3,000 rows): product_id, name, category (weighted), price (log-normal),
+      inventory_count
+
+      - sales (10,000 rows): sale_id, product_id (FK to products), quantity, sale_date,
+      discount_pct
+
+
+      Save as JSON files to a Unity Catalog volume. Use schema name ''devkit_gen2_test_small_json''.
+
+      Create a job definition with environments for dependencies (faker).
+
+      Popular product categories should have more sales (weighted sampling).
+
+      '
+  outputs:
+    expected_response_file: expected_responses/gen_serverless_job_catalog_json_002.txt
+  expectations:
+    expected_facts:
+    - serverless
+    - environments
+    - dependencies
+    - client
+    - json
+    - product_id
+    - weighted
+    - lognormal
+    - pandas_udf
+    expected_patterns:
+    - pattern: environment_key.*default
+      min_count: 1
+      description: Serverless job environment configuration
+    - pattern: client.*4
+      min_count: 1
+      description: Correct client version for serverless
+    - pattern: \.write.*json
+      min_count: 1
+      description: JSON output format
+    - pattern: product_id
+      min_count: 3
+      description: Foreign key reference in multiple places
+    - pattern: '@F\.pandas_udf|pandas_udf'
+      min_count: 1
+      description: Pandas UDF for Faker parallelism
+    - pattern: lognormal|log-normal|log_normal
+      min_count: 1
+      description: Log-normal distribution for prices
+    - pattern: CREATE SCHEMA IF NOT EXISTS|CREATE VOLUME IF NOT EXISTS
+      min_count: 1
+      description: Infrastructure creation in script
+    guidelines:
+    - Must create serverless job with environments parameter for dependencies
+    - 'Job spec must include client: 4 (not 1)'
+    - Must NOT use .cache() or .persist() (serverless incompatible)
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: interactive_execution
+    execution_date: '2026-02-26'
+    execution_verified: true
+    job_run_id: '560746964795126'
+    tags:
+    - serverless-job
+    - small
+    - json
+    - referential-integrity
+    - weighted-sampling
+    - executed
+
+- id: grp_20260302_retail_csv_3tables_003
+  inputs:
+    prompt: |
+      Generate synthetic retail order data using Databricks Connect with serverless.
+      Create 3 related tables with full referential integrity:
+      - customers (10,000 rows): customer_id, name, email, membership_level (Bronze/Silver/Gold/Platinum weighted 50/30/15/5), region
+      - orders (50,000 rows): order_id, customer_id (FK to customers), order_date, total_amount, status
+      - line_items (150,000 rows): line_item_id, order_id (FK to orders), product_name, quantity, unit_price
+
+      Save as CSV files with headers to Unity Catalog volume. Use schema name 'devkit_gen3_test_medium_csv'.
+      Create realistic product names.
+      Higher membership levels should have more orders.
+      Order total_amount should equal sum of line_items.
+  outputs:
+    expected_response_file: expected_responses/grp_20260302_retail_csv_3tables_003.txt
+    execution_success: true
+  expectations:
+    expected_facts:
+      - "DatabricksSession"
+      - "serverless"
+      - "CSV"
+      - "header"
+      - "customer_id"
+      - "order_id"
+      - "line_item"
+      - "Faker"
+      - "pandas_udf"
+      - "membership_level"
+      - "weighted"
+      - "total_amount"
+      - "lognormal"
+    expected_patterns:
+      - pattern: "DatabricksSession.*serverless.*True"
+        min_count: 1
+        description: "Databricks Connect serverless configuration"
+      - pattern: "DatabricksEnv.*withDependencies"
+        min_count: 1
+        description: "Managed dependencies for serverless"
+      - pattern: "@F\\.pandas_udf|pandas_udf"
+        min_count: 1
+        description: "Pandas UDF for Faker parallelism"
+      - pattern: "customer_id"
+        min_count: 5
+        description: "FK in customers and orders (multiple references)"
+      - pattern: "order_id"
+        min_count: 5
+        description: "FK in orders and line_items (multiple references)"
+      - pattern: "\\.option.*header.*true.*\\.csv|\\.write.*csv"
+        min_count: 1
+        description: "CSV with headers"
+      - pattern: "Bronze|Silver|Gold|Platinum"
+        min_count: 4
+        description: "All membership levels present"
+      - pattern: "lognormal"
+        min_count: 1
+        description: "Log-normal distribution for pricing"
+      - pattern: "CREATE SCHEMA IF NOT EXISTS"
+        min_count: 1
+        description: "Infrastructure creation in script"
+      - pattern: "CREATE VOLUME IF NOT EXISTS"
+        min_count: 1
+        description: "Volume creation for CSV output"
+      - pattern: "total_amount.*sum|sum.*line_total|computed_total"
+        min_count: 1
+        description: "Order total computed from line items"
+    guidelines:
+      - "Must use DatabricksSession.builder.serverless(True).getOrCreate()"
+      - "Must use Spark + Faker + Pandas UDFs approach"
+      - "line_items.order_id must reference valid orders"
+      - "Membership level must be weighted: Bronze 50%, Silver 30%, Gold 15%, Platinum 5%"
+      - "Higher membership levels must generate more orders per customer"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: interactive_execution
+    execution_date: '2026-03-02'
+    execution_verified: true
+    verified_output:
+      customers_rows: 10000
+      orders_rows: 50000
+      line_items_rows: 150000
+      membership_distribution:
+        Bronze: 5069
+        Silver: 3957
+        Gold: 919
+        Platinum: 55
+      orders_per_tier:
+        Bronze: 18170
+        Silver: 23560
+        Gold: 7613
+        Platinum: 657
+      orphan_orders: 0
+      orphan_line_items: 0
+    tags:
+      - databricks-connect
+      - serverless
+      - medium
+      - csv
+      - 3-tables
+      - pandas-udf
+      - referential-integrity
+      - weighted-sampling
+      - computed-totals
+      - executed
+
+- id: grp_20260303_manufacturing_delta_streaming_004
+  inputs:
+    prompt: |
+      Generate manufacturing data that will run incrementally with Python 3.12 and Databricks Serverless.
+      Create 2 related tables with referential integrity.
+      Create a sensor reading table that generates 10,000 rows per batch and configure to run as a streaming job.
+      Create a lookup table for the sensor device which changes slowly.
+      Save as Delta tables registered in Unity Catalog. Use catalog 'ai_dev_kit'. Use schema name 'devkit_gen4_test_large_delta'.
+  outputs:
+    expected_response_file: expected_responses/grp_20260303_manufacturing_delta_streaming_004.txt
+    execution_success: true
+  expectations:
+    expected_facts:
+      - "DatabricksSession"
+      - "serverless"
+      - "Delta"
+      - "saveAsTable"
+      - "device_id"
+      - "sensor"
+      - "reading"
+      - "Faker"
+      - "pandas_udf"
+      - "streaming"
+      - "incremental"
+      - "batch"
+      - "slowly changing"
+      - "lognormal"
+    expected_patterns:
+      - pattern: "DatabricksSession.*serverless.*True"
+        min_count: 1
+        description: "Databricks Connect serverless configuration"
+      - pattern: "DatabricksEnv.*withDependencies"
+        min_count: 1
+        description: "Managed dependencies for serverless"
+      - pattern: "@F\\.pandas_udf|pandas_udf"
+        min_count: 1
+        description: "Pandas UDF for Faker parallelism"
+      - pattern: "device_id"
+        min_count: 3
+        description: "FK in devices and readings (multiple references)"
+      - pattern: "\\.write.*saveAsTable|saveAsTable"
+        min_count: 2
+        description: "Delta table output for both tables"
+      - pattern: "CREATE SCHEMA IF NOT EXISTS"
+        min_count: 1
+        description: "Infrastructure creation in script"
+      - pattern: "sensor_devices|sensor_readings"
+        min_count: 2
+        description: "Both sensor tables present"
+      - pattern: "temperature|pressure|vibration|humidity"
+        min_count: 4
+        description: "All device types present"
+      - pattern: "lognormal"
+        min_count: 1
+        description: "Log-normal distribution for vibration sensor values"
+      - pattern: "mode.*overwrite|mode.*append"
+        min_count: 1
+        description: "Write mode for streaming support"
+    guidelines:
+      - "Must use DatabricksSession.builder.serverless(True).getOrCreate()"
+      - "Must use Spark + Faker + Pandas UDFs approach"
+      - "Must maintain referential integrity between devices and readings"
+      - "Must use Delta tables (saveAsTable) not file formats"
+      - "sensor_readings should support incremental batch processing"
+      - "Vibration should use log-normal for occasional spikes"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: interactive_execution
+    execution_date: '2026-03-03'
+    execution_verified: true
+    verified_output:
+      sensor_devices_rows: 500
+      sensor_readings_rows: 10013
+      device_type_distribution:
+        temperature: 147
+        pressure: 179
+        vibration: 140
+        humidity: 34
+      quality_flag_distribution:
+        good: 9008
+        warning: 979
+        error: 26
+      orphan_readings: 0
+    tags:
+      - databricks-connect
+      - serverless
+      - large
+      - delta
+      - 2-tables
+      - pandas-udf
+      - referential-integrity
+      - streaming
+      - incremental
+      - iot
+      - manufacturing
+      - executed

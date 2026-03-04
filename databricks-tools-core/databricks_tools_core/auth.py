@@ -41,6 +41,45 @@ logger = logging.getLogger(__name__)
 _current_username: Optional[str] = None
 _current_username_fetched: bool = False
 
+# Server-level active workspace override (set by manage_workspace tool).
+# Module-level globals are appropriate here: the standalone MCP server is
+# single-user over stdio, so there is no per-request isolation needed.
+_active_profile: Optional[str] = None
+_active_host: Optional[str] = None
+
+
+def set_active_workspace(profile: Optional[str] = None, host: Optional[str] = None) -> None:
+    """Set the active workspace for all subsequent tool calls.
+
+    Adds a step 0 to get_workspace_client() that overrides the default SDK
+    auth chain. Used by the manage_workspace MCP tool to switch workspaces
+    at runtime without restarting the MCP server.
+
+    Args:
+        profile: Profile name from ~/.databrickscfg to activate.
+        host: Workspace URL to activate (used when no profile is available).
+    """
+    global _active_profile, _active_host, _current_username, _current_username_fetched
+    _active_profile = profile
+    _active_host = host
+    # Reset cached username — it belongs to the previous workspace
+    _current_username = None
+    _current_username_fetched = False
+
+
+def clear_active_workspace() -> None:
+    """Reset to the default workspace from environment / config file."""
+    set_active_workspace(None, None)
+
+
+def get_active_workspace() -> dict:
+    """Return the current server-level workspace override state.
+
+    Returns:
+        Dict with 'profile' and 'host' keys (either or both may be None).
+    """
+    return {"profile": _active_profile, "host": _active_host}
+
 
 def _has_oauth_credentials() -> bool:
     """Check if OAuth credentials (SP) are configured in environment."""
@@ -91,6 +130,7 @@ def get_workspace_client() -> WorkspaceClient:
     """Get a WorkspaceClient using context auth or environment variables.
 
     Authentication priority:
+    0. Server-level active workspace override (set by manage_workspace tool)
     1. If force_token is set (cross-workspace), use the explicit token from context
     2. If OAuth credentials exist in env, use explicit OAuth M2M auth (Databricks Apps)
        - This explicitly sets auth_type to prevent conflicts with other auth methods
@@ -106,6 +146,16 @@ def get_workspace_client() -> WorkspaceClient:
 
     # Common kwargs for product identification in user-agent
     product_kwargs = dict(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
+
+    # Server-level workspace override set by the manage_workspace MCP tool.
+    # Profile takes precedence over host when both are set.
+    # Skipped when force_token is active (Builder App cross-workspace path wins)
+    # or when OAuth M2M credentials are present (Databricks Apps runtime).
+    if not force and not _has_oauth_credentials():
+        if _active_profile:
+            return tag_client(WorkspaceClient(profile=_active_profile, **product_kwargs))
+        if _active_host:
+            return tag_client(WorkspaceClient(host=_active_host, **product_kwargs))
 
     # Cross-workspace: explicit token overrides env OAuth so tool operations
     # target the caller-specified workspace instead of the app's own workspace

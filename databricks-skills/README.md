@@ -58,7 +58,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-iceberg** - Apache Iceberg tables (Managed/Foreign), UniForm, Iceberg REST Catalog, Iceberg Clients Interoperability
 - **databricks-spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
 - **databricks-jobs** - Multi-task workflows, triggers, schedules
-- **databricks-synthetic-data-generation** - Realistic test data with Faker
+- **databricks-synthetic-data-gen** - Realistic test data with Faker
 
 ### 🚀 Development & Deployment
 - **databricks-asset-bundles** - DABs for multi-environment deployments

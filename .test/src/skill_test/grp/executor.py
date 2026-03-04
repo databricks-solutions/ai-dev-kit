@@ -1,6 +1,7 @@
 """Execute code blocks from skill responses to verify they work."""
 
 import ast
+import json
 import re
 import time
 import yaml
@@ -192,6 +193,26 @@ def verify_yaml_syntax(code: str) -> ExecutionResult:
         )
 
 
+def verify_json_syntax(code: str) -> ExecutionResult:
+    """Verify JSON syntax is valid."""
+    start_time = time.time()
+    try:
+        json.loads(code)
+        return ExecutionResult(
+            success=True,
+            output="JSON syntax valid",
+            error=None,
+            execution_time_ms=(time.time() - start_time) * 1000,
+        )
+    except json.JSONDecodeError as e:
+        return ExecutionResult(
+            success=False,
+            output="",
+            error=f"JSON syntax error: {e.msg} at line {e.lineno}, column {e.colno}",
+            execution_time_ms=(time.time() - start_time) * 1000,
+        )
+
+
 def verify_bash_structure(code: str) -> ExecutionResult:
     """Verify bash code structure (basic validation for examples)."""
     # For bash examples, just check that it's not empty and looks like shell commands
@@ -220,6 +241,8 @@ def execute_code_blocks(response: str) -> Tuple[int, int, List[Dict[str, Any]]]:
             result = verify_sql_structure(block.code)
         elif block.language in ("yaml", "yml"):
             result = verify_yaml_syntax(block.code)
+        elif block.language == "json":
+            result = verify_json_syntax(block.code)
         elif block.language in ("bash", "sh", "shell"):
             result = verify_bash_structure(block.code)
         else:
@@ -527,6 +550,16 @@ def execute_code_blocks_on_databricks(
                 config,
                 mcp_execute_sql,
                 mcp_get_best_warehouse,
+            )
+        elif block.language == "json":
+            # JSON blocks are validated locally (e.g., job definitions)
+            json_result = verify_json_syntax(block.code)
+            result = DatabricksExecutionResult(
+                success=json_result.success,
+                output=json_result.output,
+                error=json_result.error,
+                execution_time_ms=json_result.execution_time_ms,
+                execution_mode="local",
             )
         else:
             # Skip unknown languages

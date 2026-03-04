@@ -48,14 +48,15 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 
 - [uv](https://github.com/astral-sh/uv) - Python package manager
 - [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) - Command line interface for Databricks
-- AI coding environment
+- AI coding environment (one or more):
   - [Claude Code](https://claude.ai/code)
   - [Cursor](https://cursor.com)
+  - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.  
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude or .cursor_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, or .gemini_
 
 #### Mac / Linux
 
@@ -83,7 +84,7 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 **Install for specific tools only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini
 ```
 
 </details>
@@ -123,7 +124,7 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 **Install for specific tools only**
 
 ```powershell
-.\install.ps1 -Tools cursor
+.\install.ps1 -Tools cursor,gemini
 ```
 
 </details>

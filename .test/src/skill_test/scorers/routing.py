@@ -52,7 +52,7 @@ SKILL_TRIGGERS = {
         "rest api",
     ],
     "databricks-jobs": ["job", "workflow", "task", "schedule", "trigger"],
-    "databricks-synthetic-data-generation": [
+    "databricks-synthetic-data-gen": [
         "synthetic data",
         "fake data",
         "generate data",
