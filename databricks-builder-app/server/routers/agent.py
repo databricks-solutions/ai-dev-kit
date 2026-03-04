@@ -557,26 +557,36 @@ async def get_conversation_executions(
             detail=f'Project {project_id} not found'
         )
 
-    # First check in-memory streams for this conversation (always works)
+    # Check in-memory streams for this conversation. Prefer a running stream;
+    # fall back to the most recently completed one so the poller can read all
+    # events before the 5-minute cleanup removes them from memory.
     stream_manager = get_stream_manager()
     in_memory_active = None
     async with stream_manager._lock:
+        running_stream = None
+        completed_stream = None
         for stream in stream_manager._streams.values():
-            if (
-                stream.conversation_id == conversation_id
-                and not stream.is_complete
-                and not stream.is_cancelled
-            ):
-                in_memory_active = {
-                    'id': stream.execution_id,
-                    'conversation_id': stream.conversation_id,
-                    'project_id': stream.project_id,
-                    'status': 'running',
-                    'events': [e.data for e in stream.events],
-                    'error': stream.error,
-                    'created_at': None,
-                }
-                break
+            if stream.conversation_id == conversation_id and not stream.is_cancelled:
+                if not stream.is_complete:
+                    running_stream = stream
+                    break  # Running stream always wins
+                else:
+                    completed_stream = stream
+        chosen = running_stream or completed_stream
+        if chosen:
+            if chosen.is_complete:
+                status = 'error' if chosen.error else 'completed'
+            else:
+                status = 'running'
+            in_memory_active = {
+                'id': chosen.execution_id,
+                'conversation_id': chosen.conversation_id,
+                'project_id': chosen.project_id,
+                'status': status,
+                'events': [e.data for e in chosen.events],
+                'error': chosen.error,
+                'created_at': None,
+            }
 
     # Try to get executions from database (may fail if table doesn't exist yet)
     active = None
