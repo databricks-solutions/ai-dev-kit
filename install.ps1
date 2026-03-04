@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, and Gemini CLI.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -142,7 +142,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
             Write-Host ""
@@ -472,14 +472,16 @@ function Invoke-DetectTools {
     $hasCodex   = $null -ne (Get-Command codex -ErrorAction SilentlyContinue)
     $hasCopilot = ($null -ne (Get-Command code -ErrorAction SilentlyContinue)) -or
                   (Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe")
+    $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
     $codexState   = $hasCodex;   $codexHint   = if ($hasCodex)   { "detected" } else { "not found" }
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
+    $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -494,6 +496,7 @@ function Invoke-DetectTools {
         @{ Label = "Cursor";         Value = "cursor";  State = $cursorState;  Hint = $cursorHint }
         @{ Label = "GitHub Copilot"; Value = "copilot"; State = $copilotState; Hint = $copilotHint }
         @{ Label = "OpenAI Codex";   Value = "codex";   State = $codexState;   Hint = $codexHint }
+        @{ Label = "Gemini CLI";     Value = "gemini";  State = $geminiState;  Hint = $geminiHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -744,6 +747,7 @@ function Install-Skills {
             }
             "copilot" { $dirs += Join-Path $BaseDir ".github\skills" }
             "codex"   { $dirs += Join-Path $BaseDir ".agents\skills" }
+            "gemini"  { $dirs += Join-Path $BaseDir ".gemini\skills" }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -922,6 +926,97 @@ args = ["$entryPath"]
     Add-Content -Path $Path -Value $tomlBlock -Encoding UTF8
 }
 
+function Write-GeminiMcpJson {
+    param([string]$Path)
+
+    $dir = Split-Path $Path -Parent
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+
+    # Backup existing
+    if (Test-Path $Path) {
+        Copy-Item $Path "$Path.bak" -Force
+        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
+    }
+
+    # Try to merge with existing config
+    if ((Test-Path $Path) -and (Test-Path $script:VenvPython)) {
+        try {
+            $existing = Get-Content $Path -Raw | ConvertFrom-Json
+        } catch {
+            $existing = $null
+        }
+    }
+
+    if ($existing) {
+        if (-not $existing.mcpServers) {
+            $existing | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+        $dbEntry = [PSCustomObject]@{
+            command = $script:VenvPython -replace '\\', '/'
+            args    = @($script:McpEntry -replace '\\', '/')
+            env     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
+        }
+        $existing.mcpServers | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
+        $existing | ConvertTo-Json -Depth 10 | Set-Content $Path -Encoding UTF8
+    } else {
+        $pythonPath = $script:VenvPython -replace '\\', '/'
+        $entryPath  = $script:McpEntry -replace '\\', '/'
+        $json = @"
+{
+  "mcpServers": {
+    "databricks": {
+      "command": "$pythonPath",
+      "args": ["$entryPath"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "$($script:Profile_)"}
+    }
+  }
+}
+"@
+        Set-Content -Path $Path -Value $json -Encoding UTF8
+    }
+}
+
+function Write-GeminiMd {
+    param([string]$Path)
+
+    if (Test-Path $Path) { return }  # Don't overwrite existing file
+
+    $content = @"
+# Databricks AI Dev Kit
+
+You have access to Databricks skills and MCP tools installed by the Databricks AI Dev Kit.
+
+## Available MCP Tools
+
+The ``databricks`` MCP server provides 50+ tools for interacting with Databricks, including:
+- SQL execution and warehouse management
+- Unity Catalog operations (tables, volumes, schemas)
+- Jobs and workflow management
+- Model serving endpoints
+- Genie spaces and AI/BI dashboards
+- Databricks Apps deployment
+
+## Available Skills
+
+Skills are installed in ``.gemini/skills/`` and provide patterns and best practices for:
+- Spark Declarative Pipelines, Structured Streaming
+- Databricks Jobs, Asset Bundles
+- Unity Catalog, SQL, Genie
+- MLflow evaluation and tracing
+- Model Serving, Vector Search
+- Databricks Apps (Python and APX)
+- And more
+
+## Getting Started
+
+Try asking: "List my SQL warehouses" or "Show my Unity Catalog schemas"
+"@
+    Set-Content -Path $Path -Value $content -Encoding UTF8
+    Write-Ok "GEMINI.md"
+}
+
 function Write-McpConfigs {
     param([string]$BaseDir)
 
@@ -966,6 +1061,14 @@ function Write-McpConfigs {
                     Write-McpToml (Join-Path $BaseDir ".codex\config.toml")
                 }
                 Write-Ok "Codex MCP config"
+            }
+            "gemini" {
+                if ($script:Scope -eq "global") {
+                    Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\settings.json")
+                } else {
+                    Write-GeminiMcpJson (Join-Path $BaseDir ".gemini\settings.json")
+                }
+                Write-Ok "Gemini CLI MCP config"
             }
         }
     }
@@ -1014,6 +1117,10 @@ function Show-Summary {
         Write-Msg "$step. Use Copilot in Agent mode to access Databricks skills and MCP tools"
         $step++
     }
+    if ($script:Tools -match 'gemini') {
+        Write-Msg "$step. Launch Gemini CLI in your project: gemini"
+        $step++
+    }
     Write-Msg "$step. Open your project in your tool of choice"
     $step++
     Write-Msg "$step. Try: `"List my SQL warehouses`""
@@ -1029,7 +1136,7 @@ function Invoke-PromptScope {
     
     $labels = @("Project", "Global")
     $values = @("project", "global")
-    $hints = @("Install in current directory (.cursor/ and .claude/)", "Install in home directory (~/.cursor/ and ~/.claude/)")
+    $hints = @("Install in current directory (.cursor/, .claude/, .gemini/)", "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
     $count = 2
     $selected = 0
     $cursor = 0
@@ -1039,8 +1146,8 @@ function Invoke-PromptScope {
     if (-not $isInteractive) {
         # Fallback: numbered list
         Write-Host ""
-        Write-Host "  1. (*) Project  Install in current directory (.cursor/ and .claude/)"
-        Write-Host "  2. ( ) Global   Install in home directory (~/.cursor/ and ~/.claude/)"
+        Write-Host "  1. (*) Project  Install in current directory (.cursor/, .claude/, .gemini/)"
+        Write-Host "  2. ( ) Global   Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)"
         Write-Host ""
         Write-Host "  Enter number to select (or press Enter for default): " -NoNewline
         $input_ = Read-Host
@@ -1249,6 +1356,15 @@ function Invoke-Main {
     # Install skills
     if ($script:InstallSkills) {
         Install-Skills -BaseDir $baseDir
+    }
+
+    # Write GEMINI.md if gemini is selected
+    if ($script:Tools -match 'gemini') {
+        if ($script:Scope -eq "global") {
+            Write-GeminiMd (Join-Path $env:USERPROFILE "GEMINI.md")
+        } else {
+            Write-GeminiMd (Join-Path $baseDir "GEMINI.md")
+        }
     }
 
     # Write MCP configs
