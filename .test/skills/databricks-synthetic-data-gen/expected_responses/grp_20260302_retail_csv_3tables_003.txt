@@ -1,0 +1,297 @@
+Here's the complete script to generate synthetic retail order data with 3 tables and full referential integrity:
+
+```python
+"""
+Synthetic Retail Order Data Generation
+======================================
+3 related tables with full referential integrity:
+- customers (10,000 rows)
+- orders (50,000 rows)
+- line_items (150,000 rows)
+
+Output: CSV files with headers to Unity Catalog volume
+Execution: Databricks Connect with serverless compute
+"""
+
+import os
+from pyspark.sql import functions as F
+from pyspark.sql.types import StringType, DoubleType, IntegerType
+from pyspark.sql.window import Window
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+CATALOG = "ai_dev_kit"
+SCHEMA = "devkit_gen3_test_medium_csv"
+VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
+
+NUM_CUSTOMERS = 10_000
+NUM_ORDERS = 50_000
+NUM_LINE_ITEMS = 150_000
+NUM_PARTITIONS = 32
+SEED = 42
+
+END_DATE = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+START_DATE = END_DATE - timedelta(days=180)
+
+# =============================================================================
+# SPARK SESSION
+# =============================================================================
+def is_databricks_runtime():
+    return "DATABRICKS_RUNTIME_VERSION" in os.environ
+
+if is_databricks_runtime():
+    from pyspark.sql import SparkSession
+    spark = SparkSession.builder.getOrCreate()
+    print("Running on Databricks Runtime")
+else:
+    from databricks.connect import DatabricksSession, DatabricksEnv
+
+    # Install dependencies on serverless cluster
+    env = DatabricksEnv().withDependencies("faker", "pandas", "numpy")
+    spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
+    print("Running with Databricks Connect (serverless with managed dependencies)")
+
+# =============================================================================
+# CREATE INFRASTRUCTURE
+# =============================================================================
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
+
+# =============================================================================
+# PANDAS UDFs
+# =============================================================================
+
+@F.pandas_udf(StringType())
+def fake_name(ids: pd.Series) -> pd.Series:
+    from faker import Faker
+    fake = Faker()
+    Faker.seed(SEED)
+    return pd.Series([fake.name() for _ in range(len(ids))])
+
+@F.pandas_udf(StringType())
+def fake_email(names: pd.Series) -> pd.Series:
+    from faker import Faker
+    fake = Faker()
+    emails = []
+    for name in names:
+        parts = name.lower().split()
+        if len(parts) >= 2:
+            email = f"{parts[0]}.{parts[-1]}@{fake.free_email_domain()}"
+        else:
+            email = f"{parts[0]}{np.random.randint(100, 999)}@{fake.free_email_domain()}"
+        emails.append(email)
+    return pd.Series(emails)
+
+@F.pandas_udf(StringType())
+def fake_product_name(ids: pd.Series) -> pd.Series:
+    from faker import Faker
+    fake = Faker()
+    product_types = ["Chair", "Table", "Lamp", "Desk", "Shelf", "Cabinet", "Sofa", "Rug",
+                    "Mirror", "Clock", "Vase", "Frame", "Pillow", "Blanket", "Candle",
+                    "Mug", "Bowl", "Plate", "Glass", "Bottle", "Box", "Bag", "Hat",
+                    "Watch", "Headphones", "Speaker", "Charger", "Cable", "Case"]
+    products = []
+    for _ in range(len(ids)):
+        color = fake.color_name()
+        adj = fake.word().capitalize()
+        product = np.random.choice(product_types)
+        products.append(f"{color} {adj} {product}")
+    return pd.Series(products)
+
+@F.pandas_udf(DoubleType())
+def generate_unit_price(ids: pd.Series) -> pd.Series:
+    """Log-normal unit prices (median ~$35, range $5-$500)"""
+    prices = np.random.lognormal(mean=3.5, sigma=0.7, size=len(ids))
+    prices = np.clip(prices, 5.0, 500.0)
+    return pd.Series(np.round(prices, 2))
+
+# =============================================================================
+# GENERATE CUSTOMERS TABLE
+# =============================================================================
+customers_df = (
+    spark.range(0, NUM_CUSTOMERS, numPartitions=NUM_PARTITIONS)
+    .select(
+        F.concat(F.lit("CUST-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("customer_id"),
+        F.col("id").alias("_idx")
+    )
+    .withColumn("name", fake_name(F.col("_idx")))
+    .withColumn("email", fake_email(F.col("name")))
+    .withColumn("membership_level",
+        F.when(F.rand(SEED) < 0.50, "Bronze")
+         .when(F.rand(SEED + 1) < 0.80, "Silver")
+         .when(F.rand(SEED + 2) < 0.95, "Gold")
+         .otherwise("Platinum")
+    )
+    .withColumn("region",
+        F.when(F.rand(SEED + 3) < 0.30, "US-East")
+         .when(F.rand(SEED + 4) < 0.55, "US-West")
+         .when(F.rand(SEED + 5) < 0.80, "EU")
+         .when(F.rand(SEED + 6) < 0.95, "APAC")
+         .otherwise("Other")
+    )
+    .drop("_idx")
+)
+
+# Write to temp Delta table (no .cache() on serverless)
+customers_tmp = f"{CATALOG}.{SCHEMA}._tmp_customers"
+customers_df.write.mode("overwrite").saveAsTable(customers_tmp)
+customers_df = spark.table(customers_tmp)
+
+# =============================================================================
+# GENERATE ORDERS TABLE (weighted by membership level)
+# =============================================================================
+customer_weights = customers_df.select(
+    "customer_id",
+    "membership_level",
+    F.when(F.col("membership_level") == "Platinum", 10.0)
+     .when(F.col("membership_level") == "Gold", 7.0)
+     .when(F.col("membership_level") == "Silver", 5.0)
+     .otherwise(3.0).alias("weight")
+)
+
+weighted_customers = (
+    customer_weights
+    .withColumn("replicate_count", (F.col("weight") * 2).cast("int"))
+    .select(
+        F.col("customer_id"),
+        F.explode(F.array_repeat(F.col("customer_id"), F.col("replicate_count"))).alias("_dup")
+    )
+    .drop("_dup")
+)
+
+sampled_customers = (
+    weighted_customers
+    .orderBy(F.rand(SEED + 10))
+    .limit(NUM_ORDERS)
+    .withColumn("_row", F.row_number().over(Window.orderBy(F.monotonically_increasing_id())))
+    .select("customer_id", "_row")
+)
+
+orders_base = (
+    spark.range(0, NUM_ORDERS, numPartitions=NUM_PARTITIONS)
+    .withColumn("order_id",
+        F.concat(F.lit("ORD-"), F.lpad(F.col("id").cast("string"), 6, "0")))
+    .withColumn("_row", F.row_number().over(Window.orderBy(F.col("id"))))
+)
+
+orders_df = (
+    orders_base
+    .join(sampled_customers, on="_row", how="inner")
+    .drop("_row", "id")
+    .withColumn("order_date",
+        F.date_add(F.lit(START_DATE.date()), (F.rand(SEED + 11) * 180).cast("int")))
+    .withColumn("status",
+        F.when(F.rand(SEED + 12) < 0.60, "Delivered")
+         .when(F.rand(SEED + 13) < 0.78, "Shipped")
+         .when(F.rand(SEED + 14) < 0.90, "Processing")
+         .when(F.rand(SEED + 15) < 0.96, "Pending")
+         .otherwise("Cancelled")
+    )
+    .withColumn("total_amount", F.lit(0.0))
+)
+
+orders_tmp = f"{CATALOG}.{SCHEMA}._tmp_orders"
+orders_df.write.mode("overwrite").saveAsTable(orders_tmp)
+orders_df = spark.table(orders_tmp)
+
+# =============================================================================
+# GENERATE LINE_ITEMS TABLE
+# =============================================================================
+order_ids = orders_df.select("order_id")
+
+items_per_order = (
+    order_ids
+    .withColumn("num_items",
+        F.when(F.rand(SEED + 20) < 0.10, 1)
+         .when(F.rand(SEED + 21) < 0.25, 2)
+         .when(F.rand(SEED + 22) < 0.45, 3)
+         .when(F.rand(SEED + 23) < 0.65, 4)
+         .when(F.rand(SEED + 24) < 0.80, 5)
+         .when(F.rand(SEED + 25) < 0.90, 6)
+         .when(F.rand(SEED + 26) < 0.96, 7)
+         .otherwise(8)
+    )
+)
+
+line_items_base = (
+    items_per_order
+    .select(
+        F.col("order_id"),
+        F.explode(F.sequence(F.lit(1), F.col("num_items"))).alias("item_seq")
+    )
+    .withColumn("_idx", F.monotonically_increasing_id())
+)
+
+line_items_df = (
+    line_items_base
+    .limit(NUM_LINE_ITEMS)
+    .withColumn("line_item_id",
+        F.concat(F.lit("LI-"), F.lpad(F.col("_idx").cast("string"), 7, "0")))
+    .withColumn("product_name", fake_product_name(F.col("_idx")))
+    .withColumn("quantity",
+        F.when(F.rand(SEED + 30) < 0.50, 1)
+         .when(F.rand(SEED + 31) < 0.80, 2)
+         .when(F.rand(SEED + 32) < 0.92, 3)
+         .when(F.rand(SEED + 33) < 0.97, 4)
+         .otherwise(5)
+    )
+    .withColumn("unit_price", generate_unit_price(F.col("_idx")))
+    .drop("_idx", "item_seq")
+)
+
+line_items_tmp = f"{CATALOG}.{SCHEMA}._tmp_line_items"
+line_items_df.write.mode("overwrite").saveAsTable(line_items_tmp)
+line_items_df = spark.table(line_items_tmp)
+
+# =============================================================================
+# COMPUTE ORDER TOTALS FROM LINE ITEMS
+# =============================================================================
+order_totals = (
+    line_items_df
+    .withColumn("line_total", F.col("quantity") * F.col("unit_price"))
+    .groupBy("order_id")
+    .agg(F.round(F.sum("line_total"), 2).alias("computed_total"))
+)
+
+orders_final = (
+    spark.table(orders_tmp)
+    .drop("total_amount")
+    .join(order_totals, on="order_id", how="left")
+    .withColumn("total_amount", F.coalesce(F.col("computed_total"), F.lit(0.0)))
+    .drop("computed_total")
+)
+
+# =============================================================================
+# EXPORT TO CSV
+# =============================================================================
+customers_final = spark.table(customers_tmp).select(
+    "customer_id", "name", "email", "membership_level", "region"
+)
+
+orders_out = orders_final.select(
+    "order_id", "customer_id", "order_date", "total_amount", "status"
+)
+
+line_items_out = spark.table(line_items_tmp).select(
+    "line_item_id", "order_id", "product_name", "quantity", "unit_price"
+)
+
+customers_final.coalesce(1).write.mode("overwrite").option("header", "true").csv(f"{VOLUME_PATH}/customers")
+orders_out.coalesce(1).write.mode("overwrite").option("header", "true").csv(f"{VOLUME_PATH}/orders")
+line_items_out.coalesce(4).write.mode("overwrite").option("header", "true").csv(f"{VOLUME_PATH}/line_items")
+
+# Cleanup temp tables
+spark.sql(f"DROP TABLE IF EXISTS {customers_tmp}")
+spark.sql(f"DROP TABLE IF EXISTS {orders_tmp}")
+spark.sql(f"DROP TABLE IF EXISTS {line_items_tmp}")
+```
+
+Run with (requires Python 3.12+):
+```bash
+uv pip install "databricks-connect>=16.4,<17.4" faker numpy pandas
+uv run python generate_retail_data.py
+```

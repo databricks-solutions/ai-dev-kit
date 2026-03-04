@@ -163,7 +163,7 @@ The tool finds the existing space by name and updates it.
 
 ## Example End-to-End Workflow
 
-1. **Generate synthetic data** using `databricks-synthetic-data-generation` skill:
+1. **Generate synthetic data** using `databricks-synthetic-data-gen` skill:
    - Creates parquet files in `/Volumes/catalog/schema/raw_data/`
 
 2. **Create tables** using `databricks-spark-declarative-pipelines` skill:

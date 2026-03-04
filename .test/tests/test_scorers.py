@@ -52,10 +52,10 @@ class TestDetectSkillsFromPrompt:
         assert "databricks-mlflow-evaluation" in skills
 
     def test_detect_synthetic_data(self):
-        """Test detection of databricks-synthetic-data-generation skill."""
+        """Test detection of databricks-synthetic-data-gen skill."""
         prompt = "Generate synthetic data for testing"
         skills = detect_skills_from_prompt(prompt)
-        assert "databricks-synthetic-data-generation" in skills
+        assert "databricks-synthetic-data-gen" in skills
 
     def test_detect_agent_bricks(self):
         """Test detection of databricks-agent-bricks skill."""
@@ -175,7 +175,7 @@ class TestSkillTriggers:
             "databricks-asset-bundles",
             "databricks-python-sdk",
             "databricks-jobs",
-            "databricks-synthetic-data-generation",
+            "databricks-synthetic-data-gen",
             "databricks-mlflow-evaluation",
             "databricks-agent-bricks",
             "databricks-lakebase-provisioned",

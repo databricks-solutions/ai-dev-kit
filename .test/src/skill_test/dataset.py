@@ -41,17 +41,34 @@ class YAMLDatasetSource:
     yaml_path: Path
 
     def load(self) -> List[EvalRecord]:
-        """Load records from YAML ground_truth.yaml file."""
+        """Load records from YAML ground_truth.yaml file.
+
+        Supports external response files via 'expected_response_file' field in outputs.
+        When present, the response is loaded from the file relative to the YAML directory.
+        """
         with open(self.yaml_path) as f:
             data = yaml.safe_load(f)
 
+        yaml_dir = self.yaml_path.parent
+
         records = []
         for case in data.get("test_cases", []):
+            outputs = case.get("outputs")
+
+            # Load response from external file if specified
+            if outputs and "expected_response_file" in outputs:
+                response_file = yaml_dir / outputs["expected_response_file"]
+                if response_file.exists():
+                    with open(response_file) as rf:
+                        outputs = dict(outputs)  # Copy to avoid modifying original
+                        outputs["response"] = rf.read()
+                        del outputs["expected_response_file"]
+
             records.append(
                 EvalRecord(
                     id=case["id"],
                     inputs=case["inputs"],
-                    outputs=case.get("outputs"),
+                    outputs=outputs,
                     expectations=case.get("expectations"),
                     metadata=case.get("metadata", {}),
                 )

@@ -2,7 +2,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, and Gemini CLI.
 #
 # Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
@@ -17,7 +17,7 @@
 #   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --profile DEFAULT --force
 #
 #   # Install for specific tools only
-#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,codex,copilot
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,codex,copilot,gemini
 #
 #   # Skills only (skip MCP server)
 #   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-only
@@ -74,7 +74,7 @@ MIN_SDK_VERSION="0.85.0"
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
 # Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-generation databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -112,7 +112,7 @@ while [ $# -gt 0 ]; do
             echo "  --mcp-only            Skip skills installation"
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
-            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
+            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             echo ""
@@ -395,22 +395,25 @@ detect_tools() {
     local has_cursor=false
     local has_codex=false
     local has_copilot=false
+    local has_gemini=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
     command -v codex >/dev/null 2>&1 && has_codex=true
     { [ -d "/Applications/Visual Studio Code.app" ] || command -v code >/dev/null 2>&1; } && has_copilot=true
+    { command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/local/gemini" ]; } && has_gemini=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found"
     [ "$has_claude" = true ]  && claude_state="on"  && claude_hint="detected"
     [ "$has_cursor" = true ]  && cursor_state="on"  && cursor_hint="detected"
     [ "$has_codex" = true ]   && codex_state="on"   && codex_hint="detected"
     [ "$has_copilot" = true ] && copilot_state="on"  && copilot_hint="detected"
+    [ "$has_gemini" = true ]  && gemini_state="on"   && gemini_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
@@ -425,6 +428,7 @@ detect_tools() {
             "Cursor|cursor|${cursor_state}|${cursor_hint}" \
             "GitHub Copilot|copilot|${copilot_state}|${copilot_hint}" \
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
+            "Gemini CLI|gemini|${gemini_state}|${gemini_hint}" \
         )
     else
         # Silent: use detected defaults
@@ -433,6 +437,7 @@ detect_tools() {
         [ "$has_cursor" = true ]  && tools="${tools:+$tools }cursor"
         [ "$has_copilot" = true ] && tools="${tools:+$tools }copilot"
         [ "$has_codex" = true ]   && tools="${tools:+$tools }codex"
+        [ "$has_gemini" = true ]  && tools="${tools:+$tools }gemini"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -685,6 +690,7 @@ install_skills() {
             cursor) echo "$TOOLS" | grep -q claude || dirs+=("$base_dir/.cursor/skills") ;;
             copilot) dirs+=("$base_dir/.github/skills") ;;
             codex) dirs+=("$base_dir/.agents/skills") ;;
+            gemini) dirs+=("$base_dir/.gemini/skills") ;;
         esac
     done
 
@@ -810,6 +816,76 @@ args = ["$MCP_ENTRY"]
 EOF
 }
 
+write_gemini_mcp_json() {
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+
+    # Backup existing file before any modifications
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
+
+    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
+import json, sys
+try:
+    with open('$path') as f: cfg = json.load(f)
+except: cfg = {}
+cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
+    fi
+
+    cat > "$path" << EOF
+{
+  "mcpServers": {
+    "databricks": {
+      "command": "$VENV_PYTHON",
+      "args": ["$MCP_ENTRY"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
+    }
+  }
+}
+EOF
+}
+
+write_gemini_md() {
+    local path=$1
+    [ -f "$path" ] && return  # Don't overwrite existing file
+    cat > "$path" << 'GEMINIEOF'
+# Databricks AI Dev Kit
+
+You have access to Databricks skills and MCP tools installed by the Databricks AI Dev Kit.
+
+## Available MCP Tools
+
+The `databricks` MCP server provides 50+ tools for interacting with Databricks, including:
+- SQL execution and warehouse management
+- Unity Catalog operations (tables, volumes, schemas)
+- Jobs and workflow management
+- Model serving endpoints
+- Genie spaces and AI/BI dashboards
+- Databricks Apps deployment
+
+## Available Skills
+
+Skills are installed in `.gemini/skills/` and provide patterns and best practices for:
+- Spark Declarative Pipelines, Structured Streaming
+- Databricks Jobs, Asset Bundles
+- Unity Catalog, SQL, Genie
+- MLflow evaluation and tracing
+- Model Serving, Vector Search
+- Databricks Apps (Python and APX)
+- And more
+
+## Getting Started
+
+Try asking: "List my SQL warehouses" or "Show my Unity Catalog schemas"
+GEMINIEOF
+    ok "GEMINI.md"
+}
+
 write_mcp_configs() {
     step "Configuring MCP"
     
@@ -845,6 +921,14 @@ write_mcp_configs() {
             codex)
                 [ "$SCOPE" = "global" ] && write_mcp_toml "$HOME/.codex/config.toml" || write_mcp_toml "$base_dir/.codex/config.toml"
                 ok "Codex MCP config"
+                ;;
+            gemini)
+                if [ "$SCOPE" = "global" ]; then
+                    write_gemini_mcp_json "$HOME/.gemini/settings.json"
+                else
+                    write_gemini_mcp_json "$base_dir/.gemini/settings.json"
+                fi
+                ok "Gemini CLI MCP config"
                 ;;
         esac
     done
@@ -885,6 +969,10 @@ summary() {
             msg "${step}. Use Copilot in ${B}Agent mode${N} to access Databricks skills and MCP tools"
             step=$((step + 1))
         fi
+        if echo "$TOOLS" | grep -q gemini; then
+            msg "${step}. Launch Gemini CLI in your project: ${B}gemini${N}"
+            step=$((step + 1))
+        fi
         msg "${step}. Open your project in your tool of choice"
         step=$((step + 1))
         msg "${step}. Try: \"List my SQL warehouses\""
@@ -904,7 +992,7 @@ prompt_scope() {
     # Simple radio selector without Confirm button
     local -a labels=("Project" "Global")
     local -a values=("project" "global")
-    local -a hints=("Install in current directory (.cursor/ and .claude/)" "Install in home directory (~/.cursor/ and ~/.claude/)")
+    local -a hints=("Install in current directory (.cursor/, .claude/, .gemini/)" "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
     local count=2
     local selected=0
     local cursor=0
@@ -1085,6 +1173,15 @@ main() {
     
     # Install skills
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
+
+    # Write GEMINI.md if gemini is selected
+    if echo "$TOOLS" | grep -q gemini; then
+        if [ "$SCOPE" = "global" ]; then
+            write_gemini_md "$HOME/GEMINI.md"
+        else
+            write_gemini_md "$base_dir/GEMINI.md"
+        fi
+    fi
 
     # Write MCP configs
     [ "$INSTALL_MCP" = true ] && write_mcp_configs "$base_dir"

@@ -716,3 +716,17 @@ quality_gates:
     ├── optimized_SKILL.md       # Last optimization output
     └── last_optimization.json   # Metadata for --apply-last
 ```
+
+---
+
+## Troubleshooting
+
+### MLflow evaluation not returning results
+
+If `/skill-test <skill-name> mlflow` hangs or doesn't return results, run manually with debug logging:
+
+```bash
+MLFLOW_LOG_LEVEL=DEBUG uv run python .test/scripts/mlflow_eval.py <skill-name>
+```
+
+This will show detailed MLflow API calls and help identify connection or authentication issues.

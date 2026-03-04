@@ -83,6 +83,9 @@ class MLflowConfig:
 
     tracking_uri: str = field(default_factory=lambda: _get_mlflow_tracking_uri())
     experiment_name: str = field(default_factory=lambda: os.getenv("MLFLOW_EXPERIMENT_NAME", "/Shared/skill-tests"))
+    llm_judge_timeout: int = field(
+        default_factory=lambda: int(os.getenv("MLFLOW_LLM_JUDGE_TIMEOUT", "120"))
+    )  # seconds - timeout for LLM judge evaluation
 
 
 def _get_mlflow_tracking_uri() -> str:
@@ -118,7 +121,7 @@ class DatabricksExecutionSettings:
     schema: str = field(default_factory=lambda: os.getenv("SKILL_TEST_SCHEMA", "skill_test"))
 
     # Execution settings
-    timeout: int = 120  # seconds
+    timeout: int = 240  # seconds - increased from 120s to handle larger data generation tasks
     preserve_context: bool = True  # Reuse context across code blocks
 
 
