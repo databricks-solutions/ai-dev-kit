@@ -32,6 +32,77 @@ SKILL.md files teach AI agents (like Claude Code) how to use Databricks features
 
 GEPA's reflection LM reads the `side_info` diagnostics, proposes mutations, evaluates them, and selects the best via Pareto frontier. The critical insight: the richer the `side_info` diagnostics, the better GEPA's mutations.
 
+### Evaluation Methodology: How We Measure Skill Quality
+
+Before understanding the judges and scoring, it's important to understand **what we're measuring and why the measurement is trustworthy**.
+
+#### The core question: "Does this skill actually help?"
+
+A SKILL.md is only valuable if an agent produces **better responses with the skill than without it**. This is a testable claim — we can generate responses both ways and compare. That comparison is the foundation of all evaluation and optimization in this framework.
+
+#### Two layers of comparison
+
+There are two distinct comparisons happening — understanding both is key to reading the scores:
+
+1. **Within each evaluation** (WITH vs WITHOUT skill): measures whether a given SKILL.md adds value over a bare LLM. This is what `quality_with` and `quality_without` refer to.
+2. **Across the optimization loop** (original vs optimized): measures whether GEPA's mutations improved the SKILL.md. This is what `original_score` vs `optimized_score` refer to.
+
+The first comparison runs inside the evaluator on every iteration. The second comparison runs in the runner to decide whether to keep GEPA's changes.
+
+#### The WITH vs WITHOUT experimental design
+
+Every evaluation follows a controlled experiment that measures whether a specific SKILL.md candidate helps the LLM produce better responses:
+
+1. **WITH-skill trial** (`quality_with`) — An LLM generates a response with the SKILL.md injected as system context. The skill teaches the model Databricks-specific patterns, syntax, and constraints it wouldn't otherwise know.
+2. **WITHOUT-skill trial** (`quality_without`) — The **same LLM** generates a response to the **same prompt** with **no SKILL.md in context**. This is the control — it shows what the model already knows on its own. **This is NOT "without optimization"** — it is the bare model with no skill document at all.
+3. **Judge both** — An MLflow judge scores each response against the test case's expected facts, patterns, and guidelines, returning a 0.0-1.0 quality score plus a written rationale.
+
+The WITHOUT-skill response is **computed once and cached by prompt hash** — since the model and prompt don't change, the baseline is stable across all GEPA iterations. This means every candidate SKILL.md is compared against the same fixed control (the bare model).
+
+#### What "baseline score" means
+
+Before optimization begins, the runner evaluates the **original SKILL.md** on all training tasks using the WITH/WITHOUT protocol above. This produces:
+
+- A **per-task score** — the composite score (see [Scoring Weights](#scoring-weights)) for each test case
+- A **mean baseline score** — the average across all tasks (e.g., `0.909`)
+- **Diagnostic labels** — each task is classified:
+  - **OK** — skill helped (quality delta > +0.05)
+  - **NEEDS_SKILL** — WITH-skill quality is below 0.5 (skill isn't teaching enough)
+  - **REGRESSION** — skill actively hurt the response (quality delta < −0.05)
+
+This baseline tells you exactly where the skill stands *before* any optimization.
+
+#### What "improvement" means (the second layer)
+
+This is the **outer comparison** — original SKILL.md vs optimized SKILL.md. After GEPA produces an optimized candidate, it's re-evaluated on all training tasks using the same WITH/WITHOUT protocol. Improvement is the difference between the optimized mean score and the original mean score:
+
+```
+improvement = optimized_score - original_score
+```
+
+Both scores come from the same evaluator, which internally runs the WITH vs WITHOUT comparison. So "improvement" means the optimized SKILL.md produced a larger quality delta (WITH minus WITHOUT) than the original SKILL.md did — i.e., the optimized skill helps the LLM more than the original skill did.
+
+This is **not** a subjective assessment. Both scores come from the same judges, same prompts, same cached WITHOUT-skill baselines. The only variable is the SKILL.md content.
+
+The composite score itself is a weighted combination of four dimensions (detailed in [Scoring Weights](#scoring-weights)):
+
+| Dimension | What it measures | Why it matters |
+|-----------|-----------------|----------------|
+| **Skill Effectiveness (40%)** | `quality_with - quality_without` | The skill's unique contribution — what the model gets right *because* of the skill |
+| **Absolute Quality (30%)** | `quality_with` score | Overall response quality with the skill present |
+| **Structure (5%)** | Python/SQL syntax validity | Code in the skill must be syntactically correct |
+| **Token Efficiency (25%)** | Token count vs original | Smaller skills save context window — candidates that shrink get a bonus up to 1.15x |
+
+A skill that scores 0.91 after optimization vs 0.88 at baseline has a measurable, reproducible improvement of +0.03 — driven by higher quality deltas, fewer regressions, or better token efficiency.
+
+#### Why this is rigorous, not made up
+
+- **Same model, same prompts** — the only variable is the skill content, isolating its effect
+- **Cached baselines** — WITHOUT-skill responses don't change between iterations, so score deltas are real
+- **Judge rationale** — every score comes with a written explanation of which facts were present/missing and which patterns matched/failed, making scores auditable
+- **Train/val split** — with 5+ test cases, stratified splitting prevents overfitting to the training set
+- **Deterministic structure checks** — syntax validation and pattern adherence use regex/AST parsing, not LLM judgment
+
 ### MLflow Judges as the Evaluator
 
 The evaluator uses [MLflow's `make_judge`](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html) to score responses. Two judges run by default during optimization:
@@ -121,6 +192,48 @@ Before optimization starts, `_evaluate_on_tasks()` runs the evaluator on ALL tra
 | **5%** | Structure | Python/SQL syntax validation |
 | **25%** | Token Efficiency | Smaller = higher score (bonus up to 1.15x) |
 
+### How Multi-Pass Optimization Works
+
+Optimization runs as a multi-pass loop where each pass feeds its best result into the next. This section explains what happens inside a single pass and how the runner decides when to stop.
+
+#### What happens inside a single GEPA pass
+
+GEPA's `optimize_anything` receives the seed candidate (current SKILL.md text), the evaluator, the training dataset, and the preset config. Within a pass, GEPA runs up to `max_metric_calls` iterations — **15** for `quick`, **50** for `standard`, **150** for `thorough`.
+
+Each iteration follows this cycle:
+
+1. **Reflect** — The reflection LM reads `side_info` from the previous evaluation. This includes the full judge rationale: which expected facts were missing, which regex patterns weren't found, which guidelines were violated, and whether regressions occurred.
+2. **Mutate** — Based on the rationale, the reflection LM proposes a targeted mutation to the SKILL.md (or tool docstring). Mutations are surgical — informed by exactly what the judges flagged.
+3. **Evaluate** — The evaluator scores the mutated candidate on a task from the dataset. This involves generating responses WITH the candidate, running MLflow judges, and computing the composite score.
+4. **Select** — GEPA tracks a Pareto frontier of best candidates. If the mutation improves the frontier, it's kept; otherwise, it's discarded.
+
+The key insight: because `side_info` contains **full judge rationale** (not truncated summaries), the reflection LM sees exactly which facts were missed, which patterns were absent, and which regressions occurred — leading to more targeted mutations.
+
+#### How multi-pass works and when it stops
+
+The runner (`runner.py`) wraps GEPA in a multi-pass loop (default: up to 5 passes, controlled by `--max-passes`):
+
+1. **Pass N starts** — The best candidate from pass N-1 (or the original SKILL.md for pass 1) becomes the seed.
+2. **GEPA optimizes** — Runs up to `max_metric_calls` iterations within the pass.
+3. **Re-evaluate** — After the pass completes, the best candidate is re-evaluated on **all** training tasks to get a stable score.
+4. **Compare** — The pass score is compared to the previous best score.
+5. **Decision:**
+   - If improvement > **0.0005** (the `improvement_threshold`): the best candidate becomes the seed for pass N+1, and optimization continues.
+   - If improvement ≤ **0.0005**: early stop — no further passes are run.
+
+This creates a refinement chain: each pass starts from the previous pass's best, allowing incremental improvements that compound across passes. Early stopping prevents wasting compute when the skill has converged.
+
+#### Component scaling
+
+When optimizing multiple components (e.g., SKILL.md + tool modules with `--include-tools`), metric calls scale:
+
+- **Base formula:** `base_calls × num_components`
+- **Per-preset caps:** quick → 45, standard → 150, thorough → 300
+- **Global cap:** 300 (applied for slower reflection models)
+- **Round-robin:** GEPA's component selector alternates which component to mutate each iteration, so all components get roughly equal optimization effort.
+
+For example, with `--include-tools --tool-modules sql serving` (3 components: `skill_md` + `tools_sql` + `tools_serving`), a `quick` preset uses min(15 × 3, 45) = **45** metric calls per pass.
+
 ---
 
 ## Quick Start
@@ -136,6 +249,13 @@ export DATABRICKS_API_BASE="https://<workspace>.cloud.databricks.com/serving-end
 export OPENAI_API_KEY="sk-..."
 export GEPA_REFLECTION_LM="openai/gpt-4o"
 export GEPA_GEN_LM="openai/gpt-4o"
+
+# OR use Databricks AI Gateway (routes through a centralized gateway with rate limits and logging)
+export DATABRICKS_API_KEY="dapi..."
+export DATABRICKS_API_BASE="https://<account-id>.ai-gateway.cloud.databricks.com/mlflow/v1/serving-endpoints"
+# IMPORTANT: When using AI Gateway, OPENAI_API_KEY must also be set to your Databricks API token.
+# The MLflow judges and litellm call OpenAI-compatible endpoints, which read OPENAI_API_KEY for auth.
+export OPENAI_API_KEY="$DATABRICKS_API_KEY"
 
 # Optimize
 uv run python .test/scripts/optimize.py databricks-metric-views --preset quick --apply
@@ -364,6 +484,28 @@ uv run python .test/scripts/optimize.py <skill> --preset thorough   # 150 iterat
 --requirement "..."     # Inline requirement (repeatable)
 ```
 
+### Flag Details
+
+- **`--dry-run`**: Runs baseline evaluation on all training tasks — scores the current SKILL.md WITH and WITHOUT the skill in context, shows per-task scores and a cost estimate, then exits without running optimization. Useful for checking your baseline before committing to a full run.
+
+- **`--apply`**: Runs optimization to completion, then immediately writes the optimized SKILL.md back to `databricks-skills/`. Combines `optimize` + `--apply-last` in one step. Use when you're confident in the preset and want a hands-off workflow.
+
+- **`--apply-last`**: Loads the previously saved `optimized_SKILL.md` and `last_optimization.json` from `.test/skills/<skill>/` and writes the optimized content back to the repo. Does **not** re-run optimization. Use after reviewing a previous run's diff to confirm the changes look good.
+
+- **`--include-tools`**: Makes MCP tool docstrings optimizable GEPA components alongside SKILL.md. Both are mutated by GEPA via round-robin selection. Tool descriptions are no longer read-only context — they become first-class candidates. Metric calls scale with component count (see [Component scaling](#component-scaling)).
+
+- **`--tools-only`**: Drops SKILL.md entirely. Only tool module docstrings become GEPA components. Uses a **cross-skill dataset** (tasks sampled from ALL skills with `ground_truth.yaml`, max 5 per skill) so optimized descriptions generalize across skills rather than overfitting to one.
+
+- **`--tool-modules`**: Filters which tool modules are extracted for optimization. Without this flag, all modules are included. Example: `--tool-modules sql serving` optimizes only the `tools_sql` and `tools_serving` components.
+
+- **`--all`**: Discovers all skills with `ground_truth.yaml` in `.test/skills/`, runs optimization sequentially for each, and prints per-skill results plus a summary table at the end.
+
+- **`--run-dir`**: Enables GEPA checkpointing. Each pass saves state to `{run_dir}/pass_{N}/`. If the same `--run-dir` is passed on a subsequent run, GEPA resumes from the last checkpoint. Use `touch {run_dir}/pass_N/gepa.stop` for graceful mid-pass stop.
+
+- **`--max-passes`**: Maximum number of optimization passes (default 5). Each pass feeds the previous best as seed. Early stops if improvement falls below the threshold (0.0005). Lower values trade potential quality for faster completion.
+
+- **`--token-budget`**: Hard ceiling on candidate token count. The efficiency scorer penalizes candidates that exceed this budget. Also available via `GEPA_TOKEN_BUDGET` env var.
+
 ### Model Configuration
 
 | Env Var | Default | Purpose |
@@ -434,6 +576,115 @@ test_cases:
 - **`expected_patterns`** use regex — be specific (`"MEASURE\\("` not `".*MEASURE.*"`)
 - **`guidelines`** are evaluated by the MLflow quality judge — use for soft expectations that can't be regex-matched
 - **Generate from requirements**: `--requirement "Must explain MEASURE() wrapping"` auto-generates test cases
+
+---
+
+## Test Case & Configuration Files
+
+Each skill under `.test/skills/<skill-name>/` has two configuration files that drive evaluation and optimization.
+
+### `ground_truth.yaml` — What the skill must teach
+
+The evaluation dataset. Each test case represents a user prompt and the expected behavior when the skill is in context.
+
+**Full field schema:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `metadata.skill_name` | yes | Identifier matching the skill directory name |
+| `metadata.version` | yes | Schema version (e.g., `"1.0"`) |
+| `metadata.created_at` | no | ISO timestamp of creation |
+| `test_cases[].id` | yes | Unique identifier (convention: `<skill>_<action>_<NNN>`) |
+| `test_cases[].inputs.prompt` | yes | The user question sent to the generation model |
+| `test_cases[].outputs.response` | no | Expected reference answer. Used for judge comparison, **not** exact matching. Omit if you only want pattern/fact checks. |
+| `test_cases[].expectations.expected_facts` | yes | List of factual claims the response must contain. The quality judge checks each one. |
+| `test_cases[].expectations.expected_patterns` | no | Regex patterns with fields: `pattern`, `description`, and optionally `min_count` / `max_count`. Checked deterministically. |
+| `test_cases[].expectations.guidelines` | no | Soft rules evaluated by the quality judge for things regex can't check (e.g., "Should explain why SELECT * doesn't work"). |
+| `test_cases[].metadata.category` | recommended | Used for stratified train/val splitting. Common values: `happy_path`, `error_handling`, `advanced`, `conceptual`, `edge_case`. |
+
+**Example with all fields:**
+
+```yaml
+metadata:
+  skill_name: databricks-metric-views
+  version: "1.0"
+  created_at: "2025-01-15T10:00:00Z"
+
+test_cases:
+  - id: metric-views_create_sql_001
+    inputs:
+      prompt: "Create a metric view for order analytics"
+    outputs:
+      response: |
+        ```sql
+        CREATE OR REPLACE VIEW main.default.order_metrics
+        WITH METRICS LANGUAGE YAML
+        $$
+        source: main.default.orders
+        measures:
+          - name: Total Revenue
+            expr: SUM(amount)
+        $$
+        ```
+    expectations:
+      expected_facts:
+        - "Uses CREATE OR REPLACE VIEW with WITH METRICS LANGUAGE YAML"
+        - "Defines measures with name and expr using aggregate functions"
+      expected_patterns:
+        - pattern: "WITH METRICS LANGUAGE YAML"
+          description: "Metric view DDL syntax"
+          min_count: 1
+        - pattern: "MEASURE\\("
+          description: "MEASURE() function for querying"
+          min_count: 0
+          max_count: 5
+      guidelines:
+        - "Must use WITH METRICS LANGUAGE YAML syntax, not CREATE METRIC VIEW"
+        - "Should include a complete YAML block between $$ delimiters"
+    metadata:
+      category: happy_path
+```
+
+### `manifest.yaml` — How to evaluate the skill
+
+Configures which scorers run and what quality thresholds apply during evaluation.
+
+**Full field schema:**
+
+| Field | Description |
+|-------|-------------|
+| `skill_name` | Identifier matching the skill directory name |
+| `scorers.enabled` | List of deterministic scorers to run: `python_syntax`, `sql_syntax`, `pattern_adherence`, `no_hallucinated_apis`, `expected_facts_present` |
+| `scorers.llm_scorers` | List of LLM-based scorers: `Safety`, `guidelines_from_expectations`, `Guidelines` |
+| `scorers.default_guidelines` | Fallback guidelines applied when a test case doesn't specify its own `guidelines` field |
+| `quality_gates` | Minimum score thresholds per scorer (e.g., `syntax_valid: 1.0`, `pattern_adherence: 0.9`). Failing a gate flags the test case. |
+| `scorers.trace_expectations.tool_limits` | Max number of tool calls allowed (for trace-based scoring) |
+| `scorers.trace_expectations.token_budget` | Max tokens allowed in the response |
+| `scorers.trace_expectations.required_tools` | Tools that must be called (e.g., `["execute_sql"]`) |
+| `scorers.trace_expectations.banned_tools` | Tools that must not be called |
+
+**Example:**
+
+```yaml
+skill_name: databricks-metric-views
+
+scorers:
+  enabled:
+    - sql_syntax
+    - pattern_adherence
+    - expected_facts_present
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations
+  default_guidelines:
+    - "Responses must use Databricks-specific syntax, not generic SQL"
+    - "Code examples must be runnable without modification"
+
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+  safety: 1.0
+```
 
 ---
 
