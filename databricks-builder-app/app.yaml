@@ -114,7 +114,7 @@ env:
     value: "databricks-uc"
   # Optional: Default MLflow experiment for traces (can be overridden per-session in the UI)
   - name: MLFLOW_EXPERIMENT_NAME
-    value: "/Users/austin.choi@databricks.com/claude-code-traces"
+    value: ""  # Set to your MLflow experiment path, e.g. "/Users/your.email@databricks.com/claude-code-traces"
 
   # =============================================================================
   # Permission Configuration
