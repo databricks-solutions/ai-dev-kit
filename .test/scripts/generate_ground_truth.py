@@ -556,7 +556,7 @@ MISSING_SKILLS = [
     "databricks-mlflow-evaluation",
     "databricks-python-sdk",
     "databricks-spark-structured-streaming",
-    "databricks-synthetic-data-generation",
+    "databricks-synthetic-data-gen",
     "databricks-unity-catalog",
     "databricks-unstructured-pdf-generation",
     "databricks-vector-search",
