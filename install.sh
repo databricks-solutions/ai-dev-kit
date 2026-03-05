@@ -886,6 +886,55 @@ GEMINIEOF
     ok "GEMINI.md"
 }
 
+write_claude_hook() {
+    local path=$1
+    local script=$2
+    mkdir -p "$(dirname "$path")"
+
+    # Merge into existing settings.json if present, using Python for safe JSON handling
+    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
+import json
+path = '$path'
+script = '$script'
+hook_entry = {'type': 'command', 'command': 'bash ' + script, 'timeout': 5}
+try:
+    with open(path) as f: cfg = json.load(f)
+except: cfg = {}
+hooks = cfg.setdefault('hooks', {})
+session_hooks = hooks.setdefault('SessionStart', [])
+# Check if hook already exists
+for group in session_hooks:
+    for h in group.get('hooks', []):
+        if 'check_update.sh' in h.get('command', ''):
+            exit(0)  # Already configured
+# Append new hook group
+session_hooks.append({'hooks': [hook_entry]})
+with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
+    fi
+
+    # Fallback: write new file (only if no existing file)
+    [ -f "$path" ] && return  # Don't overwrite existing settings without Python
+    cat > "$path" << EOF
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $script",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+}
+
 write_mcp_configs() {
     step "Configuring MCP"
     
@@ -895,6 +944,14 @@ write_mcp_configs() {
             claude)
                 [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude/mcp.json" || write_mcp_json "$base_dir/.mcp.json"
                 ok "Claude MCP config"
+                # Add version check hook to Claude settings
+                local check_script="$REPO_DIR/.claude-plugin/check_update.sh"
+                if [ "$SCOPE" = "global" ]; then
+                    write_claude_hook "$HOME/.claude/settings.json" "$check_script"
+                else
+                    write_claude_hook "$base_dir/.claude/settings.json" "$check_script"
+                fi
+                ok "Claude update check hook"
                 ;;
             cursor)
                 if [ "$SCOPE" = "global" ]; then
