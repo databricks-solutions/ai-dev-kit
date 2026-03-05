@@ -12,7 +12,7 @@ name = "databricks-builder-app"
 version = "0.1.0"
 description = "Claude Code MCP Application"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
   "fastapi[standard]>=0.115.8",
   "python-dotenv>=1.0.1",
