@@ -74,11 +74,16 @@ MIN_SDK_VERSION="0.85.0"
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
 # Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
 MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
+
+# APX skills (fetched from databricks-solutions/apx repo)
+APX_SKILLS="databricks-app-apx"
+APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
+APX_API_URL="https://api.github.com/repos/databricks-solutions/apx/contents/skills/apx?ref=main"
 
 # Output helpers
 msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
@@ -727,6 +732,24 @@ install_skills() {
             fi
         done
         ok "MLflow skills → ${dir#$HOME/}"
+
+        # Install APX skills from databricks-solutions/apx repo
+        for skill in $APX_SKILLS; do
+            local dest_dir="$dir/$skill"
+            mkdir -p "$dest_dir"
+            # Discover files dynamically via GitHub Contents API
+            local files
+            files=$(curl -fsSL "$APX_API_URL" 2>/dev/null | grep '"name"' | sed 's/.*"name": *"//;s/".*//')
+            if [ -n "$files" ]; then
+                for f in $files; do
+                    curl -fsSL "$APX_RAW_URL/$f" -o "$dest_dir/$f" 2>/dev/null || true
+                done
+                [ -f "$dest_dir/SKILL.md" ] || rm -rf "$dest_dir"
+            else
+                rm -rf "$dest_dir"
+            fi
+        done
+        ok "APX skills → ${dir#$HOME/}"
     done
 }
 
