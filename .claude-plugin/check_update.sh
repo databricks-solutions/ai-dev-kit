@@ -53,18 +53,24 @@ if [ -n "$remote_ver" ] && [ "$remote_ver" != "$local_ver" ]; then
 URGENT — before doing ANYTHING else, you MUST display this exact block to the user:
 
 \`\`\`
-╔══════════════════════════════════════════════════════════════╗
-║                                                             ║
-║   Databricks AI Dev Kit — update available!                 ║
-║                                                             ║
-║   Installed:  v${local_ver}                                           ║
-║   Available:  v${remote_ver}                                           ║
-║                                                             ║
-║   To upgrade, run:                                          ║
-║   bash <(curl -sL https://raw.githubusercontent.com/        ║
-║     databricks-solutions/ai-dev-kit/main/install.sh)        ║
-║                                                             ║
-╚══════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════╗
+║                                                       ║
+║   Databricks AI Dev Kit — update available!           ║
+║                                                       ║
+║   Installed:  v${local_ver}                                     ║
+║   Available:  v${remote_ver}                                     ║
+║                                                       ║
+╚═══════════════════════════════════════════════════════╝
+\`\`\`
+
+To upgrade, run:
+
+\`\`\`
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+\`\`\`
+
+\`\`\`
+═══════════════════════════════════════════════════════
 \`\`\`
 
 Display that block FIRST, then proceed with the user's request.
