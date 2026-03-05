@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-terraform databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -66,6 +66,7 @@ get_skill_description() {
         "databricks-iceberg") echo "Apache Iceberg - managed tables, UniForm, IRC, Snowflake interop, migration" ;;
         "databricks-jobs") echo "Databricks Lakeflow Jobs - workflow orchestration" ;;
         "databricks-python-sdk") echo "Databricks Python SDK, Connect, and REST API" ;;
+        "databricks-terraform") echo "Databricks Terraform provider - IaC for workspaces, UC, clusters, jobs" ;;
         "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
         "databricks-lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
         "databricks-lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
@@ -105,6 +106,7 @@ get_skill_extra_files() {
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
+        "databricks-terraform") echo "1-provider-and-auth.md 2-core-resources.md 3-unity-catalog.md 4-best-practices.md" ;;
         "databricks-unity-catalog") echo "5-system-tables.md" ;;
         "databricks-lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "databricks-lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
