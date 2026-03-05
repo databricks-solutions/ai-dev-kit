@@ -249,7 +249,10 @@ scan_result = w.vector_search_indexes.scan_index(
 
 ## Reference Files
 
-- [index-types.md](index-types.md) - Detailed comparison of index types and creation patterns
+| Topic | File | Description |
+|-------|------|-------------|
+| Index Types | [index-types.md](index-types.md) | Detailed comparison of Delta Sync (managed/self-managed) vs Direct Access |
+| End-to-End RAG | [end-to-end-rag.md](end-to-end-rag.md) | Complete walkthrough: source table → endpoint → index → query → agent integration |
 
 ## CLI Quick Reference
 
@@ -311,37 +314,44 @@ embedding_source_columns=[
 
 ## MCP Tools
 
-The following MCP tools are available for managing Vector Search infrastructure. These are **management tools** for creating and configuring endpoints/indexes. For agent-runtime querying, use the Databricks managed Vector Search MCP server or `VectorSearchRetrieverTool`.
+The following MCP tools are available for managing Vector Search infrastructure. For a full end-to-end walkthrough, see [end-to-end-rag.md](end-to-end-rag.md).
 
 ### Endpoint Management
 
 | Tool | Description |
 |------|-------------|
-| `create_or_update_vs_endpoint` | Create endpoint if it doesn't exist, or return existing (STANDARD or STORAGE_OPTIMIZED) |
-| `get_vs_endpoint` | Get endpoint details by name, or list all endpoints (omit name) |
+| `create_vs_endpoint` | Create endpoint (STANDARD or STORAGE_OPTIMIZED). Async — check status with `get_vs_endpoint` |
+| `get_vs_endpoint` | Get endpoint details and status by name |
+| `list_vs_endpoints` | List all Vector Search endpoints in the workspace |
 | `delete_vs_endpoint` | Delete an endpoint (indexes must be deleted first) |
 
 ### Index Management
 
 | Tool | Description |
 |------|-------------|
-| `create_or_update_vs_index` | Create index if it doesn't exist; auto-triggers initial sync for DELTA_SYNC |
-| `get_vs_index` | Get index details by name, or list indexes on endpoint (pass endpoint_name only) |
+| `create_vs_index` | Create a Delta Sync or Direct Access index on an endpoint |
+| `get_vs_index` | Get index details, status, and configuration |
+| `list_vs_indexes` | List all indexes on an endpoint |
 | `delete_vs_index` | Delete an index |
+| `sync_vs_index` | Trigger sync for TRIGGERED pipeline indexes |
 
 ### Query and Data
 
 | Tool | Description |
 |------|-------------|
-| `query_vs_index` | Query index with text, vector, or hybrid search (for testing) |
-| `manage_vs_data` | Upsert, delete, scan, or sync index data (operation: "upsert", "delete", "scan", or "sync") |
+| `query_vs_index` | Query index with `query_text`, `query_vector`, or hybrid (`query_type="HYBRID"`) |
+| `upsert_vs_data` | Upsert vectors into a Direct Access index |
+| `delete_vs_data` | Delete vectors from a Direct Access index by primary key |
+| `scan_vs_index` | Retrieve all vectors from an index (for debugging/export) |
 
 ## Notes
 
-- **Storage-Optimized is newer** - Better for most use cases unless you need <100ms latency
-- **Delta Sync recommended** - Easier than Direct Access for most scenarios
-- **Hybrid search** - Available for both Delta Sync and Direct Access indexes
-- **Management vs runtime** - MCP tools above handle lifecycle management; for agent tool-calling at runtime, use the Databricks managed Vector Search MCP server
+- **Storage-Optimized is newer** — better for most use cases unless you need <100ms latency
+- **Delta Sync recommended** — easier than Direct Access for most scenarios
+- **Hybrid search** — available for both Delta Sync and Direct Access indexes
+- **`columns_to_sync` matters** — only synced columns are available in query results; include all columns you need
+- **Filter syntax differs by endpoint** — Standard uses `filters_json` (dict), Storage-Optimized uses `filter_string` (SQL)
+- **Management vs runtime** — MCP tools above handle lifecycle management; for agent tool-calling at runtime, use `VectorSearchRetrieverTool` or the Databricks managed Vector Search MCP server
 
 ## Related Skills
 
