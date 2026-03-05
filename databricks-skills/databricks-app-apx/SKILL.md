@@ -236,6 +236,7 @@ Create two markdown files:
 **TypeScript errors**: Wait for OpenAPI regen, verify hook names match operation_ids
 **OpenAPI not updating**: Check watcher status with `apx dev status`, restart if needed
 **Components not added**: Run shadcn from project root with `--yes` flag
+**React page crashes to blank after data loads (Error #310)**: `useMemo`/`useCallback` hooks placed after early returns (`if (loading) return <Spinner />`) violate React Rules of Hooks. Hooks must be called in the same order on every render. Move ALL hooks before any conditional returns and guard their internals instead: `useMemo(() => { if (!data.length) return []; ... }, [data])`
 
 ## Reference Materials
 

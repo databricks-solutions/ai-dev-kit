@@ -17,6 +17,10 @@ Build Python-based Databricks applications. For full examples and recipes, see t
 - **MUST** use `dash-bootstrap-components` for Dash app layout and styling
 - **MUST** use `@st.cache_resource` for Streamlit database connections
 - **MUST** deploy Flask with Gunicorn, FastAPI with uvicorn (not dev servers)
+- **MUST NOT** use external CDN links in frontend HTML (React, Recharts, Google Fonts, Babel, etc.) — the app runtime blocks outbound CDN requests. Use self-contained inline JS/CSS only
+- **MUST NOT** delete and recreate apps to fix deployment issues — just redeploy. Deleting disrupts OAuth integration
+- **MUST NOT** upload `node_modules/`, `frontend/src/`, `__pycache__/`, or other dev-only files to the workspace when deploying. For React/Vite apps with a FastAPI backend, only upload: `app.py`, `backend.py`, `requirements.txt`, `app.yaml`, and the `static/` build output folder. Use targeted `databricks workspace import` for individual files and `databricks workspace import-dir static <ws-path>/static` for the build — never `import-dir .` from the app root
+- **MUST** (React) place ALL hooks (`useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`) BEFORE any early return statements in React components. React requires hooks to be called in the exact same order on every render. Placing `useMemo`/`useCallback` after `if (loading) return <Spinner />` causes "Rendered fewer hooks than expected" (React Error #310) — the component calls fewer hooks on the loading render than on the data-loaded render, crashing the entire page to blank. Move all hooks to the top of the function body, guard their internals with `if (!data.length) return []` instead
 
 ## Required Steps
 
@@ -35,9 +39,9 @@ Copy this checklist and verify each item:
 
 | Framework | Best For | app.yaml Command |
 |-----------|----------|------------------|
-| **Dash** | Production dashboards, BI tools, complex interactivity | `["python", "app.py"]` |
-| **Streamlit** | Rapid prototyping, data science apps, internal tools | `["streamlit", "run", "app.py"]` |
-| **Gradio** | ML demos, model interfaces, chat UIs | `["python", "app.py"]` |
+| **Dash** | Production dashboards, BI tools, complex interactivity | `["python", "app.py"]` — bind to `DATABRICKS_APP_PORT` in code |
+| **Streamlit** | Rapid prototyping, data science apps, internal tools | `["streamlit", "run", "app.py"]` — port/address/headless auto-configured by runtime |
+| **Gradio** | ML demos, model interfaces, chat UIs | `["python", "app.py"]` — bind to `DATABRICKS_APP_PORT` in code |
 | **Flask** | Custom REST APIs, lightweight apps, webhooks | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8000"]` |
 | **FastAPI** | Async APIs, auto-generated OpenAPI docs | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` |
 | **Reflex** | Full-stack Python apps without JavaScript | `["reflex", "run", "--env", "prod"]` |
@@ -174,7 +178,9 @@ class EntityIn(BaseModel):
 | **Streamlit: set_page_config error** | `st.set_page_config()` must be the first Streamlit command |
 | **Dash: unstyled layout** | Add `dash-bootstrap-components`; use `dbc.themes.BOOTSTRAP` |
 | **Slow queries** | Use Lakebase for transactional/low-latency; SQL warehouse for analytical queries |
-
+| **"App Not Available" after deploy** | Ensure resources are attached via API PATCH before deploying; verify app binds to `DATABRICKS_APP_PORT` |
+| **Frontend loads blank/black** | External CDN requests (React, Recharts, Google Fonts, Babel) are blocked by the app runtime. Use self-contained inline JS/CSS only — no external `<script>` or `<link>` tags |
+| **React page crashes to blank after data loads** | `useMemo`/`useCallback` hooks placed after early returns (`if (loading) return ...`) violate React Rules of Hooks. Move ALL hooks before any conditional returns. Guard hook internals instead: `useMemo(() => { if (!data.length) return []; ... }, [data])` |
 ---
 
 ## Platform Constraints

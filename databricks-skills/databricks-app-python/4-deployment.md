@@ -19,7 +19,8 @@ command:
 
 env:
   - name: DATABRICKS_WAREHOUSE_ID
-    valueFrom: sql-warehouse
+    valueFrom:
+      resource: sql-warehouse
   - name: USE_MOCK_BACKEND
     value: "false"
 ```
@@ -28,12 +29,14 @@ env:
 
 | Framework | Command |
 |-----------|---------|
-| Dash | `["python", "app.py"]` |
-| Streamlit | `["streamlit", "run", "app.py"]` |
-| Gradio | `["python", "app.py"]` |
+| Dash | `["python", "app.py"]` — bind to `DATABRICKS_APP_PORT` in code |
+| Streamlit | `["streamlit", "run", "app.py"]` — port/address/headless auto-configured by runtime |
+| Gradio | `["python", "app.py"]` — bind to `DATABRICKS_APP_PORT` in code |
 | Flask | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8000"]` |
 | FastAPI | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` |
 | Reflex | `["reflex", "run", "--env", "prod"]` |
+
+**Port binding**: Apps must listen on `DATABRICKS_APP_PORT` (defaults to 8000). Streamlit is auto-configured. For Flask/FastAPI, 8000 in the command matches the default. For Dash/Gradio, read the env var in code: `int(os.environ.get("DATABRICKS_APP_PORT", 8000))`. **Never use 8080.**
 
 ### Step 2: Create and Deploy
 
@@ -57,9 +60,19 @@ databricks apps get <app-name>
 
 ### Redeployment
 
+**NEVER delete and recreate an app to fix deployment issues** — just redeploy. Deleting disrupts OAuth integration and doesn't fix underlying problems.
+
+**Clean stale files** before redeploying — leftover files (e.g., old `main.py`) in the workspace source path can cause conflicts:
+
 ```bash
-databricks workspace delete /Workspace/Users/<user>/apps/<app-name> --recursive
-databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name>
+# Check for stale files
+databricks workspace list /Workspace/Users/<user>/apps/<app-name>
+
+# Remove stale files if needed
+databricks workspace delete /Workspace/Users/<user>/apps/<app-name>/<stale-file>
+
+# Sync and redeploy
+databricks sync . /Workspace/Users/<user>/apps/<app-name> --full
 databricks apps deploy <app-name> \
   --source-code-path /Workspace/Users/<user>/apps/<app-name>
 ```
@@ -115,6 +128,35 @@ For programmatic app lifecycle management, see [6-mcp-approach.md](6-mcp-approac
 
 ## Post-Deployment
 
+### Attach Resources (CRITICAL)
+
+Without resources attached, the gateway shows "App Not Available" even if the process is running. Attach resources via API PATCH **before** deploying:
+
+```bash
+databricks api patch /api/2.0/apps/<app-name> --json '{
+  "resources": [
+    {"name": "sql-warehouse", "sql_warehouse": {"id": "<warehouse-id>", "permission": "CAN_USE"}},
+    {"name": "serving-endpoint", "serving_endpoint": {"name": "<endpoint-name>", "permission": "CAN_QUERY"}}
+  ]
+}' --profile <profile>
+```
+
+**Find the correct warehouse ID** for the target workspace:
+```bash
+databricks warehouses list --profile <profile>
+```
+
+### Configure Permissions
+
+```bash
+databricks api put /api/2.0/permissions/apps/<app-name> --json '{
+  "access_control_list": [
+    {"user_name": "<your-email>", "permission_level": "CAN_MANAGE"},
+    {"group_name": "users", "permission_level": "CAN_USE"}
+  ]
+}' --profile <profile>
+```
+
 ### Check Logs
 
 ```bash
@@ -134,9 +176,3 @@ databricks apps logs <app-name>
 2. Check all pages load correctly
 3. Verify data connectivity (look for backend initialization messages in logs)
 4. Test user authorization flow if enabled
-
-### Configure Permissions
-
-- Set `CAN USE` for approved users/groups
-- Set `CAN MANAGE` only for trusted developers
-- Verify service principal has required resource permissions

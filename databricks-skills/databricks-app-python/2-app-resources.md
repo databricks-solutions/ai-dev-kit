@@ -31,20 +31,38 @@ Use `valueFrom` to reference resources — never hardcode IDs:
 ```yaml
 env:
   - name: DATABRICKS_WAREHOUSE_ID
-    valueFrom: sql-warehouse
+    valueFrom:
+      resource: sql-warehouse
 
   - name: SERVING_ENDPOINT_NAME
-    valueFrom: serving-endpoint
+    valueFrom:
+      resource: serving-endpoint
 
   - name: DB_CONNECTION_STRING
-    valueFrom: database
+    valueFrom:
+      resource: database
 ```
 
-Add resources via the Databricks Apps UI when creating or editing an app:
+Add resources via the Databricks Apps UI or CLI:
+
+**Option 1: UI**
 1. Navigate to Configure step
 2. Click **+ Add resource**
 3. Select resource type and set permissions
 4. Assign a key (referenced in `valueFrom`)
+
+**Option 2: CLI (API PATCH)** — required when deploying programmatically. Without resources attached, the gateway shows "App Not Available" even if the process is running:
+
+```bash
+databricks api patch /api/2.0/apps/<app-name> --json '{
+  "resources": [
+    {"name": "sql-warehouse", "sql_warehouse": {"id": "<warehouse-id>", "permission": "CAN_USE"}},
+    {"name": "serving-endpoint", "serving_endpoint": {"name": "<endpoint-name>", "permission": "CAN_QUERY"}}
+  ]
+}' --profile <profile>
+```
+
+**CRITICAL**: Resources must be attached BEFORE deploying. Without them, the gateway will refuse to serve the app even though the process is running and healthy.
 
 ---
 
@@ -112,9 +130,26 @@ For Lakebase patterns, see [5-lakebase.md](5-lakebase.md).
 
 ---
 
+## Troubleshooting: `valueFrom` vs `value`
+
+If `valueFrom: resource:` fails with "Error reading app.yaml", use hardcoded `value:` as a fallback:
+
+```yaml
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "<actual-warehouse-id>"
+  - name: SERVING_ENDPOINT_NAME
+    value: "<actual-endpoint-name>"
+```
+
+This can happen when resources aren't yet attached to the app or the resource key doesn't match. Prefer `valueFrom` when resources are properly configured, but use `value` to unblock deployment.
+
+---
+
 ## Best Practices
 
 - Always use `valueFrom` — keeps apps portable between environments
+- If `valueFrom` fails with "Error reading app.yaml", fall back to `value:` with hardcoded IDs (see above)
 - Grant service principal minimum required permissions (e.g., `CAN USE` not `CAN MANAGE` for SQL warehouse)
 - Use Lakebase for transactional workloads; SQL warehouse for analytical workloads
 - For external services, use UC connections or secrets (never hardcode API keys)
