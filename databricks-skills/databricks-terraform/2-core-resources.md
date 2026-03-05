@@ -201,8 +201,8 @@ resource "databricks_sql_endpoint" "serverless" {
 ```hcl
 resource "databricks_pipeline" "etl" {
   name    = "etl-pipeline"
-  target  = "analytics.silver"
   catalog = "analytics"
+  schema  = "silver"
 
   library {
     notebook {
@@ -210,7 +210,7 @@ resource "databricks_pipeline" "etl" {
     }
   }
 
-  continuous = false
+  continuous  = false
   development = false
 
   cluster {

@@ -173,7 +173,7 @@ manage_uc_security_policies(
 - Row filters and column masks are enforced at **query time** — they apply to all SQL, BI tools, and notebooks
 - Functions must be in the **same catalog** as the table (or in a catalog the user has access to)
 - `IS_ACCOUNT_GROUP_MEMBER()` checks account-level groups, not workspace-local groups
-- Masks and filters do NOT apply to the table owner or users with `ALL_PRIVILEGES`
+- Only **metastore admins** and **account admins** bypass row filters and column masks. Table owners and users with `ALL_PRIVILEGES` do NOT automatically bypass them
 - Performance impact is minimal for simple functions; avoid expensive joins in filter/mask functions
 
 ---

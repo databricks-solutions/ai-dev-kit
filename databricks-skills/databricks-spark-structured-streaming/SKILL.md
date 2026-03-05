@@ -119,7 +119,7 @@ Schedule via Databricks Jobs every 15 minutes for near-real-time at a fraction o
 
 | Latency Requirement | Trigger | Cost | Use Case |
 |---------------------|---------|------|----------|
-| < 800ms | `realTime=True` | $$$ | Real-time analytics, alerts |
+| Sub-second (ms) | `realTime="5 minutes"` | $$$ | Fraud detection, real-time personalization (DBR 16.4+) |
 | 1–30 seconds | `processingTime="N seconds"` | $$ | Near real-time dashboards |
 | 15–60 minutes | `availableNow=True` (scheduled) | $ | Batch-style SLA |
 | > 1 hour | `availableNow=True` (scheduled) | $ | ETL pipelines |
@@ -210,7 +210,7 @@ See [checkpoint-best-practices.md](checkpoint-best-practices.md) for migration, 
 - [ ] Checkpoint location is persistent (UC Volumes, not DBFS)
 - [ ] Unique checkpoint per stream
 - [ ] Fixed-size cluster (no autoscaling for streaming)
-- [ ] Trigger interval explicitly set (never use default continuous)
+- [ ] Trigger interval explicitly set (default processes micro-batches as fast as possible, which is expensive)
 - [ ] Monitoring configured (input rate, processing rate, batch duration)
 - [ ] Watermark configured for all stateful operations
 - [ ] Schema defined explicitly (not inferred) for Kafka sources

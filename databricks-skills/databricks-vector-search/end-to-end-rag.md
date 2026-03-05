@@ -116,8 +116,10 @@ query_vs_index(
 
 ### With Filters
 
+The filter syntax depends on the endpoint type used when creating the index.
+
 ```python
-# Storage-Optimized endpoint: SQL-like filter_string
+# Storage-Optimized endpoint (used in this walkthrough): SQL-like filter_string
 query_vs_index(
     index_name="catalog.schema.knowledge_base_index",
     columns=["doc_id", "title", "content"],
@@ -126,9 +128,9 @@ query_vs_index(
     filter_string="category = 'governance'"
 )
 
-# Standard endpoint: JSON filters_json
+# Standard endpoint (if you created a Standard endpoint instead): JSON filters_json
 query_vs_index(
-    index_name="catalog.schema.knowledge_base_index",
+    index_name="catalog.schema.my_standard_index",
     columns=["doc_id", "title", "content"],
     query_text="How do I govern my data?",
     num_results=3,
@@ -152,41 +154,28 @@ query_vs_index(
 
 ## Step 6: Use in an Agent
 
-### As a UC Function Tool (ChatAgent)
+### As a Tool in a ChatAgent
 
-Register the vector search index as a tool for your agent:
-
-```python
-from databricks.sdk import WorkspaceClient
-from databricks.agents.udfs import VectorSearchRetrieverUDF
-
-w = WorkspaceClient()
-
-retriever = VectorSearchRetrieverUDF(
-    index_name="catalog.schema.knowledge_base_index",
-    columns=["doc_id", "title", "content"],
-    num_results=5,
-)
-
-# Register as UC function
-retriever.register(
-    catalog="catalog",
-    schema="schema",
-    function_name="search_knowledge_base"
-)
-```
-
-### In a ChatAgent
+Use `VectorSearchRetrieverTool` to wire the index into an agent deployed on Model Serving:
 
 ```python
 from databricks.agents import ChatAgent
+from databricks.agents.tools import VectorSearchRetrieverTool
+from databricks.sdk import WorkspaceClient
+
+# Define the retriever tool
+retriever_tool = VectorSearchRetrieverTool(
+    index_name="catalog.schema.knowledge_base_index",
+    columns=["doc_id", "title", "content"],
+    num_results=3,
+)
 
 class RAGAgent(ChatAgent):
     def __init__(self):
         self.w = WorkspaceClient()
 
     def predict(self, messages, context=None):
-        query = messages[-1]["content"]
+        query = messages[-1].content
 
         results = self.w.vector_search_indexes.query_index(
             index_name="catalog.schema.knowledge_base_index",
@@ -201,7 +190,7 @@ class RAGAgent(ChatAgent):
         )
 
         response = self.w.serving_endpoints.query(
-            name="databricks-claude-sonnet-4-20250514",
+            name="databricks-meta-llama-3-3-70b-instruct",
             messages=[
                 {"role": "system", "content": f"Answer using this context:\n{context_docs}"},
                 {"role": "user", "content": query},

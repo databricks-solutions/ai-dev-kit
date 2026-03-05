@@ -65,7 +65,7 @@ resource "databricks_cluster" "shared" {
   num_workers             = 2
 
   spark_conf = {
-    "spark.databricks.cluster.profile" = "serverless"
+    "spark.databricks.io.cache.enabled" = "true"
   }
 }
 ```
