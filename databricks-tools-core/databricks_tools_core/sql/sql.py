@@ -19,6 +19,7 @@ def execute_sql(
     catalog: Optional[str] = None,
     schema: Optional[str] = None,
     timeout: int = 180,
+    query_tags: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Execute a SQL query on a Databricks SQL Warehouse.
@@ -32,6 +33,9 @@ def execute_sql(
         catalog: Optional catalog context. If not provided, use fully qualified names.
         schema: Optional schema context. If not provided, use fully qualified names.
         timeout: Timeout in seconds (default: 180)
+        query_tags: Optional query tags for cost attribution and filtering.
+            Format: "key:value,key2:value2" (e.g., "team:eng,cost_center:701").
+            Appears in system.query.history and Query History UI.
 
     Returns:
         List of dictionaries, each representing a row with column names as keys.
@@ -64,6 +68,7 @@ def execute_sql(
         catalog=catalog,
         schema=schema,
         timeout=timeout,
+        query_tags=query_tags,
     )
 
 
@@ -74,6 +79,7 @@ def execute_sql_multi(
     schema: Optional[str] = None,
     timeout: int = 180,
     max_workers: int = 4,
+    query_tags: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute multiple SQL statements with dependency-aware parallelism.
@@ -92,6 +98,7 @@ def execute_sql_multi(
         schema: Optional schema context. If not provided, use fully qualified names.
         timeout: Timeout per query in seconds (default: 180)
         max_workers: Maximum parallel queries per group (default: 4)
+        query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701").
 
     Returns:
         Dictionary with:
@@ -148,4 +155,5 @@ def execute_sql_multi(
         catalog=catalog,
         schema=schema,
         timeout=timeout,
+        query_tags=query_tags,
     )

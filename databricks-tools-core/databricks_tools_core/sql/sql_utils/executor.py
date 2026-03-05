@@ -50,6 +50,7 @@ class SQLExecutor:
         schema: Optional[str] = None,
         row_limit: Optional[int] = None,
         timeout: int = 180,
+        query_tags: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Execute a SQL query and return results as a list of dictionaries.
@@ -60,6 +61,9 @@ class SQLExecutor:
             schema: Optional schema context for the query
             row_limit: Optional maximum number of rows to return
             timeout: Timeout in seconds (default: 180)
+            query_tags: Optional query tags for cost attribution and filtering.
+                Format: "key:value,key2:value2" (e.g., "team:eng,cost_center:701").
+                Appears in system.query.history and Query History UI.
 
         Returns:
             List of dictionaries, each representing a row with column names as keys
@@ -81,6 +85,8 @@ class SQLExecutor:
             exec_params["schema"] = schema
         if row_limit is not None:
             exec_params["row_limit"] = row_limit
+        if query_tags:
+            exec_params["query_tags"] = query_tags
 
         # Submit the statement
         try:
