@@ -34,7 +34,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 
 ### 🤖 AI & Agents
 - **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
-- **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
+- **databricks-genie** - Genie Spaces: create, query, analyze, benchmark, and optimize
 - **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints
 - **databricks-parsing** - Parse documents (PDF, DOCX, images) with ai_parse_document for custom RAG pipelines
 - **databricks-unstructured-pdf-generation** - Generate synthetic PDFs for RAG
