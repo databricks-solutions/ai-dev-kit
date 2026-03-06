@@ -1,6 +1,6 @@
-"""Compute tools - Execute code on Databricks clusters."""
+"""Compute tools - Execute code on Databricks clusters and serverless compute."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from databricks_tools_core.compute import (
     list_clusters as _list_clusters,
@@ -9,6 +9,7 @@ from databricks_tools_core.compute import (
     get_cluster_status as _get_cluster_status,
     execute_databricks_command as _execute_databricks_command,
     run_python_file_on_databricks as _run_python_file_on_databricks,
+    run_code_on_serverless as _run_code_on_serverless,
     NoRunningClusterError,
 )
 
@@ -250,3 +251,55 @@ def run_python_file_on_databricks(
             "skipped_clusters": e.skipped_clusters,
             "available_clusters": e.available_clusters,
         }
+
+
+@mcp.tool
+def run_code_on_serverless(
+    code: str,
+    language: str = "python",
+    timeout: int = 1800,
+    run_name: str = None,
+) -> Dict[str, Any]:
+    """
+    Execute Python or SQL code on serverless compute (no cluster required).
+
+    This uses the Jobs API (runs/submit) with serverless compute. No interactive
+    cluster needs to be running. The code is uploaded as a temporary notebook,
+    executed on serverless infrastructure, and the notebook is cleaned up after.
+
+    Use this tool when:
+    - No cluster is available and the user doesn't want to start one
+    - Running one-off scripts or queries that don't need an interactive session
+    - Running longer-running code that benefits from dedicated serverless resources
+
+    For interactive, iterative code execution with state (variables, imports),
+    use execute_databricks_command() with a cluster instead.
+
+    For SQL-only queries against a warehouse, consider execute_sql() which uses
+    the SQL Statements API and may be faster for short queries.
+
+    Args:
+        code: Code to execute (Python or SQL).
+        language: Programming language ("python" or "sql"). Default: "python".
+        timeout: Maximum wait time in seconds (default: 1800 = 30 minutes).
+        run_name: Optional human-readable name for the run. Auto-generated if omitted.
+
+    Returns:
+        Dictionary with:
+        - success: Whether execution succeeded
+        - output: The output from execution (notebook result or logs)
+        - error: Error message if failed
+        - run_id: Databricks Jobs run ID
+        - run_url: URL to view the run in Databricks UI
+        - duration_seconds: How long the execution took
+        - state: Final state (SUCCESS, FAILED, TIMEDOUT, etc.)
+        - message: Human-readable summary
+    """
+    result = _run_code_on_serverless(
+        code=code,
+        language=language,
+        timeout=timeout,
+        run_name=run_name if run_name else None,
+        cleanup=True,
+    )
+    return result.to_dict()

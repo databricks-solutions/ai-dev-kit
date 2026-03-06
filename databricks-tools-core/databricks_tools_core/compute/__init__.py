@@ -1,7 +1,7 @@
 """
-Compute - Execution Context Operations
+Compute - Code Execution Operations
 
-Functions for executing code on Databricks clusters.
+Functions for executing code on Databricks clusters and serverless compute.
 """
 
 from .execution import (
@@ -17,6 +17,11 @@ from .execution import (
     run_python_file_on_databricks,
 )
 
+from .serverless import (
+    ServerlessRunResult,
+    run_code_on_serverless,
+)
+
 __all__ = [
     "ExecutionResult",
     "NoRunningClusterError",
@@ -28,4 +33,6 @@ __all__ = [
     "destroy_context",
     "execute_databricks_command",
     "run_python_file_on_databricks",
+    "ServerlessRunResult",
+    "run_code_on_serverless",
 ]
