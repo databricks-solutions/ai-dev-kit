@@ -83,7 +83,6 @@ MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 # APX skills (fetched from databricks-solutions/apx repo)
 APX_SKILLS="databricks-app-apx"
 APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
-APX_API_URL="https://api.github.com/repos/databricks-solutions/apx/contents/skills/apx?ref=main"
 
 # Output helpers
 msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
@@ -737,16 +736,14 @@ install_skills() {
         for skill in $APX_SKILLS; do
             local dest_dir="$dir/$skill"
             mkdir -p "$dest_dir"
-            # Discover files dynamically via GitHub Contents API
-            local files
-            files=$(curl -fsSL "$APX_API_URL" 2>/dev/null | grep '"name"' | sed 's/.*"name": *"//;s/".*//')
-            if [ -n "$files" ]; then
-                for f in $files; do
-                    curl -fsSL "$APX_RAW_URL/$f" -o "$dest_dir/$f" 2>/dev/null || true
+            local url="$APX_RAW_URL/SKILL.md"
+            if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
+                # Try to fetch optional reference files
+                for ref in backend-patterns.md frontend-patterns.md; do
+                    curl -fsSL "$APX_RAW_URL/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
                 done
-                [ -f "$dest_dir/SKILL.md" ] || rm -rf "$dest_dir"
             else
-                rm -rf "$dest_dir"
+                rmdir "$dest_dir" 2>/dev/null || warn "Could not install APX skill '$skill' — consider removing $dest_dir if it is no longer needed"
             fi
         done
         ok "APX skills → ${dir#$HOME/}"

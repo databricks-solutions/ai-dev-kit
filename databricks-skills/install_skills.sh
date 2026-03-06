@@ -51,7 +51,6 @@ MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace
 APX_REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx"
 APX_REPO_REF="main"
 APX_REPO_SKILL_PATH="skills/apx"
-APX_REPO_API_URL="https://api.github.com/repos/databricks-solutions/apx/contents"
 
 # APX skills
 APX_SKILLS="databricks-app-apx"
@@ -350,38 +349,41 @@ download_mlflow_skill() {
     return 0
 }
 
-# Function to download an APX skill (dynamically discovers files via GitHub API)
+# Get extra files for an APX skill (besides SKILL.md)
+get_apx_skill_extra_files() {
+    case "$1" in
+        "databricks-app-apx") echo "backend-patterns.md frontend-patterns.md" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Function to download an APX skill
 download_apx_skill() {
     local skill_name=$1
     local skill_dir="$SKILLS_DIR/$skill_name"
     local base_url="${APX_REPO_RAW_URL}/${APX_REPO_REF}/${APX_REPO_SKILL_PATH}"
-    local api_url="${APX_REPO_API_URL}/${APX_REPO_SKILL_PATH}?ref=${APX_REPO_REF}"
 
     echo -e "  Downloading from APX repo (${APX_REPO_REF})..."
 
-    # Discover files dynamically via GitHub Contents API
-    local files
-    files=$(curl -sSL -f "$api_url" 2>/dev/null | grep '"name"' | sed 's/.*"name": *"//;s/".*//')
-    if [ -z "$files" ]; then
-        echo -e "  ${RED}✗${NC} Failed to list files from APX repo"
+    # Download SKILL.md (required)
+    if curl -sSL -f "${base_url}/SKILL.md" -o "$skill_dir/SKILL.md" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${NC} Downloaded SKILL.md"
+    else
+        echo -e "  ${RED}✗${NC} Failed to download SKILL.md from APX repo"
         rm -rf "$skill_dir"
         return 1
     fi
 
-    # Download each discovered file
-    for f in $files; do
-        if curl -sSL -f "${base_url}/${f}" -o "$skill_dir/$f" 2>/dev/null; then
-            echo -e "  ${GREEN}✓${NC} Downloaded $f"
-        else
-            echo -e "  ${YELLOW}○${NC} Failed to download $f"
-        fi
-    done
-
-    # Verify SKILL.md was downloaded (required)
-    if [ ! -f "$skill_dir/SKILL.md" ]; then
-        echo -e "  ${RED}✗${NC} SKILL.md not found — removing skill"
-        rm -rf "$skill_dir"
-        return 1
+    # Download skill-specific extra files
+    local extra_files=$(get_apx_skill_extra_files "$skill_name")
+    if [ -n "$extra_files" ]; then
+        for extra_file in $extra_files; do
+            if curl -sSL -f "${base_url}/${extra_file}" -o "$skill_dir/${extra_file}" 2>/dev/null; then
+                echo -e "  ${GREEN}✓${NC} Downloaded ${extra_file}"
+            else
+                echo -e "  ${YELLOW}○${NC} Optional file ${extra_file} not found"
+            fi
+        done
     fi
 
     return 0
