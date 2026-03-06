@@ -1,0 +1,3 @@
+# Databricks MCP App uses uv for dependency management
+# All dependencies are defined in pyproject.toml
+uv

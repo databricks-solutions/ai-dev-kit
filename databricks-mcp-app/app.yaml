@@ -1,0 +1,20 @@
+# Databricks App configuration for MCP Server
+# Serves the ai-dev-kit MCP server over HTTP/SSE transport
+
+command:
+  - "uv"
+  - "run"
+  - "mcp-server"
+
+env:
+  - name: SKILLS_DIR
+    value: "./skills"
+  - name: FASTMCP_STATELESS_HTTP
+    value: "true"
+
+# NOTE: User authorization scopes must be configured in the Databricks UI
+# Go to: Apps > ai-dev-kit-mcp > Edit > Add Scope
+# Required scopes for full functionality:
+#   - sql (for SQL warehouses)
+#   - files.files (for workspace files)
+#   - dashboards.genie (for Genie spaces)
