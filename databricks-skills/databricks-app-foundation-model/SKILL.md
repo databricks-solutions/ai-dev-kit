@@ -184,6 +184,163 @@ def llm_chat(
     return resp.choices[0].message.content, elapsed_ms
 ```
 
+## Pattern 5: Parallel LLM Calls for Improved Performance
+
+When making multiple independent foundation model calls (e.g., content evaluation with multiple checks), use parallel execution for significant performance gains:
+
+```python
+import concurrent.futures
+from typing import Dict, List, Tuple, Any, Callable
+
+def run_jobs_parallel(
+    jobs: Dict[str, Tuple[Callable, Tuple[Any, ...], Dict[str, Any]]],
+    max_workers: int = 3,
+) -> Tuple[Dict[str, Any], List[str]]:
+    """Run multiple LLM calls in parallel and wait for all results.
+
+    Args:
+        jobs: Dict mapping job_name -> (function, args, kwargs)
+        max_workers: Max parallel executions (configurable via LLM_MAX_CONCURRENCY env var)
+
+    Returns:
+        (results_dict, errors_list)
+    """
+    results: Dict[str, Any] = {}
+    errors: List[str] = []
+
+    def _call(fn, args, kwargs):
+        return fn(*args, **kwargs)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_call, fn, args, kwargs): name
+            for name, (fn, args, kwargs) in jobs.items()
+        }
+        concurrent.futures.wait(list(futures.keys()))
+
+        for future, job_name in futures.items():
+            try:
+                results[job_name] = future.result()
+            except Exception as e:
+                errors.append(f"{job_name}: {type(e).__name__}: {str(e)[:200]}")
+                results[job_name] = None
+
+    return results, errors
+
+# Usage: Run 3 checks in parallel instead of serial
+jobs = {
+    "check_structure": (llm_call, (client, prompt1), {}),
+    "check_tldr": (llm_call, (client, prompt2), {}),
+    "check_actionability": (llm_call, (client, prompt3), {}),
+}
+results, errors = run_jobs_parallel(jobs, max_workers=3)
+```
+
+**Performance impact**: 3 calls × 2s each = 6s serial → ~2s parallel (3× faster)
+
+**Best practices**:
+- Use `LLM_MAX_CONCURRENCY` env var for configurable parallelism (default: 3)
+- Balance throughput vs rate limits (too high = rate limit errors)
+- Handle errors gracefully per job (don't fail entire batch)
+- Use for: content evaluation, batch processing, multi-aspect analysis
+- Avoid for: dependent operations, debugging, strict rate limits
+
+## Pattern 6: Structured Outputs and Robust JSON Parsing
+
+For production apps requiring structured data from foundation models (evaluation, extraction, classification):
+
+```python
+import json
+import re
+from typing import Any, Dict
+
+def _content_to_text(content: Any) -> str:
+    """Normalize message content to string (handles str, bytes, list)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, (bytes, bytearray)):
+        return content.decode("utf-8", errors="replace")
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                if "text" in item:
+                    parts.append(item["text"])
+        return "".join(parts)
+    return str(content)
+
+def _parse_json_object(response_text: str) -> Dict[str, Any]:
+    """Robust JSON parsing - handles code fences, smart quotes, extra text."""
+    text = (response_text or "").strip()
+    if not text:
+        raise ValueError("Empty response")
+
+    # Strip markdown code fences
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n", "", text)
+        text = re.sub(r"```$", "", text).strip()
+
+    # Try direct parse
+    try:
+        obj = json.loads(text)
+        if isinstance(obj, dict):
+            return obj
+    except Exception:
+        pass
+
+    # Extract first {...} block
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1:
+        text = text[start : end + 1]
+
+    # Normalize smart quotes
+    text = (text.replace("\u201c", '"').replace("\u201d", '"')
+                .replace("\u2018", "'").replace("\u2019", "'"))
+
+    return json.loads(text)
+
+# Use with retry on parse failure
+def llm_structured_call(client, system, user):
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature=0.0,  # Deterministic for structured outputs
+        max_tokens=2000,
+    )
+    content = _content_to_text(resp.choices[0].message.content)
+
+    try:
+        return _parse_json_object(content)
+    except Exception:
+        # Retry with stricter prompt
+        retry_resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": "Return ONLY minified JSON. No extra text."},
+                {"role": "user", "content": user},
+            ],
+            temperature=0.0,
+            max_tokens=2000,
+        )
+        retry_content = _content_to_text(retry_resp.choices[0].message.content)
+        return _parse_json_object(retry_content)
+```
+
+**Best practices**:
+- Use `temperature=0.0` for deterministic structured outputs
+- Strip markdown code fences (```json ... ```)
+- Normalize smart/curly quotes to straight quotes
+- Retry with stricter prompt if initial parse fails
+- Provide exact JSON schema in system prompt
+- Use `@st.cache_data(ttl=60*60)` for expensive structured calls
+
 ## What Not To Do
 
 - Do not use `dbutils.notebook.entry_point` in Databricks Apps
@@ -204,9 +361,17 @@ email, user_access_token = get_viewer_identity()  # Optional viewer context
 
 answer, latency_ms = llm_chat(
     client,
-    model="databricks-gpt-5-mini",
+    model="databricks-meta-llama-3-1-70b-instruct",
     messages=[{"role": "user", "content": "Summarize Databricks Apps auth flow."}],
     max_tokens=300,
     temperature=0.2,
 )
 ```
+
+## Examples
+
+See [`examples/`](examples/) for working code:
+- `1-auth-and-token-minting.py` - Authentication patterns and token management
+- `2-minimal-chat-app.py` - Complete Streamlit chat app with deployment instructions
+- `3-parallel-llm-calls.py` - Parallel foundation model calls for improved performance
+- `4-structured-outputs.py` - Robust JSON parsing, retry logic, and caching patterns
