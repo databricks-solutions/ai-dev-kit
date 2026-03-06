@@ -146,146 +146,55 @@ class LoggingWriter:
 
 ## Security Validation
 
-Input validation and sanitization:
+Input validation and sanitization for production data sources:
 
 ```python
 import re
 import ipaddress
 
 class SecureDataSource:
-    """Data source with security validation."""
-
-    # Sensitive keys that should never be logged
-    SENSITIVE_KEYS = {
-        "password", "api_key", "client_secret", "token",
-        "access_token", "refresh_token", "bearer_token"
-    }
+    """Data source with input validation."""
 
     def __init__(self, options):
-        # Validate and sanitize options
         self._validate_options(options)
         self.options = options
 
-        # Create sanitized version for logging
-        self._safe_options = self._sanitize_for_logging(options)
-
     def _validate_options(self, options):
-        """Comprehensive option validation."""
-        # Validate required options
+        """Validate options at system boundary."""
         required = ["host", "database", "table"]
         missing = [opt for opt in required if opt not in options]
         if missing:
             raise ValueError(f"Missing required options: {', '.join(missing)}")
 
-        # Validate host (IP or hostname)
         self._validate_host(options["host"])
 
-        # Validate port range
         if "port" in options:
             port = int(options["port"])
             if port < 1 or port > 65535:
                 raise ValueError(f"Port must be 1-65535, got {port}")
 
-        # Validate table name (prevent SQL injection)
         self._validate_identifier(options["table"], "table")
-
-        # Validate numeric options
-        if "batch_size" in options:
-            batch_size = int(options["batch_size"])
-            if batch_size < 1 or batch_size > 10000:
-                raise ValueError(f"batch_size must be 1-10000, got {batch_size}")
 
     def _validate_host(self, host):
         """Validate host is valid IP or hostname."""
         try:
-            # Try as IP address
             ipaddress.ip_address(host)
             return
         except ValueError:
             pass
-
-        # Validate as hostname
         if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9-\.]*[a-zA-Z0-9]$', host):
             raise ValueError(f"Invalid host format: {host}")
 
     def _validate_identifier(self, identifier, name):
-        """Validate SQL identifier (table, column name)."""
-        # Prevent SQL injection
+        """Validate SQL identifier to prevent injection."""
         if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', identifier):
             raise ValueError(
                 f"Invalid {name} identifier: {identifier}. "
-                f"Must contain only letters, numbers, and underscores, "
-                f"and start with a letter or underscore."
+                f"Must contain only letters, numbers, and underscores."
             )
-
-    def _sanitize_for_logging(self, options):
-        """Mask sensitive values for logging."""
-        safe = {}
-        for key, value in options.items():
-            if key.lower() in self.SENSITIVE_KEYS:
-                safe[key] = "***REDACTED***"
-            else:
-                safe[key] = value
-        return safe
-
-    def __repr__(self):
-        return f"SecureDataSource({self._safe_options})"
 ```
 
-## Secrets Management
-
-Load credentials from secure storage:
-
-```python
-def load_secrets_from_databricks(scope, keys):
-    """Load secrets from Databricks secrets."""
-    try:
-        from pyspark.dbutils import DBUtils
-        from pyspark.sql import SparkSession
-
-        spark = SparkSession.getActiveSession()
-        if not spark:
-            raise ValueError("No active Spark session")
-
-        dbutils = DBUtils(spark)
-        secrets = {}
-
-        for key in keys:
-            try:
-                secrets[key] = dbutils.secrets.get(scope=scope, key=key)
-            except Exception as e:
-                raise ValueError(f"Failed to load secret '{key}' from scope '{scope}': {e}")
-
-        return secrets
-
-    except Exception as e:
-        raise ValueError(f"Failed to access Databricks secrets: {e}")
-
-class SecureCredentialLoader:
-    """Load credentials securely."""
-
-    @staticmethod
-    def load_credentials(options):
-        """Load credentials from secure storage."""
-        # Priority 1: Databricks secrets
-        if "secret_scope" in options:
-            secret_keys = [
-                "username", "password", "api_key", "client_secret"
-            ]
-            secrets = load_secrets_from_databricks(
-                options["secret_scope"],
-                secret_keys
-            )
-            options.update(secrets)
-
-        # Priority 2: Environment variables
-        elif options.get("use_env_vars", "false").lower() == "true":
-            import os
-            options["username"] = os.environ.get("DB_USERNAME")
-            options["password"] = os.environ.get("DB_PASSWORD")
-
-        return options
-```
+For credential sanitization in logs and secrets management, see [authentication-patterns.md](authentication-patterns.md) — the "Security Best Practices" and "Use Secrets Management" sections.
 
 ## Configuration Validation
 
