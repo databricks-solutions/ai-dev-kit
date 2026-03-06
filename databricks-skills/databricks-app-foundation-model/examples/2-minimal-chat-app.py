@@ -15,7 +15,7 @@ Features:
 Local Development:
     export DATABRICKS_TOKEN="dapi..."
     export DATABRICKS_SERVING_BASE_URL="https://<workspace>/serving-endpoints"
-    export DATABRICKS_MODEL="databricks-meta-llama-3-1-70b-instruct"
+    export DATABRICKS_MODEL="<endpoint-name>"  # See databricks-model-serving
     streamlit run 2-minimal-chat-app.py
 
 Databricks Apps Deployment:
@@ -25,11 +25,12 @@ Databricks Apps Deployment:
          - name: DATABRICKS_SERVING_BASE_URL
            value: "https://<workspace>/serving-endpoints"
          - name: DATABRICKS_MODEL
-           value: "databricks-meta-llama-3-1-70b-instruct"
+            value: "<endpoint-name>"  # See databricks-model-serving
 
     2. Create requirements.txt:
+       streamlit>=1.38,<2.0
        openai>=1.30,<2.0
-       requests>=2.31,<3.0
+       requests>=2.31,<3.0  # Needed for OAuth fallback only
 
     3. Deploy:
        databricks apps create foundation-chat --source-code-path .
@@ -37,119 +38,29 @@ Databricks Apps Deployment:
     4. Add service principal via UI for OAuth M2M auth
 """
 
-import os
 import time
 from typing import Dict, List, Optional, Tuple
 
-import requests
 import streamlit as st
 from openai import OpenAI
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-DATABRICKS_SERVING_BASE_URL = os.environ.get(
-    "DATABRICKS_SERVING_BASE_URL",
-    "https://<your-workspace-host>/serving-endpoints",
-)
-DATABRICKS_MODEL = os.environ.get(
-    "DATABRICKS_MODEL",
-    "databricks-meta-llama-3-1-70b-instruct"
-)
-
-# Auth credentials (auto-injected by Databricks Apps)
-DATABRICKS_TOKEN = os.environ.get("DATABRICKS_TOKEN")
-DATABRICKS_CLIENT_ID = os.environ.get("DATABRICKS_CLIENT_ID")
-DATABRICKS_CLIENT_SECRET = os.environ.get("DATABRICKS_CLIENT_SECRET")
-
-
-# =============================================================================
-# Auth Helpers
-# =============================================================================
-def _workspace_host_from_serving_base_url(serving_base_url: str) -> str:
-    """Extract workspace host from serving base URL."""
-    return serving_base_url.split("/serving-endpoints")[0].rstrip("/")
+from _common import create_foundation_model_client, get_model_name
 
 
 def _get_forwarded_headers() -> Dict[str, str]:
-    """Best-effort access to Databricks Apps forwarded headers."""
     try:
-        hdrs = getattr(st, "context").headers
-        return {k: v for k, v in hdrs.items()}
+        return dict(getattr(st, "context").headers)
     except Exception:
         return {}
 
 
 def get_viewer_identity() -> Tuple[Optional[str], Optional[str]]:
-    """Extract viewer email and access token from forwarded headers."""
     headers = _get_forwarded_headers()
     email = headers.get("X-Forwarded-Email") or headers.get("x-forwarded-email")
     token = headers.get("X-Forwarded-Access-Token") or headers.get(
         "x-forwarded-access-token"
     )
     return email, token
-
-
-def get_databricks_bearer_token() -> str:
-    """Return a token usable as OpenAI(api_key=...).
-
-    Priority:
-    1) DATABRICKS_TOKEN (PAT) if provided
-    2) Mint OAuth token from app service principal creds
-
-    Tokens are cached in st.session_state to avoid re-minting.
-    """
-    if DATABRICKS_TOKEN:
-        return DATABRICKS_TOKEN
-
-    # Check cache
-    cached = st.session_state.get("dbx_oauth")
-    if (
-        cached
-        and cached.get("access_token")
-        and cached.get("expires_at", 0) > int(time.time()) + 30
-    ):
-        return cached["access_token"]
-
-    if not (DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET):
-        raise RuntimeError(
-            "No Databricks auth configured. Provide Apps SP creds "
-            "(DATABRICKS_CLIENT_ID/SECRET) or set DATABRICKS_TOKEN (PAT)."
-        )
-
-    host = os.environ.get("DATABRICKS_HOST") or _workspace_host_from_serving_base_url(
-        DATABRICKS_SERVING_BASE_URL
-    )
-    host = host.strip().rstrip("/")
-    if not host.startswith("http://") and not host.startswith("https://"):
-        host = "https://" + host
-
-    token_url = f"{host}/oidc/v1/token"
-    resp = requests.post(
-        token_url,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        data={"grant_type": "client_credentials", "scope": "all-apis"},
-        auth=(DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET),
-        timeout=30,
-    )
-
-    if resp.status_code >= 400:
-        raise RuntimeError(
-            f"Failed to mint OAuth token (HTTP {resp.status_code}). "
-            f"Response: {resp.text[:500]}"
-        )
-
-    payload = resp.json()
-    access_token = payload.get("access_token")
-    expires_in = int(payload.get("expires_in", 300))
-    if not access_token:
-        raise RuntimeError(f"Token endpoint response missing access_token: {payload}")
-
-    st.session_state["dbx_oauth"] = {
-        "access_token": access_token,
-        "expires_at": int(time.time()) + expires_in,
-    }
-    return access_token
 
 
 # =============================================================================
@@ -199,7 +110,7 @@ def main():
     # Sidebar: model config
     with st.sidebar:
         st.subheader("Configuration")
-        st.code(f"Model: {DATABRICKS_MODEL}", language=None)
+        st.code(f"Model: {get_model_name()}", language=None)
 
         if st.button("🗑️ Clear Chat History"):
             st.session_state.messages = []
@@ -210,9 +121,8 @@ def main():
                 """
                 This app demonstrates calling Databricks Foundation Model APIs
                 from a Streamlit app using:
-                - Dual-mode auth (PAT + OAuth M2M)
-                - OpenAI SDK compatibility
-                - Token caching with expiry check
+                - Shared dual-mode auth (PAT + OAuth M2M)
+                - Shared OpenAI client wiring
                 - Viewer identity extraction
                 """
             )
@@ -239,16 +149,12 @@ def main():
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    # Get auth token and create OpenAI client
-                    token = get_databricks_bearer_token()
-                    client = OpenAI(
-                        api_key=token, base_url=DATABRICKS_SERVING_BASE_URL
-                    )
+                    client = create_foundation_model_client(cache=st.session_state)
 
                     # Call foundation model
                     response, latency_ms = llm_chat(
                         client,
-                        model=DATABRICKS_MODEL,
+                        model=get_model_name(),
                         messages=st.session_state.messages,
                         max_tokens=1000,
                         temperature=0.7,

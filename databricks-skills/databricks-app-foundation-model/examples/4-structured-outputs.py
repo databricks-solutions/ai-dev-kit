@@ -18,10 +18,11 @@ Use cases:
 - Classification tasks
 - Compliance checking
 - Any task requiring structured model output
+
+Set `DATABRICKS_MODEL` to a valid serving endpoint name before running.
 """
 
 import json
-import os
 import re
 import time
 from typing import Any, Dict, List, Tuple
@@ -29,18 +30,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 from openai import OpenAI
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-DATABRICKS_SERVING_BASE_URL = os.environ.get(
-    "DATABRICKS_SERVING_BASE_URL",
-    "https://<your-workspace-host>/serving-endpoints",
-)
-DATABRICKS_MODEL = os.environ.get(
-    "DATABRICKS_MODEL",
-    "databricks-meta-llama-3-1-70b-instruct"
-)
-DATABRICKS_TOKEN = os.environ.get("DATABRICKS_TOKEN")
+from _common import create_foundation_model_client, get_model_name
 
 
 # =============================================================================
@@ -139,7 +129,7 @@ def llm_structured_call(
     client: OpenAI,
     system_prompt: str,
     user_prompt: str,
-    model: str = DATABRICKS_MODEL,
+    model: str | None = None,
 ) -> Tuple[Dict[str, Any], int]:
     """Call foundation model for structured output with retry on parse failure.
 
@@ -154,7 +144,7 @@ def llm_structured_call(
     # First attempt
     t0 = time.perf_counter()
     response = client.chat.completions.create(
-        model=model,
+        model=model or get_model_name(),
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -175,7 +165,7 @@ def llm_structured_call(
 
         t0_retry = time.perf_counter()
         retry_response = client.chat.completions.create(
-            model=model,
+            model=model or get_model_name(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": "Return ONLY minified JSON object. Strings must be JSON-escaped. No extra text."},
@@ -196,7 +186,7 @@ def llm_structured_call(
 @st.cache_data(ttl=60 * 60)  # Cache for 1 hour
 def cached_structured_call(
     prompt: str,
-    model: str = DATABRICKS_MODEL,
+    model: str | None = None,
 ) -> Dict[str, Any]:
     """Cache expensive structured LLM calls.
 
@@ -210,21 +200,18 @@ def cached_structured_call(
     - 60 * 60 = 1 hour (moderate freshness)
     - 60 * 60 * 24 = 24 hours (stable data)
     """
-    token = os.environ.get("DATABRICKS_TOKEN")
-    if not token:
-        raise RuntimeError("DATABRICKS_TOKEN required")
-
-    client = OpenAI(api_key=token, base_url=DATABRICKS_SERVING_BASE_URL)
-
+    client = create_foundation_model_client()
     system = "You are a data extraction assistant. Return ONLY valid JSON."
-    result, _ = llm_structured_call(client, system, prompt, model)
+    result, _ = llm_structured_call(client, system, prompt, model or get_model_name())
     return result
 
 
 # =============================================================================
 # Example: Content Quality Evaluation
 # =============================================================================
-def evaluate_content_quality(client: OpenAI, text: str) -> Dict[str, Any]:
+def evaluate_content_quality(
+    client: OpenAI, text: str
+) -> Tuple[Dict[str, Any], int]:
     """Evaluate content quality with structured output."""
 
     system_prompt = """You are a content quality evaluator.
@@ -252,7 +239,7 @@ Content to evaluate:
 # =============================================================================
 # Example: Entity Extraction
 # =============================================================================
-def extract_entities(client: OpenAI, text: str) -> Dict[str, Any]:
+def extract_entities(client: OpenAI, text: str) -> Tuple[Dict[str, Any], int]:
     """Extract structured entities from text."""
 
     system_prompt = """You are an entity extraction system.
@@ -283,11 +270,7 @@ if __name__ == "__main__":
     Jane Smith, VP of Engineering at Acme Corp, recently shared their migration story.
     """
 
-    if not DATABRICKS_TOKEN:
-        print("Error: Set DATABRICKS_TOKEN environment variable")
-        exit(1)
-
-    client = OpenAI(api_key=DATABRICKS_TOKEN, base_url=DATABRICKS_SERVING_BASE_URL)
+    client = create_foundation_model_client()
 
     print("=" * 60)
     print("Example 1: Content Quality Evaluation")

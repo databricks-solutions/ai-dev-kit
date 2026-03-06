@@ -17,27 +17,17 @@ Performance impact:
 Configuration:
 - LLM_MAX_CONCURRENCY env var controls parallelism (default: 3)
 - Balance between throughput and rate limits
+- DATABRICKS_MODEL must be set to a valid serving endpoint name
 """
 
+import concurrent.futures
 import os
 import time
-import concurrent.futures
-from typing import Any, Dict, List, Tuple, Callable, Optional
+from typing import Any, Callable, Dict, List, Tuple
 
 from openai import OpenAI
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-DATABRICKS_SERVING_BASE_URL = os.environ.get(
-    "DATABRICKS_SERVING_BASE_URL",
-    "https://<your-workspace-host>/serving-endpoints",
-)
-DATABRICKS_MODEL = os.environ.get(
-    "DATABRICKS_MODEL",
-    "databricks-meta-llama-3-1-70b-instruct"
-)
-DATABRICKS_TOKEN = os.environ.get("DATABRICKS_TOKEN")  # For this example
+from _common import create_foundation_model_client, get_model_name
 
 # Concurrency control
 LLM_MAX_CONCURRENCY = int(os.environ.get("LLM_MAX_CONCURRENCY", "3"))
@@ -105,13 +95,13 @@ def run_jobs_parallel(
 def llm_call(
     client: OpenAI,
     prompt: str,
-    model: str = DATABRICKS_MODEL,
+    model: str | None = None,
     max_tokens: int = 500,
 ) -> Tuple[str, int]:
     """Make a single LLM call and return (response, latency_ms)."""
     t0 = time.perf_counter()
     resp = client.chat.completions.create(
-        model=model,
+        model=model or get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
         temperature=0.2,
@@ -205,15 +195,10 @@ if __name__ == "__main__":
     Finally, deploy using the CLI...
     """
 
-    # Create OpenAI client
-    if not DATABRICKS_TOKEN:
-        print("Error: Set DATABRICKS_TOKEN environment variable")
-        exit(1)
-
-    client = OpenAI(api_key=DATABRICKS_TOKEN, base_url=DATABRICKS_SERVING_BASE_URL)
+    client = create_foundation_model_client()
 
     print(f"Making 3 parallel LLM calls with max_workers={LLM_MAX_CONCURRENCY}...")
-    print(f"Model: {DATABRICKS_MODEL}\n")
+    print(f"Model: {get_model_name()}\n")
 
     # Define parallel jobs
     jobs = {
