@@ -149,7 +149,7 @@ if [ -z "$WORKSPACE_HOST" ]; then
 fi
 
 # Get current user for workspace path
-CURRENT_USER=$(databricks current-user me --output json 2>/dev/null | python3 -c "
+CURRENT_USER=$(databricks current-user me --output json --profile dbx_shared_demo 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 # Handle both formats
@@ -168,7 +168,7 @@ echo ""
 
 # Check if app exists
 echo -e "${YELLOW}[2/6] Verifying app exists...${NC}"
-if ! databricks apps get "$APP_NAME" &> /dev/null; then
+if ! databricks apps get "$APP_NAME" --profile dbx_shared_demo &> /dev/null; then
   echo -e "${RED}Error: App '${APP_NAME}' does not exist.${NC}"
   echo -e "Create it first with: ${GREEN}databricks apps create ${APP_NAME}${NC}"
   exit 1
@@ -261,13 +261,13 @@ echo ""
 # Upload to workspace
 echo -e "${YELLOW}[5/6] Uploading to Databricks workspace...${NC}"
 echo "  Target: ${WORKSPACE_PATH}"
-databricks workspace import-dir "$STAGING_DIR" "$WORKSPACE_PATH" --overwrite 2>&1 | tail -5
+databricks workspace import-dir "$STAGING_DIR" "$WORKSPACE_PATH" --overwrite --profile dbx_shared_demo 2>&1 | tail -5
 echo -e "  ${GREEN}✓${NC} Upload complete"
 echo ""
 
 # Deploy the app
 echo -e "${YELLOW}[6/6] Deploying app...${NC}"
-DEPLOY_OUTPUT=$(databricks apps deploy "$APP_NAME" --source-code-path "$WORKSPACE_PATH" 2>&1)
+DEPLOY_OUTPUT=$(databricks apps deploy "$APP_NAME" --source-code-path "$WORKSPACE_PATH" --profile dbx_shared_demo 2>&1)
 echo "$DEPLOY_OUTPUT"
 
 # Check deployment status
@@ -279,7 +279,7 @@ if echo "$DEPLOY_OUTPUT" | grep -q '"state":"SUCCEEDED"'; then
   echo ""
   
   # Get app URL
-  APP_INFO=$(databricks apps get "$APP_NAME" --output json 2>/dev/null)
+  APP_INFO=$(databricks apps get "$APP_NAME" --output json --profile dbx_shared_demo 2>/dev/null)
   APP_URL=$(echo "$APP_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('url', 'N/A'))" 2>/dev/null || echo "N/A")
   
   echo -e "  App URL: ${GREEN}${APP_URL}${NC}"

@@ -1,0 +1,44 @@
+# Databricks Asset Bundle configuration for MCP Server App
+# Deploy with: databricks bundle deploy -t <target>
+
+bundle:
+  name: ai-dev-kit-mcp
+
+variables:
+  app_name:
+    description: "Name of the Databricks App"
+    default: "ai-dev-kit-mcp"
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      # Update with your workspace profile
+      # profile: your-profile-name
+      host: ${DATABRICKS_HOST}
+
+  prod:
+    mode: production
+    workspace:
+      # Update with your production workspace
+      # profile: your-prod-profile
+      host: ${DATABRICKS_HOST}
+
+resources:
+  apps:
+    ai_dev_kit_mcp:
+      name: ${var.app_name}-${bundle.target}
+      description: |
+        AI Dev Kit MCP Server - Exposes Databricks operations as MCP tools.
+        Tools include: SQL execution, compute, jobs, pipelines, dashboards, 
+        Unity Catalog, model serving, and more.
+      source_code_path: .
+      
+      # Resources the app needs access to
+      # Uncomment and configure as needed:
+      # resources:
+      #   - name: sql-warehouse
+      #     sql_warehouse:
+      #       id: ${var.warehouse_id}
+      #       permission: CAN_USE

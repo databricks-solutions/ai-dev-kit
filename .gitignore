@@ -73,3 +73,5 @@ databricks-tools-core/tests/integration/pdf/generated_pdf/
 # Python cache
 __pycache__/
 windows_info.txt
+databricks-skills/setup_uc_tools.py
+databricks-skills/setup_all_uc_tools.py

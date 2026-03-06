@@ -1,9 +1,14 @@
 {
   "mcpServers": {
     "databricks": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/.venv/bin/python",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/databricks-mcp-server/run_server.py"],
-      "defer_loading": true
+      "command": "/Users/scott.johnson/.ai-dev-kit/.venv/bin/python",
+      "args": [
+        "/Users/scott.johnson/.ai-dev-kit/repo/databricks-mcp-server/run_server.py"
+      ],
+      "defer_loading": true,
+      "env": {
+        "DATABRICKS_CONFIG_PROFILE": "dbx_shared_demo"
+      }
     }
   }
 }
