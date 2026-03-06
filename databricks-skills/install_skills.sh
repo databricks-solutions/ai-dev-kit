@@ -6,7 +6,7 @@
 # These skills teach Claude how to work with Databricks using MCP tools.
 #
 # Usage:
-#   # Install all skills (Databricks + MLflow)
+#   # Install all skills (Databricks + MLflow + APX)
 #   curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 #
 #   # Install specific skills (can mix Databricks and MLflow skills)
@@ -42,13 +42,21 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
 
+# APX skills configuration (fetched from databricks-solutions/apx repo)
+APX_REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx"
+APX_REPO_REF="main"
+APX_REPO_SKILL_PATH="skills/apx"
+
+# APX skills
+APX_SKILLS="databricks-app-apx"
+
 # All available skills
-ALL_SKILLS="$DATABRICKS_SKILLS $MLFLOW_SKILLS"
+ALL_SKILLS="$DATABRICKS_SKILLS $MLFLOW_SKILLS $APX_SKILLS"
 
 # Get skill description
 get_skill_description() {
@@ -57,7 +65,6 @@ get_skill_description() {
         "databricks-agent-bricks") echo "Knowledge Assistants, Genie Spaces, Supervisor Agents" ;;
         "databricks-aibi-dashboards") echo "Databricks AI/BI Dashboards - create and manage dashboards" ;;
         "databricks-asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
-        "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
         "databricks-config") echo "Profile authentication setup for Databricks" ;;
         "databricks-dbsql") echo "Databricks SQL - SQL scripting, MVs, geospatial, AI functions, federation" ;;
@@ -89,6 +96,8 @@ get_skill_description() {
         "querying-mlflow-metrics") echo "Aggregated metrics and time-series analysis" ;;
         "retrieving-mlflow-traces") echo "Trace search and filtering" ;;
         "searching-mlflow-docs") echo "Search MLflow documentation" ;;
+        # APX skills (from databricks-solutions/apx repo)
+        "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
         *) echo "Unknown skill" ;;
     esac
 }
@@ -101,7 +110,6 @@ get_skill_extra_files() {
         "databricks-genie") echo "spaces.md conversation.md" ;;
         "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;
-        "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
@@ -124,6 +132,17 @@ is_mlflow_skill() {
     local skill=$1
     for mlflow_skill in $MLFLOW_SKILLS; do
         if [ "$skill" = "$mlflow_skill" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Check if a skill is from APX repo
+is_apx_skill() {
+    local skill=$1
+    for apx_skill in $APX_SKILLS; do
+        if [ "$skill" = "$apx_skill" ]; then
             return 0
         fi
     done
@@ -158,6 +177,7 @@ show_help() {
     echo "  --all, -a               Install all skills (default if no skills specified)"
     echo "  --local                 Install from local files instead of downloading"
     echo "  --mlflow-version <ref>  Pin MLflow skills to specific version/branch/tag (default: main)"
+    echo "  --apx-version <ref>    Pin APX skills to specific version/branch/tag (default: main)"
     echo ""
     echo "Examples:"
     echo "  ./install_skills.sh                          # Install all skills"
@@ -165,6 +185,7 @@ show_help() {
     echo "  ./install_skills.sh agent-evaluation         # Install specific MLflow skill"
     echo "  ./install_skills.sh databricks-asset-bundles agent-evaluation  # Mix of both sources"
     echo "  ./install_skills.sh --mlflow-version v1.0.0  # Pin MLflow skills version"
+    echo "  ./install_skills.sh --apx-version v1.0.0    # Pin APX skills version"
     echo "  ./install_skills.sh --local                  # Install all from local directory"
     echo "  ./install_skills.sh --list                   # List available skills"
     echo ""
@@ -175,6 +196,11 @@ show_help() {
     echo ""
     echo -e "${GREEN}MLflow Skills (from github.com/mlflow/skills):${NC}"
     for skill in $MLFLOW_SKILLS; do
+        echo "  - $skill: $(get_skill_description "$skill")"
+    done
+    echo ""
+    echo -e "${GREEN}APX Skills (from github.com/databricks-solutions/apx):${NC}"
+    for skill in $APX_SKILLS; do
         echo "  - $skill: $(get_skill_description "$skill")"
     done
     echo ""
@@ -192,6 +218,12 @@ list_skills() {
     echo ""
     echo -e "${GREEN}MLflow Skills (from github.com/mlflow/skills):${NC}"
     for skill in $MLFLOW_SKILLS; do
+        echo -e "  ${GREEN}$skill${NC}"
+        echo -e "    $(get_skill_description "$skill")"
+    done
+    echo ""
+    echo -e "${GREEN}APX Skills (from github.com/databricks-solutions/apx):${NC}"
+    for skill in $APX_SKILLS; do
         echo -e "  ${GREEN}$skill${NC}"
         echo -e "    $(get_skill_description "$skill")"
     done
@@ -317,6 +349,46 @@ download_mlflow_skill() {
     return 0
 }
 
+# Get extra files for an APX skill (besides SKILL.md)
+get_apx_skill_extra_files() {
+    case "$1" in
+        "databricks-app-apx") echo "backend-patterns.md frontend-patterns.md" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Function to download an APX skill
+download_apx_skill() {
+    local skill_name=$1
+    local skill_dir="$SKILLS_DIR/$skill_name"
+    local base_url="${APX_REPO_RAW_URL}/${APX_REPO_REF}/${APX_REPO_SKILL_PATH}"
+
+    echo -e "  Downloading from APX repo (${APX_REPO_REF})..."
+
+    # Download SKILL.md (required)
+    if curl -sSL -f "${base_url}/SKILL.md" -o "$skill_dir/SKILL.md" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${NC} Downloaded SKILL.md"
+    else
+        echo -e "  ${RED}✗${NC} Failed to download SKILL.md from APX repo"
+        rm -rf "$skill_dir"
+        return 1
+    fi
+
+    # Download skill-specific extra files
+    local extra_files=$(get_apx_skill_extra_files "$skill_name")
+    if [ -n "$extra_files" ]; then
+        for extra_file in $extra_files; do
+            if curl -sSL -f "${base_url}/${extra_file}" -o "$skill_dir/${extra_file}" 2>/dev/null; then
+                echo -e "  ${GREEN}✓${NC} Downloaded ${extra_file}"
+            else
+                echo -e "  ${YELLOW}○${NC} Optional file ${extra_file} not found"
+            fi
+        done
+    fi
+
+    return 0
+}
+
 # Function to download a skill (routes to appropriate download function)
 download_skill() {
     local skill_name=$1
@@ -340,6 +412,13 @@ download_skill() {
             return 1
         fi
         download_mlflow_skill "$skill_name"
+    elif is_apx_skill "$skill_name"; then
+        if [ "$INSTALL_FROM_LOCAL" = true ]; then
+            echo -e "  ${RED}✗${NC} APX skills cannot be installed from local (they are fetched from github.com/databricks-solutions/apx)"
+            rm -rf "$skill_dir"
+            return 1
+        fi
+        download_apx_skill "$skill_name"
     else
         download_databricks_skill "$skill_name"
     fi
@@ -378,6 +457,14 @@ while [ $# -gt 0 ]; do
                 exit 1
             fi
             MLFLOW_REPO_REF="$2"
+            shift 2
+            ;;
+        --apx-version)
+            if [ -z "$2" ] || [ "${2:0:1}" = "-" ]; then
+                echo -e "${RED}Error: --apx-version requires a version/ref argument${NC}"
+                exit 1
+            fi
+            APX_REPO_REF="$2"
             shift 2
             ;;
         -*)

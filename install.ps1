@@ -76,7 +76,7 @@ $script:ProfileProvided = $false
 
 # Databricks skills (bundled in repo)
 $script:Skills = @(
-    "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-app-apx", "databricks-app-python",
+    "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-app-python",
     "databricks-asset-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
     "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-parsing",
@@ -92,6 +92,10 @@ $script:MlflowSkills = @(
     "retrieving-mlflow-traces", "searching-mlflow-docs"
 )
 $MlflowRawUrl = "https://raw.githubusercontent.com/mlflow/skills/main"
+
+# APX skills (fetched from databricks-solutions/apx repo)
+$script:ApxSkills = @("databricks-app-apx")
+$ApxRawUrl = "https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # ─── Ensure tools are in PATH ────────────────────────────────
 # Chocolatey-installed tools may not be in PATH for SSH sessions
@@ -789,6 +793,30 @@ function Install-Skills {
         }
         $ErrorActionPreference = $prevEAP
         Write-Ok "MLflow skills -> $shortDir"
+
+        # Install APX skills from databricks-solutions/apx repo
+        $prevEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        foreach ($skill in $script:ApxSkills) {
+            $destDir = Join-Path $dir $skill
+            if (-not (Test-Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            $url = "$ApxRawUrl/SKILL.md"
+            try {
+                Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
+                # Try optional reference files
+                foreach ($ref in @("backend-patterns.md", "frontend-patterns.md")) {
+                    try {
+                        Invoke-WebRequest -Uri "$ApxRawUrl/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
+                    } catch {}
+                }
+            } catch {
+                Remove-Item $destDir -ErrorAction SilentlyContinue
+                Write-Warning "Could not install APX skill '$skill' - consider removing $destDir if it is no longer needed"
+            }
+        }
+        $ErrorActionPreference = $prevEAP2
+        Write-Ok "APX skills -> $shortDir"
     }
 }
 
