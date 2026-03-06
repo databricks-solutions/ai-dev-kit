@@ -33,6 +33,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ## Available Skills
 
 ### 🤖 AI & Agents
+- **databricks-ai-functions** - Built-in AI Functions (ai_classify, ai_extract, ai_summarize, ai_query, ai_forecast, and more) with SQL and PySpark patterns, function selection guidance, and end-to-end document processing pipeline
 - **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
 - **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
 - **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints

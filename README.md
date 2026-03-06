@@ -55,7 +55,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 
 
 ### Install in existing project
-By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.  
+By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
 _Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, or .gemini_
 
 #### Mac / Linux
@@ -164,7 +164,7 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 19 markdown skills teaching Databricks patterns |
+| [`databricks-skills/`](databricks-skills/) | 20 markdown skills teaching Databricks patterns |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 
 ---
