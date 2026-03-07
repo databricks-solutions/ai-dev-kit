@@ -44,7 +44,7 @@ from claude_agent_sdk.types import (
 from databricks_tools_core.auth import set_databricks_auth, clear_databricks_auth
 
 from .backup_manager import ensure_project_directory as _ensure_project_directory
-from .databricks_tools import load_databricks_tools
+from .databricks_tools import load_databricks_tools, create_filtered_databricks_server
 from .system_prompt import get_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,6 @@ BUILTIN_TOOLS = [
 #  'Bash',
   'Glob',
   'Grep',
-  'Skill',  # For loading skills
 ]
 
 # Cached Databricks tools (loaded once)
@@ -141,8 +140,13 @@ def _get_mlflow_stop_hook(experiment_name: str | None = None):
     mlflow.set_tracking_uri('databricks')
     if experiment_name:
       try:
-        mlflow.set_experiment(experiment_name)
-        logger.info(f'MLflow experiment set to: {experiment_name}')
+        # Support both experiment IDs (numeric) and experiment names (paths)
+        if experiment_name.isdigit():
+          mlflow.set_experiment(experiment_id=experiment_name)
+          logger.info(f'MLflow experiment set by ID: {experiment_name}')
+        else:
+          mlflow.set_experiment(experiment_name)
+          logger.info(f'MLflow experiment set to: {experiment_name}')
       except Exception as e:
         logger.warning(f'Could not set MLflow experiment: {e}')
 
@@ -304,9 +308,14 @@ async def stream_agent_response(
   default_schema: str | None = None,
   warehouse_id: str | None = None,
   workspace_folder: str | None = None,
+  fmapi_host: str | None = None,
+  fmapi_token: str | None = None,
   databricks_host: str | None = None,
   databricks_token: str | None = None,
+  is_cross_workspace: bool = False,
   is_cancelled_fn: callable = None,
+  enabled_skills: list[str] | None = None,
+  mlflow_experiment_name: str | None = None,
 ) -> AsyncIterator[dict]:
   """Stream Claude agent response with all event types.
 
@@ -322,9 +331,14 @@ async def stream_agent_response(
       default_schema: Optional default schema name
       warehouse_id: Optional Databricks SQL warehouse ID for queries
       workspace_folder: Optional workspace folder for file uploads
-      databricks_host: Databricks workspace URL for auth context
-      databricks_token: User's Databricks access token for auth context
+      fmapi_host: Builder App workspace URL for Claude API (FMAPI)
+      fmapi_token: Builder App token for Claude API authentication
+      databricks_host: Target workspace URL for Databricks tool operations
+      databricks_token: Target workspace token for Databricks tool auth
+      is_cross_workspace: When True, tool operations target a different workspace
+          than the Builder App. Enables force_token in auth context.
       is_cancelled_fn: Optional callable that returns True if request is cancelled
+      enabled_skills: Optional list of enabled skill names. None means all skills.
 
   Yields:
       Event dicts with 'type' field for frontend consumption
@@ -340,17 +354,39 @@ async def stream_agent_response(
   logger.info(f'Agent working directory (cwd): {project_dir}')
   logger.info(f'Workspace folder (remote): {workspace_folder}')
 
-  # Set auth context for this request (enables per-user Databricks auth)
-  set_databricks_auth(databricks_host, databricks_token)
+  # Set auth context for tool operations (targets the specified workspace)
+  # When cross-workspace, force_token ensures the target credentials are used
+  # even when OAuth M2M credentials exist in environment
+  set_databricks_auth(databricks_host, databricks_token, force_token=is_cross_workspace)
 
   try:
     # Build allowed tools list
     allowed_tools = BUILTIN_TOOLS.copy()
 
-    # Get in-process Databricks tools
+    # Sync project skills directory before running agent
+    from .skills_manager import sync_project_skills, get_available_skills, get_allowed_mcp_tools
+    sync_project_skills(project_dir, enabled_skills=enabled_skills)
+
+    # Get Databricks tools and filter based on enabled skills.
+    # We must create a filtered MCP server (not just filter allowed_tools)
+    # because bypassPermissions mode exposes all tools in registered MCP servers.
     databricks_server, databricks_tool_names = get_databricks_tools()
-    allowed_tools.extend(databricks_tool_names)
-    logger.info(f'Databricks MCP server configured with {len(databricks_tool_names)} tools')
+    filtered_tool_names = get_allowed_mcp_tools(databricks_tool_names, enabled_skills=enabled_skills)
+
+    if len(filtered_tool_names) < len(databricks_tool_names):
+      # Some tools are blocked — create a filtered MCP server with only allowed tools
+      databricks_server, filtered_tool_names = create_filtered_databricks_server(filtered_tool_names)
+      blocked_count = len(databricks_tool_names) - len(filtered_tool_names)
+      logger.info(f'Databricks MCP server: {len(filtered_tool_names)} tools allowed, {blocked_count} blocked by disabled skills')
+    else:
+      logger.info(f'Databricks MCP server configured with {len(filtered_tool_names)} tools')
+
+    allowed_tools.extend(filtered_tool_names)
+
+    # Only add the Skill tool if there are enabled skills for the agent to use
+    available = get_available_skills(enabled_skills=enabled_skills)
+    if available:
+      allowed_tools.append('Skill')
 
     # Generate system prompt with available skills, cluster, warehouse, and catalog/schema context
     system_prompt = get_system_prompt(
@@ -360,38 +396,50 @@ async def stream_agent_response(
       warehouse_id=warehouse_id,
       workspace_folder=workspace_folder,
       workspace_url=databricks_host,
+      enabled_skills=enabled_skills,
     )
 
     # Load Claude settings for Databricks model serving authentication
     claude_env = _load_claude_settings()
 
     # Log auth state for debugging
-    logger.info(f'Auth state: databricks_host={databricks_host}, token_present={databricks_token is not None and len(str(databricks_token)) > 0}')
+    logger.info(
+      f'Auth state: fmapi_host={fmapi_host}, databricks_host={databricks_host}, '
+      f'is_cross_workspace={is_cross_workspace}'
+    )
 
-    # Ensure Databricks model serving endpoint is used
-    # Pass OAuth/PAT token for authentication with Databricks FMAPI
-    if databricks_host and databricks_token:
-      # Build the Anthropic base URL from Databricks host
-      # Format: https://<workspace>/serving-endpoints/anthropic
-      host = databricks_host.replace('https://', '').replace('http://', '').rstrip('/')
+    # Configure Claude subprocess to use Databricks FMAPI on the Builder App's
+    # workspace. FMAPI auth always points at the Builder App, even when tool
+    # operations target a different workspace (cross-workspace mode).
+    # Fall back to databricks_host/token for callers that don't split FMAPI creds.
+    effective_fmapi_host = fmapi_host or databricks_host
+    effective_fmapi_token = fmapi_token or databricks_token
+    if effective_fmapi_host and effective_fmapi_token:
+      host = effective_fmapi_host.replace('https://', '').replace('http://', '').rstrip('/')
       anthropic_base_url = f'https://{host}/serving-endpoints/anthropic'
 
-      # Set environment variables for Claude Code subprocess
-      # These ensure Claude Code uses Databricks model serving
-      # Note: Claude SDK uses ANTHROPIC_API_KEY for authentication
       claude_env['ANTHROPIC_BASE_URL'] = anthropic_base_url
-      claude_env['ANTHROPIC_API_KEY'] = databricks_token
-      claude_env['ANTHROPIC_AUTH_TOKEN'] = databricks_token
+      claude_env['ANTHROPIC_API_KEY'] = effective_fmapi_token
+      claude_env['ANTHROPIC_AUTH_TOKEN'] = effective_fmapi_token
 
       # Set the model to use (required for Databricks FMAPI)
-      anthropic_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-5')
+      anthropic_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-6')
       claude_env['ANTHROPIC_MODEL'] = anthropic_model
 
-      # Disable beta headers for Databricks FMAPI compatibility
-      claude_env['ANTHROPIC_CUSTOM_HEADERS'] = 'x-databricks-disable-beta-headers: true'
+      # Disable beta headers and experimental betas for Databricks FMAPI compatibility
+      # ANTHROPIC_CUSTOM_HEADERS enables coding agent mode on FMAPI
+      # CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS prevents context_management and other
+      # experimental body parameters that FMAPI doesn't support (400: Extra inputs not permitted)
+      claude_env['ANTHROPIC_CUSTOM_HEADERS'] = 'x-databricks-use-coding-agent-mode: true'
+      claude_env['CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS'] = '1'
 
       logger.info(f'Configured Databricks model serving: {anthropic_base_url} with model {anthropic_model}')
       logger.info(f'Claude env vars: BASE_URL={claude_env.get("ANTHROPIC_BASE_URL")}, MODEL={claude_env.get("ANTHROPIC_MODEL")}')
+
+    # Databricks SDK upstream tracking for subprocess user-agent attribution
+    from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
+    claude_env['DATABRICKS_SDK_UPSTREAM'] = PRODUCT_NAME
+    claude_env['DATABRICKS_SDK_UPSTREAM_VERSION'] = PRODUCT_VERSION
 
     # Ensure stream timeout is set (1 hour to handle long tool sequences)
     stream_timeout = os.environ.get('CLAUDE_CODE_STREAM_CLOSE_TIMEOUT', '3600000')
@@ -423,8 +471,8 @@ async def stream_agent_response(
     # Default to always-false if no cancellation function provided
     cancel_check = is_cancelled_fn if is_cancelled_fn else lambda: False
 
-    # Get MLflow experiment name from environment
-    mlflow_experiment = os.environ.get('MLFLOW_EXPERIMENT_NAME')
+    # Get MLflow experiment name from request param, falling back to environment
+    mlflow_experiment = mlflow_experiment_name or os.environ.get('MLFLOW_EXPERIMENT_NAME')
 
     agent_thread = threading.Thread(
       target=_run_agent_in_fresh_loop,

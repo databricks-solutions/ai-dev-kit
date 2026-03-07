@@ -1,0 +1,58 @@
+---
+skill_name: databricks-agent-bricks
+description: >
+  Create and manage Databricks Agent Bricks: Knowledge Assistants (KA)
+  for document Q&A, Genie Spaces for SQL exploration, and Supervisor
+  Agents (MAS) for multi-agent orchestration.
+triggers:
+  - knowledge assistant
+  - multi-agent supervisor
+  - MAS
+  - agent bricks
+  - supervisor agent
+  - document Q&A with RAG
+
+scorers:
+  # Deterministic scorers
+  enabled:
+    - python_syntax
+    - pattern_adherence
+    - no_hallucinated_apis
+    - expected_facts_present
+
+  # LLM-based scorers with guidelines
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations
+
+  # Default evaluation guidelines
+  default_guidelines:
+    - "Response must address the user's request completely"
+    - "Must use the correct MCP tool for the task (manage_ka or manage_mas with appropriate action)"
+    - "KA creation must use manage_ka with action=\"create_or_update\" and include volume_path pointing to a Unity Catalog Volume"
+    - "MAS agents must each have exactly one of: ka_tile_id, genie_space_id, endpoint_name, uc_function_name, or connection_name"
+    - "Agent descriptions in MAS must be specific enough for routing decisions"
+    - "Must use manage_ka with action=\"find_by_name\" or manage_mas with action=\"find_by_name\" for lookup by name, not arbitrary queries"
+    - "Must not reference deprecated system tables like system.ai.genie_spaces"
+    - "Volume paths must follow /Volumes/catalog/schema/volume/folder format"
+
+  # Trace expectations for session evaluation
+  trace_expectations:
+    tool_limits:
+      Bash: 10
+      Read: 20
+      mcp__databricks__manage_ka: 10
+      mcp__databricks__manage_mas: 10
+      mcp__databricks__create_or_update_genie: 5
+    token_budget:
+      max_total: 120000
+    required_tools:
+      - Read  # Should read skill documentation
+    banned_tools: []
+    expected_files: []
+
+quality_gates:
+  syntax_valid: 1.0        # 100% - all code must be syntactically valid
+  pattern_adherence: 0.90  # 90% - follow documented patterns
+  no_hallucinated_apis: 1.0  # 100% - no made-up APIs
+  execution_success: 0.80  # 80% - code should execute successfully

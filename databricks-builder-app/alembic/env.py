@@ -5,8 +5,6 @@ Runtime database access uses async psycopg3 driver.
 """
 
 import os
-import socket
-import subprocess
 from logging.config import fileConfig
 
 from alembic import context
@@ -18,6 +16,7 @@ load_dotenv('.env.local')
 
 # Import models for autogenerate support
 from server.db.models import Base
+from server.db.database import _resolve_hostname
 
 # this is the Alembic Config object
 config = context.config
@@ -31,32 +30,6 @@ target_metadata = Base.metadata
 
 # Store resolved hostaddr for connect_args
 _resolved_hostaddr = None
-
-
-def _resolve_hostname(hostname):
-  """Resolve hostname to IP using dig fallback for macOS DNS issues."""
-  try:
-    result = socket.getaddrinfo(hostname, 5432)
-    if result:
-      return result[0][4][0]
-  except socket.gaierror:
-    pass
-
-  try:
-    result = subprocess.run(
-      ['dig', '+short', hostname, 'A'],
-      capture_output=True,
-      text=True,
-      timeout=10,
-    )
-    ips = [line for line in result.stdout.strip().split('\n') if line and line[0].isdigit()]
-    if ips:
-      print(f'[Alembic] Resolved {hostname} -> {ips[0]} via dig')
-      return ips[0]
-  except Exception:
-    pass
-
-  return None
 
 
 def get_url_and_connect_args():
@@ -88,8 +61,9 @@ def get_url_and_connect_args():
     # Generate token using Databricks SDK
     import uuid
     from databricks.sdk import WorkspaceClient
+    from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
 
-    w = WorkspaceClient()
+    w = WorkspaceClient(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
     instance = w.database.get_database_instance(name=instance_name)
     cred = w.database.generate_database_credential(
       request_id=str(uuid.uuid4()),
@@ -149,6 +123,17 @@ def run_migrations_online():
   """Run migrations in 'online' mode using sync engine."""
   url, connect_args = get_url_and_connect_args()
 
+  # Get schema name from Alembic config or environment
+  schema_name = config.get_main_option('lakebase_schema_name') or os.environ.get('LAKEBASE_SCHEMA_NAME', 'builder_app')
+
+  # Validate schema name to prevent SQL injection (only allow alphanumeric + underscores)
+  import re
+  if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema_name):
+    raise ValueError(f'Invalid schema name: {schema_name!r} — must be alphanumeric/underscores only')
+
+  # Add search_path to connect_args so tables are created in the custom schema
+  connect_args.setdefault('options', f'-c search_path={schema_name},public')
+
   connectable = create_engine(
     url,
     poolclass=pool.NullPool,
@@ -156,6 +141,11 @@ def run_migrations_online():
   )
 
   with connectable.connect() as connection:
+    # Create the schema if it doesn't exist (SP has CREATE on the database)
+    from sqlalchemy import text
+    connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS {schema_name}'))
+    connection.commit()
+
     context.configure(
       connection=connection,
       target_metadata=target_metadata,

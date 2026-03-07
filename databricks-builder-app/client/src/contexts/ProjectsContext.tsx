@@ -9,6 +9,7 @@ import {
 import {
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
+  renameProject as apiRenameProject,
   fetchProjects,
 } from "@/lib/api";
 import type { Project } from "@/lib/types";
@@ -20,6 +21,7 @@ interface ProjectsContextType {
   refresh: () => Promise<void>;
   createProject: (name: string) => Promise<Project>;
   deleteProject: (projectId: string) => Promise<void>;
+  renameProject: (projectId: string, name: string) => Promise<void>;
 }
 
 const ProjectsContext = createContext<ProjectsContextType | null>(null);
@@ -53,6 +55,13 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
   }, []);
 
+  const renameProject = useCallback(async (projectId: string, name: string): Promise<void> => {
+    await apiRenameProject(projectId, name);
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, name } : p))
+    );
+  }, []);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -64,6 +73,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     refresh,
     createProject,
     deleteProject,
+    renameProject,
   };
 
   return (

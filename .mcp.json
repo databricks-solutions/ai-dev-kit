@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "databricks": {
-      "command": "y/.venv/bin/python",
-      "args": ["y/repo/databricks-mcp-server/run_server.py"],
-      "env": {"DATABRICKS_CONFIG_PROFILE": "DEFAULT"}
+      "command": "${CLAUDE_PLUGIN_ROOT}/.venv/bin/python",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/databricks-mcp-server/run_server.py"],
+      "defer_loading": true
     }
   }
 }

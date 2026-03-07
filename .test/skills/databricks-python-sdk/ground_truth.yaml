@@ -1,0 +1,378 @@
+metadata:
+  skill_name: databricks-python-sdk
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: pysdk_authentication_001
+  inputs:
+    prompt: "What are the different ways to authenticate with the Databricks Python SDK?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+
+      # Auto-detect credentials from environment
+      w = WorkspaceClient()
+
+      # Explicit token authentication
+      w = WorkspaceClient(
+          host="https://your-workspace.cloud.databricks.com",
+          token="dapi..."
+      )
+
+      # Azure Service Principal
+      w = WorkspaceClient(
+          host="https://adb-xxx.azuredatabricks.net",
+          azure_workspace_resource_id="/subscriptions/.../resourceGroups/.../providers/Microsoft.Databricks/workspaces/...",
+          azure_tenant_id="tenant-id",
+          azure_client_id="client-id",
+          azure_client_secret="secret"
+      )
+
+      # Use a named profile from ~/.databrickscfg
+      w = WorkspaceClient(profile="MY_PROFILE")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "WorkspaceClient auto-detects credentials from environment by default"
+    - "Explicit token auth requires host and token parameters"
+    - "Azure Service Principal auth uses azure_tenant_id, azure_client_id, and azure_client_secret"
+    - "Named profiles are loaded from ~/.databrickscfg"
+    expected_patterns:
+    - pattern: "WorkspaceClient\\(\\)"
+      min_count: 1
+      description: "Shows auto-detect authentication"
+    - pattern: "token="
+      min_count: 1
+      description: "Shows explicit token authentication"
+    - pattern: "azure_client_id"
+      min_count: 1
+      description: "Shows Azure Service Principal authentication"
+    - pattern: "profile="
+      min_count: 1
+      description: "Shows named profile authentication"
+    guidelines:
+    - "Must show at least three different authentication methods"
+    - "Must include auto-detect, explicit token, and profile-based auth"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: pysdk_clusters_api_002
+  inputs:
+    prompt: "How do I list, create, and manage clusters using the Databricks Python SDK?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+      from datetime import timedelta
+
+      w = WorkspaceClient()
+
+      # List all clusters
+      for cluster in w.clusters.list():
+          print(f"{cluster.cluster_name}: {cluster.state}")
+
+      # Get cluster details
+      cluster = w.clusters.get(cluster_id="0123-456789-abcdef")
+
+      # Create a cluster (returns Wait object)
+      wait = w.clusters.create(
+          cluster_name="my-cluster",
+          spark_version=w.clusters.select_spark_version(latest=True),
+          node_type_id=w.clusters.select_node_type(local_disk=True),
+          num_workers=2
+      )
+      cluster = wait.result()  # Wait for cluster to be running
+
+      # Start/stop/delete
+      w.clusters.start(cluster_id="...").result()
+      w.clusters.stop(cluster_id="...")
+      w.clusters.delete(cluster_id="...")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "w.clusters.list() returns an iterator of cluster objects"
+    - "w.clusters.create() returns a Wait object for async cluster creation"
+    - "select_spark_version() and select_node_type() are helper methods for discovery"
+    - "start() returns a Wait object while stop() and delete() do not"
+    expected_patterns:
+    - pattern: "w\\.clusters\\.list"
+      min_count: 1
+      description: "Lists clusters"
+    - pattern: "w\\.clusters\\.create"
+      min_count: 1
+      description: "Creates a cluster"
+    - pattern: "select_spark_version"
+      min_count: 1
+      description: "Uses spark version selector"
+    - pattern: "select_node_type"
+      min_count: 1
+      description: "Uses node type selector"
+    guidelines:
+    - "Must show list, create, start, stop, and delete operations"
+    - "Must use select_spark_version and select_node_type helpers"
+    - "Must demonstrate the Wait object pattern for async operations"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: pysdk_jobs_api_003
+  inputs:
+    prompt: "Show me how to create and run a Databricks job using the Python SDK."
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+      from databricks.sdk.service.jobs import Task, NotebookTask
+
+      w = WorkspaceClient()
+
+      # List jobs
+      for job in w.jobs.list():
+          print(f"{job.job_id}: {job.settings.name}")
+
+      # Create a job
+      created = w.jobs.create(
+          name="my-job",
+          tasks=[
+              Task(
+                  task_key="main",
+                  notebook_task=NotebookTask(notebook_path="/Users/me/notebook"),
+                  existing_cluster_id="0123-456789-abcdef"
+              )
+          ]
+      )
+
+      # Run a job and wait for completion
+      run = w.jobs.run_now_and_wait(job_id=created.job_id)
+      print(f"Run completed: {run.state.result_state}")
+
+      # Get run output
+      output = w.jobs.get_run_output(run_id=run.run_id)
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Jobs are created with w.jobs.create() returning a job with job_id"
+    - "run_now_and_wait() triggers a job and blocks until completion"
+    - "get_run_output() retrieves the output of a completed run"
+    - "Task requires task_key and a task type like NotebookTask"
+    expected_patterns:
+    - pattern: "w\\.jobs\\.create"
+      min_count: 1
+      description: "Creates a job"
+    - pattern: "run_now_and_wait"
+      min_count: 1
+      description: "Runs job and waits for completion"
+    - pattern: "get_run_output"
+      min_count: 1
+      description: "Gets run output"
+    - pattern: "NotebookTask"
+      min_count: 1
+      description: "Uses NotebookTask for task configuration"
+    guidelines:
+    - "Must show the full job lifecycle: create, run, get output"
+    - "Must use run_now_and_wait for blocking execution"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: pysdk_sql_execution_004
+  inputs:
+    prompt: "How do I execute SQL queries against a Databricks SQL warehouse using the Python SDK?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+      from databricks.sdk.service.sql import StatementState
+
+      w = WorkspaceClient()
+
+      # Execute SQL query
+      response = w.statement_execution.execute_statement(
+          warehouse_id="abc123",
+          statement="SELECT * FROM catalog.schema.table LIMIT 10",
+          wait_timeout="30s"
+      )
+
+      # Check status and get results
+      if response.status.state == StatementState.SUCCEEDED:
+          for row in response.result.data_array:
+              print(row)
+
+      # For large results, fetch chunks
+      chunk = w.statement_execution.get_statement_result_chunk_n(
+          statement_id=response.statement_id,
+          chunk_index=0
+      )
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "SQL is executed with w.statement_execution.execute_statement()"
+    - "warehouse_id specifies which SQL warehouse to use"
+    - "StatementState.SUCCEEDED indicates a successful query"
+    - "Large results are fetched in chunks with get_statement_result_chunk_n()"
+    expected_patterns:
+    - pattern: "execute_statement"
+      min_count: 1
+      description: "Executes SQL statement"
+    - pattern: "warehouse_id"
+      min_count: 1
+      description: "Specifies SQL warehouse"
+    - pattern: "StatementState"
+      min_count: 1
+      description: "Checks statement execution status"
+    - pattern: "get_statement_result_chunk_n"
+      min_count: 1
+      description: "Fetches result chunks for large queries"
+    guidelines:
+    - "Must show execute, status check, and result retrieval"
+    - "Must demonstrate chunked result fetching for large datasets"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: pysdk_databricks_connect_005
+  inputs:
+    prompt: "How do I use Databricks Connect to run Spark code locally?"
+  outputs:
+    response: |
+      ```python
+      from databricks.connect import DatabricksSession
+
+      # Auto-detects 'DEFAULT' profile from ~/.databrickscfg
+      spark = DatabricksSession.builder.getOrCreate()
+
+      # With explicit profile
+      spark = DatabricksSession.builder.profile("MY_PROFILE").getOrCreate()
+
+      # Use spark as normal
+      df = spark.sql("SELECT * FROM catalog.schema.table")
+      df.show()
+      ```
+
+      Databricks Connect requires `databricks-connect` package and a running cluster to execute against.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "DatabricksSession replaces SparkSession for remote Spark execution"
+    - "Databricks Connect auto-detects credentials from ~/.databrickscfg"
+    - "The databricks-connect package must be installed separately"
+    expected_patterns:
+    - pattern: "DatabricksSession"
+      min_count: 1
+      description: "Uses DatabricksSession for Spark"
+    - pattern: "getOrCreate"
+      min_count: 1
+      description: "Builds session with getOrCreate()"
+    - pattern: "profile"
+      min_count: 1
+      description: "Shows profile-based configuration"
+    guidelines:
+    - "Must show DatabricksSession, not SparkSession"
+    - "Must demonstrate both auto-detect and explicit profile usage"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: pysdk_rest_api_006
+  inputs:
+    prompt: "How can I make direct REST API calls using the Databricks Python SDK?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+
+      w = WorkspaceClient()
+
+      # Direct API call using authenticated client
+      response = w.api_client.do(
+          method="GET",
+          path="/api/2.0/clusters/list"
+      )
+
+      # POST with body
+      response = w.api_client.do(
+          method="POST",
+          path="/api/2.0/jobs/run-now",
+          body={"job_id": 123}
+      )
+      ```
+
+      Use direct REST API calls for operations not yet available in the SDK or for advanced use cases.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "w.api_client.do() makes authenticated REST API calls"
+    - "The method parameter accepts GET, POST, PUT, DELETE"
+    - "The body parameter accepts a dictionary for POST/PUT requests"
+    expected_patterns:
+    - pattern: "api_client\\.do"
+      min_count: 2
+      description: "Uses api_client.do() for direct REST calls"
+    - pattern: "method="
+      min_count: 2
+      description: "Specifies HTTP method"
+    - pattern: "path="
+      min_count: 2
+      description: "Specifies API endpoint path"
+    guidelines:
+    - "Must show both GET and POST examples"
+    - "Must explain when to use direct REST over SDK methods"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: pysdk_cli_commands_007
+  inputs:
+    prompt: "What are the most common Databricks CLI commands?"
+  outputs:
+    response: |
+      ```bash
+      # Check version (should be >= 0.278.0)
+      databricks --version
+
+      # Use specific profile
+      databricks --profile MY_PROFILE clusters list
+
+      # Common commands
+      databricks clusters list
+      databricks jobs list
+      databricks workspace ls /Users/me
+      ```
+
+      The CLI uses the same authentication as the Python SDK (`~/.databrickscfg` profiles, environment variables, or explicit flags).
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "The Databricks CLI shares authentication with the Python SDK"
+    - "Profiles are specified with the --profile flag"
+    - "Common subcommands include clusters, jobs, and workspace"
+    expected_patterns:
+    - pattern: "databricks --version"
+      min_count: 1
+      description: "Shows version check command"
+    - pattern: "databricks clusters list"
+      min_count: 1
+      description: "Shows cluster listing command"
+    - pattern: "databricks jobs list"
+      min_count: 1
+      description: "Shows job listing command"
+    guidelines:
+    - "Must show at least three common CLI commands"
+    - "Must mention the --profile flag for profile selection"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated

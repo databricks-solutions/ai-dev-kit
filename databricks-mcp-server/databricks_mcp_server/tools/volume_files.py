@@ -1,6 +1,6 @@
 """Volume file tools - Manage files in Unity Catalog Volumes."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from databricks_tools_core.unity_catalog import (
     list_volume_files as _list_volume_files,

@@ -1,0 +1,3 @@
+# Candidates will be populated during evaluation runs.
+# This file stores LLM-generated responses for comparison against ground truth.
+candidates: []

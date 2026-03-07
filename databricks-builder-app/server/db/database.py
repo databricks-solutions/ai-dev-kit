@@ -103,16 +103,19 @@ def _get_workspace_client():
     try:
         import os
         from databricks.sdk import WorkspaceClient
+        from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
 
+        product_kwargs = dict(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
         if _has_oauth_credentials():
             # Explicitly configure OAuth M2M to prevent auth conflicts
             return WorkspaceClient(
                 host=os.environ.get('DATABRICKS_HOST', ''),
                 client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
                 client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+                **product_kwargs,
             )
         # Development mode - use default SDK auth
-        return WorkspaceClient()
+        return WorkspaceClient(**product_kwargs)
     except Exception as e:
         logger.debug(f"Could not create WorkspaceClient: {e}")
         return None
@@ -372,6 +375,7 @@ def init_database(database_url: Optional[str] = None) -> AsyncEngine:
         # Connect args for psycopg3 with DNS workaround
         connect_args = {
             "sslmode": "require",
+            "options": f"-c search_path={os.environ.get('LAKEBASE_SCHEMA_NAME', 'builder_app')},public",
         }
         # Add hostaddr if DNS resolution was needed (bypasses Python's getaddrinfo)
         if _resolved_hostaddr:
@@ -558,6 +562,10 @@ def run_migrations() -> None:
         alembic_dir = alembic_ini_path.parent / "alembic"
         if alembic_dir.exists():
             alembic_cfg.set_main_option("script_location", str(alembic_dir))
+
+        # Pass the schema name to Alembic env.py via config
+        schema_name = os.environ.get("LAKEBASE_SCHEMA_NAME", "builder_app")
+        alembic_cfg.set_main_option("lakebase_schema_name", schema_name)
 
         command.upgrade(alembic_cfg, "head")
         logger.info("Database migrations completed")

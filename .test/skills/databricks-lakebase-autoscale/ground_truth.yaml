@@ -1,0 +1,317 @@
+metadata:
+  skill_name: databricks-lakebase-autoscale
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: lakebase_auto_create_project_001
+  inputs:
+    prompt: "How do I create a new Lakebase Autoscale project using the Python SDK?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+      from databricks.sdk.service.postgres import Project, ProjectSpec
+
+      w = WorkspaceClient()
+
+      # Create a project (long-running operation)
+      operation = w.postgres.create_project(
+          project=Project(
+              spec=ProjectSpec(
+                  display_name="My Application",
+                  pg_version="17"
+              )
+          ),
+          project_id="my-app"
+      )
+      result = operation.wait()
+      print(f"Created project: {result.name}")
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Projects are created with w.postgres.create_project()"
+    - "create_project returns a long-running operation that requires .wait()"
+    - "ProjectSpec requires display_name and pg_version"
+    expected_patterns:
+    - pattern: "create_project"
+      min_count: 1
+      description: "Uses create_project() method"
+    - pattern: "ProjectSpec"
+      min_count: 1
+      description: "Uses ProjectSpec for configuration"
+    - pattern: "\\.wait\\(\\)"
+      min_count: 1
+      description: "Waits for the long-running operation to complete"
+    - pattern: "WorkspaceClient"
+      min_count: 1
+      description: "Uses WorkspaceClient for SDK access"
+    guidelines:
+    - "Must show the long-running operation pattern with .wait()"
+    - "Must include ProjectSpec with display_name and pg_version"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: lakebase_auto_create_branch_002
+  inputs:
+    prompt: "How do I create a development branch in Lakebase Autoscale with an expiration?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk.service.postgres import Branch, BranchSpec, Duration
+
+      # Create a dev branch with 7-day expiration
+      branch = w.postgres.create_branch(
+          parent="projects/my-app",
+          branch=Branch(
+              spec=BranchSpec(
+                  source_branch="projects/my-app/branches/production",
+                  ttl=Duration(seconds=604800)  # 7 days
+              )
+          ),
+          branch_id="development"
+      ).wait()
+      print(f"Branch created: {branch.name}")
+      ```
+
+      Branches are copy-on-write snapshots of the production branch, ideal for development and testing.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Branches are created with w.postgres.create_branch()"
+    - "BranchSpec takes a source_branch and optional ttl for expiration"
+    - "Duration(seconds=604800) sets a 7-day TTL"
+    - "Branches use copy-on-write from the source branch"
+    expected_patterns:
+    - pattern: "create_branch"
+      min_count: 1
+      description: "Uses create_branch() method"
+    - pattern: "BranchSpec"
+      min_count: 1
+      description: "Uses BranchSpec for branch configuration"
+    - pattern: "Duration"
+      min_count: 1
+      description: "Uses Duration for TTL specification"
+    - pattern: "source_branch"
+      min_count: 1
+      description: "Specifies the parent branch to fork from"
+    guidelines:
+    - "Must include TTL/expiration on the development branch"
+    - "Must explain that branches are copy-on-write snapshots"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: lakebase_auto_connect_notebook_003
+  inputs:
+    prompt: "Show me how to connect to a Lakebase Autoscale database from a Databricks notebook."
+  outputs:
+    response: |
+      ```python
+      import psycopg
+      from databricks.sdk import WorkspaceClient
+
+      w = WorkspaceClient()
+
+      # Get endpoint details
+      endpoint = w.postgres.get_endpoint(
+          name="projects/my-app/branches/production/endpoints/ep-primary"
+      )
+      host = endpoint.status.hosts.host
+
+      # Generate OAuth token (scoped to endpoint)
+      cred = w.postgres.generate_database_credential(
+          endpoint="projects/my-app/branches/production/endpoints/ep-primary"
+      )
+
+      # Connect using psycopg3
+      conn_string = (
+          f"host={host} "
+          f"dbname=databricks_postgres "
+          f"user={w.current_user.me().user_name} "
+          f"password={cred.token} "
+          f"sslmode=require"
+      )
+      with psycopg.connect(conn_string) as conn:
+          with conn.cursor() as cur:
+              cur.execute("SELECT version()")
+              print(cur.fetchone())
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Connections use psycopg3 (psycopg, not psycopg2)"
+    - "OAuth tokens are generated with generate_database_credential()"
+    - "The token is used as the password in the connection string"
+    - "SSL mode must be set to require"
+    expected_patterns:
+    - pattern: "psycopg\\.connect"
+      min_count: 1
+      description: "Connects using psycopg3"
+    - pattern: "generate_database_credential"
+      min_count: 1
+      description: "Generates OAuth token for authentication"
+    - pattern: "sslmode=require"
+      min_count: 1
+      description: "Requires SSL for the connection"
+    - pattern: "get_endpoint"
+      min_count: 1
+      description: "Retrieves endpoint details"
+    guidelines:
+    - "Must use psycopg (not psycopg2) for the connection"
+    - "Must generate OAuth token and use it as password"
+    - "Connection must include sslmode=require"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: lakebase_auto_oauth_token_004
+  inputs:
+    prompt: "How do I generate an OAuth token for Lakebase Autoscale database access?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+
+      w = WorkspaceClient()
+
+      # Generate database credential (optionally scoped to an endpoint)
+      cred = w.postgres.generate_database_credential(
+          endpoint="projects/my-app/branches/production/endpoints/ep-primary"
+      )
+      token = cred.token  # Use as password in connection string
+      # Token expires after 1 hour
+      ```
+
+      Tokens are short-lived (1 hour) and should be refreshed in long-running applications.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "OAuth tokens are generated via w.postgres.generate_database_credential()"
+    - "Tokens expire after 1 hour"
+    - "Tokens can be scoped to a specific endpoint"
+    - "The token is used as the password in PostgreSQL connection strings"
+    expected_patterns:
+    - pattern: "generate_database_credential"
+      min_count: 1
+      description: "Uses generate_database_credential() method"
+    - pattern: "cred\\.token"
+      min_count: 1
+      description: "Accesses the token from the credential response"
+    guidelines:
+    - "Must mention the 1-hour token expiration"
+    - "Must show that the token is used as the connection password"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: lakebase_auto_resize_compute_005
+  inputs:
+    prompt: "How do I resize the compute capacity for a Lakebase Autoscale endpoint?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk.service.postgres import Endpoint, EndpointSpec, FieldMask
+
+      # Update compute to autoscale between 2-8 CU
+      w.postgres.update_endpoint(
+          name="projects/my-app/branches/production/endpoints/ep-primary",
+          endpoint=Endpoint(
+              name="projects/my-app/branches/production/endpoints/ep-primary",
+              spec=EndpointSpec(
+                  autoscaling_limit_min_cu=2.0,
+                  autoscaling_limit_max_cu=8.0
+              )
+          ),
+          update_mask=FieldMask(field_mask=[
+              "spec.autoscaling_limit_min_cu",
+              "spec.autoscaling_limit_max_cu"
+          ])
+      ).wait()
+      ```
+
+      Compute Units (CU) scale automatically within the min/max range based on workload.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Compute is resized with w.postgres.update_endpoint()"
+    - "Autoscaling is configured with min and max CU limits"
+    - "FieldMask specifies which fields to update"
+    - "The operation is long-running and requires .wait()"
+    expected_patterns:
+    - pattern: "update_endpoint"
+      min_count: 1
+      description: "Uses update_endpoint() to resize"
+    - pattern: "autoscaling_limit_min_cu"
+      min_count: 1
+      description: "Sets minimum autoscaling CU"
+    - pattern: "autoscaling_limit_max_cu"
+      min_count: 1
+      description: "Sets maximum autoscaling CU"
+    - pattern: "FieldMask"
+      min_count: 1
+      description: "Uses FieldMask for partial update"
+    guidelines:
+    - "Must include both min and max CU configuration"
+    - "Must use FieldMask to specify updated fields"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: lakebase_auto_cli_reference_006
+  inputs:
+    prompt: "What CLI commands are available for managing Lakebase Autoscale projects?"
+  outputs:
+    response: |
+      ```bash
+      # Create a project
+      databricks postgres create-project \
+          --project-id my-app \
+          --json '{"spec": {"display_name": "My App", "pg_version": "17"}}'
+
+      # List projects
+      databricks postgres list-projects
+
+      # Get project details
+      databricks postgres get-project projects/my-app
+
+      # Create a branch
+      databricks postgres create-branch projects/my-app development \
+          --json '{"spec": {"source_branch": "projects/my-app/branches/production", "no_expiry": true}}'
+
+      # List branches
+      databricks postgres list-branches projects/my-app
+
+      # Delete a project
+      databricks postgres delete-project projects/my-app
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Lakebase Autoscale CLI commands are under databricks postgres"
+    - "Project creation uses --json for the spec configuration"
+    - "Resource names follow the pattern projects/{id}/branches/{id}/endpoints/{id}"
+    expected_patterns:
+    - pattern: "databricks postgres create-project"
+      min_count: 1
+      description: "Shows project creation command"
+    - pattern: "databricks postgres list-projects"
+      min_count: 1
+      description: "Shows project listing command"
+    - pattern: "databricks postgres create-branch"
+      min_count: 1
+      description: "Shows branch creation command"
+    guidelines:
+    - "Must show at least 4 different CLI subcommands"
+    - "Must include both project and branch management commands"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated

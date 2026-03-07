@@ -54,6 +54,7 @@ class SQLParallelExecutor:
         catalog: Optional[str] = None,
         schema: Optional[str] = None,
         timeout: int = 180,
+        query_tags: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute multiple SQL statements with dependency-aware parallelism.
@@ -63,6 +64,7 @@ class SQLParallelExecutor:
             catalog: Optional catalog context for queries
             schema: Optional schema context for queries
             timeout: Timeout per query in seconds (default: 180)
+            query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701")
 
         Returns:
             Dictionary with:
@@ -109,6 +111,7 @@ class SQLParallelExecutor:
                 catalog=catalog,
                 schema=schema,
                 timeout=timeout,
+                query_tags=query_tags,
             )
 
             # Store results and check for errors
@@ -149,6 +152,7 @@ class SQLParallelExecutor:
         catalog: Optional[str],
         schema: Optional[str],
         timeout: int,
+        query_tags: Optional[str] = None,
     ) -> Dict[int, Dict[str, Any]]:
         """Execute a group of queries in parallel using ThreadPoolExecutor."""
         results: Dict[int, Dict[str, Any]] = {}
@@ -168,6 +172,7 @@ class SQLParallelExecutor:
                     catalog=catalog,
                     schema=schema,
                     timeout=timeout,
+                    query_tags=query_tags,
                 )
 
                 dt = round(time.time() - t0, 2)

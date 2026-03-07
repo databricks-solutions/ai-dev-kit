@@ -1,0 +1,1250 @@
+test_cases:
+- id: dabs_multi_env_variables_001
+  inputs:
+    prompt: Set up variables for catalog and schema that differ between dev, staging,
+      and prod
+  outputs:
+    response: |
+      Here's how to set up variables for catalog and schema that differ between dev, staging, and prod environments in your DABs project:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: my-project
+
+      include:
+        - resources/*.yml
+
+      variables:
+        catalog:
+          default: "default_catalog"
+        schema:
+          default: "default_schema"
+        warehouse_id:
+          lookup:
+            warehouse: "Shared SQL Warehouse"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+          workspace:
+            profile: dev-profile
+          variables:
+            catalog: "dev_catalog"
+            schema: "dev_schema"
+
+        staging:
+          mode: development
+          workspace:
+            profile: staging-profile
+          variables:
+            catalog: "staging_catalog"
+            schema: "staging_schema"
+
+        prod:
+          mode: production
+          workspace:
+            profile: prod-profile
+          variables:
+            catalog: "prod_catalog"
+            schema: "prod_schema"
+      ```
+
+      **Key points:**
+
+      1. **Define variables with defaults** - The `variables` section at the root defines default values that apply when not overridden
+
+      2. **Override per target** - Each target (dev/staging/prod) can override variables in its own `variables` section
+
+      3. **Use variables in resources** - Reference variables using `${var.catalog}` and `${var.schema}` syntax:
+
+      ```yaml
+      # In resources/*.yml
+      resources:
+        pipelines:
+          my_pipeline:
+            catalog: ${var.catalog}
+            target: ${var.schema}
+      ```
+
+      4. **Mode settings** - Use `mode: development` for dev/staging (allows easier iteration) and `mode: production` for prod (stricter deployment)
+
+      5. **Workspace profiles** - Each target specifies a different workspace profile to connect to the appropriate Databricks workspace
+
+      **Deploy to specific environment:**
+      ```bash
+      databricks bundle deploy -t dev      # Deploy to dev
+      databricks bundle deploy -t staging  # Deploy to staging
+      databricks bundle deploy -t prod     # Deploy to prod
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Defines variables with default values at root level
+    - Overrides variables per target (dev, staging, prod)
+    - Uses ${var.catalog} and ${var.schema} syntax for variable references
+    - 'Uses mode: development for dev/staging and mode: production for prod'
+    - Each target has its own workspace profile
+    expected_patterns:
+    - pattern: 'variables:'
+      min_count: 2
+      description: Has root variables and target-level variable overrides
+    - pattern: 'targets:'
+      min_count: 1
+      description: Defines targets section
+    - pattern: 'dev:|staging:|prod:'
+      min_count: 3
+      description: Defines all three environments
+    - pattern: mode:\s*(development|production)
+      min_count: 2
+      description: Uses development and production modes
+    - pattern: 'catalog:'
+      min_count: 4
+      description: Defines catalog variable and overrides
+    - pattern: 'schema:'
+      min_count: 4
+      description: Defines schema variable and overrides
+    - pattern: \$\{var\.(catalog|schema)\}
+      min_count: 1
+      description: Shows variable substitution syntax
+    guidelines:
+    - Must define variables at root level with defaults
+    - Must show how to override variables per target
+    - Must include all three environments (dev, staging, prod)
+    - Must use correct mode for each environment type
+    - Should explain the variable substitution syntax
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: grp_20260211_082058
+    tags:
+    - variables
+    - multi-environment
+    - catalog
+    - schema
+- id: dabs_ipynb_notebook_serverless_001
+  inputs:
+    prompt: Create a DABs config for a job that runs a Jupyter notebook at notebooks/etl_pipeline.ipynb
+      using serverless compute
+  outputs:
+    response: |
+      Here's a DABs configuration for running a Jupyter notebook job with serverless compute:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: etl-pipeline
+
+      include:
+        - resources/*.yml
+
+      variables:
+        notebook_path:
+          default: "./src/notebooks/etl_pipeline.ipynb"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+        prod:
+          mode: production
+      ```
+
+      **resources/etl_job.yml:**
+      ```yaml
+      resources:
+        jobs:
+          etl_pipeline_job:
+            name: etl_pipeline_${bundle.target}
+
+            tasks:
+              - task_key: run_notebook
+                notebook_task:
+                  notebook_path: ../src/notebooks/etl_pipeline.ipynb
+                  source: WORKSPACE
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: users
+      ```
+
+      **Key points:**
+      - Uses `notebook_task` with `source: WORKSPACE` for .ipynb files
+      - Serverless: omits all cluster configuration (no `new_cluster`, `existing_cluster_id`, or `job_cluster_key`)
+      - Uses relative path `../src/` in resources/*.yml
+      - Parameterizes job name with `${bundle.target}`
+    execution_success: true
+  expectations:
+    expected_facts:
+    - 'Uses notebook_task with source: WORKSPACE'
+    - Omits cluster configuration for serverless
+    - Uses relative path ../src/ in resources yml
+    - Parameterizes job name with bundle.target
+    expected_patterns:
+    - pattern: 'notebook_task:'
+      min_count: 1
+      description: Defines notebook task
+    - pattern: source:\s*WORKSPACE
+      min_count: 1
+      description: Uses WORKSPACE source for .ipynb
+    - pattern: \.\./src/
+      min_count: 1
+      description: Uses correct path resolution
+    - pattern: 'new_cluster:'
+      max_count: 0
+      min_count: 0
+      description: No new_cluster for serverless
+    - pattern: 'existing_cluster_id:'
+      max_count: 0
+      min_count: 0
+      description: No existing_cluster_id for serverless
+    - pattern: 'job_cluster_key:'
+      max_count: 0
+      min_count: 0
+      description: No job_cluster_key for serverless
+    guidelines:
+    - 'Must use notebook_task with source: WORKSPACE for .ipynb files'
+    - Must omit all cluster configuration for serverless (no new_cluster, existing_cluster_id,
+      or job_cluster_key)
+    - Must use relative path ../src/ in resources/*.yml
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+    tags:
+    - notebook
+    - ipynb
+    - serverless
+    - job
+- id: dabs_ipynb_notebook_classic_001
+  inputs:
+    prompt: Create a DABs job config for notebooks/data_processing.ipynb using a classic
+      cluster with 2 workers
+  outputs:
+    response: |
+      Here's a DABs configuration for a Jupyter notebook job with classic compute:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: data-processing
+
+      include:
+        - resources/*.yml
+
+      variables:
+        node_type_id:
+          default: "m6gd.xlarge"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+        prod:
+          mode: production
+      ```
+
+      **resources/processing_job.yml:**
+      ```yaml
+      resources:
+        jobs:
+          data_processing_job:
+            name: data_processing_${bundle.target}
+
+            tasks:
+              - task_key: process_data
+                notebook_task:
+                  notebook_path: ../src/notebooks/data_processing.ipynb
+                  source: WORKSPACE
+
+                job_cluster_key: classic_cluster
+
+            job_clusters:
+              - job_cluster_key: classic_cluster
+                new_cluster:
+                  spark_version: "17.3.x-scala2.13"
+                  node_type_id: ${var.node_type_id}
+                  num_workers: 2
+                  autoscale:
+                    min_workers: 2
+                    max_workers: 8
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: users
+      ```
+
+      **Key points:**
+      - Uses classic compute with `num_workers: 2` (or autoscale)
+      - Uses `notebook_task` with `source: WORKSPACE` for .ipynb
+      - Includes autoscale configuration for flexibility
+      - Uses relative path `../src/` in resources yml
+    execution_success: true
+  expectations:
+    expected_facts:
+    - 'Uses notebook_task with source: WORKSPACE'
+    - Configures classic compute with num_workers > 0
+    - Uses relative path ../src/ in resources yml
+    - May include autoscale configuration
+    expected_patterns:
+    - pattern: 'notebook_task:'
+      min_count: 1
+      description: Defines notebook task
+    - pattern: source:\s*WORKSPACE
+      min_count: 1
+      description: Uses WORKSPACE source
+    - pattern: num_workers:\s*[1-9]\d*
+      min_count: 1
+      description: Classic compute with workers
+    - pattern: \.\./src/
+      min_count: 1
+      description: Correct path resolution
+    - pattern: 'variables:'
+      min_count: 1
+      description: Defines variables block
+    - pattern: 'node_type_id:'
+      min_count: 2
+      description: Variable definition and usage
+    - pattern: \$\{var\.node_type_id\}
+      min_count: 1
+      description: Uses node_type_id variable
+    guidelines:
+    - 'Must use notebook_task with source: WORKSPACE for .ipynb'
+    - Must configure classic compute with num_workers > 0
+    - Should consider autoscale for production workloads
+    - Must use relative path ../src/ in resources/*.yml
+    - Must parameterize node_type_id as a variable
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+    tags:
+    - notebook
+    - ipynb
+    - classic
+    - job
+    - autoscale
+- id: dabs_py_notebook_serverless_001
+  inputs:
+    prompt: Set up a DABs job for a Databricks Python notebook at src/analysis.py
+      with serverless compute
+  outputs:
+    response: |
+      Here's a DABs configuration for a Databricks Python notebook with serverless:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: analysis-pipeline
+
+      include:
+        - resources/*.yml
+
+      targets:
+        dev:
+          default: true
+          mode: development
+        prod:
+          mode: production
+      ```
+
+      **resources/analysis_job.yml:**
+      ```yaml
+      resources:
+        jobs:
+          analysis_job:
+            name: analysis_${bundle.target}
+
+            tasks:
+              - task_key: run_analysis
+                notebook_task:
+                  notebook_path: ../src/analysis.py
+                  source: WORKSPACE
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: users
+      ```
+
+      **Key points:**
+      - Uses `notebook_task` with `source: WORKSPACE` for Databricks .py notebooks
+      - Path is `../src/analysis` (without .py extension)
+      - Serverless: omits all cluster configuration
+    execution_success: true
+  expectations:
+    expected_facts:
+    - 'Uses notebook_task with source: WORKSPACE for .py notebooks'
+    - Relative path includes.py extension
+    - Omits cluster configuration for serverless
+    - Uses relative path ../src/ in resources yml
+    expected_patterns:
+    - pattern: 'notebook_task:'
+      min_count: 1
+      description: Defines notebook task
+    - pattern: source:\s*WORKSPACE
+      min_count: 1
+      description: Uses WORKSPACE source for .py notebooks
+    - pattern: \.\./src/
+      min_count: 1
+      description: Correct path resolution
+    - pattern: 'new_cluster:'
+      max_count: 0
+      min_count: 0
+      description: No new_cluster for serverless
+    - pattern: 'existing_cluster_id:'
+      max_count: 0
+      min_count: 0
+      description: No existing_cluster_id for serverless
+    - pattern: 'job_cluster_key:'
+      max_count: 0
+      min_count: 0
+      description: No job_cluster_key for serverless
+    guidelines:
+    - 'Must use notebook_task with source: WORKSPACE for Databricks .py notebooks'
+    - Must omit .py extension from notebook path
+    - Must omit all cluster configuration for serverless
+    - Must use relative path ../src/ in resources/*.yml
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+    tags:
+    - notebook
+    - python
+    - databricks-source
+    - serverless
+    - job
+- id: dabs_py_notebook_classic_001
+  inputs:
+    prompt: Create a job config for running src/transform.py Databricks notebook with
+      a 4-worker cluster
+  outputs:
+    response: |
+      Here's a DABs configuration for a Databricks Python notebook with classic compute:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: transform-pipeline
+
+      include:
+        - resources/*.yml
+
+      variables:
+        node_type_id:
+          default: "m6gd.xlarge"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+        prod:
+          mode: production
+      ```
+
+      **resources/transform_job.yml:**
+      ```yaml
+      resources:
+        jobs:
+          transform_job:
+            name: transform_${bundle.target}
+
+            tasks:
+              - task_key: run_transform
+                notebook_task:
+                  notebook_path: ../src/transform.py
+                  source: WORKSPACE
+
+                job_cluster_key: classic_cluster
+
+            job_clusters:
+              - job_cluster_key: classic_cluster
+                new_cluster:
+                  spark_version: "17.3.x-scala2.13"
+                  node_type_id: ${var.node_type_id}
+                  num_workers: 4
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: users
+      ```
+
+      **Key points:**
+      - Uses `notebook_task` with `source: WORKSPACE` for .py notebooks
+      - Relative path includes .py extension
+      - Classic compute with `num_workers: 4`
+      - Uses relative path `../src/` in resources yml
+    execution_success: true
+  expectations:
+    expected_facts:
+    - 'Uses notebook_task with source: WORKSPACE for .py notebooks'
+    - Relative path includes.py extension
+    - Configures classic compute with num_workers > 0
+    - Uses relative path ../src/ in resources yml
+    expected_patterns:
+    - pattern: 'notebook_task:'
+      min_count: 1
+      description: Defines notebook task
+    - pattern: source:\s*WORKSPACE
+      min_count: 1
+      description: Uses GIT source
+    - pattern: num_workers:\s*[1-9]\d*
+      min_count: 1
+      description: Classic compute
+    - pattern: \.\./src/
+      min_count: 1
+      description: Correct path resolution
+    - pattern: 'variables:'
+      min_count: 1
+      description: Defines variables block
+    - pattern: 'node_type_id:'
+      min_count: 2
+      description: Variable definition and usage
+    - pattern: \$\{var\.node_type_id\}
+      min_count: 1
+      description: Uses node_type_id variable
+    guidelines:
+    - 'Must use notebook_task with source: WORKSPACE for .py notebooks'
+    - Must omit .py extension from path
+    - Must configure classic compute with num_workers > 0
+    - Must use relative path ../src/ in resources/*.yml
+    - Must parameterize node_type_id as a variable
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+    tags:
+    - notebook
+    - python
+    - databricks-source
+    - classic
+    - job
+- id: dabs_python_script_serverless_001
+  inputs:
+    prompt: Configure a DABs job to run a Python script task at scripts/load_data.py
+      using serverless
+  outputs:
+    response: |
+      Here's a DABs configuration for a Python script task with serverless:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: data-loader
+
+      include:
+        - resources/*.yml
+
+      targets:
+        dev:
+          default: true
+          mode: development
+        prod:
+          mode: production
+      ```
+
+      **resources/loader_job.yml:**
+      ```yaml
+      resources:
+        jobs:
+          data_loader_job:
+            name: data_loader_${bundle.target}
+
+            tasks:
+              - task_key: load_data
+                spark_python_task:
+                  python_file: ../src/scripts/load_data.py
+                  parameters: ["--env", "${bundle.target}"]
+                  environment_key: default
+            
+            environments:
+              - environment_key: default
+                spec:
+                  dependencies:
+                    - faker
+                  environment_version: "4"
+            performance_target: PERFORMANCE_OPTIMIZED
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: users
+      ```
+
+      **Key points:**
+      - Uses `spark_python_task` for Python scripts (not notebooks)
+      - Includes `python_file` with full .py extension
+      - Serverless: omits all cluster configuration and uses environment
+      - Can pass parameters to the script
+      - Uses relative path `../src/` in resources yml
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses spark_python_task for Python scripts
+    - Includes .py extension in python_file path
+    - Omits cluster configuration for serverless and uses environment
+    - Uses relative path ../src/ in resources yml
+    - May include parameters for script
+    expected_patterns:
+    - pattern: 'spark_python_task:'
+      min_count: 1
+      description: Defines Python script task
+    - pattern: python_file:.*\.py
+      min_count: 1
+      description: Python file with .py extension
+    - pattern: \.\./src/
+      min_count: 1
+      description: Correct path resolution
+    - pattern: 'new_cluster:'
+      max_count: 0
+      min_count: 0
+      description: No new_cluster for serverless
+    - pattern: 'existing_cluster_id:'
+      max_count: 0
+      min_count: 0
+      description: No existing_cluster_id for serverless
+    - pattern: 'job_cluster_key:'
+      max_count: 0
+      min_count: 0
+      description: No job_cluster_key for serverless
+    - pattern: 'environment_key:'
+      min_count: 1
+      description: References environment for serverless
+    - pattern: 'environments:'
+      min_count: 1
+      description: Defines environment block
+    guidelines:
+    - Must use spark_python_task for Python scripts (not notebook_task)
+    - Must include .py extension in python_file
+    - Must omit all cluster configuration for serverless
+    - Must use relative path ../src/ in resources/*.yml
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+    tags:
+    - script
+    - python
+    - serverless
+    - job
+- id: dabs_python_script_classic_001
+  inputs:
+    prompt: Set up a job to run Python script src/etl_batch.py with a cluster of 3
+      workers
+  outputs:
+    response: |
+      Here's a DABs configuration for a Python script with classic compute:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: etl-batch
+
+      include:
+        - resources/*.yml
+
+      variables:
+        node_type_id:
+          default: "m6gd.xlarge"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+        prod:
+          mode: production
+      ```
+
+      **resources/etl_job.yml:**
+      ```yaml
+      resources:
+        jobs:
+          etl_batch_job:
+            name: etl_batch_${bundle.target}
+
+            tasks:
+              - task_key: run_etl
+                spark_python_task:
+                  python_file: ../src/etl_batch.py
+                  parameters: ["--env", "${bundle.target}"]
+
+                job_cluster_key: classic_cluster
+
+            job_clusters:
+              - job_cluster_key: classic_cluster
+                new_cluster:
+                  spark_version: "17.3.x-scala2.13"
+                  node_type_id: ${var.node_type_id}
+                  num_workers: 3
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: users
+      ```
+
+      **Key points:**
+      - Uses `spark_python_task` for Python scripts
+      - Includes full .py extension
+      - Classic compute with `num_workers: 3`
+      - Uses relative path `../src/` in resources yml
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Uses spark_python_task for Python scripts
+    - Includes .py extension in python_file
+    - Configures classic compute with num_workers > 0
+    - Uses relative path ../src/ in resources yml
+    expected_patterns:
+    - pattern: 'spark_python_task:'
+      min_count: 1
+      description: Defines Python script task
+    - pattern: python_file:.*\.py
+      min_count: 1
+      description: Python file with extension
+    - pattern: num_workers:\s*[1-9]\d*
+      min_count: 1
+      description: Classic compute
+    - pattern: \.\./src/
+      min_count: 1
+      description: Correct path resolution
+    - pattern: 'variables:'
+      min_count: 1
+      description: Defines variables block
+    - pattern: 'node_type_id:'
+      min_count: 2
+      description: Variable definition and usage
+    - pattern: \$\{var\.node_type_id\}
+      min_count: 1
+      description: Uses node_type_id variable
+    guidelines:
+    - Must use spark_python_task for Python scripts
+    - Must include .py extension in python_file
+    - Must configure classic compute with num_workers > 0
+    - Must use relative path ../src/ in resources/*.yml
+    - Must parameterize node_type_id as a variable
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+    tags:
+    - script
+    - python
+    - classic
+    - job
+- id: dabs_sql_task_001
+  inputs:
+    prompt: Create a DABs job for running a SQL query task on serverless SQL warehouse
+  outputs:
+    response: |
+      Here's a DABs configuration for a SQL task with a serverless SQL warehouse created by DABs:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: sql-analytics
+
+      include:
+        - resources/*.yml
+
+      targets:
+        dev:
+          default: true
+          mode: development
+        prod:
+          mode: production
+      ```
+
+      **resources/sql_warehouse.yml:**
+      ```yaml
+      resources:
+        sql_warehouses:
+          analytics_warehouse:
+            name: analytics_warehouse_${bundle.target}
+            cluster_size: "2X-Small"
+            max_num_clusters: 1
+            auto_stop_mins: 10
+            enable_serverless_compute: true
+
+            permissions:
+              - level: CAN_USE
+                group_name: users
+      ```
+
+      **resources/sql_job.yml:**
+      ```yaml
+      resources:
+        jobs:
+          sql_analytics_job:
+            name: sql_analytics_${bundle.target}
+
+            tasks:
+              - task_key: run_query
+                sql_task:
+                  warehouse_id: ${resources.sql_warehouses.analytics_warehouse.id}
+                  query:
+                    query: |
+                      SELECT * FROM ${catalog}.${schema}.orders
+                      WHERE date >= current_date() - 7
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: users
+      ```
+
+      **Key points:**
+      - Creates SQL warehouse as a DABs resource with `enable_serverless_compute: true`
+      - References created warehouse using `${resources.sql_warehouses.<key>.id}`
+      - Warehouse is automatically managed across environments
+      - Uses inline query with SQL
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Creates SQL warehouse as DABs resource
+    - Uses sql_task for SQL queries
+    - References warehouse via resources.sql_warehouses syntax
+    - Enables serverless compute for warehouse
+    expected_patterns:
+    - pattern: 'sql_warehouses:'
+      min_count: 1
+      description: Defines SQL warehouse resource
+    - pattern: 'sql_task:'
+      min_count: 1
+      description: Defines SQL task
+    - pattern: \$\{resources\.sql_warehouses\.
+      min_count: 1
+      description: References warehouse by resource ID
+    - pattern: enable_serverless_compute:\s*true
+      min_count: 1
+      description: Enables serverless compute
+    - pattern: 'query:'
+      min_count: 1
+      description: Includes query config
+    guidelines:
+    - Must create SQL warehouse as a DABs resource
+    - Must use sql_task (not spark_sql_task)
+    - Must reference warehouse using ${resources.sql_warehouses.<key>.id}
+    - Should enable serverless compute for serverless warehouse
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+    tags:
+    - sql
+    - serverless
+    - warehouse
+    - job
+    - managed-resource
+- id: dabs_sdp_pipeline_serverless_001
+  inputs:
+    prompt: Create a DABs configuration for a Spark declarative pipeline (SDP) running
+      on serverless compute
+  outputs:
+    response: |
+      Here's a DABs configuration for a Spark declarative pipeline (SDP) running on serverless compute:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: sdp-pipeline-project
+
+      include:
+        - resources/*.yml
+
+      variables:
+        catalog:
+          default: "main"
+        schema:
+          default: "default"
+        source_catalog:
+          default: "source"
+        source_schema:
+          default: "raw"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+          workspace:
+            profile: dev-profile
+          variables:
+            catalog: "dev_catalog"
+            schema: "dev_schema"
+            source_catalog: "dev_source"
+            source_schema: "dev_raw"
+
+        prod:
+          mode: production
+          workspace:
+            profile: prod-profile
+          variables:
+            catalog: "prod_catalog"
+            schema: "prod_schema"
+            source_catalog: "prod_source"
+            source_schema: "prod_raw"
+      ```
+
+      **resources/pipeline.yml:**
+      ```yaml
+      resources:
+        pipelines:
+          data_pipeline:
+            name: "[${bundle.target}] Data Pipeline"
+
+            # Target catalog and schema
+            catalog: ${var.catalog}
+            target: ${var.schema}
+
+            # Pipeline libraries
+            libraries:
+              - glob:
+                  include: ../src/pipelines/data_pipeline/transformations/**
+
+            root_path: ../src/pipelines/data_pipeline
+
+            serverless: true
+
+            # Pipeline configuration
+            configuration:
+              source_catalog: ${var.source_catalog}
+              source_schema: ${var.source_schema}
+
+            continuous: false
+            development: true
+            photon: true
+
+            channel: current
+
+            permissions:
+              - level: CAN_VIEW
+                group_name: "users"
+      ```
+
+      **Key points:**
+      - Uses `serverless: true` for serverless compute (no cluster configuration needed)
+      - Uses `glob` pattern with `root_path` for modern pipeline organization
+      - Parameterizes catalog and schema for multi-environment deployment
+      - Sets `development: true` for dev target (enables faster iteration)
+      - Uses `continuous: false` for triggered execution (change to `true` for streaming)
+      - Enables Photon for performance optimization
+      - Pipeline code should be in `src/pipelines/data_pipeline/transformations/` directory
+    execution_success: true
+  expectations:
+    expected_facts:
+    - 'Uses serverless: true for serverless compute'
+    - Uses glob pattern with root_path for pipeline libraries
+    - Parameterizes catalog and schema for multi-environment
+    - 'Sets development: true for dev target'
+    expected_patterns:
+    - pattern: 'pipelines:'
+      min_count: 1
+      description: Defines pipelines resource
+    - pattern: 'serverless:\s*true'
+      min_count: 1
+      description: Enables serverless compute
+    - pattern: 'catalog:'
+      min_count: 2
+      description: Configures catalog
+    - pattern: 'target:'
+      min_count: 1
+      description: Configures target schema
+    - pattern: 'libraries:'
+      min_count: 1
+      description: Defines pipeline libraries
+    - pattern: 'new_cluster:'
+      max_count: 0
+      min_count: 0
+      description: No cluster config for serverless
+    guidelines:
+    - 'Must use serverless: true for serverless compute'
+    - Must use glob pattern for pipeline libraries
+    - Must parameterize catalog and schema using variables
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-13T22:21:45.813851'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'
+- id: dabs_sql_alert_v2_001
+  inputs:
+    prompt: Create a DABs configuration for a Databricks SQL Alert v2 with a managed
+      SQL warehouse that specifies the alert configuration in the YAML
+  outputs:
+    response: |
+      Here's a DABs configuration for a Databricks SQL Alert v2 with a managed SQL warehouse and the alert configuration specified in YAML:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: sql-alerts-project
+
+      include:
+        - resources/*.yml
+
+      variables:
+        catalog:
+          default: "main"
+        schema:
+          default: "default"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+          workspace:
+            profile: dev-profile
+          variables:
+            catalog: "dev_catalog"
+            schema: "dev_schema"
+
+        prod:
+          mode: production
+          workspace:
+            profile: prod-profile
+          variables:
+            catalog: "prod_catalog"
+            schema: "prod_schema"
+      ```
+
+      **resources/warehouse.yml:**
+      ```yaml
+      resources:
+        sql_warehouses:
+          alerts_warehouse:
+            name: alerts_warehouse_${bundle.target}
+            cluster_size: "2X-Small"
+            max_num_clusters: 1
+            auto_stop_mins: 10
+            enable_serverless_compute: true
+      ```
+
+      **resources/alerts.yml:**
+      ```yaml
+      resources:
+        alerts:
+          data_quality_alert:
+            display_name: "[${bundle.target}] Data Quality Alert"
+            query_text: "SELECT count(*) as record_count FROM ${var.catalog}.${var.schema}.orders WHERE date >= current_date() - 1"
+            warehouse_id: ${resources.sql_warehouses.alerts_warehouse.id}
+
+            evaluation:
+              comparison_operator: 'LESS_THAN'
+              source:
+                name: 'record_count'
+                display: 'record_count'
+              threshold:
+                value:
+                  double_value: 100
+              notification:
+                notify_on_ok: false
+                subscriptions:
+                  - user_email: "${workspace.current_user.userName}"
+
+            schedule:
+              pause_status: 'UNPAUSED'
+              quartz_cron_schedule: '0 0 9 * * ?'
+              timezone_id: 'America/Los_Angeles'
+
+            permissions:
+              - level: CAN_RUN
+                group_name: "users"
+      ```
+
+      **Key points:**
+      - Creates a managed SQL warehouse as a DABs resource
+      - Uses Alert v2 API with `evaluation` (not `condition`)
+      - Alert triggers when condition evaluates to TRUE (when record_count < 100)
+      - `source` defines the column name from query result to evaluate
+      - `comparison_operator` must be uppercase string (LESS_THAN, GREATER_THAN, EQUAL, etc.)
+      - Schedule requires all three fields: `pause_status`, `quartz_cron_schedule`, `timezone_id`
+      - Quartz cron format: `second minute hour day-of-month month day-of-week`
+      - Email notifications configured under `evaluation.notification.subscriptions`
+      - Uses `${workspace.current_user.userName}` to notify the bundle deployer
+      - References warehouse using `${resources.sql_warehouses.alerts_warehouse.id}`
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Creates managed SQL warehouse as a DABs resource
+    - Uses Alert v2 API with evaluation (not condition)
+    - Defines comparison_operator as uppercase string
+    - Configures schedule with pause_status, quartz_cron_schedule, timezone_id
+    - Uses source to define column name from query result
+    - References warehouse using resources reference (not lookup)
+    expected_patterns:
+    - pattern: 'sql_warehouses:'
+      min_count: 1
+      description: Defines SQL warehouse resource
+    - pattern: 'enable_serverless_compute:'
+      min_count: 1
+      description: Enables serverless SQL warehouse
+    - pattern: 'alerts:'
+      min_count: 1
+      description: Defines alerts resource
+    - pattern: 'evaluation:'
+      min_count: 1
+      description: Uses Alert v2 evaluation syntax
+    - pattern: 'comparison_operator:'
+      min_count: 1
+      description: Defines comparison operator
+    - pattern: 'schedule:'
+      min_count: 1
+      description: Configures alert schedule
+    - pattern: 'query_text:'
+      min_count: 1
+      description: Defines SQL query
+    - pattern: '\$\{resources\.sql_warehouses\.'
+      min_count: 1
+      description: References warehouse via resource reference
+    - pattern: 'lookup:'
+      max_count: 0
+      min_count: 0
+      description: Does not use lookup pattern
+    - pattern: 'condition:'
+      max_count: 0
+      min_count: 0
+      description: Does not use deprecated condition syntax
+    guidelines:
+    - Must create managed SQL warehouse as a DABs resource
+    - Must use Alert v2 API with evaluation (not deprecated condition)
+    - Must use uppercase comparison_operator (LESS_THAN, GREATER_THAN, etc.)
+    - Must configure schedule with all required fields
+    - Must reference warehouse using resource reference (not lookup)
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-13T22:25:28.801641'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'
+- id: dabs_dashboard_001
+  inputs:
+    prompt: Create a DABs configuration for deploying a dashboard with a managed SQL
+      warehouse that sets the default catalog and schema
+  outputs:
+    response: |
+      Here's a DABs configuration for deploying a dashboard with a managed SQL warehouse and default catalog and schema settings:
+
+      **databricks.yml:**
+      ```yaml
+      bundle:
+        name: analytics-dashboard
+
+      include:
+        - resources/*.yml
+
+      variables:
+        catalog:
+          default: "main"
+        schema:
+          default: "default"
+
+      targets:
+        dev:
+          default: true
+          mode: development
+          workspace:
+            profile: dev-profile
+          variables:
+            catalog: "dev_catalog"
+            schema: "dev_schema"
+
+        prod:
+          mode: production
+          workspace:
+            profile: prod-profile
+          variables:
+            catalog: "prod_catalog"
+            schema: "prod_schema"
+      ```
+
+      **resources/warehouse.yml:**
+      ```yaml
+      resources:
+        sql_warehouses:
+          dashboard_warehouse:
+            name: dashboard_warehouse_${bundle.target}
+            cluster_size: "2X-Small"
+            max_num_clusters: 1
+            auto_stop_mins: 10
+            enable_serverless_compute: true
+      ```
+
+      **resources/dashboard.yml:**
+      ```yaml
+      resources:
+        dashboards:
+          analytics_dashboard:
+            display_name: "[${bundle.target}] Analytics Dashboard"
+            file_path: ../src/dashboards/analytics.lvdash.json
+            warehouse_id: ${resources.sql_warehouses.dashboard_warehouse.id}
+            dataset_catalog: ${var.catalog}
+            dataset_schema: ${var.schema}
+            permissions:
+              - level: CAN_RUN
+                group_name: "users"
+      ```
+
+      **Key points:**
+      - Creates a managed SQL warehouse as a DABs resource
+      - Uses `dataset_catalog` and `dataset_schema` parameters (added in Databricks CLI 0.281.0, January 2026)
+      - These parameters set the default catalog and schema for all datasets in the dashboard if not specified in queries
+      - Parameterizes catalog and schema using variables for multi-environment deployment
+      - Dashboard file should be at `src/dashboards/analytics.lvdash.json`
+      - Uses relative path `../src/` in resources yml (one level up from resources/ directory)
+      - Different catalog/schema values per environment (dev vs prod)
+      - Permission level `CAN_RUN` allows users to view and refresh the dashboard
+      - References warehouse using `${resources.sql_warehouses.dashboard_warehouse.id}`
+    execution_success: true
+  expectations:
+    expected_facts:
+    - Creates managed SQL warehouse as a DABs resource
+    - Uses dataset_catalog and dataset_schema parameters
+    - Parameterizes catalog and schema using variables
+    - Uses relative path ../src/ in resources yml
+    - References .lvdash.json dashboard file
+    - References warehouse using resources reference (not lookup)
+    expected_patterns:
+    - pattern: 'sql_warehouses:'
+      min_count: 1
+      description: Defines SQL warehouse resource
+    - pattern: 'enable_serverless_compute:'
+      min_count: 1
+      description: Enables serverless SQL warehouse
+    - pattern: 'dashboards:'
+      min_count: 1
+      description: Defines dashboards resource
+    - pattern: 'dataset_catalog:'
+      min_count: 1
+      description: Sets default catalog for dashboard
+    - pattern: 'dataset_schema:'
+      min_count: 1
+      description: Sets default schema for dashboard
+    - pattern: 'file_path:'
+      min_count: 1
+      description: References dashboard file
+    - pattern: '\.lvdash\.json'
+      min_count: 1
+      description: Uses correct dashboard file extension
+    - pattern: \.\./src/
+      min_count: 1
+      description: Uses correct relative path
+    - pattern: '\$\{resources\.sql_warehouses\.'
+      min_count: 1
+      description: References warehouse via resource reference
+    - pattern: 'lookup:'
+      max_count: 0
+      min_count: 0
+      description: Does not use lookup pattern
+    guidelines:
+    - Must create managed SQL warehouse as a DABs resource
+    - Must use dataset_catalog and dataset_schema for default catalog/schema
+    - Must parameterize catalog and schema using variables
+    - Must use relative path ../src/ in resources/*.yml
+    - Must reference warehouse using resource reference (not lookup)
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-13T22:27:08.785295'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-13'

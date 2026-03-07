@@ -134,13 +134,13 @@ Add new command `trace-eval`:
 
 ```bash
 # Score a JSONL file against expectations
-skill-test trace-eval spark-declarative-pipelines --trace session.jsonl
+skill-test trace-eval databricks-spark-declarative-pipelines --trace session.jsonl
 
 # Score from MLflow run
-skill-test trace-eval spark-declarative-pipelines --run-id abc123
+skill-test trace-eval databricks-spark-declarative-pipelines --run-id abc123
 
 # Score all traces in a directory
-skill-test trace-eval spark-declarative-pipelines --trace-dir ./traces/
+skill-test trace-eval databricks-spark-declarative-pipelines --trace-dir ./traces/
 ```
 
 **Implementation:**
@@ -346,7 +346,7 @@ print(json.dumps(metrics.to_dict(), indent=2))
 "
 
 # 2. Run trace scorers
-skill-test trace-eval spark-declarative-pipelines --trace session.jsonl
+skill-test trace-eval databricks-spark-declarative-pipelines --trace session.jsonl
 ```
 
 ---
@@ -373,10 +373,10 @@ mlflow autolog claude -u databricks -n "Claude Code Skill Traces" .
 claude "Create a bronze ingestion pipeline for JSON files"
 
 # 3. Score the trace
-skill-test trace-eval spark-declarative-pipelines --run-id <latest>
+skill-test trace-eval databricks-spark-declarative-pipelines --run-id <latest>
 
 # 4. Or run full evaluation including traces
-skill-test mlflow-eval spark-declarative-pipelines --include-traces
+skill-test mlflow-eval databricks-spark-declarative-pipelines --include-traces
 ```
 
 ---

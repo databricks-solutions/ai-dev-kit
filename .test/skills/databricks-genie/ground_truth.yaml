@@ -1,0 +1,200 @@
+metadata:
+  skill_name: databricks-genie
+  version: 0.1.0
+  created_at: '2026-02-11T13:39:14.986589'
+test_cases:
+- id: databricks-genie_001
+  inputs:
+    prompt: Example prompt for the skill
+  outputs:
+    response: Example response from the skill
+    execution_success: true
+  expectations:
+    expected_facts:
+    - fact1
+    - fact2
+    expected_patterns:
+    - pattern: pattern_to_match
+      min_count: 1
+    guidelines:
+    - Guideline for evaluation
+  metadata:
+    category: happy_path
+    difficulty: easy
+- id: grp_20260211_134332
+  inputs:
+    prompt: Create a Genie Space for sales analytics that connects to my_catalog.sales.customers
+      and my_catalog.sales.orders tables with sample questions
+  outputs:
+    response: "I'll create a Genie Space for sales analytics using the create_or_update_genie\
+      \ tool.\n\n```python\ncreate_or_update_genie(\n    display_name=\"Sales Analytics\"\
+      ,\n    table_identifiers=[\n        \"my_catalog.sales.customers\",\n      \
+      \  \"my_catalog.sales.orders\"\n    ],\n    description=\"Explore sales data\
+      \ with natural language queries\",\n    sample_questions=[\n        \"What were\
+      \ total sales last month?\",\n        \"Who are our top 10 customers by revenue?\"\
+      ,\n        \"Show me order trends over the past year\"\n    ]\n)\n```\n\nThis\
+      \ creates a Genie Space that allows natural language exploration of your sales\
+      \ data. The space will use these tables to answer questions about customers\
+      \ and orders."
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-11T13:43:32.533719'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-11'
+- id: grp_20260211_134357
+  inputs:
+    prompt: List all my Genie Spaces
+  outputs:
+    response: 'I''ll list all Genie Spaces you have access to using the list_genie
+      tool.
+
+
+      ```python
+
+      list_genie()
+
+      ```
+
+
+      This will return all Genie Spaces accessible to you, including their space IDs,
+      display names, and descriptions.'
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-11T13:43:57.189311'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-11'
+- id: grp_20260211_134412
+  inputs:
+    prompt: 'Ask a Genie Space with ID ''abc123'' the question: What were total sales
+      last month?'
+  outputs:
+    response: "I'll ask your question to the Genie Space using the ask_genie tool.\n\
+      \n```python\nask_genie(\n    space_id=\"abc123\",\n    question=\"What were\
+      \ total sales last month?\"\n)\n```\n\nThis will return the generated SQL query,\
+      \ columns, data, and row count from the Genie Space."
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-11T13:44:12.655827'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-11'
+- id: grp_20260211_134422
+  inputs:
+    prompt: Inspect the schema and columns of my_catalog.sales.customers table before
+      creating a Genie Space
+  outputs:
+    response: "I'll inspect the table schema using the get_table_details tool.\n\n\
+      ```python\nget_table_details(\n    catalog=\"my_catalog\",\n    schema=\"sales\"\
+      ,\n    table=\"customers\",\n    table_stat_level=\"SIMPLE\"\n)\n```\n\nThis\
+      \ will show you the table's columns, data types, and statistics to help you\
+      \ understand the data before creating a Genie Space."
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-11T13:44:22.683085'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-11'
+- id: grp_20260211_134431
+  inputs:
+    prompt: Get details for Genie Space with ID 'sales-space-123'
+  outputs:
+    response: 'I''ll get the Genie Space details using the get_genie tool.
+
+
+      ```python
+
+      get_genie(space_id="sales-space-123")
+
+      ```
+
+
+      This will return the space''s configuration including display name, description,
+      table identifiers, and sample questions.'
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-11T13:44:31.885475'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-11'
+- id: grp_20260211_134914
+  inputs:
+    prompt: Delete the Genie Space with ID 'old-sales-space'
+  outputs:
+    response: 'I''ll delete the Genie Space using the delete_genie tool.
+
+
+      ```python
+
+      delete_genie(space_id="old-sales-space")
+
+      ```
+
+
+      This will permanently delete the Genie Space and all its configuration. Note
+      that this action cannot be undone.'
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-11T13:49:14.897101'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-11'
+- id: grp_20260211_134933
+  inputs:
+    prompt: 'Ask a follow-up question in conversation ''conv-456'': Show me the breakdown
+      by region'
+  outputs:
+    response: "I'll ask a follow-up question in the existing conversation using the\
+      \ ask_genie_followup tool.\n\n```python\nask_genie_followup(\n    space_id=\"\
+      sales-space-123\",\n    conversation_id=\"conv-456\",\n    question=\"Show me\
+      \ the breakdown by region\"\n)\n```\n\nThis will continue the conversation context\
+      \ and return SQL, columns, data, and row count for the follow-up question."
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: interactive
+    created_at: '2026-02-11T13:49:33.172753'
+    execution_verified:
+      mode: local
+      verified_date: '2026-02-11'

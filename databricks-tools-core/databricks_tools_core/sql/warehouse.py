@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from databricks.sdk.service.sql import State
 
-from ..auth import get_workspace_client
+from ..auth import get_workspace_client, get_current_username
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +65,33 @@ def list_warehouses(limit: int = 20) -> List[Dict[str, Any]]:
     return result
 
 
+def _prefer_user_owned(warehouses: list, current_user: Optional[str]) -> list:
+    """Sort a list of warehouses so that those owned by the current user come first.
+
+    This is a *soft* preference — no warehouses are removed. Within the same
+    priority bucket, user-owned warehouses are simply tried first.
+
+    Args:
+        warehouses: List of SDK warehouse objects.
+        current_user: Current user's username/email, or None.
+
+    Returns:
+        Reordered list (user-owned first, then the rest in original order).
+    """
+    if not current_user or not warehouses:
+        return warehouses
+    user_lower = current_user.lower()
+    owned = [w for w in warehouses if (w.creator_name or "").lower() == user_lower]
+    others = [w for w in warehouses if (w.creator_name or "").lower() != user_lower]
+    return owned + others
+
+
 def get_best_warehouse() -> Optional[str]:
     """
     Select the best available SQL warehouse based on priority rules.
+
+    Within each priority tier, warehouses created by the current user are
+    preferred (soft preference — no warehouses are excluded).
 
     Priority:
     1. Running warehouse named "Shared endpoint" or "dbdemos-shared-endpoint"
@@ -83,6 +107,7 @@ def get_best_warehouse() -> Optional[str]:
         Exception: If API request fails
     """
     client = get_workspace_client()
+    current_user = get_current_username()
 
     try:
         warehouses = list(client.warehouses.list())
@@ -116,6 +141,13 @@ def get_best_warehouse() -> Optional[str]:
             offline_shared.append(warehouse)
         else:
             offline_other.append(warehouse)
+
+    # Within each tier, prefer warehouses owned by the current user
+    standard_shared = _prefer_user_owned(standard_shared, current_user)
+    online_shared = _prefer_user_owned(online_shared, current_user)
+    online_other = _prefer_user_owned(online_other, current_user)
+    offline_shared = _prefer_user_owned(offline_shared, current_user)
+    offline_other = _prefer_user_owned(offline_other, current_user)
 
     # Select based on priority
     if standard_shared:

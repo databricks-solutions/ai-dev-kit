@@ -2,6 +2,7 @@
 
 from typing import List, Dict, Any
 
+from databricks_tools_core.identity import get_default_tags
 from databricks_tools_core.spark_declarative_pipelines.pipelines import (
     create_pipeline as _create_pipeline,
     get_pipeline as _get_pipeline,
@@ -15,7 +16,15 @@ from databricks_tools_core.spark_declarative_pipelines.pipelines import (
     find_pipeline_by_name as _find_pipeline_by_name,
 )
 
+from ..manifest import register_deleter
 from ..server import mcp
+
+
+def _delete_pipeline_resource(resource_id: str) -> None:
+    _delete_pipeline(pipeline_id=resource_id)
+
+
+register_deleter("pipeline", _delete_pipeline_resource)
 
 
 @mcp.tool
@@ -43,6 +52,11 @@ def create_pipeline(
     Returns:
         Dictionary with pipeline_id of the created pipeline.
     """
+    # Auto-inject default tags into extra_settings; user tags take precedence
+    extra_settings = extra_settings or {}
+    extra_settings.setdefault("tags", {})
+    extra_settings["tags"] = {**get_default_tags(), **extra_settings["tags"]}
+
     result = _create_pipeline(
         name=name,
         root_path=root_path,
@@ -51,6 +65,20 @@ def create_pipeline(
         workspace_file_paths=workspace_file_paths,
         extra_settings=extra_settings,
     )
+
+    # Track resource on successful create
+    try:
+        if result.pipeline_id:
+            from ..manifest import track_resource
+
+            track_resource(
+                resource_type="pipeline",
+                name=name,
+                resource_id=result.pipeline_id,
+            )
+    except Exception:
+        pass  # best-effort tracking
+
     return {"pipeline_id": result.pipeline_id}
 
 
@@ -120,6 +148,12 @@ def delete_pipeline(pipeline_id: str) -> Dict[str, str]:
         Dictionary with status message.
     """
     _delete_pipeline(pipeline_id=pipeline_id)
+    try:
+        from ..manifest import remove_resource
+
+        remove_resource(resource_type="pipeline", resource_id=pipeline_id)
+    except Exception:
+        pass
     return {"status": "deleted"}
 
 
@@ -282,6 +316,11 @@ def create_or_update_pipeline(
             }
         )
     """
+    # Auto-inject default tags into extra_settings; user tags take precedence
+    extra_settings = extra_settings or {}
+    extra_settings.setdefault("tags", {})
+    extra_settings["tags"] = {**get_default_tags(), **extra_settings["tags"]}
+
     result = _create_or_update_pipeline(
         name=name,
         root_path=root_path,
@@ -294,6 +333,22 @@ def create_or_update_pipeline(
         timeout=timeout,
         extra_settings=extra_settings,
     )
+
+    # Track resource on successful create/update
+    try:
+        result_dict = result.to_dict()
+        pipeline_id = result_dict.get("pipeline_id")
+        if pipeline_id:
+            from ..manifest import track_resource
+
+            track_resource(
+                resource_type="pipeline",
+                name=name,
+                resource_id=pipeline_id,
+            )
+    except Exception:
+        pass  # best-effort tracking
+
     return result.to_dict()
 
 

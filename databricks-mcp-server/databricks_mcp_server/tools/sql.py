@@ -21,11 +21,16 @@ def execute_sql(
     catalog: str = None,
     schema: str = None,
     timeout: int = 180,
+    query_tags: str = None,
 ) -> List[Dict[str, Any]]:
     """
     Execute a SQL query on a Databricks SQL Warehouse.
 
     If no warehouse_id is provided, automatically selects the best available warehouse.
+
+    IMPORTANT: For creating or dropping schemas, catalogs, and volumes, use the
+    manage_uc_objects tool instead of SQL DDL. Only use execute_sql for queries
+    (SELECT, INSERT, UPDATE) and table DDL (CREATE TABLE, DROP TABLE).
 
     Args:
         sql_query: SQL query to execute
@@ -33,6 +38,8 @@ def execute_sql(
         catalog: Optional catalog context for unqualified table names.
         schema: Optional schema context for unqualified table names.
         timeout: Timeout in seconds (default: 180)
+        query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701").
+            Appears in system.query.history and Query History UI.
 
     Returns:
         List of dictionaries, each representing a row with column names as keys.
@@ -43,6 +50,7 @@ def execute_sql(
         catalog=catalog,
         schema=schema,
         timeout=timeout,
+        query_tags=query_tags,
     )
 
 
@@ -54,12 +62,17 @@ def execute_sql_multi(
     schema: str = None,
     timeout: int = 180,
     max_workers: int = 4,
+    query_tags: str = None,
 ) -> Dict[str, Any]:
     """
     Execute multiple SQL statements with dependency-aware parallelism.
 
     Parses SQL content into statements, analyzes dependencies, and executes
     in optimal order. Independent queries run in parallel.
+
+    IMPORTANT: For creating or dropping schemas, catalogs, and volumes, use the
+    manage_uc_objects tool instead of SQL DDL. Only use execute_sql/execute_sql_multi
+    for queries (SELECT, INSERT, UPDATE) and table DDL (CREATE TABLE, DROP TABLE).
 
     Args:
         sql_content: SQL content with multiple statements separated by ;
@@ -68,6 +81,7 @@ def execute_sql_multi(
         schema: Optional schema context for unqualified table names.
         timeout: Timeout per query in seconds (default: 180)
         max_workers: Maximum parallel queries per group (default: 4)
+        query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701").
 
     Returns:
         Dictionary with results per query and execution summary.
@@ -79,6 +93,7 @@ def execute_sql_multi(
         schema=schema,
         timeout=timeout,
         max_workers=max_workers,
+        query_tags=query_tags,
     )
 
 
@@ -141,4 +156,4 @@ def get_table_details(
         warehouse_id=warehouse_id,
     )
     # Convert to dict for JSON serialization
-    return result.model_dump() if hasattr(result, "model_dump") else result
+    return result.model_dump(exclude_none=True) if hasattr(result, "model_dump") else result

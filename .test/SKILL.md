@@ -49,9 +49,9 @@ The `/skill-test` command provides an interactive CLI for testing Databricks ski
 ### Quick Examples
 
 ```
-/skill-test spark-declarative-pipelines run
-/skill-test spark-declarative-pipelines add --trace
-/skill-test spark-declarative-pipelines review --batch --filter-success
+/skill-test databricks-spark-declarative-pipelines run
+/skill-test databricks-spark-declarative-pipelines add --trace
+/skill-test databricks-spark-declarative-pipelines review --batch --filter-success
 /skill-test my-new-skill init
 ```
 
@@ -146,9 +146,9 @@ Create CLIContext with MCP tools before calling any command. See [Python API](re
 | Routing tests | `{repo_root}/.test/skills/_routing/ground_truth.yaml` |
 | Baselines | `{repo_root}/.test/baselines/{skill-name}/baseline.yaml` |
 
-For example, to test `spark-declarative-pipelines` in this repository:
+For example, to test `databricks-spark-declarative-pipelines` in this repository:
 ```
-/Users/.../ai-dev-kit/.test/skills/spark-declarative-pipelines/ground_truth.yaml
+/Users/.../ai-dev-kit/.test/skills/databricks-spark-declarative-pipelines/ground_truth.yaml
 ```
 
 **Not** relative to the skill definition:

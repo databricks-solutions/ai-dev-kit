@@ -1,8 +1,0 @@
-{
-  "hooks": [
-    {
-      "event": "plugin-installed",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/setup.sh"
-    }
-  ]
-}

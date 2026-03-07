@@ -97,7 +97,6 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint]
-fix = true
 select = ["E", "W", "F", "Q", "I", "D"]
 ignore = [
   "D105",

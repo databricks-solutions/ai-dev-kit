@@ -18,9 +18,7 @@ import pytest
 from databricks_tools_core.unity_catalog import (
     create_monitor,
     get_monitor,
-    run_monitor_refresh,
     list_monitor_refreshes,
-    delete_monitor,
 )
 
 logger = logging.getLogger(__name__)

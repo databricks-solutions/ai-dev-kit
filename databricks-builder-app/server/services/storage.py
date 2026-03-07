@@ -3,9 +3,8 @@
 Provides user-scoped CRUD operations using async SQLAlchemy.
 """
 
-from typing import Optional
-
 import json
+from typing import Optional
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import selectinload

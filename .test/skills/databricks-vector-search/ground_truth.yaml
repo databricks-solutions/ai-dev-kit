@@ -1,0 +1,345 @@
+metadata:
+  skill_name: databricks-vector-search
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: vs_create_endpoint_001
+  inputs:
+    prompt: "How do I create a vector search endpoint in Databricks?"
+  outputs:
+    response: |
+      ```python
+      from databricks.sdk import WorkspaceClient
+
+      w = WorkspaceClient()
+
+      # Create a standard endpoint
+      endpoint = w.vector_search_endpoints.create_endpoint(
+          name="my-vs-endpoint",
+          endpoint_type="STANDARD"  # or "STORAGE_OPTIMIZED"
+      )
+      # Endpoint creation is asynchronous; check status with get_endpoint()
+      ```
+
+      Two endpoint types are available:
+      - **STANDARD**: Best for low-latency queries
+      - **STORAGE_OPTIMIZED**: Best for large-scale, cost-effective deployments
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Endpoints are created with w.vector_search_endpoints.create_endpoint()"
+    - "Two endpoint types: STANDARD and STORAGE_OPTIMIZED"
+    - "Endpoint creation is asynchronous"
+    expected_patterns:
+    - pattern: "create_endpoint"
+      min_count: 1
+      description: "Uses create_endpoint() method"
+    - pattern: "STANDARD"
+      min_count: 1
+      description: "Shows STANDARD endpoint type"
+    - pattern: "STORAGE_OPTIMIZED"
+      min_count: 1
+      description: "Shows STORAGE_OPTIMIZED endpoint type"
+    guidelines:
+    - "Must show both STANDARD and STORAGE_OPTIMIZED endpoint types"
+    - "Must mention that endpoint creation is asynchronous"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: vs_delta_sync_managed_002
+  inputs:
+    prompt: "How do I create a Delta Sync index with managed embeddings?"
+  outputs:
+    response: |
+      ```python
+      # Source table must have: primary key column + text column
+      index = w.vector_search_indexes.create_index(
+          name="catalog.schema.my_index",
+          endpoint_name="my-vs-endpoint",
+          primary_key="id",
+          index_type="DELTA_SYNC",
+          delta_sync_index_spec={
+              "source_table": "catalog.schema.documents",
+              "embedding_source_columns": [
+                  {
+                      "name": "content",
+                      "embedding_model_endpoint_name": "databricks-gte-large-en"
+                  }
+              ],
+              "pipeline_type": "TRIGGERED"  # or "CONTINUOUS"
+          }
+      )
+      ```
+
+      Databricks automatically embeds the text column using the specified model. Pipeline types: TRIGGERED (manual sync) or CONTINUOUS (auto-sync on source changes).
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Delta Sync index automatically syncs from a source Delta table"
+    - "Managed embeddings use embedding_source_columns with a model endpoint"
+    - "TRIGGERED pipeline syncs on demand; CONTINUOUS syncs automatically"
+    - "databricks-gte-large-en is a built-in embedding model"
+    expected_patterns:
+    - pattern: "create_index"
+      min_count: 1
+      description: "Uses create_index() method"
+    - pattern: "DELTA_SYNC"
+      min_count: 1
+      description: "Specifies Delta Sync index type"
+    - pattern: "embedding_source_columns"
+      min_count: 1
+      description: "Configures managed embedding columns"
+    - pattern: "databricks-gte-large-en"
+      min_count: 1
+      description: "Uses built-in embedding model"
+    guidelines:
+    - "Must show the full create_index call with delta_sync_index_spec"
+    - "Must explain TRIGGERED vs CONTINUOUS pipeline types"
+    - "Must specify a Databricks embedding model endpoint"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: vs_delta_sync_self_managed_003
+  inputs:
+    prompt: "How do I create a Delta Sync index with pre-computed embeddings?"
+  outputs:
+    response: |
+      ```python
+      # Source table must have: primary key + embedding vector column
+      index = w.vector_search_indexes.create_index(
+          name="catalog.schema.my_index",
+          endpoint_name="my-vs-endpoint",
+          primary_key="id",
+          index_type="DELTA_SYNC",
+          delta_sync_index_spec={
+              "source_table": "catalog.schema.documents",
+              "embedding_vector_columns": [
+                  {
+                      "name": "embedding",
+                      "embedding_dimension": 768
+                  }
+              ],
+              "pipeline_type": "TRIGGERED"
+          }
+      )
+      ```
+
+      Use self-managed embeddings when you need a specific embedding model not available as a Databricks endpoint, or when you pre-compute embeddings in a pipeline.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Self-managed embeddings use embedding_vector_columns instead of embedding_source_columns"
+    - "embedding_dimension must match the dimension of your pre-computed vectors"
+    - "The source table must already contain an embedding column"
+    expected_patterns:
+    - pattern: "embedding_vector_columns"
+      min_count: 1
+      description: "Uses self-managed embedding columns"
+    - pattern: "embedding_dimension"
+      min_count: 1
+      description: "Specifies embedding dimension"
+    - pattern: "DELTA_SYNC"
+      min_count: 1
+      description: "Uses Delta Sync index type"
+    guidelines:
+    - "Must use embedding_vector_columns (not embedding_source_columns)"
+    - "Must include embedding_dimension parameter"
+    - "Must explain when to use self-managed vs managed embeddings"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: vs_query_index_004
+  inputs:
+    prompt: "How do I query a vector search index and get similarity results?"
+  outputs:
+    response: |
+      ```python
+      results = w.vector_search_indexes.query_index(
+          index_name="catalog.schema.my_index",
+          columns=["id", "content", "metadata"],
+          query_text="What is machine learning?",
+          num_results=5
+      )
+
+      for doc in results.result.data_array:
+          score = doc[-1]  # Similarity score is last column
+          print(f"Score: {score}, Content: {doc[1][:100]}...")
+      ```
+
+      For managed embedding indexes, use `query_text`. For self-managed, use `query_vector` with a pre-computed embedding.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "query_index() searches for similar documents by text or vector"
+    - "query_text is used for managed embedding indexes"
+    - "query_vector is used for self-managed embedding indexes"
+    - "Similarity score is the last column in the result array"
+    expected_patterns:
+    - pattern: "query_index"
+      min_count: 1
+      description: "Uses query_index() method"
+    - pattern: "query_text"
+      min_count: 1
+      description: "Uses text-based query"
+    - pattern: "num_results"
+      min_count: 1
+      description: "Specifies number of results"
+    - pattern: "data_array"
+      min_count: 1
+      description: "Accesses result data array"
+    guidelines:
+    - "Must show query_text for managed embeddings"
+    - "Must mention query_vector as alternative for self-managed"
+    - "Must show how to access similarity scores"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: vs_query_with_filters_005
+  inputs:
+    prompt: "How do I apply metadata filters when querying a vector search index?"
+  outputs:
+    response: |
+      ```python
+      results = w.vector_search_indexes.query_index(
+          index_name="catalog.schema.my_index",
+          columns=["id", "content", "category"],
+          query_text="machine learning best practices",
+          num_results=10,
+          filters_json='{"category": "technical", "status": "published"}'
+      )
+      ```
+
+      The `filters_json` parameter accepts a JSON string of key-value pairs that filter results by metadata columns before similarity ranking. Only documents matching all filters are returned.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "filters_json accepts a JSON string for metadata filtering"
+    - "Filters are applied before similarity ranking"
+    - "All filter conditions must be satisfied (AND logic)"
+    expected_patterns:
+    - pattern: "filters_json"
+      min_count: 1
+      description: "Uses filters_json parameter"
+    - pattern: "query_index"
+      min_count: 1
+      description: "Uses query_index() method"
+    - pattern: "query_text"
+      min_count: 1
+      description: "Combines text query with filters"
+    guidelines:
+    - "Must show filters_json parameter with a JSON string"
+    - "Must explain that filters are applied before similarity ranking"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: vs_cli_reference_006
+  inputs:
+    prompt: "What CLI commands are available for managing Databricks vector search?"
+  outputs:
+    response: |
+      ```bash
+      # List endpoints
+      databricks vector-search endpoints list
+
+      # Create endpoint
+      databricks vector-search endpoints create \
+          --name my-endpoint \
+          --endpoint-type STANDARD
+
+      # List indexes on endpoint
+      databricks vector-search indexes list-indexes \
+          --endpoint-name my-endpoint
+
+      # Get index status
+      databricks vector-search indexes get-index \
+          --index-name catalog.schema.my_index
+
+      # Sync index (for TRIGGERED pipeline)
+      databricks vector-search indexes sync-index \
+          --index-name catalog.schema.my_index
+
+      # Delete index
+      databricks vector-search indexes delete-index \
+          --index-name catalog.schema.my_index
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Vector search CLI commands are under databricks vector-search"
+    - "sync-index triggers a manual sync for TRIGGERED pipeline indexes"
+    - "Endpoints and indexes are managed as separate subcommands"
+    expected_patterns:
+    - pattern: "databricks vector-search endpoints"
+      min_count: 1
+      description: "Shows endpoint management commands"
+    - pattern: "databricks vector-search indexes"
+      min_count: 1
+      description: "Shows index management commands"
+    - pattern: "sync-index"
+      min_count: 1
+      description: "Shows manual sync command"
+    guidelines:
+    - "Must show both endpoint and index management commands"
+    - "Must include sync-index for triggered pipelines"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: vs_embedding_models_007
+  inputs:
+    prompt: "What embedding models are available for vector search indexes?"
+  outputs:
+    response: |
+      Databricks provides built-in embedding models for managed indexes:
+
+      | Model | Dimensions |
+      |-------|-----------|
+      | `databricks-gte-large-en` | 1024 |
+      | `databricks-bge-large-en` | 1024 |
+
+      ```python
+      # Use with managed embeddings in index creation
+      embedding_source_columns=[
+          {
+              "name": "content",
+              "embedding_model_endpoint_name": "databricks-gte-large-en"
+          }
+      ]
+      ```
+
+      You can also use custom embedding models deployed as serving endpoints.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "databricks-gte-large-en produces 1024-dimensional embeddings"
+    - "databricks-bge-large-en produces 1024-dimensional embeddings"
+    - "Custom embedding models can also be used via serving endpoints"
+    expected_patterns:
+    - pattern: "databricks-gte-large-en"
+      min_count: 1
+      description: "Lists GTE embedding model"
+    - pattern: "databricks-bge-large-en"
+      min_count: 1
+      description: "Lists BGE embedding model"
+    - pattern: "1024"
+      min_count: 1
+      description: "Specifies embedding dimensions"
+    guidelines:
+    - "Must list at least two built-in embedding models with dimensions"
+    - "Must mention that custom models can also be used"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated

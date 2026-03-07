@@ -3,6 +3,9 @@ Databricks REST API Client
 
 Shared HTTP client for all Databricks API operations.
 Uses Databricks SDK for authentication to support both PAT and OAuth.
+
+All clients are tagged with a custom product identifier and auto-detected
+project name so that API calls are attributable in ``system.access.audit``.
 """
 
 import os
@@ -10,6 +13,8 @@ from typing import Dict, Any, Optional, Callable
 import requests
 
 from databricks.sdk import WorkspaceClient
+
+from .identity import PRODUCT_NAME, PRODUCT_VERSION, tag_client
 
 
 def _has_oauth_credentials() -> bool:
@@ -88,6 +93,9 @@ class DatabricksClient:
             token: Databricks personal access token (optional - uses SDK auth if not provided)
             profile: Profile name from ~/.databrickscfg (e.g., "ai-strat")
         """
+        # Common kwargs for product identification in user-agent
+        product_kwargs = dict(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
+
         # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M
         # This prevents the SDK from detecting other auth methods like PAT or config file
         if _has_oauth_credentials():
@@ -96,23 +104,26 @@ class DatabricksClient:
             client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
 
             # Explicitly configure OAuth M2M to prevent auth conflicts
-            self._sdk_client = WorkspaceClient(
-                host=oauth_host,
-                client_id=client_id,
-                client_secret=client_secret,
+            self._sdk_client = tag_client(
+                WorkspaceClient(
+                    host=oauth_host,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    **product_kwargs,
+                )
             )
         elif host and token:
             # Development mode: explicit PAT auth
-            self._sdk_client = WorkspaceClient(host=host, token=token)
+            self._sdk_client = tag_client(WorkspaceClient(host=host, token=token, **product_kwargs))
         elif host:
             # Host provided, use SDK default auth
-            self._sdk_client = WorkspaceClient(host=host)
+            self._sdk_client = tag_client(WorkspaceClient(host=host, **product_kwargs))
         elif profile:
             # Use config profile
-            self._sdk_client = WorkspaceClient(profile=profile)
+            self._sdk_client = tag_client(WorkspaceClient(profile=profile, **product_kwargs))
         else:
             # Use default SDK auth (env vars, config file)
-            self._sdk_client = WorkspaceClient()
+            self._sdk_client = tag_client(WorkspaceClient(**product_kwargs))
 
         # Get host from SDK config
         self.host = self._sdk_client.config.host.rstrip("/") if self._sdk_client.config.host else ""
@@ -133,11 +144,15 @@ class DatabricksClient:
 
     @property
     def headers(self) -> Dict[str, str]:
-        """Get authentication headers using SDK's authenticate method.
+        """Get authentication and user-agent headers.
 
-        This generates fresh OAuth tokens when needed, avoiding token expiration issues.
+        Includes SDK authentication (fresh OAuth tokens when needed) and the
+        product/project User-Agent so raw ``requests`` calls are also tracked
+        in ``system.access.audit``.
         """
-        return self._authenticate()
+        headers = self._authenticate()
+        headers["User-Agent"] = self._sdk_client.config.user_agent
+        return headers
 
     def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """

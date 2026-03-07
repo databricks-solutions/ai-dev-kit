@@ -1,9 +1,9 @@
 """
-Agent Bricks Manager - Manage Genie Spaces, Knowledge Assistants, and Multi-Agent Supervisors.
+Agent Bricks Manager - Manage Genie Spaces, Knowledge Assistants, and Supervisor Agents.
 
 Unified wrapper for Agent Bricks tiles with operations for:
 - Knowledge Assistants (KA): Document-based Q&A systems
-- Multi-Agent Supervisors (MAS): Multi-agent orchestration
+- Supervisor Agents (MAS): Multi-agent orchestration
 - Genie Spaces: SQL-based data exploration
 """
 
@@ -13,15 +13,14 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from databricks.sdk import WorkspaceClient
 
-from ..auth import get_workspace_client
+from ..auth import get_workspace_client, get_current_username
 from .models import (
     EndpointStatus,
-    EvaluationRunDict,
     GenieIds,
     GenieListInstructionsResponseDict,
     GenieListQuestionsResponseDict,
@@ -638,7 +637,7 @@ class AgentBricksManager:
         return knowledge_sources
 
     # ========================================================================
-    # Multi-Agent Supervisor (MAS) Operations
+    # Supervisor Agent (MAS) Operations
     # ========================================================================
 
     def mas_create(
@@ -648,10 +647,10 @@ class AgentBricksManager:
         description: Optional[str] = None,
         instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a Multi-Agent Supervisor with specified agents.
+        """Create a Supervisor Agent with specified agents.
 
         Args:
-            name: Name for the MAS
+            name: Name for the Supervisor Agent
             agents: List of agent configurations (BaseAgent format):
                 {
                     "name": "Agent Name",
@@ -663,7 +662,7 @@ class AgentBricksManager:
             instructions: Optional instructions
 
         Returns:
-            MAS creation response
+            Supervisor Agent creation response
         """
         payload = {"name": self.sanitize_name(name), "agents": agents}
         if description:
@@ -691,7 +690,7 @@ class AgentBricksManager:
         instructions: Optional[str] = None,
         agents: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Update a Multi-Agent Supervisor."""
+        """Update a Supervisor Agent."""
         payload = {"tile_id": tile_id}
         if name:
             payload["name"] = self.sanitize_name(name)
@@ -959,7 +958,7 @@ class AgentBricksManager:
 
         # Delete existing
         for question_id in existing_ids:
-            actions.append({"action_type": "DELETE", "curated_question_id": question_id})
+            actions.append({"action_type": "DELETE", "curated_question": {"id": question_id}})
 
         # Create new
         for question_text in questions:
@@ -1159,6 +1158,8 @@ class AgentBricksManager:
         """Get the best available SQL warehouse ID for Genie spaces.
 
         Prioritizes running warehouses, then starting ones, preferring smaller sizes.
+        Within the same state/size tier, warehouses owned by the current user are
+        preferred (soft preference — no warehouses are excluded).
 
         Returns:
             Warehouse ID string, or None if no warehouses available.
@@ -1168,7 +1169,10 @@ class AgentBricksManager:
             if not warehouses:
                 return None
 
-            # Sort by state (RUNNING first) and size (smaller first)
+            current_user = get_current_username()
+
+            # Sort by state (RUNNING first) and size (smaller first),
+            # with a soft preference for user-owned warehouses within each tier
             size_order = [
                 "2X-Small",
                 "X-Small",
@@ -1187,7 +1191,9 @@ class AgentBricksManager:
                     size_priority = size_order.index(wh.cluster_size)
                 except ValueError:
                     size_priority = 99
-                return (state_priority, size_priority)
+                # Soft preference: user-owned warehouses sort first (0) within same tier
+                owner_priority = 0 if (current_user and (wh.creator_name or "").lower() == current_user.lower()) else 1
+                return (state_priority, size_priority, owner_priority)
 
             warehouses_sorted = sorted(warehouses, key=sort_key)
             return warehouses_sorted[0].id if warehouses_sorted else None

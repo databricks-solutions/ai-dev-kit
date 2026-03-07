@@ -1,31 +1,69 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, and Gemini CLI.
 #
-# Usage:
+# Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
+#        .\install.ps1 [OPTIONS]
+#
+# Examples:
+#   # Basic installation (uses DEFAULT profile, project scope, latest release)
 #   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex
-#   .\install.ps1 -Global
+#
+#   # Download and run with options
+#   irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
+#
+#   # Global installation with force reinstall
+#   .\install.ps1 -Global -Force
+#
+#   # Specify profile and force reinstall
+#   .\install.ps1 -Profile DEFAULT -Force
+#
+#   # Install for specific tools only
+#   .\install.ps1 -Tools cursor
+#
+#   # Skills only (skip MCP server)
 #   .\install.ps1 -SkillsOnly
-#   .\install.ps1 -McpOnly
-#   .\install.ps1 -Tools cursor,codex,copilot
-#   .\install.ps1 -Force
+#
+#   # Install specific branch or tag
+#   $env:AIDEVKIT_BRANCH = '0.1.0'; .\install.ps1
 #
 
 $ErrorActionPreference = "Stop"
 
 # ─── Configuration ────────────────────────────────────────────
-$RepoUrl   = "https://github.com/databricks-solutions/ai-dev-kit.git"
-$RawUrl    = "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
+$Owner = "databricks-solutions"
+$Repo  = "ai-dev-kit"
+
+# Determine branch/tag to use
+if ($env:AIDEVKIT_BRANCH) {
+    $Branch = $env:AIDEVKIT_BRANCH
+} else {
+    try {
+        $latestReleaseUri = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
+        $latestRelease = Invoke-WebRequest -Uri $latestReleaseUri -Headers @{ "Accept" = "application/json" } -UseBasicParsing -ErrorAction Stop
+        $Branch = ($latestRelease.Content | ConvertFrom-Json).tag_name
+    } catch {
+        $Branch = "main"
+    }
+}
+
+$RepoUrl   = "https://github.com/$Owner/$Repo.git"
+$RawUrl    = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
 $InstallDir = if ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $env:USERPROFILE ".ai-dev-kit" }
 $RepoDir   = Join-Path $InstallDir "repo"
 $VenvDir   = Join-Path $InstallDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $McpEntry  = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
 
+# Minimum required versions
+$MinCliVersion = "0.278.0"
+$MinSdkVersion = "0.85.0"
+
 # ─── Defaults ─────────────────────────────────────────────────
 $script:Profile_     = "DEFAULT"
 $script:Scope        = "project"
+$script:ScopeExplicit = $false  # Track if --global was explicitly passed
 $script:InstallMcp   = $true
 $script:InstallSkills = $true
 $script:Force        = $false
@@ -38,11 +76,13 @@ $script:ProfileProvided = $false
 
 # Databricks skills (bundled in repo)
 $script:Skills = @(
-    "agent-bricks", "aibi-dashboards", "asset-bundles", "databricks-app-apx",
-    "databricks-app-python", "databricks-config", "databricks-docs", "databricks-genie",
-    "databricks-jobs", "databricks-python-sdk", "databricks-unity-catalog",
-    "lakebase-provisioned", "model-serving", "spark-declarative-pipelines",
-    "synthetic-data-generation", "unstructured-pdf-generation"
+    "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-app-apx", "databricks-app-python",
+    "databricks-asset-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
+    "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
+    "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-parsing",
+    "databricks-python-sdk", "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
+    "databricks-synthetic-data-gen", "databricks-unity-catalog", "databricks-unstructured-pdf-generation",
+    "databricks-vector-search", "databricks-zerobus-ingest", "spark-python-data-source"
 )
 
 # MLflow skills (fetched from mlflow/skills repo)
@@ -82,7 +122,7 @@ $i = 0
 while ($i -lt $args.Count) {
     switch ($args[$i]) {
         { $_ -in "-p", "--profile" }  { $script:Profile_ = $args[$i + 1]; $script:ProfileProvided = $true; $i += 2 }
-        { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $i++ }
+        { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $script:ScopeExplicit = $true; $i++ }
         { $_ -in "--skills-only", "-SkillsOnly" } { $script:InstallMcp = $false; $i++ }
         { $_ -in "--mcp-only", "-McpOnly" }    { $script:InstallSkills = $false; $i++ }
         { $_ -in "--mcp-path", "-McpPath" }    { $script:UserMcpPath = $args[$i + 1]; $i += 2 }
@@ -92,7 +132,7 @@ while ($i -lt $args.Count) {
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
             Write-Host ""
-            Write-Host "Usage: irm .../install.ps1 | iex"
+            Write-Host "Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1"
             Write-Host "       .\install.ps1 [OPTIONS]"
             Write-Host ""
             Write-Host "Options:"
@@ -102,9 +142,24 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
+            Write-Host ""
+            Write-Host "Environment Variables:"
+            Write-Host "  AIDEVKIT_BRANCH       Branch or tag to install (default: latest release)"
+            Write-Host "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
+            Write-Host ""
+            Write-Host "Examples:"
+            Write-Host "  # Basic installation"
+            Write-Host "  irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex"
+            Write-Host ""
+            Write-Host "  # Download and run with options"
+            Write-Host "  irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1"
+            Write-Host "  .\install.ps1 -Global -Force"
+            Write-Host ""
+            Write-Host "  # Specify profile and force reinstall"
+            Write-Host "  .\install.ps1 -Profile DEFAULT -Force"
             return
         }
         default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
@@ -417,14 +472,16 @@ function Invoke-DetectTools {
     $hasCodex   = $null -ne (Get-Command codex -ErrorAction SilentlyContinue)
     $hasCopilot = ($null -ne (Get-Command code -ErrorAction SilentlyContinue)) -or
                   (Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe")
+    $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
     $codexState   = $hasCodex;   $codexHint   = if ($hasCodex)   { "detected" } else { "not found" }
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
+    $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -439,6 +496,7 @@ function Invoke-DetectTools {
         @{ Label = "Cursor";         Value = "cursor";  State = $cursorState;  Hint = $cursorHint }
         @{ Label = "GitHub Copilot"; Value = "copilot"; State = $copilotState; Hint = $copilotHint }
         @{ Label = "OpenAI Codex";   Value = "codex";   State = $codexState;   Hint = $codexHint }
+        @{ Label = "Gemini CLI";     Value = "gemini";  State = $geminiState;  Hint = $geminiHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -480,11 +538,23 @@ function Invoke-PromptProfile {
             if ($p -eq "DEFAULT") { $sel = $true; $hint = "default" }
             $items += @{ Label = $p; Value = $p; Selected = $sel; Hint = $hint }
         }
-        if (-not $hasDefault -and $items.Count -gt 0) {
+        
+        # Add custom profile option at the end
+        $items += @{ Label = "Custom profile name..."; Value = "__CUSTOM__"; Selected = $false; Hint = "Enter a custom profile name" }
+        
+        if (-not $hasDefault -and $items.Count -gt 1) {
             $items[0].Selected = $true
         }
 
-        $script:Profile_ = Select-Radio -Items $items
+        $selectedProfile = Select-Radio -Items $items
+        
+        # If custom was selected, prompt for name
+        if ($selectedProfile -eq "__CUSTOM__") {
+            Write-Host ""
+            $script:Profile_ = Read-Prompt -PromptText "Enter profile name" -Default "DEFAULT"
+        } else {
+            $script:Profile_ = $selectedProfile
+        }
     } else {
         Write-Host "  No ~/.databrickscfg found. You can authenticate after install." -ForegroundColor DarkGray
         Write-Host ""
@@ -524,7 +594,22 @@ function Test-Dependencies {
 
     # Databricks CLI
     if (Get-Command databricks -ErrorAction SilentlyContinue) {
-        Write-Ok "databricks CLI"
+        try {
+            $cliOutput = & databricks --version 2>&1
+            if ($cliOutput -match '(\d+\.\d+\.\d+)') {
+                $cliVersion = $Matches[1]
+                if ([version]$cliVersion -ge [version]$MinCliVersion) {
+                    Write-Ok "Databricks CLI v$cliVersion"
+                } else {
+                    Write-Warn "Databricks CLI v$cliVersion is outdated (minimum: v$MinCliVersion)"
+                    Write-Msg "  Upgrade: winget upgrade Databricks.DatabricksCLI"
+                }
+            } else {
+                Write-Warn "Could not determine Databricks CLI version"
+            }
+        } catch {
+            Write-Warn "Could not determine Databricks CLI version"
+        }
     } else {
         Write-Warn "Databricks CLI not found. Install: winget install Databricks.DatabricksCLI"
         Write-Msg "You can still install, but authentication will require the CLI later."
@@ -583,22 +668,23 @@ function Install-McpServer {
 
     # Clone or update repo
     if (Test-Path (Join-Path $script:RepoDir ".git")) {
-        & git -C $script:RepoDir pull -q 2>&1 | Out-Null
+        & git -C $script:RepoDir fetch -q --depth 1 origin $Branch 2>&1 | Out-Null
+        & git -C $script:RepoDir reset --hard FETCH_HEAD 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Remove-Item -Recurse -Force $script:RepoDir -ErrorAction SilentlyContinue
-            & git clone -q --depth 1 $RepoUrl $script:RepoDir 2>&1 | Out-Null
+            & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
         }
     } else {
         if (-not (Test-Path $script:InstallDir)) {
             New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
         }
-        & git clone -q --depth 1 $RepoUrl $script:RepoDir 2>&1 | Out-Null
+        & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
     }
     if ($LASTEXITCODE -ne 0) {
         $ErrorActionPreference = $prevEAP
         Write-Err "Failed to clone repository"
     }
-    Write-Ok "Repository cloned"
+    Write-Ok "Repository cloned ($Branch)"
 
     # Create venv and install
     Write-Msg "Installing Python dependencies..."
@@ -624,6 +710,24 @@ function Install-McpServer {
 
     $ErrorActionPreference = $prevEAP
     Write-Ok "MCP server ready"
+
+    # Check Databricks SDK version
+    try {
+        $sdkOutput = & $script:VenvPython -c "from databricks.sdk.version import __version__; print(__version__)" 2>&1
+        if ($sdkOutput -match '(\d+\.\d+\.\d+)') {
+            $sdkVersion = $Matches[1]
+            if ([version]$sdkVersion -ge [version]$MinSdkVersion) {
+                Write-Ok "Databricks SDK v$sdkVersion"
+            } else {
+                Write-Warn "Databricks SDK v$sdkVersion is outdated (minimum: v$MinSdkVersion)"
+                Write-Msg "  Upgrade: $($script:VenvPython) -m pip install --upgrade databricks-sdk"
+            }
+        } else {
+            Write-Warn "Could not determine Databricks SDK version"
+        }
+    } catch {
+        Write-Warn "Could not determine Databricks SDK version"
+    }
 }
 
 # ─── Install skills ──────────────────────────────────────────
@@ -643,6 +747,7 @@ function Install-Skills {
             }
             "copilot" { $dirs += Join-Path $BaseDir ".github\skills" }
             "codex"   { $dirs += Join-Path $BaseDir ".agents\skills" }
+            "gemini"  { $dirs += Join-Path $BaseDir ".gemini\skills" }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -821,6 +926,97 @@ args = ["$entryPath"]
     Add-Content -Path $Path -Value $tomlBlock -Encoding UTF8
 }
 
+function Write-GeminiMcpJson {
+    param([string]$Path)
+
+    $dir = Split-Path $Path -Parent
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+
+    # Backup existing
+    if (Test-Path $Path) {
+        Copy-Item $Path "$Path.bak" -Force
+        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
+    }
+
+    # Try to merge with existing config
+    if ((Test-Path $Path) -and (Test-Path $script:VenvPython)) {
+        try {
+            $existing = Get-Content $Path -Raw | ConvertFrom-Json
+        } catch {
+            $existing = $null
+        }
+    }
+
+    if ($existing) {
+        if (-not $existing.mcpServers) {
+            $existing | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+        $dbEntry = [PSCustomObject]@{
+            command = $script:VenvPython -replace '\\', '/'
+            args    = @($script:McpEntry -replace '\\', '/')
+            env     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
+        }
+        $existing.mcpServers | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
+        $existing | ConvertTo-Json -Depth 10 | Set-Content $Path -Encoding UTF8
+    } else {
+        $pythonPath = $script:VenvPython -replace '\\', '/'
+        $entryPath  = $script:McpEntry -replace '\\', '/'
+        $json = @"
+{
+  "mcpServers": {
+    "databricks": {
+      "command": "$pythonPath",
+      "args": ["$entryPath"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "$($script:Profile_)"}
+    }
+  }
+}
+"@
+        Set-Content -Path $Path -Value $json -Encoding UTF8
+    }
+}
+
+function Write-GeminiMd {
+    param([string]$Path)
+
+    if (Test-Path $Path) { return }  # Don't overwrite existing file
+
+    $content = @"
+# Databricks AI Dev Kit
+
+You have access to Databricks skills and MCP tools installed by the Databricks AI Dev Kit.
+
+## Available MCP Tools
+
+The ``databricks`` MCP server provides 50+ tools for interacting with Databricks, including:
+- SQL execution and warehouse management
+- Unity Catalog operations (tables, volumes, schemas)
+- Jobs and workflow management
+- Model serving endpoints
+- Genie spaces and AI/BI dashboards
+- Databricks Apps deployment
+
+## Available Skills
+
+Skills are installed in ``.gemini/skills/`` and provide patterns and best practices for:
+- Spark Declarative Pipelines, Structured Streaming
+- Databricks Jobs, Asset Bundles
+- Unity Catalog, SQL, Genie
+- MLflow evaluation and tracing
+- Model Serving, Vector Search
+- Databricks Apps (Python and APX)
+- And more
+
+## Getting Started
+
+Try asking: "List my SQL warehouses" or "Show my Unity Catalog schemas"
+"@
+    Set-Content -Path $Path -Value $content -Encoding UTF8
+    Write-Ok "GEMINI.md"
+}
+
 function Write-McpConfigs {
     param([string]$BaseDir)
 
@@ -866,6 +1062,14 @@ function Write-McpConfigs {
                 }
                 Write-Ok "Codex MCP config"
             }
+            "gemini" {
+                if ($script:Scope -eq "global") {
+                    Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\settings.json")
+                } else {
+                    Write-GeminiMcpJson (Join-Path $BaseDir ".gemini\settings.json")
+                }
+                Write-Ok "Gemini CLI MCP config"
+            }
         }
     }
 }
@@ -903,9 +1107,6 @@ function Show-Summary {
     Write-Host ""
     Write-Msg "Next steps:"
     $step = 1
-    Write-Msg "$step. Configure profile $($script:Profile_) or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN."
-    Write-Msg "   Authenticate: databricks auth login --profile $($script:Profile_)"
-    $step++
     if ($script:Tools -match 'cursor') {
         Write-Msg "$step. Enable MCP in Cursor: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
         $step++
@@ -916,10 +1117,110 @@ function Show-Summary {
         Write-Msg "$step. Use Copilot in Agent mode to access Databricks skills and MCP tools"
         $step++
     }
+    if ($script:Tools -match 'gemini') {
+        Write-Msg "$step. Launch Gemini CLI in your project: gemini"
+        $step++
+    }
     Write-Msg "$step. Open your project in your tool of choice"
     $step++
     Write-Msg "$step. Try: `"List my SQL warehouses`""
     Write-Host ""
+}
+
+# ─── Scope prompt ─────────────────────────────────────────────
+function Invoke-PromptScope {
+    if ($script:Silent) { return }
+
+    Write-Host ""
+    Write-Host "  Select installation scope" -ForegroundColor White
+    
+    $labels = @("Project", "Global")
+    $values = @("project", "global")
+    $hints = @("Install in current directory (.cursor/, .claude/, .gemini/)", "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
+    $count = 2
+    $selected = 0
+    $cursor = 0
+    
+    $isInteractive = Test-Interactive
+    
+    if (-not $isInteractive) {
+        # Fallback: numbered list
+        Write-Host ""
+        Write-Host "  1. (*) Project  Install in current directory (.cursor/, .claude/, .gemini/)"
+        Write-Host "  2. ( ) Global   Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)"
+        Write-Host ""
+        Write-Host "  Enter number to select (or press Enter for default): " -NoNewline
+        $input_ = Read-Host
+        if (-not [string]::IsNullOrWhiteSpace($input_) -and $input_ -eq "2") {
+            $selected = 1
+        }
+        $script:Scope = $values[$selected]
+        return
+    }
+    
+    # Interactive mode
+    Write-Host ""
+    Write-Host "  Up/Down navigate, Enter select" -ForegroundColor DarkGray
+    Write-Host ""
+    
+    $totalRows = $count
+    
+    try { [Console]::CursorVisible = $false } catch {}
+    
+    $drawScope = {
+        [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $totalRows))
+        for ($j = 0; $j -lt $count; $j++) {
+            if ($j -eq $cursor) {
+                Write-Host "  " -NoNewline
+                Write-Host ">" -ForegroundColor Blue -NoNewline
+                Write-Host " " -NoNewline
+            } else {
+                Write-Host "    " -NoNewline
+            }
+            if ($j -eq $selected) {
+                Write-Host "(*)" -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host "( )" -ForegroundColor DarkGray -NoNewline
+            }
+            $padLabel = $labels[$j].PadRight(20)
+            Write-Host " $padLabel " -NoNewline
+            if ($j -eq $selected) {
+                Write-Host $hints[$j] -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host $hints[$j] -ForegroundColor DarkGray -NoNewline
+            }
+            $pos = [Console]::CursorLeft
+            $remaining = [Console]::WindowWidth - $pos - 1
+            if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+            Write-Host ""
+        }
+    }
+    
+    # Reserve lines
+    for ($j = 0; $j -lt $totalRows; $j++) { Write-Host "" }
+    & $drawScope
+    
+    while ($true) {
+        $key = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        
+        switch ($key.VirtualKeyCode) {
+            38 { if ($cursor -gt 0) { $cursor-- } }
+            40 { if ($cursor -lt 1) { $cursor++ } }
+            32 { $selected = $cursor }
+            13 {
+                $selected = $cursor
+                & $drawScope
+                break
+            }
+        }
+        if ($key.VirtualKeyCode -eq 13) { break }
+        
+        & $drawScope
+    }
+    
+    try { [Console]::CursorVisible = $true } catch {}
+    
+    $script:Scope = $values[$selected]
 }
 
 # ─── Auth prompt ──────────────────────────────────────────────
@@ -987,6 +1288,12 @@ function Invoke-Main {
     Invoke-PromptProfile
     Write-Ok "Profile: $($script:Profile_)"
 
+    # Scope selection
+    if (-not $script:ScopeExplicit) {
+        Invoke-PromptScope
+        Write-Ok "Scope: $($script:Scope)"
+    }
+
     # MCP path
     if ($script:InstallMcp) {
         Invoke-PromptMcpPath
@@ -1041,14 +1348,23 @@ function Invoke-Main {
             New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
         }
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        & git clone -q --depth 1 $RepoUrl $script:RepoDir 2>&1 | Out-Null
+        & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
         $ErrorActionPreference = $prevEAP
-        Write-Ok "Repository cloned"
+        Write-Ok "Repository cloned ($Branch)"
     }
 
     # Install skills
     if ($script:InstallSkills) {
         Install-Skills -BaseDir $baseDir
+    }
+
+    # Write GEMINI.md if gemini is selected
+    if ($script:Tools -match 'gemini') {
+        if ($script:Scope -eq "global") {
+            Write-GeminiMd (Join-Path $env:USERPROFILE "GEMINI.md")
+        } else {
+            Write-GeminiMd (Join-Path $baseDir "GEMINI.md")
+        }
     }
 
     # Write MCP configs
@@ -1059,11 +1375,11 @@ function Invoke-Main {
     # Save version
     Save-Version
 
-    # Summary
-    Show-Summary
-
     # Auth prompt
     Invoke-PromptAuth
+
+    # Summary
+    Show-Summary
 }
 
 Invoke-Main

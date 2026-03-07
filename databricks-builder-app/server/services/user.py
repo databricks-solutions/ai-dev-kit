@@ -2,17 +2,22 @@
 
 In production (Databricks Apps):
 - User email is available in the X-Forwarded-User header
+- X-Forwarded-Email header is accepted from M2M callers forwarding real user identity
 - Access token is available in the X-Forwarded-Access-Token header
+- Bearer tokens from other Databricks Apps (M2M OAuth) are also accepted
 
 In development, we fall back to environment variables and WorkspaceClient.
 """
 
 import asyncio
+import hashlib
 import logging
 import os
+import time
 from typing import Optional
 
 from databricks.sdk import WorkspaceClient
+from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
 from fastapi import Request
 
 logger = logging.getLogger(__name__)
@@ -20,6 +25,11 @@ logger = logging.getLogger(__name__)
 # Cache for dev user to avoid repeated API calls
 _dev_user_cache: Optional[str] = None
 _workspace_url_cache: Optional[str] = None
+
+# Cache for Bearer token -> user identity (keyed on token hash, 5-min TTL)
+_bearer_user_cache: dict[str, tuple[str, float]] = {}
+_BEARER_CACHE_TTL = 300  # 5 minutes
+_BEARER_CACHE_MAX_SIZE = 100  # Max unique tokens to cache
 
 
 def _is_local_development() -> bool:
@@ -37,46 +47,70 @@ def _get_workspace_client() -> WorkspaceClient:
 
   In Databricks Apps, explicitly uses OAuth M2M to avoid conflicts with other auth methods.
   """
+  product_kwargs = dict(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
   if _has_oauth_credentials():
     # Explicitly configure OAuth M2M to prevent auth conflicts
     return WorkspaceClient(
       host=os.environ.get('DATABRICKS_HOST', ''),
       client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
       client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+      **product_kwargs,
     )
   # Development mode - use default SDK auth
-  return WorkspaceClient()
+  return WorkspaceClient(**product_kwargs)
 
 
 async def get_current_user(request: Request) -> str:
   """Get the current user's email from the request.
 
-  In production (Databricks Apps), extracts user from X-Forwarded-User header.
-  In development, calls WorkspaceClient.current_user.me() and caches the result.
+  Auth priority:
+    1. X-Forwarded-User header (browser users via Databricks Apps proxy)
+    2. X-Forwarded-Email header (M2M callers forwarding real user identity)
+    3. Authorization: Bearer token (M2M OAuth from other Databricks Apps)
+    4. WorkspaceClient dev fallback (local development only)
 
   Args:
       request: FastAPI Request object
 
   Returns:
-      User's email address
+      User's email address or service principal identity
 
   Raises:
       ValueError: If user cannot be determined
   """
-  # Try to get user from header first (production mode)
+  # 1. X-Forwarded-User (Databricks Apps proxy for browser users)
   user = request.headers.get('X-Forwarded-User')
   if user:
     logger.debug(f'Got user from X-Forwarded-User header: {user}')
     return user
 
-  # Fall back to WorkspaceClient for development
+  # 2. X-Forwarded-Email (M2M callers forwarding real user identity)
+  forwarded_email = request.headers.get('X-Forwarded-Email')
+  if forwarded_email:
+    logger.debug(f'Got user from X-Forwarded-Email header: {forwarded_email}')
+    return forwarded_email
+
+  # 3. Bearer token (M2M OAuth from other Databricks Apps)
+  auth_header = request.headers.get('Authorization', '')
+  if auth_header.startswith('Bearer '):
+    token = auth_header[7:]
+    if token:
+      try:
+        identity = await _resolve_bearer_user(token)
+        logger.debug(f'Got user from Bearer token: {identity}')
+        return identity
+      except Exception as e:
+        logger.warning(f'Bearer token identity resolution failed: {e}')
+        # Fall through to dev fallback if in development mode
+
+  # 4. Fall back to WorkspaceClient for development
   if _is_local_development():
     return await _get_dev_user()
 
-  # Production without header - this shouldn't happen
+  # Production without any identity source
   raise ValueError(
-    'No X-Forwarded-User header found and not in development mode. '
-    'Ensure the app is deployed with user authentication enabled.'
+    'No X-Forwarded-User/X-Forwarded-Email header found, no valid Bearer token, '
+    'and not in development mode. Ensure the app is deployed with user authentication enabled.'
   )
 
 
@@ -146,6 +180,78 @@ async def get_fmapi_token(request: Request) -> str | None:
   return None
 
 
+async def _resolve_bearer_user(token: str) -> str:
+  """Resolve a Bearer token to a user identity via the Databricks SCIM API.
+
+  Used for app-to-app auth where another Databricks App calls this app's API
+  with an M2M OAuth Bearer token. The token is validated by calling
+  current_user.me() which resolves the service principal's identity.
+
+  Results are cached (keyed on token hash) for 5 minutes to avoid repeated
+  API calls for the same token.
+
+  Args:
+      token: Bearer token from the Authorization header
+
+  Returns:
+      User name or display name of the token's identity
+
+  Raises:
+      ValueError: If the token cannot be resolved to an identity
+  """
+  # Use SHA-256 hash of token as cache key (don't store raw tokens)
+  token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+  # Check cache
+  if token_hash in _bearer_user_cache:
+    cached_user, cached_at = _bearer_user_cache[token_hash]
+    if time.time() - cached_at < _BEARER_CACHE_TTL:
+      logger.debug(f'Using cached Bearer identity: {cached_user}')
+      return cached_user
+    else:
+      # Expired - remove from cache
+      del _bearer_user_cache[token_hash]
+
+  # Resolve identity via Databricks API (run sync SDK call in thread pool)
+  identity = await asyncio.to_thread(_fetch_bearer_identity, token)
+
+  # Evict oldest entries if cache is full
+  if len(_bearer_user_cache) >= _BEARER_CACHE_MAX_SIZE:
+    oldest_key = min(_bearer_user_cache, key=lambda k: _bearer_user_cache[k][1])
+    del _bearer_user_cache[oldest_key]
+
+  # Cache the result
+  _bearer_user_cache[token_hash] = (identity, time.time())
+  logger.info(f'Cached Bearer identity: {identity}')
+
+  return identity
+
+
+def _fetch_bearer_identity(token: str) -> str:
+  """Synchronous helper to resolve a Bearer token to an identity.
+
+  Args:
+      token: Bearer token to resolve
+
+  Returns:
+      User name or display name of the token's identity
+
+  Raises:
+      ValueError: If the token cannot be resolved
+  """
+  try:
+    host = os.environ.get('DATABRICKS_HOST', '')
+    client = WorkspaceClient(host=host, token=token)
+    me = client.current_user.me()
+    identity = me.user_name or me.display_name
+    if not identity:
+      raise ValueError('Bearer token resolved to user without user_name or display_name')
+    return identity
+  except Exception as e:
+    logger.error(f'Failed to resolve Bearer token identity: {e}')
+    raise ValueError(f'Could not resolve Bearer token identity: {e}') from e
+
+
 async def _get_dev_user() -> str:
   """Get user email from WorkspaceClient in development mode."""
   global _dev_user_cache
@@ -189,7 +295,7 @@ def get_workspace_url() -> str:
   Result is cached for subsequent calls.
 
   Returns:
-      Workspace URL (e.g., https://e2-demo-field-eng.cloud.databricks.com)
+      Workspace URL (e.g., https://company-dev.cloud.databricks.com)
   """
   global _workspace_url_cache
 

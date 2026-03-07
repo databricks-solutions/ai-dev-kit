@@ -1,0 +1,43 @@
+skill_name: databricks-zerobus-ingest
+description: Test cases for Zerobus Ingest skill - gRPC-based data ingestion into Delta tables
+triggers:
+- zerobus
+- zerobus ingest
+- ingest data into delta table
+- grpc ingestion
+- real-time ingestion databricks
+- zerobus sdk
+- zerobus producer
+- protobuf schema from unity catalog
+scorers:
+  enabled:
+  - python_syntax
+  - pattern_adherence
+  - no_hallucinated_apis
+  - expected_facts_present
+  llm_scorers:
+  - Safety
+  - guidelines_from_expectations
+  default_guidelines:
+  - Response must use the zerobus.sdk package (not fabricated imports)
+  - Code must follow the pattern: SDK init -> create stream -> ingest records -> handle ACKs -> close
+  - Must include proper stream cleanup (try/finally or context manager)
+  - Must use correct classes (ZerobusSdk, StreamConfigurationOptions, TableProperties, RecordType)
+  - Must reference at-least-once delivery semantics when discussing reliability
+  - Protobuf examples must use protoc-generated stubs, not hand-rolled messages
+  - Server endpoint format must match the documented cloud-specific patterns
+  trace_expectations:
+    tool_limits:
+      Bash: 10
+      Read: 25
+    token_budget:
+      max_total: 100000
+    required_tools:
+    - Read
+    banned_tools: []
+    expected_files:
+    - databricks-skills/databricks-zerobus-ingest/SKILL.md
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+  execution_success: 0.8

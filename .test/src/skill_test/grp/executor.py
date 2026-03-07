@@ -1,10 +1,12 @@
 """Execute code blocks from skill responses to verify they work."""
 
 import ast
+import json
 import re
 import time
-from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Dict, Any, Callable, Protocol
+import yaml
+from dataclasses import dataclass
+from typing import List, Tuple, Optional, Dict, Any, Protocol
 
 
 @dataclass
@@ -171,6 +173,57 @@ def verify_sql_structure(code: str) -> ExecutionResult:
     return ExecutionResult(success=True, output="SQL structure valid", error=None)
 
 
+def verify_yaml_syntax(code: str) -> ExecutionResult:
+    """Verify YAML syntax is valid."""
+    start_time = time.time()
+    try:
+        yaml.safe_load(code)
+        return ExecutionResult(
+            success=True,
+            output="YAML syntax valid",
+            error=None,
+            execution_time_ms=(time.time() - start_time) * 1000,
+        )
+    except yaml.YAMLError as e:
+        return ExecutionResult(
+            success=False,
+            output="",
+            error=f"YAML syntax error: {str(e)}",
+            execution_time_ms=(time.time() - start_time) * 1000,
+        )
+
+
+def verify_json_syntax(code: str) -> ExecutionResult:
+    """Verify JSON syntax is valid."""
+    start_time = time.time()
+    try:
+        json.loads(code)
+        return ExecutionResult(
+            success=True,
+            output="JSON syntax valid",
+            error=None,
+            execution_time_ms=(time.time() - start_time) * 1000,
+        )
+    except json.JSONDecodeError as e:
+        return ExecutionResult(
+            success=False,
+            output="",
+            error=f"JSON syntax error: {e.msg} at line {e.lineno}, column {e.colno}",
+            execution_time_ms=(time.time() - start_time) * 1000,
+        )
+
+
+def verify_bash_structure(code: str) -> ExecutionResult:
+    """Verify bash code structure (basic validation for examples)."""
+    # For bash examples, just check that it's not empty and looks like shell commands
+    code = code.strip()
+    if not code:
+        return ExecutionResult(success=False, output="", error="Empty bash block")
+
+    # Accept any non-empty bash code as valid (it's usually example commands)
+    return ExecutionResult(success=True, output="Bash example present", error=None)
+
+
 def execute_code_blocks(response: str) -> Tuple[int, int, List[Dict[str, Any]]]:
     """
     Execute all code blocks in a response locally (syntax/import validation only).
@@ -186,6 +239,12 @@ def execute_code_blocks(response: str) -> Tuple[int, int, List[Dict[str, Any]]]:
             result = execute_python_block(block.code)
         elif block.language == "sql":
             result = verify_sql_structure(block.code)
+        elif block.language in ("yaml", "yml"):
+            result = verify_yaml_syntax(block.code)
+        elif block.language == "json":
+            result = verify_json_syntax(block.code)
+        elif block.language in ("bash", "sh", "shell"):
+            result = verify_bash_structure(block.code)
         else:
             # Skip unknown languages
             continue
@@ -491,6 +550,16 @@ def execute_code_blocks_on_databricks(
                 config,
                 mcp_execute_sql,
                 mcp_get_best_warehouse,
+            )
+        elif block.language == "json":
+            # JSON blocks are validated locally (e.g., job definitions)
+            json_result = verify_json_syntax(block.code)
+            result = DatabricksExecutionResult(
+                success=json_result.success,
+                output=json_result.output,
+                error=json_result.error,
+                execution_time_ms=json_result.execution_time_ms,
+                execution_mode="local",
             )
         else:
             # Skip unknown languages

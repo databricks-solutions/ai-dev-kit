@@ -1,4 +1,8 @@
-"""Dynamic scorers that use test case expectations from YAML config."""
+"""Dynamic scorers that use test case expectations from YAML config.
+
+DEPRECATED: For optimization, the quality judge in judges.py replaces this.
+This module is kept for backward compatibility with runners/evaluate.py.
+"""
 
 from mlflow.genai.scorers import scorer, Guidelines
 from mlflow.entities import Feedback

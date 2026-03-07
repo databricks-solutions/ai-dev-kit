@@ -50,14 +50,23 @@ async def get_system_prompt_endpoint(
   default_catalog: Optional[str] = Query(None),
   default_schema: Optional[str] = Query(None),
   workspace_folder: Optional[str] = Query(None),
+  project_id: Optional[str] = Query(None),
 ):
   """Get the system prompt with current configuration."""
+  enabled_skills = None
+  if project_id:
+    from ..services.agent import get_project_directory
+    from ..services.skills_manager import get_project_enabled_skills
+    project_dir = get_project_directory(project_id)
+    enabled_skills = get_project_enabled_skills(project_dir)
+
   prompt = get_system_prompt(
     cluster_id=cluster_id,
     default_catalog=default_catalog,
     default_schema=default_schema,
     warehouse_id=warehouse_id,
     workspace_folder=workspace_folder,
+    enabled_skills=enabled_skills,
   )
   return {'system_prompt': prompt}
 

@@ -57,12 +57,20 @@ class SQLDependencyAnalyzer:
         cleaned = self._strip_comments(sql_content)
 
         queries: List[str] = []
-        statements = [s for s in (sqlglot.parse(cleaned, read=self.dialect) or []) if s is not None]
+        # Split by semicolons first to preserve original SQL
+        raw_statements = [s.strip() for s in cleaned.split(";") if s.strip()]
 
-        for stmt in statements:
-            sql = stmt.sql(dialect=self.dialect).strip().rstrip(";")
-            if sql:
-                queries.append(sql + ";")
+        for raw_sql in raw_statements:
+            # Parse to validate and analyze dependencies, but keep original SQL
+            # to preserve formatting like backticks that sqlglot might modify
+            parsed = sqlglot.parse(raw_sql, read=self.dialect)
+            if parsed and parsed[0] is not None:
+                # Use original SQL to preserve backticks and other formatting
+                # that sqlglot might change during regeneration
+                queries.append(raw_sql + ";")
+            elif raw_sql:
+                # If parsing fails, still try to include the statement
+                queries.append(raw_sql + ";")
 
         logger.debug(f"Parsed {len(queries)} queries from SQL content")
         return queries

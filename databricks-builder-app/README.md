@@ -18,7 +18,7 @@ A web application that provides a Claude Code agent interface with integrated Da
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  React Frontend (client/)           FastAPI Backend (server/)               │
 │  ┌─────────────────────┐            ┌─────────────────────────────────┐     │
-│  │ Chat UI             │◄──────────►│ /api/agent/invoke               │     │
+│  │ Chat UI             │◄──────────►│ /api/invoke_agent               │     │
 │  │ Project Selector    │   SSE      │ /api/projects                   │     │
 │  │ Conversation List   │            │ /api/conversations              │     │
 │  └─────────────────────┘            └─────────────────────────────────┘     │
@@ -33,16 +33,16 @@ A web application that provides a Claude Code agent interface with integrated Da
 │  Built-in Tools:              MCP Tools (Databricks):         Skills:       │
 │  ┌──────────────────┐         ┌─────────────────────────┐    ┌───────────┐  │
 │  │ Read, Write, Edit│         │ execute_sql             │    │ sdp       │  │
-│  │ Bash, Glob, Grep │         │ create_or_update_pipeline    │ dabs      │  │
-│  │ Skill            │         │ upload_folder           │    │ sdk       │  │
-│  └──────────────────┘         │ run_python_file         │    │ ...       │  │
+│  │ Glob, Grep, Skill│         │ create_or_update_pipeline    │ dabs      │  │
+│  └──────────────────┘         │ upload_folder           │    │ sdk       │  │
+│                               │ run_python_file         │    │ ...       │  │
 │                               │ ...                     │    └───────────┘  │
 │                               └─────────────────────────┘                   │
 │                                          │                                  │
 │                                          ▼                                  │
 │                               ┌─────────────────────────┐                   │
 │                               │ databricks-mcp-server   │                   │
-│                               │ (stdio subprocess)      │                   │
+│                               │ (in-process SDK tools)  │                   │
 │                               └─────────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                              │
@@ -66,11 +66,11 @@ from claude_agent_sdk import ClaudeAgentOptions, query
 options = ClaudeAgentOptions(
     cwd=str(project_dir),           # Project working directory
     allowed_tools=allowed_tools,     # Built-in + MCP tools
-    permission_mode='acceptEdits',   # Auto-accept file edits
+    permission_mode='bypassPermissions',  # Auto-accept all tools including MCP
     resume=session_id,               # Resume previous conversation
     mcp_servers=mcp_servers,         # Databricks MCP server config
     system_prompt=system_prompt,     # Databricks-focused prompt
-    setting_sources=['project'],     # Load skills from .claude/skills
+    setting_sources=['user', 'project'],  # Load skills from .claude/skills
 )
 
 async for msg in query(prompt=message, options=options):
@@ -173,13 +173,13 @@ Skills provide specialized guidance for Databricks development tasks. They are m
 3. The agent can invoke skills using the `Skill` tool: `skill: "sdp"`
 
 Skills include:
-- **asset-bundles**: Databricks Asset Bundles configuration
+- **databricks-asset-bundles**: Databricks Asset Bundles configuration
 - **databricks-app-apx**: Full-stack apps with APX framework (FastAPI + React)
 - **databricks-app-python**: Python apps with Dash, Streamlit, Flask
 - **databricks-python-sdk**: Python SDK patterns
-- **mlflow-evaluation**: MLflow evaluation and trace analysis
-- **spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) development
-- **synthetic-data-generation**: Creating test datasets
+- **databricks-mlflow-evaluation**: MLflow evaluation and trace analysis
+- **databricks-spark-declarative-pipelines**: Spark Declarative Pipelines (SDP) development
+- **databricks-synthetic-data-gen**: Creating test datasets
 
 ### 5. Project Persistence
 
@@ -206,7 +206,7 @@ projects/
 
 - Python 3.11+
 - Node.js 18+
-- [uv](https://github.com/astral-sh/uv) package manager (or pip)
+- [uv](https://github.com/astral-sh/uv) package manager
 - Databricks workspace with:
   - SQL warehouse (for SQL queries)
   - Cluster (for Python/PySpark execution)
@@ -215,73 +215,78 @@ projects/
 
 ### Quick Start
 
-#### 1. Clone and Install Dependencies
+#### 1. Run the Setup Script
+
+From the repository root:
 
 ```bash
-# Navigate to the app directory
 cd databricks-builder-app
-
-# Install backend dependencies
-uv sync
-# OR with pip: pip install -e .
-
-# Install sibling packages (from repo root)
-cd ..
-uv pip install -e databricks-tools-core -e databricks-mcp-server
-# OR: pip install -e databricks-tools-core -e databricks-mcp-server
-
-# Install frontend dependencies
-cd databricks-builder-app/client
-npm install
-cd ..
+./scripts/setup.sh
 ```
 
-#### 2. Configure Environment Variables
+This will:
 
-Create `.env.local` in the `databricks-builder-app` directory:
+- Verify prerequisites (uv, Node.js, npm)
+- Create a `.env.local` file from `.env.example` (if one doesn't already exist)
+- Install backend Python dependencies via `uv sync`
+- Install sibling packages (`databricks-tools-core`, `databricks-mcp-server`)
+- Install frontend Node.js dependencies
+
+#### 2. Configure Your `.env.local` File
+
+> **You must do this before running the app.** The setup script creates a `.env.local` file from `.env.example`, but all values are placeholders. Open `.env.local` and fill in your actual values.
+
+The `.env.local` file is gitignored and will never be committed. At a minimum, you need to set these:
 
 ```bash
-# Copy example
-cp .env.example .env.local
-```
-
-Edit `.env.local` with your configuration:
-
-```bash
-# Databricks Configuration (for local development)
+# Required: Your Databricks workspace
 DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
-DATABRICKS_TOKEN=dapi...  # Your personal access token
+DATABRICKS_TOKEN=dapi...
 
-# PostgreSQL Database (Lakebase) - Required for persistence
+# Required: Database for project persistence (pick ONE option)
+# Option A — Static connection URL (simplest for local dev):
 LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
-LAKEBASE_PROJECT_ID=your-lakebase-project-id
 
-# Projects directory (where agent works)
-PROJECTS_BASE_DIR=./projects
-
-# Environment mode
-ENV=development
-
-# Skills to load (comma-separated)
-ENABLED_SKILLS=spark-declarative-pipelines,synthetic-data-generation
+# Option B — Dynamic OAuth via Databricks SDK:
+# LAKEBASE_INSTANCE_NAME=your-lakebase-instance
+# LAKEBASE_DATABASE_NAME=databricks_postgres
 ```
+
+See `.env.example` for the full list of available settings including LLM provider, skills configuration, and MLflow tracing. The app loads `.env.local` (not `.env`) at startup.
 
 **Getting your Databricks token:**
 1. Go to your Databricks workspace
 2. Click your username → User Settings
-3. Go to Access Tokens → Generate New Token
+3. Go to Developer → Access Tokens → Generate New Token
 4. Copy the token value
 
-#### 3. Configure Claude Settings (Optional - for Databricks Model Serving)
-
-If you're routing Claude API calls through Databricks Model Serving instead of directly to Anthropic, create `.claude/settings.json` in the **repository root** (not in the app directory):
+#### 3. Start the Development Servers
 
 ```bash
-# From repo root
-mkdir -p .claude
+./scripts/start_dev.sh
 ```
 
-Create `.claude/settings.json`:
+This starts both the backend and frontend in one terminal.
+
+You can also start them separately if you prefer:
+
+```bash
+# Terminal 1 — Backend
+uvicorn server.app:app --reload --port 8000 --reload-dir server
+
+# Terminal 2 — Frontend
+cd client && npm run dev
+```
+
+#### 4. Access the App
+
+- **Frontend**: <http://localhost:3000>
+- **Backend API**: <http://localhost:8000>
+- **API Docs**: <http://localhost:8000/docs>
+
+#### 5. (Optional) Configure Claude via Databricks Model Serving
+
+If you're routing Claude API calls through Databricks Model Serving instead of directly to Anthropic, create `.claude/settings.json` in the **repository root** (not in the app directory):
 
 ```json
 {
@@ -295,41 +300,11 @@ Create `.claude/settings.json`:
 }
 ```
 
-**Notes:**
-- `ANTHROPIC_AUTH_TOKEN` should be a Databricks Personal Access Token (PAT), not an Anthropic API key
+Notes:
+
+- `ANTHROPIC_AUTH_TOKEN` should be a Databricks PAT, not an Anthropic API key
 - `ANTHROPIC_BASE_URL` should point to your Databricks Model Serving endpoint
-- If this file doesn't exist, the app will use your Anthropic API key from the environment
-
-**⚠️ Important:** Add `.claude/settings.json` to `.gitignore` - it contains credentials!
-
-#### 4. Start the Development Servers
-
-**Option A: Use the start script (recommended)**
-
-```bash
-./scripts/start_dev.sh
-```
-
-This starts both backend and frontend in one terminal.
-
-**Option B: Start separately**
-
-Terminal 1 (Backend):
-```bash
-uvicorn server.app:app --reload --port 8000 --reload-dir server
-```
-
-Terminal 2 (Frontend):
-```bash
-cd client
-npm run dev
-```
-
-#### 5. Access the App
-
-- **Frontend**: http://localhost:3000
-- **Backend**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- If this file doesn't exist, the app uses your `ANTHROPIC_API_KEY` from `.env.local`
 
 ### Configuration Details
 
@@ -340,7 +315,7 @@ The app supports two authentication modes:
 **1. Local Development (Environment Variables)**
 - Uses `DATABRICKS_HOST` and `DATABRICKS_TOKEN` from `.env.local`
 - All users share the same credentials
-- Good for local testing
+- Good for local development and testing
 
 **2. Production (Request Headers)**
 - Uses `X-Forwarded-User` and `X-Forwarded-Access-Token` headers
@@ -353,9 +328,10 @@ The app supports two authentication modes:
 Skills are loaded from `../databricks-skills/` and filtered by the `ENABLED_SKILLS` environment variable:
 
 - `databricks-python-sdk`: Patterns for using the Databricks Python SDK
-- `spark-declarative-pipelines`: SDP/DLT pipeline development
-- `synthetic-data-generation`: Creating test datasets
-- `build-databricks-app`: Building Databricks apps
+- `databricks-spark-declarative-pipelines`: SDP/DLT pipeline development
+- `databricks-synthetic-data-gen`: Creating test datasets
+- `databricks-app-apx`: Full-stack apps with React (APX framework)
+- `databricks-app-python`: Python apps with Dash, Streamlit, Flask
 
 **Adding custom skills:**
 1. Create a new directory in `../databricks-skills/`
@@ -471,14 +447,29 @@ databricks-builder-app/
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/api/me` | GET | Get current user info |
+| `/api/health` | GET | Health check |
+| `/api/system_prompt` | GET | Preview the system prompt |
 | `/api/projects` | GET | List all projects |
 | `/api/projects` | POST | Create new project |
 | `/api/projects/{id}` | GET | Get project details |
+| `/api/projects/{id}` | PATCH | Update project name |
+| `/api/projects/{id}` | DELETE | Delete project |
 | `/api/projects/{id}/conversations` | GET | List project conversations |
-| `/api/conversations` | POST | Create new conversation |
-| `/api/conversations/{id}` | GET | Get conversation with messages |
-| `/api/agent/invoke` | POST | Send message to agent (SSE stream) |
-| `/api/config/user` | GET | Get current user info |
+| `/api/projects/{id}/conversations` | POST | Create new conversation |
+| `/api/projects/{id}/conversations/{cid}` | GET | Get conversation with messages |
+| `/api/projects/{id}/files` | GET | List files in project directory |
+| `/api/invoke_agent` | POST | Start agent execution (returns execution_id) |
+| `/api/stream_progress/{execution_id}` | POST | SSE stream of agent events |
+| `/api/stop_stream/{execution_id}` | POST | Cancel an active execution |
+| `/api/projects/{id}/skills/available` | GET | List skills with enabled status |
+| `/api/projects/{id}/skills/enabled` | PUT | Update enabled skills for project |
+| `/api/projects/{id}/skills/reload` | POST | Reload skills from source |
+| `/api/projects/{id}/skills/tree` | GET | Get skills file tree |
+| `/api/projects/{id}/skills/file` | GET | Get skill file content |
+| `/api/clusters` | GET | List available Databricks clusters |
+| `/api/warehouses` | GET | List available SQL warehouses |
+| `/api/mlflow/status` | GET | Get MLflow tracing status |
 
 ## Deploying to Databricks Apps
 
@@ -594,7 +585,7 @@ env:
 
   # Skills to enable (comma-separated)
   - name: ENABLED_SKILLS
-    value: "agent-bricks,databricks-python-sdk,spark-declarative-pipelines"
+    value: "databricks-agent-bricks,databricks-python-sdk,databricks-spark-declarative-pipelines"
 
   # MLflow tracing (optional)
   - name: MLFLOW_TRACKING_URI

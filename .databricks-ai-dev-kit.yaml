@@ -1,0 +1,10 @@
+# AI Dev Kit project configuration
+# This file is intended to be committed to git and shared across the team.
+#
+# project: Override the auto-detected project name (used in resource tags and audit logs)
+# tags: Freeform key-value pairs applied to every resource created by the MCP server
+
+# project: my-project
+# tags:
+#   team: data-eng
+#   env: dev

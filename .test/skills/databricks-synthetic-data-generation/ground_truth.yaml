@@ -1,0 +1,392 @@
+metadata:
+  skill_name: databricks-synthetic-data-generation
+  version: 0.1.0
+  created_at: '2026-02-23T08:00:00.000000'
+
+test_cases:
+- id: synth_data_script_structure_001
+  inputs:
+    prompt: "What is the recommended structure for a synthetic data generation script on Databricks?"
+  outputs:
+    response: |
+      ```python
+      """Generate synthetic data for [use case]."""
+      import numpy as np
+      import pandas as pd
+      from datetime import datetime, timedelta
+      from faker import Faker
+      import holidays
+      from pyspark.sql import SparkSession
+
+      # =============================================================================
+      # CONFIGURATION - Edit these values
+      # =============================================================================
+      CATALOG = "my_catalog"
+      SCHEMA = "my_schema"
+      VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
+
+      N_CUSTOMERS = 2500
+      N_ORDERS = 25000
+      N_TICKETS = 8000
+
+      END_DATE = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+      START_DATE = END_DATE - timedelta(days=180)
+
+      SEED = 42
+
+      # =============================================================================
+      # SETUP
+      # =============================================================================
+      np.random.seed(SEED)
+      Faker.seed(SEED)
+      fake = Faker()
+      spark = SparkSession.builder.getOrCreate()
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Configuration variables go at the top of the script"
+    - "Seeds must be set for both numpy and Faker for reproducibility"
+    - "Volume path follows /Volumes/{catalog}/{schema}/{volume} pattern"
+    - "SparkSession is used for saving data to Delta/Parquet"
+    expected_patterns:
+    - pattern: "CATALOG\\s*="
+      min_count: 1
+      description: "Defines catalog configuration variable"
+    - pattern: "np\\.random\\.seed"
+      min_count: 1
+      description: "Sets numpy random seed"
+    - pattern: "Faker\\.seed"
+      min_count: 1
+      description: "Sets Faker random seed"
+    - pattern: "SparkSession"
+      min_count: 1
+      description: "Uses SparkSession for data saving"
+    guidelines:
+    - "Configuration must be at the top of the script"
+    - "Must set seeds for both numpy and Faker for reproducibility"
+    - "Must use SparkSession for saving to Databricks storage"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: synth_data_infrastructure_002
+  inputs:
+    prompt: "Should I create the catalog, schema, and volume separately or inside the generation script?"
+  outputs:
+    response: |
+      Always create infrastructure inside the Python script using `spark.sql()`:
+
+      ```python
+      # =============================================================================
+      # CREATE INFRASTRUCTURE (inside the Python script)
+      # =============================================================================
+      spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
+      spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+      spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
+      ```
+
+      Do NOT make separate MCP SQL calls - it's much slower. The `spark` variable is available by default on Databricks clusters.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Infrastructure creation belongs inside the Python script, not as separate SQL calls"
+    - "spark.sql() is used for CREATE CATALOG, CREATE SCHEMA, and CREATE VOLUME"
+    - "IF NOT EXISTS makes the script idempotent"
+    expected_patterns:
+    - pattern: "CREATE CATALOG IF NOT EXISTS"
+      min_count: 1
+      description: "Creates catalog idempotently"
+    - pattern: "CREATE SCHEMA IF NOT EXISTS"
+      min_count: 1
+      description: "Creates schema idempotently"
+    - pattern: "CREATE VOLUME IF NOT EXISTS"
+      min_count: 1
+      description: "Creates volume idempotently"
+    guidelines:
+    - "Must use spark.sql() inside the script, not separate SQL calls"
+    - "All CREATE statements must use IF NOT EXISTS"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: synth_data_distributions_003
+  inputs:
+    prompt: "How do I generate synthetic data with realistic statistical distributions?"
+  outputs:
+    response: |
+      Use numpy distributions with weighted probabilities:
+
+      ```python
+      import numpy as np
+      from faker import Faker
+
+      fake = Faker()
+
+      # Categorical with weighted distribution
+      customers_pdf["tier"] = np.random.choice(
+          ['Free', 'Pro', 'Enterprise'], N_CUSTOMERS, p=[0.6, 0.3, 0.1]
+      )
+
+      # Log-normal for financial data (right-skewed, no negatives)
+      customers_pdf["arr"] = customers_pdf["tier"].apply(
+          lambda t: round(np.random.lognormal(11, 0.5), 2) if t == 'Enterprise'
+                    else round(np.random.lognormal(8, 0.6), 2) if t == 'Pro' else 0
+      )
+
+      # Correlated fields: order amount varies by tier
+      amount = np.random.lognormal(
+          7 if tier == 'Enterprise' else 5 if tier == 'Pro' else 3.5,
+          0.7
+      )
+      ```
+
+      Key distributions: use log-normal for financial amounts, weighted choice for categories, and exponential for time durations.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Log-normal distribution is ideal for financial data (right-skewed, non-negative)"
+    - "np.random.choice with p parameter creates weighted categorical distributions"
+    - "Field values should correlate with related fields (e.g., order amount varies by tier)"
+    expected_patterns:
+    - pattern: "np\\.random\\.choice"
+      min_count: 1
+      description: "Uses weighted random choice for categories"
+    - pattern: "np\\.random\\.lognormal"
+      min_count: 1
+      description: "Uses log-normal for financial data"
+    - pattern: "p=\\["
+      min_count: 1
+      description: "Specifies probability weights"
+    guidelines:
+    - "Must show weighted distributions, not uniform random"
+    - "Financial values must use log-normal, not normal distribution"
+    - "Must demonstrate correlation between related fields"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: synth_data_time_patterns_004
+  inputs:
+    prompt: "How do I add realistic time-based patterns like weekday/weekend effects and event spikes?"
+  outputs:
+    response: |
+      ```python
+      import holidays
+
+      US_HOLIDAYS = holidays.US(years=[START_DATE.year, END_DATE.year])
+
+      def get_daily_multiplier(date):
+          """Calculate volume multiplier for a given date."""
+          multiplier = 1.0
+
+          # Weekend drop
+          if date.weekday() >= 5:
+              multiplier *= 0.6
+
+          # Holiday drop (even lower than weekends)
+          if date in US_HOLIDAYS:
+              multiplier *= 0.3
+
+          # Q4 seasonality (higher in Oct-Dec)
+          multiplier *= 1 + 0.15 * (date.month - 6) / 6
+
+          # Incident spike
+          if INCIDENT_START <= date <= INCIDENT_END:
+              multiplier *= 3.0
+
+          # Random noise
+          multiplier *= np.random.normal(1, 0.1)
+
+          return max(0.1, multiplier)
+
+      # Apply to generate daily volumes
+      date_range = pd.date_range(START_DATE, END_DATE, freq='D')
+      daily_volumes = [int(BASE_DAILY * get_daily_multiplier(d)) for d in date_range]
+      ```
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "The holidays library provides country-specific holiday calendars"
+    - "Weekend volumes should drop to 60% of weekday volumes"
+    - "Holiday volumes should drop further to 30%"
+    - "Event spikes multiply baseline volume by 3x or more"
+    expected_patterns:
+    - pattern: "holidays\\.US"
+      min_count: 1
+      description: "Uses US holiday calendar"
+    - pattern: "weekday\\(\\)"
+      min_count: 1
+      description: "Checks for weekday/weekend"
+    - pattern: "INCIDENT_START"
+      min_count: 1
+      description: "Implements event spike period"
+    - pattern: "np\\.random\\.normal"
+      min_count: 1
+      description: "Adds random noise to volumes"
+    guidelines:
+    - "Must include weekday/weekend effects"
+    - "Must include holiday effects using the holidays library"
+    - "Must include at least one event spike period"
+    - "Must add random noise to avoid unrealistic regularity"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: auto_generated
+
+- id: synth_data_save_volume_005
+  inputs:
+    prompt: "How should I save generated synthetic data to Databricks?"
+  outputs:
+    response: |
+      Always save data to a Unity Catalog Volume as parquet files:
+
+      ```python
+      VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/raw_data"
+
+      # Save as parquet files (raw data for downstream pipelines)
+      spark.createDataFrame(customers_pdf).write.mode("overwrite").parquet(f"{VOLUME_PATH}/customers")
+      spark.createDataFrame(orders_pdf).write.mode("overwrite").parquet(f"{VOLUME_PATH}/orders")
+      spark.createDataFrame(tickets_pdf).write.mode("overwrite").parquet(f"{VOLUME_PATH}/tickets")
+      ```
+
+      Save to Volumes as parquet, not directly to tables. This serves as raw input for a downstream Spark Declarative Pipeline that handles bronze/silver/gold layers.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Data should be saved to Volumes as parquet, not directly to tables"
+    - "Volume path pattern is /Volumes/{catalog}/{schema}/{volume}"
+    - "spark.createDataFrame() converts pandas DataFrames to Spark for saving"
+    - "Parquet files serve as input for downstream pipeline processing"
+    expected_patterns:
+    - pattern: "createDataFrame"
+      min_count: 1
+      description: "Converts pandas to Spark DataFrame"
+    - pattern: "\\.parquet\\("
+      min_count: 1
+      description: "Saves as parquet format"
+    - pattern: "mode\\(\"overwrite\"\\)"
+      min_count: 1
+      description: "Uses overwrite mode"
+    - pattern: "/Volumes/"
+      min_count: 1
+      description: "Saves to Unity Catalog Volume path"
+    guidelines:
+    - "Must save to Volumes, not directly to tables"
+    - "Must use parquet format"
+    - "Must explain that this is raw data for downstream pipeline"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: synth_data_raw_only_006
+  inputs:
+    prompt: "Should I include pre-aggregated fields like total_orders or avg_revenue in my synthetic data?"
+  outputs:
+    response: |
+      No. By default, generate only raw transactional data. One row equals one event.
+
+      ```python
+      # CORRECT - Raw transactional data
+      customers_data.append({
+          "customer_id": cid,
+          "name": fake.company(),
+          "tier": "Enterprise",
+          "region": "North",
+      })
+
+      orders_data.append({
+          "order_id": f"ORD-{i:06d}",
+          "customer_id": cid,
+          "amount": 150.00,
+          "order_date": "2024-10-15",
+      })
+
+      # WRONG - Do not add pre-aggregated fields
+      # customers_data.append({
+      #     "total_orders": 47,        # aggregation
+      #     "total_revenue": 12500.00, # sum
+      #     "avg_order_value": 265.95, # average
+      # })
+      ```
+
+      Aggregations belong in downstream pipeline transformations, not in raw data.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Raw data should have one row per event/transaction/record"
+    - "Pre-aggregated fields like total_orders, sum_revenue, avg_csat should not be included"
+    - "Aggregations belong in downstream pipeline transformations"
+    expected_patterns:
+    - pattern: "customer_id"
+      min_count: 1
+      description: "Shows raw transactional customer data"
+    - pattern: "order_id"
+      min_count: 1
+      description: "Shows raw transactional order data"
+    - pattern: "WRONG|BAD|Do not"
+      min_count: 1
+      description: "Shows anti-pattern example"
+    guidelines:
+    - "Must clearly show the correct raw data pattern"
+    - "Must show the anti-pattern with pre-aggregated fields"
+    - "Must explain that aggregations belong downstream"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated
+
+- id: synth_data_common_libraries_007
+  inputs:
+    prompt: "What Python libraries should I use for generating synthetic data?"
+  outputs:
+    response: |
+      Key libraries for synthetic data generation:
+
+      - **faker**: Generates realistic names, addresses, emails, companies, and dates
+      - **numpy**: Statistical distributions (log-normal, exponential, weighted choice)
+      - **pandas**: DataFrame construction and manipulation
+      - **holidays**: Country-specific holiday calendars for realistic date patterns
+      - **pyspark**: SparkSession for saving data to Volumes as parquet
+
+      ```python
+      import numpy as np
+      import pandas as pd
+      from datetime import datetime, timedelta
+      from faker import Faker
+      import holidays
+      from pyspark.sql import SparkSession
+      ```
+
+      All of these are pre-installed on Databricks clusters.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Faker generates realistic personal and business data"
+    - "Numpy provides statistical distributions for realistic value generation"
+    - "The holidays library provides holiday calendars for date patterns"
+    - "All listed libraries are pre-installed on Databricks clusters"
+    expected_patterns:
+    - pattern: "faker"
+      min_count: 1
+      description: "Mentions Faker library"
+    - pattern: "numpy"
+      min_count: 1
+      description: "Mentions numpy library"
+    - pattern: "holidays"
+      min_count: 1
+      description: "Mentions holidays library"
+    - pattern: "pyspark"
+      min_count: 1
+      description: "Mentions PySpark library"
+    guidelines:
+    - "Must list at least four key libraries with their purposes"
+    - "Must mention that libraries are pre-installed on Databricks"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: auto_generated

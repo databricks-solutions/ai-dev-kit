@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 import yaml
 import mlflow
-from mlflow.genai.scorers import Guidelines, Safety
+from mlflow.genai.scorers import Safety
 
 from ..config import SkillTestConfig
 from ..dataset import get_dataset_source
@@ -25,7 +25,6 @@ from ..scorers.trace import (
     file_existence,
     tool_sequence,
     category_limits,
-    get_trace_scorers,
 )
 
 
@@ -154,6 +153,7 @@ def evaluate_skill(
     config: Optional[SkillTestConfig] = None,
     run_name: Optional[str] = None,
     filter_category: Optional[str] = None,
+    timeout: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate a skill using pre-computed outputs (Pattern 2).
@@ -163,12 +163,16 @@ def evaluate_skill(
         config: Configuration (uses defaults if None)
         run_name: MLflow run name
         filter_category: Filter test cases by category
+        timeout: Timeout in seconds for LLM judge evaluation (overrides config)
 
     Returns:
         Evaluation results dict with metrics and run_id
     """
     if config is None:
         config = SkillTestConfig()
+
+    # Use provided timeout or fall back to config
+    eval_timeout = timeout if timeout is not None else config.mlflow.llm_judge_timeout
 
     setup_mlflow(config)
 
@@ -192,13 +196,19 @@ def evaluate_skill(
     else:
         scorers = get_default_scorers()
 
-    # Run evaluation
+    # Run evaluation with timeout
     with mlflow.start_run(run_name=run_name or f"{skill_name}_eval"):
         mlflow.set_tags(
-            {"skill_name": skill_name, "test_count": len(eval_data), "filter_category": filter_category or "all"}
+            {
+                "skill_name": skill_name,
+                "test_count": len(eval_data),
+                "filter_category": filter_category or "all",
+                "timeout_seconds": eval_timeout,
+            }
         )
 
         # No predict_fn - using pre-computed outputs
+        # Run evaluation directly - timeout is handled via signal alarm on Unix
         results = mlflow.genai.evaluate(data=eval_data, scorers=scorers)
 
         return {

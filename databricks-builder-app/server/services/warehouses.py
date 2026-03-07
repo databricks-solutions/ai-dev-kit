@@ -25,10 +25,12 @@ def _fetch_warehouses_sync(limit: int = 50, timeout: int = 15) -> list[dict]:
   """Synchronously fetch SQL warehouses from Databricks using SDK.
 
   Returns warehouses sorted by priority:
-  1. Running + "shared" in name (highest priority)
-  2. Running (without "shared")
-  3. Not running + "shared" in name
-  4. Everything else
+  1. Serverless + running (highest priority)
+  2. Serverless + not running
+  3. Running + "shared" in name
+  4. Running (without "shared")
+  5. Not running + "shared" in name
+  6. Everything else
 
   Args:
       limit: Maximum number of warehouses to return
@@ -42,19 +44,24 @@ def _fetch_warehouses_sync(limit: int = 50, timeout: int = 15) -> list[dict]:
   # Fetch warehouses
   warehouses = list(islice(client.warehouses.list(), limit * 2))
 
-  # Sort by priority: running + shared > running > shared > rest
+  # Sort by priority: serverless first, then running + shared > running > shared > rest
   def sort_key(w):
     is_running = w.state == State.RUNNING if w.state else False
     is_shared = 'shared' in (w.name or '').lower()
-    # Priority: (running + shared) = 0, running = 1, shared = 2, other = 3
-    if is_running and is_shared:
+    is_serverless = getattr(w, 'enable_serverless_compute', False) or False
+    # Serverless warehouses always come first
+    if is_serverless and is_running:
       priority = 0
-    elif is_running:
+    elif is_serverless:
       priority = 1
-    elif is_shared:
+    elif is_running and is_shared:
       priority = 2
-    else:
+    elif is_running:
       priority = 3
+    elif is_shared:
+      priority = 4
+    else:
+      priority = 5
     return priority
 
   warehouses.sort(key=sort_key)
@@ -66,6 +73,7 @@ def _fetch_warehouses_sync(limit: int = 50, timeout: int = 15) -> list[dict]:
       'state': w.state.value if w.state else 'UNKNOWN',
       'cluster_size': w.cluster_size,
       'creator_name': w.creator_name,
+      'is_serverless': getattr(w, 'enable_serverless_compute', False) or False,
     }
     for w in warehouses[:limit]
   ]

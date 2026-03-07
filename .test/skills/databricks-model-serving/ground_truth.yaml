@@ -1,0 +1,659 @@
+test_cases:
+  # ============================================================================
+  # GenAI Agents - ResponsesAgent
+  # ============================================================================
+  - id: "ms_responses_agent_001"
+    inputs:
+      prompt: "Create a simple ResponsesAgent that echoes user messages"
+    outputs:
+      response: |
+        Here's a simple ResponsesAgent that echoes user messages:
+
+        ```python
+        # echo_agent.py
+        import mlflow
+        from mlflow.pyfunc import ResponsesAgent
+        from mlflow.types.responses import (
+            ResponsesAgentRequest,
+            ResponsesAgentResponse,
+            ResponsesAgentStreamEvent,
+        )
+        from typing import Generator
+
+
+        class EchoAgent(ResponsesAgent):
+            """Agent that echoes back user messages."""
+
+            def predict(self, request: ResponsesAgentRequest) -> ResponsesAgentResponse:
+                """Echo the user's message back."""
+                last_message = request.input[-1]
+                echo_text = f"Echo: {last_message.content}"
+                
+                # Use helper method - NOT raw dicts
+                return ResponsesAgentResponse(
+                    output=[self.create_text_output_item(text=echo_text, id="echo_1")]
+                )
+
+            def predict_stream(
+                self, request: ResponsesAgentRequest
+            ) -> Generator[ResponsesAgentStreamEvent, None, None]:
+                """Stream the echo response."""
+                result = self.predict(request)
+                for item in result.output:
+                    yield ResponsesAgentStreamEvent(
+                        type="response.output_item.done",
+                        item=item
+                    )
+
+
+        # Export for MLflow
+        AGENT = EchoAgent()
+        mlflow.models.set_model(AGENT)
+        ```
+
+        Key points:
+        - Uses `self.create_text_output_item()` for output (NOT raw dicts)
+        - Implements both `predict` and `predict_stream`
+        - Exports with `mlflow.models.set_model()`
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "ResponsesAgent"
+        - "create_text_output_item"
+        - "mlflow.models.set_model"
+      expected_patterns:
+        - pattern: "class.*\\(ResponsesAgent\\)"
+          min_count: 1
+          description: "ResponsesAgent subclass"
+        - pattern: "self\\.create_text_output_item\\("
+          min_count: 1
+          description: "helper method for output"
+        - pattern: "mlflow\\.models\\.set_model\\("
+          min_count: 1
+          description: "model export"
+      guidelines:
+        - "Must use ResponsesAgent pattern, not ChatAgent"
+        - "Must use self.create_text_output_item() helper method, NOT raw dicts"
+        - "Must export agent with mlflow.models.set_model()"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "cursor_generated"
+      tags: ["genai", "responses-agent", "basic"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"
+
+  # ============================================================================
+  # Classical ML - Autolog
+  # ============================================================================
+  - id: "ms_classical_ml_001"
+    inputs:
+      prompt: "Train and deploy an sklearn classifier with autolog to Unity Catalog"
+    outputs:
+      response: |
+        Here's how to train and deploy an sklearn classifier with autolog:
+
+        ```python
+        import mlflow
+        import mlflow.sklearn
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.model_selection import train_test_split
+        from sklearn.datasets import load_iris
+
+        # Configuration
+        catalog = "main"
+        schema = "models"
+        model_name = "iris_classifier"
+
+        # Enable autolog with auto-registration to Unity Catalog
+        mlflow.sklearn.autolog(
+            log_input_examples=True,
+            registered_model_name=f"{catalog}.{schema}.{model_name}"
+        )
+
+        # Load and prepare data
+        X, y = load_iris(return_X_y=True)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.25, random_state=42
+        )
+
+        # Train model - automatically logged and registered
+        model = LogisticRegression(max_iter=200)
+        model.fit(X_train, y_train)
+
+        # Verify accuracy
+        accuracy = model.score(X_test, y_test)
+        print(f"Model accuracy: {accuracy:.2%}")
+        print(f"Registered to: {catalog}.{schema}.{model_name}")
+        ```
+
+        Key points:
+        - `mlflow.sklearn.autolog()` handles logging automatically
+        - `registered_model_name` with 3-level path registers to Unity Catalog
+        - `log_input_examples=True` helps with debugging and signature inference
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "mlflow.sklearn.autolog"
+        - "registered_model_name"
+        - "Unity Catalog"
+      expected_patterns:
+        - pattern: "mlflow\\.sklearn\\.autolog\\("
+          min_count: 1
+          description: "sklearn autolog"
+        - pattern: "registered_model_name.*=.*f?[\"'].*\\..*\\."
+          min_count: 1
+          description: "3-level UC path"
+      guidelines:
+        - "Must use mlflow.sklearn.autolog() for sklearn models"
+        - "Must register to Unity Catalog with 3-level path (catalog.schema.model)"
+        - "Should use log_input_examples=True for better debugging"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "cursor_generated"
+      tags: ["classical-ml", "sklearn", "autolog"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"
+
+  # ============================================================================
+  # Custom PyFunc
+  # ============================================================================
+  - id: "ms_custom_pyfunc_001"
+    inputs:
+      prompt: "Create a custom pyfunc model with preprocessing"
+    outputs:
+      response: |
+        Here's a custom pyfunc model with preprocessing:
+
+        ```python
+        import mlflow
+        import pandas as pd
+        from mlflow.models import infer_signature
+
+
+        class CustomModelWithPreprocessing(mlflow.pyfunc.PythonModel):
+            """Custom model that includes preprocessing logic."""
+
+            def load_context(self, context):
+                """Load artifacts when model is loaded."""
+                import pickle
+                
+                # Load preprocessor
+                with open(context.artifacts["preprocessor"], "rb") as f:
+                    self.preprocessor = pickle.load(f)
+                
+                # Load trained model
+                with open(context.artifacts["model"], "rb") as f:
+                    self.model = pickle.load(f)
+
+            def predict(self, context, model_input: pd.DataFrame) -> pd.DataFrame:
+                """Preprocess input and run prediction."""
+                # Apply preprocessing
+                processed = self.preprocessor.transform(model_input)
+                
+                # Run prediction
+                predictions = self.model.predict(processed)
+                
+                return pd.DataFrame({"prediction": predictions})
+
+
+        # Log the model with artifacts
+        with mlflow.start_run():
+            mlflow.pyfunc.log_model(
+                artifact_path="model",
+                python_model=CustomModelWithPreprocessing(),
+                artifacts={
+                    "preprocessor": "artifacts/preprocessor.pkl",
+                    "model": "artifacts/model.pkl"
+                },
+                pip_requirements=["scikit-learn==1.3.0", "pandas"],
+                registered_model_name="main.models.custom_preprocessor"
+            )
+        ```
+
+        Key points:
+        - Subclass `mlflow.pyfunc.PythonModel`
+        - Implement `load_context()` to load artifacts
+        - Use `mlflow.pyfunc.log_model()` with `artifacts` dict
+        - Always specify `pip_requirements` for dependencies
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "mlflow.pyfunc.PythonModel"
+        - "load_context"
+        - "artifacts"
+      expected_patterns:
+        - pattern: "class.*\\(mlflow\\.pyfunc\\.PythonModel\\)"
+          min_count: 1
+          description: "PythonModel subclass"
+        - pattern: "def load_context\\(self, context\\)"
+          min_count: 1
+          description: "load_context method"
+        - pattern: "mlflow\\.pyfunc\\.log_model\\("
+          min_count: 1
+          description: "log_model call"
+      guidelines:
+        - "Must subclass mlflow.pyfunc.PythonModel"
+        - "Must implement load_context for loading artifacts"
+        - "Must specify pip_requirements for dependencies"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "cursor_generated"
+      tags: ["custom-pyfunc", "preprocessing", "artifacts"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"
+
+  # ============================================================================
+  # Deployment - Job-Based
+  # ============================================================================
+  - id: "ms_deployment_job_001"
+    inputs:
+      prompt: "Deploy a GenAI agent using job-based async deployment"
+    outputs:
+      response: |
+        For GenAI agents, use job-based deployment to avoid MCP timeouts (~15 min deployment time).
+
+        **Step 1: Create deployment script (`deploy_agent.py`)**
+
+        ```python
+        # deploy_agent.py
+        import sys
+        from databricks import agents
+
+        model_name = sys.argv[1] if len(sys.argv) > 1 else "main.agents.my_agent"
+        version = sys.argv[2] if len(sys.argv) > 2 else "1"
+
+        print(f"Deploying {model_name} version {version}...")
+
+        deployment = agents.deploy(
+            model_name,
+            version,
+            tags={"source": "mcp", "environment": "dev"}
+        )
+
+        print(f"Deployment complete!")
+        print(f"Endpoint: {deployment.endpoint_name}")
+        ```
+
+        **Step 2: Create the deployment job**
+
+        ```python
+        # Use MCP tool
+        create_job(
+            name="deploy-agent-job",
+            tasks=[
+                {
+                    "task_key": "deploy",
+                    "spark_python_task": {
+                        "python_file": "/Workspace/Users/you@company.com/deploy_agent.py",
+                        "parameters": ["{{job.parameters.model_name}}", "{{job.parameters.version}}"]
+                    }
+                }
+            ],
+            parameters=[
+                {"name": "model_name", "default": "main.agents.my_agent"},
+                {"name": "version", "default": "1"}
+            ]
+        )
+        ```
+
+        **Step 3: Trigger deployment (returns immediately)**
+
+        ```python
+        run_job_now(
+            job_id=12345,
+            job_parameters={"model_name": "main.agents.my_agent", "version": "2"}
+        )
+        ```
+
+        **Step 4: Check endpoint status**
+
+        ```python
+        get_serving_endpoint_status(name="agents_main-agents-my_agent")
+        ```
+
+        Key points:
+        - `databricks.agents.deploy()` handles endpoint creation/update
+        - Job-based approach avoids MCP tool timeouts
+        - Deployment takes ~15 minutes to complete
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "agents.deploy"
+        - "job-based"
+        - "create_job"
+        - "run_job_now"
+      expected_patterns:
+        - pattern: "agents\\.deploy\\("
+          min_count: 1
+          description: "agents.deploy call"
+        - pattern: "create_job\\("
+          min_count: 1
+          description: "job creation"
+        - pattern: "run_job_now\\("
+          min_count: 1
+          description: "async job run"
+      guidelines:
+        - "Must use job-based deployment for GenAI agents (avoids timeout)"
+        - "Must use databricks.agents.deploy() not synchronous SDK calls"
+        - "Should show complete workflow: create job, run job, check status"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "cursor_generated"
+      tags: ["deployment", "job-based", "async", "genai"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"
+
+  # ============================================================================
+  # Querying Endpoints
+  # ============================================================================
+  - id: "ms_query_endpoint_001"
+    inputs:
+      prompt: "Query a deployed ML endpoint with dataframe records"
+    outputs:
+      response: |
+        Here's how to query a deployed ML endpoint:
+
+        **Via MCP Tool:**
+
+        ```python
+        # Using MCP tool (pseudo-code)
+        # query_serving_endpoint(
+        #     name="sklearn-classifier",
+        #     dataframe_records=[
+        #         {"age": 25, "income": 50000, "credit_score": 720},
+        #         {"age": 35, "income": 75000, "credit_score": 680}
+        #     ]
+        # )
+        ```
+
+        **Via Python SDK:**
+
+        ```python
+        from databricks.sdk import WorkspaceClient
+
+        w = WorkspaceClient()
+
+        # Query the endpoint
+        response = w.serving_endpoints.query(
+            name="sklearn-classifier",
+            dataframe_records=[
+                {"age": 25, "income": 50000, "credit_score": 720},
+                {"age": 35, "income": 75000, "credit_score": 680}
+            ]
+        )
+
+        # Access predictions
+        print(response.predictions)  # [0.85, 0.72]
+        ```
+
+        Key points:
+        - Use `dataframe_records` for ML models (not `messages`)
+        - Response contains `predictions` array
+        - Check endpoint status with `get_serving_endpoint_status` first
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "dataframe_records"
+        - "query_serving_endpoint"
+        - "predictions"
+      expected_patterns:
+        - pattern: "dataframe_records\\s*=\\s*\\["
+          min_count: 1
+          description: "dataframe_records format"
+        - pattern: "(query_serving_endpoint|serving_endpoints\\.query)\\("
+          min_count: 1
+          description: "query method"
+      guidelines:
+        - "Must use dataframe_records for ML models, not messages"
+        - "Should show MCP tool and/or SDK usage"
+        - "Should mention checking endpoint status first"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "cursor_generated"
+      tags: ["querying", "ml-endpoint", "dataframe-records"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"
+
+  - id: "ms_query_chat_endpoint_001"
+    inputs:
+      prompt: "Query a chat/agent endpoint with messages"
+    outputs:
+      response: |
+        Here's how to query a chat/agent endpoint:
+
+        **Via MCP Tool:**
+
+        ```python
+        # MCP tool call
+        query_serving_endpoint(
+            name="my-agent-endpoint",
+            messages=[
+                {"role": "user", "content": "What is Databricks?"}
+            ],
+            max_tokens=500,
+            temperature=0.7
+        )
+        ```
+
+        **Via Python SDK:**
+
+        ```python
+        from databricks.sdk import WorkspaceClient
+
+        w = WorkspaceClient()
+
+        response = w.serving_endpoints.query(
+            name="my-agent-endpoint",
+            messages=[
+                {"role": "user", "content": "What is Databricks?"}
+            ],
+            max_tokens=500
+        )
+
+        # Access the response
+        print(response.choices[0].message.content)
+        ```
+
+        **Streaming Response:**
+
+        ```python
+        for chunk in w.serving_endpoints.query(
+            name="my-agent-endpoint",
+            messages=[{"role": "user", "content": "Tell me a story"}],
+            stream=True
+        ):
+            if chunk.choices:
+                print(chunk.choices[0].delta.content, end="")
+        ```
+
+        Key points:
+        - Use `messages` for chat/agent endpoints (not `dataframe_records`)
+        - Response follows OpenAI chat completion structure
+        - Use `stream=True` for streaming responses
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "messages"
+        - "query_serving_endpoint"
+        - "choices"
+      expected_patterns:
+        - pattern: "messages.*\\[.*\\{.*role.*content.*\\}.*\\]"
+          min_count: 1
+          description: "messages format"
+        - pattern: "(query_serving_endpoint|serving_endpoints\\.query)\\("
+          min_count: 1
+          description: "query method"
+      guidelines:
+        - "Must use messages format for chat/agent endpoints"
+        - "Should show response structure with choices"
+        - "May show streaming option"
+    metadata:
+      category: "happy_path"
+      difficulty: "easy"
+      source: "cursor_generated"
+      tags: ["querying", "chat-endpoint", "agent-endpoint"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"
+
+  # ============================================================================
+  # Logging and Registration
+  # ============================================================================
+  - id: "ms_log_agent_001"
+    inputs:
+      prompt: "Log a GenAI agent to Unity Catalog with proper resources"
+    outputs:
+      response: |
+        Here's how to log a GenAI agent to Unity Catalog:
+
+        ```python
+        import mlflow
+        from mlflow.models.resources import DatabricksServingEndpoint
+
+        # Configuration
+        LLM_ENDPOINT = "databricks-meta-llama-3-3-70b-instruct"
+
+        # Set registry to Unity Catalog
+        mlflow.set_registry_uri("databricks-uc")
+
+        # Define resources for automatic passthrough authentication
+        resources = [
+            DatabricksServingEndpoint(endpoint_name=LLM_ENDPOINT)
+        ]
+
+        with mlflow.start_run():
+            model_info = mlflow.pyfunc.log_model(
+                artifact_path="agent",
+                python_model="agent.py",  # File path, not class instance
+                resources=resources,
+                pip_requirements=[
+                    "mlflow==3.6.0",
+                    "databricks-langchain",
+                    "langgraph==0.3.4",
+                ],
+                input_example={
+                    "input": [{"role": "user", "content": "Hello!"}]
+                },
+                registered_model_name="main.agents.my_agent"
+            )
+
+        print(f"Model URI: {model_info.model_uri}")
+        ```
+
+        Key points:
+        - Use `mlflow.set_registry_uri("databricks-uc")` for Unity Catalog
+        - Specify `resources` for automatic passthrough authentication
+        - Use file path (`python_model="agent.py"`) for file-based logging
+        - Include exact `pip_requirements` versions
+        - Use 3-level namespace: `catalog.schema.model_name`
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "mlflow.pyfunc.log_model"
+        - "resources"
+        - "DatabricksServingEndpoint"
+        - "registered_model_name"
+      expected_patterns:
+        - pattern: "mlflow\\.pyfunc\\.log_model\\("
+          min_count: 1
+          description: "log_model call"
+        - pattern: "DatabricksServingEndpoint\\("
+          min_count: 1
+          description: "resource specification"
+        - pattern: "registered_model_name.*=.*[\"'].*\\..*\\."
+          min_count: 1
+          description: "3-level UC path"
+      guidelines:
+        - "Must specify resources for LLM endpoints (auto passthrough)"
+        - "Must register to Unity Catalog with 3-level path"
+        - "Must specify pip_requirements with exact versions"
+    metadata:
+      category: "happy_path"
+      difficulty: "medium"
+      source: "cursor_generated"
+      tags: ["logging", "registration", "unity-catalog", "resources"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"
+
+  # ============================================================================
+  # Error Cases / Common Issues
+  # ============================================================================
+  - id: "ms_error_raw_dict_001"
+    inputs:
+      prompt: "What's wrong with this ResponsesAgent that returns raw dicts?"
+    outputs:
+      response: |
+        The common mistake is using raw dicts in ResponsesAgentResponse output instead of helper methods.
+
+        **WRONG - raw dicts cause errors:**
+
+        ```python
+        class BadAgent(ResponsesAgent):
+            def predict(self, request: ResponsesAgentRequest) -> ResponsesAgentResponse:
+                # ERROR: Raw dicts cause "Invalid output format" errors!
+                return ResponsesAgentResponse(
+                    output=[{"role": "assistant", "content": "Hello!"}]
+                )
+        ```
+
+        **CORRECT - use helper methods:**
+
+        ```python
+        class GoodAgent(ResponsesAgent):
+            def predict(self, request: ResponsesAgentRequest) -> ResponsesAgentResponse:
+                # MUST use helper methods for output items
+                return ResponsesAgentResponse(
+                    output=[self.create_text_output_item(text="Hello!", id="msg_1")]
+                )
+        ```
+
+        **Available helper methods:**
+        - `self.create_text_output_item(text, id)` - for text responses
+        - `self.create_function_call_item(id, call_id, name, arguments)` - for tool calls
+        - `self.create_function_call_output_item(call_id, output)` - for tool results
+
+        This is a critical pattern - raw dicts will cause deployment failures or runtime errors!
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "create_text_output_item"
+        - "helper methods"
+        - "raw dicts"
+      expected_patterns:
+        - pattern: "self\\.create_text_output_item\\("
+          min_count: 1
+          description: "correct helper method"
+        - pattern: "(WRONG|ERROR|don't work)"
+          min_count: 1
+          description: "identifies the error"
+      guidelines:
+        - "Must clearly identify that raw dicts are wrong"
+        - "Must show correct pattern with helper methods"
+        - "Should list all available helper methods"
+    metadata:
+      category: "error_handling"
+      difficulty: "medium"
+      source: "cursor_generated"
+      tags: ["error", "responses-agent", "common-issue"]
+      execution_verified:
+        mode: databricks
+        verified_date: "2026-02-09"
+        cluster_id: "0709-132523-cnhxf2p6"

@@ -66,6 +66,10 @@ When adding a new skill to `databricks-skills/`:
 3. Add supporting documentation files as needed
 4. Update the skills table in the main README.md
 
+## Updating Existing Skills
+
+The `main` branch install script clones the latest release, so even after a skill PR update is merged, the latest content will not be installed until a new release is produced.
+
 ## Security
 
 - Never commit credentials, tokens, or sensitive data

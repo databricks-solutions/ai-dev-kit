@@ -30,7 +30,7 @@ env:
   # =============================================================================
   # Comma-separated list of skills to enable
   - name: ENABLED_SKILLS
-    value: "agent-bricks,aibi-dashboards,asset-bundles,databricks-app-apx,databricks-app-python,databricks-config,databricks-docs,databricks-jobs,databricks-python-sdk,databricks-unity-catalog,mlflow-evaluation,spark-declarative-pipelines,synthetic-data-generation,unstructured-pdf-generation"
+    value: "databricks-asset-bundles,databricks-agent-bricks,databricks-aibi-dashboards,databricks-app-apx,databricks-app-python,databricks-config,databricks-docs,databricks-jobs,databricks-python-sdk,databricks-unity-catalog,mlflow-evaluation,spark-declarative-pipelines,synthetic-data-generation,unstructured-pdf-generation"
   - name: SKILLS_ONLY_MODE
     value: "false"
   
@@ -55,6 +55,8 @@ env:
     value: "fe-shared-demo"
   - name: LAKEBASE_DATABASE_NAME
     value: "databricks_postgres"
+  - name: LAKEBASE_SCHEMA_NAME
+    value: "builder_app"
   
   # =============================================================================
   # LLM Provider Configuration
@@ -92,9 +94,9 @@ env:
   # instead of hitting Anthropic directly. The app dynamically sets ANTHROPIC_BASE_URL
   # and ANTHROPIC_AUTH_TOKEN from the user's Databricks credentials at runtime.
   - name: ANTHROPIC_MODEL
-    value: "databricks-claude-opus-4-5"
+    value: "databricks-claude-opus-4-6"
   - name: ANTHROPIC_MODEL_MINI
-    value: "databricks-claude-sonnet-4-5"
+    value: "databricks-claude-sonnet-4-6"
   - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
     value: "3600000"
 
@@ -110,9 +112,9 @@ env:
     value: "databricks"
   - name: MLFLOW_REGISTRY_URI
     value: "databricks-uc"
-  # Optional: Specify a custom experiment for traces
+  # Optional: Default MLflow experiment for traces (can be overridden per-session in the UI)
   - name: MLFLOW_EXPERIMENT_NAME
-    value: "/Users/austin.choi@databricks.com/claude-code-traces"
+    value: ""  # Set to your MLflow experiment path, e.g. "/Users/your.email@databricks.com/claude-code-traces"
 
   # =============================================================================
   # Permission Configuration

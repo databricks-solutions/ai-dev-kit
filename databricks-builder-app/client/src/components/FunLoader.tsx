@@ -56,7 +56,7 @@ export function FunLoader({ todos = [], className }: FunLoaderProps) {
   const currentTodo = todos.find((t) => t.status === 'in_progress');
 
   return (
-    <div className={cn('flex flex-col items-center gap-3', className)}>
+    <div className={cn('flex flex-col items-start gap-3', className)}>
       {/* Main loader with rotating message */}
       <div className="flex items-center gap-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50 px-4 py-3 shadow-sm">
         <Loader2 className="h-5 w-5 animate-spin text-[var(--color-accent-primary)]" />

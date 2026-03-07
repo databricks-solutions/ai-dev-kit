@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "databricks": {
-      "command": "/Users/saroj.venkatesh/ai-dev-kit/.venv/bin/python",
-      "args": ["/Users/saroj.venkatesh/ai-dev-kit/databricks-mcp-server/run_server.py"]
-    }
-  }
-}

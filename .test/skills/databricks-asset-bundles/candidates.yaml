@@ -1,0 +1,5 @@
+# Candidate test cases pending review for asset-bundles skill
+# Add candidates using: /skill-test asset-bundles add
+# Review candidates using: /skill-test asset-bundles review
+
+candidates: []

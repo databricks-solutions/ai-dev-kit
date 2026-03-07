@@ -48,6 +48,9 @@ class InvokeAgentRequest(BaseModel):
     default_schema: Optional[str] = None  # Default schema
     warehouse_id: Optional[str] = None  # Databricks SQL warehouse for queries
     workspace_folder: Optional[str] = None  # Workspace folder for file uploads
+    mlflow_experiment_name: Optional[str] = None  # MLflow experiment name for tracing
+    target_databricks_host: Optional[str] = None  # Target workspace URL for cross-workspace ops
+    target_databricks_token: Optional[str] = None  # Pre-generated OAuth token for target workspace
 
 
 class InvokeAgentResponse(BaseModel):
@@ -91,12 +94,27 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
     user_token = await get_fmapi_token(request)
     workspace_url = get_workspace_url()
 
+    # FMAPI (Claude API) always uses the Builder App's own workspace
+    fmapi_host = workspace_url
+    fmapi_token = user_token
+
+    # Databricks tool operations target the caller-specified workspace when
+    # cross-workspace params are provided, otherwise default to this workspace
+    is_cross_workspace = body.target_databricks_host is not None
+    tools_host = body.target_databricks_host or workspace_url
+    tools_token = body.target_databricks_token or user_token
+
     # Verify project exists and belongs to user
     project_storage = ProjectStorage(user_email)
     project = await project_storage.get(body.project_id)
     if not project:
         logger.error(f'Project not found: {body.project_id}')
         raise HTTPException(status_code=404, detail=f'Project not found: {body.project_id}')
+
+    # Read enabled skills from project filesystem (not DB)
+    from ..services.skills_manager import get_project_enabled_skills
+    project_dir = get_project_directory(body.project_id)
+    enabled_skills = get_project_enabled_skills(project_dir)
 
     # Get or create conversation
     conv_storage = ConversationStorage(user_email, body.project_id)
@@ -112,14 +130,15 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
         logger.info(f'Created new conversation: {conversation_id}')
 
         # Generate AI title in the background (fire-and-forget)
+        # Title generation calls the Claude API, so always use FMAPI creds
         asyncio.create_task(
             generate_title_async(
                 message=body.message,
                 conversation_id=conversation_id,
                 user_email=user_email,
                 project_id=body.project_id,
-                databricks_host=workspace_url,
-                databricks_token=user_token,
+                databricks_host=fmapi_host,
+                databricks_token=fmapi_token,
             )
         )
     else:
@@ -163,9 +182,14 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
                 default_schema=body.default_schema,
                 warehouse_id=body.warehouse_id,
                 workspace_folder=body.workspace_folder,
-                databricks_host=workspace_url,
-                databricks_token=user_token,
+                fmapi_host=fmapi_host,
+                fmapi_token=fmapi_token,
+                databricks_host=tools_host,
+                databricks_token=tools_token,
+                is_cross_workspace=is_cross_workspace,
                 is_cancelled_fn=lambda: stream.is_cancelled,
+                enabled_skills=enabled_skills,
+                mlflow_experiment_name=body.mlflow_experiment_name,
             ):
                 # Check if cancelled (also checked in agent thread, but double-check here)
                 if stream.is_cancelled:

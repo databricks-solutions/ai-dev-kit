@@ -1,0 +1,37 @@
+skill:
+  name: "databricks-asset-bundles"
+  source_path: "databricks-skills/databricks-asset-bundles"
+  description: "Create and configure Databricks Asset Bundles (DABs) for multi-environment deployments"
+
+evaluation:
+  datasets:
+    - path: ground_truth.yaml
+      type: yaml
+
+# Scorer configuration
+scorers:
+  # Built-in deterministic scorers to enable
+  enabled:
+    - yaml_syntax
+    - pattern_adherence
+    - no_hallucinated_apis
+    - expected_facts_present
+
+  # LLM-based scorers
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations
+
+  # Default guidelines (used when test case has no guidelines)
+  default_guidelines:
+    - "Response must address the user's request completely"
+    - "YAML examples must be valid and properly indented"
+    - "Must use correct path resolution (../src/ in resources/*.yml, ./src/ in databricks.yml)"
+    - "Must parameterize environment-specific values using variables"
+    - "Must include appropriate permissions for resources"
+    - "Must follow DABs structure with databricks.yml and resources/*.yml pattern"
+
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+  execution_success: 0.8

@@ -2,62 +2,97 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, and GitHub Copilot.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, and Gemini CLI.
 #
-# Usage:
-#   curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
-#   curl -sL ... | bash -s -- --global
-#   curl -sL ... | bash -s -- --skills-only
-#   curl -sL ... | bash -s -- --mcp-only
-#   curl -sL ... | bash -s -- --tools cursor,codex,copilot
-#   curl -sL ... | bash -s -- --force
+# Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
+#
+# Examples:
+#   # Basic installation (project scoped, prompts for inputs, uses latest release)
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+#
+#   # Global installation with force reinstall
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --global --force
+#
+#   # Specify profile and force reinstall
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --profile DEFAULT --force
+#
+#   # Install for specific tools only
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,codex,copilot,gemini
+#
+#   # Skills only (skip MCP server)
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-only
+#
+# Alternative: Use environment variables
+#   DEVKIT_TOOLS=cursor curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
+#   DEVKIT_FORCE=true DEVKIT_PROFILE=DEFAULT curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
 #
 
 set -e
 
-# Configuration
-REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
-RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main"
-INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
-REPO_DIR="$INSTALL_DIR/repo"
-VENV_DIR="$INSTALL_DIR/.venv"
-VENV_PYTHON="$VENV_DIR/bin/python"
-MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
+# Defaults (can be overridden by environment variables or command-line arguments)
+PROFILE="${DEVKIT_PROFILE:-DEFAULT}"
+SCOPE="${DEVKIT_SCOPE:-project}"
+SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
+FORCE="${DEVKIT_FORCE:-false}"
+IS_UPDATE=false
+SILENT="${DEVKIT_SILENT:-false}"
+TOOLS="${DEVKIT_TOOLS:-}"
+USER_TOOLS=""
+USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
+
+# Convert string booleans from env vars to actual booleans
+[ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
+[ "$SILENT" = "true" ] || [ "$SILENT" = "1" ] && SILENT=true || SILENT=false
+
+# Check if scope was explicitly set via env var
+[ -n "${DEVKIT_SCOPE:-}" ] && SCOPE_EXPLICIT=true
+
+OWNER="databricks-solutions"
+REPO="ai-dev-kit"
+
+if [ -n "${DEVKIT_BRANCH:-}" ]; then
+  BRANCH="$DEVKIT_BRANCH"
+else
+  BRANCH="$(
+    curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" \
+    | grep '"tag_name"' \
+    | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
+  )"
+  # Fallback to main if we couldn't fetch the latest release
+  [ -z "$BRANCH" ] && BRANCH="main"
+fi
+
+# Installation mode defaults
+INSTALL_MCP=true
+INSTALL_SKILLS=true
+
+# Minimum required versions
+MIN_CLI_VERSION="0.278.0"
+MIN_SDK_VERSION="0.85.0"
 
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
-# Defaults
-PROFILE="DEFAULT"
-SCOPE="project"
-INSTALL_MCP=true
-INSTALL_SKILLS=true
-FORCE=false
-IS_UPDATE=false
-SILENT=false
-TOOLS=""
-USER_TOOLS=""
-USER_MCP_PATH=""
-
 # Databricks skills (bundled in repo)
-SKILLS="agent-bricks aibi-dashboards asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-docs databricks-genie databricks-jobs databricks-python-sdk databricks-unity-catalog lakebase-provisioned model-serving spark-declarative-pipelines synthetic-data-generation unstructured-pdf-generation"
+SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-apx databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
 MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 
 # Output helpers
-msg()  { [ "$SILENT" = false ] && echo -e "  $*"; }
-ok()   { [ "$SILENT" = false ] && echo -e "  ${G}✓${N} $*"; }
-warn() { [ "$SILENT" = false ] && echo -e "  ${Y}!${N} $*"; }
+msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
+ok()   { [ "$SILENT" = true ] || echo -e "  ${G}✓${N} $*"; }
+warn() { [ "$SILENT" = true ] || echo -e "  ${Y}!${N} $*"; }
 die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
-step() { [ "$SILENT" = false ] && echo -e "\n${B}$*${N}"; }
+step() { [ "$SILENT" = true ] || echo -e "\n${B}$*${N}"; }
 
 # Parse arguments
 while [ $# -gt 0 ]; do
     case $1 in
         -p|--profile)     PROFILE="$2"; shift 2 ;;
-        -g|--global)      SCOPE="global"; shift ;;
+        -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
+        -b|--branch)      BRANCH="$2"; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; shift ;;
         --mcp-path)       USER_MCP_PATH="$2"; shift 2 ;;
@@ -67,22 +102,47 @@ while [ $# -gt 0 ]; do
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
             echo ""
-            echo "Usage: curl -sL .../install.sh | bash [OPTIONS]"
+            echo "Usage: bash <(curl -sL .../install.sh) [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
+            echo "  -b, --branch NAME     Git branch/tag to install (default: latest release)"
             echo "  -g, --global          Install globally for all projects"
             echo "  --skills-only         Skip MCP server setup"
             echo "  --mcp-only            Skip skills installation"
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
-            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex"
+            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
+            echo ""
+            echo "Environment Variables (alternative to flags):"
+            echo "  DEVKIT_PROFILE        Databricks config profile"
+            echo "  DEVKIT_BRANCH         Git branch/tag to install (default: latest release)"
+            echo "  DEVKIT_SCOPE          'project' or 'global'"
+            echo "  DEVKIT_TOOLS          Comma-separated list of tools"
+            echo "  DEVKIT_FORCE          Set to 'true' to force reinstall"
+            echo "  DEVKIT_MCP_PATH       Path to MCP server installation"
+            echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
+            echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
+            echo ""
+            echo "Examples:"
+            echo "  # Using environment variables"
+            echo "  DEVKIT_TOOLS=cursor curl -sL .../install.sh | bash"
+            echo ""
             exit 0 ;;
         *) die "Unknown option: $1 (use -h for help)" ;;
     esac
 done
+
+# Set configuration URLs after parsing branch argument
+REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
+RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/${BRANCH}"
+INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
+REPO_DIR="$INSTALL_DIR/repo"
+VENV_DIR="$INSTALL_DIR/.venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 
 # ─── Interactive helpers ────────────────────────────────────────
 # Reads from /dev/tty so prompts work even when piped via curl | bash
@@ -320,9 +380,13 @@ radio_select() {
 
 # ─── Tool detection & selection ─────────────────────────────────
 detect_tools() {
-    # If provided via --tools flag, skip detection and prompts
+    # If provided via --tools flag or TOOLS env var, skip detection and prompts
     if [ -n "$USER_TOOLS" ]; then
         TOOLS=$(echo "$USER_TOOLS" | tr ',' ' ')
+        return
+    elif [ -n "$TOOLS" ]; then
+        # TOOLS env var already set, just normalize it
+        TOOLS=$(echo "$TOOLS" | tr ',' ' ')
         return
     fi
 
@@ -331,22 +395,25 @@ detect_tools() {
     local has_cursor=false
     local has_codex=false
     local has_copilot=false
+    local has_gemini=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
     command -v codex >/dev/null 2>&1 && has_codex=true
     { [ -d "/Applications/Visual Studio Code.app" ] || command -v code >/dev/null 2>&1; } && has_copilot=true
+    { command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/local/gemini" ]; } && has_gemini=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found"
     [ "$has_claude" = true ]  && claude_state="on"  && claude_hint="detected"
     [ "$has_cursor" = true ]  && cursor_state="on"  && cursor_hint="detected"
     [ "$has_codex" = true ]   && codex_state="on"   && codex_hint="detected"
     [ "$has_copilot" = true ] && copilot_state="on"  && copilot_hint="detected"
+    [ "$has_gemini" = true ]  && gemini_state="on"   && gemini_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
@@ -361,6 +428,7 @@ detect_tools() {
             "Cursor|cursor|${cursor_state}|${cursor_hint}" \
             "GitHub Copilot|copilot|${copilot_state}|${copilot_hint}" \
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
+            "Gemini CLI|gemini|${gemini_state}|${gemini_hint}" \
         )
     else
         # Silent: use detected defaults
@@ -369,6 +437,7 @@ detect_tools() {
         [ "$has_cursor" = true ]  && tools="${tools:+$tools }cursor"
         [ "$has_copilot" = true ] && tools="${tools:+$tools }copilot"
         [ "$has_codex" = true ]   && tools="${tools:+$tools }codex"
+        [ "$has_gemini" = true ]  && tools="${tools:+$tools }gemini"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -417,6 +486,9 @@ prompt_profile() {
             [ "$p" = "DEFAULT" ] && state="on" && hint="default"
             items+=("${p}|${p}|${state}|${hint}")
         done
+        
+        # Add custom profile option at the end
+        items+=("Custom profile name...|__CUSTOM__|off|Enter a custom profile name")
 
         # If no DEFAULT profile exists, pre-select the first one
         local has_default=false
@@ -427,7 +499,18 @@ prompt_profile() {
             items[0]=$(echo "${items[0]}" | sed 's/|off|/|on|/')
         fi
 
-        PROFILE=$(radio_select "${items[@]}")
+        local selected_profile
+        selected_profile=$(radio_select "${items[@]}")
+        
+        # If custom was selected, prompt for name
+        if [ "$selected_profile" = "__CUSTOM__" ]; then
+            echo ""
+            local custom_name
+            custom_name=$(prompt "Enter profile name" "DEFAULT")
+            PROFILE="$custom_name"
+        else
+            PROFILE="$selected_profile"
+        fi
     else
         echo -e "  ${D}No ~/.databrickscfg found. You can authenticate after install.${N}"
         echo ""
@@ -463,13 +546,54 @@ prompt_mcp_path() {
     MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 }
 
+# Compare semantic versions (returns 0 if $1 >= $2)
+version_gte() {
+    printf '%s\n%s' "$2" "$1" | sort -V -C
+}
+
+# Check Databricks CLI version meets minimum requirement
+check_cli_version() {
+    local cli_version
+    cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+
+    if [ -z "$cli_version" ]; then
+        warn "Could not determine Databricks CLI version"
+        return
+    fi
+
+    if version_gte "$cli_version" "$MIN_CLI_VERSION"; then
+        ok "Databricks CLI v${cli_version}"
+    else
+        warn "Databricks CLI v${cli_version} is outdated (minimum: v${MIN_CLI_VERSION})"
+        msg "  ${B}Upgrade:${N} curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh"
+    fi
+}
+
+# Check Databricks SDK version in the MCP venv
+check_sdk_version() {
+    local sdk_version
+    sdk_version=$("$VENV_PYTHON" -c "from databricks.sdk.version import __version__; print(__version__)" 2>/dev/null)
+
+    if [ -z "$sdk_version" ]; then
+        warn "Could not determine Databricks SDK version"
+        return
+    fi
+
+    if version_gte "$sdk_version" "$MIN_SDK_VERSION"; then
+        ok "Databricks SDK v${sdk_version}"
+    else
+        warn "Databricks SDK v${sdk_version} is outdated (minimum: v${MIN_SDK_VERSION})"
+        msg "  ${B}Upgrade:${N} $VENV_PYTHON -m pip install --upgrade databricks-sdk"
+    fi
+}
+
 # Check prerequisites
 check_deps() {
     command -v git >/dev/null 2>&1 || die "git required"
     ok "git"
 
     if command -v databricks >/dev/null 2>&1; then
-        ok "databricks CLI"
+        check_cli_version
     else
         warn "Databricks CLI not found. Install: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}"
         msg "${D}You can still install, but authentication will require the CLI later.${N}"
@@ -517,26 +641,37 @@ setup_mcp() {
     
     # Clone or update repo
     if [ -d "$REPO_DIR/.git" ]; then
-        git -C "$REPO_DIR" pull -q 2>/dev/null || {
+        git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
+        git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
         }
     else
         mkdir -p "$INSTALL_DIR"
-        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
     fi
-    ok "Repository cloned"
+    ok "Repository cloned ($BRANCH)"
     
     # Create venv and install
+    # On Apple Silicon under Rosetta, force arm64 to avoid architecture mismatch
+    # with universal2 Python binaries (see: github.com/databricks-solutions/ai-dev-kit/issues/115)
+    local arch_prefix=""
+    if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] && [ "$(uname -m)" = "x86_64" ]; then
+        if arch -arm64 python3 -c "pass" 2>/dev/null; then
+            arch_prefix="arch -arm64"
+            warn "Rosetta detected on Apple Silicon — forcing arm64 for Python"
+        fi
+    fi
+
     msg "Installing Python dependencies..."
     if [ "$PKG" = "uv" ]; then
-        uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || uv venv --allow-existing "$VENV_DIR" -q
-        uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
+        $arch_prefix uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
+        $arch_prefix uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
     else
-        [ ! -d "$VENV_DIR" ] && python3 -m venv "$VENV_DIR"
-        "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
+        [ ! -d "$VENV_DIR" ] && $arch_prefix python3 -m venv "$VENV_DIR"
+        $arch_prefix "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
     fi
-    
+
     "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
     ok "MCP server ready"
 }
@@ -546,21 +681,27 @@ install_skills() {
     step "Installing skills"
 
     local base_dir=$1
-    local dirs=""
+    local dirs=()
 
-    # Determine target directories
+    # Determine target directories (array so paths with spaces work)
     for tool in $TOOLS; do
         case $tool in
-            claude) dirs="$base_dir/.claude/skills" ;;
-            cursor) echo "$TOOLS" | grep -q claude || dirs="$dirs $base_dir/.cursor/skills" ;;
-            copilot) dirs="$dirs $base_dir/.github/skills" ;;
-            codex) dirs="$dirs $base_dir/.agents/skills" ;;
+            claude) dirs=("$base_dir/.claude/skills") ;;
+            cursor) echo "$TOOLS" | grep -q claude || dirs+=("$base_dir/.cursor/skills") ;;
+            copilot) dirs+=("$base_dir/.github/skills") ;;
+            codex) dirs+=("$base_dir/.agents/skills") ;;
+            gemini) dirs+=("$base_dir/.gemini/skills") ;;
         esac
     done
 
-    dirs=$(echo "$dirs" | xargs -n1 | sort -u | xargs)
+    # Dedupe: one element per line, sort -u, read back into array
+    local unique=()
+    while IFS= read -r d; do
+        unique+=("$d")
+    done < <(printf '%s\n' "${dirs[@]}" | sort -u)
+    dirs=("${unique[@]}")
 
-    for dir in $dirs; do
+    for dir in "${dirs[@]}"; do
         mkdir -p "$dir"
         # Install Databricks skills from repo
         for skill in $SKILLS; do
@@ -606,7 +747,7 @@ import json, sys
 try:
     with open('$path') as f: cfg = json.load(f)
 except: cfg = {}
-cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'defer_loading': True, 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
 with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 " 2>/dev/null && return
     fi
@@ -617,6 +758,7 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
     "databricks": {
       "command": "$VENV_PYTHON",
       "args": ["$MCP_ENTRY"],
+      "defer_loading": true,
       "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
     }
   }
@@ -674,6 +816,76 @@ args = ["$MCP_ENTRY"]
 EOF
 }
 
+write_gemini_mcp_json() {
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+
+    # Backup existing file before any modifications
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
+
+    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
+import json, sys
+try:
+    with open('$path') as f: cfg = json.load(f)
+except: cfg = {}
+cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
+    fi
+
+    cat > "$path" << EOF
+{
+  "mcpServers": {
+    "databricks": {
+      "command": "$VENV_PYTHON",
+      "args": ["$MCP_ENTRY"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
+    }
+  }
+}
+EOF
+}
+
+write_gemini_md() {
+    local path=$1
+    [ -f "$path" ] && return  # Don't overwrite existing file
+    cat > "$path" << 'GEMINIEOF'
+# Databricks AI Dev Kit
+
+You have access to Databricks skills and MCP tools installed by the Databricks AI Dev Kit.
+
+## Available MCP Tools
+
+The `databricks` MCP server provides 50+ tools for interacting with Databricks, including:
+- SQL execution and warehouse management
+- Unity Catalog operations (tables, volumes, schemas)
+- Jobs and workflow management
+- Model serving endpoints
+- Genie spaces and AI/BI dashboards
+- Databricks Apps deployment
+
+## Available Skills
+
+Skills are installed in `.gemini/skills/` and provide patterns and best practices for:
+- Spark Declarative Pipelines, Structured Streaming
+- Databricks Jobs, Asset Bundles
+- Unity Catalog, SQL, Genie
+- MLflow evaluation and tracing
+- Model Serving, Vector Search
+- Databricks Apps (Python and APX)
+- And more
+
+## Getting Started
+
+Try asking: "List my SQL warehouses" or "Show my Unity Catalog schemas"
+GEMINIEOF
+    ok "GEMINI.md"
+}
+
 write_mcp_configs() {
     step "Configuring MCP"
     
@@ -710,6 +922,14 @@ write_mcp_configs() {
                 [ "$SCOPE" = "global" ] && write_mcp_toml "$HOME/.codex/config.toml" || write_mcp_toml "$base_dir/.codex/config.toml"
                 ok "Codex MCP config"
                 ;;
+            gemini)
+                if [ "$SCOPE" = "global" ]; then
+                    write_gemini_mcp_json "$HOME/.gemini/settings.json"
+                else
+                    write_gemini_mcp_json "$base_dir/.gemini/settings.json"
+                fi
+                ok "Gemini CLI MCP config"
+                ;;
         esac
     done
 }
@@ -721,7 +941,10 @@ save_version() {
     # Validate version format
     [[ "$ver" =~ (404|Not Found|error) ]] && ver="dev"
     echo "$ver" > "$INSTALL_DIR/version"
-    [ "$SCOPE" = "project" ] && { mkdir -p ".ai-dev-kit"; echo "$ver" > ".ai-dev-kit/version"; }
+    if [ "$SCOPE" = "project" ]; then
+        mkdir -p ".ai-dev-kit"
+        echo "$ver" > ".ai-dev-kit/version"
+    fi
 }
 
 # Print summary
@@ -736,9 +959,6 @@ summary() {
         echo ""
         msg "${B}Next steps:${N}"
         local step=1
-        msg "${step}. Configure profile $PROFILE or set environment variables DATABRICKS_HOST and DATABRICKS_TOKEN".
-        msg "   Authenticate: ${B}${BL}databricks auth login --profile $PROFILE${N}"
-        step=$((step + 1))
         if echo "$TOOLS" | grep -q cursor; then
             msg "${R}${step}. Enable MCP in Cursor: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
             step=$((step + 1))
@@ -749,11 +969,84 @@ summary() {
             msg "${step}. Use Copilot in ${B}Agent mode${N} to access Databricks skills and MCP tools"
             step=$((step + 1))
         fi
+        if echo "$TOOLS" | grep -q gemini; then
+            msg "${step}. Launch Gemini CLI in your project: ${B}gemini${N}"
+            step=$((step + 1))
+        fi
         msg "${step}. Open your project in your tool of choice"
         step=$((step + 1))
         msg "${step}. Try: \"List my SQL warehouses\""
         echo ""
     fi
+}
+
+# Prompt for installation scope
+prompt_scope() {
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Select installation scope${N}"
+    
+    # Simple radio selector without Confirm button
+    local -a labels=("Project" "Global")
+    local -a values=("project" "global")
+    local -a hints=("Install in current directory (.cursor/, .claude/, .gemini/)" "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
+    local count=2
+    local selected=0
+    local cursor=0
+    
+    _scope_draw() {
+        for i in 0 1; do
+            local dot="○"
+            local dot_color="\033[2m"
+            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
+            local arrow="  "
+            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
+            local hint_style="\033[2m"
+            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
+            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
+        done
+    }
+    
+    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
+    printf "\033[?25l" > /dev/tty
+    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+    
+    _scope_draw
+    
+    while true; do
+        printf "\033[%dA" "$count" > /dev/tty
+        _scope_draw
+        
+        local key=""
+        IFS= read -rsn1 key < /dev/tty 2>/dev/null
+        
+        if [ "$key" = $'\x1b' ]; then
+            local s1="" s2=""
+            read -rsn1 s1 < /dev/tty 2>/dev/null
+            read -rsn1 s2 < /dev/tty 2>/dev/null
+            if [ "$s1" = "[" ]; then
+                case "$s2" in
+                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
+                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
+                esac
+            fi
+        elif [ "$key" = "" ]; then
+            selected=$cursor
+            printf "\033[%dA" "$count" > /dev/tty
+            _scope_draw
+            break
+        elif [ "$key" = " " ]; then
+            selected=$cursor
+        fi
+    done
+    
+    printf "\033[?25h" > /dev/tty
+    trap - EXIT
+    
+    SCOPE="${values[$selected]}"
 }
 
 # Prompt to run auth
@@ -825,6 +1118,12 @@ main() {
     prompt_profile
     ok "Profile: $PROFILE"
 
+    # ── Step 3.5: Interactive scope selection ──
+    if [ "$SCOPE_EXPLICIT" = false ]; then
+        prompt_scope
+        ok "Scope: $SCOPE"
+    fi
+
     # ── Step 4: Interactive MCP path ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
@@ -868,12 +1167,21 @@ main() {
     elif [ ! -d "$REPO_DIR" ]; then
         step "Downloading sources"
         mkdir -p "$INSTALL_DIR"
-        git clone -q --depth 1 "$REPO_URL" "$REPO_DIR"
-        ok "Repository cloned"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        ok "Repository cloned ($BRANCH)"
     fi
     
     # Install skills
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
+
+    # Write GEMINI.md if gemini is selected
+    if echo "$TOOLS" | grep -q gemini; then
+        if [ "$SCOPE" = "global" ]; then
+            write_gemini_md "$HOME/GEMINI.md"
+        else
+            write_gemini_md "$base_dir/GEMINI.md"
+        fi
+    fi
 
     # Write MCP configs
     [ "$INSTALL_MCP" = true ] && write_mcp_configs "$base_dir"
@@ -881,11 +1189,11 @@ main() {
     # Save version
     save_version
     
-    # Done
-    summary
-    
     # Prompt to run auth
     prompt_auth
+    
+    # Done
+    summary
 }
 
 main "$@"

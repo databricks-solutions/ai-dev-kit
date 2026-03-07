@@ -13,7 +13,7 @@ from databricks.sdk.service.jobs import (
 )
 
 from ..auth import get_workspace_client
-from .models import JobRunResult, JobError, RunLifecycleState, RunResultState as RunResultStateEnum
+from .models import JobRunResult, JobError
 
 
 # Terminal states - run has finished (success or failure)

@@ -118,7 +118,7 @@ app.add_middleware(
 API_PREFIX = '/api'
 
 # Include routers
-app.include_router(config_router, prefix=API_PREFIX, tags=['configuration'])
+app.include_router(config_router, prefix=f'{API_PREFIX}/config', tags=['configuration'])
 app.include_router(clusters_router, prefix=API_PREFIX, tags=['clusters'])
 app.include_router(warehouses_router, prefix=API_PREFIX, tags=['warehouses'])
 app.include_router(projects_router, prefix=API_PREFIX, tags=['projects'])

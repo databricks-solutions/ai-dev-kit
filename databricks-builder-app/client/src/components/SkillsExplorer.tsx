@@ -15,15 +15,19 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
+  fetchAvailableSkills,
   fetchSkillFile,
   fetchSkillsTree,
   fetchSystemPrompt,
   reloadProjectSkills,
+  updateEnabledSkills,
   type FetchSystemPromptParams,
   type SkillTreeNode,
 } from '@/lib/api';
+import type { AvailableSkill } from '@/lib/types';
 
 interface TreeNodeProps {
   node: SkillTreeNode;
@@ -112,6 +116,42 @@ function TreeNode({
   );
 }
 
+// Toggle switch component
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange(!checked);
+      }}
+      className={cn(
+        'relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]/50 focus:ring-offset-1',
+        checked ? 'bg-[var(--color-accent-primary)]' : 'bg-[var(--color-text-muted)]/50',
+        disabled && 'opacity-50 cursor-not-allowed'
+      )}
+    >
+      <span
+        className={cn(
+          'pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+          checked ? 'translate-x-3' : 'translate-x-0'
+        )}
+      />
+    </button>
+  );
+}
+
 interface SkillsExplorerProps {
   projectId: string;
   systemPromptParams: FetchSystemPromptParams;
@@ -133,13 +173,21 @@ export function SkillsExplorer({
   const [showRawCode, setShowRawCode] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
 
-  // Load skills tree
+  // Skill management state
+  const [availableSkills, setAvailableSkills] = useState<AvailableSkill[]>([]);
+  const [isUpdatingSkills, setIsUpdatingSkills] = useState(false);
+
+  // Load skills tree and available skills
   useEffect(() => {
-    const loadTree = async () => {
+    const loadData = async () => {
       try {
         setIsLoadingTree(true);
-        const treeData = await fetchSkillsTree(projectId);
+        const [treeData, skillsData] = await Promise.all([
+          fetchSkillsTree(projectId),
+          fetchAvailableSkills(projectId),
+        ]);
         setTree(treeData);
+        setAvailableSkills(skillsData.skills);
 
         // Auto-expand first level directories
         const initialExpanded = new Set<string>();
@@ -150,13 +198,13 @@ export function SkillsExplorer({
         });
         setExpandedPaths(initialExpanded);
       } catch (error) {
-        console.error('Failed to load skills tree:', error);
+        console.error('Failed to load skills data:', error);
       } finally {
         setIsLoadingTree(false);
       }
     };
 
-    loadTree();
+    loadData();
   }, [projectId]);
 
   // Load system prompt by default
@@ -227,9 +275,13 @@ export function SkillsExplorer({
     setIsReloading(true);
     try {
       await reloadProjectSkills(projectId);
-      // Reload the tree after skills are refreshed
-      const treeData = await fetchSkillsTree(projectId);
+      // Reload the tree and available skills after refresh
+      const [treeData, skillsData] = await Promise.all([
+        fetchSkillsTree(projectId),
+        fetchAvailableSkills(projectId),
+      ]);
       setTree(treeData);
+      setAvailableSkills(skillsData.skills);
       // Auto-expand first level directories
       const initialExpanded = new Set<string>();
       treeData.forEach((node) => {
@@ -241,13 +293,112 @@ export function SkillsExplorer({
       // Reset selection to system prompt
       setSelectedPath(null);
       setSelectedType('system_prompt');
+      toast.success('Skills reloaded');
     } catch (error) {
       console.error('Failed to reload skills:', error);
+      toast.error('Failed to reload skills');
     } finally {
       setIsReloading(false);
     }
   }, [projectId]);
 
+  // Toggle a single skill
+  const handleToggleSkill = useCallback(
+    async (skillName: string, enabled: boolean) => {
+      setIsUpdatingSkills(true);
+      try {
+        // Calculate new enabled list
+        const allEnabled = availableSkills.every((s) => s.enabled) && availableSkills.some((s) => s.name !== skillName);
+        let newEnabledList: string[] | null;
+
+        if (enabled) {
+          // Enabling a skill
+          const currentEnabled = availableSkills.filter((s) => s.enabled).map((s) => s.name);
+          const newEnabled = [...currentEnabled, skillName];
+          // If all skills would be enabled, set to null (all)
+          if (newEnabled.length >= availableSkills.length) {
+            newEnabledList = null;
+          } else {
+            newEnabledList = newEnabled;
+          }
+        } else {
+          // Disabling a skill
+          const currentEnabled = availableSkills.filter((s) => s.enabled).map((s) => s.name);
+          newEnabledList = currentEnabled.filter((n) => n !== skillName);
+          if (newEnabledList.length === 0) {
+            toast.error('At least one skill must be enabled');
+            setIsUpdatingSkills(false);
+            return;
+          }
+        }
+
+        await updateEnabledSkills(projectId, newEnabledList);
+
+        // Update local state
+        setAvailableSkills((prev) =>
+          prev.map((s) => (s.name === skillName ? { ...s, enabled } : s))
+        );
+
+        // Refresh the tree to reflect filesystem changes
+        const treeData = await fetchSkillsTree(projectId);
+        setTree(treeData);
+
+        // Refresh system prompt if currently viewing it (so disabled skills disappear)
+        if (selectedType === 'system_prompt') {
+          const prompt = await fetchSystemPrompt(systemPromptParams);
+          setContent(prompt);
+        }
+      } catch (error) {
+        console.error('Failed to toggle skill:', error);
+        toast.error('Failed to update skill');
+      } finally {
+        setIsUpdatingSkills(false);
+      }
+    },
+    [projectId, availableSkills, selectedType, systemPromptParams]
+  );
+
+  // Enable or disable all skills
+  const handleToggleAll = useCallback(
+    async (enableAll: boolean) => {
+      setIsUpdatingSkills(true);
+      try {
+        if (enableAll) {
+          await updateEnabledSkills(projectId, null);
+          setAvailableSkills((prev) => prev.map((s) => ({ ...s, enabled: true })));
+        } else {
+          // Disable all except first skill (must have at least one)
+          const firstSkill = availableSkills[0]?.name;
+          if (!firstSkill) return;
+          await updateEnabledSkills(projectId, [firstSkill]);
+          setAvailableSkills((prev) =>
+            prev.map((s) => ({ ...s, enabled: s.name === firstSkill }))
+          );
+        }
+
+        // Refresh tree
+        const treeData = await fetchSkillsTree(projectId);
+        setTree(treeData);
+
+        // Refresh system prompt if currently viewing it
+        if (selectedType === 'system_prompt') {
+          const prompt = await fetchSystemPrompt(systemPromptParams);
+          setContent(prompt);
+        }
+
+        toast.success(enableAll ? 'All skills enabled' : 'Skills minimized');
+      } catch (error) {
+        console.error('Failed to toggle all skills:', error);
+        toast.error('Failed to update skills');
+      } finally {
+        setIsUpdatingSkills(false);
+      }
+    },
+    [projectId, availableSkills, selectedType, systemPromptParams]
+  );
+
+  const enabledCount = availableSkills.filter((s) => s.enabled).length;
+  const totalCount = availableSkills.length;
   const isMarkdownFile = selectedType === 'system_prompt' || selectedPath?.endsWith('.md');
 
   return (
@@ -261,12 +412,15 @@ export function SkillsExplorer({
       {/* Content */}
       <div className="relative z-10 flex w-full h-full m-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] shadow-2xl overflow-hidden">
         {/* Left sidebar - Navigation */}
-        <div className="w-64 flex-shrink-0 border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 flex flex-col">
+        <div className="w-72 flex-shrink-0 border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)]/30 flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
             <h2 className="text-sm font-semibold text-[var(--color-text-heading)]">
-              Documentation
+              Skills & Docs
             </h2>
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--color-accent-primary)]/10 text-[var(--color-accent-primary)]">
+              {enabledCount}/{totalCount}
+            </span>
           </div>
 
           {/* Navigation content */}
@@ -288,44 +442,98 @@ export function SkillsExplorer({
             {/* Divider */}
             <div className="my-2 border-t border-[var(--color-border)]" />
 
-            {/* Reload Skills Button */}
-            <button
-              onClick={handleReloadSkills}
-              disabled={isReloading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-3 shadow-sm"
-            >
-              <RefreshCw className={cn('h-3.5 w-3.5 flex-shrink-0', isReloading && 'animate-spin')} />
-              <span>{isReloading ? 'Reloading...' : 'Reload project skills'}</span>
-            </button>
+            {/* Action Buttons Row */}
+            <div className="flex gap-1.5 mb-3">
+              {/* Reload Skills Button */}
+              <button
+                onClick={handleReloadSkills}
+                disabled={isReloading}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-medium bg-[var(--color-accent-primary)] text-white hover:bg-[var(--color-accent-secondary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                <RefreshCw className={cn('h-3 w-3 flex-shrink-0', isReloading && 'animate-spin')} />
+                <span>{isReloading ? 'Reloading...' : 'Reload'}</span>
+              </button>
+
+              {/* Enable All / Disable All */}
+              <button
+                onClick={() => handleToggleAll(true)}
+                disabled={isUpdatingSkills || enabledCount === totalCount}
+                className="flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                All on
+              </button>
+              <button
+                onClick={() => handleToggleAll(false)}
+                disabled={isUpdatingSkills || enabledCount <= 1}
+                className="flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Min
+              </button>
+            </div>
 
             {/* Skills label */}
             <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
               Skills
             </div>
 
-            {/* Skills tree */}
+            {/* Skills list with toggles */}
             {isLoadingTree ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-4 w-4 animate-spin text-[var(--color-text-muted)]" />
               </div>
-            ) : tree.length === 0 ? (
+            ) : availableSkills.length === 0 ? (
               <div className="px-2 py-4 text-xs text-[var(--color-text-muted)]">
                 No skills available
               </div>
             ) : (
               <div className="space-y-0.5">
-                {tree.map((node) => (
-                  <TreeNode
-                    key={node.path}
-                    node={node}
-                    level={0}
-                    selectedPath={selectedPath}
-                    expandedPaths={expandedPaths}
-                    onSelect={handleSelectSkill}
-                    onToggle={handleToggle}
-                  />
+                {availableSkills.map((skill) => (
+                  <div
+                    key={skill.name}
+                    className={cn(
+                      'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors group',
+                      !skill.enabled && 'opacity-50'
+                    )}
+                  >
+                    <Toggle
+                      checked={skill.enabled}
+                      onChange={(checked) => handleToggleSkill(skill.name, checked)}
+                      disabled={isUpdatingSkills}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-[var(--color-text-primary)] truncate text-[11px]">
+                        {skill.name}
+                      </div>
+                      <div className="text-[var(--color-text-muted)] truncate text-[10px] leading-tight">
+                        {skill.description}
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
+            )}
+
+            {/* File tree (collapsed by default behind a divider) */}
+            {tree.length > 0 && (
+              <>
+                <div className="my-3 border-t border-[var(--color-border)]" />
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                  Skill Files
+                </div>
+                <div className="space-y-0.5">
+                  {tree.map((node) => (
+                    <TreeNode
+                      key={node.path}
+                      node={node}
+                      level={0}
+                      selectedPath={selectedPath}
+                      expandedPaths={expandedPaths}
+                      onSelect={handleSelectSkill}
+                      onToggle={handleToggle}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
