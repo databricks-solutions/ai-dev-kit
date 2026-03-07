@@ -64,7 +64,7 @@ def get_connection():
 | Detail | Value |
 |--------|-------|
 | Pre-installed version | 1.38.0 |
-| app.yaml command | `["streamlit", "run", "app.py"]` |
+| app.yaml command | `["streamlit", "run", "app.py"]` — port, address, and headless are auto-configured by the runtime via `DATABRICKS_APP_PORT` |
 | Auth header | `st.context.headers.get('x-forwarded-access-token')` |
 
 **Databricks tips**:
@@ -152,7 +152,7 @@ def get_data():
 | Detail | Value |
 |--------|-------|
 | Pre-installed version | 3.0.3 |
-| app.yaml command | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8000"]` |
+| app.yaml command | `["gunicorn", "app:app", "-w", "4", "-b", "0.0.0.0:8000"]` — uses `DATABRICKS_APP_PORT` default (8000) |
 | Auth header | `request.headers.get('x-forwarded-access-token')` |
 
 **Databricks tips**:
@@ -192,7 +192,7 @@ async def get_data(request: Request):
 | Detail | Value |
 |--------|-------|
 | Pre-installed version | 0.115.0 |
-| app.yaml command | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` |
+| app.yaml command | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` — uses `DATABRICKS_APP_PORT` default (8000) |
 | Auth header | `request.headers.get('x-forwarded-access-token')` via `Request` |
 
 **Databricks tips**:
@@ -244,5 +244,7 @@ class State(rx.State):
 - Add only additional packages your app needs to `requirements.txt`
 - SDK `Config()` auto-detects credentials from injected environment variables
 - Apps must bind to `DATABRICKS_APP_PORT` env var (defaults to 8000). Streamlit is auto-configured by the runtime; for other frameworks, read the env var in code or hardcode 8000 in `app.yaml` command. **Never use 8080**
+- **No external CDN dependencies** in frontend HTML — the app runtime blocks outbound CDN requests (React, Recharts, Google Fonts, Babel). Build self-contained HTML with inline JS/CSS only
+- **Never delete apps to fix issues** — just redeploy. Deleting disrupts OAuth integration
 - For framework-specific deployment commands, see [4-deployment.md](4-deployment.md)
 - For authorization integration, see [1-authorization.md](1-authorization.md)
