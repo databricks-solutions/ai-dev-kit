@@ -2,91 +2,36 @@
 Parallel Foundation Model Calls
 
 This example demonstrates how to make multiple foundation model API calls in parallel
-for improved performance. Pattern extracted from databricksters-check-and-pub production app.
+for improved performance. It uses the same bounded job-runner pattern as the
+production Databricks App, but keeps the example generic enough to reuse in
+other review, extraction, or scoring workflows.
 
 Use cases:
-- Content evaluation with multiple checks (compliance, quality, etc.)
+- Document evaluation with multiple independent checks
 - Batch processing of independent prompts
 - Multi-aspect analysis of the same content
 - A/B testing different prompts
 
 Performance impact:
-- Serial: 3 calls × 2s each = 6s total
-- Parallel (max_workers=3): ~2s total (3× faster)
+- Serial: 5 calls × 2s each = 10s total
+- Parallel (max_workers=5): ~2s to 3s total depending on endpoint overhead
 
 Configuration:
-- LLM_MAX_CONCURRENCY env var controls parallelism (default: 3)
+- LLM_MAX_CONCURRENCY env var controls parallelism (positive integer, default: 5)
 - Balance between throughput and rate limits
 - DATABRICKS_MODEL must be set to a valid serving endpoint name
 """
 
-import concurrent.futures
-import os
 import time
 from typing import Any, Callable, Dict, List, Tuple
 
 from openai import OpenAI
 
-from _common import create_foundation_model_client, get_model_name
-
-# Concurrency control
-LLM_MAX_CONCURRENCY = int(os.environ.get("LLM_MAX_CONCURRENCY", "3"))
-
-
-# =============================================================================
-# Pattern: Parallel Job Execution
-# =============================================================================
-def run_jobs_parallel(
-    jobs: Dict[str, Tuple[Callable, Tuple[Any, ...], Dict[str, Any]]],
-    max_workers: int = LLM_MAX_CONCURRENCY,
-) -> Tuple[Dict[str, Any], List[str]]:
-    """Run a set of callables in parallel and wait for all results.
-
-    This is the pattern used in databricksters-check-and-pub for making multiple
-    LLM calls simultaneously.
-
-    Args:
-        jobs: Dict mapping job_name -> (function, args, kwargs)
-        max_workers: Max parallel executions (default from LLM_MAX_CONCURRENCY)
-
-    Returns:
-        (results_dict, errors_list) where:
-        - results_dict: job_name -> result (or None if failed)
-        - errors_list: List of error messages for failed jobs
-
-    Example:
-        jobs = {
-            "check_1": (my_llm_call, (prompt1,), {}),
-            "check_2": (my_llm_call, (prompt2,), {}),
-        }
-        results, errors = run_jobs_parallel(jobs)
-    """
-    results: Dict[str, Any] = {}
-    errors: List[str] = []
-
-    def _call(fn, args, kwargs):
-        return fn(*args, **kwargs)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all jobs
-        futures = {
-            executor.submit(_call, fn, args, kwargs): name
-            for name, (fn, args, kwargs) in jobs.items()
-        }
-
-        # Wait for all to complete
-        concurrent.futures.wait(list(futures.keys()))
-
-        # Harvest results
-        for future, job_name in futures.items():
-            try:
-                results[job_name] = future.result()
-            except Exception as e:
-                error_msg = f"{job_name}: {type(e).__name__}: {str(e)[:200]}"
-                errors.append(error_msg)
-                results[job_name] = None
-
-    return results, errors
+from llm_config import (
+    create_foundation_model_client,
+    get_model_name,
+    run_jobs_parallel,
+)
 
 
 # =============================================================================
@@ -112,13 +57,13 @@ def llm_call(
 
 
 # =============================================================================
-# Example: Content Quality Checks (from databricksters-check-and-pub)
+# Example: Generic Technical Document Checks
 # =============================================================================
 def check_structure(client: OpenAI, text: str) -> Dict[str, Any]:
-    """Check if content has clear heading structure."""
-    prompt = f"""Evaluate the structure of this blog post. Does it have clear H2/H3 headings that segment the content?
+    """Check if a technical document has clear section structure."""
+    prompt = f"""Evaluate the structure of this technical document. Does it have clear section headings and a logical progression?
 
-Blog post:
+DOCUMENT:
 {text[:2000]}
 
 Answer with: PASS or FAIL, then brief explanation."""
@@ -134,11 +79,11 @@ Answer with: PASS or FAIL, then brief explanation."""
     }
 
 
-def check_tldr(client: OpenAI, text: str) -> Dict[str, Any]:
-    """Check if content has TL;DR near the top."""
-    prompt = f"""Does this blog post start with a TL;DR or Key Takeaways section in the first 10%?
+def check_summary(client: OpenAI, text: str) -> Dict[str, Any]:
+    """Check if content has a concise executive summary near the top."""
+    prompt = f"""Does this technical document start with a concise summary or key takeaways section in the first 10 percent?
 
-Blog post:
+DOCUMENT:
 {text[:2000]}
 
 Answer with: PASS or FAIL, then brief explanation."""
@@ -147,18 +92,18 @@ Answer with: PASS or FAIL, then brief explanation."""
     passed = "PASS" in response.upper().split("\n")[0]
 
     return {
-        "check": "tldr",
+        "check": "summary",
         "passed": passed,
         "response": response,
         "latency_ms": latency_ms,
     }
 
 
-def check_actionability(client: OpenAI, text: str) -> Dict[str, Any]:
-    """Check if content has actionable takeaways."""
-    prompt = f"""Does this blog post include actionable steps or concrete examples readers can use?
+def check_examples(client: OpenAI, text: str) -> Dict[str, Any]:
+    """Check if content includes concrete examples."""
+    prompt = f"""Does this technical document include concrete examples, code, or step-by-step guidance readers can adapt?
 
-Blog post:
+DOCUMENT:
 {text[:2000]}
 
 Answer with: PASS or FAIL, then brief explanation."""
@@ -167,7 +112,47 @@ Answer with: PASS or FAIL, then brief explanation."""
     passed = "PASS" in response.upper().split("\n")[0]
 
     return {
-        "check": "actionability",
+        "check": "examples",
+        "passed": passed,
+        "response": response,
+        "latency_ms": latency_ms,
+    }
+
+
+def check_troubleshooting(client: OpenAI, text: str) -> Dict[str, Any]:
+    """Check if content covers troubleshooting or failure modes."""
+    prompt = f"""Does this technical document include troubleshooting guidance, failure modes, or common pitfalls?
+
+DOCUMENT:
+{text[:2000]}
+
+Answer with: PASS or FAIL, then brief explanation."""
+
+    response, latency_ms = llm_call(client, prompt)
+    passed = "PASS" in response.upper().split("\n")[0]
+
+    return {
+        "check": "troubleshooting",
+        "passed": passed,
+        "response": response,
+        "latency_ms": latency_ms,
+    }
+
+
+def check_audience_fit(client: OpenAI, text: str) -> Dict[str, Any]:
+    """Check if content matches a technical practitioner audience."""
+    prompt = f"""Does this technical document appear written for practitioners, with the right level of specificity and useful context?
+
+DOCUMENT:
+{text[:2000]}
+
+Answer with: PASS or FAIL, then brief explanation."""
+
+    response, latency_ms = llm_call(client, prompt)
+    passed = "PASS" in response.upper().split("\n")[0]
+
+    return {
+        "check": "audience_fit",
         "passed": passed,
         "response": response,
         "latency_ms": latency_ms,
@@ -178,9 +163,9 @@ Answer with: PASS or FAIL, then brief explanation."""
 # Example Usage: Parallel Execution
 # =============================================================================
 if __name__ == "__main__":
-    # Sample blog content
+    # Sample technical document
     sample_text = """
-    TL;DR: This post shows you how to deploy Databricks Apps in 3 steps.
+    Summary: This guide shows how to deploy a Databricks App in three steps.
 
     ## Introduction
     Databricks Apps provides a way to deploy web applications...
@@ -197,19 +182,21 @@ if __name__ == "__main__":
 
     client = create_foundation_model_client()
 
-    print(f"Making 3 parallel LLM calls with max_workers={LLM_MAX_CONCURRENCY}...")
+    print("Making 5 parallel LLM calls...")
     print(f"Model: {get_model_name()}\n")
 
-    # Define parallel jobs
+    # Define independent parallel jobs
     jobs = {
         "structure": (check_structure, (client, sample_text), {}),
-        "tldr": (check_tldr, (client, sample_text), {}),
-        "actionability": (check_actionability, (client, sample_text), {}),
+        "summary": (check_summary, (client, sample_text), {}),
+        "examples": (check_examples, (client, sample_text), {}),
+        "troubleshooting": (check_troubleshooting, (client, sample_text), {}),
+        "audience_fit": (check_audience_fit, (client, sample_text), {}),
     }
 
-    # Execute in parallel (this is the key pattern!)
+    # Execute in parallel using the shared bounded job runner.
     start = time.perf_counter()
-    results, errors = run_jobs_parallel(jobs, max_workers=LLM_MAX_CONCURRENCY)
+    results, errors = run_jobs_parallel(jobs)
     total_time = time.perf_counter() - start
 
     # Display results
@@ -248,7 +235,7 @@ if __name__ == "__main__":
 Best practices from databricksters-check-and-pub:
 
 1. Configurable concurrency
-   - Use LLM_MAX_CONCURRENCY env var (default: 3)
+   - Use LLM_MAX_CONCURRENCY env var (default: 5 in the production app)
    - Balance throughput vs rate limits
    - Too high = rate limit errors
    - Too low = underutilized resources
@@ -259,11 +246,10 @@ Best practices from databricksters-check-and-pub:
    - Collect error messages for debugging
    - Continue execution even if some jobs fail
 
-3. Phased execution
-   - Group related checks together
-   - Run critical checks first (e.g., compliance)
-   - Then run optimization checks
-   - Avoid overwhelming the endpoint
+3. Bounded execution
+   - Only parallelize independent checks
+   - Cap concurrency with an env var rather than firing unlimited requests
+   - Keep the job contract simple: name -> (callable, args, kwargs)
 
 4. When to use parallel calls
    - Multiple independent evaluations of same content

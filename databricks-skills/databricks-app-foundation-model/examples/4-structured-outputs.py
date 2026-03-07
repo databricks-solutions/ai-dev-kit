@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 from openai import OpenAI
 
-from _common import create_foundation_model_client, get_model_name
+from llm_config import create_foundation_model_client, get_model_name
 
 
 # =============================================================================

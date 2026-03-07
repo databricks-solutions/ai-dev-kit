@@ -4,7 +4,7 @@ This file owns the App-side client wiring for Databricks Foundation Model APIs.
 
 ## Core Pattern
 
-Use the resolved Databricks bearer token as `api_key` and the serving-endpoint base URL as `base_url`.
+Use the validated Databricks bearer token as `api_key` and the serving-endpoint base URL as `base_url`.
 
 ```python
 import os
@@ -17,16 +17,17 @@ client = OpenAI(
 model = os.environ["DATABRICKS_MODEL"]
 ```
 
-The shared helper in [`examples/_common.py`](examples/_common.py) constructs the equivalent of:
+If you copy `examples/llm_config.py` into your app as `llm_config.py`, the reusable helper goes a step further:
 
 ```python
-from openai import OpenAI
+from llm_config import build_openai_client
 
-client = OpenAI(
-    api_key=resolved_databricks_token,
-    base_url=DATABRICKS_SERVING_BASE_URL,
-)
+client = build_openai_client()
 ```
+
+That helper validates the serving URL and model name first, caches endpoint validation results for a short TTL, then constructs the OpenAI-compatible client.
+
+Because the helper performs HTTP endpoint validation and may mint OAuth tokens, include `requests` in your app dependencies alongside `openai`.
 
 ## Chat Completion Shape
 
@@ -54,10 +55,11 @@ This skill only covers the App integration layer around those endpoints.
 
 | Concern | Guidance |
 |---------|----------|
-| Token source | Use PAT if explicitly provided, otherwise mint OAuth from App credentials |
-| `base_url` | Always set to `DATABRICKS_SERVING_BASE_URL` |
+| Token source | Prefer OAuth M2M when App credentials are present; use PAT for local development |
+| `base_url` | Always set to the validated `DATABRICKS_SERVING_BASE_URL` |
 | Request schema | Use OpenAI-compatible chat/completions calls |
-| Local development | PAT override is acceptable and often easiest |
+| Endpoint validation | Validate once and cache the result briefly instead of blindly assuming the endpoint exists |
+| Local development | PAT mode is fine when App credentials are not present |
 | Deployed Apps | Prefer App-injected service-principal credentials |
 
 ## Common Mistakes
@@ -66,4 +68,5 @@ This skill only covers the App integration layer around those endpoints.
 |---------|-----|
 | Calling `OpenAI()` without `base_url` | Set `base_url=DATABRICKS_SERVING_BASE_URL` |
 | Treating the bearer token like an SDK `Config()` object | Pass it as `api_key` to the OpenAI client |
-| Hardcoding a stale model name in multiple places | Centralize default selection and defer authoritative names to `databricks-model-serving` |
+| Assuming the configured endpoint exists | Validate `DATABRICKS_MODEL` against the workspace before building the client |
+| Hardcoding a stale model name in multiple places | Set `DATABRICKS_MODEL` explicitly and defer authoritative endpoint naming to `databricks-model-serving` |

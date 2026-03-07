@@ -1,6 +1,6 @@
 ## Auth And Identity
 
-This file owns the App-specific authentication rules for this skill. If the task is "how do I authenticate from a Databricks App to a foundation-model endpoint?", start here.
+This file owns the App-specific authentication and configuration rules for this skill. If the task is "how do I validate Databricks LLM config and authenticate from a Databricks App to a foundation-model endpoint?", start here.
 
 ## Environment Variables
 
@@ -9,34 +9,42 @@ When a Databricks App has a service principal configured, Databricks can inject:
 | Variable | Required | Purpose |
 |---------|----------|---------|
 | `DATABRICKS_SERVING_BASE_URL` | Yes | Base URL for serving endpoints, for example `https://<host>/serving-endpoints` |
-| `DATABRICKS_TOKEN` | Optional | PAT override for local development or explicit override path |
-| `DATABRICKS_CLIENT_ID` | Yes if no PAT | App service-principal client ID |
-| `DATABRICKS_CLIENT_SECRET` | Yes if no PAT | App service-principal client secret |
-| `DATABRICKS_HOST` | Optional | Explicit workspace host used to mint OAuth tokens |
+| `DATABRICKS_TOKEN` | Optional | PAT for local development when App credentials are not present |
+| `DATABRICKS_CLIENT_ID` | Required for OAuth | App service-principal client ID |
+| `DATABRICKS_CLIENT_SECRET` | Required for OAuth | App service-principal client secret |
+| `DATABRICKS_HOST` | Optional | Explicit workspace host; if set, it must match the host in `DATABRICKS_SERVING_BASE_URL` |
 
 ## Canonical Auth Flow
 
 Always resolve auth in this order:
 
-1. If `DATABRICKS_TOKEN` exists, use it as the bearer token.
-2. Otherwise mint an OAuth token from `DATABRICKS_CLIENT_ID` and `DATABRICKS_CLIENT_SECRET`.
-3. Cache the minted token when a state container is available, such as `st.session_state`.
+1. Validate `DATABRICKS_SERVING_BASE_URL` and `DATABRICKS_MODEL`.
+2. If App service-principal credentials are present, prefer OAuth M2M.
+3. Otherwise use `DATABRICKS_TOKEN` for PAT-based local development.
+4. Cache minted OAuth tokens so repeated or concurrent calls do not re-mint unnecessarily.
 
-The shared example helper in [`examples/_common.py`](examples/_common.py) follows this pattern.
+The shared example helper in [`examples/llm_config.py`](examples/llm_config.py) follows this pattern.
 
 ## Canonical Helper
 
-```python
-token = resolve_bearer_token(cache=st.session_state)
-```
-
-If you are not inside Streamlit, you can omit the cache or pass any mutable mapping:
+If you copy `examples/llm_config.py` into your app as `llm_config.py`, the auth/config entry points are:
 
 ```python
-token = resolve_bearer_token()
+from llm_config import get_databricks_bearer_token, get_databricks_llm_config
+
+config = get_databricks_llm_config()
+token = get_databricks_bearer_token()
 ```
 
-The canonical implementation of `resolve_bearer_token()` lives in [`examples/_common.py`](examples/_common.py).
+If you want to verify that the configured endpoint exists before issuing requests:
+
+```python
+from llm_config import validate_databricks_llm_config
+
+config = validate_databricks_llm_config()
+```
+
+The canonical implementation of `get_databricks_llm_config()`, `get_databricks_bearer_token()`, and `validate_databricks_llm_config()` lives in [`examples/llm_config.py`](examples/llm_config.py).
 
 ## Forwarded Viewer Identity
 
@@ -81,7 +89,8 @@ Use this file when the question is specifically about foundation-model calls fro
 
 | Mistake | Fix |
 |---------|-----|
-| Minting a new OAuth token on every rerun | Cache the token in `st.session_state` with an expiry check |
+| Accepting an invalid serving base URL | Validate that `DATABRICKS_SERVING_BASE_URL` ends with `/serving-endpoints` |
+| Treating `DATABRICKS_HOST` and the serving URL host as unrelated | Reject mismatches early so auth and validation hit the same workspace |
+| Minting a new OAuth token on every call | Reuse the shared cached token helper |
 | Assuming `dbutils` exists in Apps | Use env vars and HTTP token minting instead |
 | Failing hard when forwarded headers are missing | Treat viewer identity as optional in local development |
-| Copying auth code into every script | Reuse `examples/_common.py` as the single source of truth |

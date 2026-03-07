@@ -2,9 +2,10 @@
 Canonical authentication example for Databricks Apps foundation-model calls.
 
 This file shows the single auth flow used by the other examples:
-1. PAT override for local development
-2. OAuth M2M fallback with app-injected service-principal credentials
-3. Optional viewer identity from forwarded headers
+1. Validate serving URL and model configuration
+2. Prefer OAuth M2M when app-injected service-principal credentials are present
+3. Use PAT mode for local development when OAuth credentials are absent
+4. Optional viewer identity from forwarded headers
 
 Set `DATABRICKS_MODEL` before running so the final sample request can pick an endpoint.
 """
@@ -13,7 +14,7 @@ from typing import Dict, Optional, Tuple
 
 import streamlit as st
 
-from _common import (
+from llm_config import (
     create_foundation_model_client,
     get_model_name,
     get_serving_base_url,

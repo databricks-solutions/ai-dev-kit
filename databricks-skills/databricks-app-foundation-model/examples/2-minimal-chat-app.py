@@ -5,7 +5,7 @@ A complete, deployable Streamlit app demonstrating Foundation Model API integrat
 in Databricks Apps. This is a working example extracted from databricksters-check-and-pub.
 
 Features:
-- Dual-mode auth (PAT for local dev, OAuth M2M for deployed apps)
+- Validated dual-mode auth (OAuth M2M in Apps, PAT for local dev)
 - OpenAI SDK wired to Databricks serving endpoints
 - Token caching with expiry check
 - Multi-turn chat with conversation history
@@ -25,12 +25,12 @@ Databricks Apps Deployment:
          - name: DATABRICKS_SERVING_BASE_URL
            value: "https://<workspace>/serving-endpoints"
          - name: DATABRICKS_MODEL
-            value: "<endpoint-name>"  # See databricks-model-serving
+           value: "<endpoint-name>"  # See databricks-model-serving
 
     2. Create requirements.txt:
        streamlit>=1.38,<2.0
        openai>=1.30,<2.0
-       requests>=2.31,<3.0  # Needed for OAuth fallback only
+       requests>=2.31,<3.0  # Needed for endpoint validation and OAuth fallback
 
     3. Deploy:
        databricks apps create foundation-chat --source-code-path .
@@ -44,7 +44,7 @@ from typing import Dict, List, Optional, Tuple
 import streamlit as st
 from openai import OpenAI
 
-from _common import create_foundation_model_client, get_model_name
+from llm_config import create_foundation_model_client, get_model_name
 
 
 def _get_forwarded_headers() -> Dict[str, str]:

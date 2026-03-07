@@ -14,6 +14,13 @@ Do not use it for dependent workflows where one answer feeds the next prompt.
 
 Reference implementation: [`examples/3-parallel-llm-calls.py`](examples/3-parallel-llm-calls.py)
 
+Use a bounded job runner rather than firing requests ad hoc:
+
+- store work as `job_name -> (callable, args, kwargs)`
+- cap concurrency with a positive-integer `LLM_MAX_CONCURRENCY`
+- collect per-job errors instead of failing the entire batch
+- preserve the result map so the caller can decide which failures are fatal
+
 ## Structured Outputs
 
 When a response must be machine-readable:
@@ -28,9 +35,10 @@ Reference implementation: [`examples/4-structured-outputs.py`](examples/4-struct
 
 ## Caching
 
-Use caching at two different layers when appropriate:
+Use caching at three different layers when appropriate:
 
-- auth token caching in `st.session_state` to avoid re-minting OAuth tokens
+- auth token caching to avoid re-minting OAuth tokens
+- endpoint-validation caching so the app does not re-check the same endpoint on every call
 - `@st.cache_data(ttl=...)` for expensive, repeatable structured-output calls
 
 Keep the TTL aligned with how stale the result can be.
@@ -45,16 +53,18 @@ Keep the TTL aligned with how stale the result can be.
 
 | Pattern | Use When | Avoid When |
 |---------|----------|------------|
-| Parallel calls | Requests are independent and latency matters | Requests depend on each other |
+| Bounded parallel calls | Requests are independent and latency matters | Requests depend on each other |
 | Structured outputs | Response is parsed by code | Free-form chat UX |
 | `@st.cache_data` | Inputs are stable and repeated | Results must be real-time |
-| Token cache | App reruns often | One-shot scripts without state |
+| Token cache | The app may issue repeated or concurrent OAuth-backed calls | One-shot scripts using PAT only |
+| Validation cache | The same endpoint is reused across many calls | Endpoint choice changes every request |
 
 ## Common Mistakes
 
 | Mistake | Fix |
 |---------|-----|
 | Running every call in parallel by default | Bound concurrency and only parallelize independent calls |
+| Treating parallelism as all-or-nothing | Group independent jobs together and keep dependent work serial |
 | Parsing model output with `json.loads` only | Add normalization, code-fence stripping, and retry logic |
 | Using creative temperatures for extraction tasks | Use `temperature=0.0` for deterministic structured outputs |
 | Repeating the same retry and parsing logic in every script | Keep one canonical implementation in the example set |
