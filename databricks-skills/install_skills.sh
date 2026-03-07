@@ -105,7 +105,7 @@ get_skill_extra_files() {
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
-        "databricks-unity-catalog") echo "5-system-tables.md" ;;
+        "databricks-unity-catalog") echo "5-system-tables.md 9-resource-tracking.md" ;;
         "databricks-lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "databricks-lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
         "databricks-metric-views") echo "yaml-reference.md patterns.md" ;;
