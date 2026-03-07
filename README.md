@@ -27,6 +27,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 - **MLflow Experiments** (evaluation, scoring, traces)
 - **Model Serving** (deploy ML models and AI agents to endpoints)
 - **Databricks Apps** (full-stack web applications)
+- **Foundation Model App Integrations** (Databricks Apps calling foundation model endpoints with app auth, OpenAI-compatible client wiring, and production LLM patterns)
 - ...and more
 
 ---
@@ -164,7 +165,7 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 19 markdown skills teaching Databricks patterns |
+| [`databricks-skills/`](databricks-skills/) | 20 markdown skills teaching Databricks patterns |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 
 ---

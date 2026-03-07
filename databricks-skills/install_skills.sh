@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-apx databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-apx databricks-app-foundation-model databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -58,6 +58,7 @@ get_skill_description() {
         "databricks-aibi-dashboards") echo "Databricks AI/BI Dashboards - create and manage dashboards" ;;
         "databricks-asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-apx") echo "Databricks Apps with React/Next.js (APX framework)" ;;
+        "databricks-app-foundation-model") echo "Databricks Apps + Foundation Model APIs with app auth, OpenAI wiring, and production patterns" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
         "databricks-config") echo "Profile authentication setup for Databricks" ;;
         "databricks-dbsql") echo "Databricks SQL - SQL scripting, MVs, geospatial, AI functions, federation" ;;
@@ -102,6 +103,7 @@ get_skill_extra_files() {
         "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
+        "databricks-app-foundation-model") echo "1-auth-and-identity.md 2-client-wiring.md 3-production-patterns.md examples/1-auth-and-token-minting.py examples/2-minimal-chat-app.py examples/3-parallel-llm-calls.py examples/4-structured-outputs.py examples/llm_config.py" ;;
         "databricks-app-python") echo "dash.md streamlit.md README.md" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
