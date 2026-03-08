@@ -33,7 +33,8 @@ Use this skill when:
 
 | Tool | Purpose |
 |------|---------|
-| `ask_genie` | Ask a question or follow-up (`conversation_id` optional) |
+| `ask_genie` | Ask an initial question to a Genie Space |
+| `ask_genie_followup` | Ask a follow-up question in an existing conversation |
 
 ### Supporting Tools
 
@@ -95,7 +96,7 @@ ask_genie(
 ## Reference Files
 
 - [spaces.md](spaces.md) - Creating and managing Genie Spaces
-- [conversation.md](conversation.md) - Asking questions via the Conversation API
+- [2-conversation-api.md](2-conversation-api.md) - Asking questions via the Conversation API
 
 ## Prerequisites
 

@@ -98,7 +98,7 @@ get_skill_extra_files() {
     case "$1" in
         "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
         "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
-        "databricks-genie") echo "spaces.md conversation.md" ;;
+        "databricks-genie") echo "spaces.md 2-conversation-api.md" ;;
         "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
