@@ -74,6 +74,9 @@ class AgentBricksManager:
         - genie_get(): Get Genie space
         - genie_update(): Update Genie space
         - genie_delete(): Delete Genie space
+        - genie_export(): Export space with full serialized config
+        - genie_import(): Create new space from serialized payload
+        - genie_update_with_serialized_space(): Full update via serialized payload
         - genie_add_sample_questions_batch(): Add sample questions
         - genie_add_sql_instructions_batch(): Add SQL examples
         - genie_add_benchmarks_batch(): Add benchmarks
@@ -924,6 +927,100 @@ class AgentBricksManager:
         """Delete a Genie space."""
         self._delete(f"/api/2.0/data-rooms/{space_id}")
 
+    def genie_export(self, space_id: str) -> Dict[str, Any]:
+        """Export a Genie space with its full serialized configuration.
+
+        Uses the public /api/2.0/genie/spaces endpoint with include_serialized_space=true.
+        Requires at least CAN EDIT permission on the space.
+
+        Args:
+            space_id: The Genie space ID to export
+
+        Returns:
+            Dictionary with space metadata including:
+            - space_id: The space ID
+            - title: The space title
+            - description: The description
+            - warehouse_id: The SQL warehouse ID
+            - serialized_space: JSON string with full space config (tables, instructions,
+              SQL queries, layout). Pass this to genie_import() to clone/migrate the space.
+        """
+        return self._get(
+            f"/api/2.0/genie/spaces/{space_id}",
+            params={"include_serialized_space": "true"},
+        )
+
+    def genie_import(
+        self,
+        warehouse_id: str,
+        serialized_space: str,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        parent_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a new Genie space from a serialized payload (import/clone).
+
+        Uses the public /api/2.0/genie/spaces endpoint with serialized_space in the body.
+        The serialized_space string is obtained from genie_export().
+
+        Args:
+            warehouse_id: SQL warehouse ID to associate with the new space
+            serialized_space: The JSON string from genie_export() containing the full
+                space configuration (tables, instructions, SQL queries, layout)
+            title: Optional title override (defaults to the exported space's title)
+            description: Optional description override
+            parent_path: Optional workspace folder path where the space will be registered
+                (e.g., "/Workspace/Users/you@company.com/Genie Spaces")
+
+        Returns:
+            Dictionary with the newly created space details including space_id
+        """
+        payload: Dict[str, Any] = {
+            "warehouse_id": warehouse_id,
+            "serialized_space": serialized_space,
+        }
+        if title:
+            payload["title"] = title
+        if description:
+            payload["description"] = description
+        if parent_path:
+            payload["parent_path"] = parent_path
+        return self._post("/api/2.0/genie/spaces", payload)
+
+    def genie_update_with_serialized_space(
+        self,
+        space_id: str,
+        serialized_space: str,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        warehouse_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update a Genie space using a serialized payload (full replacement).
+
+        Uses the public /api/2.0/genie/spaces/{space_id} endpoint (PUT) with
+        serialized_space in the body. This replaces the entire space configuration.
+
+        Args:
+            space_id: The Genie space ID to update
+            serialized_space: The JSON string containing the new space configuration.
+                Obtain from genie_export() or construct manually:
+                '{"version":1,"data_sources":{"tables":[{"identifier":"cat.schema.table"}]}}'
+            title: Optional title override
+            description: Optional description override
+            warehouse_id: Optional warehouse override
+
+        Returns:
+            Dictionary with the updated space details
+        """
+        payload: Dict[str, Any] = {"serialized_space": serialized_space}
+        if title:
+            payload["title"] = title
+        if description:
+            payload["description"] = description
+        if warehouse_id:
+            payload["warehouse_id"] = warehouse_id
+        return self._put(f"/api/2.0/genie/spaces/{space_id}", payload)
+
     def genie_list_questions(
         self, space_id: str, question_type: str = "SAMPLE_QUESTION"
     ) -> GenieListQuestionsResponseDict:
@@ -1140,6 +1237,15 @@ class AgentBricksManager:
         response = requests.patch(url, headers=headers, json=body, timeout=20)
         if response.status_code >= 400:
             self._handle_response_error(response, "PATCH", path)
+        return response.json()
+
+    def _put(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        headers = self.w.config.authenticate()
+        headers["Content-Type"] = "application/json"
+        url = f"{self.w.config.host}{path}"
+        response = requests.put(url, headers=headers, json=body, timeout=20)
+        if response.status_code >= 400:
+            self._handle_response_error(response, "PUT", path)
         return response.json()
 
     def _delete(self, path: str) -> Dict[str, Any]:
