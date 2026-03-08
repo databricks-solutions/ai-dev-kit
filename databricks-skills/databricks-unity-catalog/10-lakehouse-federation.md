@@ -1,31 +1,71 @@
 # Lakehouse Federation
 
-Comprehensive reference for Lakehouse Federation: create foreign connections to external databases (Snowflake, PostgreSQL, MySQL, SQL Server, BigQuery) and query them through Unity Catalog without moving data.
+Comprehensive reference for Lakehouse Federation: query external data sources through Unity Catalog without moving data. Covers both query federation (JDBC pushdown) and catalog federation (direct storage access).
 
 ## Overview
 
-Lakehouse Federation lets you query data in external database systems directly from Databricks, using Unity Catalog as the governance layer. You create a **connection** (credentials + endpoint), then a **foreign catalog** that mirrors the external database's schema structure into Unity Catalog.
+Lakehouse Federation is the query federation platform for Databricks. It lets you run queries against external data sources without migrating data, using Unity Catalog as the governance layer.
 
-| Component | Description |
-|-----------|-------------|
-| **Connection** | Stores credentials and endpoint info for an external database |
-| **Foreign Catalog** | A Unity Catalog catalog backed by a connection; mirrors external schemas/tables |
-| **Supported Types** | `SNOWFLAKE`, `POSTGRESQL`, `MYSQL`, `SQLSERVER`, `BIGQUERY` |
+There are **two types** of federation:
 
-### How It Works
+| Attribute | Query Federation | Catalog Federation |
+|-----------|-----------------|-------------------|
+| **How it works** | Queries are pushed down to the foreign database via JDBC. Runs on both Databricks and remote compute. | Queries directly access foreign tables in object storage. Runs only on Databricks compute. |
+| **Best for** | Ad hoc reporting, POC access to operational data, live access to external systems | Migrating to Unity Catalog incrementally, long-term hybrid catalog models |
+| **Performance** | Network-dependent (JDBC round-trips) | More cost-effective and performance-optimized (direct storage access) |
+
+### Supported Data Sources
+
+**Query federation** (JDBC pushdown):
+
+| Source | MCP Tool Support | Notes |
+|--------|:---:|-------|
+| MySQL | Yes | `connection_type="MYSQL"` |
+| PostgreSQL | Yes | `connection_type="POSTGRESQL"` |
+| Snowflake | Yes | `connection_type="SNOWFLAKE"` |
+| Microsoft SQL Server | Yes | `connection_type="SQLSERVER"` |
+| Google BigQuery | Yes | `connection_type="BIGQUERY"` |
+| Teradata | No | Use SQL: `CREATE CONNECTION ... TYPE TERADATA` |
+| Oracle | No | Use SQL: `CREATE CONNECTION ... TYPE ORACLE` |
+| Amazon Redshift | No | Use SQL: `CREATE CONNECTION ... TYPE REDSHIFT` |
+| Salesforce Data 360 | No | Use SQL: `CREATE CONNECTION ... TYPE SALESFORCE` |
+| Azure Synapse | No | Use SQL: `CREATE CONNECTION ... TYPE SQLDW` |
+| Databricks-to-Databricks | No | Use SQL: `CREATE CONNECTION ... TYPE DATABRICKS` |
+
+**Catalog federation** (direct storage access):
+
+| Source | Notes |
+|--------|-------|
+| Legacy Databricks Hive metastore | Incrementally migrate HMS tables to Unity Catalog |
+| External Hive metastore | Connect to external HMS (e.g., on EMR, Dataproc) |
+| AWS Glue metastore | Connect to Glue Data Catalog |
+| Salesforce Data 360 | Direct catalog access to Salesforce data |
+| Snowflake | Direct catalog access to Snowflake tables |
+
+> **Tip:** When a source supports both Lakehouse Federation and Lakeflow Connect, Databricks recommends Lakeflow Connect if performance on higher data volumes and lower latency are priorities.
+
+### How It Works (Query Federation)
 
 1. Create a connection with credentials for the external system
 2. Create a foreign catalog that uses the connection
 3. Query external tables using standard SQL: `SELECT * FROM foreign_catalog.schema.table`
 4. Unity Catalog enforces access controls on the foreign catalog like any other catalog
 
+### How It Works (Catalog Federation)
+
+1. Create a connection for accessing the external catalog
+2. Create a storage credential and external location for the table paths
+3. Create a foreign catalog using the connection and external location
+4. Query tables — queries run directly against object storage (no JDBC)
+
 ### Requirements
 
 - Unity Catalog enabled workspace
 - `CREATE CONNECTION` privilege (for connections)
 - `CREATE CATALOG` privilege (for foreign catalogs)
-- Network connectivity from Databricks to the external database
+- Network connectivity from Databricks to the external database (query federation) or object storage (catalog federation)
 - SQL warehouse for foreign catalog creation and queries
+- Storage credential + external location (catalog federation only)
 
 ---
 
@@ -207,7 +247,115 @@ manage_uc_connections(
 
 ---
 
-## Connection Type Options (Verified)
+## SQL Fallback for Unsupported Connection Types
+
+The MCP tool supports 5 connection types. For the remaining sources, use `execute_sql`:
+
+### Teradata
+
+```sql
+CREATE CONNECTION teradata_conn
+TYPE TERADATA
+OPTIONS (
+  host '10.0.0.1',
+  user 'dbc',
+  password 'secret'
+);
+
+CREATE FOREIGN CATALOG teradata_analytics
+USING CONNECTION teradata_conn;
+```
+
+### Oracle
+
+```sql
+CREATE CONNECTION oracle_conn
+TYPE ORACLE
+OPTIONS (
+  host 'oracle.example.com',
+  port '1521',
+  user 'reader',
+  password 'secret'
+);
+
+CREATE FOREIGN CATALOG oracle_erp
+USING CONNECTION oracle_conn
+OPTIONS (database 'ORCL');
+```
+
+### Amazon Redshift
+
+```sql
+CREATE CONNECTION redshift_conn
+TYPE REDSHIFT
+OPTIONS (
+  host 'cluster.us-east-1.redshift.amazonaws.com',
+  port '5439',
+  user 'admin',
+  password 'secret'
+);
+
+CREATE FOREIGN CATALOG redshift_dw
+USING CONNECTION redshift_conn
+OPTIONS (database 'analytics');
+```
+
+### Azure Synapse
+
+```sql
+CREATE CONNECTION synapse_conn
+TYPE SQLDW
+OPTIONS (
+  host 'workspace.sql.azuresynapse.net',
+  port '1433',
+  user 'sqladmin',
+  password 'secret'
+);
+
+CREATE FOREIGN CATALOG synapse_dw
+USING CONNECTION synapse_conn
+OPTIONS (database 'analytics');
+```
+
+### Databricks-to-Databricks
+
+```sql
+CREATE CONNECTION remote_databricks
+TYPE DATABRICKS
+OPTIONS (
+  host 'https://other-workspace.cloud.databricks.com',
+  httpPath '/sql/1.0/warehouses/abc123',
+  personalAccessToken 'dapi...'
+);
+
+CREATE FOREIGN CATALOG remote_catalog
+USING CONNECTION remote_databricks;
+```
+
+### Catalog Federation (Glue, Hive Metastore)
+
+```sql
+-- AWS Glue catalog federation
+CREATE CONNECTION glue_conn
+TYPE GLUE
+OPTIONS (
+  region 'us-east-1',
+  access_key_id 'AKIA...',
+  secret_access_key 'secret'
+);
+
+CREATE FOREIGN CATALOG glue_catalog
+USING CONNECTION glue_conn
+OPTIONS (
+  external_location_path 's3://my-bucket/data/'
+);
+```
+
+> **Note:** Catalog federation also requires a storage credential and external location for the table paths. See [Databricks docs](https://docs.databricks.com/en/query-federation/index.html) for full setup.
+
+---
+
+## Connection Type Options (Verified — MCP Tool)
 
 Each connection type supports specific options. Passing an unsupported option returns an error listing all valid keys.
 
@@ -442,6 +590,8 @@ GROUP BY status;
 
 ## Resources
 
-- [Lakehouse Federation Documentation](https://docs.databricks.com/en/query-federation/index.html)
+- [What is Lakehouse Federation?](https://docs.databricks.com/aws/en/query-federation/) — Overview of query vs catalog federation
+- [Query Federation](https://docs.databricks.com/en/query-federation/query-federation.html) — JDBC pushdown details
+- [Catalog Federation](https://docs.databricks.com/en/query-federation/catalog-federation.html) — Direct storage access details
 - [Connection Types Reference](https://docs.databricks.com/en/query-federation/create-connection.html)
 - [Foreign Catalog Setup](https://docs.databricks.com/en/query-federation/create-foreign-catalog.html)
