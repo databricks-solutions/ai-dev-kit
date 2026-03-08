@@ -161,6 +161,140 @@ To update an existing space:
 
 The tool finds the existing space by name and updates it.
 
+## Export, Import & Migration
+
+Genie Spaces can be exported as a `serialized_space` JSON string that captures the full configuration: tables, instructions, certified SQL queries, sample questions, and layout. This enables cloning, backup, and cross-workspace migration.
+
+Use the `export_genie` and `import_genie` MCP tools for all export/import operations — no direct REST calls needed.
+
+### What is `serialized_space`?
+
+The `serialized_space` field is a JSON-encoded string returned by the Genie API. It contains:
+- Data sources (Unity Catalog table identifiers — fully qualified as `catalog.schema.table`)
+- Curated instructions and business logic
+- Certified SQL queries (including inline catalog references)
+- Join specifications and SQL filters
+- Sample questions and benchmarks
+- Space layout and version metadata
+
+Minimum structure:
+```json
+{"version": 1, "data_sources": {"tables": [{"identifier": "catalog.schema.table"}]}}
+```
+
+### Exporting a Space
+
+Use `export_genie` to export the full configuration (requires CAN EDIT permission):
+
+```python
+exported = export_genie(space_id="01abc123...")
+# Returns:
+# {
+#   "space_id": "01abc123...",
+#   "title": "Sales Analytics",
+#   "warehouse_id": "abc123def456",
+#   "serialized_space": "{\"version\":2,\"data_sources\":{...},\"instructions\":{...}}"
+# }
+```
+
+You can also get `serialized_space` inline via `get_genie`:
+
+```python
+details = get_genie(space_id="01abc123...", include_serialized_space=True)
+serialized = details["serialized_space"]
+```
+
+### Cloning a Space (Same Workspace)
+
+```python
+# Step 1: Export the source space
+source = export_genie(space_id="01abc123...")
+
+# Step 2: Import as a new space
+import_genie(
+    warehouse_id=source["warehouse_id"],
+    serialized_space=source["serialized_space"],
+    title="Sales Analytics (Dev Copy)"
+)
+# Returns: {"space_id": "01def456...", "title": "Sales Analytics (Dev Copy)", "operation": "imported"}
+```
+
+### Migrating Across Workspaces with Catalog Remapping
+
+When migrating between environments (e.g. prod → dev), Unity Catalog names are often different. The `serialized_space` string contains the source catalog name **everywhere** — in table identifiers, SQL queries, join specs, and filter snippets. You must remap it before importing.
+
+**Agent workflow (3 steps):**
+
+**Step 1 — Export from source workspace:**
+```python
+exported = export_genie(space_id="01f106e1239d14b28d6ab46f9c15e540")
+# exported["serialized_space"] contains all references to source catalog
+```
+
+**Step 2 — Remap catalog name in `serialized_space`:**
+
+The agent does this as an inline string substitution between the two MCP calls:
+```python
+modified_serialized = exported["serialized_space"].replace(
+    "source_catalog_name",     # e.g. "healthverity_claims_sample_patient_dataset"
+    "target_catalog_name"      # e.g. "healthverity_claims_sample_patient_dataset_dev"
+)
+```
+This replaces all occurrences — table identifiers, SQL FROM clauses, join specs, and filter snippets.
+
+**Step 3 — Import to target workspace using `import_genie`:**
+```python
+import_genie(
+    warehouse_id="<target_warehouse_id>",   # from list_warehouses() on target
+    serialized_space=modified_serialized,
+    title=exported["title"],
+    description=exported["description"]
+)
+```
+
+### Batch Migration of Multiple Spaces
+
+To migrate several spaces at once, loop through space IDs. The agent calls `export_genie`, remaps the catalog, then calls `import_genie` for each:
+
+```
+For each space_id in [id1, id2, id3]:
+  1. exported = export_genie(space_id)
+  2. modified  = exported["serialized_space"].replace(src_catalog, tgt_catalog)
+  3. result    = import_genie(warehouse_id, modified, title=exported["title"])
+  4. record result["space_id"] for updating databricks.yml
+```
+
+After migration, update `databricks.yml` with the new dev `space_id` values under the `dev` target's `genie_space_ids` variable.
+
+### Updating an Existing Space with New Config
+
+Use `create_or_update_genie` with `serialized_space` to push a config to an already-existing space without creating a new one:
+
+```python
+# 1. Export from dev
+dev_space = export_genie(space_id=DEV_SPACE_ID)
+
+# 2. Remap catalog if environments use different catalog names
+remapped = dev_space["serialized_space"].replace("dev_catalog", "prod_catalog")
+
+# 3. Push to prod (updates in place)
+create_or_update_genie(
+    display_name="Sales Analytics",
+    table_identifiers=[],      # ignored when serialized_space is provided
+    space_id=PROD_SPACE_ID,
+    warehouse_id=PROD_WAREHOUSE_ID,
+    serialized_space=remapped
+)
+```
+
+### Permissions Required
+
+| Operation | Required Permission |
+|-----------|-------------------|
+| `export_genie` / `get_genie(include_serialized_space=True)` | CAN EDIT on source space |
+| `import_genie` | Can create items in target workspace folder |
+| `create_or_update_genie` with `serialized_space` (update) | CAN EDIT on target space |
+
 ## Example End-to-End Workflow
 
 1. **Generate synthetic data** using `databricks-synthetic-data-gen` skill:
