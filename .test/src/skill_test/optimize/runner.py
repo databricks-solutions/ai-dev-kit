@@ -700,11 +700,11 @@ def optimize_skill(
         # Report comparison
         if agent_baseline_score is not None:
             agent_improvement = agent_validation_score - agent_baseline_score
-            print(f"\n  Agent score comparison:")
+            print("\n  Agent score comparison:")
             print(f"    Baseline: {agent_baseline_score:.3f}")
             print(f"    Validated: {agent_validation_score:.3f}")
             print(f"    Improvement: {agent_improvement:+.3f}")
-            print(f"\n  Proxy score comparison:")
+            print("\n  Proxy score comparison:")
             print(f"    Baseline: {original_score:.3f}")
             print(f"    Optimized: {optimized_score:.3f}")
             print(f"    Improvement: {optimized_score - original_score:+.3f}")

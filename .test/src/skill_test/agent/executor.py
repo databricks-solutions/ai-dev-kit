@@ -292,7 +292,7 @@ def _get_mlflow_stop_hook(mlflow_experiment: str | None = None, skill_name: str 
     # so SkillTestConfig / MLflow can pick them up for auth.
     agent_env = _get_agent_env()
     for key, value in agent_env.items():
-        if key.startswith("DATABRICKS_") or key.startswith("MLFLOW_"):
+        if key.startswith(("DATABRICKS_", "MLFLOW_")):
             os.environ[key] = value
 
     # Configure MLflow at hook creation time (matches builder app pattern).
@@ -436,7 +436,7 @@ async def run_agent(
         allowed_tools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
         # Add MCP tool names if config provided
         if mcp_config:
-            for server_name in mcp_config:
+            for _server_name in mcp_config:
                 # MCP tools will be auto-discovered; we don't need to enumerate them
                 pass
 
