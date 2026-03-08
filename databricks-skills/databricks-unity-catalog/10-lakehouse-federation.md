@@ -28,7 +28,8 @@ There are **two types** of federation:
 | Teradata | No | Use SQL: `CREATE CONNECTION ... TYPE TERADATA` |
 | Oracle | No | Use SQL: `CREATE CONNECTION ... TYPE ORACLE` |
 | Amazon Redshift | No | Use SQL: `CREATE CONNECTION ... TYPE REDSHIFT` |
-| Salesforce Data 360 | No | Use SQL: `CREATE CONNECTION ... TYPE SALESFORCE` |
+| Salesforce Data Cloud | No | Use SQL: `CREATE CONNECTION ... TYPE SALESFORCE_DATA_CLOUD` |
+| Salesforce CRM | No | Use SQL: `CREATE CONNECTION ... TYPE SALESFORCE` |
 | Azure Synapse | No | Use SQL: `CREATE CONNECTION ... TYPE SQLDW` |
 | Databricks-to-Databricks | No | Use SQL: `CREATE CONNECTION ... TYPE DATABRICKS` |
 
@@ -39,7 +40,7 @@ There are **two types** of federation:
 | Legacy Databricks Hive metastore | Incrementally migrate HMS tables to Unity Catalog |
 | External Hive metastore | Connect to external HMS (e.g., on EMR, Dataproc) |
 | AWS Glue metastore | Connect to Glue Data Catalog |
-| Salesforce Data 360 | Direct catalog access to Salesforce data |
+| Salesforce Data Cloud | Direct catalog access to Salesforce data |
 | Snowflake | Direct catalog access to Snowflake tables |
 
 > **Tip:** When a source supports both Lakehouse Federation and Lakeflow Connect, Databricks recommends Lakeflow Connect if performance on higher data volumes and lower latency are priorities.
@@ -336,22 +337,20 @@ USING CONNECTION remote_databricks;
 
 ```sql
 -- AWS Glue catalog federation
+-- Requires a pre-configured storage credential in Unity Catalog
 CREATE CONNECTION glue_conn
 TYPE GLUE
 OPTIONS (
-  region 'us-east-1',
-  access_key_id 'AKIA...',
-  secret_access_key 'secret'
+  aws_region 'us-east-1',
+  aws_account_id '123456789012',
+  credential 'my_storage_credential'
 );
 
 CREATE FOREIGN CATALOG glue_catalog
-USING CONNECTION glue_conn
-OPTIONS (
-  external_location_path 's3://my-bucket/data/'
-);
+USING CONNECTION glue_conn;
 ```
 
-> **Note:** Catalog federation also requires a storage credential and external location for the table paths. See [Databricks docs](https://docs.databricks.com/en/query-federation/index.html) for full setup.
+> **Note:** The `credential` option references a Unity Catalog storage credential name (not inline keys). You must create the storage credential first, then reference it here. Catalog federation also requires an external location for the table paths. See [Databricks docs](https://docs.databricks.com/en/query-federation/index.html) for full setup.
 
 ---
 
@@ -364,7 +363,7 @@ Each connection type supports specific options. Passing an unsupported option re
 | Option | Required | Description |
 |--------|----------|-------------|
 | `host` | Yes | Hostname or IP |
-| `port` | Yes | Port (typically `5432`) |
+| `port` | No | Port (defaults to `5432`) |
 | `user` | Yes | Username |
 | `password` | Yes | Password |
 | `trustServerCertificate` | No | Trust self-signed certs |
@@ -422,7 +421,7 @@ manage_uc_connections(
 | Option | Required | Description |
 |--------|----------|-------------|
 | `host` | Yes | Hostname or IP |
-| `port` | Yes | Port (typically `3306`) |
+| `port` | No | Port (defaults to `3306`) |
 | `user` | Yes | Username |
 | `password` | Yes | Password |
 | `trustServerCertificate` | No | Trust self-signed certs |
@@ -447,7 +446,7 @@ manage_uc_connections(
 | Option | Required | Description |
 |--------|----------|-------------|
 | `host` | Yes | Hostname or IP |
-| `port` | Yes | Port (typically `1433`) |
+| `port` | No | Port (defaults to `1433`) |
 | `user` | Yes | Username |
 | `password` | Yes | Password |
 | `trustServerCertificate` | No | Trust self-signed certs |
@@ -487,7 +486,7 @@ manage_uc_connections(
 )
 ```
 
-> **Note:** The service account key JSON must contain all required fields: `type`, `project_id`, `private_key_id`, `private_key`, `client_email`, `client_id`, `auth_uri`, `token_uri`, `auth_provider_x509_cert_url`, `client_x509_cert_url`, `universe_domain`. The response `options` field is empty (all values are secrets). The response `url` is `https://www.googleapis.com/bigquery/v2:443`.
+> **Note:** The service account key JSON must contain all required fields: `type`, `project_id`, `private_key_id`, `private_key`, `client_email`, `client_id`, `auth_uri`, `token_uri`, `auth_provider_x509_cert_url`, `client_x509_cert_url`, `universe_domain`. The response omits the `options` field entirely (all values are secrets). The response `url` is `https://www.googleapis.com/bigquery/v2:443`.
 
 ---
 
@@ -572,7 +571,7 @@ GROUP BY status;
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| `does not support the following option(s): database` | `database` is not a connection option for any type | Specify the database in `catalog_options` when creating the foreign catalog |
+| `does not support the following option(s): database` | `database` is not a connection option for the 5 MCP-supported types (POSTGRESQL, MYSQL, SQLSERVER, SNOWFLAKE, BIGQUERY) | Specify the database in `catalog_options` when creating the foreign catalog |
 | `does not support the following option(s): <key>` | Invalid option key for the connection type | Check the supported options table for your connection type above; the error message lists all valid keys |
 | `Connection '<name>' already exists` | Duplicate connection name | Use a different name or delete the existing connection first |
 | `Connection '<name>' does not exist.` | Connection not found for get/update/delete | Check the connection name with `list` action |
