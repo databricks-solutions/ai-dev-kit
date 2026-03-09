@@ -396,5 +396,5 @@ class MonitoredStreamReader(DataSourceStreamReader):
 3. **State Management**: Store offsets in Spark checkpoints
 4. **Watermarking**: Support event-time processing for late data
 5. **Monitoring**: Track batch progress and lag metrics
-6. **Error Handling**: Implement retry logic for transient failures
+6. **Error Handling**: Streaming writers are especially susceptible to transient failures (network blips, rate limits) since they run continuously. Use retry with exponential backoff from [error-handling.md](error-handling.md) in your `write()` methods.
 7. **Backpressure**: Respect rate limits with appropriate partition sizing
