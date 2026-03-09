@@ -362,6 +362,106 @@ def clone_genie(
         return {"error": f"Failed to clone Genie space: {e}"}
 
 
+@mcp.tool
+def manage_genie_instructions(
+    space_id: str,
+    action: str = "list",
+    instruction_type: Optional[str] = None,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+    instructions: Optional[List[Dict[str, str]]] = None,
+) -> Dict[str, Any]:
+    """
+    Manage instructions for a Genie Space (list, add text notes, add SQL examples).
+
+    Instructions guide how Genie interprets questions and generates SQL.
+    Text instructions provide general guidance; SQL instructions provide
+    example queries that Genie can reference.
+
+    Args:
+        space_id: The Genie space ID
+        action: One of:
+            - "list": List all instructions in the space
+            - "add_text": Add a text instruction/note
+            - "add_sql": Add a SQL query example
+            - "add_sql_function": Add a certified SQL function
+            - "add_batch": Add multiple SQL instructions at once
+        instruction_type: Not needed — determined by action
+        title: Title for the instruction (required for add_text, add_sql)
+        content: Content of the instruction (required for add_text, add_sql,
+            add_sql_function)
+        instructions: For add_batch: list of {"title": str, "content": str}
+            dicts to add as SQL instructions
+
+    Returns:
+        For "list": {"instructions": [...]} with all instructions
+        For "add_*": The created instruction dict
+        For "add_batch": {"added": int, "results": [...]}
+
+    Example:
+        >>> manage_genie_instructions(space_id="abc123", action="list")
+        {"instructions": [{"title": "...", "content": "...", "instruction_type": "..."}, ...]}
+
+        >>> manage_genie_instructions(
+        ...     space_id="abc123",
+        ...     action="add_text",
+        ...     title="Date handling",
+        ...     content="When users say 'last month', use date_trunc('month', current_date()) - interval 1 month"
+        ... )
+
+        >>> manage_genie_instructions(
+        ...     space_id="abc123",
+        ...     action="add_sql",
+        ...     title="Revenue by region",
+        ...     content="SELECT region, SUM(amount) as revenue FROM sales GROUP BY region"
+        ... )
+
+        >>> manage_genie_instructions(
+        ...     space_id="abc123",
+        ...     action="add_batch",
+        ...     instructions=[
+        ...         {"title": "Top customers",
+        ...          "content": "SELECT customer, SUM(amount) FROM orders GROUP BY 1 LIMIT 10"},
+        ...         {"title": "Monthly trend",
+        ...          "content": "SELECT date_trunc('month', order_date), COUNT(*) FROM orders GROUP BY 1"},
+        ...     ]
+        ... )
+    """
+    try:
+        manager = _get_manager()
+
+        if action == "list":
+            result = manager.genie_list_instructions(space_id)
+            return {"instructions": result.get("instructions", [])}
+
+        elif action == "add_text":
+            if not content:
+                return {"error": "content is required for add_text"}
+            return manager.genie_add_text_instruction(space_id, content=content, title=title or "Notes")
+
+        elif action == "add_sql":
+            if not title or not content:
+                return {"error": "title and content are required for add_sql"}
+            return manager.genie_add_sql_instruction(space_id, title=title, content=content)
+
+        elif action == "add_sql_function":
+            if not content:
+                return {"error": "content (function name) is required for add_sql_function"}
+            return manager.genie_add_sql_function(space_id, function_name=content)
+
+        elif action == "add_batch":
+            if not instructions:
+                return {"error": "instructions list is required for add_batch"}
+            results = manager.genie_add_sql_instructions_batch(space_id, instructions)
+            return {"added": len(results), "results": results}
+
+        else:
+            return {"error": f"Unknown action '{action}'. Use: list, add_text, add_sql, add_sql_function, add_batch"}
+
+    except Exception as e:
+        return {"error": f"Failed to manage instructions for space {space_id}: {e}"}
+
+
 # ============================================================================
 # Genie Conversation API Tools
 # ============================================================================
