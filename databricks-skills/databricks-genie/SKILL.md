@@ -1,11 +1,11 @@
 ---
 name: databricks-genie
-description: "Create and query Databricks Genie Spaces for natural language SQL exploration. Use when building Genie Spaces or asking questions via the Genie Conversation API."
+description: "Create and query Databricks Genie Spaces for natural language SQL exploration. Use when building Genie Spaces, exporting and importing Genie Spaces, migrating Genie Spaces between workspaces or environments, or asking questions via the Genie Conversation API."
 ---
 
 # Databricks Genie
 
-Create and query Databricks Genie Spaces - natural language interfaces for SQL-based data exploration.
+Create, manage, and query Databricks Genie Spaces - natural language interfaces for SQL-based data exploration.
 
 ## Overview
 
@@ -107,7 +107,8 @@ Clone to a new space (same catalog):
 import_genie(
     warehouse_id=exported["warehouse_id"],
     serialized_space=exported["serialized_space"],
-    title="Sales Analytics (Dev Copy)"
+    title=exported["title"],,  # override title; omit to keep original
+    description=exported["description"],
 )
 ```
 
@@ -149,7 +150,7 @@ Both servers run simultaneously after one IDE reload. This lets you call `export
 ```python
 # Call export_genie via the prod-scoped MCP server
 exported = export_genie(space_id="<prod_space_id>")
-# exported["serialized_space"] contains the full config
+# exported keys: warehouse_id, title, description, serialized_space
 # exported["warehouse_id"] is the PROD warehouse — do NOT reuse it for DEV
 ```
 
@@ -175,27 +176,20 @@ dev_serialized_space = exported["serialized_space"].replace(
 result = import_genie(
     warehouse_id="<dev_warehouse_id>",
     serialized_space=dev_serialized_space,
-    title="My Space"
+    title=exported["title"],
+    description=exported["description"],
 )
 # result["space_id"] is the new DEV space ID
 ```
 
-**Step 4 — Update `databricks.yml`** with the new DEV space IDs so they are tracked in the bundle:
-
-```yaml
-targets:
-  dev:
-    variables:
-      genie_space_ids: "<new_dev_space_id_1>,<new_dev_space_id_2>,<new_dev_space_id_3>"
-```
-
-**Step 5 — Save exports locally** for version control and future re-migrations:
+**Step 4 — Save exports locally** for version control and future re-migrations:
 
 ```json
 // genie_exports/MySpace.json
 {
   "space_id": "<prod_space_id>",
   "title": "MySpace",
+  "description": "<space_description>",
   "warehouse_id": "<prod_warehouse_id>",
   "serialized_space": "{ ... }"
 }
