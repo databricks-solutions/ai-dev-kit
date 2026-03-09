@@ -228,9 +228,7 @@ class AgentEvaluator:
         self._baseline_judge_cache: dict[str, JudgeFeedback] = {}
 
         # Create judge
-        self._quality_judge = create_skill_quality_judge(
-            skill_guidelines, judge_model=judge_model
-        )
+        self._quality_judge = create_skill_quality_judge(skill_guidelines, judge_model=judge_model)
 
     def _run_agent(self, prompt: str, skill_md: str | None = None) -> AgentResult:
         """Run the agent and return result. Synchronous wrapper."""
@@ -308,18 +306,14 @@ class AgentEvaluator:
         facts_str = "\n".join(f"- {f}" for f in facts) if facts else "None specified"
         patterns_str = (
             "\n".join(
-                f"- {p}" if isinstance(p, str)
-                else f"- {p.get('description', p.get('pattern', ''))}"
-                for p in patterns
+                f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}" for p in patterns
             )
             if patterns
             else "None specified"
         )
         guidelines_str = "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
         expectations_text = (
-            f"Expected facts:\n{facts_str}\n\n"
-            f"Expected patterns:\n{patterns_str}\n\n"
-            f"Guidelines:\n{guidelines_str}"
+            f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
         )
         expectations_dict = {"criteria": expectations_text}
 
@@ -350,16 +344,17 @@ class AgentEvaluator:
 
         # Phase 4: Tool-call judges (MLflow or fallback)
         tool_scores = _run_mlflow_tool_judges(
-            with_trace, prompt, with_response, trace_expectations,
+            with_trace,
+            prompt,
+            with_response,
+            trace_expectations,
             mlflow_trace=with_result.mlflow_trace,
         )
         tool_correctness = tool_scores.get("tool_correctness", 0.5)
         tool_efficiency = tool_scores.get("tool_efficiency", 0.5)
 
         # Phase 5: Behavioral trace scorers
-        behavioral_score, behavioral_details = _run_behavioral_scorers(
-            with_trace, trace_expectations
-        )
+        behavioral_score, behavioral_details = _run_behavioral_scorers(with_trace, trace_expectations)
 
         # Phase 6: Execution success
         execution_success = _compute_execution_success(with_result)
@@ -381,13 +376,13 @@ class AgentEvaluator:
 
         # Composite score with proposed weights
         final_score = (
-            0.20 * score_with                        # Content quality
-            + 0.20 * max(0.0, effectiveness_delta)   # Skill effectiveness
-            + 0.20 * tool_correctness                # Tool call correctness
-            + 0.10 * tool_efficiency                 # Tool call efficiency
-            + 0.15 * behavioral_score                # Behavioral trace scorers
-            + 0.10 * execution_success               # Execution success
-            + 0.05 * token_efficiency                # Token efficiency
+            0.20 * score_with  # Content quality
+            + 0.20 * max(0.0, effectiveness_delta)  # Skill effectiveness
+            + 0.20 * tool_correctness  # Tool call correctness
+            + 0.10 * tool_efficiency  # Tool call efficiency
+            + 0.15 * behavioral_score  # Behavioral trace scorers
+            + 0.10 * execution_success  # Execution success
+            + 0.05 * token_efficiency  # Token efficiency
         )
 
         # Build rich side_info
@@ -406,9 +401,7 @@ class AgentEvaluator:
         }
         side_info["Judge_effectiveness"] = {
             "verdict": (
-                "improved" if effectiveness_delta > 0.05
-                else "regressed" if effectiveness_delta < -0.05
-                else "same"
+                "improved" if effectiveness_delta > 0.05 else "regressed" if effectiveness_delta < -0.05 else "same"
             ),
             "delta": effectiveness_delta,
         }
@@ -462,10 +455,7 @@ class AgentEvaluator:
                 f"(with={score_with:.2f}, without={score_without:.2f})"
             )
         elif score_with < 0.5:
-            side_info["Error"] = (
-                f"NEEDS_SKILL: quality_with={score_with:.2f}. "
-                f"Judge: {quality_with_fb.rationale[:200]}"
-            )
+            side_info["Error"] = f"NEEDS_SKILL: quality_with={score_with:.2f}. Judge: {quality_with_fb.rationale[:200]}"
 
         return final_score, side_info
 

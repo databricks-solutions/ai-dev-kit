@@ -110,23 +110,17 @@ def _build_trace_metrics(
                     fp = tool_input.get("file_path", "")
                     if fp:
                         metrics.files_created.append(fp)
-                        metrics.file_operations.append(
-                            FileOperation(type="create", file_path=fp, timestamp=ts)
-                        )
+                        metrics.file_operations.append(FileOperation(type="create", file_path=fp, timestamp=ts))
                 elif tool_name == "Edit" and tc.success:
                     fp = tool_input.get("file_path", "")
                     if fp:
                         metrics.files_modified.append(fp)
-                        metrics.file_operations.append(
-                            FileOperation(type="edit", file_path=fp, timestamp=ts)
-                        )
+                        metrics.file_operations.append(FileOperation(type="edit", file_path=fp, timestamp=ts))
                 elif tool_name == "Read":
                     fp = tool_input.get("file_path", "")
                     if fp:
                         metrics.files_read.append(fp)
-                        metrics.file_operations.append(
-                            FileOperation(type="read", file_path=fp, timestamp=ts)
-                        )
+                        metrics.file_operations.append(FileOperation(type="read", file_path=fp, timestamp=ts))
 
         elif event.type == "assistant_turn":
             num_turns += 1
@@ -164,6 +158,7 @@ def _build_trace_metrics(
 def _find_repo_root() -> str:
     """Walk up from this file to find the repo root (contains .git)."""
     from pathlib import Path
+
     d = Path(__file__).resolve().parent
     for _ in range(10):
         if (d / ".git").exists():
@@ -248,8 +243,7 @@ def _get_agent_env() -> dict[str, str]:
 
     # 2. Env vars with known prefixes override settings file values
     # Skip internal Claude Code vars that would confuse the subprocess
-    _skip_keys = {"CLAUDE_CODE_SSE_PORT", "CLAUDE_CODE_ENTRYPOINT",
-                  "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY"}
+    _skip_keys = {"CLAUDE_CODE_SSE_PORT", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY"}
     for key, value in os.environ.items():
         if key in _skip_keys:
             continue
@@ -281,8 +275,9 @@ def _get_mlflow_stop_hook(mlflow_experiment: str | None = None, skill_name: str 
         from mlflow.claude_code.tracing import process_transcript, setup_mlflow
         import mlflow
     except ImportError:
-        logger.warning("mlflow.claude_code.tracing not available — traces will not be logged. "
-                       "Ensure mlflow>=3.10.1 is installed.")
+        logger.warning(
+            "mlflow.claude_code.tracing not available — traces will not be logged. Ensure mlflow>=3.10.1 is installed."
+        )
         return None, None
 
     # Mutable dict so the hook can pass the trace out
@@ -330,7 +325,8 @@ def _get_mlflow_stop_hook(mlflow_experiment: str | None = None, skill_name: str 
             logger.warning(
                 "Cannot access MLflow experiment '%s' on %s. "
                 "Traces will not be logged. Check DATABRICKS_CONFIG_PROFILE.",
-                experiment_name, tracking_uri,
+                experiment_name,
+                tracking_uri,
             )
             return None, None
 
@@ -375,6 +371,7 @@ def _get_mlflow_stop_hook(mlflow_experiment: str | None = None, skill_name: str 
         except Exception as e:
             print(f"    [MLflow] Error processing transcript: {e}")
             import traceback
+
             traceback.print_exc()
 
         return {"continue": True}
@@ -486,11 +483,13 @@ async def run_agent(
                 elapsed = time.monotonic() - start_time
 
                 if elapsed > timeout_seconds:
-                    events.append(AgentEvent(
-                        type="error",
-                        timestamp=now,
-                        data={"message": f"Timeout after {timeout_seconds}s"},
-                    ))
+                    events.append(
+                        AgentEvent(
+                            type="error",
+                            timestamp=now,
+                            data={"message": f"Timeout after {timeout_seconds}s"},
+                        )
+                    )
                     break
 
                 # Dispatch on message type — same pattern as builder app
@@ -503,91 +502,109 @@ async def run_agent(
                             "cache_creation_input_tokens": getattr(msg.usage, "cache_creation_input_tokens", 0),
                             "cache_read_input_tokens": getattr(msg.usage, "cache_read_input_tokens", 0),
                         }
-                    events.append(AgentEvent(
-                        type="assistant_turn",
-                        timestamp=now,
-                        data={"usage": usage_data},
-                    ))
+                    events.append(
+                        AgentEvent(
+                            type="assistant_turn",
+                            timestamp=now,
+                            data={"usage": usage_data},
+                        )
+                    )
 
                     for block in getattr(msg, "content", []):
                         if isinstance(block, TextBlock):
                             response_parts.append(block.text)
-                            events.append(AgentEvent(
-                                type="text",
-                                timestamp=now,
-                                data={"text": block.text},
-                            ))
+                            events.append(
+                                AgentEvent(
+                                    type="text",
+                                    timestamp=now,
+                                    data={"text": block.text},
+                                )
+                            )
                         elif isinstance(block, ToolUseBlock):
-                            events.append(AgentEvent(
-                                type="tool_use",
-                                timestamp=now,
-                                data={
-                                    "id": block.id,
-                                    "name": block.name,
-                                    "input": block.input if isinstance(block.input, dict) else {},
-                                },
-                            ))
+                            events.append(
+                                AgentEvent(
+                                    type="tool_use",
+                                    timestamp=now,
+                                    data={
+                                        "id": block.id,
+                                        "name": block.name,
+                                        "input": block.input if isinstance(block.input, dict) else {},
+                                    },
+                                )
+                            )
                         elif isinstance(block, ToolResultBlock):
-                            events.append(AgentEvent(
-                                type="tool_result",
-                                timestamp=now,
-                                data={
-                                    "tool_use_id": getattr(block, "tool_use_id", ""),
-                                    "content": getattr(block, "content", ""),
-                                    "is_error": getattr(block, "is_error", False),
-                                },
-                            ))
+                            events.append(
+                                AgentEvent(
+                                    type="tool_result",
+                                    timestamp=now,
+                                    data={
+                                        "tool_use_id": getattr(block, "tool_use_id", ""),
+                                        "content": getattr(block, "content", ""),
+                                        "is_error": getattr(block, "is_error", False),
+                                    },
+                                )
+                            )
 
                 elif isinstance(msg, UserMessage):
                     # Tool results come back as UserMessage with ToolResultBlock content
                     for block in getattr(msg, "content", []):
                         if isinstance(block, ToolResultBlock):
-                            events.append(AgentEvent(
-                                type="tool_result",
-                                timestamp=now,
-                                data={
-                                    "tool_use_id": getattr(block, "tool_use_id", ""),
-                                    "content": getattr(block, "content", ""),
-                                    "is_error": getattr(block, "is_error", False),
-                                },
-                            ))
+                            events.append(
+                                AgentEvent(
+                                    type="tool_result",
+                                    timestamp=now,
+                                    data={
+                                        "tool_use_id": getattr(block, "tool_use_id", ""),
+                                        "content": getattr(block, "content", ""),
+                                        "is_error": getattr(block, "is_error", False),
+                                    },
+                                )
+                            )
 
                 elif isinstance(msg, ResultMessage):
-                    events.append(AgentEvent(
-                        type="result",
-                        timestamp=now,
-                        data={
-                            "session_id": getattr(msg, "session_id", session_id),
-                            "duration_ms": getattr(msg, "duration_ms", None),
-                            "cost": getattr(msg, "cost", None),
-                        },
-                    ))
+                    events.append(
+                        AgentEvent(
+                            type="result",
+                            timestamp=now,
+                            data={
+                                "session_id": getattr(msg, "session_id", session_id),
+                                "duration_ms": getattr(msg, "duration_ms", None),
+                                "cost": getattr(msg, "cost", None),
+                            },
+                        )
+                    )
                     session_id = getattr(msg, "session_id", session_id)
 
                 elif isinstance(msg, SystemMessage):
-                    events.append(AgentEvent(
-                        type="system",
-                        timestamp=now,
-                        data={
-                            "subtype": getattr(msg, "subtype", ""),
-                            "data": getattr(msg, "data", {}),
-                        },
-                    ))
+                    events.append(
+                        AgentEvent(
+                            type="system",
+                            timestamp=now,
+                            data={
+                                "subtype": getattr(msg, "subtype", ""),
+                                "data": getattr(msg, "data", {}),
+                            },
+                        )
+                    )
 
     except asyncio.TimeoutError:
-        events.append(AgentEvent(
-            type="error",
-            timestamp=datetime.now(timezone.utc),
-            data={"message": f"asyncio.TimeoutError after {timeout_seconds}s"},
-        ))
+        events.append(
+            AgentEvent(
+                type="error",
+                timestamp=datetime.now(timezone.utc),
+                data={"message": f"asyncio.TimeoutError after {timeout_seconds}s"},
+            )
+        )
     except Exception as e:
         stderr_detail = "; ".join(stderr_lines[-5:]) if stderr_lines else "no stderr"
         logger.error("Agent execution failed: %s | stderr: %s", e, stderr_detail)
-        events.append(AgentEvent(
-            type="error",
-            timestamp=datetime.now(timezone.utc),
-            data={"message": f"{e} | stderr: {stderr_detail}"},
-        ))
+        events.append(
+            AgentEvent(
+                type="error",
+                timestamp=datetime.now(timezone.utc),
+                data={"message": f"{e} | stderr: {stderr_detail}"},
+            )
+        )
     finally:
         # Restore CLAUDECODE so the parent session isn't affected
         if _saved_claudecode is not None:
@@ -694,6 +711,4 @@ def run_agent_sync_wrapper(
     following the same pattern as databricks-builder-app to avoid
     anyio cancel-scope and subprocess transport cleanup issues.
     """
-    return _run_in_fresh_loop(
-        run_agent(prompt=prompt, skill_md=skill_md, **kwargs)
-    )
+    return _run_in_fresh_loop(run_agent(prompt=prompt, skill_md=skill_md, **kwargs))

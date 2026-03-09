@@ -376,14 +376,10 @@ class SkillBenchEvaluator:
         # Inject matched real-world assessments from MLflow traces
         if self._assessment_by_task:
             task_id = example.get("additional_context", {}).get("task_id", "")
-            matched = (
-                self._assessment_by_task.get(task_id)
-                or self._assessment_by_task.get(_prompt_hash(prompt), [])
-            )
+            matched = self._assessment_by_task.get(task_id) or self._assessment_by_task.get(_prompt_hash(prompt), [])
             if matched:
                 side_info["real_world_assessments"] = [
-                    {"name": a.name, "value": a.value, "rationale": a.rationale}
-                    for a in matched
+                    {"name": a.name, "value": a.value, "rationale": a.rationale} for a in matched
                 ]
 
         # Derive diagnostic labels from judge verdicts for backward compat

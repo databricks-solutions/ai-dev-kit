@@ -360,6 +360,7 @@ def optimize_skill(
     assessment_by_task: dict[str, list] = {}
     if mlflow_assessment_experiment:
         from .assessment_fetcher import fetch_assessments, summarize_assessment_patterns, match_assessments_to_tasks
+
         records = fetch_assessments(mlflow_assessment_experiment, skill_name=skill_name)
         if records:
             assessment_summary = summarize_assessment_patterns(records)
