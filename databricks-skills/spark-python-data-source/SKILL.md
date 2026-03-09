@@ -293,9 +293,17 @@ Write a data source for REST API with OAuth2 authentication and pagination
 
 ## Related
 
-- databricks-testing: Test data sources on Databricks clusters
-- databricks-spark-declarative-pipelines: Use custom sources in DLT pipelines
-- python-dev: Python development best practices
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** — use custom data sources in SDP/DLT pipelines
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** — SDK patterns for Databricks operations
+- **[databricks-spark-structured-streaming](../databricks-spark-structured-streaming/SKILL.md)** — streaming patterns for data source streaming readers
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** — catalog governance for tables created by data sources
+- **[databricks-dbsql](../databricks-dbsql/SKILL.md)** — query data loaded by custom data sources
+
+## Resources
+
+- [Python Data Source API Documentation](https://docs.databricks.com/aws/en/pyspark/datasources)
+- [Apache Spark Python DataSource Tutorial](https://spark.apache.org/docs/latest/api/python/tutorial/sql/python_data_source.html)
+- [awesome-python-datasources](https://github.com/allisonwang-db/awesome-python-datasources) — directory of available implementations
 
 ## References
 
