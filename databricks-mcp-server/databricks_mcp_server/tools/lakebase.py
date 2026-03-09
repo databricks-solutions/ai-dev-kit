@@ -31,12 +31,15 @@ from databricks_tools_core.lakebase_autoscale import (
     update_project as _update_project,
     delete_project as _delete_project,
     create_branch as _create_branch,
+    get_branch as _get_branch,
     list_branches as _list_branches,
     update_branch as _update_branch,
     delete_branch as _delete_branch,
     create_endpoint as _create_endpoint,
+    get_endpoint as _get_endpoint,
     list_endpoints as _list_endpoints,
     update_endpoint as _update_endpoint,
+    delete_endpoint as _delete_endpoint,
     generate_credential as _generate_autoscale_credential,
 )
 
@@ -534,3 +537,71 @@ def generate_lakebase_credential(
         return _generate_autoscale_credential(endpoint=endpoint)
     else:
         return {"error": "Provide either instance_names (provisioned) or endpoint (autoscale)."}
+
+
+# ============================================================================
+# Tool 9: get_lakebase_endpoint
+# ============================================================================
+
+
+@mcp.tool
+def get_lakebase_endpoint(
+    name: Optional[str] = None,
+    branch_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Get details of a Lakebase Autoscale endpoint, or list all endpoints on a branch.
+
+    Provide name to get a specific endpoint's details (state, host, CU settings).
+    Provide branch_name to list all endpoints on that branch.
+
+    Args:
+        name: Endpoint resource name
+            (e.g., "projects/my-app/branches/production/endpoints/ep-primary")
+        branch_name: Branch resource name to list all endpoints
+            (e.g., "projects/my-app/branches/production")
+
+    Returns:
+        Single endpoint dict (if name provided) or {"endpoints": [...]} (if branch_name).
+
+    Example:
+        >>> get_lakebase_endpoint(name="projects/my-app/branches/production/endpoints/ep-primary")
+        {"name": "...", "state": "ACTIVE", "host": "...", "min_cu": 0.5, "max_cu": 4.0}
+
+        >>> get_lakebase_endpoint(branch_name="projects/my-app/branches/production")
+        {"endpoints": [{"name": "...", "state": "ACTIVE", ...}]}
+    """
+    if name:
+        return _get_endpoint(name=name)
+    elif branch_name:
+        endpoints = _list_endpoints(branch_name=branch_name)
+        return {"endpoints": endpoints, "count": len(endpoints)}
+    else:
+        return {"error": "Provide either name (specific endpoint) or branch_name (list all)."}
+
+
+# ============================================================================
+# Tool 10: delete_lakebase_endpoint
+# ============================================================================
+
+
+@mcp.tool
+def delete_lakebase_endpoint(name: str) -> Dict[str, Any]:
+    """
+    Delete a Lakebase Autoscale compute endpoint.
+
+    Removes the endpoint from its branch. The branch and its data are not affected.
+    Retries automatically on transient reconciliation errors.
+
+    Args:
+        name: Endpoint resource name
+            (e.g., "projects/my-app/branches/production/endpoints/ep-primary")
+
+    Returns:
+        Dictionary with name and deletion status.
+
+    Example:
+        >>> delete_lakebase_endpoint(name="projects/my-app/branches/dev/endpoints/dev-ep")
+        {"name": "...", "status": "deleted"}
+    """
+    return _delete_endpoint(name=name)
