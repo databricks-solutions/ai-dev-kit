@@ -85,11 +85,48 @@ GROUP BY workspace_id, sku_name;
 
 ## MCP Tool Integration
 
-Use `mcp__databricks__execute_sql` for system table queries:
+### Governance Tools
+
+Use these MCP tools for Unity Catalog governance operations:
 
 ```python
-# Query lineage
-mcp__databricks__execute_sql(
+# Manage catalogs, schemas, tables, volumes, functions
+manage_uc_objects(action="list", object_type="catalogs")
+manage_uc_objects(action="create", object_type="schema", catalog="main", schema="my_schema")
+manage_uc_objects(action="describe", object_type="table", full_name="main.schema.table")
+
+# Manage grants and permissions
+manage_uc_grants(action="list", securable_type="table", full_name="main.schema.table")
+manage_uc_grants(action="grant", securable_type="schema", full_name="main.my_schema",
+                 principal="data-engineers", privileges=["USE_SCHEMA", "SELECT"])
+
+# Manage tags for classification
+manage_uc_tags(action="set", securable_type="table", full_name="main.schema.table",
+               tags={"pii": "true", "team": "analytics"})
+
+# Manage storage credentials and external locations
+manage_uc_storage(action="list", storage_type="credentials")
+manage_uc_storage(action="list", storage_type="external_locations")
+
+# Manage Lakehouse Federation connections
+manage_uc_connections(action="list")
+
+# Manage row filters and column masks
+manage_uc_security_policies(action="list", securable_type="table", full_name="main.schema.table")
+
+# Manage data quality monitors
+manage_uc_monitors(action="list", table_name="main.schema.table")
+
+# Manage Delta Sharing
+manage_uc_sharing(action="list", sharing_type="shares")
+```
+
+### SQL Queries
+
+Use `execute_sql` for system table queries:
+
+```python
+execute_sql(
     sql_query="""
         SELECT source_table_full_name, target_table_full_name
         FROM system.access.table_lineage
