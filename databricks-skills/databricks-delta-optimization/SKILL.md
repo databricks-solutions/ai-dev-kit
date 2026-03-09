@@ -7,18 +7,19 @@ description: "Optimize Delta table performance with liquid clustering, OPTIMIZE,
 
 Patterns for optimizing Delta table performance on Databricks — liquid clustering, compaction, vacuuming, statistics, and migration from legacy partitioning.
 
+> **Best practice:** Before reaching for manual OPTIMIZE/VACUUM, consider using **managed tables with predictive optimization** — see the [databricks-managed-tables](../databricks-managed-tables/SKILL.md) skill. Predictive optimization automates OPTIMIZE, VACUUM, and clustering maintenance with zero manual effort.
+
 ## When to Use
 
-- Creating new tables and choosing a clustering strategy
-- Improving query performance on existing tables
-- Reducing storage costs with VACUUM and compaction
-- Migrating from Hive-style partitioning to liquid clustering
-- Setting up automated table maintenance
+- Running manual OPTIMIZE/VACUUM on tables where predictive optimization is not available
+- Tuning liquid clustering column selection
 - Diagnosing slow queries caused by data layout
+- Migrating from Hive-style partitioning to liquid clustering
+- Understanding DESCRIBE DETAIL and table health metrics
 
 ## Quick Start
 
-### Create a Table with Liquid Clustering
+### Best Path: Managed Table + Predictive Optimization
 
 ```sql
 CREATE TABLE catalog.schema.events (
@@ -28,9 +29,18 @@ CREATE TABLE catalog.schema.events (
     amount DOUBLE,
     created_at TIMESTAMP
 ) CLUSTER BY (event_type, region);
+
+ALTER TABLE catalog.schema.events
+SET TBLPROPERTIES (
+    'delta.autoOptimize.autoCompact' = 'auto',
+    'delta.autoOptimize.optimizeWrite' = 'true'
+);
+-- Done. Databricks handles OPTIMIZE and VACUUM automatically.
 ```
 
-### Optimize and Vacuum
+### Manual Path: OPTIMIZE and VACUUM
+
+For external tables or when predictive optimization is not enabled:
 
 ```sql
 OPTIMIZE catalog.schema.events;
@@ -143,7 +153,11 @@ VACUUM catalog.schema.events DRY RUN;
 ## Reference Files
 
 - [table-diagnostics.md](table-diagnostics.md) - DESCRIBE DETAIL, HISTORY, statistics, and performance diagnosis
-- [maintenance-automation.md](maintenance-automation.md) - Scheduled OPTIMIZE/VACUUM, predictive optimization, migration patterns
+- [maintenance-automation.md](maintenance-automation.md) - Scheduled OPTIMIZE/VACUUM, migration from Hive partitioning
+
+## Related Skills
+
+- **[databricks-managed-tables](../databricks-managed-tables/SKILL.md)** — Managed tables + predictive optimization (the recommended zero-maintenance approach). Covers managed vs external trade-offs, PO setup, and external-to-managed migration via DEEP CLONE.
 
 ## Common Issues
 
