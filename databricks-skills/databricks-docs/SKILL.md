@@ -55,6 +55,19 @@ The llms.txt file is organized by category:
 2. Read the specific docs to understand the feature
 3. Determine which skill/tools apply, then use them
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **llms.txt is too large to process** | Don't fetch the entire file. Search for keywords in the URL index first, then fetch only the specific documentation pages you need |
+| **Documentation page returns 404** | Databricks docs URLs change when features are renamed or restructured. Try searching llms.txt for the feature name to find the current URL |
+| **Docs say feature X exists but MCP tool doesn't support it** | Not all documented features have MCP tool coverage. Fall back to the Python SDK (`databricks-python-sdk` skill) or REST API for unsupported operations |
+| **Conflicting information between docs and skill** | Docs are the authoritative source. If a skill contradicts the docs, follow the docs and consider updating the skill |
+| **Can't find docs for a new feature** | New features may not be in llms.txt yet. Try fetching `https://docs.databricks.com/aws/en/release-notes/` for recent additions, or search the feature name directly on the docs site |
+| **Docs reference a DBR version I don't have** | Check `spark.version` on your cluster. Some features require specific DBR versions. Use serverless compute for the latest feature support |
+| **Documentation is for a different cloud** | Databricks docs have cloud-specific pages. Replace `/aws/` with `/azure/` or `/gcp/` in the URL path to find the correct version |
+| **Feature marked "Public Preview"** | Public Preview features are available but may change. Check the preview limitations section in the docs. Some require workspace admin opt-in |
+
 ## Related Skills
 
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns for programmatic Databricks access
