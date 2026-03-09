@@ -298,3 +298,26 @@ Load these for detailed syntax, full parameter lists, and advanced patterns:
 - **Define PK/FK constraints** on dimensional models for query optimization
 - **Use `COLLATE UTF8_LCASE`** for user-facing string columns that need case-insensitive search
 - **Use MCP tools** (`execute_sql`, `execute_sql_multi`) to test and validate all SQL before deploying
+
+---
+
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`ai_query` returns NULL** | Check that the model endpoint exists and is running. Use `LIMIT` to test with a small batch first. Serverless or Pro warehouse required |
+| **`ai_query` rate limited / slow** | AI functions have token-per-minute limits. Use `LIMIT` during development. For bulk processing, batch with `ROW_NUMBER()` and process in chunks |
+| **`ai_classify` returns unexpected category** | Categories must be an `ARRAY('a','b','c')` literal, not a column reference. Ensure categories are mutually exclusive and descriptive |
+| **`COLLATE` not recognized** | Collations require DBR 16.1+. Use Serverless SQL warehouse or DBR 16.1+ cluster |
+| **`CREATE MATERIALIZED VIEW` fails** | MVs require Pro or Serverless SQL warehouse. Classic warehouses do not support MVs |
+| **MV refresh stuck or failing** | Check `DESCRIBE EXTENDED mv_name` for refresh status. Common cause: source table schema changed. Recreate the MV if schema drift occurred |
+| **Pipe syntax `\|>` parse error** | Pipe syntax requires DBR 16.1+. Ensure no space between `\|` and `>`. The `FROM` clause must come first (not `SELECT`) |
+| **`BEGIN...END` not recognized** | SQL Scripting requires DBR 16.3+ for anonymous blocks, DBR 17.0+ for stored procedures. Use Serverless SQL warehouse |
+| **`CALL procedure` returns no result** | Use `OUT` parameters or `SELECT` as the last statement in the procedure body to return results |
+| **`WITH RECURSIVE` infinite loop** | Always include a `WHERE depth < N` safety limit in the recursive member. Max recursion depth is 100 by default |
+| **`http_request` connection refused** | Create a `CONNECTION` object first with `TYPE HTTP`. The `bearer_token` must use `secret('scope','key')` syntax, not a raw string |
+| **`read_files` schema mismatch** | Use `schemaHints` for semi-structured data. For CSV, set `header => true` and explicit `schema` to avoid type inference issues |
+| **`remote_query` timeout** | Federated queries push down to the remote system. Ensure the remote query is optimized. Add `LIMIT` to test connectivity first |
+| **`TEMPORARY TABLE` not visible** | Temp tables are session-scoped. They won't be visible in other notebooks, jobs, or warehouse sessions |
+| **`GENERATED ALWAYS AS IDENTITY` gaps** | Identity columns may have gaps after failed inserts or rollbacks. This is by design — don't rely on contiguous IDs |
+| **H3 function returns NULL** | Ensure latitude is in [-90, 90] and longitude is in [-180, 180]. `h3_longlatash3` returns NULL for invalid coordinates |
