@@ -151,7 +151,9 @@ class SkillBenchEvaluator:
         assessment_by_task: dict[str, list] | None = None,
     ):
         if not gen_model:
-            raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
+            raise ValueError(
+                "SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var."
+            )
         self.gen_model = gen_model
         self._baseline_response_cache: dict[str, str] = {}
         self._baseline_judge_cache: dict[str, JudgeFeedback] = {}
@@ -162,7 +164,9 @@ class SkillBenchEvaluator:
         self._assessment_by_task = assessment_by_task or {}
 
         # Create judge instances with configurable model
-        self._quality_judge = create_skill_quality_judge(skill_guidelines, judge_model=judge_model)
+        self._quality_judge = create_skill_quality_judge(
+            skill_guidelines, judge_model=judge_model
+        )
         self._regression_judge = create_regression_judge(judge_model=judge_model)
 
     def _generate_response(self, prompt: str, skill_context: str | None = None) -> str:
@@ -225,7 +229,9 @@ class SkillBenchEvaluator:
 
         # Decode expectations
         expectations: dict[str, Any] = {}
-        expectations_json = example.get("additional_context", {}).get("expectations", "")
+        expectations_json = example.get("additional_context", {}).get(
+            "expectations", ""
+        )
         if expectations_json:
             try:
                 expectations = json.loads(expectations_json)
@@ -251,16 +257,19 @@ class SkillBenchEvaluator:
         facts_str = "\n".join(f"- {f}" for f in facts) if facts else "None specified"
         patterns_str = (
             "\n".join(
-                f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}" for p in patterns
+                f"- {p}"
+                if isinstance(p, str)
+                else f"- {p.get('description', p.get('pattern', ''))}"
+                for p in patterns
             )
             if patterns
             else "None specified"
         )
-        guidelines_str = "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
-
-        expectations_text = (
-            f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
+        guidelines_str = (
+            "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
         )
+
+        expectations_text = f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
 
         # make_judge requires expectations as dict, inputs/outputs as Any.
         # The template renders {{ expectations }} as the dict's string repr,
@@ -321,7 +330,12 @@ class SkillBenchEvaluator:
             efficiency = 1.0
 
         # Weighted final score
-        final_score = 0.40 * max(0.0, effectiveness_delta) + 0.30 * score_with + 0.05 * structure + 0.25 * efficiency
+        final_score = (
+            0.40 * max(0.0, effectiveness_delta)
+            + 0.30 * score_with
+            + 0.05 * structure
+            + 0.25 * efficiency
+        )
 
         # Build side info with FULL judge rationale (not truncated!)
         reference_answer = example.get("answer", "")
@@ -343,7 +357,11 @@ class SkillBenchEvaluator:
         }
         side_info["Judge_effectiveness"] = {
             "verdict": (
-                "improved" if effectiveness_verdict == 1.0 else "regressed" if effectiveness_verdict == 0.0 else "same"
+                "improved"
+                if effectiveness_verdict == 1.0
+                else "regressed"
+                if effectiveness_verdict == 0.0
+                else "same"
             ),
             "delta": effectiveness_delta,
         }
@@ -376,10 +394,13 @@ class SkillBenchEvaluator:
         # Inject matched real-world assessments from MLflow traces
         if self._assessment_by_task:
             task_id = example.get("additional_context", {}).get("task_id", "")
-            matched = self._assessment_by_task.get(task_id) or self._assessment_by_task.get(_prompt_hash(prompt), [])
+            matched = self._assessment_by_task.get(
+                task_id
+            ) or self._assessment_by_task.get(_prompt_hash(prompt), [])
             if matched:
                 side_info["real_world_assessments"] = [
-                    {"name": a.name, "value": a.value, "rationale": a.rationale} for a in matched
+                    {"name": a.name, "value": a.value, "rationale": a.rationale}
+                    for a in matched
                 ]
 
         # Derive diagnostic labels from judge verdicts for backward compat
@@ -400,28 +421,41 @@ class SkillBenchEvaluator:
 
 
 def _collect_skill_guidelines(skill_name: str) -> list[str]:
-    """Collect and deduplicate all guidelines from a skill's ground_truth.yaml."""
+    """Collect and deduplicate guidelines from ground_truth.yaml and manifest.yaml."""
     from pathlib import Path
     import yaml
 
-    gt_path = Path(".test/skills") / skill_name / "ground_truth.yaml"
-    if not gt_path.exists():
-        return []
-
-    try:
-        with open(gt_path) as f:
-            data = yaml.safe_load(f) or {}
-    except Exception:
-        return []
-
     seen: set[str] = set()
     guidelines: list[str] = []
-    for tc in data.get("test_cases", []):
-        for g in tc.get("expectations", {}).get("guidelines", []):
-            g_norm = g.strip()
-            if g_norm and g_norm not in seen:
-                seen.add(g_norm)
-                guidelines.append(g_norm)
+
+    # Collect from ground_truth.yaml test cases
+    gt_path = Path(".test/skills") / skill_name / "ground_truth.yaml"
+    if gt_path.exists():
+        try:
+            with open(gt_path) as f:
+                data = yaml.safe_load(f) or {}
+            for tc in data.get("test_cases", []):
+                for g in tc.get("expectations", {}).get("guidelines", []):
+                    g_norm = g.strip()
+                    if g_norm and g_norm not in seen:
+                        seen.add(g_norm)
+                        guidelines.append(g_norm)
+        except Exception:
+            pass
+
+    # Collect from manifest.yaml default_guidelines (includes [FOCUS] guidelines)
+    manifest_path = Path(".test/skills") / skill_name / "manifest.yaml"
+    if manifest_path.exists():
+        try:
+            with open(manifest_path) as f:
+                manifest = yaml.safe_load(f) or {}
+            for g in manifest.get("scorers", {}).get("default_guidelines", []):
+                g_norm = g.strip()
+                if g_norm and g_norm not in seen:
+                    seen.add(g_norm)
+                    guidelines.append(g_norm)
+        except Exception:
+            pass
 
     return guidelines
 
@@ -484,6 +518,7 @@ def build_skillbench_background(
     baseline_side_info: dict[str, dict] | None = None,
     token_budget: int | None = None,
     assessment_summary: str | None = None,
+    focus_areas: list[str] | None = None,
 ) -> str:
     """Build concise GEPA reflection context for SkillBench optimization.
 
@@ -493,7 +528,9 @@ def build_skillbench_background(
     baseline_desc = ""
     if baseline_scores:
         mean_score = sum(baseline_scores.values()) / len(baseline_scores)
-        baseline_desc = f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
+        baseline_desc = (
+            f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
+        )
 
         if baseline_side_info:
             needs_skill_ids = []
@@ -511,7 +548,9 @@ def build_skillbench_background(
 
     components_desc = ""
     if component_names and any(c.startswith("tools_") for c in component_names):
-        tool_modules = [c.replace("tools_", "") for c in component_names if c.startswith("tools_")]
+        tool_modules = [
+            c.replace("tools_", "") for c in component_names if c.startswith("tools_")
+        ]
         components_desc = (
             f"\nAlso optimizing MCP tool descriptions for: {', '.join(tool_modules)}. "
             "Keep docstrings accurate and concise — every token counts toward the budget."
@@ -528,6 +567,15 @@ def build_skillbench_background(
     if assessment_summary:
         assessment_desc = f"\n\n{assessment_summary}"
 
+    focus_desc = ""
+    if focus_areas:
+        focus_items = "\n".join(f"  - {f}" for f in focus_areas)
+        focus_desc = (
+            f"\n\nUSER FOCUS PRIORITIES:\n{focus_items}\n"
+            "These are high-priority areas the user wants the skill to emphasize. "
+            "Weight these heavily in your optimization decisions."
+        )
+
     return (
         f"You are refining SKILL.md for '{skill_name}'.\n"
         "The skill is scored by MLflow judges that evaluate how much it HELPS an agent.\n"
@@ -540,4 +588,5 @@ def build_skillbench_background(
         f"{components_desc}"
         f"{token_desc}"
         f"{assessment_desc}"
+        f"{focus_desc}"
     )

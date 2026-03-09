@@ -52,7 +52,8 @@ def main():
         help="Optimize all skills that have ground_truth.yaml",
     )
     parser.add_argument(
-        "--preset", "-p",
+        "--preset",
+        "-p",
         choices=["quick", "standard", "thorough"],
         default="standard",
         help="GEPA optimization preset (default: standard)",
@@ -61,7 +62,7 @@ def main():
         "--gen-model",
         default=None,
         help="LLM model for generative evaluation (default: GEPA_GEN_LM env or "
-             "databricks/databricks-claude-sonnet-4-6).",
+        "databricks/databricks-claude-sonnet-4-6).",
     )
     parser.add_argument(
         "--reflection-lm",
@@ -87,7 +88,7 @@ def main():
         "--apply-last",
         action="store_true",
         help="Apply the last saved optimization result without re-running "
-             "(reads from .test/skills/<skill>/optimized_SKILL.md)",
+        "(reads from .test/skills/<skill>/optimized_SKILL.md)",
     )
     parser.add_argument(
         "--include-tools",
@@ -145,19 +146,19 @@ def main():
         "--agent-eval",
         action="store_true",
         help="Hybrid mode: use real Claude Code agent for baseline + validation, "
-             "proxy for GEPA iterations.",
+        "proxy for GEPA iterations.",
     )
     parser.add_argument(
         "--agent-eval-full",
         action="store_true",
         help="Full agent mode: use real Claude Code agent for ALL GEPA iterations "
-             "(slow but most accurate).",
+        "(slow but most accurate).",
     )
     parser.add_argument(
         "--agent-model",
         default=None,
         help="Model for agent execution (e.g., databricks-claude-sonnet-4-6). "
-             "Defaults to ANTHROPIC_MODEL env var.",
+        "Defaults to ANTHROPIC_MODEL env var.",
     )
     parser.add_argument(
         "--agent-timeout",
@@ -175,7 +176,7 @@ def main():
         default=None,
         metavar="EXPERIMENT_ID",
         help="MLflow experiment ID with ToolCallCorrectness/ToolCallEfficiency assessments. "
-             "Injects real-world behavioral feedback into GEPA's reflection context.",
+        "Injects real-world behavioral feedback into GEPA's reflection context.",
     )
 
     parser.add_argument(
@@ -192,6 +193,20 @@ def main():
         dest="requirements",
         help="Inline requirement for test case generation (repeatable).",
     )
+    parser.add_argument(
+        "--focus",
+        action="append",
+        default=None,
+        dest="focus_areas",
+        help="Natural-language focus area to steer optimization (repeatable). "
+        "E.g., --focus 'prefix all catalogs with customer_ prefix'",
+    )
+    parser.add_argument(
+        "--focus-file",
+        type=str,
+        default=None,
+        help="File with focus areas (one per line). Combined with --focus args.",
+    )
 
     args = parser.parse_args()
 
@@ -199,7 +214,11 @@ def main():
         parser.error("Either provide a skill name or use --all")
 
     from skill_test.optimize.runner import optimize_skill
-    from skill_test.optimize.review import review_optimization, apply_optimization, load_last_result
+    from skill_test.optimize.review import (
+        review_optimization,
+        apply_optimization,
+        load_last_result,
+    )
 
     # Handle requirements-driven example generation
     if args.generate_from or args.requirements:
@@ -212,16 +231,19 @@ def main():
                 print(f"Error: requirements file not found: {req_path}")
                 sys.exit(1)
             requirements.extend(
-                line.strip() for line in req_path.read_text().splitlines()
+                line.strip()
+                for line in req_path.read_text().splitlines()
                 if line.strip() and not line.strip().startswith("#")
             )
         if args.requirements:
             requirements.extend(args.requirements)
         if requirements:
             from generate_examples import run_generation
+
             gen_model = args.gen_model
             if gen_model is None:
                 from skill_test.optimize.config import DEFAULT_GEN_LM
+
                 gen_model = DEFAULT_GEN_LM
             run_generation(
                 skill_name=args.skill_name,
@@ -231,6 +253,39 @@ def main():
             )
             print()
 
+    # Collect focus areas from --focus and --focus-file
+    focus_areas: list[str] | None = None
+    if args.focus_areas or args.focus_file:
+        focus_areas = []
+        if args.focus_areas:
+            focus_areas.extend(args.focus_areas)
+        if args.focus_file:
+            fp = Path(args.focus_file)
+            if not fp.exists():
+                print(f"Error: focus file not found: {fp}")
+                sys.exit(1)
+            focus_areas.extend(
+                line.strip()
+                for line in fp.read_text().splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            )
+
+    # Apply focus areas before optimization
+    if focus_areas:
+        from focus import apply_focus
+        from skill_test.optimize.config import DEFAULT_GEN_LM
+
+        focus_gen_model = args.gen_model or DEFAULT_GEN_LM
+        if args.all:
+            # Defer per-skill focus application to the loop below
+            pass
+        elif args.skill_name:
+            apply_focus(
+                skill_name=args.skill_name,
+                focus_areas=focus_areas,
+                gen_model=focus_gen_model,
+            )
+
     # Handle --apply-last: load saved result and apply without re-running
     if args.apply_last:
         if not args.skill_name:
@@ -238,12 +293,18 @@ def main():
         result = load_last_result(args.skill_name)
         if result is None:
             print(f"No saved optimization found for '{args.skill_name}'.")
-            print(f"Run optimization first: uv run python .test/scripts/optimize.py {args.skill_name}")
+            print(
+                f"Run optimization first: uv run python .test/scripts/optimize.py {args.skill_name}"
+            )
             sys.exit(1)
         print(f"Applying saved optimization for '{args.skill_name}':")
-        print(f"  Score: {result.original_score:.3f} -> {result.optimized_score:.3f} "
-              f"({result.improvement:+.3f})")
-        print(f"  Tokens: {result.original_token_count:,} -> {result.optimized_token_count:,}")
+        print(
+            f"  Score: {result.original_score:.3f} -> {result.optimized_score:.3f} "
+            f"({result.improvement:+.3f})"
+        )
+        print(
+            f"  Tokens: {result.original_token_count:,} -> {result.optimized_token_count:,}"
+        )
         try:
             apply_optimization(result)
             sys.exit(0)
@@ -277,6 +338,7 @@ def main():
                 mlflow_experiment=args.mlflow_experiment,
                 mlflow_assessment_experiment=args.mlflow_assessments,
                 max_per_skill=args.max_per_skill,
+                focus_areas=focus_areas,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:
@@ -291,15 +353,29 @@ def main():
         skill_names = [
             d.name
             for d in sorted(skills_dir.iterdir())
-            if d.is_dir() and (d / "ground_truth.yaml").exists() and not d.name.startswith("_")
+            if d.is_dir()
+            and (d / "ground_truth.yaml").exists()
+            and not d.name.startswith("_")
         ]
-        print(f"Found {len(skill_names)} skills to optimize: {', '.join(skill_names)}\n")
+        print(
+            f"Found {len(skill_names)} skills to optimize: {', '.join(skill_names)}\n"
+        )
 
         results = []
         for name in skill_names:
             print(f"\n{'=' * 60}")
             print(f"  Optimizing: {name}")
             print(f"{'=' * 60}")
+            # Apply focus per-skill in --all mode
+            if focus_areas:
+                from focus import apply_focus
+                from skill_test.optimize.config import DEFAULT_GEN_LM
+
+                apply_focus(
+                    skill_name=name,
+                    focus_areas=focus_areas,
+                    gen_model=args.gen_model or DEFAULT_GEN_LM,
+                )
             try:
                 result = optimize_skill(
                     skill_name=name,
@@ -322,11 +398,14 @@ def main():
                     agent_timeout=args.agent_timeout,
                     mlflow_experiment=args.mlflow_experiment,
                     mlflow_assessment_experiment=args.mlflow_assessments,
+                    focus_areas=focus_areas,
                 )
                 review_optimization(result)
                 if args.apply and not args.dry_run:
                     apply_optimization(result)
-                results.append({"skill": name, "success": True, "improvement": result.improvement})
+                results.append(
+                    {"skill": name, "success": True, "improvement": result.improvement}
+                )
             except Exception as e:
                 print(f"  ERROR: {e}")
                 results.append({"skill": name, "success": False, "error": str(e)})
@@ -364,6 +443,7 @@ def main():
                 agent_model=args.agent_model,
                 agent_timeout=args.agent_timeout,
                 mlflow_experiment=args.mlflow_experiment,
+                focus_areas=focus_areas,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:
