@@ -793,10 +793,21 @@ class AgentBricksManager:
     # Genie Space Operations
     # ========================================================================
 
-    def genie_get(self, space_id: str) -> Optional[GenieSpaceDict]:
-        """Get Genie space by ID."""
+    def genie_get(
+        self, space_id: str, include_serialized_space: bool = False
+    ) -> Optional[GenieSpaceDict]:
+        """Get Genie space by ID.
+
+        Args:
+            space_id: The Genie space ID
+            include_serialized_space: If True, includes the serialized_space field
+                containing full space configuration (settings, instructions, etc.)
+        """
         try:
-            return self._get(f"/api/2.0/data-rooms/{space_id}")
+            params = {}
+            if include_serialized_space:
+                params["include_serialized_space"] = "true"
+            return self._get(f"/api/2.0/data-rooms/{space_id}", params=params or None)
         except Exception as e:
             if "does not exist" in str(e).lower() or "not found" in str(e).lower():
                 return None
@@ -812,6 +823,7 @@ class AgentBricksManager:
         parent_folder_id: Optional[str] = None,
         create_dir: bool = True,
         run_as_type: str = "VIEWER",
+        serialized_space: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a Genie space.
 
@@ -824,6 +836,8 @@ class AgentBricksManager:
             parent_folder_id: Optional parent folder ID
             create_dir: Whether to create parent folder if missing
             run_as_type: Run as type (default: "VIEWER")
+            serialized_space: Optional JSON string containing full space configuration
+                (settings, instructions). Used to import/clone a Genie space.
 
         Returns:
             Created Genie space data
@@ -837,6 +851,9 @@ class AgentBricksManager:
             "table_identifiers": table_identifiers,
             "run_as_type": run_as_type,
         }
+
+        if serialized_space:
+            room_payload["serialized_space"] = serialized_space
 
         if description:
             room_payload["description"] = description
@@ -869,6 +886,7 @@ class AgentBricksManager:
         warehouse_id: Optional[str] = None,
         table_identifiers: Optional[List[str]] = None,
         sample_questions: Optional[List[str]] = None,
+        serialized_space: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update a Genie space.
 
@@ -879,6 +897,8 @@ class AgentBricksManager:
             warehouse_id: Optional new warehouse ID
             table_identifiers: Optional new table identifiers
             sample_questions: Optional sample questions (replaces all existing)
+            serialized_space: Optional JSON string containing full space configuration
+                (settings, instructions). Replaces the existing configuration.
 
         Returns:
             Updated Genie space data
@@ -912,6 +932,9 @@ class AgentBricksManager:
         ]:
             if current_space.get(field):
                 update_payload[field] = current_space[field]
+
+        if serialized_space:
+            update_payload["serialized_space"] = serialized_space
 
         result = self._patch(f"/api/2.0/data-rooms/{space_id}", update_payload)
 
