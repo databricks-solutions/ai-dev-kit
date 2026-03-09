@@ -195,6 +195,21 @@ manage_mas(
 )
 ```
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **KA creation fails with "endpoint not found"** | The vector search endpoint must exist before creating a KA. Create it first with `manage_vector_search(action="create_endpoint")` |
+| **KA not indexing documents** | Check that the source volume path is correct and contains supported file types (PDF, TXT, HTML, DOCX, MD). Verify the KA's data source configuration |
+| **KA returns "I don't know" for relevant questions** | The chunking or embedding may not capture the answer. Try adjusting chunk size, adding more documents, or rephrasing the question to match document terminology |
+| **Genie Space returns wrong SQL** | Add sample questions with verified SQL in the space instructions. Use `curate_genie_space` to add golden SQL examples that guide the model |
+| **Genie Space "no tables found"** | Ensure tables are in the configured catalog/schema and the service principal has `SELECT` permission. Tables must have column comments for best results |
+| **MAS supervisor routes to wrong agent** | Improve the `instructions` field with explicit routing rules. Use numbered conditions and be specific about which query patterns map to which agent |
+| **MAS agent timeout** | Individual agent calls have a default timeout. For long-running agents, increase the timeout in the supervisor configuration or break the task into smaller steps |
+| **"PROVISIONING" state stuck** | Agent bricks endpoints can take 5-15 minutes to provision. Poll status with `get` action. If stuck beyond 20 minutes, delete and recreate |
+| **KA response includes irrelevant chunks** | Enable reranking if available, or reduce the number of retrieved chunks. Add negative examples to the instructions to guide filtering |
+| **Permission denied creating agent bricks** | Requires workspace admin or `CREATE_SERVING_ENDPOINT` permission. The service principal also needs access to underlying data sources |
+
 ## Related Skills
 
 - **[databricks-genie](../databricks-genie/SKILL.md)** - Comprehensive Genie Space creation, curation, and Conversation API guidance
