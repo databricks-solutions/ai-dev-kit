@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from databricks_tools_core.agent_bricks import (
     AgentBricksManager,
     EndpointStatus,
+    TileType,
     get_tile_example_queue,
 )
 from databricks_tools_core.identity import with_description_footer
@@ -464,6 +465,34 @@ def _mas_delete(tile_id: str) -> Dict[str, Any]:
         return {"success": False, "tile_id": tile_id, "error": str(e)}
 
 
+def _ka_list() -> Dict[str, Any]:
+    """List all Knowledge Assistants in the workspace."""
+    manager = _get_manager()
+    tiles = manager.list_all_agent_bricks(tile_type=TileType.KA)
+    kas = []
+    for tile in tiles:
+        kas.append({
+            "tile_id": tile.get("tile_id", ""),
+            "name": tile.get("name", ""),
+            "description": tile.get("description", ""),
+        })
+    return {"knowledge_assistants": kas, "count": len(kas)}
+
+
+def _mas_list() -> Dict[str, Any]:
+    """List all Supervisor Agents in the workspace."""
+    manager = _get_manager()
+    tiles = manager.list_all_agent_bricks(tile_type=TileType.MAS)
+    agents = []
+    for tile in tiles:
+        agents.append({
+            "tile_id": tile.get("tile_id", ""),
+            "name": tile.get("name", ""),
+            "description": tile.get("description", ""),
+        })
+    return {"supervisor_agents": agents, "count": len(agents)}
+
+
 # ============================================================================
 # Consolidated MCP Tools
 # ============================================================================
@@ -486,13 +515,14 @@ def manage_ka(
     questions from indexed documents (PDFs, text files, etc.).
 
     Actions:
+    - list: List all Knowledge Assistants in the workspace
     - create_or_update: Create or update a KA (requires name, volume_path)
     - get: Get KA details by tile_id
     - find_by_name: Find a KA by exact name
     - delete: Delete a KA by tile_id
 
     Args:
-        action: "create_or_update", "get", "find_by_name", or "delete"
+        action: "list", "create_or_update", "get", "find_by_name", or "delete"
         name: Name for the KA (for create_or_update, find_by_name)
         volume_path: Path to the volume folder containing documents
             (e.g., "/Volumes/catalog/schema/volume/folder") (for create_or_update)
@@ -504,12 +534,16 @@ def manage_ka(
 
     Returns:
         Dict with operation result. Varies by action:
+        - list: knowledge_assistants (list of {tile_id, name, description}), count
         - create_or_update: tile_id, name, operation, endpoint_status, examples_queued
         - get: tile_id, name, description, endpoint_status, knowledge_sources, examples_count
         - find_by_name: found, tile_id, name, endpoint_name, endpoint_status
         - delete: success, tile_id
 
     Example:
+        >>> manage_ka(action="list")
+        {"knowledge_assistants": [{"tile_id": "...", "name": "...", ...}], "count": 3}
+
         >>> manage_ka(
         ...     action="create_or_update",
         ...     name="HR Policy Assistant",
@@ -527,7 +561,9 @@ def manage_ka(
     """
     action = action.lower()
 
-    if action == "create_or_update":
+    if action == "list":
+        return _ka_list()
+    elif action == "create_or_update":
         return _ka_create_or_update(
             name=name,
             volume_path=volume_path,
@@ -543,7 +579,7 @@ def manage_ka(
     elif action == "delete":
         return _ka_delete(tile_id=tile_id)
     else:
-        return {"error": f"Invalid action '{action}'. Must be one of: create_or_update, get, find_by_name, delete"}
+        return {"error": f"Invalid action '{action}'. Must be one of: list, create_or_update, get, find_by_name, delete"}
 
 
 @mcp.tool
@@ -564,13 +600,14 @@ def manage_mas(
     Genie spaces, Knowledge Assistants, UC functions, and external MCP servers as agents.
 
     Actions:
+    - list: List all Supervisor Agents in the workspace
     - create_or_update: Create or update a Supervisor Agent (requires name, agents)
     - get: Get Supervisor Agent details by tile_id
     - find_by_name: Find a Supervisor Agent by exact name
     - delete: Delete a Supervisor Agent by tile_id
 
     Args:
-        action: "create_or_update", "get", "find_by_name", or "delete"
+        action: "list", "create_or_update", "get", "find_by_name", or "delete"
         name: Name for the Supervisor Agent (for create_or_update, find_by_name)
         agents: List of agent configurations (for create_or_update). Each agent requires:
             - name: Agent identifier (used internally for routing)
@@ -591,12 +628,16 @@ def manage_mas(
 
     Returns:
         Dict with operation result. Varies by action:
+        - list: supervisor_agents (list of {tile_id, name, description}), count
         - create_or_update: tile_id, name, operation, endpoint_status, agents_count
         - get: tile_id, name, description, endpoint_status, agents, examples_count
         - find_by_name: found, tile_id, name, endpoint_status, agents_count
         - delete: success, tile_id
 
     Example:
+        >>> manage_mas(action="list")
+        {"supervisor_agents": [{"tile_id": "...", "name": "...", ...}], "count": 2}
+
         >>> manage_mas(
         ...     action="create_or_update",
         ...     name="Customer Support MAS",
@@ -625,7 +666,9 @@ def manage_mas(
     """
     action = action.lower()
 
-    if action == "create_or_update":
+    if action == "list":
+        return _mas_list()
+    elif action == "create_or_update":
         return _mas_create_or_update(
             name=name,
             agents=agents,
@@ -641,4 +684,4 @@ def manage_mas(
     elif action == "delete":
         return _mas_delete(tile_id=tile_id)
     else:
-        return {"error": f"Invalid action '{action}'. Must be one of: create_or_update, get, find_by_name, delete"}
+        return {"error": f"Invalid action '{action}'. Must be one of: list, create_or_update, get, find_by_name, delete"}
