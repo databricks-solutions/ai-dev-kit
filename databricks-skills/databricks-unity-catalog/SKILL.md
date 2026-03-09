@@ -106,6 +106,21 @@ mcp__databricks__execute_sql(
 3. **Grant minimal access** - System tables contain sensitive metadata
 4. **Schedule reports** - Create scheduled queries for regular monitoring
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`PERMISSION_DENIED` on system tables** | System tables require explicit grants. Run `GRANT USE CATALOG ON CATALOG system TO group`, then `GRANT USE SCHEMA` and `GRANT SELECT` on the specific schema (e.g., `system.access`) |
+| **System table query is slow** | Always filter by date: `WHERE event_date >= current_date() - 7`. System tables can have billions of rows. Use `LIMIT` during development |
+| **Volume path not found** | Volume paths must use the format `/Volumes/catalog/schema/volume/path`. Ensure the volume exists and you have `READ_VOLUME` or `WRITE_VOLUME` permission |
+| **`GRANT` fails with "cannot grant on..."** | You need `MANAGE` privilege on the securable, or be the owner. For catalog-level grants, you need to be a metastore admin or catalog owner |
+| **Lineage not showing for a table** | Lineage is captured from Spark jobs and SQL queries. If data was loaded via external tools (COPY INTO from external systems), lineage may not be tracked |
+| **Audit log missing events** | Audit logs have a delivery delay (typically 1-2 hours). Query with `event_date` not `event_time` for partition pruning. Some events require account-level system tables |
+| **`USE CATALOG` vs `USE SCHEMA`** | `USE CATALOG` grants ability to see the catalog in listings. `USE SCHEMA` grants ability to see the schema. Neither grants data access — you still need `SELECT`, `MODIFY`, etc. |
+| **Billing usage numbers don't match console** | `system.billing.usage` shows raw DBU consumption. The console may show dollar amounts with different rate cards. Use `usage_quantity * list_price` for dollar estimates |
+| **Cannot create volume in schema** | Requires `CREATE VOLUME` privilege on the schema, plus `USE CATALOG` on the catalog and `USE SCHEMA` on the schema |
+| **External table shows wrong data after file changes** | External tables don't auto-refresh metadata. Run `REFRESH TABLE catalog.schema.table` or use `MSCK REPAIR TABLE` to pick up partition changes |
+
 ## Related Skills
 
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - for pipelines that write to Unity Catalog tables
