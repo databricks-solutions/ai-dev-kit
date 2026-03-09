@@ -360,3 +360,11 @@ The following MCP tools are available for managing Vector Search infrastructure.
 - **[databricks-unstructured-pdf-generation](../databricks-unstructured-pdf-generation/SKILL.md)** - Generate documents to index in Vector Search
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs and tables that back Delta Sync indexes
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build Delta tables used as Vector Search sources
+
+## Resources
+
+- [Vector Search Overview](https://docs.databricks.com/aws/en/generative-ai/vector-search.html)
+- [Create a Vector Search Index](https://docs.databricks.com/aws/en/generative-ai/create-query-vector-search.html)
+- [Vector Search API Reference](https://docs.databricks.com/api/workspace/vectorsearchindexes)
+- [Embedding Models](https://docs.databricks.com/aws/en/generative-ai/vector-search.html#embedding-source-columns)
+- [VectorSearchRetrieverTool](https://docs.databricks.com/aws/en/generative-ai/agent-framework/build-retriever-tool.html)
