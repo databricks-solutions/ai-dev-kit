@@ -63,3 +63,19 @@ df.writeStream \
 - [ ] Exactly-once verified (txnVersion/txnAppId)
 - [ ] Watermark configured for stateful operations
 - [ ] Left joins for stream-static (not inner)
+
+## Related Skills
+
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** — SDP/DLT pipelines (higher-level abstraction over structured streaming)
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** — catalog governance, volumes for checkpoints
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** — schedule and monitor streaming jobs
+- **[databricks-dbsql](../databricks-dbsql/SKILL.md)** — query streaming table outputs
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** — SDK patterns for managing streaming resources
+
+## Resources
+
+- [Structured Streaming Guide](https://docs.databricks.com/aws/en/structured-streaming/)
+- [Auto Loader](https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/)
+- [Stream-Stream Joins](https://docs.databricks.com/aws/en/structured-streaming/stream-stream-joins.html)
+- [Streaming Best Practices](https://docs.databricks.com/aws/en/structured-streaming/production.html)
+- [Kafka Integration](https://docs.databricks.com/aws/en/structured-streaming/kafka.html)
