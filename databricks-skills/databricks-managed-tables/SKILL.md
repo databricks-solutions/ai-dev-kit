@@ -1,6 +1,6 @@
 ---
 name: databricks-managed-tables
-description: "Unity Catalog managed tables with predictive optimization. Covers managed vs external tables, predictive optimization setup, and automatic maintenance. Use when creating tables, choosing managed vs external, or enabling auto-optimization."
+description: "Unity Catalog managed tables with predictive optimization. Covers managed vs external tables, SET MANAGED migration (external and foreign to managed), predictive optimization setup, and automatic maintenance. Use when creating tables, migrating to managed, or enabling auto-optimization."
 ---
 
 # Databricks Managed Tables & Predictive Optimization
@@ -10,6 +10,8 @@ The single most impactful optimization on Databricks: use **Unity Catalog manage
 ## When to Use
 
 - Creating new Delta tables (always prefer managed)
+- Migrating external tables to managed via `ALTER TABLE ... SET MANAGED`
+- Migrating foreign tables (HMS/Glue federation) to managed via `SET MANAGED {MOVE|COPY}`
 - Enabling predictive optimization on existing managed tables
 - Understanding the trade-offs between managed and external tables
 - Setting up zero-maintenance table lifecycle
@@ -142,6 +144,39 @@ System table columns:
 | `usage_quantity` | DBUs consumed |
 | `usage_unit` | Always `DBU` |
 | `start_time` / `end_time` | Operation window |
+
+## Migrating to Managed Tables
+
+### External to Managed: `SET MANAGED` (Recommended)
+
+```sql
+-- Recommended: in-place conversion with minimal downtime (DBR 17.0+)
+ALTER TABLE catalog.schema.my_external_table SET MANAGED;
+
+-- Verify
+DESCRIBE EXTENDED catalog.schema.my_external_table;
+-- Type: MANAGED
+```
+
+`SET MANAGED` copies data in the background, then briefly blocks writes to switch over. Supports rollback within 14 days via `UNSET MANAGED`.
+
+### Foreign to Managed: `SET MANAGED {MOVE|COPY}` (DBR 17.3+)
+
+For tables federated from HMS or AWS Glue:
+
+```sql
+-- MOVE: converts and disables access from external catalog
+ALTER TABLE catalog.schema.my_foreign_table SET MANAGED MOVE;
+
+-- COPY: converts but keeps source table accessible in external catalog
+ALTER TABLE catalog.schema.my_foreign_table SET MANAGED COPY;
+```
+
+See [migration-patterns.md](migration-patterns.md) for full details, batch scripts, conversion times, rollback procedures, and error handling.
+
+## Reference Files
+
+- [migration-patterns.md](migration-patterns.md) - SET MANAGED migration patterns (external + foreign), batch conversion, rollback, and troubleshooting
 
 ## Common Issues
 

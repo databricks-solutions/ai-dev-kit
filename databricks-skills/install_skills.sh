@@ -69,7 +69,7 @@ get_skill_description() {
         "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
         "databricks-lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
         "databricks-lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
-        "databricks-managed-tables") echo "Managed tables and predictive optimization" ;;
+        "databricks-managed-tables") echo "Managed tables, predictive optimization, SET MANAGED migration (external + foreign)" ;;
         "databricks-metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
         "databricks-model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
         "databricks-parsing") echo "Document parsing with ai_parse_document and custom RAG pipelines" ;;
@@ -109,6 +109,7 @@ get_skill_extra_files() {
         "databricks-unity-catalog") echo "5-system-tables.md" ;;
         "databricks-lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "databricks-lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
+        "databricks-managed-tables") echo "migration-patterns.md" ;;
         "databricks-metric-views") echo "yaml-reference.md patterns.md" ;;
         "databricks-model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
         "databricks-mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
