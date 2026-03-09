@@ -13,6 +13,7 @@ Usage:
 
 import base64
 import datetime
+import json
 import logging
 import time
 import uuid
@@ -91,19 +92,30 @@ def _get_temp_notebook_path(run_label: str) -> str:
     return f"{base}/.ai_dev_kit_tmp/{run_label}"
 
 
-def _upload_temp_notebook(code: str, language: str, workspace_path: str) -> None:
+def _is_ipynb(content: str) -> bool:
+    """Check if content is a Jupyter notebook (.ipynb) JSON structure."""
+    try:
+        data = json.loads(content)
+        return isinstance(data, dict) and "cells" in data
+    except (json.JSONDecodeError, ValueError):
+        return False
+
+
+def _upload_temp_notebook(
+    code: str, language: str, workspace_path: str, is_jupyter: bool = False
+) -> None:
     """Upload code as a temporary notebook to the Databricks workspace.
 
     Args:
-        code: Source code to upload.
-        language: Language string ("python" or "sql").
+        code: Source code or .ipynb JSON content to upload.
+        language: Language string ("python" or "sql"). Ignored for Jupyter uploads.
         workspace_path: Target workspace path (without file extension).
+        is_jupyter: If True, upload as Jupyter format (ImportFormat.JUPYTER).
 
     Raises:
         Exception: If the upload fails.
     """
     w = get_workspace_client()
-    lang_enum = _LANGUAGE_MAP[language]
     content_b64 = base64.b64encode(code.encode("utf-8")).decode("utf-8")
 
     # Ensure parent directory exists
@@ -113,13 +125,22 @@ def _upload_temp_notebook(code: str, language: str, workspace_path: str) -> None
     except Exception:
         pass  # Directory may already exist
 
-    w.workspace.import_(
-        path=workspace_path,
-        content=content_b64,
-        language=lang_enum,
-        format=ImportFormat.SOURCE,
-        overwrite=True,
-    )
+    if is_jupyter:
+        w.workspace.import_(
+            path=workspace_path,
+            content=content_b64,
+            format=ImportFormat.JUPYTER,
+            overwrite=True,
+        )
+    else:
+        lang_enum = _LANGUAGE_MAP[language]
+        w.workspace.import_(
+            path=workspace_path,
+            content=content_b64,
+            language=lang_enum,
+            format=ImportFormat.SOURCE,
+            overwrite=True,
+        )
 
 
 def _cleanup_temp_notebook(workspace_path: str) -> None:
@@ -188,6 +209,12 @@ def run_code_on_serverless(
     the only way to run Python when no interactive cluster is available and
     the user doesn't want to start one.
 
+    Jupyter notebooks (.ipynb) are also supported. If the code content is
+    detected as .ipynb JSON (contains "cells" key), it is uploaded using
+    Databricks' native Jupyter import (ImportFormat.JUPYTER). The language
+    parameter is ignored in this case since the notebook carries its own
+    kernel metadata.
+
     SQL is also supported but with a significant limitation: SELECT query
     results are NOT captured in the output. The Jobs API notebook task does
     not populate notebook_output.result for SQL cells. SQL via this tool is
@@ -197,8 +224,8 @@ def run_code_on_serverless(
     warehouses).
 
     Args:
-        code: Code to execute.
-        language: Programming language ("python" or "sql").
+        code: Code to execute, or raw .ipynb JSON content (auto-detected).
+        language: Programming language ("python" or "sql"). Ignored for .ipynb.
         timeout: Maximum wait time in seconds (default: 1800 = 30 minutes).
         run_name: Optional human-readable run name. Auto-generated if omitted.
         cleanup: Delete the temporary notebook after execution (default: True).
@@ -206,21 +233,24 @@ def run_code_on_serverless(
     Returns:
         ServerlessRunResult with output, error, run_id, run_url, and timing info.
     """
-    language = language.lower()
-    if language not in _LANGUAGE_MAP:
-        return ServerlessRunResult(
-            success=False,
-            error=f"Unsupported language: {language!r}. Must be 'python' or 'sql'.",
-            state="INVALID_INPUT",
-            message=f"Unsupported language {language!r}. Use 'python' or 'sql'.",
-        )
-
     if not code or not code.strip():
         return ServerlessRunResult(
             success=False,
             error="Code cannot be empty.",
             state="INVALID_INPUT",
             message="No code provided to execute.",
+        )
+
+    # Auto-detect .ipynb content
+    is_jupyter = _is_ipynb(code)
+
+    language = language.lower()
+    if not is_jupyter and language not in _LANGUAGE_MAP:
+        return ServerlessRunResult(
+            success=False,
+            error=f"Unsupported language: {language!r}. Must be 'python' or 'sql'.",
+            state="INVALID_INPUT",
+            message=f"Unsupported language {language!r}. Use 'python' or 'sql'.",
         )
 
     unique_id = uuid.uuid4().hex[:12]
@@ -233,7 +263,7 @@ def run_code_on_serverless(
 
     # --- Step 1: Upload code as a notebook ---
     try:
-        _upload_temp_notebook(code, language, notebook_path)
+        _upload_temp_notebook(code, language, notebook_path, is_jupyter=is_jupyter)
     except Exception as e:
         return ServerlessRunResult(
             success=False,

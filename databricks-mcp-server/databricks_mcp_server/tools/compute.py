@@ -267,10 +267,16 @@ def run_code_on_serverless(
     available. Uses the Jobs API (runs/submit) with serverless compute — the code
     is uploaded as a temporary notebook, executed, and cleaned up automatically.
 
+    Also supports Jupyter notebooks (.ipynb): if the code content is valid .ipynb
+    JSON (i.e. contains a "cells" key), it is automatically uploaded using
+    Databricks' native Jupyter import. The language parameter is ignored for .ipynb.
+    To run a .ipynb file, read its contents and pass the raw JSON string as code.
+
     Use this tool when:
     - The user needs to run Python and no cluster is running
     - Running one-off Python scripts that don't need an interactive session
     - Running longer-running Python code (up to 30 min default timeout)
+    - Running a Jupyter notebook (.ipynb) on Databricks serverless
 
     Do NOT use this tool for:
     - Interactive, iterative Python with state (use execute_databricks_command)
@@ -281,8 +287,8 @@ def run_code_on_serverless(
     MERGE). SQL SELECT results are NOT captured — use execute_sql() instead.
 
     Args:
-        code: Code to execute (Python or SQL).
-        language: Programming language ("python" or "sql"). Default: "python".
+        code: Code to execute (Python or SQL), or raw .ipynb JSON content (auto-detected).
+        language: Programming language ("python" or "sql"). Default: "python". Ignored for .ipynb.
         timeout: Maximum wait time in seconds (default: 1800 = 30 minutes).
         run_name: Optional human-readable name for the run. Auto-generated if omitted.
 

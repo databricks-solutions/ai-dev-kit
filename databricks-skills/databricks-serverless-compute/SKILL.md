@@ -1,10 +1,11 @@
 ---
 name: databricks-serverless-compute
 description: >-
-  Run Python code on Databricks serverless compute with no cluster required.
+  Run Python code or Jupyter notebooks on Databricks serverless compute with no cluster required.
   Use this skill when the user mentions: "serverless", "run code", "no cluster",
   "execute python without cluster", "one-off script", "notebook run", "batch script",
-  "run without a cluster", "serverless notebook", "submit code". Also use when the user
+  "run without a cluster", "serverless notebook", "submit code", "run ipynb",
+  "run notebook on databricks", "run jupyter notebook". Also use when the user
   wants to run Python but has no running cluster and does not want to start one.
 ---
 
@@ -12,7 +13,9 @@ description: >-
 
 ## Overview
 
-Run Python code on Databricks serverless compute via the Jobs API (`runs/submit`). This is the only way to execute Python when no interactive cluster is available and the user doesn't want to start one. No cluster management required — serverless compute spins up automatically.
+Run Python code or Jupyter notebooks (.ipynb) on Databricks serverless compute via the Jobs API (`runs/submit`). This is the only way to execute Python when no interactive cluster is available and the user doesn't want to start one. No cluster management required — serverless compute spins up automatically.
+
+Jupyter notebooks are auto-detected: if the `code` content is valid `.ipynb` JSON (contains a `"cells"` key), it is uploaded using Databricks' native Jupyter import (`ImportFormat.JUPYTER`). The `language` parameter is ignored for `.ipynb` since the notebook carries its own kernel metadata.
 
 SQL is also supported (`language="sql"`) but only for DDL/DML operations (CREATE TABLE, INSERT, MERGE). For SQL queries that need result rows, use `execute_sql()` which works with serverless SQL warehouses.
 
@@ -22,6 +25,7 @@ SQL is also supported (`language="sql"`) but only for DDL/DML operations (CREATE
 |----------|------|-----|
 | **Run Python, no cluster available** | `run_code_on_serverless` | **Primary use case.** No cluster required; serverless spins up automatically |
 | Batch/ETL Python that doesn't need interactivity | `run_code_on_serverless` | Dedicated serverless resources, up to 30 min timeout |
+| **Run a Jupyter notebook (.ipynb) on Databricks** | `run_code_on_serverless` | Auto-detects .ipynb JSON; uploads via native Jupyter import |
 | Interactive, iterative Python (preserving variables) | `execute_databricks_command` | Keeps execution context alive across calls |
 | SQL queries that need result rows (SELECT) | `execute_sql` | Works with serverless SQL warehouses; returns result data |
 | SQL DDL/DML when no warehouse exists | `run_code_on_serverless` with `language="sql"` | Niche: only when no SQL warehouse is available |
@@ -35,7 +39,7 @@ SQL is also supported (`language="sql"`) but only for DDL/DML operations (CREATE
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `code` | string | *(required)* | Python or SQL code to execute |
+| `code` | string | *(required)* | Python or SQL code to execute, or raw .ipynb JSON content (auto-detected) |
 | `language` | string | `"python"` | `"python"` or `"sql"` |
 | `timeout` | int | `1800` | Max wait time in seconds (30 min default) |
 | `run_name` | string | auto-generated | Optional human-readable run name |
@@ -81,6 +85,16 @@ dbutils.notebook.exit(json.dumps(results))
     timeout=600,
     run_name="data-processing-run"
 )
+```
+
+### Run a Jupyter notebook (.ipynb)
+
+```python
+# Read the .ipynb file and pass its contents directly — auto-detected
+with open("my_notebook.ipynb", "r") as f:
+    ipynb_content = f.read()
+
+run_code_on_serverless(code=ipynb_content)
 ```
 
 ## Limitations
