@@ -22,6 +22,18 @@
 #   # Skills only (skip MCP server)
 #   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-only
 #
+#   # Install skills for a specific profile
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-profile data-engineer
+#
+#   # Install multiple profiles
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-profile data-engineer,ai-ml-engineer
+#
+#   # Install specific skills only
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills databricks-jobs,databricks-dbsql
+#
+#   # List available skills and profiles
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --list-skills
+#
 # Alternative: Use environment variables
 #   DEVKIT_TOOLS=cursor curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
 #   DEVKIT_FORCE=true DEVKIT_PROFILE=DEFAULT curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh | bash
@@ -39,6 +51,8 @@ SILENT="${DEVKIT_SILENT:-false}"
 TOOLS="${DEVKIT_TOOLS:-}"
 USER_TOOLS=""
 USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
+SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
+USER_SKILLS="${DEVKIT_SKILLS:-}"
 
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
@@ -84,6 +98,22 @@ MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 APX_SKILLS="databricks-app-apx"
 APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
+# ─── Skill profiles ──────────────────────────────────────────
+# Core skills always installed regardless of profile selection
+CORE_SKILLS="databricks-config databricks-docs databricks-python-sdk databricks-unity-catalog"
+
+# Profile definitions (non-core skills only — core skills are always added)
+PROFILE_DATA_ENGINEER="databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-jobs databricks-asset-bundles databricks-dbsql databricks-iceberg databricks-zerobus-ingest spark-python-data-source databricks-metric-views databricks-synthetic-data-gen"
+PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie databricks-metric-views"
+PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-vector-search databricks-model-serving databricks-genie databricks-parsing databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
+PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
+PROFILE_APP_DEVELOPER="databricks-app-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-asset-bundles"
+
+# Selected skills (populated during profile selection)
+SELECTED_SKILLS=""
+SELECTED_MLFLOW_SKILLS=""
+SELECTED_APX_SKILLS=""
+
 # Output helpers
 msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
 ok()   { [ "$SILENT" = true ] || echo -e "  ${G}✓${N} $*"; }
@@ -100,6 +130,9 @@ while [ $# -gt 0 ]; do
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; shift ;;
         --mcp-path)       USER_MCP_PATH="$2"; shift 2 ;;
+        --skills-profile) SKILLS_PROFILE="$2"; shift 2 ;;
+        --skills)         USER_SKILLS="$2"; shift 2 ;;
+        --list-skills)    LIST_SKILLS=true; shift ;;
         --silent)         SILENT=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         -f|--force)       FORCE=true; shift ;;
@@ -117,6 +150,9 @@ while [ $# -gt 0 ]; do
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
             echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
+            echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
+            echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
+            echo "  --list-skills         List available skills and profiles, then exit"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             echo ""
@@ -127,6 +163,8 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_TOOLS          Comma-separated list of tools"
             echo "  DEVKIT_FORCE          Set to 'true' to force reinstall"
             echo "  DEVKIT_MCP_PATH       Path to MCP server installation"
+            echo "  DEVKIT_SKILLS_PROFILE Comma-separated skill profiles"
+            echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             echo ""
@@ -138,6 +176,70 @@ while [ $# -gt 0 ]; do
         *) die "Unknown option: $1 (use -h for help)" ;;
     esac
 done
+
+# ─── --list-skills handler ─────────────────────────────────────
+if [ "${LIST_SKILLS:-false}" = true ]; then
+    echo ""
+    echo -e "${B}Available Skill Profiles${N}"
+    echo "────────────────────────────────"
+    echo ""
+    echo -e "  ${B}all${N}              All 34 skills (default)"
+    echo -e "  ${B}data-engineer${N}    Pipelines, Spark, Jobs, Streaming (14 skills)"
+    echo -e "  ${B}analyst${N}          Dashboards, SQL, Genie, Metrics (8 skills)"
+    echo -e "  ${B}ai-ml-engineer${N}   Agents, RAG, Vector Search, MLflow (17 skills)"
+    echo -e "  ${B}app-developer${N}    Apps, Lakebase, Deployment (10 skills)"
+    echo ""
+    echo -e "${B}Core Skills${N} (always installed)"
+    echo "────────────────────────────────"
+    for skill in $CORE_SKILLS; do
+        echo -e "  ${G}✓${N} $skill"
+    done
+    echo ""
+    echo -e "${B}Data Engineer${N}"
+    echo "────────────────────────────────"
+    for skill in $PROFILE_DATA_ENGINEER; do
+        echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${B}Business Analyst${N}"
+    echo "────────────────────────────────"
+    for skill in $PROFILE_ANALYST; do
+        echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${B}AI/ML Engineer${N}"
+    echo "────────────────────────────────"
+    for skill in $PROFILE_AIML_ENGINEER; do
+        echo -e "    $skill"
+    done
+    echo -e "  ${D}+ MLflow skills:${N}"
+    for skill in $PROFILE_AIML_MLFLOW; do
+        echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${B}App Developer${N}"
+    echo "────────────────────────────────"
+    for skill in $PROFILE_APP_DEVELOPER; do
+        echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${B}MLflow Skills${N} (from mlflow/skills repo)"
+    echo "────────────────────────────────"
+    for skill in $MLFLOW_SKILLS; do
+        echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${B}APX Skills${N} (from databricks-solutions/apx repo)"
+    echo "────────────────────────────────"
+    for skill in $APX_SKILLS; do
+        echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${D}Usage: bash install.sh --skills-profile data-engineer,ai-ml-engineer${N}"
+    echo -e "${D}       bash install.sh --skills databricks-jobs,databricks-dbsql${N}"
+    echo ""
+    exit 0
+fi
 
 # Set configuration URLs after parsing branch argument
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
@@ -550,6 +652,209 @@ prompt_mcp_path() {
     MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 }
 
+# ─── Skill profile selection ──────────────────────────────────
+# Resolve selected skills from profile names or explicit skill list
+resolve_skills() {
+    local db_skills="" mlflow_skills="" apx_skills=""
+
+    # Priority 1: Explicit --skills flag (comma-separated skill names)
+    if [ -n "$USER_SKILLS" ]; then
+        local user_list
+        user_list=$(echo "$USER_SKILLS" | tr ',' ' ')
+        # Separate into DB, MLflow, and APX buckets, always include core
+        db_skills="$CORE_SKILLS"
+        for skill in $user_list; do
+            if echo "$MLFLOW_SKILLS" | grep -qw "$skill"; then
+                mlflow_skills="${mlflow_skills:+$mlflow_skills }$skill"
+            elif echo "$APX_SKILLS" | grep -qw "$skill"; then
+                apx_skills="${apx_skills:+$apx_skills }$skill"
+            else
+                db_skills="${db_skills:+$db_skills }$skill"
+            fi
+        done
+        # Deduplicate
+        SELECTED_SKILLS=$(echo "$db_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+        SELECTED_MLFLOW_SKILLS=$(echo "$mlflow_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+        SELECTED_APX_SKILLS=$(echo "$apx_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+        return
+    fi
+
+    # Priority 2: --skills-profile flag or interactive selection
+    if [ -z "$SKILLS_PROFILE" ] || [ "$SKILLS_PROFILE" = "all" ]; then
+        SELECTED_SKILLS="$SKILLS"
+        SELECTED_MLFLOW_SKILLS="$MLFLOW_SKILLS"
+        SELECTED_APX_SKILLS="$APX_SKILLS"
+        return
+    fi
+
+    # Build union of selected profiles (comma-separated)
+    db_skills="$CORE_SKILLS"
+    mlflow_skills=""
+    apx_skills=""
+
+    local profiles
+    profiles=$(echo "$SKILLS_PROFILE" | tr ',' ' ')
+    for profile in $profiles; do
+        case $profile in
+            all)
+                SELECTED_SKILLS="$SKILLS"
+                SELECTED_MLFLOW_SKILLS="$MLFLOW_SKILLS"
+                SELECTED_APX_SKILLS="$APX_SKILLS"
+                return
+                ;;
+            data-engineer)
+                db_skills="$db_skills $PROFILE_DATA_ENGINEER"
+                ;;
+            analyst)
+                db_skills="$db_skills $PROFILE_ANALYST"
+                ;;
+            ai-ml-engineer)
+                db_skills="$db_skills $PROFILE_AIML_ENGINEER"
+                mlflow_skills="$mlflow_skills $PROFILE_AIML_MLFLOW"
+                ;;
+            app-developer)
+                db_skills="$db_skills $PROFILE_APP_DEVELOPER"
+                apx_skills="$apx_skills $APX_SKILLS"
+                ;;
+            *)
+                warn "Unknown skill profile: $profile (ignored)"
+                ;;
+        esac
+    done
+
+    # Deduplicate
+    SELECTED_SKILLS=$(echo "$db_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    SELECTED_MLFLOW_SKILLS=$(echo "$mlflow_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    SELECTED_APX_SKILLS=$(echo "$apx_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+}
+
+# Interactive skill profile selection (multi-select)
+prompt_skills_profile() {
+    # If provided via --skills or --skills-profile, skip interactive prompt
+    if [ -n "$USER_SKILLS" ] || [ -n "$SKILLS_PROFILE" ]; then
+        return
+    fi
+
+    # Skip in silent mode or non-interactive
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        SKILLS_PROFILE="all"
+        return
+    fi
+
+    # Check for previous selection
+    local profile_file="$INSTALL_DIR/.skills-profile"
+    if [ -f "$profile_file" ]; then
+        local prev_profile
+        prev_profile=$(cat "$profile_file")
+        if [ "$FORCE" != true ]; then
+            echo ""
+            local display_profile
+            display_profile=$(echo "$prev_profile" | tr ',' ', ')
+            local keep
+            keep=$(prompt "Previous skill profile: ${B}${display_profile}${N}. Keep? ${D}(Y/n)${N}" "y")
+            if [ "$keep" = "y" ] || [ "$keep" = "Y" ] || [ "$keep" = "yes" ] || [ -z "$keep" ]; then
+                SKILLS_PROFILE="$prev_profile"
+                return
+            fi
+        fi
+    fi
+
+    echo ""
+    echo -e "  ${B}Select skill profile(s)${N}"
+
+    local selected
+    selected=$(checkbox_select \
+        "All Skills|all|on|Install everything (34 skills)" \
+        "Data Engineer|data-engineer|off|Pipelines, Spark, Jobs, Streaming (14 skills)" \
+        "Business Analyst|analyst|off|Dashboards, SQL, Genie, Metrics (8 skills)" \
+        "AI/ML Engineer|ai-ml-engineer|off|Agents, RAG, Vector Search, MLflow (17 skills)" \
+        "App Developer|app-developer|off|Apps, Lakebase, Deployment (10 skills)" \
+        "Custom|custom|off|Pick individual skills" \
+    )
+
+    # Handle empty selection — default to all
+    if [ -z "$selected" ]; then
+        SKILLS_PROFILE="all"
+        return
+    fi
+
+    # Check if "all" is selected
+    if echo "$selected" | grep -qw "all"; then
+        SKILLS_PROFILE="all"
+        return
+    fi
+
+    # Check if "custom" is selected — show individual skill picker
+    if echo "$selected" | grep -qw "custom"; then
+        prompt_custom_skills "$selected"
+        return
+    fi
+
+    # Store comma-separated profile names
+    SKILLS_PROFILE=$(echo "$selected" | tr ' ' ',')
+}
+
+# Custom individual skill picker
+prompt_custom_skills() {
+    local preselected_profiles="$1"
+
+    # Build pre-selection set from any profiles that were also checked
+    local preselected=""
+    for profile in $preselected_profiles; do
+        case $profile in
+            data-engineer) preselected="$preselected $PROFILE_DATA_ENGINEER" ;;
+            analyst)       preselected="$preselected $PROFILE_ANALYST" ;;
+            ai-ml-engineer) preselected="$preselected $PROFILE_AIML_ENGINEER $PROFILE_AIML_MLFLOW" ;;
+            app-developer) preselected="$preselected $PROFILE_APP_DEVELOPER $APX_SKILLS" ;;
+        esac
+    done
+
+    _is_preselected() {
+        echo "$preselected" | grep -qw "$1" && echo "on" || echo "off"
+    }
+
+    echo ""
+    echo -e "  ${B}Select individual skills${N}"
+    echo -e "  ${D}Core skills (config, docs, python-sdk, unity-catalog) are always installed${N}"
+
+    local selected
+    selected=$(checkbox_select \
+        "Spark Pipelines|databricks-spark-declarative-pipelines|$(_is_preselected databricks-spark-declarative-pipelines)|SDP/LDP, CDC, SCD Type 2" \
+        "Structured Streaming|databricks-spark-structured-streaming|$(_is_preselected databricks-spark-structured-streaming)|Real-time streaming" \
+        "Jobs & Workflows|databricks-jobs|$(_is_preselected databricks-jobs)|Multi-task orchestration" \
+        "Asset Bundles|databricks-asset-bundles|$(_is_preselected databricks-asset-bundles)|DABs deployment" \
+        "Databricks SQL|databricks-dbsql|$(_is_preselected databricks-dbsql)|SQL warehouse queries" \
+        "Iceberg|databricks-iceberg|$(_is_preselected databricks-iceberg)|Apache Iceberg tables" \
+        "Zerobus Ingest|databricks-zerobus-ingest|$(_is_preselected databricks-zerobus-ingest)|Streaming ingestion" \
+        "Python Data Source|spark-python-data-source|$(_is_preselected spark-python-data-source)|Custom Spark data sources" \
+        "Metric Views|databricks-metric-views|$(_is_preselected databricks-metric-views)|Metric definitions" \
+        "AI/BI Dashboards|databricks-aibi-dashboards|$(_is_preselected databricks-aibi-dashboards)|Dashboard creation" \
+        "Genie|databricks-genie|$(_is_preselected databricks-genie)|Natural language SQL" \
+        "Agent Bricks|databricks-agent-bricks|$(_is_preselected databricks-agent-bricks)|Build AI agents" \
+        "Vector Search|databricks-vector-search|$(_is_preselected databricks-vector-search)|Similarity search" \
+        "Model Serving|databricks-model-serving|$(_is_preselected databricks-model-serving)|Deploy models/agents" \
+        "MLflow Evaluation|databricks-mlflow-evaluation|$(_is_preselected databricks-mlflow-evaluation)|Model evaluation" \
+        "Parsing|databricks-parsing|$(_is_preselected databricks-parsing)|Document parsing for RAG" \
+        "Unstructured PDF|databricks-unstructured-pdf-generation|$(_is_preselected databricks-unstructured-pdf-generation)|Synthetic PDFs for RAG" \
+        "Synthetic Data|databricks-synthetic-data-gen|$(_is_preselected databricks-synthetic-data-gen)|Generate test data" \
+        "Lakebase Autoscale|databricks-lakebase-autoscale|$(_is_preselected databricks-lakebase-autoscale)|Managed PostgreSQL" \
+        "Lakebase Provisioned|databricks-lakebase-provisioned|$(_is_preselected databricks-lakebase-provisioned)|Provisioned PostgreSQL" \
+        "App Python|databricks-app-python|$(_is_preselected databricks-app-python)|Dash, Streamlit, Flask" \
+        "App APX|databricks-app-apx|$(_is_preselected databricks-app-apx)|FastAPI + React" \
+        "MLflow Onboarding|mlflow-onboarding|$(_is_preselected mlflow-onboarding)|Getting started" \
+        "Agent Evaluation|agent-evaluation|$(_is_preselected agent-evaluation)|Evaluate AI agents" \
+        "MLflow Tracing|instrumenting-with-mlflow-tracing|$(_is_preselected instrumenting-with-mlflow-tracing)|Instrument with tracing" \
+        "Analyze Traces|analyze-mlflow-trace|$(_is_preselected analyze-mlflow-trace)|Analyze trace data" \
+        "Retrieve Traces|retrieving-mlflow-traces|$(_is_preselected retrieving-mlflow-traces)|Search & retrieve traces" \
+        "Analyze Chat Session|analyze-mlflow-chat-session|$(_is_preselected analyze-mlflow-chat-session)|Chat session analysis" \
+        "Query Metrics|querying-mlflow-metrics|$(_is_preselected querying-mlflow-metrics)|MLflow metrics queries" \
+        "Search MLflow Docs|searching-mlflow-docs|$(_is_preselected searching-mlflow-docs)|MLflow documentation" \
+    )
+
+    # Use explicit skills list — set USER_SKILLS so resolve_skills handles it
+    USER_SKILLS=$(echo "$selected" | tr ' ' ',')
+}
+
 # Compare semantic versions (returns 0 if $1 >= $2)
 version_gte() {
     printf '%s\n%s' "$2" "$1" | sort -V -C
@@ -705,49 +1010,69 @@ install_skills() {
     done < <(printf '%s\n' "${dirs[@]}" | sort -u)
     dirs=("${unique[@]}")
 
+    # Count selected skills for display
+    local db_count=0 mlflow_count=0 apx_count=0
+    for _ in $SELECTED_SKILLS; do db_count=$((db_count + 1)); done
+    for _ in $SELECTED_MLFLOW_SKILLS; do mlflow_count=$((mlflow_count + 1)); done
+    for _ in $SELECTED_APX_SKILLS; do apx_count=$((apx_count + 1)); done
+    local total_count=$((db_count + mlflow_count + apx_count))
+    msg "Installing ${B}${total_count}${N} skills"
+
     for dir in "${dirs[@]}"; do
         mkdir -p "$dir"
         # Install Databricks skills from repo
-        for skill in $SKILLS; do
+        for skill in $SELECTED_SKILLS; do
             local src="$REPO_DIR/databricks-skills/$skill"
             [ ! -d "$src" ] && continue
             rm -rf "$dir/$skill"
             cp -r "$src" "$dir/$skill"
         done
-        ok "Databricks skills → ${dir#$HOME/}"
+        ok "Databricks skills ($db_count) → ${dir#$HOME/}"
 
         # Install MLflow skills from mlflow/skills repo
-        for skill in $MLFLOW_SKILLS; do
-            local dest_dir="$dir/$skill"
-            mkdir -p "$dest_dir"
-            local url="$MLFLOW_RAW_URL/$skill/SKILL.md"
-            if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
-                # Try to fetch optional reference files
-                for ref in reference.md examples.md api.md; do
-                    curl -fsSL "$MLFLOW_RAW_URL/$skill/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
-                done
-            else
-                rm -rf "$dest_dir"
-            fi
-        done
-        ok "MLflow skills → ${dir#$HOME/}"
+        if [ -n "$SELECTED_MLFLOW_SKILLS" ]; then
+            for skill in $SELECTED_MLFLOW_SKILLS; do
+                local dest_dir="$dir/$skill"
+                mkdir -p "$dest_dir"
+                local url="$MLFLOW_RAW_URL/$skill/SKILL.md"
+                if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
+                    # Try to fetch optional reference files
+                    for ref in reference.md examples.md api.md; do
+                        curl -fsSL "$MLFLOW_RAW_URL/$skill/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
+                    done
+                else
+                    rm -rf "$dest_dir"
+                fi
+            done
+            ok "MLflow skills ($mlflow_count) → ${dir#$HOME/}"
+        fi
 
         # Install APX skills from databricks-solutions/apx repo
-        for skill in $APX_SKILLS; do
-            local dest_dir="$dir/$skill"
-            mkdir -p "$dest_dir"
-            local url="$APX_RAW_URL/SKILL.md"
-            if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
-                # Try to fetch optional reference files
-                for ref in backend-patterns.md frontend-patterns.md; do
-                    curl -fsSL "$APX_RAW_URL/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
-                done
-            else
-                rmdir "$dest_dir" 2>/dev/null || warn "Could not install APX skill '$skill' — consider removing $dest_dir if it is no longer needed"
-            fi
-        done
-        ok "APX skills → ${dir#$HOME/}"
+        if [ -n "$SELECTED_APX_SKILLS" ]; then
+            for skill in $SELECTED_APX_SKILLS; do
+                local dest_dir="$dir/$skill"
+                mkdir -p "$dest_dir"
+                local url="$APX_RAW_URL/SKILL.md"
+                if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
+                    # Try to fetch optional reference files
+                    for ref in backend-patterns.md frontend-patterns.md; do
+                        curl -fsSL "$APX_RAW_URL/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
+                    done
+                else
+                    rmdir "$dest_dir" 2>/dev/null || warn "Could not install APX skill '$skill' — consider removing $dest_dir if it is no longer needed"
+                fi
+            done
+            ok "APX skills ($apx_count) → ${dir#$HOME/}"
+        fi
     done
+
+    # Save selected profile for future reinstalls
+    mkdir -p "$INSTALL_DIR"
+    if [ -n "$USER_SKILLS" ]; then
+        echo "custom:$USER_SKILLS" > "$INSTALL_DIR/.skills-profile"
+    else
+        echo "${SKILLS_PROFILE:-all}" > "$INSTALL_DIR/.skills-profile"
+    fi
 }
 
 # Write MCP configs
@@ -1201,13 +1526,28 @@ main() {
         ok "Scope: $SCOPE"
     fi
 
-    # ── Step 4: Interactive MCP path ──
+    # ── Step 4: Skill profile selection ──
+    if [ "$INSTALL_SKILLS" = true ]; then
+        step "Skill profiles"
+        prompt_skills_profile
+        resolve_skills
+        # Count for display
+        local sk_count=0
+        for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_count=$((sk_count + 1)); done
+        if [ -n "$USER_SKILLS" ]; then
+            ok "Custom selection ($sk_count skills)"
+        else
+            ok "Profile: ${SKILLS_PROFILE:-all} ($sk_count skills)"
+        fi
+    fi
+
+    # ── Step 5: Interactive MCP path ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
         ok "MCP path: $INSTALL_DIR"
     fi
 
-    # ── Step 5: Confirm before proceeding ──
+    # ── Step 6: Confirm before proceeding ──
     if [ "$SILENT" = false ]; then
         echo ""
         echo -e "  ${B}Summary${N}"
@@ -1216,7 +1556,15 @@ main() {
         echo -e "  Profile:     ${G}${PROFILE}${N}"
         echo -e "  Scope:       ${G}${SCOPE}${N}"
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${G}${INSTALL_DIR}${N}"
-        [ "$INSTALL_SKILLS" = true ] && echo -e "  Skills:      ${G}yes${N}"
+        if [ "$INSTALL_SKILLS" = true ]; then
+            if [ -n "$USER_SKILLS" ]; then
+                echo -e "  Skills:      ${G}custom selection${N}"
+            else
+                local sk_total=0
+                for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_total=$((sk_total + 1)); done
+                echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N}"
+            fi
+        fi
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
         echo ""
     fi
@@ -1231,7 +1579,7 @@ main() {
         fi
     fi
 
-    # ── Step 6: Version check (may exit early if up to date) ──
+    # ── Step 7: Version check (may exit early if up to date) ──
     check_version
     
     # Determine base directory
