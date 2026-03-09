@@ -4,33 +4,23 @@
 
 Use these patterns to automate table maintenance (OPTIMIZE, VACUUM) and migrate from legacy partitioning to liquid clustering.
 
-## Predictive Optimization
+## Predictive Optimization (Recommended)
 
-Databricks can automatically run OPTIMIZE and VACUUM on managed tables. Enable at the catalog, schema, or table level:
+For managed tables, **predictive optimization** eliminates the need for manual OPTIMIZE/VACUUM entirely. See the [databricks-managed-tables](../databricks-managed-tables/SKILL.md) skill for full setup, monitoring, and external-to-managed migration patterns.
+
+Quick setup:
 
 ```sql
--- Enable for an entire schema
-ALTER SCHEMA catalog.schema
-SET TBLPROPERTIES ('delta.enableOptimizeWrite' = 'true');
-
--- Enable for a specific table
 ALTER TABLE catalog.schema.my_table
 SET TBLPROPERTIES (
-    'delta.enableOptimizeWrite' = 'true',
-    'delta.autoOptimize.autoCompact' = 'true'
+    'delta.autoOptimize.autoCompact' = 'auto',
+    'delta.autoOptimize.optimizeWrite' = 'true'
 );
 ```
 
-### Predictive Optimization (Unity Catalog Managed Tables)
+**Note:** Use `delta.autoOptimize.optimizeWrite`, not `delta.enableOptimizeWrite` (the latter is invalid and throws `DELTA_UNKNOWN_CONFIGURATION`).
 
-For Unity Catalog managed tables, predictive optimization automatically identifies and runs maintenance:
-
-```sql
--- Check if predictive optimization is enabled
-SELECT clusterByAuto FROM (DESCRIBE DETAIL catalog.schema.my_table);
-```
-
-## Scheduled Maintenance with Jobs
+## Scheduled Maintenance with Jobs (External Tables)
 
 ### OPTIMIZE + VACUUM Job
 
@@ -119,7 +109,7 @@ Reduces small files during writes:
 
 ```sql
 ALTER TABLE catalog.schema.my_table
-SET TBLPROPERTIES ('delta.enableOptimizeWrite' = 'true');
+SET TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true');
 ```
 
 ### Enable Deletion Vectors
@@ -157,4 +147,4 @@ SET TBLPROPERTIES ('delta.targetFileSize' = '134217728');  -- 128 MB
 4. **Choose 1-4 clustering columns** based on query filter patterns
 5. **Enable optimized writes** for streaming and frequent small writes
 6. **Monitor with DESCRIBE DETAIL** — check `numFiles` and `sizeInBytes` regularly
-7. **Use predictive optimization** on Unity Catalog managed tables when available
+7. **Use managed tables + predictive optimization** — see [databricks-managed-tables](../databricks-managed-tables/SKILL.md) for the zero-maintenance approach
