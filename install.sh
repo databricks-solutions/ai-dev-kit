@@ -893,7 +893,7 @@ write_mcp_configs() {
     for tool in $TOOLS; do
         case $tool in
             claude)
-                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude/mcp.json" || write_mcp_json "$base_dir/.mcp.json"
+                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude.json" || write_mcp_json "$base_dir/.mcp.json"
                 ok "Claude MCP config"
                 ;;
             cursor)
