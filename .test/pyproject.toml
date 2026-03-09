@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
     "mlflow[databricks]>=3.10.1",
-    "protobuf>=5.26,<6",
+    "protobuf>=5.26",
     "python-dotenv>=1.0.0",
 ]
 

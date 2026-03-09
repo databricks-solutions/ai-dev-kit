@@ -597,6 +597,7 @@ def optimize_skill(
     current_seed = dict(seed_candidate)
     best = dict(seed_candidate)
     best_score = original_score
+    best_si_by_id = si_by_id  # side_info from baseline eval
     last_result = None
     total_metric_calls = 0
     improvement_threshold = 0.0005
@@ -642,7 +643,7 @@ def optimize_skill(
         total_metric_calls += result.total_metric_calls or 0
 
         candidate = result.best_candidate
-        pass_score, _, _, _ = _evaluate_on_tasks(evaluator, candidate, train, label=f"Pass {pass_num}")
+        pass_score, _, pass_si_by_id, _ = _evaluate_on_tasks(evaluator, candidate, train, label=f"Pass {pass_num}")
         improvement = pass_score - best_score
 
         print(f"  Pass {pass_num} score: {pass_score:.4f} (delta: {'+' if improvement >= 0 else ''}{improvement:.4f})")
@@ -650,6 +651,7 @@ def optimize_skill(
         if pass_score > best_score + improvement_threshold:
             best = dict(candidate)
             best_score = pass_score
+            best_si_by_id = pass_si_by_id
             last_result = result
             current_seed = dict(candidate)
         else:
@@ -680,9 +682,6 @@ def optimize_skill(
     )
 
     diff_summary = _compute_diff_summary(original_content, optimized_content)
-
-    # Capture final side_info for review output
-    _, _, final_si_by_id, _ = _evaluate_on_tasks(evaluator, best, train, label="Final eval")
 
     # 10. Agent validation (hybrid mode: after GEPA loop)
     agent_validation_score = None
@@ -740,7 +739,7 @@ def optimize_skill(
             )
             _log_detailed_judge_metrics(
                 mlflow_mod=mlflow,
-                si_by_id=final_si_by_id,
+                si_by_id=best_si_by_id,
                 val_scores=val_scores if val_scores else None,
                 agent_baseline_score=agent_baseline_score,
                 agent_validation_score=agent_validation_score,
@@ -768,7 +767,7 @@ def optimize_skill(
         original_components=dict(seed_candidate),
         tool_map=tool_map,
         evaluator_type="agent" if agent_eval_full else "skillbench",
-        skillbench_side_info=final_si_by_id,
+        skillbench_side_info=best_si_by_id,
         agent_baseline_score=agent_baseline_score,
         agent_validation_score=agent_validation_score,
         agent_side_info=agent_validation_si,
