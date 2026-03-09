@@ -184,8 +184,17 @@ def run_code_on_serverless(
     on serverless compute (no cluster required), waits for completion,
     retrieves the output, and cleans up.
 
-    Both Python and SQL are supported. SQL code is uploaded as a SQL notebook
-    and executed directly on serverless compute.
+    This is primarily intended for Python execution without a cluster. It is
+    the only way to run Python when no interactive cluster is available and
+    the user doesn't want to start one.
+
+    SQL is also supported but with a significant limitation: SELECT query
+    results are NOT captured in the output. The Jobs API notebook task does
+    not populate notebook_output.result for SQL cells. SQL via this tool is
+    only useful for DDL/DML operations (CREATE TABLE, INSERT, MERGE, etc.)
+    that don't need result rows. For any SQL that needs result rows, use
+    execute_sql() which runs against a SQL warehouse (including serverless
+    warehouses).
 
     Args:
         code: Code to execute.
@@ -296,9 +305,23 @@ def run_code_on_serverless(
             )
         except Exception as e:
             elapsed = time.time() - start_time
+            error_text = str(e)
+
+            # Best-effort: retrieve the actual error traceback from run output
+            if run_id:
+                try:
+                    failed_run = w.jobs.get_run(run_id=run_id)
+                    if failed_run.tasks:
+                        task_run_id = failed_run.tasks[0].run_id
+                        output_data = _get_run_output(task_run_id)
+                        if output_data.get("error"):
+                            error_text = output_data["error"]
+                except Exception:
+                    pass  # Fall back to the original exception message
+
             return ServerlessRunResult(
                 success=False,
-                error=str(e),
+                error=error_text,
                 run_id=run_id,
                 run_url=run_url,
                 duration_seconds=round(elapsed, 2),

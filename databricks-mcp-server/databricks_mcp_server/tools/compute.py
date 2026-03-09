@@ -258,25 +258,27 @@ def run_code_on_serverless(
     code: str,
     language: str = "python",
     timeout: int = 1800,
-    run_name: str = None,
+    run_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Execute Python or SQL code on serverless compute (no cluster required).
+    Execute Python code on serverless compute (no cluster required).
 
-    This uses the Jobs API (runs/submit) with serverless compute. No interactive
-    cluster needs to be running. The code is uploaded as a temporary notebook,
-    executed on serverless infrastructure, and the notebook is cleaned up after.
+    This is the primary tool for running Python when no interactive cluster is
+    available. Uses the Jobs API (runs/submit) with serverless compute — the code
+    is uploaded as a temporary notebook, executed, and cleaned up automatically.
 
     Use this tool when:
-    - No cluster is available and the user doesn't want to start one
-    - Running one-off scripts or queries that don't need an interactive session
-    - Running longer-running code that benefits from dedicated serverless resources
+    - The user needs to run Python and no cluster is running
+    - Running one-off Python scripts that don't need an interactive session
+    - Running longer-running Python code (up to 30 min default timeout)
 
-    For interactive, iterative code execution with state (variables, imports),
-    use execute_databricks_command() with a cluster instead.
+    Do NOT use this tool for:
+    - Interactive, iterative Python with state (use execute_databricks_command)
+    - SQL queries that need result rows (use execute_sql — works with serverless
+      SQL warehouses)
 
-    For SQL-only queries against a warehouse, consider execute_sql() which uses
-    the SQL Statements API and may be faster for short queries.
+    SQL is supported (language="sql") but only for DDL/DML (CREATE TABLE, INSERT,
+    MERGE). SQL SELECT results are NOT captured — use execute_sql() instead.
 
     Args:
         code: Code to execute (Python or SQL).
