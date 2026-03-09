@@ -298,3 +298,21 @@ Load these for detailed syntax, full parameter lists, and advanced patterns:
 - **Define PK/FK constraints** on dimensional models for query optimization
 - **Use `COLLATE UTF8_LCASE`** for user-facing string columns that need case-insensitive search
 - **Use MCP tools** (`execute_sql`, `execute_sql_multi`) to test and validate all SQL before deploying
+
+## Related Skills
+
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** — catalog governance, grants, system tables
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** — streaming tables and materialized views in pipelines
+- **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** — build dashboards on top of SQL queries
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** — execute SQL programmatically via the SDK
+- **[databricks-jobs](../databricks-jobs/SKILL.md)** — schedule SQL queries as job tasks
+- **[databricks-iceberg](../databricks-iceberg/SKILL.md)** — Iceberg table interop with SQL warehouses
+
+## Resources
+
+- [SQL Language Reference](https://docs.databricks.com/aws/en/sql/language-manual/index.html)
+- [SQL Warehouses](https://docs.databricks.com/aws/en/compute/sql-warehouse/)
+- [AI Functions](https://docs.databricks.com/aws/en/large-language-models/ai-functions.html)
+- [Materialized Views](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-create-materialized-view.html)
+- [Pipe Syntax](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-pipe.html)
+- [Geospatial Functions](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-functions-builtin.html#h3-geospatial-functions)
