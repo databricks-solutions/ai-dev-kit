@@ -47,6 +47,7 @@ Use this skill when:
 | System Tables | [5-system-tables.md](5-system-tables.md) | Lineage, audit, billing, compute, jobs, query history |
 | Volumes | [6-volumes.md](6-volumes.md) | Volume file operations, permissions, best practices |
 | Data Profiling | [7-data-profiling.md](7-data-profiling.md) | Data profiling, drift detection, ML model monitoring |
+| Lakehouse Federation | [10-lakehouse-federation.md](10-lakehouse-federation.md) | Foreign connections, foreign catalogs, querying external databases |
 
 ## Quick Start
 
