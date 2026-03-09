@@ -139,6 +139,21 @@ For automatically improving a registered system prompt using `optimize_prompts()
 
 See `GOTCHAS.md` for complete list.
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`mlflow.evaluate()` vs `mlflow.genai.evaluate()`** | Use `mlflow.genai.evaluate()` for GenAI agents. The older `mlflow.evaluate()` has a different API and doesn't support GenAI scorers |
+| **`predict_fn` receives dict instead of kwargs** | The predict function receives `**unpacked` keyword arguments, not a single dict. Define it as `def predict(query, context=None)` not `def predict(inputs)` |
+| **Dataset `inputs` format wrong** | Must be nested: `{"inputs": {"query": "..."}}`. A flat `{"query": "..."}` will fail silently or produce NaN scores |
+| **Built-in scorer returns NaN** | Check that your dataset has the required columns. `Correctness` needs `expectations.expected_response`. `RetrievalGroundedness` needs `retrieved_context` in the trace |
+| **Custom scorer not called** | Ensure the `@scorer` decorator is applied and the function signature matches: `def my_scorer(*, inputs, outputs, expectations=None, traces=None)` |
+| **MemAlign `align()` returns empty result** | The label schema `name` must exactly match the judge `name` used in `evaluate()`. Mismatched names mean no scores to align on |
+| **Aligned judge scores lower than unaligned** | This is expected behavior — the aligned judge is more accurate, not worse. The agent didn't regress; the judge is now stricter |
+| **`optimize_prompts()` import error** | Requires MLflow >= 3.5.0. Run `pip install --upgrade mlflow` |
+| **GEPA optimization dataset missing expectations** | `optimize_prompts()` requires both `inputs` AND `expectations` per record, unlike `evaluate()` which can work without expectations |
+| **Evaluation hangs or is very slow** | LLM judge calls are the bottleneck. Reduce dataset size for iteration. Set `MLFLOW_ENABLE_ASYNC_LOGGING=true` for parallel trace logging |
+
 ## Related Skills
 
 - **[databricks-docs](../databricks-docs/SKILL.md)** - General Databricks documentation reference
