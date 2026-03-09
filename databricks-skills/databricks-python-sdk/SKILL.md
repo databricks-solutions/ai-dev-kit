@@ -614,6 +614,23 @@ If I'm unsure about a method, I should:
 | Secrets | https://databricks-sdk-py.readthedocs.io/en/latest/workspace/workspace/secrets.html |
 | DBUtils | https://databricks-sdk-py.readthedocs.io/en/latest/dbutils.html |
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`ImportError: cannot import name 'X'`** | SDK version mismatch. Run `pip install --upgrade databricks-sdk`. Many classes were renamed or moved between 0.x and 1.x releases |
+| **`AuthenticationError` or 401** | Check `databricks auth profiles list` for valid profiles. Ensure `DATABRICKS_HOST` and `DATABRICKS_TOKEN` are set, or `~/.databrickscfg` has the correct profile |
+| **`WorkspaceClient()` hangs** | The client tries multiple auth methods in sequence. Set explicit auth: `WorkspaceClient(profile="my-profile")` or set env vars to avoid probing |
+| **`w.users.list()` extremely slow** | Large workspaces have thousands of users. Use SCIM API with pagination: `w.api_client.do("GET", "/api/2.0/preview/scim/v2/Users", query={"count": 10, "startIndex": 1})` |
+| **`w.groups.list()` returns partial results** | SDK list methods may paginate automatically but can be slow. For large result sets, use the REST API directly with `count` and `startIndex` parameters |
+| **`statement_execution` returns empty result** | DDL/DML statements (CREATE, INSERT, ALTER) don't return data rows. Check `r.status.state` for `SUCCEEDED` and `r.status.error` for errors |
+| **`statement_execution` result parsing** | Access results via `r.manifest.schema.columns` (column names), `r.result.data_array` (row data), `r.status.state.value` (status string) |
+| **`wait_timeout="0s"` for async** | Long-running statements need async execution. Set `wait_timeout="0s"` and poll `w.statement_execution.get_statement(statement_id)` until status is `SUCCEEDED` |
+| **`PermissionDenied` on UC objects** | Ensure the authenticated user has `USE_CATALOG` + `USE_SCHEMA` + the required privilege (e.g., `SELECT`, `MODIFY`). Check with `SHOW GRANTS ON ...` |
+| **SDK enum values** | Many SDK responses use enum objects. Access the string value with `.value` (e.g., `state.value` instead of comparing directly to a string) |
+| **`databricks-connect` vs `databricks-sdk`** | `databricks-connect` is for running Spark code remotely. `databricks-sdk` is for REST API operations. They serve different purposes and can coexist |
+| **Pagination with `list()` methods** | Most `list()` methods return iterators that auto-paginate. Wrap in `list()` to materialize: `all_clusters = list(w.clusters.list())`. Beware of memory for large collections |
+
 ## Related Skills
 
 - **[databricks-config](../databricks-config/SKILL.md)** - profile and authentication setup
