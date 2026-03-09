@@ -183,7 +183,7 @@ manage_uc_security_policies(
 | Issue | Solution |
 |-------|----------|
 | **"Function not found"** | Function must exist before applying. Use `create_security_function` first |
-| **Filter not working for admins** | Users with `ALL_PRIVILEGES` or table ownership bypass filters/masks by design |
+| **Filter not working for admins** | Only metastore admins and account admins bypass filters/masks. `ALL_PRIVILEGES` and table ownership do NOT bypass them |
 | **Type mismatch** | Column mask `return_type` must exactly match the column's data type |
 | **Cannot apply to view** | Row filters and column masks only work on tables, not views. Use view-level logic instead |
 | **"Cannot create function"** | Need `CREATE_FUNCTION` privilege on the schema |
