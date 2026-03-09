@@ -63,3 +63,20 @@ df.writeStream \
 - [ ] Exactly-once verified (txnVersion/txnAppId)
 - [ ] Watermark configured for stateful operations
 - [ ] Left joins for stream-static (not inner)
+
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **Checkpoint corruption after schema change** | Checkpoints are tied to the query plan. Schema changes (adding/removing columns) require a new checkpoint location. Back up the old checkpoint before changing |
+| **OOM on stateful operations** | Enable RocksDB state store: `spark.conf.set("spark.sql.streaming.stateStore.providerClass", "com.databricks.sql.streaming.state.RocksDBStateStoreProvider")`. This moves state to disk instead of heap |
+| **Watermark not dropping late data** | Watermark only guarantees state cleanup, not data filtering. Late data may still appear in output. Use `withWatermark()` on the timestamp column BEFORE the aggregation |
+| **`foreachBatch` MERGE duplicates** | Without idempotency, retries can duplicate rows. Use `batchId` as a dedup key or add `WHEN MATCHED` to your MERGE to handle re-processing |
+| **Stream-static join returns NULL** | Use LEFT JOIN (not INNER) for stream-static joins. The static side may not have loaded yet on the first micro-batch |
+| **`availableNow` vs `once` trigger** | `once` is deprecated. Use `trigger(availableNow=True)` instead — it processes all available data across multiple batches for better parallelism |
+| **Checkpoint on DBFS root** | Never use `dbfs:/` for checkpoints in production. Use UC Volumes: `/Volumes/catalog/schema/volume/checkpoints/stream_name` |
+| **Autoscaling cluster with streaming** | Disable autoscaling for streaming jobs. Use a fixed-size cluster — autoscaling causes instability as executors are added/removed during micro-batches |
+| **Kafka offset reset** | Set `startingOffsets` to `"earliest"` or `"latest"` (default). To replay from a specific offset, use `startingOffsetsByTimestamp` with a JSON map |
+| **Multiple streams sharing checkpoint** | Each stream MUST have its own unique checkpoint location. Sharing causes data corruption and "concurrent update" errors |
+| **Stream stops silently** | Enable `spark.sql.streaming.metricsEnabled=true` and monitor `StreamingQueryListener` or the Spark UI Streaming tab. Set up alerts on `lastProgress` staleness |
+| **`MERGE INTO` slow in `foreachBatch`** | Ensure the target table has liquid clustering on the join key. Use `OPTIMIZE` periodically. Consider `WHEN NOT MATCHED BY SOURCE` for deletes instead of separate DELETE statements |
