@@ -140,7 +140,7 @@ def create_or_update_genie(
                         description=description,
                     )
                     space_id = result.get("space_id", "")
-        
+
         # When serialized_space is not provided
         else:
             if space_id:
@@ -295,7 +295,6 @@ def get_genie(space_id: Optional[str] = None, include_serialized_space: bool = F
         return {"error": str(e)}
 
 
-
 @mcp.tool
 def delete_genie(space_id: str) -> Dict[str, Any]:
     """
@@ -437,6 +436,7 @@ def import_genie(
         if space_id:
             try:
                 from ..manifest import track_resource
+
                 track_resource(
                     resource_type="genie_space",
                     name=title or result.get("title", space_id),
