@@ -762,15 +762,92 @@ prompt_skills_profile() {
     echo ""
     echo -e "  ${B}Select skill profile(s)${N}"
 
-    local selected
-    selected=$(checkbox_select \
-        "All Skills|all|on|Install everything (34 skills)" \
-        "Data Engineer|data-engineer|off|Pipelines, Spark, Jobs, Streaming (14 skills)" \
-        "Business Analyst|analyst|off|Dashboards, SQL, Genie, Metrics (8 skills)" \
-        "AI/ML Engineer|ai-ml-engineer|off|Agents, RAG, Vector Search, MLflow (17 skills)" \
-        "App Developer|app-developer|off|Apps, Lakebase, Deployment (10 skills)" \
-        "Custom|custom|off|Pick individual skills" \
-    )
+    # Custom checkbox with mutual exclusion: "All" deselects others, others deselect "All"
+    local -a p_labels=("All Skills" "Data Engineer" "Business Analyst" "AI/ML Engineer" "App Developer" "Custom")
+    local -a p_values=("all" "data-engineer" "analyst" "ai-ml-engineer" "app-developer" "custom")
+    local -a p_hints=("Install everything (34 skills)" "Pipelines, Spark, Jobs, Streaming (14 skills)" "Dashboards, SQL, Genie, Metrics (8 skills)" "Agents, RAG, Vector Search, MLflow (17 skills)" "Apps, Lakebase, Deployment (10 skills)" "Pick individual skills")
+    local -a p_states=(1 0 0 0 0 0)  # "All" selected by default
+    local p_count=6
+    local p_cursor=0
+    local p_total_rows=$((p_count + 2))
+
+    _profile_draw() {
+        local i
+        for i in $(seq 0 $((p_count - 1))); do
+            local check=" "
+            [ "${p_states[$i]}" = "1" ] && check="\033[0;32m✓\033[0m"
+            local arrow="  "
+            [ "$i" = "$p_cursor" ] && arrow="\033[0;34m❯\033[0m "
+            local hint_style="\033[2m"
+            [ "${p_states[$i]}" = "1" ] && hint_style="\033[0;32m"
+            printf "\033[2K  %b[%b] %-20s %b%s\033[0m\n" "$arrow" "$check" "${p_labels[$i]}" "$hint_style" "${p_hints[$i]}" > /dev/tty
+        done
+        printf "\033[2K\n" > /dev/tty
+        if [ "$p_cursor" = "$p_count" ]; then
+            printf "\033[2K  \033[0;34m❯\033[0m \033[1;32m[ Confirm ]\033[0m\n" > /dev/tty
+        else
+            printf "\033[2K    \033[2m[ Confirm ]\033[0m\n" > /dev/tty
+        fi
+    }
+
+    printf "\n  \033[2m↑/↓ navigate · space/enter select · enter on Confirm to finish\033[0m\n\n" > /dev/tty
+    printf "\033[?25l" > /dev/tty
+    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+
+    _profile_draw
+
+    while true; do
+        printf "\033[%dA" "$p_total_rows" > /dev/tty
+        _profile_draw
+
+        local key=""
+        IFS= read -rsn1 key < /dev/tty 2>/dev/null
+
+        if [ "$key" = $'\x1b' ]; then
+            local s1="" s2=""
+            read -rsn1 s1 < /dev/tty 2>/dev/null
+            read -rsn1 s2 < /dev/tty 2>/dev/null
+            if [ "$s1" = "[" ]; then
+                case "$s2" in
+                    A) [ "$p_cursor" -gt 0 ] && p_cursor=$((p_cursor - 1)) ;;
+                    B) [ "$p_cursor" -lt "$p_count" ] && p_cursor=$((p_cursor + 1)) ;;
+                esac
+            fi
+        elif [ "$key" = " " ] || [ "$key" = "" ]; then
+            if [ "$p_cursor" -lt "$p_count" ]; then
+                # Toggle the current item
+                if [ "${p_states[$p_cursor]}" = "1" ]; then
+                    p_states[$p_cursor]=0
+                else
+                    p_states[$p_cursor]=1
+                    # Mutual exclusion: "All" (index 0) vs individual profiles (1-5)
+                    if [ "$p_cursor" = "0" ]; then
+                        # Selected "All" → deselect all others
+                        for j in $(seq 1 $((p_count - 1))); do p_states[$j]=0; done
+                    else
+                        # Selected an individual profile → deselect "All"
+                        p_states[0]=0
+                    fi
+                fi
+            else
+                # On Confirm — done
+                printf "\033[%dA" "$p_total_rows" > /dev/tty
+                _profile_draw
+                break
+            fi
+        fi
+    done
+
+    printf "\033[?25h" > /dev/tty
+    trap - EXIT
+
+    # Build result
+    local selected=""
+    for i in $(seq 0 $((p_count - 1))); do
+        if [ "${p_states[$i]}" = "1" ]; then
+            selected="${selected:+$selected }${p_values[$i]}"
+        fi
+    done
 
     # Handle empty selection — default to all
     if [ -z "$selected" ]; then

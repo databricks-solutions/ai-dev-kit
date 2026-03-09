@@ -919,35 +919,149 @@ function Invoke-PromptSkillsProfile {
     Write-Host ""
     Write-Host "  Select skill profile(s)" -ForegroundColor White
 
-    $items = @(
-        @{ Label = "All Skills";       Value = "all";             State = $true;  Hint = "Install everything (34 skills)" }
-        @{ Label = "Data Engineer";    Value = "data-engineer";   State = $false; Hint = "Pipelines, Spark, Jobs, Streaming (14 skills)" }
-        @{ Label = "Business Analyst"; Value = "analyst";         State = $false; Hint = "Dashboards, SQL, Genie, Metrics (8 skills)" }
-        @{ Label = "AI/ML Engineer";   Value = "ai-ml-engineer";  State = $false; Hint = "Agents, RAG, Vector Search, MLflow (17 skills)" }
-        @{ Label = "App Developer";    Value = "app-developer";   State = $false; Hint = "Apps, Lakebase, Deployment (10 skills)" }
-        @{ Label = "Custom";           Value = "custom";          State = $false; Hint = "Pick individual skills" }
-    )
+    # Custom checkbox with mutual exclusion: "All" deselects others, others deselect "All"
+    $pLabels = @("All Skills", "Data Engineer", "Business Analyst", "AI/ML Engineer", "App Developer", "Custom")
+    $pValues = @("all", "data-engineer", "analyst", "ai-ml-engineer", "app-developer", "custom")
+    $pHints  = @("Install everything (34 skills)", "Pipelines, Spark, Jobs, Streaming (14 skills)", "Dashboards, SQL, Genie, Metrics (8 skills)", "Agents, RAG, Vector Search, MLflow (17 skills)", "Apps, Lakebase, Deployment (10 skills)", "Pick individual skills")
+    $pStates = @($true, $false, $false, $false, $false, $false)
+    $pCount  = 6
+    $pCursor = 0
+    $pTotalRows = $pCount + 2
 
-    $selected = Select-Checkbox -Items $items
+    $isInteractive = Test-Interactive
+
+    if (-not $isInteractive) {
+        # Fallback: numbered list
+        Write-Host ""
+        for ($j = 0; $j -lt $pCount; $j++) {
+            $mark = if ($pStates[$j]) { "[X]" } else { "[ ]" }
+            Write-Host "  $($j + 1). $mark $($pLabels[$j])  ($($pHints[$j]))"
+        }
+        Write-Host ""
+        Write-Host "  Enter numbers to toggle (e.g. 2,4), or press Enter for All: " -NoNewline
+        $input_ = Read-Host
+        if (-not [string]::IsNullOrWhiteSpace($input_)) {
+            for ($j = 0; $j -lt $pCount; $j++) { $pStates[$j] = $false }
+            $nums = $input_ -split ',' | ForEach-Object { $_.Trim() }
+            foreach ($n in $nums) {
+                $idx = [int]$n - 1
+                if ($idx -ge 0 -and $idx -lt $pCount) { $pStates[$idx] = $true }
+            }
+        }
+    } else {
+        Write-Host ""
+        Write-Host "  Up/Down navigate, Space toggle, Enter on Confirm to finish" -ForegroundColor DarkGray
+        Write-Host ""
+
+        try { [Console]::CursorVisible = $false } catch {}
+
+        $drawProfiles = {
+            [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $pTotalRows))
+            for ($j = 0; $j -lt $pCount; $j++) {
+                if ($j -eq $pCursor) {
+                    Write-Host "  " -NoNewline; Write-Host ">" -ForegroundColor Blue -NoNewline; Write-Host " " -NoNewline
+                } else {
+                    Write-Host "    " -NoNewline
+                }
+                if ($pStates[$j]) {
+                    Write-Host "[" -NoNewline; Write-Host "v" -ForegroundColor Green -NoNewline; Write-Host "]" -NoNewline
+                } else {
+                    Write-Host "[ ]" -NoNewline
+                }
+                $padLabel = $pLabels[$j].PadRight(20)
+                Write-Host " $padLabel " -NoNewline
+                if ($pStates[$j]) {
+                    Write-Host $pHints[$j] -ForegroundColor Green -NoNewline
+                } else {
+                    Write-Host $pHints[$j] -ForegroundColor DarkGray -NoNewline
+                }
+                $pos = [Console]::CursorLeft
+                $remaining = [Console]::WindowWidth - $pos - 1
+                if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+                Write-Host ""
+            }
+            Write-Host (' ' * ([Console]::WindowWidth - 1))
+            if ($pCursor -eq $pCount) {
+                Write-Host "  " -NoNewline; Write-Host ">" -ForegroundColor Blue -NoNewline
+                Write-Host " " -NoNewline; Write-Host "[ Confirm ]" -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host "    " -NoNewline; Write-Host "[ Confirm ]" -ForegroundColor DarkGray -NoNewline
+            }
+            $pos = [Console]::CursorLeft
+            $remaining = [Console]::WindowWidth - $pos - 1
+            if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+            Write-Host ""
+        }
+
+        for ($j = 0; $j -lt $pTotalRows; $j++) { Write-Host "" }
+        & $drawProfiles
+
+        while ($true) {
+            $key = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+            switch ($key.VirtualKeyCode) {
+                38 { if ($pCursor -gt 0) { $pCursor-- } }
+                40 { if ($pCursor -lt $pCount) { $pCursor++ } }
+                32 { # Space
+                    if ($pCursor -lt $pCount) {
+                        $pStates[$pCursor] = -not $pStates[$pCursor]
+                        if ($pStates[$pCursor]) {
+                            if ($pCursor -eq 0) {
+                                # Selected "All" → deselect others
+                                for ($j = 1; $j -lt $pCount; $j++) { $pStates[$j] = $false }
+                            } else {
+                                # Selected individual → deselect "All"
+                                $pStates[0] = $false
+                            }
+                        }
+                    }
+                }
+                13 { # Enter
+                    if ($pCursor -lt $pCount) {
+                        $pStates[$pCursor] = -not $pStates[$pCursor]
+                        if ($pStates[$pCursor]) {
+                            if ($pCursor -eq 0) {
+                                for ($j = 1; $j -lt $pCount; $j++) { $pStates[$j] = $false }
+                            } else {
+                                $pStates[0] = $false
+                            }
+                        }
+                    } else {
+                        & $drawProfiles
+                        break
+                    }
+                }
+            }
+            if ($key.VirtualKeyCode -eq 13 -and $pCursor -eq $pCount) { break }
+            & $drawProfiles
+        }
+
+        try { [Console]::CursorVisible = $true } catch {}
+    }
+
+    # Build result from states
+    $selectedProfiles = @()
+    for ($j = 0; $j -lt $pCount; $j++) {
+        if ($pStates[$j]) { $selectedProfiles += $pValues[$j] }
+    }
+    $selected = $selectedProfiles -join ' '
 
     if ([string]::IsNullOrWhiteSpace($selected)) {
         $script:SkillsProfile = "all"
         return
     }
 
-    # Check if "all" is selected
     if ($selected -match '\ball\b') {
         $script:SkillsProfile = "all"
         return
     }
 
-    # Check if "custom" is selected
     if ($selected -match '\bcustom\b') {
         Invoke-PromptCustomSkills -PreselectedProfiles $selected
         return
     }
 
-    $script:SkillsProfile = ($selected -split ' ') -join ','
+    $script:SkillsProfile = ($selectedProfiles -join ',')
 }
 
 function Invoke-PromptCustomSkills {
