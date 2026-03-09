@@ -265,14 +265,20 @@ Before implementing, ask:
 4. Can I solve this with standard library?
 5. Does this follow the established flat pattern?
 
-### Common Mistakes to Avoid
+### Common Issues
 
-- Creating abstract base classes for "reusability"
-- Adding configuration frameworks or dependency injection
-- Premature optimization before measuring performance
-- Complex error handling hierarchies
-- Importing heavy libraries at module level (import in methods)
-- Using `python` command directly (always use `poetry run`)
+| Issue | Solution |
+|-------|----------|
+| **`DataSource` class not found** | Requires PySpark 4.0+ or DBR 15.2+. Check `spark.version` and ensure you're using a compatible runtime |
+| **`read()` returns wrong schema** | The `schema()` method must return a `StructType` matching exactly what `read()` yields. Mismatches cause silent NULL columns or cast errors |
+| **Streaming source missing data** | Ensure `simpleStreamReader.commit()` is implemented to track offsets. Without it, the source re-reads all data on each micro-batch |
+| **`write()` silently drops rows** | Check that the `writer.write()` method handles all partition data. Each task gets a partition — verify with `len(iterator)` logging |
+| **Import errors in executor** | Heavy libraries must be imported inside methods, not at module level. Executors may not have the same packages as the driver |
+| **Abstract base classes / DI frameworks** | Keep it flat — one file per data source. Spark serializes these classes to executors; complex inheritance breaks serialization |
+| **Configuration frameworks overkill** | Use `options` dict passed to `DataSource.__init__`. No need for pydantic, dataclasses, or config frameworks |
+| **`poetry run` vs `python`** | Always use `poetry run python` or `poetry run pytest` to ensure the correct virtual environment and dependencies |
+| **Slow reads without partitioning** | Implement `partitions()` to enable parallel reads. Without it, Spark uses a single partition. See [partitioning-patterns.md](references/partitioning-patterns.md) |
+| **Auth credentials exposed in logs** | Never log credentials. Use Databricks secrets (`dbutils.secrets.get`) and pass via `options`. See [authentication-patterns.md](references/authentication-patterns.md) |
 
 ### Reference Implementations
 
