@@ -204,6 +204,17 @@ manage_mas(
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy custom agent endpoints used as MAS agents
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Build vector indexes for RAG applications paired with KAs
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **KA endpoint stuck in PROVISIONING** | Endpoints take 5-15 minutes to provision. Use `manage_ka(action="get", tile_id="...")` to poll status. If stuck >20 min, delete and recreate |
+| **KA returns generic answers ignoring documents** | Ensure documents are indexed (check knowledge source status). Add specific instructions telling the KA to cite sources |
+| **MAS routes all questions to one agent** | Agent descriptions are critical for routing. Make each description specific about what that agent handles vs. doesn't handle |
+| **"Endpoint not found" when querying KA** | The endpoint name follows the pattern `ka-{tile_id_prefix}-endpoint` where prefix is the first segment of the tile_id before the first hyphen |
+| **Examples not being added to KA** | Examples are queued when endpoint is not ONLINE yet. They are added automatically once the endpoint becomes ready |
+| **Genie space returns no results** | Verify the warehouse is running and the tables in `table_identifiers` exist and are accessible to the current user |
+
 ## See Also
 
 - `1-knowledge-assistants.md` - Detailed KA patterns and examples

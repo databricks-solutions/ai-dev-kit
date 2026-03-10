@@ -614,6 +614,18 @@ If I'm unsure about a method, I should:
 | Secrets | https://databricks-sdk-py.readthedocs.io/en/latest/workspace/workspace/secrets.html |
 | DBUtils | https://databricks-sdk-py.readthedocs.io/en/latest/dbutils.html |
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`ValueError: default auth` on `WorkspaceClient()`** | No valid credentials found. Run `databricks auth login --host <url>` or set `DATABRICKS_HOST` + `DATABRICKS_TOKEN` env vars |
+| **`PermissionDenied` on API calls** | The authenticated user/SP lacks permissions. Check grants with `w.grants.get()` or ask a workspace admin |
+| **SDK method signature changed** | The SDK is actively developed. Pin your version in `requirements.txt`. Check the [changelog](https://github.com/databricks/databricks-sdk-py/releases) for breaking changes |
+| **`w.jobs.list()` is very slow** | The workspace may have thousands of jobs. Use `w.jobs.list(name="prefix")` to filter, or add `limit=N` |
+| **Databricks Connect `SparkSession` fails** | Ensure `databricks-connect` version matches your DBR version. Use `serverless_compute_id="auto"` for serverless |
+| **`ImportError` for SDK service classes** | Import from the correct submodule: `from databricks.sdk.service.workspace import ImportFormat` not `from databricks.sdk import ImportFormat` |
+| **OAuth token refresh fails** | Re-run `databricks auth login`. If using a service principal, check that the client secret hasn't expired |
+
 ## Related Skills
 
 - **[databricks-config](../databricks-config/SKILL.md)** - profile and authentication setup

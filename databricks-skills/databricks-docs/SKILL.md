@@ -55,6 +55,16 @@ The llms.txt file is organized by category:
 2. Read the specific docs to understand the feature
 3. Determine which skill/tools apply, then use them
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **llms.txt is too large to process** | Don't fetch the entire file. Search for keywords in the URL index first, then fetch only the specific documentation pages you need |
+| **Documentation page returns 404** | Databricks docs URLs change when features are renamed. Search llms.txt for the feature name to find the current URL |
+| **Docs show different API than what works** | Check the DBR/runtime version. Many features require specific minimum versions (e.g., pipe syntax needs DBR 16.2+) |
+| **Can't find docs for a preview feature** | Preview features may only be documented in release notes. Search for the feature name in the release notes page |
+| **Conflicting information between docs pages** | Prefer the more specific page (e.g., feature-specific guide over general overview). Check the page's last-updated date |
+
 ## Related Skills
 
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns for programmatic Databricks access

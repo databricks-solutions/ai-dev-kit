@@ -298,3 +298,16 @@ Load these for detailed syntax, full parameter lists, and advanced patterns:
 - **Define PK/FK constraints** on dimensional models for query optimization
 - **Use `COLLATE UTF8_LCASE`** for user-facing string columns that need case-insensitive search
 - **Use MCP tools** (`execute_sql`, `execute_sql_multi`) to test and validate all SQL before deploying
+
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`execute_sql` times out on large queries** | Add `LIMIT` during development. For production, use `execute_sql_multi` to break into smaller statements |
+| **`ai_query` returns NULL or errors** | Ensure the Foundation Model API endpoint exists and is running. Check that the prompt column is not NULL. Use `ai_query('databricks-meta-llama-...',  col)` with a valid model name |
+| **Pipe syntax `\|>` not recognized** | Pipe syntax requires DBR 16.2+. Check your warehouse version. Use traditional `SELECT ... FROM ... WHERE` as fallback |
+| **`COLLATE` errors on string comparisons** | `COLLATE` requires DBR 16.0+. Define collation at column creation: `name STRING COLLATE UTF8_LCASE` |
+| **Materialized view refresh fails** | MVs require a SQL warehouse or DLT pipeline to refresh. They cannot be refreshed from an all-purpose cluster |
+| **`MERGE INTO` performance is slow** | Add `CLUSTER BY` on the merge key columns. Ensure the target table has liquid clustering enabled |
+| **`http_request` blocked or returns 403** | `http_request` requires allowlisting the target domain. Contact your workspace admin to configure network access |
+| **Recursive CTE hits iteration limit** | Default max recursion is 100. Add `OPTION (MAXRECURSION n)` or restructure to avoid deep recursion |
