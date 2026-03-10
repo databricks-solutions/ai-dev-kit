@@ -26,7 +26,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          uvx ruff@0.11.0 format --check \
+          uvx ruff@0.11.0 format --diff \
             --line-length=120 \
             --target-version=py311 \
             databricks-tools-core/ databricks-mcp-server/ .test/src/
