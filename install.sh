@@ -392,7 +392,6 @@ detect_tools() {
         TOOLS=$(echo "$USER_TOOLS" | tr ',' ' ')
         return
     elif [ -n "$TOOLS" ]; then
-        # TOOLS env var already set, just normalize it
         TOOLS=$(echo "$TOOLS" | tr ',' ' ')
         return
     fi
@@ -1033,7 +1032,7 @@ CONF
 # Load saved config for --update mode
 load_config() {
     local config_file="$INSTALL_DIR/install.conf"
-    [ "$SCOPE" = "project" ] && [ -f ".ai-dev-kit/install.conf" ] && config_file=".ai-dev-kit/install.conf"
+    [ -f ".ai-dev-kit/install.conf" ] && config_file=".ai-dev-kit/install.conf"
 
     if [ ! -f "$config_file" ]; then
         die "No saved config found at $config_file. Run a full install first, then use --update."
@@ -1044,6 +1043,7 @@ load_config() {
     [ -n "${SAVED_TOOLS:-}" ] && TOOLS="$SAVED_TOOLS"
     [ -n "${SAVED_SCOPE:-}" ] && SCOPE="$SAVED_SCOPE"
     [ -n "${SAVED_PROFILE:-}" ] && PROFILE="$SAVED_PROFILE"
+    [ -n "${SAVED_BASE_DIR:-}" ] && UPDATE_BASE_DIR="$SAVED_BASE_DIR"
     SILENT=true
     msg "${B}Update mode:${N} reusing saved config (tools=$TOOLS, scope=$SCOPE, profile=$PROFILE)"
 }
@@ -1276,9 +1276,15 @@ main() {
     # ── Step 6: Version check (may exit early if up to date) ──
     check_version
     
-    # Determine base directory
+    # Determine base directory (use saved path in update mode for project-scoped installs)
     local base_dir
-    [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+    if [ -n "${UPDATE_BASE_DIR:-}" ]; then
+        base_dir="$UPDATE_BASE_DIR"
+    elif [ "$SCOPE" = "global" ]; then
+        base_dir="$HOME"
+    else
+        base_dir="$(pwd)"
+    fi
     
     # Setup MCP server
     if [ "$INSTALL_MCP" = true ]; then
