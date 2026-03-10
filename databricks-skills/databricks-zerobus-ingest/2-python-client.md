@@ -41,7 +41,7 @@ table_name = os.environ["ZEROBUS_TABLE_NAME"]
 client_id = os.environ["DATABRICKS_CLIENT_ID"]
 client_secret = os.environ["DATABRICKS_CLIENT_SECRET"]
 
-sdk = ZerobusSdk(host=server_endpoint, unity_catalog_url=workspace_url)
+sdk = ZerobusSdk(server_endpoint, workspace_url)
 
 options = StreamConfigurationOptions(record_type=RecordType.JSON)
 table_props = TableProperties(table_name)
@@ -78,7 +78,7 @@ table_name = os.environ["ZEROBUS_TABLE_NAME"]
 client_id = os.environ["DATABRICKS_CLIENT_ID"]
 client_secret = os.environ["DATABRICKS_CLIENT_SECRET"]
 
-sdk = ZerobusSdk(host=server_endpoint, unity_catalog_url=workspace_url)
+sdk = ZerobusSdk(server_endpoint, workspace_url)
 
 options = StreamConfigurationOptions(record_type=RecordType.PROTO)
 table_props = TableProperties(table_name, record_pb2.AirQuality.DESCRIPTOR)
@@ -177,7 +177,7 @@ class ZerobusClient:
         self.ack_callback = ack_callback
         self.proto_descriptor = proto_descriptor
 
-        self.sdk = ZerobusSdk(host=self.server_endpoint, unity_catalog_url=self.workspace_url)
+        self.sdk = ZerobusSdk(self.server_endpoint, self.workspace_url)
         self.stream = None
 
     def init_stream(self) -> None:
@@ -286,7 +286,7 @@ from zerobus.sdk.shared import RecordType, StreamConfigurationOptions, TableProp
 
 
 async def ingest_async():
-    sdk = AsyncZerobusSdk(host=server_endpoint, unity_catalog_url=workspace_url)
+    sdk = AsyncZerobusSdk(server_endpoint, workspace_url)
     options = StreamConfigurationOptions(record_type=RecordType.JSON)
     table_props = TableProperties(table_name)
 

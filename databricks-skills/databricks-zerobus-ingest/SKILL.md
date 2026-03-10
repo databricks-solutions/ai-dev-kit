@@ -89,7 +89,7 @@ import json
 from zerobus.sdk.sync import ZerobusSdk
 from zerobus.sdk.shared import RecordType, StreamConfigurationOptions, TableProperties
 
-sdk = ZerobusSdk(host=server_endpoint, unity_catalog_url=workspace_url)
+sdk = ZerobusSdk(server_endpoint, workspace_url)
 options = StreamConfigurationOptions(record_type=RecordType.JSON)
 table_props = TableProperties(table_name)
 
