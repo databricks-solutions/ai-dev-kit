@@ -41,7 +41,7 @@ table_name = os.environ["ZEROBUS_TABLE_NAME"]
 client_id = os.environ["DATABRICKS_CLIENT_ID"]
 client_secret = os.environ["DATABRICKS_CLIENT_SECRET"]
 
-sdk = ZerobusSdk(server_endpoint, workspace_url)
+sdk = ZerobusSdk(host=server_endpoint, unity_catalog_url=workspace_url)
 
 options = StreamConfigurationOptions(record_type=RecordType.JSON)
 table_props = TableProperties(table_name)
@@ -78,7 +78,7 @@ table_name = os.environ["ZEROBUS_TABLE_NAME"]
 client_id = os.environ["DATABRICKS_CLIENT_ID"]
 client_secret = os.environ["DATABRICKS_CLIENT_SECRET"]
 
-sdk = ZerobusSdk(server_endpoint, workspace_url)
+sdk = ZerobusSdk(host=server_endpoint, unity_catalog_url=workspace_url)
 
 options = StreamConfigurationOptions(record_type=RecordType.PROTO)
 table_props = TableProperties(table_name, record_pb2.AirQuality.DESCRIPTOR)
@@ -177,7 +177,7 @@ class ZerobusClient:
         self.ack_callback = ack_callback
         self.proto_descriptor = proto_descriptor
 
-        self.sdk = ZerobusSdk(self.server_endpoint, self.workspace_url)
+        self.sdk = ZerobusSdk(host=self.server_endpoint, unity_catalog_url=self.workspace_url)
         self.stream = None
 
     def init_stream(self) -> None:
@@ -286,7 +286,7 @@ from zerobus.sdk.shared import RecordType, StreamConfigurationOptions, TableProp
 
 
 async def ingest_async():
-    sdk = AsyncZerobusSdk(server_endpoint, workspace_url)
+    sdk = AsyncZerobusSdk(host=server_endpoint, unity_catalog_url=workspace_url)
     options = StreamConfigurationOptions(record_type=RecordType.JSON)
     table_props = TableProperties(table_name)
 
@@ -355,4 +355,4 @@ stream.wait_for_offset(offset)
 | `ingest_records_nowait(records)` | None | No | Max batch throughput |
 | `wait_for_offset(offset)` | None | Yes (until ACK) | Durability confirmation |
 | `flush()` | None | Yes (until sent) | Ensure all buffered records are sent |
-| `ingest_record(record)` | RecordAcknowledgment | No | **Deprecated** — use `ingest_record_offset` |
+| `ingest_record(record)` | RecordAcknowledgment | No | Primary method in SDK v1.1.0+; pass `json.dumps(record)` for JSON |
