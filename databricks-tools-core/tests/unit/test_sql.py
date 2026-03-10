@@ -13,13 +13,9 @@ from databricks_tools_core.sql.warehouse import _sort_within_tier, get_best_ware
 class TestExecuteSQLQueryTags:
     """Tests for query_tags parameter passthrough."""
 
-    @mock.patch(
-        "databricks_tools_core.sql.sql.get_best_warehouse", return_value="wh-123"
-    )
+    @mock.patch("databricks_tools_core.sql.sql.get_best_warehouse", return_value="wh-123")
     @mock.patch("databricks_tools_core.sql.sql.SQLExecutor")
-    def test_execute_sql_passes_query_tags_to_executor(
-        self, mock_executor_cls, mock_warehouse
-    ):
+    def test_execute_sql_passes_query_tags_to_executor(self, mock_executor_cls, mock_warehouse):
         """query_tags should be passed through to SQLExecutor.execute()."""
         mock_executor = mock.Mock()
         mock_executor.execute.return_value = [{"num": 1}]
@@ -35,9 +31,7 @@ class TestExecuteSQLQueryTags:
         call_kwargs = mock_executor.execute.call_args.kwargs
         assert call_kwargs["query_tags"] == "team:eng,cost_center:701"
 
-    @mock.patch(
-        "databricks_tools_core.sql.sql.get_best_warehouse", return_value="wh-123"
-    )
+    @mock.patch("databricks_tools_core.sql.sql.get_best_warehouse", return_value="wh-123")
     @mock.patch("databricks_tools_core.sql.sql.SQLExecutor")
     def test_execute_sql_without_query_tags(self, mock_executor_cls, mock_warehouse):
         """When query_tags not provided, executor should not receive it (or receive None)."""
@@ -51,13 +45,9 @@ class TestExecuteSQLQueryTags:
         call_kwargs = mock_executor.execute.call_args.kwargs
         assert call_kwargs.get("query_tags") is None
 
-    @mock.patch(
-        "databricks_tools_core.sql.sql.get_best_warehouse", return_value="wh-123"
-    )
+    @mock.patch("databricks_tools_core.sql.sql.get_best_warehouse", return_value="wh-123")
     @mock.patch("databricks_tools_core.sql.sql.SQLParallelExecutor")
-    def test_execute_sql_multi_passes_query_tags(
-        self, mock_parallel_cls, mock_warehouse
-    ):
+    def test_execute_sql_multi_passes_query_tags(self, mock_parallel_cls, mock_warehouse):
         """query_tags should be passed through to SQLParallelExecutor.execute()."""
         mock_executor = mock.Mock()
         mock_executor.execute.return_value = {
@@ -131,9 +121,8 @@ class TestSQLExecutorQueryTags:
         assert "query_tags" not in call_kwargs
 
 
-def _make_warehouse(
-    id, name, state, creator_name="other@example.com", enable_serverless_compute=False
-):
+def _make_warehouse(id, name, state, creator_name="other@example.com",
+                    enable_serverless_compute=False):
     """Helper to create a mock warehouse object."""
     w = mock.Mock()
     w.id = id
@@ -152,49 +141,33 @@ class TestSortWithinTier:
     def test_serverless_first(self):
         """Serverless warehouses should come before classic ones."""
         classic = _make_warehouse("c1", "Classic WH", State.RUNNING)
-        serverless = _make_warehouse(
-            "s1", "Serverless WH", State.RUNNING, enable_serverless_compute=True
-        )
+        serverless = _make_warehouse("s1", "Serverless WH", State.RUNNING,
+                                     enable_serverless_compute=True)
         result = _sort_within_tier([classic, serverless], current_user=None)
         assert result[0].id == "s1"
         assert result[1].id == "c1"
 
     def test_serverless_before_user_owned(self):
         """Serverless should be preferred over user-owned classic."""
-        classic_owned = _make_warehouse(
-            "c1", "My WH", State.RUNNING, creator_name="me@example.com"
-        )
-        serverless_other = _make_warehouse(
-            "s1",
-            "Other WH",
-            State.RUNNING,
-            creator_name="other@example.com",
-            enable_serverless_compute=True,
-        )
-        result = _sort_within_tier(
-            [classic_owned, serverless_other], current_user="me@example.com"
-        )
+        classic_owned = _make_warehouse("c1", "My WH", State.RUNNING,
+                                        creator_name="me@example.com")
+        serverless_other = _make_warehouse("s1", "Other WH", State.RUNNING,
+                                           creator_name="other@example.com",
+                                           enable_serverless_compute=True)
+        result = _sort_within_tier([classic_owned, serverless_other],
+                                   current_user="me@example.com")
         assert result[0].id == "s1"
 
     def test_serverless_user_owned_first(self):
         """Among serverless, user-owned should come first."""
-        serverless_other = _make_warehouse(
-            "s1",
-            "Other Serverless",
-            State.RUNNING,
-            creator_name="other@example.com",
-            enable_serverless_compute=True,
-        )
-        serverless_owned = _make_warehouse(
-            "s2",
-            "My Serverless",
-            State.RUNNING,
-            creator_name="me@example.com",
-            enable_serverless_compute=True,
-        )
-        result = _sort_within_tier(
-            [serverless_other, serverless_owned], current_user="me@example.com"
-        )
+        serverless_other = _make_warehouse("s1", "Other Serverless", State.RUNNING,
+                                           creator_name="other@example.com",
+                                           enable_serverless_compute=True)
+        serverless_owned = _make_warehouse("s2", "My Serverless", State.RUNNING,
+                                           creator_name="me@example.com",
+                                           enable_serverless_compute=True)
+        result = _sort_within_tier([serverless_other, serverless_owned],
+                                   current_user="me@example.com")
         assert result[0].id == "s2"
         assert result[1].id == "s1"
 
@@ -204,9 +177,8 @@ class TestSortWithinTier:
     def test_no_current_user(self):
         """Without a current user, only serverless preference applies."""
         classic = _make_warehouse("c1", "Classic", State.RUNNING)
-        serverless = _make_warehouse(
-            "s1", "Serverless", State.RUNNING, enable_serverless_compute=True
-        )
+        serverless = _make_warehouse("s1", "Serverless", State.RUNNING,
+                                     enable_serverless_compute=True)
         result = _sort_within_tier([classic, serverless], current_user=None)
         assert result[0].id == "s1"
 
@@ -214,17 +186,14 @@ class TestSortWithinTier:
 class TestGetBestWarehouseServerless:
     """Tests for serverless preference in get_best_warehouse."""
 
-    @mock.patch(
-        "databricks_tools_core.sql.warehouse.get_current_username",
-        return_value="me@example.com",
-    )
+    @mock.patch("databricks_tools_core.sql.warehouse.get_current_username",
+                return_value="me@example.com")
     @mock.patch("databricks_tools_core.sql.warehouse.get_workspace_client")
     def test_prefers_serverless_within_running_shared(self, mock_client_fn, mock_user):
         """Among running shared warehouses, serverless should be picked."""
         classic_shared = _make_warehouse("c1", "Shared WH", State.RUNNING)
-        serverless_shared = _make_warehouse(
-            "s1", "Shared Serverless", State.RUNNING, enable_serverless_compute=True
-        )
+        serverless_shared = _make_warehouse("s1", "Shared Serverless", State.RUNNING,
+                                            enable_serverless_compute=True)
         mock_client = mock.Mock()
         mock_client.warehouses.list.return_value = [classic_shared, serverless_shared]
         mock_client_fn.return_value = mock_client
@@ -232,17 +201,14 @@ class TestGetBestWarehouseServerless:
         result = get_best_warehouse()
         assert result == "s1"
 
-    @mock.patch(
-        "databricks_tools_core.sql.warehouse.get_current_username",
-        return_value="me@example.com",
-    )
+    @mock.patch("databricks_tools_core.sql.warehouse.get_current_username",
+                return_value="me@example.com")
     @mock.patch("databricks_tools_core.sql.warehouse.get_workspace_client")
     def test_prefers_serverless_within_running_other(self, mock_client_fn, mock_user):
         """Among running non-shared warehouses, serverless should be picked."""
         classic = _make_warehouse("c1", "My WH", State.RUNNING)
-        serverless = _make_warehouse(
-            "s1", "Fast WH", State.RUNNING, enable_serverless_compute=True
-        )
+        serverless = _make_warehouse("s1", "Fast WH", State.RUNNING,
+                                     enable_serverless_compute=True)
         mock_client = mock.Mock()
         mock_client.warehouses.list.return_value = [classic, serverless]
         mock_client_fn.return_value = mock_client
@@ -250,22 +216,16 @@ class TestGetBestWarehouseServerless:
         result = get_best_warehouse()
         assert result == "s1"
 
-    @mock.patch(
-        "databricks_tools_core.sql.warehouse.get_current_username",
-        return_value="me@example.com",
-    )
+    @mock.patch("databricks_tools_core.sql.warehouse.get_current_username",
+                return_value="me@example.com")
     @mock.patch("databricks_tools_core.sql.warehouse.get_workspace_client")
     def test_tier_order_preserved_over_serverless(self, mock_client_fn, mock_user):
         """A running shared classic should still beat a stopped serverless."""
         running_shared_classic = _make_warehouse("c1", "Shared WH", State.RUNNING)
-        stopped_serverless = _make_warehouse(
-            "s1", "Fast WH", State.STOPPED, enable_serverless_compute=True
-        )
+        stopped_serverless = _make_warehouse("s1", "Fast WH", State.STOPPED,
+                                             enable_serverless_compute=True)
         mock_client = mock.Mock()
-        mock_client.warehouses.list.return_value = [
-            stopped_serverless,
-            running_shared_classic,
-        ]
+        mock_client.warehouses.list.return_value = [stopped_serverless, running_shared_classic]
         mock_client_fn.return_value = mock_client
 
         result = get_best_warehouse()

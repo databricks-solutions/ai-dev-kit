@@ -48,9 +48,7 @@ _active_profile: Optional[str] = None
 _active_host: Optional[str] = None
 
 
-def set_active_workspace(
-    profile: Optional[str] = None, host: Optional[str] = None
-) -> None:
+def set_active_workspace(profile: Optional[str] = None, host: Optional[str] = None) -> None:
     """Set the active workspace for all subsequent tool calls.
 
     Adds a step 0 to get_workspace_client() that overrides the default SDK
@@ -85,10 +83,7 @@ def get_active_workspace() -> dict:
 
 def _has_oauth_credentials() -> bool:
     """Check if OAuth credentials (SP) are configured in environment."""
-    return bool(
-        os.environ.get("DATABRICKS_CLIENT_ID")
-        and os.environ.get("DATABRICKS_CLIENT_SECRET")
-    )
+    return bool(os.environ.get("DATABRICKS_CLIENT_ID") and os.environ.get("DATABRICKS_CLIENT_SECRET"))
 
 
 # Context variables for per-request authentication
@@ -158,9 +153,7 @@ def get_workspace_client() -> WorkspaceClient:
     # or when OAuth M2M credentials are present (Databricks Apps runtime).
     if not force and not _has_oauth_credentials():
         if _active_profile:
-            return tag_client(
-                WorkspaceClient(profile=_active_profile, **product_kwargs)
-            )
+            return tag_client(WorkspaceClient(profile=_active_profile, **product_kwargs))
         if _active_host:
             return tag_client(WorkspaceClient(host=_active_host, **product_kwargs))
 
