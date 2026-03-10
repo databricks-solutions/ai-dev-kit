@@ -690,7 +690,7 @@ install_skills() {
     # Determine target directories (array so paths with spaces work)
     for tool in $TOOLS; do
         case $tool in
-            claude) dirs=("$base_dir/.claude/skills") ;;
+            claude) dirs+=("$base_dir/.claude/skills") ;;
             cursor) echo "$TOOLS" | grep -q claude || dirs+=("$base_dir/.cursor/skills") ;;
             copilot) dirs+=("$base_dir/.github/skills") ;;
             codex) dirs+=("$base_dir/.agents/skills") ;;
