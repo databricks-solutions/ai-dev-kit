@@ -132,6 +132,24 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 **Next steps:** Respond to interactive prompts and follow the on-screen instructions.
 - Note: Cursor and Copilot require updating settings manually after install.
 
+#### Updating to the Latest Version
+
+After initial install, update to the latest version with:
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --update
+```
+
+This re-runs the installer using your saved configuration (tools, scope, profile) — no interactive prompts needed. It updates both the MCP server and re-copies the latest skills to your tool directories.
+
+> **Why is `--update` needed?** Skills are copied to tool-specific directories (e.g., `~/.cursor/skills/`) during install. A `git pull` on the repo only updates the MCP server source, not the copied skills. The `--update` flag ensures everything stays in sync.
+
+If you haven't used `--update` before (installed with an older version), use `--force` instead:
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --force
+```
+
 
 ### Visual Builder App
 
