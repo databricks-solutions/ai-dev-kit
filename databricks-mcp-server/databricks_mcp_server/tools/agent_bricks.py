@@ -579,7 +579,8 @@ def manage_ka(
     elif action == "delete":
         return _ka_delete(tile_id=tile_id)
     else:
-        return {"error": f"Invalid action '{action}'. Must be one of: list, create_or_update, get, find_by_name, delete"}
+        valid = "list, create_or_update, get, find_by_name, delete"
+        return {"error": f"Invalid action '{action}'. Must be one of: {valid}"}
 
 
 @mcp.tool
@@ -684,4 +685,5 @@ def manage_mas(
     elif action == "delete":
         return _mas_delete(tile_id=tile_id)
     else:
-        return {"error": f"Invalid action '{action}'. Must be one of: list, create_or_update, get, find_by_name, delete"}
+        valid = "list, create_or_update, get, find_by_name, delete"
+        return {"error": f"Invalid action '{action}'. Must be one of: {valid}"}
