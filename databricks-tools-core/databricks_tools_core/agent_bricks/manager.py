@@ -793,9 +793,7 @@ class AgentBricksManager:
     # Genie Space Operations
     # ========================================================================
 
-    def genie_get(
-        self, space_id: str, include_serialized_space: bool = False
-    ) -> Optional[GenieSpaceDict]:
+    def genie_get(self, space_id: str, include_serialized_space: bool = False) -> Optional[GenieSpaceDict]:
         """Get Genie space by ID.
 
         Args:
