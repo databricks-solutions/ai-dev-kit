@@ -257,8 +257,6 @@ monitor = w.data_quality.create_monitor(
 
 > **Note:** Anomaly detection requires `MANAGE SCHEMA` or `MANAGE CATALOG` privileges and serverless compute enabled on the workspace.
 
-For more details, see [Anomaly Detection Documentation](https://docs.databricks.com/aws/en/data-quality-monitoring/anomaly-detection/).
-
 ---
 
 ## Output Tables
