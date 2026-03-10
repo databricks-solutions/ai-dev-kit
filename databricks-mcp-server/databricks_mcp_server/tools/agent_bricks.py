@@ -471,11 +471,13 @@ def _ka_list() -> Dict[str, Any]:
     tiles = manager.list_all_agent_bricks(tile_type=TileType.KA)
     kas = []
     for tile in tiles:
-        kas.append({
-            "tile_id": tile.get("tile_id", ""),
-            "name": tile.get("name", ""),
-            "description": tile.get("description", ""),
-        })
+        kas.append(
+            {
+                "tile_id": tile.get("tile_id", ""),
+                "name": tile.get("name", ""),
+                "description": tile.get("description", ""),
+            }
+        )
     return {"knowledge_assistants": kas, "count": len(kas)}
 
 
@@ -485,11 +487,13 @@ def _mas_list() -> Dict[str, Any]:
     tiles = manager.list_all_agent_bricks(tile_type=TileType.MAS)
     agents = []
     for tile in tiles:
-        agents.append({
-            "tile_id": tile.get("tile_id", ""),
-            "name": tile.get("name", ""),
-            "description": tile.get("description", ""),
-        })
+        agents.append(
+            {
+                "tile_id": tile.get("tile_id", ""),
+                "name": tile.get("name", ""),
+                "description": tile.get("description", ""),
+            }
+        )
     return {"supervisor_agents": agents, "count": len(agents)}
 
 
