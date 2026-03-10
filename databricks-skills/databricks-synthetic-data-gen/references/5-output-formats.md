@@ -149,6 +149,24 @@ spark.sql(f"""
 customers_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.customers")
 ```
 
+**PySpark schema with comments:**
+```python
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+
+schema = StructType([
+    StructField("customer_id", StringType(), True, metadata={"comment": "Unique customer identifier (CUST-XXXXX)"}),
+    StructField("name", StringType(), True, metadata={"comment": "Full customer name"}),
+    StructField("email", StringType(), True, metadata={"comment": "Customer email address"}),
+    StructField("tier", StringType(), True, metadata={"comment": "Customer tier: Free, Pro, Enterprise"}),
+    StructField("region", StringType(), True, metadata={"comment": "Geographic region"}),
+    StructField("arr", DoubleType(), True, metadata={"comment": "Annual recurring revenue in USD"}),
+])
+
+# Apply schema when creating the DataFrame, comments persist when saved as Delta
+customers_df = spark.createDataFrame(data, schema)
+customers_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.customers")
+```
+
 **Post-write (alternative):**
 ```python
 # Write first, then add comments
