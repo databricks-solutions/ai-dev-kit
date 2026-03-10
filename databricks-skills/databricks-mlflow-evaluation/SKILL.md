@@ -146,3 +146,11 @@ See `GOTCHAS.md` for complete list.
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Building agents that can be evaluated with this skill
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns used alongside MLflow APIs
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Unity Catalog tables for managed evaluation datasets
+
+## Resources
+
+- [MLflow GenAI Evaluation Guide](https://docs.databricks.com/aws/en/mlflow/llm-evaluate.html)
+- [MLflow Scorers Reference](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html)
+- [MLflow Tracing](https://mlflow.org/docs/latest/llms/tracing/index.html)
+- [Agent Evaluation on Databricks](https://docs.databricks.com/aws/en/generative-ai/agent-evaluation/index.html)
+- [MLflow Python API](https://mlflow.org/docs/latest/python_api/index.html)

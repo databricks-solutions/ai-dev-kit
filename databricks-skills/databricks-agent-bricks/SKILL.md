@@ -209,3 +209,11 @@ manage_mas(
 - `1-knowledge-assistants.md` - Detailed KA patterns and examples
 - `databricks-genie` skill - Detailed Genie patterns, curation, and examples
 - `2-supervisor-agents.md` - Detailed MAS patterns and examples
+
+## Resources
+
+- [AI/BI Genie Spaces](https://docs.databricks.com/aws/en/genie/)
+- [Mosaic AI Agent Framework](https://docs.databricks.com/aws/en/generative-ai/agent-framework/index.html)
+- [Knowledge Assistants](https://docs.databricks.com/aws/en/generative-ai/agent-framework/build-knowledge-assistant.html)
+- [Multi-Agent Supervisors](https://docs.databricks.com/aws/en/generative-ai/agent-framework/build-multi-agent-system.html)
+- [Model Serving Endpoints](https://docs.databricks.com/aws/en/machine-learning/model-serving/index.html)

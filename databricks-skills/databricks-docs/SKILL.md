@@ -62,3 +62,11 @@ The llms.txt file is organized by category:
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Governance and catalog management
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Serving endpoints and model deployment
 - **[databricks-mlflow-evaluation](../databricks-mlflow-evaluation/SKILL.md)** - MLflow 3 GenAI evaluation workflows
+
+## Resources
+
+- [Databricks Documentation Home](https://docs.databricks.com/)
+- [llms.txt Index](https://docs.databricks.com/llms.txt) — machine-readable doc index for searching
+- [Release Notes](https://docs.databricks.com/aws/en/release-notes/)
+- [Databricks Knowledge Base](https://kb.databricks.com/)
+- [REST API Reference](https://docs.databricks.com/api/workspace/introduction)

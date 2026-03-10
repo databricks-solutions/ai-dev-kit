@@ -623,3 +623,12 @@ If I'm unsure about a method, I should:
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving endpoint management
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - vector index operations
 - **[databricks-lakebase-provisioned](../databricks-lakebase-provisioned/SKILL.md)** - managed PostgreSQL via SDK
+
+## Resources
+
+- [Databricks SDK for Python](https://docs.databricks.com/aws/en/dev-tools/sdk-python.html)
+- [SDK API Reference (PyPI)](https://databricks-sdk-py.readthedocs.io/)
+- [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/index.html)
+- [Databricks Connect](https://docs.databricks.com/aws/en/dev-tools/databricks-connect/index.html)
+- [REST API Reference](https://docs.databricks.com/api/workspace/introduction)
+- [Authentication](https://docs.databricks.com/aws/en/dev-tools/auth/index.html)
