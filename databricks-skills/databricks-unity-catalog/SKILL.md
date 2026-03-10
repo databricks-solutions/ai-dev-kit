@@ -99,6 +99,30 @@ mcp__databricks__execute_sql(
 )
 ```
 
+## Cost & Billing Analysis
+
+Use `system.billing.usage` joined with `system.billing.list_prices` for cost analysis:
+
+```sql
+-- Top 10 cost drivers (last 30 days)
+SELECT
+  u.billing_origin_product,
+  ROUND(SUM(u.usage_quantity), 2) AS total_dbus,
+  ROUND(SUM(u.usage_quantity * COALESCE(p.pricing.effective_list.default, p.pricing.default)), 2) AS est_cost_usd
+FROM system.billing.usage u
+LEFT JOIN system.billing.list_prices p
+  ON u.sku_name = p.sku_name AND u.cloud = p.cloud
+  AND u.usage_unit = p.usage_unit AND p.price_end_time IS NULL
+WHERE u.usage_date >= CURRENT_DATE() - INTERVAL 30 DAYS
+GROUP BY u.billing_origin_product
+ORDER BY est_cost_usd DESC
+LIMIT 10
+```
+
+> **CRITICAL:** `usage_metadata` is a STRUCT — use dot notation (`usage_metadata.job_id`), NOT colon notation (`usage_metadata:job_id`).
+
+Key `usage_metadata` fields: `.job_id`, `.job_name`, `.warehouse_id`, `.endpoint_name`, `.cluster_id`, `.notebook_path`, `.dlt_pipeline_id`, `.app_name`.
+
 ## Best Practices
 
 1. **Filter by date** - System tables can be large; always use date filters
