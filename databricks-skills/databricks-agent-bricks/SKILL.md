@@ -204,6 +204,13 @@ manage_mas(
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy custom agent endpoints used as MAS agents
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Build vector indexes for RAG applications paired with KAs
 
+## Resources
+
+- [Databricks Agent Bricks](https://docs.databricks.com/generative-ai/agent-bricks/index.html)
+- [Knowledge Assistants](https://docs.databricks.com/generative-ai/agent-bricks/knowledge-assistants.html)
+- [Supervisor Agents](https://docs.databricks.com/generative-ai/agent-bricks/supervisor-agents.html)
+- [Genie Spaces](https://docs.databricks.com/genie/index.html)
+
 ## See Also
 
 - `1-knowledge-assistants.md` - Detailed KA patterns and examples

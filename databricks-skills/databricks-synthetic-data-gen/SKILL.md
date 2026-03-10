@@ -256,3 +256,9 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 | `F.window` vs `Window` confusion | Use `from pyspark.sql.window import Window` for `row_number()`, `rank()`, etc. `F.window` is for streaming only. |
 
 See [references/6-troubleshooting.md](references/6-troubleshooting.md) for full troubleshooting guide.
+
+## Resources
+
+- [Faker Library](https://faker.readthedocs.io/en/master/)
+- [PySpark DataFrame API](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/dataframe.html)
+- [Unity Catalog Volumes](https://docs.databricks.com/connect/unity-catalog/volumes.html)

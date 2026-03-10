@@ -20,3 +20,14 @@ Use the `manage_workspace` MCP tool for all workspace operations. Do NOT edit `~
 4. Present the result. For `status`/`switch`/`login`: show host, profile, username. For `list`: formatted table with the active profile marked.
 
 > **Note:** The switch is session-scoped — it resets on MCP server restart. For permanent profile setup, use `databricks auth login -p <profile>` and update `~/.databrickscfg` with `cluster_id` or `serverless_compute_id = auto`.
+
+## Related Skills
+
+- **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns that depend on workspace configuration
+- **[databricks-docs](../databricks-docs/SKILL.md)** - Documentation reference for authentication methods
+
+## Resources
+
+- [Databricks CLI Authentication](https://docs.databricks.com/dev-tools/cli/authentication.html)
+- [Unified Auth Configuration](https://docs.databricks.com/dev-tools/auth/unified-auth.html)
+- [Environment Variables](https://docs.databricks.com/dev-tools/auth/env-variables.html)

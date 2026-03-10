@@ -273,3 +273,9 @@ error_status[]       -- errors per page (if any)
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** — Pre-built Knowledge Assistants (out-of-the-box RAG without custom parsing)
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** — Production pipelines for batch document processing
 - **[databricks-dbsql](../databricks-dbsql/SKILL.md)** — Full AI functions reference including `ai_query`, `ai_extract`, `ai_classify`
+
+## Resources
+
+- [Document Parsing with Databricks](https://docs.databricks.com/generative-ai/tutorials/ai-cookbook/nbs/1-pdf-chunk-extract.html)
+- [Unstructured Data in Unity Catalog Volumes](https://docs.databricks.com/ingestion/file-upload/upload-to-volume.html)
+- [Foundation Model APIs](https://docs.databricks.com/machine-learning/foundation-models/index.html)

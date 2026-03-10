@@ -306,3 +306,9 @@ databricks database start-database-instance --name my-lakebase-instance
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for instance management and token generation
 - **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps with Lakebase resources
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - scheduling reverse ETL sync jobs
+
+## Resources
+
+- [Lakebase Overview](https://docs.databricks.com/database/lakebase/index.html)
+- [Lakebase Provisioned](https://docs.databricks.com/database/lakebase/provisioned.html)
+- [Lakebase Sync (Reverse ETL)](https://docs.databricks.com/database/lakebase/sync.html)

@@ -124,3 +124,9 @@ Use these skills in sequence:
 - **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - Generate raw parquet data to populate tables for Genie
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs, schemas, and tables Genie queries
+
+## Resources
+
+- [Genie Spaces](https://docs.databricks.com/genie/index.html)
+- [Genie Conversation API](https://docs.databricks.com/api/workspace/genie)
+- [Genie Best Practices](https://docs.databricks.com/genie/best-practices.html)
