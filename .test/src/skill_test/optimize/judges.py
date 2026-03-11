@@ -1,11 +1,18 @@
 """MLflow judge factories for skill evaluation.
 
-Replaces the 6 separate judge calls and binary assertion layer with three
-focused judges that provide both scores AND rich rationale for GEPA's
-reflection LM.
+Multi-judge architecture with three focused custom ``make_judge`` instances:
 
-Judges:
-    quality_judge   — Scores a single response (0.0-1.0) against expectations.
+    correctness_judge      — Are facts, API references, and code syntax accurate?
+    completeness_judge     — Are all parts of the question addressed?
+    guideline_adherence_judge — Does the response follow Databricks-specific patterns?
+
+Each judge uses categorical ``Literal["excellent", "acceptable", "poor"]``
+feedback types for more reliable, alignable judgments. Scores are converted
+to floats via ``CATEGORICAL_SCORES``.
+
+Legacy judges (kept for backward compat):
+    _create_legacy_quality_judge — Single 0.0-1.0 quality scorer (renamed from
+        ``create_skill_quality_judge``).
     effectiveness_judge — Compares WITH vs WITHOUT responses, returns verdict.
     regression_judge — Identifies specific ways a skill harms responses.
 
@@ -31,7 +38,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from mlflow.genai.judges import make_judge
 
@@ -244,7 +251,235 @@ def _safe_parse_score(raw_value: Any) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Quality judge — primary scorer for a single response
+# Categorical scoring
+# ---------------------------------------------------------------------------
+
+CATEGORICAL_SCORES: dict[str, float] = {
+    "excellent": 1.0,
+    "acceptable": 0.6,
+    "poor": 0.0,
+}
+
+
+def _categorical_to_float(verdict: str | float) -> float:
+    """Convert a categorical verdict to a float score.
+
+    Handles ``Literal["excellent", "acceptable", "poor"]`` from the new
+    multi-judge architecture as well as raw floats from legacy judges.
+    """
+    if isinstance(verdict, (int, float)):
+        return max(0.0, min(1.0, float(verdict)))
+    key = str(verdict).strip().lower()
+    return CATEGORICAL_SCORES.get(key, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# Correctness judge — facts, API references, code syntax accuracy
+# ---------------------------------------------------------------------------
+
+_CORRECTNESS_KEYWORDS = {"api", "syntax", "correct", "deprecated", "modern", "function", "parameter", "error", "version"}
+
+_CORRECTNESS_INSTRUCTIONS = """\
+You are an expert evaluator for Databricks skill documentation CORRECTNESS.
+Focus ONLY on whether facts, API references, and code syntax are accurate.
+
+## What to evaluate
+
+1. **Factual accuracy** — are stated facts correct?
+2. **API accuracy** — are function names, parameters, and return types correct?
+3. **Code syntax** — is the code syntactically valid and runnable?
+4. **Currency** — are APIs current (not deprecated)?
+
+Do NOT evaluate completeness or style — only correctness.
+
+## Expected Information
+
+{{ expectations }}
+
+## Input
+
+Question: {{ inputs }}
+Response: {{ outputs }}
+
+## Instructions
+
+Return one of exactly: "excellent", "acceptable", "poor".
+
+- "excellent" = all facts, APIs, and syntax are correct
+- "acceptable" = mostly correct with minor inaccuracies that don't break functionality
+- "poor" = contains significant factual errors, wrong APIs, or broken syntax
+
+Provide detailed rationale explaining:
+- Specific factual errors found (or confirming correctness)
+- API references that are wrong or deprecated
+- Syntax issues in code examples
+"""
+
+
+def create_correctness_judge(
+    skill_guidelines: list[str] | None = None,
+    judge_model: str | None = None,
+) -> Any:
+    """Create a correctness-focused judge with categorical feedback.
+
+    Args:
+        skill_guidelines: Optional guidelines — only correctness-related ones
+            (matching keywords like api, syntax, correct, deprecated) are injected.
+        judge_model: LLM model for the judge.
+    """
+    instructions = _CORRECTNESS_INSTRUCTIONS
+    if skill_guidelines:
+        # Filter for correctness-related guidelines
+        filtered = [
+            g for g in skill_guidelines
+            if any(kw in g.lower() for kw in _CORRECTNESS_KEYWORDS)
+        ]
+        if filtered:
+            principles = "\n".join(f"- {g}" for g in filtered)
+            instructions += f"\n\n## Domain-Specific Correctness Principles\n{principles}\n"
+
+    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
+    return make_judge(
+        name="skill_correctness",
+        model=model_uri,
+        instructions=instructions,
+        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        inference_params=inference_params,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Completeness judge — all parts addressed, all expected info present
+# ---------------------------------------------------------------------------
+
+_COMPLETENESS_INSTRUCTIONS = """\
+You are an expert evaluator for Databricks skill documentation COMPLETENESS.
+Focus ONLY on whether all parts of the question are addressed and all expected
+information is present.
+
+## What to evaluate
+
+1. **Question coverage** — are all parts of the question answered?
+2. **Expected facts** — are all expected facts present?
+3. **Expected patterns** — are all expected code patterns demonstrated?
+4. **Depth** — is the response detailed enough to be actionable?
+
+Do NOT evaluate correctness or style — only completeness.
+
+## Expected Information
+
+{{ expectations }}
+
+## Input
+
+Question: {{ inputs }}
+Response: {{ outputs }}
+
+## Instructions
+
+Return one of exactly: "excellent", "acceptable", "poor".
+
+- "excellent" = all parts addressed, all expected facts and patterns present
+- "acceptable" = most parts addressed, minor gaps in coverage
+- "poor" = significant parts of the question unanswered or major facts missing
+
+Provide detailed rationale explaining:
+- Which parts of the question are addressed vs unanswered
+- Which expected facts are present vs missing
+- Which expected patterns are demonstrated vs absent
+"""
+
+
+def create_completeness_judge(
+    judge_model: str | None = None,
+) -> Any:
+    """Create a completeness-focused judge with categorical feedback.
+
+    Args:
+        judge_model: LLM model for the judge.
+    """
+    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
+    return make_judge(
+        name="skill_completeness",
+        model=model_uri,
+        instructions=_COMPLETENESS_INSTRUCTIONS,
+        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        inference_params=inference_params,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Guideline adherence judge — Databricks patterns and practices
+# ---------------------------------------------------------------------------
+
+_GUIDELINE_ADHERENCE_INSTRUCTIONS = """\
+You are an expert evaluator for Databricks skill documentation GUIDELINE ADHERENCE.
+Focus ONLY on whether the response follows Databricks-specific patterns,
+conventions, and guidelines.
+
+## What to evaluate
+
+1. **Pattern adherence** — does the response follow expected code patterns?
+2. **Convention compliance** — does it use Databricks-specific conventions?
+3. **Best practice alignment** — does it follow recommended practices?
+4. **Guideline compliance** — does it adhere to the specific guidelines listed below?
+
+Do NOT evaluate general correctness or completeness — only guideline adherence.
+
+## Expected Information
+
+{{ expectations }}
+
+## Input
+
+Question: {{ inputs }}
+Response: {{ outputs }}
+
+## Instructions
+
+Return one of exactly: "excellent", "acceptable", "poor".
+
+- "excellent" = follows all guidelines and patterns precisely
+- "acceptable" = follows most guidelines with minor deviations
+- "poor" = ignores or violates important guidelines
+
+Provide detailed rationale explaining:
+- Which guidelines are followed vs violated
+- Which patterns are correctly demonstrated vs missing
+- Specific deviations from expected practices
+"""
+
+
+def create_guideline_adherence_judge(
+    skill_guidelines: list[str] | None = None,
+    judge_model: str | None = None,
+) -> Any:
+    """Create a guideline adherence judge with categorical feedback.
+
+    Receives ALL guidelines (default_guidelines + per-test guidelines +
+    [FOCUS] guidelines from ``--focus``), making focus areas directly evaluable.
+
+    Args:
+        skill_guidelines: All guidelines to evaluate against.
+        judge_model: LLM model for the judge.
+    """
+    instructions = _GUIDELINE_ADHERENCE_INSTRUCTIONS
+    if skill_guidelines:
+        principles = "\n".join(f"- {g}" for g in skill_guidelines)
+        instructions += f"\n\n## Required Guidelines\n{principles}\n"
+
+    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
+    return make_judge(
+        name="skill_guideline_adherence",
+        model=model_uri,
+        instructions=instructions,
+        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        inference_params=inference_params,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Legacy quality judge (renamed, kept for backward compatibility)
 # ---------------------------------------------------------------------------
 
 _QUALITY_INSTRUCTIONS = """\
@@ -286,11 +521,13 @@ Provide detailed rationale explaining:
 """
 
 
-def create_skill_quality_judge(
+def _create_legacy_quality_judge(
     skill_guidelines: list[str] | None = None,
     judge_model: str | None = None,
 ) -> Any:
-    """Create a universal quality judge for scoring responses.
+    """Create a universal quality judge for scoring responses (legacy).
+
+    Renamed from ``create_skill_quality_judge``. Kept for backward compatibility.
 
     Args:
         skill_guidelines: Optional per-skill evaluation principles from
@@ -311,6 +548,10 @@ def create_skill_quality_judge(
         feedback_value_type=float,
         inference_params=inference_params,
     )
+
+
+# Backward-compatible alias
+create_skill_quality_judge = _create_legacy_quality_judge
 
 
 # ---------------------------------------------------------------------------

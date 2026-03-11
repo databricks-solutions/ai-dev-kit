@@ -18,6 +18,8 @@ test_cases:
     - Calls stream.ingest_record() to send data
     - Calls ack.wait_for_ack() to confirm durability
     - Closes stream in a finally block
+    - Installs databricks-sdk>=0.97.0 and databricks-zerobus-ingest-sdk>=1.1.0
+    - Uses %pip install to install required packages before importing
     expected_patterns:
     - pattern: from zerobus\.sdk
       min_count: 1
@@ -29,13 +31,26 @@ test_cases:
       min_count: 1
     - pattern: (finally|close)
       min_count: 1
+    - pattern: databricks-zerobus-ingest-sdk>=1\.1\.0
+      min_count: 1
+      description: Must reference the latest Zerobus SDK version 1.1.0 or higher
+    - pattern: databricks-sdk>=0\.97\.0
+      min_count: 1
+      description: Must reference the latest Databricks SDK version 0.97.0 or higher
     guidelines:
     - Must import from zerobus.sdk.sync or zerobus.sdk.aio
     - Must include proper stream cleanup with try/finally
     - Must show the full init -> stream -> ingest -> ack -> close pattern
+    - Must specify databricks-sdk>=0.97.0 in the pip install command
+    - Must specify databricks-zerobus-ingest-sdk>=1.1.0 in the pip install command
+    - Must include a protobuf runtime compatibility check before installing grpcio-tools
   metadata:
     category: happy_path
     difficulty: easy
+    tags:
+    - sdk-versioning
+    - installation
+    - compatibility
 - id: databricks-zerobus-ingest_002
   inputs:
     prompt: How do I set up authentication and find the server endpoint for Zerobus
@@ -75,6 +90,8 @@ test_cases:
     - Uses RecordType.PROTOBUF for Protobuf serialization
     - Requires a compiled .proto file matching the target table schema
     - Uses SerializeToString() to convert Protobuf messages to bytes
+    - Installs databricks-zerobus-ingest-sdk>=1.1.0 for async support
+    - Checks google.protobuf runtime version before installing grpcio-tools for compatibility
     expected_patterns:
     - pattern: zerobus\.sdk\.aio
       min_count: 1
@@ -84,13 +101,27 @@ test_cases:
       min_count: 1
     - pattern: await
       min_count: 1
+    - pattern: databricks-zerobus-ingest-sdk>=1\.1\.0
+      min_count: 1
+      description: Must use the latest Zerobus SDK version 1.1.0 or higher
+    - pattern: google\.protobuf|grpcio-tools
+      min_count: 1
+      description: Must reference protobuf or grpcio-tools for Protobuf serialization
     guidelines:
     - Must use async/await patterns consistently
     - Must reference Protobuf schema generation from UC table
     - Must include proper async stream cleanup
+    - Must specify databricks-zerobus-ingest-sdk>=1.1.0 in the pip install command
+    - Must include a runtime protobuf version check to select the correct grpcio-tools
+      version
+    - Must handle compatibility between protobuf 5.26.x/5.29.x and grpcio-tools 1.62.0
   metadata:
     category: happy_path
     difficulty: medium
+    tags:
+    - sdk-versioning
+    - protobuf-compatibility
+    - async
 - id: databricks-zerobus-ingest_004
   inputs:
     prompt: Generate a Protobuf schema from a Unity Catalog table for Zerobus ingestion
@@ -103,6 +134,8 @@ test_cases:
     - Maps UC column types to Protobuf types
     - Generates a .proto file with correct syntax
     - Requires protoc compilation to produce language stubs
+    - Uses databricks-sdk>=0.97.0 to fetch Unity Catalog table schema
+    - Checks protobuf runtime version before installing grpcio-tools to ensure compatibility
     expected_patterns:
     - pattern: \.proto
       min_count: 1
@@ -110,13 +143,27 @@ test_cases:
       min_count: 1
     - pattern: message
       min_count: 1
+    - pattern: databricks-sdk>=0\.97\.0
+      min_count: 1
+      description: Must use the latest Databricks SDK version 0.97.0 or higher
+    - pattern: google\.protobuf\.__version__|runtime_version
+      min_count: 1
+      description: Must check the runtime protobuf version for grpcio-tools compatibility
     guidelines:
     - Must show the type mapping from UC types to Protobuf types
     - Must include protoc compilation step
     - Must produce valid proto3 syntax
+    - Must specify databricks-sdk>=0.97.0 in the pip install command
+    - Must include the smart grpcio-tools installation that checks the runtime protobuf
+      version
+    - Must handle protobuf 5.26.x and 5.29.x by pinning grpcio-tools==1.62.0
   metadata:
     category: happy_path
     difficulty: medium
+    tags:
+    - sdk-versioning
+    - protobuf-compatibility
+    - schema-generation
 - id: databricks-zerobus-ingest_005
   inputs:
     prompt: Implement retry and reconnection logic for a Zerobus producer
@@ -129,18 +176,29 @@ test_cases:
     - Implement exponential backoff for retries
     - Reinitialize the stream on connection failures
     - Max throughput is 100 MB/s and 15,000 rows/s per stream
+    - Uses databricks-zerobus-ingest-sdk>=1.1.0 which includes improved retry primitives
+    - Installs compatible SDK versions before implementing retry logic
     expected_patterns:
     - pattern: (retry|backoff|reconnect)
       min_count: 1
     - pattern: create_stream
       min_count: 1
+    - pattern: databricks-zerobus-ingest-sdk>=1\.1\.0
+      min_count: 1
+      description: Must use the latest Zerobus SDK version 1.1.0 or higher
     guidelines:
     - Must implement exponential backoff, not fixed-interval retries
     - Must reinitialize stream on disconnection, not just retry the same call
     - Must mention at-least-once semantics and idempotency considerations
+    - Must specify databricks-zerobus-ingest-sdk>=1.1.0 in the pip install command
+    - Must specify databricks-sdk>=0.97.0 in the pip install command
   metadata:
     category: error_handling
     difficulty: hard
+    tags:
+    - sdk-versioning
+    - retry-logic
+    - resilience
 - id: databricks-zerobus-ingest_006
   inputs:
     prompt: Build a Zerobus Ingest client in Go that sends JSON records
@@ -153,6 +211,8 @@ test_cases:
     - Uses gRPC for transport
     - Implements proper error handling and stream cleanup
     - Uses JSON record type
+    - References the latest SDK versions compatible with Go (databricks-zerobus-ingest-sdk>=1.1.0
+      equivalent for Go)
     expected_patterns:
     - pattern: (go|golang|Go)
       min_count: 1
@@ -162,9 +222,15 @@ test_cases:
     - Must use idiomatic Go patterns (error handling, defer for cleanup)
     - Must reference the multi-language client documentation
     - Must include proper gRPC connection setup
+    - Must reference the latest available Zerobus SDK version (1.1.0+) for Go
+    - Must note any Go-specific version compatibility requirements
   metadata:
     category: multi_language
     difficulty: medium
+    tags:
+    - sdk-versioning
+    - go
+    - multi-language
 - id: databricks-zerobus-ingest_007
   inputs:
     prompt: What are the limits and constraints of Zerobus Ingest?
@@ -179,6 +245,7 @@ test_cases:
     - At-least-once delivery semantics
     - Table must be a managed Delta table in Unity Catalog
     - Zerobus does not create or alter tables
+    - 'SDK version requirements: databricks-sdk>=0.97.0 and databricks-zerobus-ingest-sdk>=1.1.0'
     expected_patterns:
     - pattern: 100.?MB
       min_count: 1
@@ -188,9 +255,15 @@ test_cases:
     - Must list concrete throughput limits
     - Must mention single-AZ durability caveat
     - Must mention that table management is the user's responsibility
+    - Must mention the minimum SDK version requirements for production use
+    - Must note that older SDK versions may lack features or have known issues
   metadata:
     category: knowledge
     difficulty: easy
+    tags:
+    - sdk-versioning
+    - limits
+    - constraints
 - id: grp_20260212_153137
   inputs:
     prompt: Build a simple python producer that ingests JSON records into a Delta
@@ -433,3 +506,311 @@ test_cases:
     fixed_by_commit: null
     fix_description: null
     trace_run_id: null
+- id: databricks-zerobus-ingest_focus_00
+  inputs:
+    prompt: Show me how to install the correct versions of databricks-sdk and databricks-zerobus-ingest-sdk
+      with protobuf runtime compatibility handling
+  outputs:
+    response: "Here is the recommended installation sequence for Zerobus Ingest that\
+      \ handles protobuf runtime compatibility across Databricks Runtime versions:\n\
+      \n```python\n# Step 1: Install core SDKs with pinned minimum versions\n%pip\
+      \ install databricks-sdk>=0.97.0 databricks-zerobus-ingest-sdk>=1.1.0\n\n# Step\
+      \ 2: Smart grpcio-tools installation based on runtime protobuf version\nimport\
+      \ google.protobuf\nruntime_version = google.protobuf.__version__\nprint(f\"\
+      Runtime protobuf version: {runtime_version}\")\n\nif runtime_version.startswith(\"\
+      5.26\") or runtime_version.startswith(\"5.29\"):\n    # These protobuf versions\
+      \ require a pinned grpcio-tools to avoid descriptor conflicts\n    %pip install\
+      \ grpcio-tools==1.62.0\nelse:\n    # Newer or older protobuf versions can use\
+      \ the latest grpcio-tools\n    %pip install grpcio-tools\n\nprint(\"Installation\
+      \ complete. Restart the Python kernel if running in a notebook.\")\n```\n\n\
+      **Why these versions?**\n\n| Package | Minimum Version | Reason |\n|---|---|---|\n\
+      | `databricks-sdk` | `>=0.97.0` | Required for latest Unity Catalog APIs and\
+      \ token refresh fixes |\n| `databricks-zerobus-ingest-sdk` | `>=1.1.0` | Includes\
+      \ stream stability improvements and ACK reliability fixes |\n| `grpcio-tools`\
+      \ | `==1.62.0` (conditional) | Avoids protobuf descriptor pool conflicts on\
+      \ DBR 14.x/15.x |\n\n**Verification:**\n```python\nimport databricks.sdk\nimport\
+      \ zerobus\nprint(f\"databricks-sdk version: {databricks.sdk.__version__}\")\n\
+      print(f\"zerobus-ingest-sdk version: {zerobus.__version__}\")\n```\n\n**Notes:**\n\
+      - These packages are NOT pre-installed on Databricks clusters.\n- After `%pip\
+      \ install`, restart the Python interpreter (or use `dbutils.library.restartPython()`)\
+      \ before importing.\n- For production clusters, pin exact versions in your `requirements.txt`\
+      \ to ensure reproducibility."
+    execution_success: true
+  expectations:
+    expected_patterns:
+    - pattern: databricks-sdk>=0\.97\.0
+      min_count: 1
+      description: Must specify databricks-sdk>=0.97.0
+    - pattern: databricks-zerobus-ingest-sdk>=1\.1\.0
+      min_count: 1
+      description: Must specify databricks-zerobus-ingest-sdk>=1.1.0
+    - pattern: google\.protobuf\.__version__|runtime_version
+      min_count: 1
+      description: Must check the runtime protobuf version
+    - pattern: grpcio-tools==1\.62\.0
+      min_count: 1
+      description: Must pin grpcio-tools==1.62.0 for protobuf 5.26.x/5.29.x
+    - pattern: 5\.26|5\.29
+      min_count: 1
+      description: Must handle protobuf versions 5.26.x and 5.29.x specifically
+    - pattern: '%pip install'
+      min_count: 1
+      description: Must use %pip install for Databricks notebook compatibility
+    expected_facts:
+    - Installs databricks-sdk>=0.97.0
+    - Installs databricks-zerobus-ingest-sdk>=1.1.0
+    - Checks google.protobuf.__version__ before installing grpcio-tools
+    - Pins grpcio-tools==1.62.0 for protobuf 5.26.x and 5.29.x runtimes
+    - Uses latest grpcio-tools for other protobuf versions
+    - These packages are NOT pre-installed on Databricks clusters
+    - Recommends restarting the Python kernel after installation
+    guidelines:
+    - Must specify databricks-sdk>=0.97.0 as the minimum version
+    - Must specify databricks-zerobus-ingest-sdk>=1.1.0 as the minimum version
+    - Must include the conditional grpcio-tools installation based on runtime protobuf
+      version
+    - Must handle protobuf 5.26.x and 5.29.x by pinning grpcio-tools==1.62.0
+    - Must note that packages are not pre-installed and a kernel restart may be needed
+    - Must provide a verification step to confirm installed versions
+  metadata:
+    category: setup
+    difficulty: easy
+    source: generated_from_focus
+    focus: '- ensure the latest databricks-sdk is being used like 0.97.0
+
+      - ensure the latest databricks zerobus sdk is being using 1.1.0
+
+      - make sure compatibility across runtimes'
+    tags:
+    - sdk-versioning
+    - installation
+    - protobuf-compatibility
+    - grpcio-tools
+    - runtime-compatibility
+- id: databricks-zerobus-ingest_focus_01
+  inputs:
+    prompt: Write a production-ready Python Zerobus Ingest producer using the latest
+      SDK versions (databricks-sdk 0.97.0, zerobus-ingest-sdk 1.1.0) with Protobuf
+      serialization, proper version checks, and error handling
+  outputs:
+    response: "Here is a production-ready Zerobus Ingest producer using the latest\
+      \ SDK versions with Protobuf serialization:\n\n## Step 1: Install Dependencies\n\
+      \n```python\n# Install latest compatible SDK versions\n%pip install databricks-sdk>=0.97.0\
+      \ databricks-zerobus-ingest-sdk>=1.1.0\n\n# Smart grpcio-tools installation\n\
+      import google.protobuf\nruntime_version = google.protobuf.__version__\nprint(f\"\
+      Runtime protobuf version: {runtime_version}\")\n\nif runtime_version.startswith(\"\
+      5.26\") or runtime_version.startswith(\"5.29\"):\n    %pip install grpcio-tools==1.62.0\n\
+      else:\n    %pip install grpcio-tools\n```\n\n## Step 2: Define Protobuf Schema\
+      \ (events.proto)\n\n```protobuf\nsyntax = \"proto3\";\npackage events;\n\nmessage\
+      \ SensorEvent {\n  string device_id = 1;\n  double temperature = 2;\n  int64\
+      \ event_timestamp = 3;\n  string status = 4;\n}\n```\n\nCompile with:\n```bash\n\
+      python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. events.proto\n\
+      ```\n\n## Step 3: Production Producer\n\n```python\nimport time\nimport logging\n\
+      from zerobus.sdk.sync import ZerobusSdk, RecordType\nfrom events_pb2 import\
+      \ SensorEvent\n\nlogging.basicConfig(level=logging.INFO)\nlogger = logging.getLogger(__name__)\n\
+      \n# Configuration\nSERVER_ENDPOINT = \"<your-workspace-region>.zerobus.databricks.com:443\"\
+      \nCLIENT_ID = \"<service-principal-client-id>\"\nCLIENT_SECRET = \"<service-principal-client-secret>\"\
+      \nTABLE_FQN = \"catalog.schema.sensor_events\"\n\nMAX_RETRIES = 5\nBASE_BACKOFF_SECONDS\
+      \ = 1.0\nMAX_BACKOFF_SECONDS = 60.0\n\ndef create_sdk_client():\n    \"\"\"\
+      Initialize the Zerobus SDK with service principal credentials.\"\"\"\n    return\
+      \ ZerobusSdk(\n        server_endpoint=SERVER_ENDPOINT,\n        client_id=CLIENT_ID,\n\
+      \        client_secret=CLIENT_SECRET,\n    )\n\ndef ingest_with_retry(records:\
+      \ list, max_retries: int = MAX_RETRIES):\n    \"\"\"Ingest records with exponential\
+      \ backoff retry on failure.\"\"\"\n    attempt = 0\n    backoff = BASE_BACKOFF_SECONDS\n\
+      \n    while attempt <= max_retries:\n        sdk = None\n        stream = None\n\
+      \        try:\n            sdk = create_sdk_client()\n            stream = sdk.create_stream(\n\
+      \                table=TABLE_FQN,\n                record_type=RecordType.PROTOBUF,\n\
+      \            )\n            logger.info(f\"Stream created. Ingesting {len(records)}\
+      \ records (attempt {attempt + 1}).\")\n\n            acks = []\n           \
+      \ for record in records:\n                proto_msg = SensorEvent(\n       \
+      \             device_id=record[\"device_id\"],\n                    temperature=record[\"\
+      temperature\"],\n                    event_timestamp=record[\"event_timestamp\"\
+      ],\n                    status=record[\"status\"],\n                )\n    \
+      \            ack = stream.ingest_record(proto_msg.SerializeToString())\n   \
+      \             acks.append(ack)\n\n            # Wait for all ACKs to confirm\
+      \ durability\n            for ack in acks:\n                ack.wait_for_ack()\n\
+      \n            stream.flush()\n            logger.info(f\"Successfully ingested\
+      \ {len(records)} records.\")\n            return  # Success\n\n        except\
+      \ Exception as e:\n            logger.warning(f\"Ingestion attempt {attempt\
+      \ + 1} failed: {e}\")\n            attempt += 1\n            if attempt > max_retries:\n\
+      \                logger.error(\"Max retries exceeded. Raising exception.\")\n\
+      \                raise\n            sleep_time = min(backoff * (2 ** (attempt\
+      \ - 1)), MAX_BACKOFF_SECONDS)\n            logger.info(f\"Retrying in {sleep_time:.1f}s...\"\
+      )\n            time.sleep(sleep_time)\n        finally:\n            if stream:\n\
+      \                try:\n                    stream.close()\n                except\
+      \ Exception:\n                    pass\n            if sdk:\n              \
+      \  try:\n                    sdk.close()\n                except Exception:\n\
+      \                    pass\n\n# Example usage\nif __name__ == \"__main__\":\n\
+      \    sample_records = [\n        {\"device_id\": \"sensor-001\", \"temperature\"\
+      : 22.5, \"event_timestamp\": int(time.time()), \"status\": \"ok\"},\n      \
+      \  {\"device_id\": \"sensor-002\", \"temperature\": 35.1, \"event_timestamp\"\
+      : int(time.time()), \"status\": \"warning\"},\n    ]\n    ingest_with_retry(sample_records)\n\
+      ```\n\n**Key production considerations:**\n- **SDK versions**: `databricks-sdk>=0.97.0`\
+      \ and `databricks-zerobus-ingest-sdk>=1.1.0` are required for stability.\n-\
+      \ **Protobuf compatibility**: Always check `google.protobuf.__version__` before\
+      \ installing `grpcio-tools`.\n- **At-least-once delivery**: Zerobus guarantees\
+      \ at-least-once semantics; design your target table to handle duplicate records\
+      \ (e.g., use a deduplication key).\n- **Stream limits**: Max 100 MB/s and 15,000\
+      \ rows/s per stream.\n- **Cleanup**: Always close streams and SDK clients in\
+      \ `finally` blocks to avoid resource leaks."
+    execution_success: true
+  expectations:
+    expected_patterns:
+    - pattern: databricks-sdk>=0\.97\.0
+      min_count: 1
+      description: Must specify databricks-sdk>=0.97.0
+    - pattern: databricks-zerobus-ingest-sdk>=1\.1\.0
+      min_count: 1
+      description: Must specify databricks-zerobus-ingest-sdk>=1.1.0
+    - pattern: RecordType\.PROTOBUF
+      min_count: 1
+      description: Must use RecordType.PROTOBUF for Protobuf serialization
+    - pattern: SerializeToString
+      min_count: 1
+      description: Must call SerializeToString() to serialize Protobuf messages
+    - pattern: wait_for_ack
+      min_count: 1
+      description: Must call wait_for_ack() to confirm durability
+    - pattern: exponential|backoff|2 \*\*
+      min_count: 1
+      description: Must implement exponential backoff
+    - pattern: finally
+      min_count: 1
+      description: Must use finally block for cleanup
+    - pattern: google\.protobuf\.__version__|runtime_version
+      min_count: 1
+      description: Must check runtime protobuf version
+    - pattern: grpcio-tools==1\.62\.0
+      min_count: 1
+      description: Must pin grpcio-tools for protobuf 5.26.x/5.29.x
+    expected_facts:
+    - Installs databricks-sdk>=0.97.0 and databricks-zerobus-ingest-sdk>=1.1.0
+    - Checks google.protobuf.__version__ before installing grpcio-tools
+    - Pins grpcio-tools==1.62.0 for protobuf 5.26.x and 5.29.x
+    - Uses RecordType.PROTOBUF for Protobuf serialization
+    - Calls SerializeToString() to convert Protobuf messages to bytes
+    - Calls wait_for_ack() to confirm durability
+    - Implements exponential backoff for retries
+    - Closes stream and SDK in a finally block
+    - Mentions at-least-once delivery semantics
+    - Mentions max 100 MB/s and 15,000 rows/s per stream limits
+    guidelines:
+    - Must specify databricks-sdk>=0.97.0 in the pip install command
+    - Must specify databricks-zerobus-ingest-sdk>=1.1.0 in the pip install command
+    - Must include the conditional grpcio-tools installation based on runtime protobuf
+      version
+    - Must use RecordType.PROTOBUF and call SerializeToString()
+    - Must implement exponential backoff (not fixed-interval) for retries
+    - Must close stream and SDK client in finally blocks
+    - Must call wait_for_ack() to confirm record durability
+    - Must mention at-least-once delivery semantics and idempotency considerations
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: generated_from_focus
+    focus: '- ensure the latest databricks-sdk is being used like 0.97.0
+
+      - ensure the latest databricks zerobus sdk is being using 1.1.0
+
+      - make sure compatibility across runtimes'
+    tags:
+    - sdk-versioning
+    - protobuf-compatibility
+    - production-ready
+    - retry-logic
+    - grpcio-tools
+    - protobuf
+- id: databricks-zerobus-ingest_focus_02
+  inputs:
+    prompt: I'm getting a protobuf descriptor pool conflict when using Zerobus Ingest
+      with grpcio-tools on Databricks Runtime 14.x. How do I fix this?
+  outputs:
+    response: "This is a known compatibility issue between certain protobuf runtime\
+      \ versions (5.26.x and 5.29.x shipped with DBR 14.x/15.x) and newer `grpcio-tools`\
+      \ releases. Here is how to diagnose and fix it:\n\n## Diagnosis\n\n```python\n\
+      import google.protobuf\nprint(f\"Protobuf runtime version: {google.protobuf.__version__}\"\
+      )\n# If this prints 5.26.x or 5.29.x, you need the pinned grpcio-tools\n```\n\
+      \n## Fix: Smart grpcio-tools Installation\n\n```python\n# First, ensure you\
+      \ have the latest compatible core SDKs\n%pip install databricks-sdk>=0.97.0\
+      \ databricks-zerobus-ingest-sdk>=1.1.0\n\n# Then install grpcio-tools based\
+      \ on the detected protobuf version\nimport google.protobuf\nruntime_version\
+      \ = google.protobuf.__version__\nprint(f\"Runtime protobuf version: {runtime_version}\"\
+      )\n\nif runtime_version.startswith(\"5.26\") or runtime_version.startswith(\"\
+      5.29\"):\n    # Pin grpcio-tools to avoid descriptor pool conflicts\n    %pip\
+      \ install grpcio-tools==1.62.0\n    print(\"Installed grpcio-tools==1.62.0 for\
+      \ protobuf compatibility\")\nelse:\n    # Use latest grpcio-tools for other\
+      \ protobuf versions\n    %pip install grpcio-tools\n    print(f\"Installed latest\
+      \ grpcio-tools for protobuf {runtime_version}\")\n```\n\n## Why This Happens\n\
+      \n| DBR Version | Protobuf Version | Compatible grpcio-tools |\n|---|---|---|\n\
+      | 14.x | 5.26.x | `==1.62.0` |\n| 15.x | 5.29.x | `==1.62.0` |\n| 13.x and earlier\
+      \ | 3.x / 4.x | Latest |\n| 16.x+ | 6.x+ | Latest |\n\nThe conflict occurs because\
+      \ `grpcio-tools` bundles its own protobuf descriptor pool, which clashes with\
+      \ the runtime version when they are incompatible. Pinning `grpcio-tools==1.62.0`\
+      \ uses a bundled protobuf that is compatible with the 5.26.x/5.29.x runtime.\n\
+      \n## Verify the Fix\n\n```python\n# After installation and kernel restart, verify\
+      \ no import errors\nfrom grpc_tools import protoc\nfrom zerobus.sdk.sync import\
+      \ ZerobusSdk, RecordType\nprint(\"All imports successful - no descriptor pool\
+      \ conflicts\")\n```\n\n## Additional Tips\n\n- Always restart the Python kernel\
+      \ (`dbutils.library.restartPython()`) after `%pip install` in notebooks.\n-\
+      \ Pin exact versions in `requirements.txt` for production cluster init scripts\
+      \ to ensure reproducibility.\n- If you are using `databricks-zerobus-ingest-sdk>=1.1.0`,\
+      \ the SDK itself does not require `grpcio-tools` at runtime — only for compiling\
+      \ `.proto` files during development."
+    execution_success: true
+  expectations:
+    expected_patterns:
+    - pattern: google\.protobuf\.__version__|runtime_version
+      min_count: 1
+      description: Must check the runtime protobuf version
+    - pattern: 5\.26|5\.29
+      min_count: 1
+      description: Must identify protobuf 5.26.x and 5.29.x as the affected versions
+    - pattern: grpcio-tools==1\.62\.0
+      min_count: 1
+      description: Must recommend pinning grpcio-tools==1.62.0 as the fix
+    - pattern: databricks-sdk>=0\.97\.0
+      min_count: 1
+      description: Must reference the latest databricks-sdk version
+    - pattern: databricks-zerobus-ingest-sdk>=1\.1\.0
+      min_count: 1
+      description: Must reference the latest zerobus-ingest-sdk version
+    - pattern: descriptor.pool|descriptor pool
+      min_count: 1
+      description: Must explain the descriptor pool conflict
+    - pattern: restartPython|restart.*kernel|kernel.*restart
+      min_count: 1
+      description: Must recommend restarting the Python kernel after installation
+    expected_facts:
+    - Protobuf 5.26.x and 5.29.x shipped with DBR 14.x/15.x cause descriptor pool
+      conflicts
+    - The fix is to pin grpcio-tools==1.62.0 for protobuf 5.26.x and 5.29.x
+    - Checks google.protobuf.__version__ to detect the runtime version
+    - Installs databricks-sdk>=0.97.0 and databricks-zerobus-ingest-sdk>=1.1.0
+    - Recommends restarting the Python kernel after pip install
+    - grpcio-tools is only needed for compiling .proto files, not at runtime for the
+      SDK
+    guidelines:
+    - Must identify protobuf 5.26.x and 5.29.x as the root cause of the conflict
+    - Must recommend pinning grpcio-tools==1.62.0 as the specific fix
+    - Must include the conditional installation pattern that checks the runtime version
+    - Must specify databricks-sdk>=0.97.0 and databricks-zerobus-ingest-sdk>=1.1.0
+    - Must recommend restarting the Python kernel after installation
+    - Must explain why the conflict occurs (bundled vs runtime protobuf descriptor
+      pool)
+    - Should provide a verification step to confirm the fix worked
+  metadata:
+    category: error_handling
+    difficulty: medium
+    source: generated_from_focus
+    focus: '- ensure the latest databricks-sdk is being used like 0.97.0
+
+      - ensure the latest databricks zerobus sdk is being using 1.1.0
+
+      - make sure compatibility across runtimes'
+    tags:
+    - sdk-versioning
+    - protobuf-compatibility
+    - grpcio-tools
+    - troubleshooting
+    - databricks-runtime
+    - descriptor-pool

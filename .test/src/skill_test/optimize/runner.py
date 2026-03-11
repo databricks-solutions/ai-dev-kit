@@ -151,11 +151,18 @@ def _log_detailed_judge_metrics(
     agent_validation_si: dict[str, dict] | None,
 ):
     """Log detailed per-task judge metrics, aggregates, and rationales to the active MLflow run."""
-    # Score keys we expect from skillbench judges
+    # Score keys we expect from skillbench judges (multi-judge architecture)
     JUDGE_SCORE_KEYS = [
-        "quality_with",
-        "quality_without",
+        "correctness_with",
+        "correctness_without",
+        "completeness_with",
+        "completeness_without",
+        "guideline_adherence",
+        "quality_composite",
+        "correctness_delta",
+        "completeness_delta",
         "skill_effectiveness",
+        "regression_penalty",
         "fact_coverage",
         "pattern_adherence",
         "structure",
@@ -557,7 +564,7 @@ def optimize_skill(
             print(f"Run dir: {run_dir}")
         print(f"Reflection LM: {config.reflection.reflection_lm}")
 
-        print(f"\nScoring baseline ({len(train)} tasks, ~3 LLM calls each)...")
+        print(f"\nScoring baseline ({len(train)} tasks, ~5 LLM calls each)...")
         original_score, original_per_task, si_by_id, _ = _evaluate_on_tasks(
             evaluator, seed_candidate, train, label="Baseline"
         )
@@ -616,7 +623,7 @@ def optimize_skill(
         )
 
     # Evaluate original and capture per-task detail for baseline context
-    print(f"\nScoring baseline ({len(train)} tasks, ~3 LLM calls each)...")
+    print(f"\nScoring baseline ({len(train)} tasks, ~5 LLM calls each)...")
     original_score, original_per_task, si_by_id, si_by_input = _evaluate_on_tasks(
         evaluator, seed_candidate, train, label="Baseline"
     )
@@ -634,9 +641,12 @@ def optimize_skill(
     )
     objective = (
         f"Refine and improve the existing '{skill_name}' skill. "
-        "Score: EFFECTIVENESS (35%) + QUALITY (30%) + FACT_PATTERN (15%) + EFFICIENCY (15%) + STRUCTURE (5%). "
+        "Score: EFFECTIVENESS (30%) + QUALITY_COMPOSITE (20%) + FACT_PATTERN (15%) "
+        "+ GUIDELINE_ADHERENCE (10%) + EFFICIENCY (10%) + STRUCTURE (5%) - REGRESSION_PENALTY (10%). "
+        "Three judges evaluate independently: CORRECTNESS (facts/API/syntax), "
+        "COMPLETENESS (coverage), GUIDELINE_ADHERENCE (patterns). "
+        "Use per-dimension deltas in Judge_effectiveness to see WHERE improvement happened. "
         "Use Missing_Facts and Missing_Patterns in side_info to see exactly what content to add. "
-        "Use Judge_quality_with rationale for nuanced quality feedback. "
         "Focus on what the agent would otherwise get wrong. "
         "Be concise — remove redundant examples and verbose explanations."
     )

@@ -187,7 +187,7 @@ uv run python .test/scripts/optimize.py <skill_name> [options]
 |------|---------|---------|---------|
 | `--gen-model` | `GEPA_GEN_LM` | `databricks/databricks-claude-sonnet-4-6` | Generates responses in proxy evaluator |
 | `--reflection-lm` | `GEPA_REFLECTION_LM` | `databricks/databricks-claude-opus-4-6` | GEPA's reflection/mutation model |
-| `--judge-model` | `GEPA_JUDGE_LM` | `databricks/databricks-claude-sonnet-4-6` | MLflow quality/regression judges |
+| `--judge-model` | `GEPA_JUDGE_LM` | `databricks/databricks-claude-sonnet-4-6` | MLflow quality judge |
 
 Proxy evaluator models use [litellm provider prefixes](https://docs.litellm.ai/docs/providers): `databricks/`, `openai/`, `anthropic/`.
 
@@ -277,8 +277,8 @@ test_cases:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `inputs.prompt` | Yes | The user question |
-| `expectations.expected_facts` | Yes | Facts the response must contain (checked by quality judge) |
-| `expectations.expected_patterns` | No | Regex patterns checked deterministically |
+| `expectations.expected_facts` | Yes | Facts the response must contain (checked by quality judge + deterministic substring match) |
+| `expectations.expected_patterns` | No | Regex patterns checked deterministically (feeds `fact_coverage`/`pattern_adherence` scores) |
 | `expectations.guidelines` | No | Soft rules for the quality judge |
 | `expectations.trace_expectations` | No | Agent behavioral validation (only with `--agent-eval`) |
 | `outputs.response` | No | Reference answer for judge comparison |
@@ -311,6 +311,80 @@ Without `--tool-modules`, all skills are included regardless. Available modules:
 
 ---
 
+## Evaluation & Scoring
+
+### SkillBench evaluator (default)
+
+Each candidate skill is evaluated per-task using a WITH vs WITHOUT comparison:
+
+1. **Generate WITH-skill response** — LLM generates with SKILL.md in context
+2. **Generate WITHOUT-skill response** — LLM generates without skill (cached)
+3. **Three focused judges** — each returns categorical `"excellent"` / `"acceptable"` / `"poor"` verdicts:
+   - **Correctness judge** (WITH + WITHOUT) — facts, API references, code syntax accuracy
+   - **Completeness judge** (WITH + WITHOUT) — all parts addressed, expected info present
+   - **Guideline adherence judge** (WITH only) — Databricks-specific patterns and practices
+   - **Regression judge** (conditional) — fires only when effectiveness delta < -0.05
+4. **Deterministic assertions** (0 LLM calls) — `assertions.py` checks `expected_facts` (substring match) and `expected_patterns` (regex match) against both responses
+
+**Cost per task:** 5 LLM calls (correctness×2 + completeness×2 + guideline_adherence×1). WITHOUT calls are cached, so subsequent iterations cost only 3 calls.
+
+**Scoring weights:**
+
+| Component | Weight | Source |
+|-----------|--------|--------|
+| Effectiveness delta | 30% | Mean of (correctness_delta + completeness_delta) |
+| Quality composite | 20% | Mean of (correctness + completeness + guideline_adherence) WITH scores |
+| Fact/pattern coverage | 15% | Deterministic assertions from `assertions.py` |
+| Guideline adherence | 10% | Dedicated weight for Databricks patterns |
+| Token efficiency | 10% | Smaller candidates score higher |
+| Structure | 5% | Syntax validation (Python, SQL, no hallucinated APIs) |
+| Regression penalty | -10% | Explicit penalty when regression_judge detects harm |
+
+**Categorical-to-float conversion:** `excellent=1.0`, `acceptable=0.6`, `poor=0.0`. The nonlinear scale incentivizes GEPA to push from "acceptable" to "excellent" (0.4 gap).
+
+### How GEPA uses evaluation feedback
+
+GEPA's reflection LM reads `side_info` rendered as markdown headers. Key fields:
+
+- **`Judge_correctness_with`** / **`Judge_correctness_without`** — per-dimension accuracy feedback with categorical verdicts
+- **`Judge_completeness_with`** / **`Judge_completeness_without`** — per-dimension coverage feedback
+- **`Judge_guideline_adherence`** — pattern compliance feedback (WITH only)
+- **`Judge_effectiveness`** — per-dimension deltas (`correctness_delta`, `completeness_delta`, `overall_delta`)
+- **`Regression_Analysis`** — specific "what to fix" guidance (only when regression detected)
+- **`Missing_Facts`** / **`Missing_Patterns`** — exact list of what the skill should add (from assertions)
+- **`Passed_Facts`** / **`Passed_Patterns`** — what the skill already covers
+- **`scores`** — feeds GEPA's multi-objective Pareto frontier (`correctness_with`, `completeness_with`, `guideline_adherence`, `quality_composite`, etc.)
+
+This gives GEPA three independent, actionable signals. A mutation that fixes correctness but doesn't help completeness shows clear movement on one dimension, guiding the next mutation.
+
+### Why three judges (not one, not five)?
+
+The previous single quality judge collapsed 5 criteria into one 0.0–1.0 score. When a mutation improved correctness but hurt completeness, the score barely moved — GEPA couldn't distinguish which dimension improved. Three judges cover the core evaluation dimensions without excessive cost:
+
+1. **Correctness** → fix errors (API syntax, deprecated patterns)
+2. **Completeness** → add missing content
+3. **Guideline adherence** → align with Databricks patterns + `--focus` areas
+
+Deterministic assertions in `assertions.py` remain for precise, structured `Missing_Facts` lists at zero LLM cost.
+
+### Agent evaluator (`--agent-eval`)
+
+Runs a real Claude Code agent and adds tool-call scoring:
+
+| Component | Weight |
+|-----------|--------|
+| Content quality | 20% |
+| Skill effectiveness | 20% |
+| Tool call correctness | 20% |
+| Behavioral compliance | 15% |
+| Execution success | 10% |
+| Tool call efficiency | 10% |
+| Token efficiency | 5% |
+
+The agent evaluator also uses `assertions.py` for structured `Missing_Facts`/`Missing_Patterns` feedback. Tool-call judges use MLflow's `ToolCallCorrectness`/`ToolCallEfficiency` when available, falling back to deterministic trace scorers.
+
+---
+
 ## Project Structure
 
 ```
@@ -325,8 +399,9 @@ Without `--tool-modules`, all skills are included regardless. Available modules:
 │       ├── runner.py            # Multi-pass GEPA orchestrator
 │       ├── skillbench_evaluator.py  # Fast proxy evaluator (WITH vs WITHOUT)
 │       ├── agent_evaluator.py   # Real Claude Code agent evaluator
+│       ├── assertions.py        # Deterministic fact/pattern assertions (zero LLM cost)
 │       ├── assessment_fetcher.py # MLflow assessment injection
-│       ├── judges.py            # MLflow judge factories + fallback chain
+│       ├── judges.py            # MLflow quality judge factory + fallback chain
 │       ├── config.py            # Presets, model registration
 │       ├── splitter.py          # Train/val dataset splitting
 │       ├── tools.py             # MCP tool description extraction

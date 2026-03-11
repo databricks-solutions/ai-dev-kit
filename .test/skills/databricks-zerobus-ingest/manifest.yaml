@@ -1,6 +1,7 @@
 skill_name: databricks-zerobus-ingest
 tool_modules: []
-description: Test cases for Zerobus Ingest skill - gRPC-based data ingestion into Delta tables
+description: Test cases for Zerobus Ingest skill - gRPC-based data ingestion into
+  Delta tables
 triggers:
 - zerobus
 - zerobus ingest
@@ -21,12 +22,26 @@ scorers:
   - guidelines_from_expectations
   default_guidelines:
   - Response must use the zerobus.sdk package (not fabricated imports)
-  - Code must follow the pattern: SDK init -> create stream -> ingest records -> handle ACKs -> close
+  - 'Code must follow the pattern: SDK init -> create stream -> ingest records ->
+    handle ACKs -> close'
   - Must include proper stream cleanup (try/finally or context manager)
-  - Must use correct classes (ZerobusSdk, StreamConfigurationOptions, TableProperties, RecordType)
+  - Must use correct classes (ZerobusSdk, StreamConfigurationOptions, TableProperties,
+    RecordType)
   - Must reference at-least-once delivery semantics when discussing reliability
   - Protobuf examples must use protoc-generated stubs, not hand-rolled messages
   - Server endpoint format must match the documented cloud-specific patterns
+  - '[FOCUS] Must use databricks-sdk>=0.97.0 (not older versions like 0.85.0) in all
+    pip install commands and requirements'
+  - '[FOCUS] Must use databricks-zerobus-ingest-sdk>=1.1.0 (not older versions like
+    0.2.0) in all pip install commands and requirements'
+  - '[FOCUS] Must include the smart protobuf/grpcio-tools compatibility check before
+    installing grpcio-tools to avoid runtime version conflicts'
+  - '[FOCUS] Must print or check the runtime protobuf version before installing grpcio-tools
+    and select a compatible grpcio-tools version accordingly'
+  - '[FOCUS] Must not hardcode a single grpcio-tools version without first inspecting
+    the runtime google.protobuf version'
+  - '[FOCUS] When specifying SDK versions in code comments or documentation, must
+    reflect the latest versions (databricks-sdk>=0.97.0, databricks-zerobus-ingest-sdk>=1.1.0)'
   trace_expectations:
     tool_limits:
       Bash: 10
@@ -40,5 +55,5 @@ scorers:
     - databricks-skills/databricks-zerobus-ingest/SKILL.md
 quality_gates:
   syntax_valid: 1.0
-  pattern_adherence: 0.9
+  pattern_adherence: 0.95
   execution_success: 0.8
