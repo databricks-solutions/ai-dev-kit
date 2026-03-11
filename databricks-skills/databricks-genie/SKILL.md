@@ -1,11 +1,11 @@
 ---
 name: databricks-genie
-description: "Create and query Databricks Genie Spaces for natural language SQL exploration. Use when building Genie Spaces or asking questions via the Genie Conversation API."
+description: "Create and query Databricks Genie Spaces for natural language SQL exploration. Use when building Genie Spaces, exporting and importing Genie Spaces, migrating Genie Spaces between workspaces or environments, or asking questions via the Genie Conversation API."
 ---
 
 # Databricks Genie
 
-Create and query Databricks Genie Spaces - natural language interfaces for SQL-based data exploration.
+Create, manage, and query Databricks Genie Spaces - natural language interfaces for SQL-based data exploration.
 
 ## Overview
 
@@ -18,6 +18,12 @@ Use this skill when:
 - Adding sample questions to guide users
 - Connecting Unity Catalog tables to a conversational interface
 - Asking questions to a Genie Space programmatically (Conversation API)
+- Exporting a Genie Space configuration (serialized_space) for backup or migration
+- Importing / cloning a Genie Space from a serialized payload
+- Migrating a Genie Space between workspaces or environments (dev → staging → prod)
+    - Only supports catalog remapping where catalog names differ across environments
+    - Not supported for schema and/or table names that differ across environments
+    - Not including migration of tables between environments (only migration of Genie Spaces)
 
 ## MCP Tools
 
@@ -25,9 +31,12 @@ Use this skill when:
 
 | Tool | Purpose |
 |------|---------|
-| `create_or_update_genie` | Create or update a Genie Space |
-| `get_genie` | Get space details (by ID) or list all spaces (no ID) |
+| `list_genie` | List all Genie Spaces accessible to you |
+| `create_or_update_genie` | Create or update a Genie Space (supports `serialized_space`) |
+| `get_genie` |  Get space details (by ID and support `include_serialized_space` parameter) or list all spaces (no ID) |
 | `delete_genie` | Delete a Genie Space |
+| `export_genie` | Export a Genie Space with full serialized configuration |
+| `import_genie` | Import / clone a Genie Space from a serialized payload |
 
 ### Conversation API
 
@@ -83,14 +92,27 @@ ask_genie(
 # Returns: SQL, columns, data, row_count
 ```
 
-## Workflow
+### 4. Export & Import (Clone / Migrate)
 
+Export a space (preserves all tables, instructions, SQL examples, and layout):
+
+```python
+exported = export_genie(space_id="your_space_id")
+# exported["serialized_space"] contains the full config
 ```
-1. Inspect tables    → get_table_details
-2. Create space      → create_or_update_genie
-3. Query space       → ask_genie (or test in Databricks UI)
-4. Curate (optional) → Use Databricks UI to add instructions
+
+Clone to a new space (same catalog):
+
+```python
+import_genie(
+    warehouse_id=exported["warehouse_id"],
+    serialized_space=exported["serialized_space"],
+    title=exported["title"],  # override title; omit to keep original
+    description=exported["description"],
+)
 ```
+
+> **Cross-workspace migration:** Each MCP server is workspace-scoped. Configure one server entry per workspace profile in your IDE's MCP config, then export from the source server and import via the target server. See [spaces.md §Migration](spaces.md#migrating-across-workspaces-with-catalog-remapping) for the full workflow.
 
 ## Reference Files
 
@@ -112,12 +134,7 @@ Use these skills in sequence:
 
 ## Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| **No warehouse available** | Create a SQL warehouse or provide `warehouse_id` explicitly |
-| **Poor query generation** | Add instructions and sample questions that reference actual column names |
-| **Slow queries** | Ensure warehouse is running; use OPTIMIZE on tables |
-
+See [spaces.md §Troubleshooting](spaces.md#troubleshooting) for a full list of issues and solutions.
 ## Related Skills
 
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Use Genie Spaces as agents inside Supervisor Agents
