@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Fraud Queue — Databricks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d26;
+      --surface2: #242736;
+      --border: #2e3145;
+      --text: #e2e4f0;
+      --text-muted: #8b8fa8;
+      --accent: #ff3621;       /* Databricks red */
+      --accent2: #1890ff;      /* info blue */
+      --high: #f5222d;
+      --medium: #fa8c16;
+      --low: #52c41a;
+      --green: #00c853;
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ─── Header ─────────────────────────────────────────────────── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 28px; height: 28px; }
+    .header h1 { font-size: 16px; font-weight: 600; color: var(--text); }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255, 54, 33, 0.15);
+      border: 1px solid rgba(255, 54, 33, 0.3);
+      color: var(--accent);
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+    }
+    .live-dot {
+      width: 7px; height: 7px; background: var(--accent);
+      border-radius: 50%; animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .refresh-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-muted); padding: 6px 14px; border-radius: 6px;
+      cursor: pointer; font-size: 12px; font-family: inherit;
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover { border-color: var(--accent2); color: var(--text); }
+
+    /* ─── Layout ─────────────────────────────────────────────────── */
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* ─── Summary Cards ──────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: var(--accent2); }
+    .stat-label { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .stat-value { font-size: 26px; font-weight: 700; color: var(--text); }
+    .stat-value.red { color: var(--high); }
+    .stat-value.orange { color: var(--medium); }
+    .stat-value.green { color: var(--green); }
+    .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ─── Filters ────────────────────────────────────────────────── */
+    .filters-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+      margin-bottom: 20px;
+    }
+    .filter-group { display: flex; align-items: center; gap: 8px; }
+    .filter-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    select, input[type="text"], input[type="number"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus, input:focus { border-color: var(--accent2); }
+    .btn {
+      padding: 7px 16px; border-radius: 6px; font-size: 13px;
+      font-family: inherit; cursor: pointer; border: none;
+      font-weight: 500; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #d42d1b; }
+    .btn-outline {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .btn-outline:hover { border-color: var(--text-muted); color: var(--text); }
+
+    /* ─── Alert Table ────────────────────────────────────────────── */
+    .table-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .table-header {
+      padding: 16px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .table-title { font-size: 14px; font-weight: 600; }
+    .total-count { font-size: 12px; color: var(--text-muted); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: var(--surface2);
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 11px; font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    td { padding: 12px 16px; font-size: 13px; }
+    .txn-id { font-family: monospace; font-size: 12px; color: var(--accent2); }
+    .account-id { font-family: monospace; font-size: 12px; }
+
+    /* Risk badges */
+    .risk-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+    }
+    .risk-high { background: rgba(245,34,45,0.15); color: var(--high); border: 1px solid rgba(245,34,45,0.3); }
+    .risk-medium { background: rgba(250,140,22,0.15); color: var(--medium); border: 1px solid rgba(250,140,22,0.3); }
+    .risk-low { background: rgba(82,196,26,0.15); color: var(--low); border: 1px solid rgba(82,196,26,0.3); }
+
+    /* Decision badges */
+    .decision-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+    }
+    .decision-blocked { background: rgba(245,34,45,0.15); color: var(--high); }
+    .decision-approved { background: rgba(82,196,26,0.15); color: var(--low); }
+    .decision-escalated { background: rgba(24,144,255,0.15); color: var(--accent2); }
+    .decision-pending { background: var(--surface2); color: var(--text-muted); }
+
+    /* Risk score bar */
+    .score-cell { display: flex; align-items: center; gap: 8px; }
+    .score-bar-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; min-width: 60px; }
+    .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .score-num { font-weight: 600; font-size: 13px; min-width: 30px; text-align: right; }
+
+    /* Signal pills */
+    .signals { display: flex; flex-wrap: wrap; gap: 4px; }
+    .signal-pill {
+      font-size: 10px; padding: 2px 7px; border-radius: 10px;
+      background: rgba(255,54,33,0.12); color: #ff7875;
+      border: 1px solid rgba(255,54,33,0.2);
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex; justify-content: center; align-items: center; gap: 8px;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .page-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-muted); padding: 6px 12px; border-radius: 6px;
+      cursor: pointer; font-size: 12px; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--accent2); color: var(--text); }
+    .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .page-btn.active { background: var(--accent2); border-color: var(--accent2); color: white; }
+    .page-info { font-size: 12px; color: var(--text-muted); }
+
+    /* ─── Modal (Alert Detail) ───────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 24px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: 100%; max-width: 760px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: var(--shadow);
+    }
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .modal-title { font-size: 16px; font-weight: 600; }
+    .modal-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .modal-close {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-muted); width: 30px; height: 30px;
+      border-radius: 6px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 24px; }
+    .detail-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      margin-bottom: 20px;
+    }
+    .detail-section {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 16px;
+    }
+    .detail-section h3 {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 12px;
+    }
+    .detail-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .detail-row:last-child { margin-bottom: 0; }
+    .detail-key { font-size: 12px; color: var(--text-muted); }
+    .detail-val { font-size: 12px; font-weight: 500; text-align: right; max-width: 55%; word-break: break-all; }
+    .ai-box {
+      background: linear-gradient(135deg, rgba(255,54,33,0.08) 0%, rgba(24,144,255,0.06) 100%);
+      border: 1px solid rgba(255,54,33,0.25);
+      border-radius: 8px; padding: 16px;
+      margin-bottom: 20px;
+    }
+    .ai-box-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    }
+    .ai-icon { font-size: 16px; }
+    .ai-title { font-size: 12px; font-weight: 600; color: var(--accent); }
+    .ai-score-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+    }
+    .ai-score-big {
+      font-size: 36px; font-weight: 700; line-height: 1;
+    }
+    .ai-explanation { font-size: 13px; line-height: 1.6; color: var(--text); }
+    .signals-section { margin-bottom: 20px; }
+    .signals-section h3 {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 10px;
+    }
+    .signal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .signal-card {
+      border-radius: 8px; padding: 10px 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .signal-active {
+      background: rgba(245,34,45,0.12); border: 1px solid rgba(245,34,45,0.25);
+    }
+    .signal-inactive {
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .signal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .signal-dot.active { background: var(--high); }
+    .signal-dot.inactive { background: var(--text-muted); }
+    .signal-name { font-size: 11px; font-weight: 500; }
+    .signal-active .signal-name { color: #ff7875; }
+    .signal-inactive .signal-name { color: var(--text-muted); }
+
+    /* Decision actions */
+    .decision-actions {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      padding-top: 16px; border-top: 1px solid var(--border);
+    }
+    .btn-block { background: rgba(245,34,45,0.2); color: var(--high); border: 1px solid rgba(245,34,45,0.4); }
+    .btn-block:hover { background: rgba(245,34,45,0.35); }
+    .btn-approve { background: rgba(82,196,26,0.2); color: var(--low); border: 1px solid rgba(82,196,26,0.4); }
+    .btn-approve:hover { background: rgba(82,196,26,0.35); }
+    .btn-escalate { background: rgba(24,144,255,0.2); color: var(--accent2); border: 1px solid rgba(24,144,255,0.4); }
+    .btn-escalate:hover { background: rgba(24,144,255,0.35); }
+    .decision-label { font-size: 12px; color: var(--text-muted); align-self: center; }
+
+    /* Loading spinner */
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent2); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-row td { text-align: center; padding: 40px; color: var(--text-muted); }
+
+    /* Toast */
+    .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 16px;
+      font-size: 13px; min-width: 240px;
+      box-shadow: var(--shadow); animation: slideIn 0.3s ease;
+      display: flex; align-items: center; gap: 8px;
+    }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .toast.success { border-color: var(--low); }
+    .toast.error { border-color: var(--high); }
+    .toast-icon { font-size: 16px; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+    .empty-state p { font-size: 14px; }
+
+    /* Amount */
+    .amount-cell { font-weight: 600; }
+    .amount-high { color: var(--high); }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-left">
+    <svg class="logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 5L95 30V70L50 95L5 70V30L50 5Z" fill="#FF3621"/>
+      <path d="M50 20L80 37V63L50 80L20 63V37L50 20Z" fill="white" opacity="0.9"/>
+    </svg>
+    <h1>Live Fraud Queue</h1>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <span style="font-size:12px;color:var(--text-muted)" id="last-updated">Loading...</span>
+    <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+  </div>
+</header>
+
+<!-- Main Content -->
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total Alerts</div><div class="stat-value" id="s-total">—</div></div>
+    <div class="stat-card"><div class="stat-label">High Risk</div><div class="stat-value red" id="s-high">—</div></div>
+    <div class="stat-card"><div class="stat-label">Medium Risk</div><div class="stat-value orange" id="s-medium">—</div></div>
+    <div class="stat-card"><div class="stat-label">Pending Review</div><div class="stat-value" id="s-pending">—</div></div>
+    <div class="stat-card"><div class="stat-label">Blocked</div><div class="stat-value red" id="s-blocked">—</div></div>
+    <div class="stat-card"><div class="stat-label">Approved</div><div class="stat-value green" id="s-approved">—</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Risk Score</div><div class="stat-value" id="s-avg">—</div></div>
+    <div class="stat-card"><div class="stat-label">High Risk %</div><div class="stat-value orange" id="s-high-pct">—</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="filter-group">
+      <span class="filter-label">Risk</span>
+      <select id="f-category" onchange="loadAlerts(0)">
+        <option value="">All</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Decision</span>
+      <select id="f-decision" onchange="loadAlerts(0)">
+        <option value="">All</option>
+        <option value="pending">Pending Review</option>
+        <option value="blocked">Blocked</option>
+        <option value="approved">Approved</option>
+        <option value="escalated">Escalated</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Min Score</span>
+      <input type="number" id="f-min-score" placeholder="0" min="0" max="100" style="width:70px" onchange="loadAlerts(0)" />
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Search</span>
+      <input type="text" id="f-search" placeholder="TXN ID or Account..." style="width:180px"
+             oninput="debounceSearch()" />
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Sort</span>
+      <select id="f-sort" onchange="loadAlerts(0)">
+        <option value="risk_score_desc">Highest Risk</option>
+        <option value="risk_score_asc">Lowest Risk</option>
+        <option value="amount_desc">Highest Amount</option>
+        <option value="timestamp_desc">Most Recent</option>
+      </select>
+    </div>
+    <button class="btn btn-outline" onclick="clearFilters()">Clear</button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container">
+    <div class="table-header">
+      <span class="table-title">Fraud Alerts</span>
+      <span class="total-count" id="table-total">Loading...</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Risk Score</th>
+          <th>Category</th>
+          <th>Transaction ID</th>
+          <th>Account</th>
+          <th>Amount</th>
+          <th>Type</th>
+          <th>Location</th>
+          <th>Signals</th>
+          <th>Decision</th>
+        </tr>
+      </thead>
+      <tbody id="alerts-tbody">
+        <tr class="loading-row"><td colspan="9"><div class="spinner"></div> Loading alerts...</td></tr>
+      </tbody>
+    </table>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<!-- Alert Detail Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">Transaction Detail</div>
+        <div class="modal-subtitle" id="modal-subtitle"></div>
+      </div>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body">Loading...</div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────
+let currentPage = 0;
+let pageSize = 50;
+let totalAlerts = 0;
+let searchTimeout = null;
+
+// ─── API helpers ──────────────────────────────────────────────────────
+async function apiFetch(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// ─── Load all data ────────────────────────────────────────────────────
+async function loadAll() {
+  document.getElementById('last-updated').textContent = 'Refreshing...';
+  await Promise.all([loadSummary(), loadAlerts(currentPage)]);
+  document.getElementById('last-updated').textContent =
+    'Updated ' + new Date().toLocaleTimeString();
+}
+
+async function loadSummary() {
+  try {
+    const d = await apiFetch('/api/summary');
+    document.getElementById('s-total').textContent = fmtNum(d.total_alerts);
+    document.getElementById('s-high').textContent = fmtNum(d.high_risk);
+    document.getElementById('s-medium').textContent = fmtNum(d.medium_risk);
+    document.getElementById('s-pending').textContent = fmtNum(d.pending_review);
+    document.getElementById('s-blocked').textContent = fmtNum(d.blocked);
+    document.getElementById('s-approved').textContent = fmtNum(d.approved);
+    document.getElementById('s-avg').textContent = d.avg_risk_score ?? '—';
+    document.getElementById('s-high-pct').textContent = d.high_risk_pct ? d.high_risk_pct + '%' : '—';
+  } catch(e) { console.error('Summary failed', e); }
+}
+
+async function loadAlerts(offset = 0) {
+  currentPage = offset;
+  const tbody = document.getElementById('alerts-tbody');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="9"><div class="spinner"></div> Loading...</td></tr>';
+
+  const params = new URLSearchParams({
+    limit: pageSize,
+    offset,
+    sort: document.getElementById('f-sort').value,
+  });
+  const cat = document.getElementById('f-category').value;
+  const dec = document.getElementById('f-decision').value;
+  const minS = document.getElementById('f-min-score').value;
+  const search = document.getElementById('f-search').value;
+  if (cat) params.append('risk_category', cat);
+  if (dec) params.append('decision', dec);
+  if (minS) params.append('min_score', minS);
+  if (search) params.append('search', search);
+
+  try {
+    const data = await apiFetch('/api/alerts?' + params);
+    totalAlerts = data.total;
+    document.getElementById('table-total').textContent =
+      `${fmtNum(totalAlerts)} alerts`;
+    renderTable(data.alerts);
+    renderPagination(offset, totalAlerts);
+  } catch(e) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="9" style="color:var(--high)">Error loading alerts: ${e.message}</td></tr>`;
+  }
+}
+
+function renderTable(alerts) {
+  const tbody = document.getElementById('alerts-tbody');
+  if (!alerts.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="icon">🔍</div><p>No alerts match your filters</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = alerts.map(a => {
+    const scoreColor = a.risk_score >= 75 ? 'var(--high)' : a.risk_score >= 50 ? 'var(--medium)' : 'var(--low)';
+    const signals = buildSignalPills(a);
+    const amtClass = a.amount > 10000 ? 'amount-high' : '';
+    return `<tr onclick="openModal('${a.transaction_id}')">
+      <td>
+        <div class="score-cell">
+          <div class="score-bar-track">
+            <div class="score-bar-fill" style="width:${a.risk_score}%;background:${scoreColor}"></div>
+          </div>
+          <span class="score-num" style="color:${scoreColor}">${Math.round(a.risk_score)}</span>
+        </div>
+      </td>
+      <td><span class="risk-badge risk-${a.risk_category}">${a.risk_category}</span></td>
+      <td><span class="txn-id">${a.transaction_id}</span></td>
+      <td><span class="account-id">${a.account_id}</span></td>
+      <td><span class="amount-cell ${amtClass}">$${fmtAmt(a.amount)} ${a.currency}</span></td>
+      <td>${a.transaction_type} / ${a.channel}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${a.geo_location}</td>
+      <td><div class="signals">${signals}</div></td>
+      <td>${renderDecisionBadge(a.analyst_decision)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function buildSignalPills(a) {
+  const pills = [];
+  if (a.sig_mfa_change) pills.push('<span class="signal-pill">MFA Change</span>');
+  if (a.sig_geo_mismatch) pills.push('<span class="signal-pill">Geo Mismatch</span>');
+  if (a.sig_high_value_wire) pills.push('<span class="signal-pill">High Wire</span>');
+  if (a.sig_new_device) pills.push('<span class="signal-pill">New Device</span>');
+  if (a.sig_international) pills.push('<span class="signal-pill">Intl</span>');
+  if (a.sig_large_wire) pills.push('<span class="signal-pill">Large Wire</span>');
+  return pills.slice(0, 3).join('') + (pills.length > 3 ? `<span class="signal-pill">+${pills.length-3}</span>` : '');
+}
+
+function renderDecisionBadge(d) {
+  if (!d) return '<span class="decision-badge decision-pending">Pending</span>';
+  return `<span class="decision-badge decision-${d}">${d}</span>`;
+}
+
+function renderPagination(offset, total) {
+  const el = document.getElementById('pagination');
+  const totalPages = Math.ceil(total / pageSize);
+  const page = Math.floor(offset / pageSize);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  let html = `
+    <button class="page-btn" onclick="loadAlerts(${Math.max(0, offset - pageSize)})" ${page === 0 ? 'disabled' : ''}>← Prev</button>
+    <span class="page-info">Page ${page + 1} of ${totalPages} (${fmtNum(total)} total)</span>
+    <button class="page-btn" onclick="loadAlerts(${offset + pageSize})" ${page >= totalPages - 1 ? 'disabled' : ''}>Next →</button>
+  `;
+  el.innerHTML = html;
+}
+
+// ─── Modal ─────────────────────────────────────────────────────────────
+async function openModal(txnId) {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.add('open');
+  document.getElementById('modal-body').innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner"></div></div>';
+  document.getElementById('modal-title').textContent = txnId;
+  document.getElementById('modal-subtitle').textContent = 'Loading details...';
+
+  try {
+    const a = await apiFetch(`/api/alerts/${txnId}`);
+    document.getElementById('modal-subtitle').textContent =
+      `Account ${a.account_id} · ${fmtDate(a.txn_timestamp)}`;
+    renderModal(a);
+  } catch(e) {
+    document.getElementById('modal-body').innerHTML =
+      `<p style="color:var(--high)">Error: ${e.message}</p>`;
+  }
+}
+
+function renderModal(a) {
+  const scoreColor = a.risk_score >= 75 ? 'var(--high)' : a.risk_score >= 50 ? 'var(--medium)' : 'var(--low)';
+  const signals = [
+    { key: 'sig_mfa_change', label: 'MFA Change' },
+    { key: 'sig_geo_mismatch', label: 'Geo Mismatch' },
+    { key: 'sig_high_value_wire', label: 'High Value Wire' },
+    { key: 'sig_new_device', label: 'New Device' },
+    { key: 'sig_international', label: 'International' },
+    { key: 'sig_large_wire', label: 'Large Wire' },
+  ];
+
+  const signalGrid = signals.map(s => {
+    const active = a[s.key];
+    return `<div class="signal-card ${active ? 'signal-active' : 'signal-inactive'}">
+      <div class="signal-dot ${active ? 'active' : 'inactive'}"></div>
+      <span class="signal-name">${s.label}</span>
+    </div>`;
+  }).join('');
+
+  const currentDecision = a.analyst_decision
+    ? `<div style="margin-bottom:12px"><span class="decision-badge decision-${a.analyst_decision}" style="font-size:13px;padding:5px 14px">Current Decision: ${a.analyst_decision.toUpperCase()}</span></div>`
+    : '';
+
+  document.getElementById('modal-body').innerHTML = `
+    <!-- AI Reasoning Box -->
+    <div class="ai-box">
+      <div class="ai-box-header">
+        <span class="ai-icon">🤖</span>
+        <span class="ai-title">AI FRAUD REASONING</span>
+        <span class="risk-badge risk-${a.risk_category}" style="margin-left:auto">${a.risk_category}</span>
+      </div>
+      <div class="ai-score-row">
+        <div class="ai-score-big" style="color:${scoreColor}">${Math.round(a.risk_score)}</div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px">Risk Score</div>
+          <div class="score-bar-track" style="width:200px;margin-top:6px">
+            <div class="score-bar-fill" style="width:${a.risk_score}%;background:${scoreColor}"></div>
+          </div>
+        </div>
+      </div>
+      <p class="ai-explanation">${a.ai_explanation || 'No AI explanation available yet.'}</p>
+    </div>
+
+    <!-- Signal Grid -->
+    <div class="signals-section">
+      <h3>Risk Signals (${a.risk_signal_count} detected)</h3>
+      <div class="signal-grid">${signalGrid}</div>
+    </div>
+
+    <!-- Detail Grid -->
+    <div class="detail-grid">
+      <div class="detail-section">
+        <h3>Transaction</h3>
+        <div class="detail-row"><span class="detail-key">Amount</span><span class="detail-val" style="font-weight:700;color:${a.amount > 10000 ? 'var(--high)' : 'var(--text)'}">$${fmtAmt(a.amount)} ${a.currency}</span></div>
+        <div class="detail-row"><span class="detail-key">Type</span><span class="detail-val">${a.transaction_type}</span></div>
+        <div class="detail-row"><span class="detail-key">Channel</span><span class="detail-val">${a.channel}</span></div>
+        <div class="detail-row"><span class="detail-key">Merchant</span><span class="detail-val">${a.merchant_type}</span></div>
+        <div class="detail-row"><span class="detail-key">Location</span><span class="detail-val">${a.geo_location}</span></div>
+        <div class="detail-row"><span class="detail-key">International</span><span class="detail-val">${a.is_international ? '🌍 Yes' : 'Domestic'}</span></div>
+        <div class="detail-row"><span class="detail-key">Device ID</span><span class="detail-val" style="font-family:monospace;font-size:11px">${a.device_id}</span></div>
+        <div class="detail-row"><span class="detail-key">Timestamp</span><span class="detail-val">${fmtDate(a.txn_timestamp)}</span></div>
+      </div>
+      <div class="detail-section">
+        <h3>Login Context</h3>
+        <div class="detail-row"><span class="detail-key">Login IP</span><span class="detail-val" style="font-family:monospace;font-size:11px">${a.login_ip || 'N/A'}</span></div>
+        <div class="detail-row"><span class="detail-key">Login Location</span><span class="detail-val">${a.login_geo || 'N/A'}</span></div>
+        <div class="detail-row"><span class="detail-key">MFA Changed</span><span class="detail-val" style="color:${a.mfa_change_event ? 'var(--high)' : 'var(--text)'}">${a.mfa_change_event ? '⚠️ Yes' : 'No'}</span></div>
+        <div class="detail-row"><span class="detail-key">User Agent</span><span class="detail-val" style="font-size:10px">${(a.user_agent || 'N/A').substring(0, 50)}...</span></div>
+        <div class="detail-row"><span class="detail-key">Login ID</span><span class="detail-val" style="font-family:monospace;font-size:11px">${a.recent_login_id || 'N/A'}</span></div>
+      </div>
+    </div>
+
+    <!-- Analyst Actions -->
+    <div>
+      ${currentDecision}
+      <div class="decision-actions">
+        <span class="decision-label">Analyst Action:</span>
+        <button class="btn btn-block" onclick="submitDecision('${a.transaction_id}', 'blocked')">🚫 Block Transaction</button>
+        <button class="btn btn-approve" onclick="submitDecision('${a.transaction_id}', 'approved')">✅ Approve as Legitimate</button>
+        <button class="btn btn-escalate" onclick="submitDecision('${a.transaction_id}', 'escalated')">⬆️ Escalate to Senior</button>
+      </div>
+    </div>
+  `;
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModalDirect();
+}
+function closeModalDirect() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// ─── Analyst Decision ──────────────────────────────────────────────────
+async function submitDecision(txnId, decision) {
+  try {
+    await fetch(`/api/alerts/${txnId}/decision`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ transaction_id: txnId, decision }),
+    });
+    showToast('success', `Transaction ${decision.toUpperCase()}`, `${txnId} has been ${decision}`);
+    closeModalDirect();
+    loadAll();
+  } catch(e) {
+    showToast('error', 'Decision failed', e.message);
+  }
+}
+
+// ─── Utilities ─────────────────────────────────────────────────────────
+function fmtNum(n) { return n != null ? Number(n).toLocaleString() : '—'; }
+function fmtAmt(n) { return n != null ? Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'; }
+function fmtDate(s) {
+  if (!s) return 'N/A';
+  return new Date(s).toLocaleString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+
+function clearFilters() {
+  ['f-category','f-decision','f-sort'].forEach(id => document.getElementById(id).value = id === 'f-sort' ? 'risk_score_desc' : '');
+  document.getElementById('f-min-score').value = '';
+  document.getElementById('f-search').value = '';
+  loadAlerts(0);
+}
+
+function debounceSearch() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => loadAlerts(0), 400);
+}
+
+function showToast(type, title, msg) {
+  const icon = type === 'success' ? '✅' : '❌';
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${icon}</span><div><div style="font-weight:600;font-size:13px">${title}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${msg}</div></div>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ─── Auto-refresh ──────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 30000); // refresh every 30s
+</script>
+</body>
+</html>

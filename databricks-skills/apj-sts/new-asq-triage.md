@@ -19,7 +19,11 @@ For workspace setup ASQs, check if:
 - The completed workspace checklist based on the cloud (Azure, AWS, or GCP) has been attached to the ASQ.
 
 If the workspace type is not specified and the workspace checklist is not filled and attached:
-- Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** stating the request does not specify the workspace type and cannot be assigned to an engineer.
+- Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** stating the request does not specify the workspace type and cannot be assigned to an engineer. Include a link to [go/wssetup-cheatsheet](https://sites.google.com/databricks.com/sts-workspace-setup) for reference.
+- Change the status of the ASQs to **'Under Review'**.
+
+If the workspace type is specified but the workspace checklist has **not** been attached:
+- Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** requesting them to fill out and attach the workspace setup checklist. Include a link to [go/wssetup-cheatsheet](https://sites.google.com/databricks.com/sts-workspace-setup) to help them complete the checklist.
 - Change the status of the ASQs to **'Under Review'**.
 
 ### 4. Validate Against STS Catalog
@@ -56,6 +60,10 @@ For ASQs that qualify for STS support, recommend which APJ STS engineer the requ
 #### Shadow Assignments
 - Identify engineers to be added to SFDC chatter/activity for shadow based on the shadow wishlist column in the [capacity spreadsheet](https://docs.google.com/spreadsheets/d/127ULgyQH8eDvqNJA5r35xeYvHHfS4_vjnO-BnqEvTNo/edit?gid=2004962154#gid=2004962154).
 - Add engineer for shadow tagging their email id and **#Shadow**.
+
+#### Status Values
+- When assigning an ASQ to an engineer, set the status to **'In Progress'**. There is no 'Assigned' status — do not use it.
+- When assigning an ASQ to an engineer, also update the **OwnerId** of the ASQ record to the assigned engineer's Salesforce User ID.
 
 #### Output Format
 - Show the final results in a **tabular format** with recommendations on all ASQs analyzed. Include:

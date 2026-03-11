@@ -1,3 +1,7 @@
+/* AG Grid legacy theme CSS (dash-ag-grid v33 removed bundled CSS) */
+@import url("https://cdn.jsdelivr.net/npm/ag-grid-community@31.3.4/styles/ag-grid.css");
+@import url("https://cdn.jsdelivr.net/npm/ag-grid-community@31.3.4/styles/ag-theme-alpine.css");
+
 /* Live Fraud Queue — custom styles */
 
 :root {

@@ -1,0 +1,14 @@
+[project]
+name = "banking-fraud-analytics"
+version = "0.1.0"
+description = "Fraud Triage Agent - Databricks Lakehouse Demo"
+requires-python = ">=3.12"
+dependencies = [
+    "databricks-connect>=17.0.0,<=17.0.1",
+    "dbldatagen>=0.4.0.post1",
+    "jmespath>=1.0.1",
+    "pyparsing>=3.2.5",
+    "faker>=24.0.0",
+    "openai>=1.0.0",
+    "databricks-sdk>=0.20.0",
+]

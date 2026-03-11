@@ -1,0 +1,95 @@
+bundle:
+  name: fraud_triage_agent
+
+workspace:
+  host: https://fevm-sv-ai-builder-workspace.cloud.databricks.com
+
+variables:
+  catalog:
+    default: sv_ai_builder_workspace_catalog
+  schema:
+    default: fraud_demo
+
+resources:
+  jobs:
+    generate_fraud_data:
+      name: "[${bundle.environment}] Fraud Triage - Generate Synthetic Data"
+      tasks:
+        - task_key: generate_fraud_data
+          spark_python_task:
+            python_file: ${workspace.file_path}/generate_fraud_data.py
+            source: WORKSPACE
+          environment_key: serverless_env
+
+      environments:
+        - environment_key: serverless_env
+          spec:
+            client: "4"
+            dependencies:
+              - "dbldatagen==0.4.0.post1"
+              - "jmespath==1.0.1"
+              - "pyparsing==3.2.5"
+
+    run_fraud_scoring:
+      name: "[${bundle.environment}] Fraud Triage - AI Scoring Agent"
+      tasks:
+        - task_key: score_fraud_alerts
+          spark_python_task:
+            python_file: ${workspace.file_path}/fraud_scoring_agent.py
+            source: WORKSPACE
+          environment_key: ai_env
+
+      environments:
+        - environment_key: ai_env
+          spec:
+            client: "4"
+            dependencies:
+              - "databricks-sdk>=0.20.0"
+              - "openai>=1.0.0"
+
+    run_streaming_pipeline:
+      name: "[${bundle.environment}] Fraud Triage - Streaming Pipeline"
+      tasks:
+        - task_key: streaming_pipeline
+          spark_python_task:
+            python_file: ${workspace.file_path}/streaming_pipeline.py
+            source: WORKSPACE
+          environment_key: streaming_env
+
+      environments:
+        - environment_key: streaming_env
+          spec:
+            client: "4"
+            dependencies:
+              - "databricks-sdk>=0.20.0"
+              - "openai>=1.0.0"
+
+  apps:
+    live_fraud_queue:
+      name: live-fraud-queue
+      description: "Live Fraud Queue - Real-time analyst triage application"
+      source_code_path: ./live_fraud_queue
+      config:
+        command:
+          - "uvicorn"
+          - "app:app"
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+      resources:
+        - name: fraud-warehouse
+          sql_warehouse:
+            id: ec21a6912382cb9d
+            permission: CAN_USE
+        - name: fraud-serving
+          serving_endpoint:
+            name: databricks-claude-sonnet-4-5
+            permission: CAN_QUERY
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      root_path: /Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.environment}
