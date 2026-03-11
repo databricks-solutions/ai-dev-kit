@@ -244,6 +244,49 @@ query_serving_endpoint(
 
 ---
 
+## Agent Deployment Patterns
+
+### UC Volume Access in Serving
+
+Model Serving endpoints can access UC Volumes at runtime, but `mlflow.models.predict` (pre-deployment validation) **cannot**. Bundle files with a fallback:
+
+```python
+# When logging the model — bundle files from volumes
+mlflow.pyfunc.log_model(
+    python_model="agent.py",
+    code_paths=["/path/to/local/copy"],  # copied from volume
+)
+```
+
+In the agent, resolve paths with fallback:
+
+```python
+from pathlib import Path
+
+def _resolve_path() -> str:
+    volume_path = os.environ.get("MY_PATH", "/Volumes/catalog/schema/volume")
+    if Path(volume_path).exists():
+        return volume_path
+    for candidate in [Path(__file__).parent / "bundle", Path(__file__).parent / "code" / "bundle"]:
+        if candidate.exists():
+            return str(candidate)
+    return volume_path
+```
+
+### Notebook Deployment Pattern (%%writefile)
+
+1. `%pip install ...` + `dbutils.library.restartPython()`
+2. Set widgets + config + `os.environ[...] = ...`
+3. `%%writefile agent.py` — agent code with env var fallbacks
+4. `dbutils.library.restartPython()` — **critical** to pick up new file
+5. `from agent import AGENT` — test locally
+6. `mlflow.pyfunc.log_model(python_model="agent.py", ...)`
+7. `agents.deploy(...)` + wait loop
+
+> The `restartPython()` between writing and importing is critical — without it, Python caches a stale module.
+
+---
+
 ## Common Issues
 
 | Issue | Solution |
@@ -254,6 +297,9 @@ query_serving_endpoint(
 | **Tool timeout** | Use job-based deployment, not synchronous calls |
 | **Auth error on endpoint** | Ensure `resources` specified in `log_model` for auto passthrough |
 | **Model not found** | Check Unity Catalog path: `catalog.schema.model_name` |
+| **UC Volume not found during `mlflow.models.predict`** | Bundle files via `code_paths` + add fallback path resolution (see Deployment Patterns above) |
+| **Stale module after `%%writefile`** | Add `dbutils.library.restartPython()` between write and import |
+| **`UPDATE_FAILED` with `DEPLOYMENT_ABORTED`** | Infrastructure timeout — retry deployment usually works |
 
 ### Critical: ResponsesAgent Output Format
 
