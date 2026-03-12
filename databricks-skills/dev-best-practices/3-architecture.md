@@ -1,6 +1,6 @@
 # Part III: Software Architecture
 
-Good architecture makes code easier to understand, test, and hand off. In FDE engagements, customers inherit everything we build — our architectural choices become their long-term maintenance burden.
+Good architecture makes code easier to understand, test, and hand off. Customers inherit everything we build — our architectural choices become their long-term maintenance burden.
 
 ## 6.1 Design Principles
 

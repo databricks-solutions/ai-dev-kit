@@ -1,6 +1,6 @@
 # Part IV: Databricks Platform
 
-Databricks-specific best practices for FDE engagements. This section covers patterns that matter most for building handoff-ready solutions. For comprehensive platform guidance, see [Databricks docs](https://docs.databricks.com/).
+Databricks-specific best practices for building handoff-ready solutions. For comprehensive platform guidance, see [Databricks docs](https://docs.databricks.com/).
 
 ## 7.1 Notebooks
 
@@ -37,7 +37,7 @@ result = customer_pipeline.run(spark, catalog, config)
 
 ## 7.2 Databricks Asset Bundles (DABs)
 
-DABs are the **required** approach for managing Databricks infrastructure in FDE engagements. They enable infrastructure as code, version-controlled deployments, and consistent dev/prod environments.
+DABs are the **required** approach for managing Databricks infrastructure. They enable infrastructure as code, version-controlled deployments, and consistent dev/prod environments.
 
 **Why DABs:**
 - **Multi-environment:** Same code deploys to dev, staging, prod with variable substitution
@@ -234,8 +234,8 @@ changes = spark.read.format("delta") \
 - [ ] All personal dev resources deleted (`databricks bundle destroy`)
 - [ ] Production resources documented in Reference Doc
 - [ ] Ownership transferred to customer team
-- [ ] FDE access removed or downgraded
-- [ ] Service principal credentials rotated (if FDE had access)
+- [ ] Developer access removed or downgraded
+- [ ] Service principal credentials rotated (if temporary dev access was granted)
 - [ ] No orphaned resources (clusters, jobs, endpoints)
 - [ ] Customer can deploy and operate independently
 

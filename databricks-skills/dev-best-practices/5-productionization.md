@@ -1,6 +1,6 @@
 # Part VI: Productionization
 
-Productionization is where FDE engagements deliver lasting value. It's not enough to build something that works in a notebook — we need to deliver systems that are tested, observable, deployable, and maintainable by the customer team after we leave.
+Productionization is where development teams deliver lasting value. It's not enough to build something that works in a notebook — we need to deliver systems that are tested, observable, deployable, and maintainable by the customer team after we leave.
 
 ## 11. Observability & Monitoring
 
@@ -207,7 +207,7 @@ jobs:
 
 ## 13. Documentation & Handoff
 
-Documentation is how knowledge survives the engagement. The customer team will maintain this system after FDE leaves.
+Documentation is how knowledge survives the engagement. The customer team will maintain this system after the project team leaves.
 
 ### 13.1 Documentation Artifacts
 

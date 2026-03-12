@@ -64,8 +64,8 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-bundles** - DABs for multi-environment deployments
 - **databricks-app-apx** - Full-stack apps (FastAPI + React)
 - **databricks-app-python** - Python web apps (Dash, Streamlit, Flask) with foundation model integration
+- **dev-best-practices** - Databricks development best practices: Git workflow, code quality, architecture, CI/CD, and production handoff
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
-- **databricks-config** - Profile authentication setup
 - **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
 
 ### 📚 Reference
