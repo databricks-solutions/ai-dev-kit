@@ -1,11 +1,11 @@
 ---
-name: databricks-fde-playbook
-description: "FDE engagement best practices for Databricks: Git workflow, code quality, architecture, platform usage, CI/CD, testing, and production handoff. Use when working on Databricks FDE engagements or building production-ready Databricks solutions."
+name: dev-best-practices
+description: "Databricks development best practices: Git workflow, code quality, architecture, platform usage, CI/CD, testing, and production handoff. Use when building production-ready Databricks solutions."
 ---
 
-# FDE Technical Playbook
+# Databricks Development Best Practices
 
-A practical guide for how FDE teams write code, collaborate, and ship production-ready solutions on Databricks — from environment setup to customer handoff.
+A practical guide for writing code, collaborating, and shipping production-ready solutions on Databricks — from environment setup to customer handoff.
 
 ## Core Philosophy
 
@@ -30,6 +30,10 @@ A practical guide for how FDE teams write code, collaborate, and ship production
 | Git branch naming | [1-foundations-and-setup.md](1-foundations-and-setup.md) | §3.2 Branch Strategy |
 | PR workflow | [1-foundations-and-setup.md](1-foundations-and-setup.md) | §3.4–3.6 Pull Requests |
 | Python type hints / docstrings | [2-code-quality.md](2-code-quality.md) | §4.1–4.2 |
+| Naming conventions | [2-code-quality.md](2-code-quality.md) | §4.3 Naming |
+| Error handling | [2-code-quality.md](2-code-quality.md) | §4.4 Error Handling |
+| Code simplicity | [2-code-quality.md](2-code-quality.md) | §4.5 Code Simplicity |
+| Logging standards | [2-code-quality.md](2-code-quality.md) | §4.6 Logging |
 | Testing philosophy | [2-code-quality.md](2-code-quality.md) | §4.7 Testing |
 | Project structure | [3-architecture.md](3-architecture.md) | §6.2 Project Structure |
 | Config management pattern | [3-architecture.md](3-architecture.md) | §6.4 Config Management |

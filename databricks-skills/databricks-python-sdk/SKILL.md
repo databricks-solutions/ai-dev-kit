@@ -616,7 +616,7 @@ If I'm unsure about a method, I should:
 
 ## Related Skills
 
-- **[databricks-fde-playbook](../databricks-fde-playbook/SKILL.md)** - FDE engagement best practices (dev environment, Git workflow, architecture, CI/CD)
+- **[dev-best-practices](../dev-best-practices/SKILL.md)** - Databricks development best practices (dev environment, Git workflow, architecture, CI/CD)
 - **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying resources via DABs
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - job orchestration patterns
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - catalog governance

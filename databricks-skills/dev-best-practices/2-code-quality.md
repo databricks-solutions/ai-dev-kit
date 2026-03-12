@@ -1,6 +1,6 @@
 # Part II: Code Quality Standards
 
-Code quality isn't about perfection — it's about writing code that's easy to understand, maintain, and hand off. In FDE engagements, customers inherit our code. Every shortcut becomes their technical debt.
+Code quality isn't about perfection — it's about writing code that's easy to understand, maintain, and hand off. Customers inherit our code — every shortcut becomes their technical debt.
 
 If a customer has existing style guides, adopt theirs. Consistency with their codebase matters more than our preferences.
 

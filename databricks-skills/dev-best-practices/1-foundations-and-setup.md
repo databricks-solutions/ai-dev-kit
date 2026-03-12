@@ -379,18 +379,42 @@ databricks bundle destroy -t dev   # clean up dev resources
 
 ### 5.7 Cost Consciousness
 
-**Clusters:** Terminate when not in use, auto-terminate 30–60 min, right-size (start small).
+Databricks compute costs accrue whenever clusters are running — treat compute as a shared resource.
 
-**Tables:** Delete test tables when done, use `dev_{username}_*` naming, don't write to prod during development.
+**Clusters:**
+- Terminate clusters when not actively using them — never leave them running overnight
+- Configure auto-termination: 30–60 minutes for interactive clusters, shorter for job clusters
+- Right-size your cluster: start with the smallest instance that meets your needs, scale up only when needed
+- Use single-node clusters for development and testing when distributed compute isn't required
+- Use Databricks Connect from VS Code/Cursor to avoid launching a full cluster for lightweight tasks
 
-**MLflow:** Delete failed/abandoned runs, clean up unused model versions.
+**Tables & Storage:**
+- Delete test/scratch tables when done with a task
+- Use `dev_{username}_*` naming for all dev tables (e.g., `dev_niall_customer_data`)
+- Never write to prod catalogs during development
+- Clean up intermediate checkpoint files from streaming jobs
+
+**MLflow:**
+- Delete failed or abandoned experiment runs
+- Clean up unused model versions in the registry
+- Don't log unnecessary artifacts (large DataFrames, full datasets)
+
+**DABs & Resources:**
+- Destroy dev bundle resources when a feature branch is complete
+- Don't leave deployed dev jobs running on schedules
 
 ```sql
 -- find tables you created in dev
 SHOW TABLES IN dev_catalog.dev_schema LIKE '*niall*';
+
+-- drop dev tables when done
+DROP TABLE IF EXISTS dev_catalog.dev_schema.dev_niall_scratch;
 ```
 
 ```bash
 # destroy DAB dev resources when done with a feature
 databricks bundle destroy -t dev
+
+# check for running clusters you own
+databricks clusters list --output json | jq '.[] | select(.state == "RUNNING") | {id: .cluster_id, name: .cluster_name}'
 ```
