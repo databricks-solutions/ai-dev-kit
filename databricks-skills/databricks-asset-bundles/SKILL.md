@@ -312,7 +312,7 @@ databricks bundle destroy -t prod --auto-approve
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - pipeline definitions referenced by DABs
 - **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - app deployment via DABs
 - **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python app deployment via DABs
-- **[databricks-config](../databricks-config/SKILL.md)** - profile and authentication setup for CLI/SDK
+- **[databricks-fde-playbook](../databricks-fde-playbook/SKILL.md)** - FDE engagement best practices including DABs philosophy, CI/CD, and dev environment setup
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - job orchestration managed through bundles
 
 ## Resources
