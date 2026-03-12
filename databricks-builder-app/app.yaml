@@ -30,7 +30,7 @@ env:
   # =============================================================================
   # Comma-separated list of skills to enable
   - name: ENABLED_SKILLS
-    value: "databricks-asset-bundles,databricks-agent-bricks,databricks-aibi-dashboards,databricks-app-apx,databricks-app-python,databricks-config,databricks-docs,databricks-jobs,databricks-python-sdk,databricks-unity-catalog,mlflow-evaluation,spark-declarative-pipelines,synthetic-data-generation,unstructured-pdf-generation"
+    value: "databricks-agent-bricks,databricks-aibi-dashboards,databricks-app-apx,databricks-app-python,databricks-asset-bundles,databricks-config,databricks-dbsql,databricks-docs,databricks-genie,databricks-jobs,databricks-lakebase-autoscale,databricks-lakebase-provisioned,databricks-metric-views,databricks-mlflow-evaluation,databricks-model-serving,databricks-python-sdk,databricks-spark-declarative-pipelines,databricks-spark-structured-streaming,databricks-synthetic-data-generation,databricks-unity-catalog,databricks-unstructured-pdf-generation,databricks-vector-search,databricks-zerobus-ingest,spark-python-data-source"
   - name: SKILLS_ONLY_MODE
     value: "false"
   
@@ -52,7 +52,7 @@ env:
   #
   # You only need to specify the instance name for OAuth token generation:
   - name: LAKEBASE_INSTANCE_NAME
-    value: "fe-shared-demo"
+    value: "wanderbricks-lakebase"
   - name: LAKEBASE_DATABASE_NAME
     value: "databricks_postgres"
   - name: LAKEBASE_SCHEMA_NAME
@@ -114,7 +114,7 @@ env:
     value: "databricks-uc"
   # Optional: Default MLflow experiment for traces (can be overridden per-session in the UI)
   - name: MLFLOW_EXPERIMENT_NAME
-    value: ""  # Set to your MLflow experiment path, e.g. "/Users/your.email@databricks.com/claude-code-traces"
+    value: "/Users/scott.johnson@databricks.com/claude-code-traces"
 
   # =============================================================================
   # Permission Configuration

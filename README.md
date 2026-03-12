@@ -40,6 +40,10 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
 | [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
 | [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
+| [**UI Assistant MCP APP**](databricks-mcp-app/) | DBX APP bundling the MCP to expose tools to the UI assistant | `databricks-mcp-app/` | 
+
+**For AI assistants:** When working in this repo, use the **Databricks MCP** tools (e.g. `execute_sql`, `create_or_update_pipeline`, `manage_jobs`, `query_lakebase`, Lakebase/UC/Genie/dashboard tools) for Databricks operations instead of suggesting only CLI or SDK snippets. Skills provide patterns; MCP performs the actions.
+
 ---
 
 ## Quick Start
