@@ -616,8 +616,8 @@ If I'm unsure about a method, I should:
 
 ## Related Skills
 
-- **[databricks-config](../databricks-config/SKILL.md)** - profile and authentication setup
-- **[databricks-bundles](../databricks-bundles/SKILL.md)** - deploying resources via DABs
+- **[databricks-fde-playbook](../databricks-fde-playbook/SKILL.md)** - FDE engagement best practices (dev environment, Git workflow, architecture, CI/CD)
+- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying resources via DABs
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - job orchestration patterns
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - catalog governance
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving endpoint management
