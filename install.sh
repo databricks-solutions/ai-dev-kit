@@ -1410,12 +1410,12 @@ write_mcp_configs() {
     for tool in $TOOLS; do
         case $tool in
             claude)
-                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude/mcp.json" || write_mcp_json "$base_dir/.mcp.json"
+                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude.json" || write_mcp_json "$base_dir/.mcp.json"
                 ok "Claude MCP config"
                 # Add version check hook to Claude settings
                 local check_script="$REPO_DIR/.claude-plugin/check_update.sh"
                 if [ "$SCOPE" = "global" ]; then
-                    write_claude_hook "$HOME/.claude/settings.json" "$check_script"
+                    write_claude_hook "$HOME/.claude.json" "$check_script"
                 else
                     write_claude_hook "$base_dir/.claude/settings.json" "$check_script"
                 fi
