@@ -42,6 +42,7 @@ def create_or_update_genie(
     description: Optional[str] = None,
     sample_questions: Optional[List[str]] = None,
     space_id: Optional[str] = None,
+    serialized_space: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create or update a Genie Space for SQL-based data exploration.
@@ -58,6 +59,9 @@ def create_or_update_genie(
         description: Optional description of what the Genie space does
         sample_questions: Optional list of sample questions to help users
         space_id: Optional existing space_id to update instead of create
+        serialized_space: Optional JSON string containing full space configuration
+            (settings, instructions). Use this to import/clone a Genie space
+            exported via get_genie with include_serialized_space=True.
 
     Returns:
         Dictionary with:
@@ -75,6 +79,14 @@ def create_or_update_genie(
         ...     sample_questions=["What were total sales last month?"]
         ... )
         {"space_id": "abc123...", "display_name": "Sales Analytics", "operation": "created", ...}
+
+        Clone a space:
+        >>> source = get_genie(space_id="abc123", include_serialized_space=True)
+        >>> create_or_update_genie(
+        ...     display_name="Sales Analytics (Copy)",
+        ...     table_identifiers=source["table_identifiers"],
+        ...     serialized_space=source["serialized_space"]
+        ... )
     """
     try:
         description = with_description_footer(description)
@@ -99,6 +111,7 @@ def create_or_update_genie(
                     warehouse_id=warehouse_id,
                     table_identifiers=table_identifiers,
                     sample_questions=sample_questions,
+                    serialized_space=serialized_space,
                 )
             else:
                 return {"error": f"Genie space {space_id} not found"}
@@ -113,6 +126,7 @@ def create_or_update_genie(
                     warehouse_id=warehouse_id,
                     table_identifiers=table_identifiers,
                     sample_questions=sample_questions,
+                    serialized_space=serialized_space,
                 )
                 space_id = existing.space_id
             else:
@@ -121,6 +135,7 @@ def create_or_update_genie(
                     warehouse_id=warehouse_id,
                     table_identifiers=table_identifiers,
                     description=description,
+                    serialized_space=serialized_space,
                 )
                 space_id = result.get("space_id", "")
 
@@ -154,7 +169,10 @@ def create_or_update_genie(
 
 
 @mcp.tool
-def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
+def get_genie(
+    space_id: Optional[str] = None,
+    include_serialized_space: bool = False,
+) -> Dict[str, Any]:
     """
     Get details of a Genie Space, or list all spaces.
 
@@ -163,6 +181,9 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
 
     Args:
         space_id: The Genie space ID. If omitted, lists all spaces.
+        include_serialized_space: If True, includes the serialized_space field
+            containing the full space configuration (settings, instructions).
+            Useful for exporting a space to clone or import elsewhere.
 
     Returns:
         Single space dict (if space_id provided) or {"spaces": [...]}.
@@ -173,11 +194,15 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
 
         >>> get_genie()
         {"spaces": [{"space_id": "abc123...", "title": "Sales Analytics", ...}, ...]}
+
+        Export for cloning:
+        >>> get_genie("abc123...", include_serialized_space=True)
+        {"space_id": "abc123...", ..., "serialized_space": "{...}"}
     """
     if space_id:
         try:
             manager = _get_manager()
-            result = manager.genie_get(space_id)
+            result = manager.genie_get(space_id, include_serialized_space=include_serialized_space)
 
             if not result:
                 return {"error": f"Genie space {space_id} not found"}
@@ -185,7 +210,7 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
             questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
             sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
 
-            return {
+            response = {
                 "space_id": result.get("space_id", space_id),
                 "display_name": result.get("display_name", ""),
                 "description": result.get("description", ""),
@@ -193,6 +218,11 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
                 "table_identifiers": result.get("table_identifiers", []),
                 "sample_questions": sample_questions,
             }
+
+            if include_serialized_space and result.get("serialized_space"):
+                response["serialized_space"] = result["serialized_space"]
+
+            return response
         except Exception as e:
             return {"error": f"Failed to get Genie space {space_id}: {e}"}
 
@@ -244,6 +274,192 @@ def delete_genie(space_id: str) -> Dict[str, Any]:
         return {"success": True, "space_id": space_id}
     except Exception as e:
         return {"success": False, "space_id": space_id, "error": str(e)}
+
+
+@mcp.tool
+def clone_genie(
+    source_space_id: str,
+    new_display_name: str,
+    warehouse_id: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Clone a Genie Space by exporting its full configuration and creating a new space.
+
+    Exports the source space (including settings, instructions, sample questions)
+    and imports it as a new space. Useful for promoting spaces across environments
+    or creating variants for different teams.
+
+    Args:
+        source_space_id: The Genie space ID to clone from
+        new_display_name: Display name for the cloned space
+        warehouse_id: Optional warehouse ID for the clone. If not provided,
+            uses the same warehouse as the source space.
+        description: Optional description for the clone. If not provided,
+            uses the source space's description.
+
+    Returns:
+        Dictionary with:
+        - space_id: The new cloned space ID
+        - display_name: The new display name
+        - source_space_id: The original space ID
+        - operation: 'cloned'
+
+    Example:
+        >>> clone_genie(
+        ...     source_space_id="abc123...",
+        ...     new_display_name="Sales Analytics (Staging)",
+        ... )
+        {"space_id": "def456...", "display_name": "Sales Analytics (Staging)", ...}
+    """
+    try:
+        manager = _get_manager()
+
+        source = manager.genie_get(source_space_id, include_serialized_space=True)
+        if not source:
+            return {"error": f"Source Genie space {source_space_id} not found"}
+
+        target_warehouse = warehouse_id or source.get("warehouse_id")
+        if not target_warehouse:
+            target_warehouse = manager.get_best_warehouse_id()
+            if not target_warehouse:
+                return {"error": "No SQL warehouses available. Please provide a warehouse_id."}
+
+        target_description = description or source.get("description", "")
+
+        result = manager.genie_create(
+            display_name=new_display_name,
+            warehouse_id=target_warehouse,
+            table_identifiers=source.get("table_identifiers", []),
+            description=target_description,
+            serialized_space=source.get("serialized_space"),
+        )
+
+        new_space_id = result.get("space_id", "")
+
+        try:
+            if new_space_id:
+                from ..manifest import track_resource
+
+                track_resource(
+                    resource_type="genie_space",
+                    name=new_display_name,
+                    resource_id=new_space_id,
+                )
+        except Exception:
+            pass
+
+        return {
+            "space_id": new_space_id,
+            "display_name": new_display_name,
+            "source_space_id": source_space_id,
+            "operation": "cloned",
+            "warehouse_id": target_warehouse,
+            "table_count": len(source.get("table_identifiers", [])),
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to clone Genie space: {e}"}
+
+
+@mcp.tool
+def manage_genie_instructions(
+    space_id: str,
+    action: str = "list",
+    instruction_type: Optional[str] = None,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+    instructions: Optional[List[Dict[str, str]]] = None,
+) -> Dict[str, Any]:
+    """
+    Manage instructions for a Genie Space (list, add text notes, add SQL examples).
+
+    Instructions guide how Genie interprets questions and generates SQL.
+    Text instructions provide general guidance; SQL instructions provide
+    example queries that Genie can reference.
+
+    Args:
+        space_id: The Genie space ID
+        action: One of:
+            - "list": List all instructions in the space
+            - "add_text": Add a text instruction/note
+            - "add_sql": Add a SQL query example
+            - "add_sql_function": Add a certified SQL function
+            - "add_batch": Add multiple SQL instructions at once
+        instruction_type: Not needed — determined by action
+        title: Title for the instruction (required for add_text, add_sql)
+        content: Content of the instruction (required for add_text, add_sql,
+            add_sql_function)
+        instructions: For add_batch: list of {"title": str, "content": str}
+            dicts to add as SQL instructions
+
+    Returns:
+        For "list": {"instructions": [...]} with all instructions
+        For "add_*": The created instruction dict
+        For "add_batch": {"added": int, "results": [...]}
+
+    Example:
+        >>> manage_genie_instructions(space_id="abc123", action="list")
+        {"instructions": [{"title": "...", "content": "...", "instruction_type": "..."}, ...]}
+
+        >>> manage_genie_instructions(
+        ...     space_id="abc123",
+        ...     action="add_text",
+        ...     title="Date handling",
+        ...     content="When users say 'last month', use date_trunc('month', current_date()) - interval 1 month"
+        ... )
+
+        >>> manage_genie_instructions(
+        ...     space_id="abc123",
+        ...     action="add_sql",
+        ...     title="Revenue by region",
+        ...     content="SELECT region, SUM(amount) as revenue FROM sales GROUP BY region"
+        ... )
+
+        >>> manage_genie_instructions(
+        ...     space_id="abc123",
+        ...     action="add_batch",
+        ...     instructions=[
+        ...         {"title": "Top customers",
+        ...          "content": "SELECT customer, SUM(amount) FROM orders GROUP BY 1 LIMIT 10"},
+        ...         {"title": "Monthly trend",
+        ...          "content": "SELECT date_trunc('month', order_date), COUNT(*) FROM orders GROUP BY 1"},
+        ...     ]
+        ... )
+    """
+    try:
+        manager = _get_manager()
+
+        if action == "list":
+            result = manager.genie_list_instructions(space_id)
+            return {"instructions": result.get("instructions", [])}
+
+        elif action == "add_text":
+            if not content:
+                return {"error": "content is required for add_text"}
+            return manager.genie_add_text_instruction(space_id, content=content, title=title or "Notes")
+
+        elif action == "add_sql":
+            if not title or not content:
+                return {"error": "title and content are required for add_sql"}
+            return manager.genie_add_sql_instruction(space_id, title=title, content=content)
+
+        elif action == "add_sql_function":
+            if not content:
+                return {"error": "content (function name) is required for add_sql_function"}
+            return manager.genie_add_sql_function(space_id, function_name=content)
+
+        elif action == "add_batch":
+            if not instructions:
+                return {"error": "instructions list is required for add_batch"}
+            results = manager.genie_add_sql_instructions_batch(space_id, instructions)
+            return {"added": len(results), "results": results}
+
+        else:
+            return {"error": f"Unknown action '{action}'. Use: list, add_text, add_sql, add_sql_function, add_batch"}
+
+    except Exception as e:
+        return {"error": f"Failed to manage instructions for space {space_id}: {e}"}
 
 
 # ============================================================================
