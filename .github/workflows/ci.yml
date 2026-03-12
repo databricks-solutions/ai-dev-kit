@@ -17,7 +17,7 @@ jobs:
       
       - name: Run ruff check
         run: |
-          uvx ruff check \
+          uvx ruff@0.11.0 check \
             --select=E,F,B,PIE \
             --ignore=E401,E402,F401,F403,B017,B904,ANN,TCH \
             --line-length=120 \
@@ -26,7 +26,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          uvx ruff format --check \
+          uvx ruff@0.11.0 format --check \
             --line-length=120 \
             --target-version=py311 \
             databricks-tools-core/ databricks-mcp-server/ .test/src/

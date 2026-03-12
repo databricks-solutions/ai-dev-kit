@@ -1,4 +1,5 @@
 skill_name: databricks-synthetic-data-gen
+tool_modules: [sql, compute]
 description: Tests for Databricks synthetic data generation skill covering Spark + Faker + Pandas UDFs, execution methods, output formats, and referential integrity
 version: 1.0.0
 

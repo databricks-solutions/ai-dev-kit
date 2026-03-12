@@ -54,6 +54,7 @@ def _get_workspace_client() -> WorkspaceClient:
       host=os.environ.get('DATABRICKS_HOST', ''),
       client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
       client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+      auth_type='oauth-m2m',
       **product_kwargs,
     )
   # Development mode - use default SDK auth

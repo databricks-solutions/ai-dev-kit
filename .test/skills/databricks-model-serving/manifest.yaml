@@ -1,5 +1,6 @@
 ---
 skill_name: databricks-model-serving
+tool_modules: [serving, compute]
 description: "Deploy and query Databricks Model Serving endpoints"
 
 scorers:

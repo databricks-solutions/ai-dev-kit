@@ -355,4 +355,4 @@ stream.wait_for_offset(offset)
 | `ingest_records_nowait(records)` | None | No | Max batch throughput |
 | `wait_for_offset(offset)` | None | Yes (until ACK) | Durability confirmation |
 | `flush()` | None | Yes (until sent) | Ensure all buffered records are sent |
-| `ingest_record(record)` | RecordAcknowledgment | No | **Deprecated** — use `ingest_record_offset` |
+| `ingest_record(record)` | RecordAcknowledgment | No | Primary method in SDK v1.1.0+; pass `json.dumps(record)` for JSON |

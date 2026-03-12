@@ -1,5 +1,6 @@
 ---
 skill_name: databricks-agent-bricks
+tool_modules: [agent_bricks, serving]
 description: >
   Create and manage Databricks Agent Bricks: Knowledge Assistants (KA)
   for document Q&A, Genie Spaces for SQL exploration, and Supervisor

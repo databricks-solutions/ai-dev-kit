@@ -112,6 +112,12 @@ def main():
         help="Maximum optimization passes per component (default: 5).",
     )
     parser.add_argument(
+        "--max-per-skill",
+        type=int,
+        default=None,
+        help="Max tasks per skill in cross-skill dataset for --tools-only (default: 5).",
+    )
+    parser.add_argument(
         "--max-metric-calls",
         type=int,
         default=None,
@@ -134,6 +140,44 @@ def main():
         default=None,
         help="Directory for GEPA checkpoints. Resumes from last state if dir exists.",
     )
+    # Agent evaluation flags
+    parser.add_argument(
+        "--agent-eval",
+        action="store_true",
+        help="Hybrid mode: use real Claude Code agent for baseline + validation, "
+             "proxy for GEPA iterations.",
+    )
+    parser.add_argument(
+        "--agent-eval-full",
+        action="store_true",
+        help="Full agent mode: use real Claude Code agent for ALL GEPA iterations "
+             "(slow but most accurate).",
+    )
+    parser.add_argument(
+        "--agent-model",
+        default=None,
+        help="Model for agent execution (e.g., databricks-claude-sonnet-4-6). "
+             "Defaults to ANTHROPIC_MODEL env var.",
+    )
+    parser.add_argument(
+        "--agent-timeout",
+        type=int,
+        default=300,
+        help="Timeout per agent run in seconds (default: 300).",
+    )
+    parser.add_argument(
+        "--mlflow-experiment",
+        default=None,
+        help="MLflow experiment name for agent tracing (default: SKILL_TEST_MLFLOW_EXPERIMENT env or /Shared/skill-tests).",
+    )
+    parser.add_argument(
+        "--mlflow-assessments",
+        default=None,
+        metavar="EXPERIMENT_ID",
+        help="MLflow experiment ID with ToolCallCorrectness/ToolCallEfficiency assessments. "
+             "Injects real-world behavioral feedback into GEPA's reflection context.",
+    )
+
     parser.add_argument(
         "--generate-from",
         type=str,
@@ -151,7 +195,7 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.skill_name and not args.all:
+    if not args.skill_name and not args.all and not args.tools_only:
         parser.error("Either provide a skill name or use --all")
 
     from skill_test.optimize.runner import optimize_skill
@@ -207,7 +251,41 @@ def main():
             print(f"Error applying: {e}")
             sys.exit(1)
 
-    if args.all:
+    # Tools-only global mode: single pass using cross-skill dataset
+    if args.tools_only:
+        skill_name = args.skill_name or "_tools_global"
+        try:
+            result = optimize_skill(
+                skill_name=skill_name,
+                preset=args.preset,
+                gen_model=args.gen_model,
+                reflection_lm=args.reflection_lm,
+                include_tools=False,
+                tool_modules=args.tool_modules,
+                tools_only=True,
+                dry_run=args.dry_run,
+                max_passes=args.max_passes,
+                max_metric_calls=args.max_metric_calls,
+                token_budget=args.token_budget,
+                judge_model=args.judge_model,
+                align=args.align,
+                run_dir=args.run_dir,
+                agent_eval=args.agent_eval,
+                agent_eval_full=args.agent_eval_full,
+                agent_model=args.agent_model,
+                agent_timeout=args.agent_timeout,
+                mlflow_experiment=args.mlflow_experiment,
+                mlflow_assessment_experiment=args.mlflow_assessments,
+                max_per_skill=args.max_per_skill,
+            )
+            review_optimization(result)
+            if args.apply and not args.dry_run:
+                apply_optimization(result)
+            sys.exit(0)
+        except Exception as e:
+            sys.exit(handle_error(e, skill_name))
+
+    elif args.all:
         # Find all skills with ground_truth.yaml
         skills_dir = Path(".test/skills")
         skill_names = [
@@ -230,7 +308,7 @@ def main():
                     reflection_lm=args.reflection_lm,
                     include_tools=args.include_tools,
                     tool_modules=args.tool_modules,
-                    tools_only=args.tools_only,
+                    tools_only=False,
                     dry_run=args.dry_run,
                     max_passes=args.max_passes,
                     max_metric_calls=args.max_metric_calls,
@@ -238,6 +316,12 @@ def main():
                     judge_model=args.judge_model,
                     align=args.align,
                     run_dir=f"{args.run_dir}/{name}" if args.run_dir else None,
+                    agent_eval=args.agent_eval,
+                    agent_eval_full=args.agent_eval_full,
+                    agent_model=args.agent_model,
+                    agent_timeout=args.agent_timeout,
+                    mlflow_experiment=args.mlflow_experiment,
+                    mlflow_assessment_experiment=args.mlflow_assessments,
                 )
                 review_optimization(result)
                 if args.apply and not args.dry_run:
@@ -275,6 +359,11 @@ def main():
                 judge_model=args.judge_model,
                 align=args.align,
                 run_dir=args.run_dir,
+                agent_eval=args.agent_eval,
+                agent_eval_full=args.agent_eval_full,
+                agent_model=args.agent_model,
+                agent_timeout=args.agent_timeout,
+                mlflow_experiment=args.mlflow_experiment,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:

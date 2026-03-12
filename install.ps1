@@ -73,6 +73,9 @@ $script:Tools        = ""
 $script:UserMcpPath  = ""
 $script:Pkg          = ""
 $script:ProfileProvided = $false
+$script:SkillsProfile = ""
+$script:UserSkills   = ""
+$script:ListSkills   = $false
 
 # Databricks skills (bundled in repo)
 $script:Skills = @(
@@ -96,6 +99,87 @@ $MlflowRawUrl = "https://raw.githubusercontent.com/mlflow/skills/main"
 # APX skills (fetched from databricks-solutions/apx repo)
 $script:ApxSkills = @("databricks-app-apx")
 $ApxRawUrl = "https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
+
+# ─── Skill profiles ──────────────────────────────────────────
+$script:CoreSkills = @("databricks-config", "databricks-docs", "databricks-python-sdk", "databricks-unity-catalog")
+
+$script:ProfileDataEngineer = @(
+    "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
+    "databricks-jobs", "databricks-asset-bundles", "databricks-dbsql", "databricks-iceberg",
+    "databricks-zerobus-ingest", "spark-python-data-source", "databricks-metric-views",
+    "databricks-synthetic-data-gen"
+)
+$script:ProfileAnalyst = @(
+    "databricks-aibi-dashboards", "databricks-dbsql", "databricks-genie", "databricks-metric-views"
+)
+$script:ProfileAiMlEngineer = @(
+    "databricks-agent-bricks", "databricks-vector-search", "databricks-model-serving",
+    "databricks-genie", "databricks-parsing", "databricks-unstructured-pdf-generation",
+    "databricks-mlflow-evaluation", "databricks-synthetic-data-gen", "databricks-jobs"
+)
+$script:ProfileAiMlMlflow = @(
+    "agent-evaluation", "analyze-mlflow-chat-session", "analyze-mlflow-trace",
+    "instrumenting-with-mlflow-tracing", "mlflow-onboarding", "querying-mlflow-metrics",
+    "retrieving-mlflow-traces", "searching-mlflow-docs"
+)
+$script:ProfileAppDeveloper = @(
+    "databricks-app-python", "databricks-app-apx", "databricks-lakebase-autoscale",
+    "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
+    "databricks-jobs", "databricks-asset-bundles"
+)
+
+# Selected skills (populated during profile selection)
+$script:SelectedSkills = @()
+$script:SelectedMlflowSkills = @()
+$script:SelectedApxSkills = @()
+
+# ─── --list-skills handler ────────────────────────────────────
+if ($script:ListSkills) {
+    Write-Host ""
+    Write-Host "Available Skill Profiles" -ForegroundColor White
+    Write-Host "--------------------------------"
+    Write-Host ""
+    Write-Host "  all              " -ForegroundColor White -NoNewline; Write-Host "All 34 skills (default)"
+    Write-Host "  data-engineer    " -ForegroundColor White -NoNewline; Write-Host "Pipelines, Spark, Jobs, Streaming (14 skills)"
+    Write-Host "  analyst          " -ForegroundColor White -NoNewline; Write-Host "Dashboards, SQL, Genie, Metrics (8 skills)"
+    Write-Host "  ai-ml-engineer   " -ForegroundColor White -NoNewline; Write-Host "Agents, RAG, Vector Search, MLflow (17 skills)"
+    Write-Host "  app-developer    " -ForegroundColor White -NoNewline; Write-Host "Apps, Lakebase, Deployment (10 skills)"
+    Write-Host ""
+    Write-Host "Core Skills (always installed)" -ForegroundColor White
+    Write-Host "--------------------------------"
+    foreach ($s in $script:CoreSkills) { Write-Host "  " -NoNewline; Write-Host "v" -ForegroundColor Green -NoNewline; Write-Host " $s" }
+    Write-Host ""
+    Write-Host "Data Engineer" -ForegroundColor White
+    Write-Host "--------------------------------"
+    foreach ($s in $script:ProfileDataEngineer) { Write-Host "    $s" }
+    Write-Host ""
+    Write-Host "Business Analyst" -ForegroundColor White
+    Write-Host "--------------------------------"
+    foreach ($s in $script:ProfileAnalyst) { Write-Host "    $s" }
+    Write-Host ""
+    Write-Host "AI/ML Engineer" -ForegroundColor White
+    Write-Host "--------------------------------"
+    foreach ($s in $script:ProfileAiMlEngineer) { Write-Host "    $s" }
+    Write-Host "  + MLflow skills:" -ForegroundColor DarkGray
+    foreach ($s in $script:ProfileAiMlMlflow) { Write-Host "    $s" }
+    Write-Host ""
+    Write-Host "App Developer" -ForegroundColor White
+    Write-Host "--------------------------------"
+    foreach ($s in $script:ProfileAppDeveloper) { Write-Host "    $s" }
+    Write-Host ""
+    Write-Host "MLflow Skills (from mlflow/skills repo)" -ForegroundColor White
+    Write-Host "--------------------------------"
+    foreach ($s in $script:MlflowSkills) { Write-Host "    $s" }
+    Write-Host ""
+    Write-Host "APX Skills (from databricks-solutions/apx repo)" -ForegroundColor White
+    Write-Host "--------------------------------"
+    foreach ($s in $script:ApxSkills) { Write-Host "    $s" }
+    Write-Host ""
+    Write-Host "Usage: .\install.ps1 --skills-profile data-engineer,ai-ml-engineer" -ForegroundColor DarkGray
+    Write-Host "       .\install.ps1 --skills databricks-jobs,databricks-dbsql" -ForegroundColor DarkGray
+    Write-Host ""
+    return
+}
 
 # ─── Ensure tools are in PATH ────────────────────────────────
 # Chocolatey-installed tools may not be in PATH for SSH sessions
@@ -132,6 +216,9 @@ while ($i -lt $args.Count) {
         { $_ -in "--mcp-path", "-McpPath" }    { $script:UserMcpPath = $args[$i + 1]; $i += 2 }
         { $_ -in "--silent", "-Silent" }       { $script:Silent = $true; $i++ }
         { $_ -in "--tools", "-Tools" }         { $script:UserTools = $args[$i + 1]; $i += 2 }
+        { $_ -in "--skills-profile", "-SkillsProfile" } { $script:SkillsProfile = $args[$i + 1]; $i += 2 }
+        { $_ -in "--skills", "-Skills" }       { $script:UserSkills = $args[$i + 1]; $i += 2 }
+        { $_ -in "--list-skills", "-ListSkills" } { $script:ListSkills = $true; $i++ }
         { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
@@ -147,6 +234,9 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
             Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
+            Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
+            Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
+            Write-Host "  --list-skills         List available skills and profiles, then exit"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
             Write-Host ""
@@ -644,6 +734,19 @@ function Test-Version {
     if (-not (Test-Path $verFile)) { return }
     if ($script:Force) { return }
 
+    # Skip version gate if user explicitly wants a different skill profile
+    if (-not [string]::IsNullOrWhiteSpace($script:SkillsProfile) -or -not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
+        $savedProfileFile = Join-Path $script:StateDir ".skills-profile"
+        if (-not (Test-Path $savedProfileFile) -and $script:Scope -eq "project") {
+            $savedProfileFile = Join-Path $script:InstallDir ".skills-profile"
+        }
+        if (Test-Path $savedProfileFile) {
+            $savedProfile = (Get-Content $savedProfileFile -Raw).Trim()
+            $requested = if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) { "custom:$($script:UserSkills)" } else { $script:SkillsProfile }
+            if ($savedProfile -ne $requested) { return }
+        }
+    }
+
     $localVer = (Get-Content $verFile -Raw).Trim()
 
     try {
@@ -655,7 +758,7 @@ function Test-Version {
     if ($remoteVer -and $remoteVer -notmatch '(404|Not Found|error)') {
         if ($localVer -eq $remoteVer) {
             Write-Ok "Already up to date (v$localVer)"
-            Write-Msg "Use --force to reinstall"
+            Write-Msg "Use --force to reinstall or --skills-profile to change profiles"
             exit 0
         }
     }
@@ -734,6 +837,304 @@ function Install-McpServer {
     }
 }
 
+# ─── Skill profile selection ──────────────────────────────────
+function Resolve-Skills {
+    # Priority 1: Explicit --skills flag
+    if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
+        $userList = $script:UserSkills -split ','
+        $dbSkills = @() + $script:CoreSkills
+        $mlflowSkills = @()
+        $apxSkills = @()
+        foreach ($skill in $userList) {
+            $skill = $skill.Trim()
+            if ($script:MlflowSkills -contains $skill) {
+                $mlflowSkills += $skill
+            } elseif ($script:ApxSkills -contains $skill) {
+                $apxSkills += $skill
+            } else {
+                $dbSkills += $skill
+            }
+        }
+        $script:SelectedSkills = $dbSkills | Select-Object -Unique
+        $script:SelectedMlflowSkills = $mlflowSkills | Select-Object -Unique
+        $script:SelectedApxSkills = $apxSkills | Select-Object -Unique
+        return
+    }
+
+    # Priority 2: --skills-profile flag or interactive selection
+    if ([string]::IsNullOrWhiteSpace($script:SkillsProfile) -or $script:SkillsProfile -eq "all") {
+        $script:SelectedSkills = $script:Skills
+        $script:SelectedMlflowSkills = $script:MlflowSkills
+        $script:SelectedApxSkills = $script:ApxSkills
+        return
+    }
+
+    # Build union of selected profiles
+    $dbSkills = @() + $script:CoreSkills
+    $mlflowSkills = @()
+    $apxSkills = @()
+
+    foreach ($profile in ($script:SkillsProfile -split ',')) {
+        $profile = $profile.Trim()
+        switch ($profile) {
+            "all" {
+                $script:SelectedSkills = $script:Skills
+                $script:SelectedMlflowSkills = $script:MlflowSkills
+                $script:SelectedApxSkills = $script:ApxSkills
+                return
+            }
+            "data-engineer"  { $dbSkills += $script:ProfileDataEngineer }
+            "analyst"        { $dbSkills += $script:ProfileAnalyst }
+            "ai-ml-engineer" {
+                $dbSkills += $script:ProfileAiMlEngineer
+                $mlflowSkills += $script:ProfileAiMlMlflow
+            }
+            "app-developer" {
+                $dbSkills += $script:ProfileAppDeveloper
+                $apxSkills += $script:ApxSkills
+            }
+            default { Write-Warn "Unknown skill profile: $profile (ignored)" }
+        }
+    }
+
+    $script:SelectedSkills = $dbSkills | Select-Object -Unique
+    $script:SelectedMlflowSkills = $mlflowSkills | Select-Object -Unique
+    $script:SelectedApxSkills = $apxSkills | Select-Object -Unique
+}
+
+function Invoke-PromptSkillsProfile {
+    # If provided via --skills or --skills-profile, skip interactive prompt
+    if (-not [string]::IsNullOrWhiteSpace($script:UserSkills) -or -not [string]::IsNullOrWhiteSpace($script:SkillsProfile)) {
+        return
+    }
+
+    # Skip in silent mode
+    if ($script:Silent) {
+        $script:SkillsProfile = "all"
+        return
+    }
+
+    # Check for previous selection (scope-local first, then global fallback for upgrades)
+    $profileFile = Join-Path $script:StateDir ".skills-profile"
+    if (-not (Test-Path $profileFile) -and $script:Scope -eq "project") {
+        $profileFile = Join-Path $script:InstallDir ".skills-profile"
+    }
+    if (Test-Path $profileFile) {
+        $prevProfile = (Get-Content $profileFile -Raw).Trim()
+        if (-not $script:Force) {
+            Write-Host ""
+            $displayProfile = $prevProfile -replace ',', ', '
+            $keep = Read-Prompt -PromptText "Previous skill profile: $displayProfile. Keep? (Y/n)" -Default "y"
+            if ($keep -in @("y", "Y", "yes", "")) {
+                $script:SkillsProfile = $prevProfile
+                return
+            }
+        }
+    }
+
+    Write-Host ""
+    Write-Host "  Select skill profile(s)" -ForegroundColor White
+
+    # Custom checkbox with mutual exclusion: "All" deselects others, others deselect "All"
+    $pLabels = @("All Skills", "Data Engineer", "Business Analyst", "AI/ML Engineer", "App Developer", "Custom")
+    $pValues = @("all", "data-engineer", "analyst", "ai-ml-engineer", "app-developer", "custom")
+    $pHints  = @("Install everything (34 skills)", "Pipelines, Spark, Jobs, Streaming (14 skills)", "Dashboards, SQL, Genie, Metrics (8 skills)", "Agents, RAG, Vector Search, MLflow (17 skills)", "Apps, Lakebase, Deployment (10 skills)", "Pick individual skills")
+    $pStates = @($true, $false, $false, $false, $false, $false)
+    $pCount  = 6
+    $pCursor = 0
+    $pTotalRows = $pCount + 2
+
+    $isInteractive = Test-Interactive
+
+    if (-not $isInteractive) {
+        # Fallback: numbered list
+        Write-Host ""
+        for ($j = 0; $j -lt $pCount; $j++) {
+            $mark = if ($pStates[$j]) { "[X]" } else { "[ ]" }
+            Write-Host "  $($j + 1). $mark $($pLabels[$j])  ($($pHints[$j]))"
+        }
+        Write-Host ""
+        Write-Host "  Enter numbers to toggle (e.g. 2,4), or press Enter for All: " -NoNewline
+        $input_ = Read-Host
+        if (-not [string]::IsNullOrWhiteSpace($input_)) {
+            for ($j = 0; $j -lt $pCount; $j++) { $pStates[$j] = $false }
+            $nums = $input_ -split ',' | ForEach-Object { $_.Trim() }
+            foreach ($n in $nums) {
+                $idx = [int]$n - 1
+                if ($idx -ge 0 -and $idx -lt $pCount) { $pStates[$idx] = $true }
+            }
+        }
+    } else {
+        Write-Host ""
+        Write-Host "  Up/Down navigate, Space toggle, Enter on Confirm to finish" -ForegroundColor DarkGray
+        Write-Host ""
+
+        try { [Console]::CursorVisible = $false } catch {}
+
+        $drawProfiles = {
+            [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $pTotalRows))
+            for ($j = 0; $j -lt $pCount; $j++) {
+                if ($j -eq $pCursor) {
+                    Write-Host "  " -NoNewline; Write-Host ">" -ForegroundColor Blue -NoNewline; Write-Host " " -NoNewline
+                } else {
+                    Write-Host "    " -NoNewline
+                }
+                if ($pStates[$j]) {
+                    Write-Host "[" -NoNewline; Write-Host "v" -ForegroundColor Green -NoNewline; Write-Host "]" -NoNewline
+                } else {
+                    Write-Host "[ ]" -NoNewline
+                }
+                $padLabel = $pLabels[$j].PadRight(20)
+                Write-Host " $padLabel " -NoNewline
+                if ($pStates[$j]) {
+                    Write-Host $pHints[$j] -ForegroundColor Green -NoNewline
+                } else {
+                    Write-Host $pHints[$j] -ForegroundColor DarkGray -NoNewline
+                }
+                $pos = [Console]::CursorLeft
+                $remaining = [Console]::WindowWidth - $pos - 1
+                if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+                Write-Host ""
+            }
+            Write-Host (' ' * ([Console]::WindowWidth - 1))
+            if ($pCursor -eq $pCount) {
+                Write-Host "  " -NoNewline; Write-Host ">" -ForegroundColor Blue -NoNewline
+                Write-Host " " -NoNewline; Write-Host "[ Confirm ]" -ForegroundColor Green -NoNewline
+            } else {
+                Write-Host "    " -NoNewline; Write-Host "[ Confirm ]" -ForegroundColor DarkGray -NoNewline
+            }
+            $pos = [Console]::CursorLeft
+            $remaining = [Console]::WindowWidth - $pos - 1
+            if ($remaining -gt 0) { Write-Host (' ' * $remaining) -NoNewline }
+            Write-Host ""
+        }
+
+        for ($j = 0; $j -lt $pTotalRows; $j++) { Write-Host "" }
+        & $drawProfiles
+
+        while ($true) {
+            $key = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+            switch ($key.VirtualKeyCode) {
+                38 { if ($pCursor -gt 0) { $pCursor-- } }
+                40 { if ($pCursor -lt $pCount) { $pCursor++ } }
+                32 { # Space
+                    if ($pCursor -lt $pCount) {
+                        $pStates[$pCursor] = -not $pStates[$pCursor]
+                        if ($pStates[$pCursor]) {
+                            if ($pCursor -eq 0) {
+                                # Selected "All" → deselect others
+                                for ($j = 1; $j -lt $pCount; $j++) { $pStates[$j] = $false }
+                            } else {
+                                # Selected individual → deselect "All"
+                                $pStates[0] = $false
+                            }
+                        }
+                    }
+                }
+                13 { # Enter
+                    if ($pCursor -lt $pCount) {
+                        $pStates[$pCursor] = -not $pStates[$pCursor]
+                        if ($pStates[$pCursor]) {
+                            if ($pCursor -eq 0) {
+                                for ($j = 1; $j -lt $pCount; $j++) { $pStates[$j] = $false }
+                            } else {
+                                $pStates[0] = $false
+                            }
+                        }
+                    } else {
+                        & $drawProfiles
+                        break
+                    }
+                }
+            }
+            if ($key.VirtualKeyCode -eq 13 -and $pCursor -eq $pCount) { break }
+            & $drawProfiles
+        }
+
+        try { [Console]::CursorVisible = $true } catch {}
+    }
+
+    # Build result from states
+    $selectedProfiles = @()
+    for ($j = 0; $j -lt $pCount; $j++) {
+        if ($pStates[$j]) { $selectedProfiles += $pValues[$j] }
+    }
+    $selected = $selectedProfiles -join ' '
+
+    if ([string]::IsNullOrWhiteSpace($selected)) {
+        $script:SkillsProfile = "all"
+        return
+    }
+
+    if ($selected -match '\ball\b') {
+        $script:SkillsProfile = "all"
+        return
+    }
+
+    if ($selected -match '\bcustom\b') {
+        Invoke-PromptCustomSkills -PreselectedProfiles $selected
+        return
+    }
+
+    $script:SkillsProfile = ($selectedProfiles -join ',')
+}
+
+function Invoke-PromptCustomSkills {
+    param([string]$PreselectedProfiles)
+
+    # Build pre-selection set from any profiles that were also checked
+    $preselected = @()
+    foreach ($profile in ($PreselectedProfiles -split ' ')) {
+        switch ($profile) {
+            "data-engineer"  { $preselected += $script:ProfileDataEngineer }
+            "analyst"        { $preselected += $script:ProfileAnalyst }
+            "ai-ml-engineer" { $preselected += $script:ProfileAiMlEngineer + $script:ProfileAiMlMlflow }
+            "app-developer"  { $preselected += $script:ProfileAppDeveloper + $script:ApxSkills }
+        }
+    }
+
+    Write-Host ""
+    Write-Host "  Select individual skills" -ForegroundColor White
+    Write-Host "  Core skills (config, docs, python-sdk, unity-catalog) are always installed" -ForegroundColor DarkGray
+
+    $items = @(
+        @{ Label = "Spark Pipelines";      Value = "databricks-spark-declarative-pipelines"; State = ($preselected -contains "databricks-spark-declarative-pipelines"); Hint = "SDP/LDP, CDC, SCD Type 2" }
+        @{ Label = "Streaming";            Value = "databricks-spark-structured-streaming";  State = ($preselected -contains "databricks-spark-structured-streaming");  Hint = "Real-time streaming" }
+        @{ Label = "Jobs & Workflows";     Value = "databricks-jobs";                        State = ($preselected -contains "databricks-jobs");                        Hint = "Multi-task orchestration" }
+        @{ Label = "Asset Bundles";        Value = "databricks-asset-bundles";               State = ($preselected -contains "databricks-asset-bundles");               Hint = "DABs deployment" }
+        @{ Label = "Databricks SQL";       Value = "databricks-dbsql";                       State = ($preselected -contains "databricks-dbsql");                       Hint = "SQL warehouse queries" }
+        @{ Label = "Iceberg";              Value = "databricks-iceberg";                     State = ($preselected -contains "databricks-iceberg");                     Hint = "Apache Iceberg tables" }
+        @{ Label = "Zerobus Ingest";       Value = "databricks-zerobus-ingest";              State = ($preselected -contains "databricks-zerobus-ingest");              Hint = "Streaming ingestion" }
+        @{ Label = "Python Data Src";      Value = "spark-python-data-source";               State = ($preselected -contains "spark-python-data-source");               Hint = "Custom Spark data sources" }
+        @{ Label = "Metric Views";         Value = "databricks-metric-views";                State = ($preselected -contains "databricks-metric-views");                Hint = "Metric definitions" }
+        @{ Label = "AI/BI Dashboards";     Value = "databricks-aibi-dashboards";             State = ($preselected -contains "databricks-aibi-dashboards");             Hint = "Dashboard creation" }
+        @{ Label = "Genie";                Value = "databricks-genie";                       State = ($preselected -contains "databricks-genie");                       Hint = "Natural language SQL" }
+        @{ Label = "Agent Bricks";         Value = "databricks-agent-bricks";                State = ($preselected -contains "databricks-agent-bricks");                Hint = "Build AI agents" }
+        @{ Label = "Vector Search";        Value = "databricks-vector-search";               State = ($preselected -contains "databricks-vector-search");               Hint = "Similarity search" }
+        @{ Label = "Model Serving";        Value = "databricks-model-serving";               State = ($preselected -contains "databricks-model-serving");               Hint = "Deploy models/agents" }
+        @{ Label = "MLflow Evaluation";    Value = "databricks-mlflow-evaluation";           State = ($preselected -contains "databricks-mlflow-evaluation");           Hint = "Model evaluation" }
+        @{ Label = "Parsing";              Value = "databricks-parsing";                     State = ($preselected -contains "databricks-parsing");                     Hint = "Document parsing for RAG" }
+        @{ Label = "Unstructured PDF";     Value = "databricks-unstructured-pdf-generation"; State = ($preselected -contains "databricks-unstructured-pdf-generation"); Hint = "Synthetic PDFs for RAG" }
+        @{ Label = "Synthetic Data";       Value = "databricks-synthetic-data-gen";          State = ($preselected -contains "databricks-synthetic-data-gen");          Hint = "Generate test data" }
+        @{ Label = "Lakebase Autoscale";   Value = "databricks-lakebase-autoscale";          State = ($preselected -contains "databricks-lakebase-autoscale");          Hint = "Managed PostgreSQL" }
+        @{ Label = "Lakebase Provisioned"; Value = "databricks-lakebase-provisioned";        State = ($preselected -contains "databricks-lakebase-provisioned");        Hint = "Provisioned PostgreSQL" }
+        @{ Label = "App Python";           Value = "databricks-app-python";                  State = ($preselected -contains "databricks-app-python");                  Hint = "Dash, Streamlit, Flask" }
+        @{ Label = "App APX";              Value = "databricks-app-apx";                     State = ($preselected -contains "databricks-app-apx");                     Hint = "FastAPI + React" }
+        @{ Label = "MLflow Onboarding";    Value = "mlflow-onboarding";                      State = ($preselected -contains "mlflow-onboarding");                      Hint = "Getting started" }
+        @{ Label = "Agent Evaluation";     Value = "agent-evaluation";                       State = ($preselected -contains "agent-evaluation");                       Hint = "Evaluate AI agents" }
+        @{ Label = "MLflow Tracing";       Value = "instrumenting-with-mlflow-tracing";      State = ($preselected -contains "instrumenting-with-mlflow-tracing");      Hint = "Instrument with tracing" }
+        @{ Label = "Analyze Traces";       Value = "analyze-mlflow-trace";                   State = ($preselected -contains "analyze-mlflow-trace");                   Hint = "Analyze trace data" }
+        @{ Label = "Retrieve Traces";      Value = "retrieving-mlflow-traces";               State = ($preselected -contains "retrieving-mlflow-traces");               Hint = "Search & retrieve traces" }
+        @{ Label = "Analyze Chat";         Value = "analyze-mlflow-chat-session";            State = ($preselected -contains "analyze-mlflow-chat-session");            Hint = "Chat session analysis" }
+        @{ Label = "Query Metrics";        Value = "querying-mlflow-metrics";                State = ($preselected -contains "querying-mlflow-metrics");                Hint = "MLflow metrics queries" }
+        @{ Label = "Search MLflow Docs";   Value = "searching-mlflow-docs";                  State = ($preselected -contains "searching-mlflow-docs");                  Hint = "MLflow documentation" }
+    )
+
+    $selected = Select-Checkbox -Items $items
+    $script:UserSkills = ($selected -split ' ') -join ','
+}
+
 # ─── Install skills ──────────────────────────────────────────
 function Install-Skills {
     param([string]$BaseDir)
@@ -756,67 +1157,127 @@ function Install-Skills {
     }
     $dirs = $dirs | Select-Object -Unique
 
+    # Count selected skills for display
+    $dbCount = $script:SelectedSkills.Count
+    $mlflowCount = $script:SelectedMlflowSkills.Count
+    $apxCount = $script:SelectedApxSkills.Count
+    $totalCount = $dbCount + $mlflowCount + $apxCount
+    Write-Msg "Installing $totalCount skills"
+
+    # Build set of all skills being installed now
+    $allNewSkills = @()
+    $allNewSkills += $script:SelectedSkills
+    $allNewSkills += $script:SelectedMlflowSkills
+    $allNewSkills += $script:SelectedApxSkills
+
+    # Clean up previously installed skills that are no longer selected
+    # Check scope-local manifest first, fall back to global for upgrades from older versions
+    $manifest = Join-Path $script:StateDir ".installed-skills"
+    if (-not (Test-Path $manifest) -and $script:Scope -eq "project" -and (Test-Path (Join-Path $script:InstallDir ".installed-skills"))) {
+        $manifest = Join-Path $script:InstallDir ".installed-skills"
+    }
+    if (Test-Path $manifest) {
+        foreach ($line in (Get-Content $manifest)) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            $parts = $line -split '\|', 2
+            if ($parts.Count -ne 2) { continue }
+            $prevDir = $parts[0]
+            $prevSkill = $parts[1]
+            # Skip if this skill is still selected
+            if ($allNewSkills -contains $prevSkill) { continue }
+            # Only remove if the directory exists
+            $prevPath = Join-Path $prevDir $prevSkill
+            if (Test-Path $prevPath) {
+                Remove-Item -Recurse -Force $prevPath
+                Write-Msg "Removed deselected skill: $prevSkill"
+            }
+        }
+    }
+
+    # Start fresh manifest
+    $manifestEntries = @()
+
     foreach ($dir in $dirs) {
         if (-not (Test-Path $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
         # Install Databricks skills from repo
-        foreach ($skill in $script:Skills) {
+        foreach ($skill in $script:SelectedSkills) {
             $src = Join-Path $script:RepoDir "databricks-skills\$skill"
             if (-not (Test-Path $src)) { continue }
             $dest = Join-Path $dir $skill
             if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
             Copy-Item -Recurse $src $dest
+            $manifestEntries += "$dir|$skill"
         }
         $shortDir = $dir -replace [regex]::Escape($env:USERPROFILE), '~'
-        Write-Ok "Databricks skills -> $shortDir"
+        Write-Ok "Databricks skills ($dbCount) -> $shortDir"
 
         # Install MLflow skills from mlflow/skills repo
-        $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        foreach ($skill in $script:MlflowSkills) {
-            $destDir = Join-Path $dir $skill
-            if (-not (Test-Path $destDir)) {
-                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-            }
-            $url = "$MlflowRawUrl/$skill/SKILL.md"
-            try {
-                Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
-                # Try optional reference files
-                foreach ($ref in @("reference.md", "examples.md", "api.md")) {
-                    try {
-                        Invoke-WebRequest -Uri "$MlflowRawUrl/$skill/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
-                    } catch {}
+        if ($script:SelectedMlflowSkills.Count -gt 0) {
+            $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            foreach ($skill in $script:SelectedMlflowSkills) {
+                $destDir = Join-Path $dir $skill
+                if (-not (Test-Path $destDir)) {
+                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
                 }
-            } catch {
-                Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
+                $url = "$MlflowRawUrl/$skill/SKILL.md"
+                try {
+                    Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
+                    foreach ($ref in @("reference.md", "examples.md", "api.md")) {
+                        try {
+                            Invoke-WebRequest -Uri "$MlflowRawUrl/$skill/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
+                        } catch {}
+                    }
+                    $manifestEntries += "$dir|$skill"
+                } catch {
+                    Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
+                }
             }
+            $ErrorActionPreference = $prevEAP
+            Write-Ok "MLflow skills ($mlflowCount) -> $shortDir"
         }
-        $ErrorActionPreference = $prevEAP
-        Write-Ok "MLflow skills -> $shortDir"
 
         # Install APX skills from databricks-solutions/apx repo
-        $prevEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        foreach ($skill in $script:ApxSkills) {
-            $destDir = Join-Path $dir $skill
-            if (-not (Test-Path $destDir)) {
-                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-            }
-            $url = "$ApxRawUrl/SKILL.md"
-            try {
-                Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
-                # Try optional reference files
-                foreach ($ref in @("backend-patterns.md", "frontend-patterns.md")) {
-                    try {
-                        Invoke-WebRequest -Uri "$ApxRawUrl/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
-                    } catch {}
+        if ($script:SelectedApxSkills.Count -gt 0) {
+            $prevEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            foreach ($skill in $script:SelectedApxSkills) {
+                $destDir = Join-Path $dir $skill
+                if (-not (Test-Path $destDir)) {
+                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
                 }
-            } catch {
-                Remove-Item $destDir -ErrorAction SilentlyContinue
-                Write-Warning "Could not install APX skill '$skill' - consider removing $destDir if it is no longer needed"
+                $url = "$ApxRawUrl/SKILL.md"
+                try {
+                    Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
+                    foreach ($ref in @("backend-patterns.md", "frontend-patterns.md")) {
+                        try {
+                            Invoke-WebRequest -Uri "$ApxRawUrl/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
+                        } catch {}
+                    }
+                    $manifestEntries += "$dir|$skill"
+                } catch {
+                    Remove-Item $destDir -ErrorAction SilentlyContinue
+                    Write-Warning "Could not install APX skill '$skill' - consider removing $destDir if it is no longer needed"
+                }
             }
+            $ErrorActionPreference = $prevEAP2
+            Write-Ok "APX skills ($apxCount) -> $shortDir"
         }
-        $ErrorActionPreference = $prevEAP2
-        Write-Ok "APX skills -> $shortDir"
+    }
+
+    # Save manifest and profile to scope-local state directory
+    if (-not (Test-Path $script:StateDir)) {
+        New-Item -ItemType Directory -Path $script:StateDir -Force | Out-Null
+    }
+    $manifest = Join-Path $script:StateDir ".installed-skills"
+    Set-Content -Path $manifest -Value ($manifestEntries -join "`n") -Encoding UTF8
+
+    # Save selected profile for future reinstalls
+    if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
+        Set-Content -Path (Join-Path $script:StateDir ".skills-profile") -Value "custom:$($script:UserSkills)" -Encoding UTF8
+    } else {
+        $profileValue = if ([string]::IsNullOrWhiteSpace($script:SkillsProfile)) { "all" } else { $script:SkillsProfile }
+        Set-Content -Path (Join-Path $script:StateDir ".skills-profile") -Value $profileValue -Encoding UTF8
     }
 }
 
@@ -1322,6 +1783,27 @@ function Invoke-Main {
         Write-Ok "Scope: $($script:Scope)"
     }
 
+    # Set state directory based on scope (for profile/manifest storage)
+    if ($script:Scope -eq "global") {
+        $script:StateDir = $script:InstallDir
+    } else {
+        $script:StateDir = Join-Path (Get-Location) ".ai-dev-kit"
+    }
+
+    # Skill profile selection
+    if ($script:InstallSkills) {
+        Write-Step "Skill profiles"
+        Invoke-PromptSkillsProfile
+        Resolve-Skills
+        $skCount = $script:SelectedSkills.Count + $script:SelectedMlflowSkills.Count + $script:SelectedApxSkills.Count
+        if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
+            Write-Ok "Custom selection ($skCount skills)"
+        } else {
+            $profileDisplay = if ([string]::IsNullOrWhiteSpace($script:SkillsProfile)) { "all" } else { $script:SkillsProfile }
+            Write-Ok "Profile: $profileDisplay ($skCount skills)"
+        }
+    }
+
     # MCP path
     if ($script:InstallMcp) {
         Invoke-PromptMcpPath
@@ -1340,7 +1822,13 @@ function Invoke-Main {
             Write-Host "  MCP server:  " -NoNewline; Write-Host $script:InstallDir -ForegroundColor Green
         }
         if ($script:InstallSkills) {
-            Write-Host "  Skills:      " -NoNewline; Write-Host "yes" -ForegroundColor Green
+            $skTotal = $script:SelectedSkills.Count + $script:SelectedMlflowSkills.Count + $script:SelectedApxSkills.Count
+            if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
+                Write-Host "  Skills:      " -NoNewline; Write-Host "custom selection ($skTotal skills)" -ForegroundColor Green
+            } else {
+                $profileDisplay = if ([string]::IsNullOrWhiteSpace($script:SkillsProfile)) { "all" } else { $script:SkillsProfile }
+                Write-Host "  Skills:      " -NoNewline; Write-Host "$profileDisplay ($skTotal skills)" -ForegroundColor Green
+            }
         }
         if ($script:InstallMcp) {
             Write-Host "  MCP config:  " -NoNewline; Write-Host "yes" -ForegroundColor Green

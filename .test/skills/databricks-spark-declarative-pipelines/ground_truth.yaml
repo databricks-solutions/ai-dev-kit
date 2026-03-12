@@ -44,6 +44,13 @@ test_cases:
       guidelines:
         - "Must use modern SDP syntax, not legacy DLT"
         - "Should include metadata columns for lineage"
+      trace_expectations:
+        required_tools:
+          - mcp__databricks__execute_sql
+        banned_tools:
+          - Bash
+        tool_limits:
+          mcp__databricks__execute_sql: 3
     metadata:
       category: "happy_path"
       difficulty: "easy"
@@ -122,6 +129,13 @@ test_cases:
         - "Must use STORED AS SCD TYPE 2"
         - "Should use SEQUENCE BY for ordering"
         - "Should handle DELETE operations"
+      trace_expectations:
+        required_tools:
+          - mcp__databricks__execute_sql
+        banned_tools:
+          - Bash
+        tool_limits:
+          mcp__databricks__execute_sql: 5
     metadata:
       category: "happy_path"
       difficulty: "hard"

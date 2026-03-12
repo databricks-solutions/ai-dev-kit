@@ -77,7 +77,7 @@ class ActiveStream:
             Tuple of (events list, new cursor timestamp)
         """
         new_events = [
-            e.data for e in self.events
+            {**e.data, '_cursor': e.timestamp} for e in self.events
             if e.timestamp > cursor
         ]
 

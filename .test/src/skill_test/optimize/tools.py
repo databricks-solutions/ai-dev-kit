@@ -249,9 +249,9 @@ def list_tool_modules(tools_dir: Path | None = None) -> list[str]:
     return sorted(f.stem for f in tools_dir.glob("*.py") if f.stem != "__init__")
 
 
-def get_tool_stats(tools_dir: Path | None = None) -> dict[str, Any]:
+def get_tool_stats(tools_dir: Path | None = None, modules: list[str] | None = None) -> dict[str, Any]:
     """Get statistics about available MCP tools."""
-    tool_map = extract_tool_descriptions(tools_dir=tools_dir)
+    tool_map = extract_tool_descriptions(tools_dir=tools_dir, modules=modules)
     total_tools = sum(len(tools) for tools in tool_map.values())
     total_chars = sum(len(td.docstring) for tools in tool_map.values() for td in tools)
     return {

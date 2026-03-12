@@ -4,6 +4,7 @@
 # It specifies scorers, trace expectations, and quality gates.
 
 skill_name: databricks-aibi-dashboards
+tool_modules: [sql, aibi_dashboards]
 version: 1.0.0
 
 # Scorers evaluate different aspects of the skill's output

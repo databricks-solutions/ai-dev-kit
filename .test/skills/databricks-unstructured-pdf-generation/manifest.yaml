@@ -1,4 +1,5 @@
 skill_name: databricks-unstructured-pdf-generation
+tool_modules: [volume_files]
 description: Generate synthetic PDF documents for RAG and unstructured data use cases. Use when creating test PDFs, demo documents,
   or evaluation datasets for retrieval systems.
 scorers:

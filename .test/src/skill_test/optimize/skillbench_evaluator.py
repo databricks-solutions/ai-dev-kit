@@ -148,6 +148,7 @@ class SkillBenchEvaluator:
         skill_guidelines: list[str] | None = None,
         judge_model: str | None = None,
         tool_context: str | None = None,
+        assessment_by_task: dict[str, list] | None = None,
     ):
         if not gen_model:
             raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
@@ -158,6 +159,7 @@ class SkillBenchEvaluator:
         self._total_original_tokens = sum(self._original_token_counts.values())
         self._token_budget = token_budget
         self._tool_context = tool_context or ""
+        self._assessment_by_task = assessment_by_task or {}
 
         # Create judge instances with configurable model
         self._quality_judge = create_skill_quality_judge(skill_guidelines, judge_model=judge_model)
@@ -371,6 +373,15 @@ class SkillBenchEvaluator:
         if self._token_budget:
             side_info["token_counts"]["budget"] = self._token_budget
 
+        # Inject matched real-world assessments from MLflow traces
+        if self._assessment_by_task:
+            task_id = example.get("additional_context", {}).get("task_id", "")
+            matched = self._assessment_by_task.get(task_id) or self._assessment_by_task.get(_prompt_hash(prompt), [])
+            if matched:
+                side_info["real_world_assessments"] = [
+                    {"name": a.name, "value": a.value, "rationale": a.rationale} for a in matched
+                ]
+
         # Derive diagnostic labels from judge verdicts for backward compat
         if effectiveness_delta < -0.05:
             side_info["Error"] = (
@@ -422,6 +433,7 @@ def create_skillbench_evaluator(
     token_budget: int | None = None,
     judge_model: str | None = None,
     tool_context: str | None = None,
+    assessment_by_task: dict[str, list] | None = None,
 ) -> Callable:
     """Factory for SkillBench-style evaluator.
 
@@ -460,6 +472,7 @@ def create_skillbench_evaluator(
         skill_guidelines=skill_guidelines,
         judge_model=judge_model,
         tool_context=tool_context,
+        assessment_by_task=assessment_by_task,
     )
 
 
@@ -470,6 +483,7 @@ def build_skillbench_background(
     baseline_scores: dict[str, float] | None = None,
     baseline_side_info: dict[str, dict] | None = None,
     token_budget: int | None = None,
+    assessment_summary: str | None = None,
 ) -> str:
     """Build concise GEPA reflection context for SkillBench optimization.
 
@@ -510,6 +524,10 @@ def build_skillbench_background(
     if token_budget:
         token_desc += f"\nTOKEN BUDGET: {token_budget:,} tokens. Candidates exceeding this are heavily penalized."
 
+    assessment_desc = ""
+    if assessment_summary:
+        assessment_desc = f"\n\n{assessment_summary}"
+
     return (
         f"You are refining SKILL.md for '{skill_name}'.\n"
         "The skill is scored by MLflow judges that evaluate how much it HELPS an agent.\n"
@@ -521,4 +539,5 @@ def build_skillbench_background(
         f"{baseline_desc}"
         f"{components_desc}"
         f"{token_desc}"
+        f"{assessment_desc}"
     )
