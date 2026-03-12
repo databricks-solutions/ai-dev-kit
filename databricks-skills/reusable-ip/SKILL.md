@@ -1,16 +1,16 @@
 ---
 name: reusable-ip
-description: "Reusable Databricks best-practice implementations. At the start of ANY Databricks development task, fetch llms.txt from this repo to check for relevant reference implementations before writing new code."
+description: "Production-ready Databricks reference implementations (agent deployment, model serving, CI/CD, Genie Spaces, Lakebase, DABs, A/B testing, Claude Code). TRIGGER: before writing any Databricks implementation code. ACTION: fetch llms.txt index first, then fetch only relevant files."
 ---
 
-# Reusable IP — Databricks Best Practices
+# Reusable IP — Databricks Reference Implementations
 
 ## When to Use
 
-**Always check this repo before writing Databricks implementation code.** It contains
-production-ready reference implementations for: agent deployment, model serving
-(concurrent PyFunc), CI/CD, Genie Spaces, Lakebase, Databricks Asset Bundles (DABs),
-A/B testing, and Claude Code integration.
+Before writing any Databricks implementation code, check this repo for existing reference
+implementations. Covers: agent deployment, model serving (concurrent PyFunc), CI/CD,
+Genie Spaces, Lakebase, Databricks Asset Bundles (DABs), A/B testing, and Claude Code
+integration.
 
 ## JIT Fetch Protocol
 
