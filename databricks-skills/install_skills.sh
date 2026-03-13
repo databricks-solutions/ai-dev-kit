@@ -42,7 +42,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-asset-bundles databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-asset-bundles databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -63,6 +63,7 @@ get_skill_description() {
     case "$1" in
         # Databricks skills
         "databricks-agent-bricks") echo "Knowledge Assistants, Genie Spaces, Supervisor Agents" ;;
+        "databricks-ai-functions") echo "Built-in AI Functions (classify, extract, query, forecast, parse, etc.), doc processing & custom RAG" ;;
         "databricks-aibi-dashboards") echo "Databricks AI/BI Dashboards - create and manage dashboards" ;;
         "databricks-asset-bundles") echo "Databricks Asset Bundles - deployment and configuration" ;;
         "databricks-app-python") echo "Databricks Apps with Python (Dash, Streamlit)" ;;
@@ -78,7 +79,6 @@ get_skill_description() {
         "databricks-lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
         "databricks-metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
         "databricks-model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
-        "databricks-parsing") echo "Document parsing with ai_parse_document and custom RAG pipelines" ;;
         "databricks-mlflow-evaluation") echo "MLflow evaluation and trace analysis" ;;
         "databricks-spark-declarative-pipelines") echo "Spark Declarative Pipelines (SDP/LDP/DLT)" ;;
         "spark-python-data-source") echo "Spark custom Python data sources" ;;
@@ -106,6 +106,7 @@ get_skill_description() {
 get_skill_extra_files() {
     case "$1" in
         "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
+        "databricks-ai-functions") echo "1-task-functions.md 2-ai-query.md 3-ai-forecast.md 4-document-processing-pipeline.md" ;;
         "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
         "databricks-genie") echo "spaces.md conversation.md" ;;
         "databricks-asset-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
