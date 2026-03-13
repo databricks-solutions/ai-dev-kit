@@ -164,9 +164,7 @@ class SkillBenchEvaluator:
         assessment_by_task: dict[str, list] | None = None,
     ):
         if not gen_model:
-            raise ValueError(
-                "SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var."
-            )
+            raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
         self.gen_model = gen_model
         self._baseline_response_cache: dict[str, str] = {}
         # Per-judge baseline caches (WITHOUT responses are stable across iterations)
@@ -179,18 +177,10 @@ class SkillBenchEvaluator:
         self._assessment_by_task = assessment_by_task or {}
 
         # Create three focused judge instances
-        self._correctness_judge = create_correctness_judge(
-            skill_guidelines, judge_model=judge_model
-        )
-        self._completeness_judge = create_completeness_judge(
-            judge_model=judge_model
-        )
-        self._guideline_adherence_judge = create_guideline_adherence_judge(
-            skill_guidelines, judge_model=judge_model
-        )
-        self._regression_judge = create_regression_judge(
-            judge_model=judge_model
-        )
+        self._correctness_judge = create_correctness_judge(skill_guidelines, judge_model=judge_model)
+        self._completeness_judge = create_completeness_judge(judge_model=judge_model)
+        self._guideline_adherence_judge = create_guideline_adherence_judge(skill_guidelines, judge_model=judge_model)
+        self._regression_judge = create_regression_judge(judge_model=judge_model)
 
     def _generate_response(self, prompt: str, skill_context: str | None = None) -> str:
         """Generate a response with or without skill context."""
@@ -252,9 +242,7 @@ class SkillBenchEvaluator:
 
         # Decode expectations
         expectations: dict[str, Any] = {}
-        expectations_json = example.get("additional_context", {}).get(
-            "expectations", ""
-        )
+        expectations_json = example.get("additional_context", {}).get("expectations", "")
         if expectations_json:
             try:
                 expectations = json.loads(expectations_json)
@@ -280,17 +268,12 @@ class SkillBenchEvaluator:
         facts_str = "\n".join(f"- {f}" for f in facts) if facts else "None specified"
         patterns_str = (
             "\n".join(
-                f"- {p}"
-                if isinstance(p, str)
-                else f"- {p.get('description', p.get('pattern', ''))}"
-                for p in patterns
+                f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}" for p in patterns
             )
             if patterns
             else "None specified"
         )
-        guidelines_str = (
-            "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
-        )
+        guidelines_str = "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
 
         expectations_text = (
             f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
@@ -424,15 +407,19 @@ class SkillBenchEvaluator:
 
         # Weighted final score with new multi-judge weights
         fact_pattern = 0.5 * fact_score + 0.5 * pattern_score
-        final_score = max(0.0, min(1.0,
-            0.30 * effectiveness_delta
-            + 0.20 * quality_composite
-            + 0.15 * fact_pattern
-            + 0.10 * guideline_adherence_score
-            + 0.05 * structure
-            + 0.10 * efficiency
-            - 0.10 * regression_penalty
-        ))
+        final_score = max(
+            0.0,
+            min(
+                1.0,
+                0.30 * effectiveness_delta
+                + 0.20 * quality_composite
+                + 0.15 * fact_pattern
+                + 0.10 * guideline_adherence_score
+                + 0.05 * structure
+                + 0.10 * efficiency
+                - 0.10 * regression_penalty,
+            ),
+        )
 
         # Build side info with FULL judge rationale (not truncated!)
         reference_answer = example.get("answer", "")
@@ -533,13 +520,10 @@ class SkillBenchEvaluator:
         # Inject matched real-world assessments from MLflow traces
         if self._assessment_by_task:
             task_id = example.get("additional_context", {}).get("task_id", "")
-            matched = self._assessment_by_task.get(
-                task_id
-            ) or self._assessment_by_task.get(_prompt_hash(prompt), [])
+            matched = self._assessment_by_task.get(task_id) or self._assessment_by_task.get(_prompt_hash(prompt), [])
             if matched:
                 side_info["real_world_assessments"] = [
-                    {"name": a.name, "value": a.value, "rationale": a.rationale}
-                    for a in matched
+                    {"name": a.name, "value": a.value, "rationale": a.rationale} for a in matched
                 ]
 
         # Derive diagnostic labels from assertions + judge verdicts
@@ -681,9 +665,7 @@ def build_skillbench_background(
     baseline_desc = ""
     if baseline_scores:
         mean_score = sum(baseline_scores.values()) / len(baseline_scores)
-        baseline_desc = (
-            f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
-        )
+        baseline_desc = f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
 
         if baseline_side_info:
             needs_skill_ids = []
@@ -701,9 +683,7 @@ def build_skillbench_background(
 
     components_desc = ""
     if component_names and any(c.startswith("tools_") for c in component_names):
-        tool_modules = [
-            c.replace("tools_", "") for c in component_names if c.startswith("tools_")
-        ]
+        tool_modules = [c.replace("tools_", "") for c in component_names if c.startswith("tools_")]
         components_desc = (
             f"\nAlso optimizing MCP tool descriptions for: {', '.join(tool_modules)}. "
             "Keep docstrings accurate and concise — every token counts toward the budget."

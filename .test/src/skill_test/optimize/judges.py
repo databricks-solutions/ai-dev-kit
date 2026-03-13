@@ -278,7 +278,15 @@ def _categorical_to_float(verdict: str | float) -> float:
 # ---------------------------------------------------------------------------
 
 _CORRECTNESS_KEYWORDS = {
-    "api", "syntax", "correct", "deprecated", "modern", "function", "parameter", "error", "version",
+    "api",
+    "syntax",
+    "correct",
+    "deprecated",
+    "modern",
+    "function",
+    "parameter",
+    "error",
+    "version",
 }
 
 _CORRECTNESS_INSTRUCTIONS = """\
@@ -332,10 +340,7 @@ def create_correctness_judge(
     instructions = _CORRECTNESS_INSTRUCTIONS
     if skill_guidelines:
         # Filter for correctness-related guidelines
-        filtered = [
-            g for g in skill_guidelines
-            if any(kw in g.lower() for kw in _CORRECTNESS_KEYWORDS)
-        ]
+        filtered = [g for g in skill_guidelines if any(kw in g.lower() for kw in _CORRECTNESS_KEYWORDS)]
         if filtered:
             principles = "\n".join(f"- {g}" for g in filtered)
             instructions += f"\n\n## Domain-Specific Correctness Principles\n{principles}\n"
