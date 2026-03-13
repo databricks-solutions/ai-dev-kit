@@ -277,7 +277,9 @@ def _categorical_to_float(verdict: str | float) -> float:
 # Correctness judge — facts, API references, code syntax accuracy
 # ---------------------------------------------------------------------------
 
-_CORRECTNESS_KEYWORDS = {"api", "syntax", "correct", "deprecated", "modern", "function", "parameter", "error", "version"}
+_CORRECTNESS_KEYWORDS = {
+    "api", "syntax", "correct", "deprecated", "modern", "function", "parameter", "error", "version",
+}
 
 _CORRECTNESS_INSTRUCTIONS = """\
 You are an expert evaluator for Databricks skill documentation CORRECTNESS.

@@ -292,7 +292,9 @@ class SkillBenchEvaluator:
             "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
         )
 
-        expectations_text = f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
+        expectations_text = (
+            f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
+        )
 
         # make_judge requires expectations as dict, inputs/outputs as Any.
         expectations_dict = {"criteria": expectations_text}
