@@ -47,6 +47,7 @@ SCOPE="${DEVKIT_SCOPE:-project}"
 SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
 FORCE="${DEVKIT_FORCE:-false}"
 IS_UPDATE=false
+UPDATE_MODE=false
 SILENT="${DEVKIT_SILENT:-false}"
 TOOLS="${DEVKIT_TOOLS:-}"
 USER_TOOLS=""
@@ -136,6 +137,7 @@ while [ $# -gt 0 ]; do
         --silent)         SILENT=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         -f|--force)       FORCE=true; shift ;;
+        -u|--update)      UPDATE_MODE=true; FORCE=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
             echo ""
@@ -154,6 +156,7 @@ while [ $# -gt 0 ]; do
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
             echo "  -f, --force           Force reinstall"
+            echo "  -u, --update          Update to latest version using saved install config"
             echo "  -h, --help            Show this help"
             echo ""
             echo "Environment Variables (alternative to flags):"
@@ -491,7 +494,6 @@ detect_tools() {
         TOOLS=$(echo "$USER_TOOLS" | tr ',' ' ')
         return
     elif [ -n "$TOOLS" ]; then
-        # TOOLS env var already set, just normalize it
         TOOLS=$(echo "$TOOLS" | tr ',' ' ')
         return
     fi
@@ -1459,6 +1461,41 @@ write_mcp_configs() {
     done
 }
 
+# Save install config for future --update runs
+save_config() {
+    local config_file="$INSTALL_DIR/install.conf"
+    cat > "$config_file" <<CONF
+# Saved by ai-dev-kit installer — used by --update flag
+SAVED_TOOLS="$TOOLS"
+SAVED_SCOPE="$SCOPE"
+SAVED_PROFILE="$PROFILE"
+SAVED_BASE_DIR="${1:-}"
+CONF
+    if [ "$SCOPE" = "project" ]; then
+        mkdir -p ".ai-dev-kit"
+        cp "$config_file" ".ai-dev-kit/install.conf"
+    fi
+}
+
+# Load saved config for --update mode
+load_config() {
+    local config_file="$INSTALL_DIR/install.conf"
+    [ -f ".ai-dev-kit/install.conf" ] && config_file=".ai-dev-kit/install.conf"
+
+    if [ ! -f "$config_file" ]; then
+        die "No saved config found at $config_file. Run a full install first, then use --update."
+    fi
+
+    # shellcheck disable=SC1090
+    source "$config_file"
+    [ -n "${SAVED_TOOLS:-}" ] && TOOLS="$SAVED_TOOLS"
+    [ -n "${SAVED_SCOPE:-}" ] && SCOPE="$SAVED_SCOPE"
+    [ -n "${SAVED_PROFILE:-}" ] && PROFILE="$SAVED_PROFILE"
+    [ -n "${SAVED_BASE_DIR:-}" ] && UPDATE_BASE_DIR="$SAVED_BASE_DIR"
+    SILENT=true
+    msg "${B}Update mode:${N} reusing saved config (tools=$TOOLS, scope=$SCOPE, profile=$PROFILE)"
+}
+
 # Save version
 save_version() {
     # Use -f to fail on HTTP errors (like 404)
@@ -1629,6 +1666,11 @@ main() {
         echo "────────────────────────────────"
     fi
     
+    # Load saved config if --update mode
+    if [ "$UPDATE_MODE" = true ]; then
+        load_config
+    fi
+
     # Check dependencies
     step "Checking prerequisites"
     check_deps
@@ -1712,9 +1754,15 @@ main() {
     # ── Step 7: Version check (may exit early if up to date) ──
     check_version
     
-    # Determine base directory
+    # Determine base directory (use saved path in update mode for project-scoped installs)
     local base_dir
-    [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+    if [ -n "${UPDATE_BASE_DIR:-}" ]; then
+        base_dir="$UPDATE_BASE_DIR"
+    elif [ "$SCOPE" = "global" ]; then
+        base_dir="$HOME"
+    else
+        base_dir="$(pwd)"
+    fi
     
     # Setup MCP server
     if [ "$INSTALL_MCP" = true ]; then
@@ -1741,11 +1789,12 @@ main() {
     # Write MCP configs
     [ "$INSTALL_MCP" = true ] && write_mcp_configs "$base_dir"
     
-    # Save version
+    # Save version and install config
     save_version
+    save_config "$base_dir"
     
-    # Prompt to run auth
-    prompt_auth
+    # Prompt to run auth (skip in update mode)
+    [ "$UPDATE_MODE" != true ] && prompt_auth
     
     # Done
     summary
