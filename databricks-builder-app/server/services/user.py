@@ -1,8 +1,8 @@
 """User service for getting the current authenticated user and token.
 
 In production (Databricks Apps):
-- User email is available in the X-Forwarded-User header
-- X-Forwarded-Email header is accepted from M2M callers forwarding real user identity
+- X-Forwarded-Email header is checked first (M2M callers forwarding real user identity)
+- X-Forwarded-User header is used as fallback (browser users via Databricks Apps proxy)
 - Access token is available in the X-Forwarded-Access-Token header
 - Bearer tokens from other Databricks Apps (M2M OAuth) are also accepted
 
@@ -65,8 +65,8 @@ async def get_current_user(request: Request) -> str:
   """Get the current user's email from the request.
 
   Auth priority:
-    1. X-Forwarded-User header (browser users via Databricks Apps proxy)
-    2. X-Forwarded-Email header (M2M callers forwarding real user identity)
+    1. X-Forwarded-Email header (M2M callers forwarding real user identity)
+    2. X-Forwarded-User header (browser users via Databricks Apps proxy)
     3. Authorization: Bearer token (M2M OAuth from other Databricks Apps)
     4. WorkspaceClient dev fallback (local development only)
 
@@ -79,17 +79,20 @@ async def get_current_user(request: Request) -> str:
   Raises:
       ValueError: If user cannot be determined
   """
-  # 1. X-Forwarded-User (Databricks Apps proxy for browser users)
-  user = request.headers.get('X-Forwarded-User')
-  if user:
-    logger.debug(f'Got user from X-Forwarded-User header: {user}')
-    return user
-
-  # 2. X-Forwarded-Email (M2M callers forwarding real user identity)
+  # 1. X-Forwarded-Email (M2M callers forwarding real user identity)
+  # Checked first so that when an M2M caller (e.g. Lemma) explicitly sets the
+  # real user's SCIM identity, it takes priority over X-Forwarded-User which
+  # the proxy overwrites with the service principal's identity.
   forwarded_email = request.headers.get('X-Forwarded-Email')
   if forwarded_email:
     logger.debug(f'Got user from X-Forwarded-Email header: {forwarded_email}')
     return forwarded_email
+
+  # 2. X-Forwarded-User (Databricks Apps proxy for browser users)
+  user = request.headers.get('X-Forwarded-User')
+  if user:
+    logger.debug(f'Got user from X-Forwarded-User header: {user}')
+    return user
 
   # 3. Bearer token (M2M OAuth from other Databricks Apps)
   auth_header = request.headers.get('Authorization', '')
