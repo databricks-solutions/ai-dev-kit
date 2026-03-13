@@ -1,4 +1,4 @@
-"""Compute tools - Execute code on Databricks clusters and serverless compute."""
+"""Compute tools - Execute code on Databricks clusters and serverless compute, and manage compute resources."""
 
 from typing import Dict, Any, List, Optional
 
@@ -11,6 +11,15 @@ from databricks_tools_core.compute import (
     run_file_on_databricks as _run_file_on_databricks,
     run_code_on_serverless as _run_code_on_serverless,
     NoRunningClusterError,
+    create_cluster as _create_cluster,
+    modify_cluster as _modify_cluster,
+    terminate_cluster as _terminate_cluster,
+    delete_cluster as _delete_cluster,
+    list_node_types as _list_node_types,
+    list_spark_versions as _list_spark_versions,
+    create_sql_warehouse as _create_sql_warehouse,
+    modify_sql_warehouse as _modify_sql_warehouse,
+    delete_sql_warehouse as _delete_sql_warehouse,
 )
 
 from ..server import mcp
@@ -342,3 +351,319 @@ def run_code_on_serverless(
         workspace_path=workspace_path if workspace_path else None,
     )
     return result.to_dict()
+
+
+# --- Compute Management Tools ---
+
+
+@mcp.tool
+def create_cluster(
+    name: str,
+    num_workers: int = 1,
+    spark_version: str = None,
+    node_type_id: str = None,
+    autotermination_minutes: int = 120,
+    data_security_mode: str = None,
+    spark_conf: str = None,
+    autoscale_min_workers: int = None,
+    autoscale_max_workers: int = None,
+) -> Dict[str, Any]:
+    """
+    Create a new Databricks cluster with sensible defaults.
+
+    Just provide a name and num_workers — the tool auto-picks the latest LTS
+    Databricks Runtime, a reasonable node type for the cloud, SINGLE_USER
+    security mode, and 120-minute auto-termination.
+
+    Power users can override any parameter for full control.
+
+    Args:
+        name: Human-readable cluster name.
+        num_workers: Fixed number of workers (ignored if autoscale is set). Default 1.
+        spark_version: DBR version key (e.g. "15.4.x-scala2.12"). Auto-picks latest LTS if omitted.
+        node_type_id: Worker node type (e.g. "i3.xlarge"). Auto-picked if omitted.
+        autotermination_minutes: Minutes of inactivity before auto-termination. Default 120.
+        data_security_mode: Security mode ("SINGLE_USER", "USER_ISOLATION", etc.). Default SINGLE_USER.
+        spark_conf: JSON string of Spark config overrides (e.g. '{"spark.sql.shuffle.partitions": "8"}').
+        autoscale_min_workers: If set with autoscale_max_workers, enables autoscaling.
+        autoscale_max_workers: Maximum workers for autoscaling.
+
+    Returns:
+        Dictionary with cluster_id, cluster_name, state, spark_version, node_type_id, and message.
+    """
+    # Convert empty strings to None
+    if spark_version == "":
+        spark_version = None
+    if node_type_id == "":
+        node_type_id = None
+    if data_security_mode == "":
+        data_security_mode = None
+
+    # Parse spark_conf from JSON string
+    parsed_spark_conf = None
+    if spark_conf and spark_conf.strip():
+        import json
+        parsed_spark_conf = json.loads(spark_conf)
+
+    kwargs = {}
+    if spark_version:
+        kwargs["spark_version"] = spark_version
+    if node_type_id:
+        kwargs["node_type_id"] = node_type_id
+    if data_security_mode:
+        kwargs["data_security_mode"] = data_security_mode
+    if parsed_spark_conf:
+        kwargs["spark_conf"] = parsed_spark_conf
+    if autoscale_min_workers is not None:
+        kwargs["autoscale_min_workers"] = autoscale_min_workers
+    if autoscale_max_workers is not None:
+        kwargs["autoscale_max_workers"] = autoscale_max_workers
+
+    return _create_cluster(
+        name=name,
+        num_workers=num_workers,
+        autotermination_minutes=autotermination_minutes,
+        **kwargs,
+    )
+
+
+@mcp.tool
+def modify_cluster(
+    cluster_id: str,
+    name: str = None,
+    num_workers: int = None,
+    spark_version: str = None,
+    node_type_id: str = None,
+    autotermination_minutes: int = None,
+    spark_conf: str = None,
+    autoscale_min_workers: int = None,
+    autoscale_max_workers: int = None,
+) -> Dict[str, Any]:
+    """
+    Modify an existing Databricks cluster configuration.
+
+    Only the specified parameters are changed; others remain as-is.
+    If the cluster is running, it will restart to apply changes.
+
+    Args:
+        cluster_id: ID of the cluster to modify.
+        name: New cluster name (optional).
+        num_workers: New fixed worker count (optional).
+        spark_version: New DBR version (optional).
+        node_type_id: New worker node type (optional).
+        autotermination_minutes: New auto-termination timeout (optional).
+        spark_conf: JSON string of Spark config overrides (optional).
+        autoscale_min_workers: Set to enable/modify autoscaling (optional).
+        autoscale_max_workers: Set to enable/modify autoscaling (optional).
+
+    Returns:
+        Dictionary with cluster_id, cluster_name, state, and message.
+    """
+    # Convert empty strings to None
+    if name == "":
+        name = None
+    if spark_version == "":
+        spark_version = None
+    if node_type_id == "":
+        node_type_id = None
+
+    kwargs = {}
+    if name:
+        kwargs["name"] = name
+    if num_workers is not None:
+        kwargs["num_workers"] = num_workers
+    if spark_version:
+        kwargs["spark_version"] = spark_version
+    if node_type_id:
+        kwargs["node_type_id"] = node_type_id
+    if autotermination_minutes is not None:
+        kwargs["autotermination_minutes"] = autotermination_minutes
+    if autoscale_min_workers is not None:
+        kwargs["autoscale_min_workers"] = autoscale_min_workers
+    if autoscale_max_workers is not None:
+        kwargs["autoscale_max_workers"] = autoscale_max_workers
+
+    # Parse spark_conf from JSON string
+    if spark_conf and spark_conf.strip():
+        import json
+        kwargs["spark_conf"] = json.loads(spark_conf)
+
+    return _modify_cluster(cluster_id=cluster_id, **kwargs)
+
+
+@mcp.tool
+def terminate_cluster(cluster_id: str) -> Dict[str, Any]:
+    """
+    Stop a running Databricks cluster (reversible).
+
+    The cluster is terminated but NOT deleted. It can be restarted later
+    with start_cluster(). This is safe and reversible.
+
+    Args:
+        cluster_id: ID of the cluster to terminate.
+
+    Returns:
+        Dictionary with cluster_id, cluster_name, state, and message.
+    """
+    return _terminate_cluster(cluster_id)
+
+
+@mcp.tool
+def delete_cluster(cluster_id: str) -> Dict[str, Any]:
+    """
+    PERMANENTLY delete a Databricks cluster.
+
+    WARNING: This is a DESTRUCTIVE, IRREVERSIBLE action. The cluster and its
+    configuration will be permanently removed. This cannot be undone.
+
+    IMPORTANT: Always confirm with the user before calling this tool.
+    Ask: "Are you sure you want to permanently delete cluster '<name>'?
+    This cannot be undone."
+
+    Args:
+        cluster_id: ID of the cluster to permanently delete.
+
+    Returns:
+        Dictionary with cluster_id, cluster_name, state, and warning message.
+    """
+    return _delete_cluster(cluster_id)
+
+
+@mcp.tool
+def list_node_types() -> List[Dict[str, Any]]:
+    """
+    List available VM/node types for cluster creation.
+
+    Returns node type IDs, memory, cores, and GPU info. Useful when the user
+    wants to choose a specific node type for create_cluster().
+
+    Returns:
+        List of node type dicts with node_type_id, memory_mb, num_cores, num_gpus, description.
+    """
+    return _list_node_types()
+
+
+@mcp.tool
+def list_spark_versions() -> List[Dict[str, Any]]:
+    """
+    List available Databricks Runtime (Spark) versions.
+
+    Returns version keys and names. Filter for "LTS" in the name to find
+    long-term support versions for create_cluster().
+
+    Returns:
+        List of dicts with key and name for each version.
+    """
+    return _list_spark_versions()
+
+
+@mcp.tool
+def create_sql_warehouse(
+    name: str,
+    size: str = "Small",
+    min_num_clusters: int = 1,
+    max_num_clusters: int = 1,
+    auto_stop_mins: int = 120,
+    warehouse_type: str = "PRO",
+    enable_serverless: bool = True,
+) -> Dict[str, Any]:
+    """
+    Create a new SQL warehouse with sensible defaults.
+
+    By default creates a serverless Pro warehouse with auto-stop at 120 minutes.
+
+    Args:
+        name: Human-readable warehouse name.
+        size: T-shirt size ("2X-Small", "X-Small", "Small", "Medium", "Large",
+            "X-Large", "2X-Large", "3X-Large", "4X-Large"). Default "Small".
+        min_num_clusters: Minimum cluster count. Default 1.
+        max_num_clusters: Maximum cluster count for scaling. Default 1.
+        auto_stop_mins: Minutes of inactivity before auto-stop. Default 120.
+        warehouse_type: "PRO" or "CLASSIC". Default "PRO".
+        enable_serverless: Enable serverless compute. Default True.
+
+    Returns:
+        Dictionary with warehouse_id, name, size, state, and message.
+    """
+    # Convert empty strings to None
+    if size == "":
+        size = "Small"
+    if warehouse_type == "":
+        warehouse_type = "PRO"
+
+    return _create_sql_warehouse(
+        name=name,
+        size=size,
+        min_num_clusters=min_num_clusters,
+        max_num_clusters=max_num_clusters,
+        auto_stop_mins=auto_stop_mins,
+        warehouse_type=warehouse_type,
+        enable_serverless=enable_serverless,
+    )
+
+
+@mcp.tool
+def modify_sql_warehouse(
+    warehouse_id: str,
+    name: str = None,
+    size: str = None,
+    min_num_clusters: int = None,
+    max_num_clusters: int = None,
+    auto_stop_mins: int = None,
+) -> Dict[str, Any]:
+    """
+    Modify an existing SQL warehouse configuration.
+
+    Only the specified parameters are changed; others remain as-is.
+
+    Args:
+        warehouse_id: ID of the warehouse to modify.
+        name: New warehouse name (optional).
+        size: New T-shirt size (optional).
+        min_num_clusters: New minimum clusters (optional).
+        max_num_clusters: New maximum clusters (optional).
+        auto_stop_mins: New auto-stop timeout in minutes (optional).
+
+    Returns:
+        Dictionary with warehouse_id, name, state, and message.
+    """
+    # Convert empty strings to None
+    if name == "":
+        name = None
+    if size == "":
+        size = None
+
+    kwargs = {}
+    if name:
+        kwargs["name"] = name
+    if size:
+        kwargs["size"] = size
+    if min_num_clusters is not None:
+        kwargs["min_num_clusters"] = min_num_clusters
+    if max_num_clusters is not None:
+        kwargs["max_num_clusters"] = max_num_clusters
+    if auto_stop_mins is not None:
+        kwargs["auto_stop_mins"] = auto_stop_mins
+
+    return _modify_sql_warehouse(warehouse_id=warehouse_id, **kwargs)
+
+
+@mcp.tool
+def delete_sql_warehouse(warehouse_id: str) -> Dict[str, Any]:
+    """
+    PERMANENTLY delete a SQL warehouse.
+
+    WARNING: This is a DESTRUCTIVE, IRREVERSIBLE action. The warehouse and its
+    configuration will be permanently removed. This cannot be undone.
+
+    IMPORTANT: Always confirm with the user before calling this tool.
+    Ask: "Are you sure you want to permanently delete warehouse '<name>'?
+    This cannot be undone."
+
+    Args:
+        warehouse_id: ID of the warehouse to permanently delete.
+
+    Returns:
+        Dictionary with warehouse_id, name, state, and warning message.
+    """
+    return _delete_sql_warehouse(warehouse_id)
