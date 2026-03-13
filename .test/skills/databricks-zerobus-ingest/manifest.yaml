@@ -1,4 +1,5 @@
 skill_name: databricks-zerobus-ingest
+tool_modules: []
 description: Test cases for Zerobus Ingest skill - gRPC-based data ingestion into Delta tables
 triggers:
 - zerobus

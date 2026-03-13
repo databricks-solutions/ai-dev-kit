@@ -3,6 +3,8 @@ skill:
   source_path: "databricks-skills/databricks-asset-bundles"
   description: "Create and configure Databricks Asset Bundles (DABs) for multi-environment deployments"
 
+tool_modules: [jobs, pipelines]
+
 evaluation:
   datasets:
     - path: ground_truth.yaml

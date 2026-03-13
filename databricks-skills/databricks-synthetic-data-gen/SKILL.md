@@ -83,10 +83,19 @@ Show a clear specification with **YOUR ASSUMPTIONS surfaced**. Always start with
    Volume: /Volumes/{user_catalog}/ecommerce_demo/raw_data/
 ```
 
-| Table | Columns | Rows | Key Assumptions |
-|-------|---------|------|-----------------|
-| customers | customer_id, name, email, tier, region | 5,000 | Tier: Free 60%, Pro 30%, Enterprise 10% |
-| orders | order_id, customer_id (FK), amount, status | 15,000 | Enterprise customers generate 5x more orders |
+| Table | Columns | Description | Rows | Key Assumptions |
+|-------|---------|-------------|------|-----------------|
+| customers | customer_id, name, email, tier, region | Synthetic customer profiles | 5,000 | Tier: Free 60%, Pro 30%, Enterprise 10% |
+| orders | order_id, customer_id (FK), amount, status | Customer purchase transactions | 15,000 | Enterprise customers generate 5x more orders |
+
+Include column-level descriptions in the plan (these become column comments in Unity Catalog):
+
+| Table | Column | Comment |
+|-------|--------|---------|
+| customers | customer_id | Unique customer identifier (CUST-XXXXX) |
+| customers | tier | Customer tier: Free, Pro, Enterprise |
+| orders | customer_id | FK to customers.customer_id |
+| orders | amount | Order total in USD |
 
 **Assumptions I'm making:**
 - Amount distribution: log-normal by tier (Enterprise ~$1800, Pro ~$245, Free ~$55)
@@ -238,6 +247,7 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 - Create infrastructure in script (`CREATE SCHEMA/VOLUME IF NOT EXISTS`)
 - Do NOT create catalogs - assume they exist
 - Delta tables as default
+- Add table and column comments for discoverability in Unity Catalog (see [references/5-output-formats.md](references/5-output-formats.md))
 
 ## Related Skills
 

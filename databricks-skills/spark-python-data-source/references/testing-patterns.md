@@ -415,25 +415,27 @@ tests/
 
 ## Running Tests
 
+Run tests through your packaging tool (e.g., `uv run`, `poetry run`, `hatch run`). Examples use `uv`:
+
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run specific test file
-poetry run pytest tests/unit/test_writer.py
+uv run pytest tests/unit/test_writer.py
 
 # Run specific test
-poetry run pytest tests/unit/test_writer.py::test_writer_sends_batch
+uv run pytest tests/unit/test_writer.py::test_writer_sends_batch
 
 # Run with coverage
-poetry run pytest --cov=your_package --cov-report=html
+uv run pytest --cov=your_package --cov-report=html
 
 # Run only unit tests
-poetry run pytest tests/unit/
+uv run pytest tests/unit/
 
 # Run with verbose output
-poetry run pytest -v
+uv run pytest -v
 
 # Run with print statements
-poetry run pytest -s
+uv run pytest -s
 ```

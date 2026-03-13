@@ -7,6 +7,11 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/setup.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/check_update.sh",
+            "timeout": 5
           }
         ]
       }

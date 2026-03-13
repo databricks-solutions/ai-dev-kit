@@ -45,7 +45,11 @@ def save_result(result: OptimizationResult) -> tuple[Path | None, Path | None]:
     Returns:
         Tuple of (optimized_skill_path, metadata_path), either may be None on error.
     """
-    if result.improvement <= 0 and result.original_content == result.optimized_content:
+    # Check if this is a tools-only result (no skill content to save)
+    has_tool_components = result.components and any(k.startswith("tools_") for k in result.components)
+    is_tools_only = has_tool_components and result.original_content == result.optimized_content
+
+    if result.improvement <= 0 and not is_tools_only:
         return None, None
 
     results_dir = _get_results_dir(result.skill_name)
@@ -53,8 +57,8 @@ def save_result(result: OptimizationResult) -> tuple[Path | None, Path | None]:
     optimized_path = None
     metadata_path = None
 
-    # Write the optimized SKILL.md
-    if result.optimized_content and result.optimized_content != result.original_content:
+    # Write the optimized SKILL.md (skip for tools-only — no skill changes)
+    if not is_tools_only and result.optimized_content and result.optimized_content != result.original_content:
         optimized_path = results_dir / "optimized_SKILL.md"
         optimized_path.write_text(result.optimized_content)
 

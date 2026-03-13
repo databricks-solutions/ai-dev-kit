@@ -76,6 +76,8 @@ GRANT MODIFY, SELECT ON TABLE my_catalog.my_schema.my_events TO `<service-princi
 
 **Tip:** For broader access (e.g., writing to multiple tables in a schema), grant `MODIFY` and `SELECT` at the schema level instead.
 
+**Important:** For Zerobus, always grant explicit table-level `MODIFY` and `SELECT` permissions in addition to catalog/schema access. Schema-level inherited grants may not be sufficient for the OAuth `authorization_details` flow used by Zerobus.
+
 ---
 
 ## 4. Install the SDK
@@ -83,13 +85,15 @@ GRANT MODIFY, SELECT ON TABLE my_catalog.my_schema.my_events TO `<service-princi
 ### Python (3.9+)
 
 ```bash
-pip install databricks-zerobus-ingest-sdk
+pip install databricks-zerobus-ingest-sdk>=1.0.0
 ```
 
 Or with a virtual environment:
 ```bash
-uv pip install databricks-zerobus-ingest-sdk
+uv pip install databricks-zerobus-ingest-sdk>=1.0.0
 ```
+
+**Note:** The Zerobus SDK cannot be pip-installed on Databricks serverless compute. Use classic compute clusters, or use the [Zerobus REST API](https://docs.databricks.com/aws/en/ingestion/zerobus-rest-api) (Beta) for notebook-based ingestion without the SDK.
 
 ### Java (8+)
 

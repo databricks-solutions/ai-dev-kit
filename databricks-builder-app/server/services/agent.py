@@ -32,11 +32,14 @@ from typing import AsyncIterator
 from claude_agent_sdk import ClaudeAgentOptions, query, HookMatcher
 from claude_agent_sdk.types import (
   AssistantMessage,
+  PermissionResultAllow,
+  PermissionResultDeny,
   ResultMessage,
   StreamEvent,
   SystemMessage,
   TextBlock,
   ThinkingBlock,
+  ToolPermissionContext,
   ToolResultBlock,
   ToolUseBlock,
   UserMessage,
@@ -299,6 +302,39 @@ def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancell
   context.run(run_with_context)
 
 
+def _process_tool_result(block: ToolResultBlock, ask_user_tool_ids: set[str]) -> dict:
+  """Extract and normalize content from a ToolResultBlock for streaming."""
+  content = block.content
+  if isinstance(content, list):
+    texts = []
+    for item in content:
+      if isinstance(item, dict) and 'text' in item:
+        texts.append(item['text'])
+      elif isinstance(item, str):
+        texts.append(item)
+      else:
+        texts.append(str(item))
+    content = '\n'.join(texts) if texts else str(block.content)
+  elif not isinstance(content, str):
+    content = str(content)
+
+  # Rewrite AskUserQuestion results — the can_use_tool callback provides
+  # synthetic answers, but the CLI result text is misleading (e.g. "User has
+  # answered your questions: ..."). Replace with a clear message.
+  if block.tool_use_id in ask_user_tool_ids:
+    content = 'Asking user questions directly in conversation'
+  elif block.is_error and 'Stream closed' in content:
+    content = f'Tool execution interrupted: {content}. This may occur when operations exceed timeout limits or when the connection is interrupted. Check backend logs for more details.'
+    logger.warning(f'Tool result error (improved): {content}')
+
+  return {
+    'type': 'tool_result',
+    'tool_use_id': block.tool_use_id,
+    'content': content,
+    'is_error': block.is_error,
+  }
+
+
 async def stream_agent_response(
   project_id: str,
   message: str,
@@ -451,10 +487,37 @@ async def stream_agent_response(
       # Also print to stderr for immediate visibility during development
       print(f'[Claude stderr] {line.strip()}', file=sys.stderr, flush=True)
 
+    # Handle AskUserQuestion tool calls gracefully.
+    # With bypassPermissions and no callback, AskUserQuestion triggers an SDK
+    # error ("canUseTool callback is not provided") which produces is_error=True
+    # tool results — showing as "Failed" in downstream UIs like Lemma.
+    # This callback allows AskUserQuestion with a synthetic answer that redirects
+    # Claude to ask questions as normal text, avoiding the error path entirely.
+    async def can_use_tool(
+      tool_name: str, input_data: dict, _context: ToolPermissionContext,
+    ) -> PermissionResultAllow | PermissionResultDeny:
+      if tool_name == "AskUserQuestion":
+        questions = input_data.get("questions", [])
+        answers = {
+          q.get("question", ""): "Please ask this question directly in your text response."
+          for q in questions
+        }
+        return PermissionResultAllow(
+          updated_input={"questions": questions, "answers": answers},
+        )
+      return PermissionResultAllow(updated_input=input_data)
+
+    # Required for can_use_tool in Python: a PreToolUse hook that keeps the
+    # stream open so the permission callback can be invoked.
+    async def _keepalive_hook(_input_data, _tool_use_id, _context):
+      return {"continue_": True}
+
     options = ClaudeAgentOptions(
       cwd=str(project_dir),
       allowed_tools=allowed_tools,
       permission_mode='bypassPermissions',  # Auto-accept all tools including MCP
+      can_use_tool=can_use_tool,  # Handle AskUserQuestion gracefully
+      hooks={"PreToolUse": [HookMatcher(matcher=None, hooks=[_keepalive_hook])]},
       resume=session_id,  # Resume from previous session if provided
       mcp_servers={'databricks': databricks_server},  # In-process SDK tools
       system_prompt=system_prompt,  # Databricks-focused system prompt
@@ -484,6 +547,8 @@ async def stream_agent_response(
     # Process messages from the queue with keepalive for long operations
     KEEPALIVE_INTERVAL = 15  # seconds - send keepalive if no activity
     last_activity = time.time()
+    # Track AskUserQuestion tool IDs to rewrite their results in the stream
+    ask_user_tool_ids: set[str] = set()
 
     while True:
       # Use timeout on queue.get to allow keepalive emission
@@ -534,6 +599,9 @@ async def stream_agent_response(
                 'thinking': block.thinking,
               }
             elif isinstance(block, ToolUseBlock):
+              # Track AskUserQuestion calls so we can rewrite their results
+              if block.name == 'AskUserQuestion':
+                ask_user_tool_ids.add(block.id)
               yield {
                 'type': 'tool_use',
                 'tool_id': block.id,
@@ -541,33 +609,7 @@ async def stream_agent_response(
                 'tool_input': block.input,
               }
             elif isinstance(block, ToolResultBlock):
-              # Extract content - may be string, list, or complex structure
-              content = block.content
-              if isinstance(content, list):
-                # Handle list of content blocks (e.g., [{'type': 'text', 'text': '...'}])
-                texts = []
-                for item in content:
-                  if isinstance(item, dict) and 'text' in item:
-                    texts.append(item['text'])
-                  elif isinstance(item, str):
-                    texts.append(item)
-                  else:
-                    texts.append(str(item))
-                content = '\n'.join(texts) if texts else str(block.content)
-              elif not isinstance(content, str):
-                content = str(content)
-
-              # Improve generic "Stream closed" error messages
-              if block.is_error and 'Stream closed' in content:
-                content = f'Tool execution interrupted: {content}. This may occur when operations exceed timeout limits or when the connection is interrupted. Check backend logs for more details.'
-                logger.warning(f'Tool result error (improved): {content}')
-
-              yield {
-                'type': 'tool_result',
-                'tool_use_id': block.tool_use_id,
-                'content': content,
-                'is_error': block.is_error,
-              }
+              yield _process_tool_result(block, ask_user_tool_ids)
 
         elif isinstance(msg, ResultMessage):
           yield {
@@ -592,32 +634,7 @@ async def stream_agent_response(
           if isinstance(msg_content, list):
             for block in msg_content:
               if isinstance(block, ToolResultBlock):
-                # Extract content - may be string, list, or complex structure
-                content = block.content
-                if isinstance(content, list):
-                  texts = []
-                  for item in content:
-                    if isinstance(item, dict) and 'text' in item:
-                      texts.append(item['text'])
-                    elif isinstance(item, str):
-                      texts.append(item)
-                    else:
-                      texts.append(str(item))
-                  content = '\n'.join(texts) if texts else str(block.content)
-                elif not isinstance(content, str):
-                  content = str(content)
-
-                # Improve generic "Stream closed" error messages
-                if block.is_error and 'Stream closed' in content:
-                  content = f'Tool execution interrupted: {content}. This may occur when operations exceed timeout limits or when the connection is interrupted. Check backend logs for more details.'
-                  logger.warning(f'Tool result error (improved): {content}')
-
-                yield {
-                  'type': 'tool_result',
-                  'tool_use_id': block.tool_use_id,
-                  'content': content,
-                  'is_error': block.is_error,
-                }
+                yield _process_tool_result(block, ask_user_tool_ids)
           # Skip string content (just echo of user input)
 
         elif isinstance(msg, StreamEvent):

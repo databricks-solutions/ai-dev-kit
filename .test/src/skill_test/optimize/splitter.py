@@ -16,6 +16,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, TypedDict
 
+import yaml
+
 from ..dataset import EvalRecord, get_dataset_source
 
 
@@ -162,6 +164,7 @@ def create_cross_skill_dataset(
     max_per_skill: int = 5,
     base_path: Path | None = None,
     seed: int = 42,
+    tool_modules: list[str] | None = None,
 ) -> list[SkillTask]:
     """Create a merged dataset from multiple skills for cross-skill tool optimization.
 
@@ -190,6 +193,25 @@ def create_cross_skill_dataset(
             for d in base_path.iterdir()
             if d.is_dir() and (d / "ground_truth.yaml").exists() and not d.name.startswith("_")
         )
+
+    # Filter skills by tool_modules relevance
+    if tool_modules:
+        tool_modules_set = set(tool_modules)
+        filtered = []
+        for name in skill_names:
+            manifest_path = base_path / name / "manifest.yaml"
+            if manifest_path.exists():
+                manifest = yaml.safe_load(manifest_path.read_text()) or {}
+                skill_tool_modules = manifest.get("tool_modules")
+                if skill_tool_modules is None:
+                    # No field → include by default (backward compat)
+                    filtered.append(name)
+                elif tool_modules_set & set(skill_tool_modules):
+                    filtered.append(name)
+                # else: skill declares modules that don't overlap → skip
+            else:
+                filtered.append(name)  # No manifest → include
+        skill_names = filtered
 
     if not skill_names:
         return []

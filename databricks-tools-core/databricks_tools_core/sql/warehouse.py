@@ -29,6 +29,8 @@ def list_warehouses(limit: int = 20) -> List[Dict[str, Any]]:
         - cluster_size: Size of the warehouse
         - auto_stop_mins: Auto-stop timeout in minutes
         - creator_name: Who created the warehouse
+        - warehouse_type: Type of warehouse (PRO, CLASSIC)
+        - enable_serverless_compute: Whether serverless compute is enabled
 
     Raises:
         Exception: If API request fails
@@ -59,39 +61,46 @@ def list_warehouses(limit: int = 20) -> List[Dict[str, Any]]:
                 "cluster_size": w.cluster_size,
                 "auto_stop_mins": w.auto_stop_mins,
                 "creator_name": w.creator_name,
+                "warehouse_type": getattr(w, "warehouse_type", None),
+                "enable_serverless_compute": getattr(w, "enable_serverless_compute", None),
             }
         )
 
     return result
 
 
-def _prefer_user_owned(warehouses: list, current_user: Optional[str]) -> list:
-    """Sort a list of warehouses so that those owned by the current user come first.
+def _sort_within_tier(warehouses: list, current_user: Optional[str]) -> list:
+    """Sort warehouses within a tier: serverless first, then user-owned.
 
     This is a *soft* preference — no warehouses are removed. Within the same
-    priority bucket, user-owned warehouses are simply tried first.
+    priority bucket, serverless warehouses are tried first, then user-owned.
 
     Args:
         warehouses: List of SDK warehouse objects.
         current_user: Current user's username/email, or None.
 
     Returns:
-        Reordered list (user-owned first, then the rest in original order).
+        Reordered list (serverless first, then user-owned, then the rest).
     """
-    if not current_user or not warehouses:
+    if not warehouses:
         return warehouses
-    user_lower = current_user.lower()
-    owned = [w for w in warehouses if (w.creator_name or "").lower() == user_lower]
-    others = [w for w in warehouses if (w.creator_name or "").lower() != user_lower]
-    return owned + others
+
+    def sort_key(w):
+        is_serverless = 0 if getattr(w, "enable_serverless_compute", False) else 1
+        user_lower = (current_user or "").lower()
+        is_owned = 0 if user_lower and (w.creator_name or "").lower() == user_lower else 1
+        return (is_serverless, is_owned)
+
+    return sorted(warehouses, key=sort_key)
 
 
 def get_best_warehouse() -> Optional[str]:
     """
     Select the best available SQL warehouse based on priority rules.
 
-    Within each priority tier, warehouses created by the current user are
-    preferred (soft preference — no warehouses are excluded).
+    Within each priority tier, serverless warehouses are preferred first
+    (instant start, auto-scale, no idle costs), then warehouses created
+    by the current user. No warehouses are excluded.
 
     Priority:
     1. Running warehouse named "Shared endpoint" or "dbdemos-shared-endpoint"
@@ -143,11 +152,11 @@ def get_best_warehouse() -> Optional[str]:
             offline_other.append(warehouse)
 
     # Within each tier, prefer warehouses owned by the current user
-    standard_shared = _prefer_user_owned(standard_shared, current_user)
-    online_shared = _prefer_user_owned(online_shared, current_user)
-    online_other = _prefer_user_owned(online_other, current_user)
-    offline_shared = _prefer_user_owned(offline_shared, current_user)
-    offline_other = _prefer_user_owned(offline_other, current_user)
+    standard_shared = _sort_within_tier(standard_shared, current_user)
+    online_shared = _sort_within_tier(online_shared, current_user)
+    online_other = _sort_within_tier(online_other, current_user)
+    offline_shared = _sort_within_tier(offline_shared, current_user)
+    offline_other = _sort_within_tier(offline_other, current_user)
 
     # Select based on priority
     if standard_shared:

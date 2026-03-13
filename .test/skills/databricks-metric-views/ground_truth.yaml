@@ -26,6 +26,13 @@ test_cases:
     - Defines dimensions for grouping data
     - Defines measures for aggregations
     - Uses YAML version 1.1
+    trace_expectations:
+      required_tools:
+      - mcp__databricks__execute_sql
+      banned_tools:
+      - Bash
+      tool_limits:
+        mcp__databricks__execute_sql: 3
     expected_patterns:
     - pattern: CREATE OR REPLACE VIEW
       min_count: 1
@@ -98,6 +105,13 @@ test_cases:
     - Uses manage_metric_views MCP tool
     - Sets action to create
     - Specifies source table
+    trace_expectations:
+      required_tools:
+      - mcp__databricks__manage_metric_views
+      banned_tools:
+      - Bash
+      tool_limits:
+        mcp__databricks__manage_metric_views: 2
     expected_patterns:
     - pattern: manage_metric_views
       min_count: 1
@@ -133,6 +147,13 @@ test_cases:
     expected_facts:
     - Uses manage_metric_views with action query
     - Specifies query_measures and query_dimensions
+    trace_expectations:
+      required_tools:
+      - mcp__databricks__manage_metric_views
+      banned_tools:
+      - Bash
+      tool_limits:
+        mcp__databricks__manage_metric_views: 2
     expected_patterns:
     - pattern: manage_metric_views
       min_count: 1
