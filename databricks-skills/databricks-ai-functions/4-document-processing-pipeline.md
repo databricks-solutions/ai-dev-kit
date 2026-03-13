@@ -228,6 +228,149 @@ def processing_errors():
 
 ---
 
+## Custom RAG Pipeline — Parse → Chunk → Index → Query
+
+When the goal is retrieval-augmented generation rather than field extraction, use this pipeline to parse documents, chunk them into a Delta table, and index with Vector Search.
+
+### Step 1 — Parse and Chunk into a Delta Table
+
+`ai_parse_document` returns a VARIANT. Use `variant_get` with an explicit `ARRAY<VARIANT>` cast before calling `explode`, since `explode()` does not accept raw VARIANT values.
+
+```sql
+CREATE OR REPLACE TABLE catalog.schema.parsed_chunks AS
+WITH parsed AS (
+  SELECT
+    path,
+    ai_parse_document(content) AS doc
+  FROM read_files('/Volumes/catalog/schema/volume/docs/', format => 'binaryFile')
+),
+elements AS (
+  SELECT
+    path,
+    explode(variant_get(doc, '$.document.elements', 'ARRAY<VARIANT>')) AS element
+  FROM parsed
+)
+SELECT
+  md5(concat(path, variant_get(element, '$.content', 'STRING'))) AS chunk_id,
+  path AS source_path,
+  variant_get(element, '$.content', 'STRING') AS content,
+  variant_get(element, '$.type', 'STRING') AS element_type,
+  current_timestamp() AS parsed_at
+FROM elements
+WHERE variant_get(element, '$.content', 'STRING') IS NOT NULL
+  AND length(trim(variant_get(element, '$.content', 'STRING'))) > 10;
+```
+
+### Step 1a (Production) — Incremental Parsing with Structured Streaming
+
+For production pipelines where new documents arrive over time, use Structured Streaming with checkpoints for exactly-once processing. Each run processes only new files, then stops with `trigger(availableNow=True)`.
+
+See the official bundle example:
+[databricks/bundle-examples/contrib/job_with_ai_parse_document](https://github.com/databricks/bundle-examples/tree/main/contrib/job_with_ai_parse_document)
+
+**Stage 1 — Parse raw documents (streaming):**
+
+```python
+from pyspark.sql.functions import col, current_timestamp, expr
+
+files_df = (
+    spark.readStream.format("binaryFile")
+    .option("pathGlobFilter", "*.{pdf,jpg,jpeg,png}")
+    .option("recursiveFileLookup", "true")
+    .load("/Volumes/catalog/schema/volume/docs/")
+)
+
+parsed_df = (
+    files_df
+    .repartition(8, expr("crc32(path) % 8"))
+    .withColumn("parsed", expr("""
+        ai_parse_document(content, map(
+            'version', '2.0',
+            'descriptionElementTypes', '*'
+        ))
+    """))
+    .withColumn("parsed_at", current_timestamp())
+    .select("path", "parsed", "parsed_at")
+)
+
+(
+    parsed_df.writeStream.format("delta")
+    .outputMode("append")
+    .option("checkpointLocation", "/Volumes/catalog/schema/checkpoints/01_parse")
+    .option("mergeSchema", "true")
+    .trigger(availableNow=True)
+    .toTable("catalog.schema.parsed_documents_raw")
+)
+```
+
+**Stage 2 — Extract text from parsed VARIANT (streaming):**
+
+Uses `transform()` to extract element content from the VARIANT array, and `try_cast` for safe access. Error rows are preserved but flagged.
+
+```python
+from pyspark.sql.functions import col, concat_ws, expr, lit, when
+
+parsed_stream = spark.readStream.format("delta").table("catalog.schema.parsed_documents_raw")
+
+text_df = (
+    parsed_stream
+    .withColumn("text",
+        when(
+            expr("try_cast(parsed:error_status AS STRING)").isNotNull(), lit(None)
+        ).otherwise(
+            concat_ws("\n\n", expr("""
+                transform(
+                    try_cast(parsed:document:elements AS ARRAY),
+                    element -> try_cast(element:content AS STRING)
+                )
+            """))
+        )
+    )
+    .withColumn("error_status", expr("try_cast(parsed:error_status AS STRING)"))
+    .select("path", "text", "error_status", "parsed_at")
+)
+
+(
+    text_df.writeStream.format("delta")
+    .outputMode("append")
+    .option("checkpointLocation", "/Volumes/catalog/schema/checkpoints/02_text")
+    .option("mergeSchema", "true")
+    .trigger(availableNow=True)
+    .toTable("catalog.schema.parsed_documents_text")
+)
+```
+
+Key techniques:
+- **`repartition` by file hash** — parallelizes `ai_parse_document` across workers
+- **`trigger(availableNow=True)`** — processes all pending files then stops (batch-like)
+- **Checkpoints** — exactly-once guarantee; no re-parsing on re-runs
+- **`transform()` + `try_cast`** — safer than `explode` + `variant_get` for text extraction
+- **Separate stages with independent checkpoints** — parse and text extraction can fail/retry independently
+
+### Step 1b — Enable Change Data Feed
+
+Required for Vector Search Delta Sync:
+
+```sql
+ALTER TABLE catalog.schema.parsed_chunks
+SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
+```
+
+### Step 2 — Create a Vector Search Index and Query It
+
+Use the **[databricks-vector-search](../databricks-vector-search/SKILL.md)** skill to create a Delta Sync index on the chunked table and query it. Ensure CDF is enabled first (Step 1b above).
+
+### RAG-Specific Issues
+
+| Issue | Solution |
+|-------|----------|
+| `explode()` fails with VARIANT | `explode()` requires ARRAY, not VARIANT. Use `variant_get(doc, '$.document.elements', 'ARRAY<VARIANT>')` to cast before exploding |
+| Short/noisy chunks | Filter with `length(trim(...)) > 10` — parsing produces tiny fragments (page numbers, headers) that pollute the index |
+| Re-parsing unchanged documents | Use Structured Streaming with checkpoints — see Step 1a above |
+| Region not supported | US/EU regions only, or enable cross-geography routing |
+
+---
+
 ## Near-Real-Time Variant — DSPy + MLflow Agent
 
 When the pipeline must respond in seconds (triggered by a user action, API call, or form submission), use DSPy with an MLflow ChatAgent instead of a DLT pipeline.

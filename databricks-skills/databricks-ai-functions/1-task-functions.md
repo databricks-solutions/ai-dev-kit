@@ -265,12 +265,35 @@ df.withColumn(
 
 **Requires:** DBR 17.1+
 
-**Syntax:** `ai_parse_document(content)`
+**Syntax:** `ai_parse_document(content [, options])`
 - `content`: BINARY — document content loaded from `read_files()` or `spark.read.format("binaryFile")`
+- `options`: MAP\<STRING, STRING\> (optional) — parsing configuration
 
 **Supported formats:** PDF, JPG/JPEG, PNG, DOCX, PPTX
 
 Returns a VARIANT with pages, elements (text paragraphs, tables, figures, headers, footers), bounding boxes, and error metadata.
+
+**Options:**
+
+| Key | Values | Description |
+|-----|--------|-------------|
+| `version` | `'2.0'` | Output schema version |
+| `imageOutputPath` | Volume path | Save rendered page images |
+| `descriptionElementTypes` | `''`, `'figure'`, `'*'` | AI-generated descriptions (default: `'*'` for all) |
+
+**Output schema:**
+
+```
+document
+├── pages[]          -- page id, image_uri
+└── elements[]       -- extracted content
+    ├── type         -- "text", "table", "figure", etc.
+    ├── content      -- extracted text
+    ├── bbox         -- bounding box coordinates
+    └── description  -- AI-generated description
+metadata             -- file info, schema version
+error_status[]       -- errors per page (if any)
+```
 
 ```sql
 -- Parse and extract text blocks
@@ -282,6 +305,17 @@ FROM (
     SELECT path, ai_parse_document(content) AS parsed
     FROM read_files('/Volumes/catalog/schema/landing/docs/', format => 'binaryFile')
 );
+
+-- Parse with options (image output + descriptions)
+SELECT ai_parse_document(
+    content,
+    map(
+        'version', '2.0',
+        'imageOutputPath', '/Volumes/catalog/schema/volume/images/',
+        'descriptionElementTypes', '*'
+    )
+) AS parsed
+FROM read_files('/Volumes/catalog/schema/volume/invoices/', format => 'binaryFile');
 ```
 
 ```python
