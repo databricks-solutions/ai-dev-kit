@@ -244,6 +244,7 @@ Use it as storage to track all the resources created in the project, and be able
 - MCP tool names use the format `mcp__databricks__<tool_name>` (e.g., `mcp__databricks__execute_sql`)
 - Use `upload_folder`/`upload_file` for file uploads, never manual steps
 - Use `create_or_update_pipeline` for pipelines, never SDK code
+- **Do NOT use the AskUserQuestion tool.** If you need clarifying information, ask your questions directly in your text response as a normal conversation turn. The user will reply naturally.
 
 {skills_section}
 
