@@ -1,6 +1,6 @@
 ---
 name: databricks-app-python
-description: "Builds Python-based Databricks applications using Dash, Streamlit, Gradio, Flask, FastAPI, or Reflex. Handles OAuth authorization (app and user auth), app resources, SQL warehouse and Lakebase connectivity, model serving integration, and deployment. Use when building Python web apps, dashboards, ML demos, or REST APIs for Databricks, or when the user mentions Streamlit, Dash, Gradio, Flask, FastAPI, Reflex, or Databricks app."
+description: "Builds Python-based Databricks applications using Dash, Streamlit, Gradio, Flask, FastAPI, or Reflex. Handles OAuth authorization (app and user auth), app resources, SQL warehouse and Lakebase connectivity, model serving integration, foundation model APIs, LLM integration, and deployment. Use when building Python web apps, dashboards, ML demos, or REST APIs for Databricks, or when the user mentions Streamlit, Dash, Gradio, Flask, FastAPI, Reflex, or Databricks app."
 ---
 
 # Databricks Python Application
@@ -74,6 +74,8 @@ Copy this checklist and verify each item:
 
 **MCP tools**: Use [6-mcp-approach.md](6-mcp-approach.md) for managing app lifecycle via MCP tools — covers creating, deploying, monitoring, and deleting apps programmatically. (Keywords: MCP, create app, deploy app, app logs)
 
+**Foundation Models**: See [examples/llm_config.py](examples/llm_config.py) for calling Databricks foundation model APIs — covers OAuth M2M auth, OpenAI-compatible client wiring, and token caching. (Keywords: foundation model, LLM, OpenAI client, chat completions)
+
 ---
 
 ## Workflow
@@ -86,6 +88,7 @@ Copy this checklist and verify each item:
    **Using Lakebase (PostgreSQL)?** → Read [5-lakebase.md](5-lakebase.md)
    **Deploying to Databricks?** → Read [4-deployment.md](4-deployment.md)
    **Using MCP tools?** → Read [6-mcp-approach.md](6-mcp-approach.md)
+   **Calling foundation model/LLM APIs?** → See [examples/llm_config.py](examples/llm_config.py)
 
 2. Follow the instructions in the relevant guide
 3. For full code examples, browse https://apps-cookbook.dev/
