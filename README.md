@@ -26,8 +26,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 - **Knowledge Assistants** (RAG-based document Q&A)
 - **MLflow Experiments** (evaluation, scoring, traces)
 - **Model Serving** (deploy ML models and AI agents to endpoints)
-- **Databricks Apps** (full-stack web applications)
-- **Foundation Model App Integrations** (Databricks Apps calling foundation model endpoints with app auth, OpenAI-compatible client wiring, and production LLM patterns)
+- **Databricks Apps** (full-stack web applications with foundation model integration)
 - ...and more
 
 ---
