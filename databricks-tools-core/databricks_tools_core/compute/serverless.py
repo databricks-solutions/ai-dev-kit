@@ -63,10 +63,11 @@ class ServerlessRunResult:
     duration_seconds: Optional[float] = None
     state: Optional[str] = None
     message: Optional[str] = None
+    workspace_path: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
+        d = {
             "success": self.success,
             "output": self.output,
             "error": self.error,
@@ -76,6 +77,9 @@ class ServerlessRunResult:
             "state": self.state,
             "message": self.message,
         }
+        if self.workspace_path:
+            d["workspace_path"] = self.workspace_path
+        return d
 
 
 def _get_temp_notebook_path(run_label: str) -> str:
@@ -198,16 +202,18 @@ def run_code_on_serverless(
     timeout: int = 1800,
     run_name: Optional[str] = None,
     cleanup: bool = True,
+    workspace_path: Optional[str] = None,
 ) -> ServerlessRunResult:
     """Execute code on serverless compute via Jobs API runs/submit.
 
-    Uploads the code as a temporary notebook, submits it as a one-time run
-    on serverless compute (no cluster required), waits for completion,
-    retrieves the output, and cleans up.
+    Uploads the code as a notebook, submits it as a one-time run on serverless
+    compute (no cluster required), waits for completion, and retrieves output.
 
-    This is primarily intended for Python execution without a cluster. It is
-    the only way to run Python when no interactive cluster is available and
-    the user doesn't want to start one.
+    Two modes:
+    - **Ephemeral** (default): Uploads to a temp path and cleans up after.
+    - **Persistent**: If ``workspace_path`` is provided, uploads to that path
+      and keeps it after execution. Useful for project notebooks (model training,
+      ETL) the user wants saved in their workspace.
 
     Jupyter notebooks (.ipynb) are also supported. If the code content is
     detected as .ipynb JSON (contains "cells" key), it is uploaded using
@@ -215,20 +221,21 @@ def run_code_on_serverless(
     parameter is ignored in this case since the notebook carries its own
     kernel metadata.
 
-    SQL is also supported but with a significant limitation: SELECT query
-    results are NOT captured in the output. The Jobs API notebook task does
-    not populate notebook_output.result for SQL cells. SQL via this tool is
-    only useful for DDL/DML operations (CREATE TABLE, INSERT, MERGE, etc.)
-    that don't need result rows. For any SQL that needs result rows, use
-    execute_sql() which runs against a SQL warehouse (including serverless
-    warehouses).
+    SQL is supported but SELECT query results are NOT captured in the output.
+    SQL via this tool is only useful for DDL/DML (CREATE TABLE, INSERT, MERGE).
+    For SQL that needs result rows, use execute_sql() instead.
 
     Args:
         code: Code to execute, or raw .ipynb JSON content (auto-detected).
         language: Programming language ("python" or "sql"). Ignored for .ipynb.
         timeout: Maximum wait time in seconds (default: 1800 = 30 minutes).
         run_name: Optional human-readable run name. Auto-generated if omitted.
-        cleanup: Delete the temporary notebook after execution (default: True).
+        cleanup: Delete the notebook after execution (default: True).
+            Ignored when ``workspace_path`` is provided (persistent mode never cleans up).
+        workspace_path: Optional workspace path to save the notebook to
+            (e.g. "/Workspace/Users/user@company.com/my-project/train").
+            If provided, the notebook is persisted at this path. If omitted,
+            a temporary path is used and cleaned up after execution.
 
     Returns:
         ServerlessRunResult with output, error, run_id, run_url, and timing info.
@@ -256,7 +263,13 @@ def run_code_on_serverless(
     unique_id = uuid.uuid4().hex[:12]
     if not run_name:
         run_name = f"ai_dev_kit_serverless_{unique_id}"
-    notebook_path = _get_temp_notebook_path(f"serverless_{unique_id}")
+
+    # Persistent mode: user-specified path, never cleanup
+    if workspace_path:
+        notebook_path = workspace_path
+        cleanup = False
+    else:
+        notebook_path = _get_temp_notebook_path(f"serverless_{unique_id}")
 
     start_time = time.time()
     w = get_workspace_client()
@@ -328,10 +341,7 @@ def run_code_on_serverless(
                 run_url=run_url,
                 duration_seconds=round(elapsed, 2),
                 state="TIMEDOUT",
-                message=(
-                    f"Serverless run {run_id} did not complete within {timeout}s. "
-                    f"Check status at {run_url}"
-                ),
+                message=(f"Serverless run {run_id} did not complete within {timeout}s. Check status at {run_url}"),
             )
         except Exception as e:
             elapsed = time.time() - start_time
@@ -395,15 +405,9 @@ def run_code_on_serverless(
         if is_success:
             if not output_text:
                 output_text = "Success (no output)"
-            message = (
-                f"Code executed successfully on serverless compute "
-                f"in {round(elapsed, 1)}s."
-            )
+            message = f"Code executed successfully on serverless compute in {round(elapsed, 1)}s."
         else:
-            message = (
-                f"Serverless run failed with state {state_str}. "
-                f"Check {run_url} for details."
-            )
+            message = f"Serverless run failed with state {state_str}. Check {run_url} for details."
 
         return ServerlessRunResult(
             success=is_success,
@@ -414,6 +418,7 @@ def run_code_on_serverless(
             duration_seconds=round(elapsed, 2),
             state=state_str,
             message=message,
+            workspace_path=notebook_path if workspace_path else None,
         )
 
     finally:

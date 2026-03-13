@@ -8,7 +8,7 @@ from databricks_tools_core.compute import (
     start_cluster as _start_cluster,
     get_cluster_status as _get_cluster_status,
     execute_databricks_command as _execute_databricks_command,
-    run_python_file_on_databricks as _run_python_file_on_databricks,
+    run_file_on_databricks as _run_file_on_databricks,
     run_code_on_serverless as _run_code_on_serverless,
     NoRunningClusterError,
 )
@@ -183,17 +183,26 @@ def execute_databricks_command(
 
 
 @mcp.tool
-def run_python_file_on_databricks(
+def run_file_on_databricks(
     file_path: str,
     cluster_id: str = None,
     context_id: str = None,
+    language: str = None,
     timeout: int = 600,
     destroy_context_on_completion: bool = False,
+    workspace_path: str = None,
 ) -> Dict[str, Any]:
     """
-    Read a local Python file and execute it on a Databricks cluster.
+    Read a local file and execute it on a Databricks cluster.
 
-    Useful for running data generation scripts or other Python code.
+    Supports Python (.py), Scala (.scala), SQL (.sql), and R (.r) files.
+    Language is auto-detected from the file extension if not specified.
+
+    Two modes:
+    - Ephemeral (default): Sends code via Command Execution API. No workspace artifact.
+    - Persistent: If workspace_path is provided, also uploads the file as a notebook
+      to that workspace path so it's visible and re-runnable in the Databricks UI.
+      Use persistent mode for project work (model training, ETL scripts, etc.).
 
     If context_id is provided, reuses the existing context (faster, maintains state).
     If not provided, creates a new context.
@@ -202,15 +211,17 @@ def run_python_file_on_databricks(
     returns an error with actionable suggestions (startable clusters, alternatives).
 
     Args:
-        file_path: Local path to the Python file
+        file_path: Local path to the file to execute.
         cluster_id: ID of the cluster to run on. If not provided, auto-selects
                    a running cluster accessible to the current user.
-                   Single-user clusters owned by other users are automatically skipped.
-        context_id: Optional existing execution context ID. If provided, reuses it
-                   for faster execution and state preservation.
-        timeout: Maximum wait time in seconds (default: 600)
+        context_id: Optional existing execution context ID for reuse.
+        language: Programming language ("python", "scala", "sql", "r").
+                 If omitted, auto-detected from file extension.
+        timeout: Maximum wait time in seconds (default: 600).
         destroy_context_on_completion: If True, destroys the context after execution.
-                                       Default is False to allow reuse.
+        workspace_path: Optional workspace path to persist the file as a notebook
+            (e.g. "/Workspace/Users/user@company.com/my-project/train").
+            If omitted, no workspace artifact is created.
 
     Returns:
         Dictionary with:
@@ -227,14 +238,20 @@ def run_python_file_on_databricks(
         cluster_id = None
     if context_id == "":
         context_id = None
+    if language == "":
+        language = None
+    if workspace_path == "":
+        workspace_path = None
 
     try:
-        result = _run_python_file_on_databricks(
+        result = _run_file_on_databricks(
             file_path=file_path,
             cluster_id=cluster_id,
             context_id=context_id,
+            language=language,
             timeout=timeout,
             destroy_context_on_completion=destroy_context_on_completion,
+            workspace_path=workspace_path,
         )
         return result.to_dict()
     except NoRunningClusterError as e:
@@ -259,13 +276,21 @@ def run_code_on_serverless(
     language: str = "python",
     timeout: int = 1800,
     run_name: Optional[str] = None,
+    workspace_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Execute Python code on serverless compute (no cluster required).
+    Execute code on serverless compute (no cluster required).
 
     This is the primary tool for running Python when no interactive cluster is
     available. Uses the Jobs API (runs/submit) with serverless compute — the code
-    is uploaded as a temporary notebook, executed, and cleaned up automatically.
+    is uploaded as a notebook, executed, and (by default) cleaned up automatically.
+
+    Two modes:
+    - Ephemeral (default): Uploads to a temp path and cleans up after execution.
+      Good for testing, exploration, one-off scripts.
+    - Persistent: If workspace_path is provided, saves the notebook at that path
+      and keeps it after execution. Good for project work the user wants saved
+      (model training, ETL, data pipelines).
 
     Also supports Jupyter notebooks (.ipynb): if the code content is valid .ipynb
     JSON (i.e. contains a "cells" key), it is automatically uploaded using
@@ -291,6 +316,10 @@ def run_code_on_serverless(
         language: Programming language ("python" or "sql"). Default: "python". Ignored for .ipynb.
         timeout: Maximum wait time in seconds (default: 1800 = 30 minutes).
         run_name: Optional human-readable name for the run. Auto-generated if omitted.
+        workspace_path: Optional workspace path to persist the notebook
+            (e.g. "/Workspace/Users/user@company.com/my-project/train").
+            If provided, the notebook is saved at this path and kept after execution.
+            If omitted, uses a temp path and cleans up after.
 
     Returns:
         Dictionary with:
@@ -302,12 +331,14 @@ def run_code_on_serverless(
         - duration_seconds: How long the execution took
         - state: Final state (SUCCESS, FAILED, TIMEDOUT, etc.)
         - message: Human-readable summary
+        - workspace_path: (persistent mode only) Where the notebook was saved
     """
     result = _run_code_on_serverless(
         code=code,
         language=language,
         timeout=timeout,
         run_name=run_name if run_name else None,
-        cleanup=True,
+        cleanup=workspace_path is None,
+        workspace_path=workspace_path if workspace_path else None,
     )
     return result.to_dict()
