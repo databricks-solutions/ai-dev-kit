@@ -218,6 +218,43 @@ tasks:
         custom_param: "value"
 ```
 
+## MCP Tool Integration
+
+Use these MCP tools for job management:
+
+```python
+# Create or update a job
+manage_jobs(action="create", job_config={
+    "name": "my_etl_job",
+    "tasks": [{"task_key": "extract", "notebook_task": {"notebook_path": "/src/extract"}}]
+})
+
+# List all jobs
+manage_jobs(action="list")
+
+# Get job details
+manage_jobs(action="get", job_id=12345)
+
+# Delete a job
+manage_jobs(action="delete", job_id=12345)
+
+# Run a job immediately
+manage_job_runs(action="run_now", job_id=12345)
+
+# Run with parameters
+manage_job_runs(action="run_now", job_id=12345,
+                job_parameters={"env": "prod", "date": "2024-01-15"})
+
+# Check run status
+manage_job_runs(action="get_run", run_id=67890)
+
+# Cancel a run
+manage_job_runs(action="cancel", run_id=67890)
+
+# List recent runs for a job
+manage_job_runs(action="list_runs", job_id=12345)
+```
+
 ## Common Operations
 
 ### Python SDK Operations
