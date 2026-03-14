@@ -55,6 +55,13 @@ The llms.txt file is organized by category:
 2. Read the specific docs to understand the feature
 3. Determine which skill/tools apply, then use them
 
+## Resources
+
+- [Databricks Documentation](https://docs.databricks.com/)
+- [Databricks llms.txt](https://docs.databricks.com/llms.txt)
+- [Release Notes](https://docs.databricks.com/release-notes/index.html)
+- [REST API Reference](https://docs.databricks.com/api/workspace/introduction)
+
 ## Related Skills
 
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns for programmatic Databricks access

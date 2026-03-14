@@ -298,3 +298,20 @@ Load these for detailed syntax, full parameter lists, and advanced patterns:
 - **Define PK/FK constraints** on dimensional models for query optimization
 - **Use `COLLATE UTF8_LCASE`** for user-facing string columns that need case-insensitive search
 - **Use MCP tools** (`execute_sql`, `execute_sql_multi`) to test and validate all SQL before deploying
+
+## Related Skills
+
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Governance, grants, and catalog management for SQL objects
+- **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - Building dashboards that consume DBSQL queries
+- **[databricks-metric-views](../databricks-metric-views/SKILL.md)** - Defining reusable business metrics in SQL
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - ETL pipelines using SQL and materialized views
+- **[databricks-genie](../databricks-genie/SKILL.md)** - Natural language SQL exploration via Genie Spaces
+
+## Resources
+
+- [Databricks SQL Language Reference](https://docs.databricks.com/sql/language-manual/index.html)
+- [AI Functions](https://docs.databricks.com/large-language-models/ai-functions.html)
+- [Pipe Syntax](https://docs.databricks.com/sql/language-manual/sql-ref-pipe-syntax.html)
+- [Materialized Views](https://docs.databricks.com/sql/language-manual/sql-ref-materialized-views.html)
+- [SQL Scripting](https://docs.databricks.com/sql/language-manual/sql-ref-sql-scripting.html)
+- [Geospatial H3 Functions](https://docs.databricks.com/sql/language-manual/sql-ref-h3-geospatial-functions.html)

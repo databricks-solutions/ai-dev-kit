@@ -192,3 +192,9 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Index generated documents for semantic search and RAG
 - **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - Generate structured tabular data (complement to unstructured PDFs)
 - **[databricks-mlflow-evaluation](../databricks-mlflow-evaluation/SKILL.md)** - Evaluate RAG systems using the generated question/guideline pairs
+
+## Resources
+
+- [Unity Catalog Volumes](https://docs.databricks.com/connect/unity-catalog/volumes.html)
+- [ReportLab Documentation](https://docs.reportlab.com/)
+- [Document Parsing with Databricks](https://docs.databricks.com/generative-ai/tutorials/ai-cookbook/nbs/1-pdf-chunk-extract.html)

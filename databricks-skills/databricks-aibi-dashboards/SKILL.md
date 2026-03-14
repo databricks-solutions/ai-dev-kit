@@ -914,6 +914,12 @@ print(result["url"])
 - Use **separate text widgets** for title and subtitle at different y positions
 - Example: title at y=0 with height=1, subtitle at y=1 with height=1
 
+## Resources
+
+- [AI/BI Dashboards](https://docs.databricks.com/dashboards/index.html)
+- [Lakeview API Reference](https://docs.databricks.com/api/workspace/lakeview)
+- [Dashboard Embedding](https://docs.databricks.com/dashboards/embed.html)
+
 ## Related Skills
 
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for querying the underlying data and system tables

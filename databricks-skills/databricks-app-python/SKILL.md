@@ -199,6 +199,13 @@ class EntityIn(BaseModel):
 - **[app.yaml Reference](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/app-runtime)** — command and env config
 - **[System Environment](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/system-env)** — pre-installed packages, runtime details
 
+## Resources
+
+- [Databricks Apps Overview](https://docs.databricks.com/dev-tools/databricks-apps/index.html)
+- [App Configuration (app.yaml)](https://docs.databricks.com/dev-tools/databricks-apps/configuration.html)
+- [App Resources and Permissions](https://docs.databricks.com/dev-tools/databricks-apps/app-resources.html)
+- [Streamlit on Databricks](https://docs.databricks.com/dev-tools/databricks-apps/streamlit.html)
+
 ## Related Skills
 
 - **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps with FastAPI + React

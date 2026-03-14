@@ -54,6 +54,21 @@ df.writeStream \
 |-------|-------------|-----------|
 | **Production Checklist** | Comprehensive best practices | See [streaming-best-practices.md](streaming-best-practices.md) |
 
+## Related Skills
+
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Declarative streaming tables and DLT pipelines
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Catalog governance for streaming tables
+- **[databricks-zerobus-ingest](../databricks-zerobus-ingest/SKILL.md)** - Near real-time ingestion into Delta tables via gRPC
+- **[databricks-dbsql](../databricks-dbsql/SKILL.md)** - SQL queries on streaming table outputs
+
+## Resources
+
+- [Structured Streaming Guide](https://docs.databricks.com/structured-streaming/index.html)
+- [Auto Loader](https://docs.databricks.com/ingestion/auto-loader/index.html)
+- [Streaming Tables](https://docs.databricks.com/sql/language-manual/sql-ref-streaming-tables.html)
+- [RocksDB State Store](https://docs.databricks.com/structured-streaming/rocksdb-state-store.html)
+- [Stream-Stream Joins](https://docs.databricks.com/structured-streaming/stream-stream-joins.html)
+
 ## Production Checklist
 
 - [ ] Checkpoint location is persistent (UC volumes, not DBFS)

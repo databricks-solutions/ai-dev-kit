@@ -219,6 +219,12 @@ Metric views work natively with:
 - **SQL Editor** - Direct SQL querying with MEASURE()
 - **Catalog Explorer UI** - Visual creation and browsing
 
+## Related Skills
+
+- **[databricks-dbsql](../databricks-dbsql/SKILL.md)** - SQL features used in metric view definitions
+- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Catalog governance for metric view objects
+- **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - Dashboards that consume metric views
+
 ## Resources
 
 - [Metric Views Documentation](https://docs.databricks.com/en/metric-views/)

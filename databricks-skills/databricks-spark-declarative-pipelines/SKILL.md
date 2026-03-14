@@ -575,3 +575,11 @@ For advanced configuration options (development mode, continuous pipelines, cust
 - **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - for multi-environment deployment of pipeline projects
 - **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - for generating test data to feed into pipelines
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for catalog/schema/volume management and governance
+
+## Resources
+
+- [Lakeflow Declarative Pipelines](https://docs.databricks.com/delta-live-tables/index.html)
+- [Streaming Tables](https://docs.databricks.com/sql/language-manual/sql-ref-streaming-tables.html)
+- [Materialized Views](https://docs.databricks.com/sql/language-manual/sql-ref-materialized-views.html)
+- [Change Data Capture](https://docs.databricks.com/delta-live-tables/cdc.html)
+- [Auto Loader](https://docs.databricks.com/ingestion/auto-loader/index.html)

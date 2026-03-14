@@ -292,3 +292,9 @@ These features are NOT yet supported in Lakebase Autoscaling:
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for project management and token generation
 - **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps with Lakebase resources
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - scheduling reverse ETL sync jobs
+
+## Resources
+
+- [Lakebase Overview](https://docs.databricks.com/database/lakebase/index.html)
+- [Lakebase Autoscale](https://docs.databricks.com/database/lakebase/autoscale.html)
+- [Lakebase Branching](https://docs.databricks.com/database/lakebase/branching.html)
