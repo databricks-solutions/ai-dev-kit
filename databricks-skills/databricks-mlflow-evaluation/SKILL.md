@@ -139,6 +139,18 @@ For automatically improving a registered system prompt using `optimize_prompts()
 
 See `GOTCHAS.md` for complete list.
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`mlflow.evaluate()` vs `mlflow.genai.evaluate()`** | Use `mlflow.genai.evaluate()` for GenAI agents. The older `mlflow.evaluate()` has a different API and doesn't support GenAI scorers |
+| **`predict_fn` receives dict instead of kwargs** | The predict function receives `**unpacked` keyword arguments, not a single dict. Define it as `def predict(query, context=None)` not `def predict(inputs)` |
+| **Scorer returns wrong type** | `@scorer` functions must return a `Score` object: `Score(value=0.8, rationale="...")`. Don't return raw floats or strings |
+| **Dataset `inputs` format error** | Inputs must be nested: `{"inputs": {"query": "..."}}` not `{"query": "..."}`. Each row's `inputs` dict is unpacked as kwargs to `predict_fn` |
+| **Built-in scorer fails with "no guidelines"** | `Guidelines` scorer requires a `guidelines` parameter. Pass it as: `Guidelines(name="helpful", guidelines="The response should be helpful")` |
+| **Evaluation runs but scores are all None** | Check that your scorer handles the response format correctly. If `predict_fn` returns a dict, the scorer receives that dict as `output` |
+| **MemAlign requires human labels** | MemAlign calibrates judge prompts from domain expert feedback. You need at least 20-50 labeled examples for meaningful alignment |
+
 ## Related Skills
 
 - **[databricks-docs](../databricks-docs/SKILL.md)** - General Databricks documentation reference

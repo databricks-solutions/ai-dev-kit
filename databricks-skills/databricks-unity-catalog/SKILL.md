@@ -113,6 +113,18 @@ mcp__databricks__execute_sql(
 - **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - for generating data stored in Unity Catalog Volumes
 - **[databricks-aibi-dashboards](../databricks-aibi-dashboards/SKILL.md)** - for building dashboards on top of Unity Catalog data
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`PERMISSION_DENIED` on system tables** | System tables require explicit grants: `GRANT USE CATALOG ON CATALOG system TO group`, then `GRANT USE SCHEMA` and `GRANT SELECT` on the specific schema |
+| **System table query is slow** | Always filter by date: `WHERE event_date >= current_date() - 7`. System tables can have billions of rows |
+| **`GRANT` fails with "not owner"** | Only the object owner or metastore admin can grant permissions. Use `SHOW GRANTS ON <object>` to check current ownership |
+| **Table not visible after creation** | Check that `USE CATALOG` and `USE SCHEMA` grants exist for the user/group. Three-level namespace requires grants at each level |
+| **Tags not appearing on table** | Tags are set via `ALTER TABLE ... SET TAGS`. Verify with `SELECT * FROM system.information_schema.table_tags` |
+| **External location permission denied** | The storage credential must have access to the cloud path. Check `SHOW EXTERNAL LOCATIONS` and verify IAM/SAS permissions |
+| **Delta Sharing recipient can't access share** | Verify the recipient's activation link was used. Check `SHOW GRANTS ON SHARE` and ensure tables are added to the share |
+
 ## Resources
 
 - [Unity Catalog System Tables](https://docs.databricks.com/administration-guide/system-tables/)

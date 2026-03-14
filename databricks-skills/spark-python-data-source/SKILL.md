@@ -136,6 +136,16 @@ Implement a batch writer for Snowflake with staged uploads
 Write a data source for REST API with OAuth2 authentication and pagination
 ```
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`DataSource.schema()` returns wrong types** | Spark types must match exactly. Use `StructType([StructField("col", StringType())])` — don't return Python dicts |
+| **Data source not found after registration** | Ensure `spark.dataSource.register(MyDataSource)` is called before `spark.read.format("my_source")`. The name comes from `MyDataSource.name()` |
+| **Serialization error in `read()`** | The `DataSourceReader.read()` method runs on executors. Don't reference SparkSession or driver-only objects inside it |
+| **Streaming source never triggers new batches** | `latestOffset()` must return a new offset when new data is available. If it returns the same offset, Spark skips the batch |
+| **Schema evolution not supported** | Python data sources have a fixed schema from `schema()`. To handle schema changes, return a superset schema and fill missing fields with NULL |
+
 ## Related
 
 - databricks-testing: Test data sources on Databricks clusters

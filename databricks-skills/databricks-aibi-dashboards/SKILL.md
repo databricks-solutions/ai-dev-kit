@@ -843,6 +843,17 @@ result = create_or_update_dashboard(
 print(result["url"])
 ```
 
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **Dashboard API returns 404** | Verify the dashboard ID is correct. Use `list_lakeview_dashboards` to find valid IDs. Draft dashboards use a different endpoint than published ones |
+| **SQL query works in editor but fails in dashboard** | Dashboard queries run as the dashboard owner. Ensure the owner has `SELECT` on all referenced tables and `USE CATALOG`/`USE SCHEMA` grants |
+| **Chart shows no data despite valid query** | Field names in `query.fields[].name` must exactly match `encodings[].fieldName`. See Troubleshooting section below for details |
+| **Widget layout overlaps or misaligned** | Positions use a 6-column grid. Ensure `x + width <= 6` for each widget. Heights are in grid units (1 unit ≈ 40px) |
+| **Filter widget not filtering other widgets** | Filters use `associatedQueries` to link to datasets. Verify the query name and column name match exactly |
+| **Published dashboard shows stale data** | Published dashboards use a schedule. Update the schedule or use `execute_sql` to refresh the underlying tables |
+
 ## Troubleshooting
 
 ### Widget shows "no selected fields to visualize"

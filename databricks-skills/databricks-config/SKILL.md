@@ -20,3 +20,14 @@ Use the `manage_workspace` MCP tool for all workspace operations. Do NOT edit `~
 4. Present the result. For `status`/`switch`/`login`: show host, profile, username. For `list`: formatted table with the active profile marked.
 
 > **Note:** The switch is session-scoped — it resets on MCP server restart. For permanent profile setup, use `databricks auth login -p <profile>` and update `~/.databrickscfg` with `cluster_id` or `serverless_compute_id = auto`.
+
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **`manage_workspace` returns "no profiles found"** | Run `databricks auth login --host https://your-workspace.cloud.databricks.com` to create a profile in `~/.databrickscfg` |
+| **Switch doesn't persist after restart** | Expected — switches are session-scoped. For permanent changes, set `DATABRICKS_HOST` / `DATABRICKS_TOKEN` env vars |
+| **"Token expired" errors** | Re-authenticate with `databricks auth login`. OAuth tokens from `databricks auth login` auto-refresh; PATs do not |
+| **Wrong workspace after switching** | Use `action="status"` to verify which workspace is active. The MCP server may have restarted, resetting the switch |
+| **Multiple profiles for same host** | Use distinct profile names. The CLI picks the first matching host if no profile is specified |
+| **`DATABRICKS_CONFIG_PROFILE` not respected** | Env vars override `~/.databrickscfg` defaults. Unset conflicting env vars: `DATABRICKS_HOST`, `DATABRICKS_TOKEN` |

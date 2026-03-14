@@ -63,3 +63,16 @@ df.writeStream \
 - [ ] Exactly-once verified (txnVersion/txnAppId)
 - [ ] Watermark configured for stateful operations
 - [ ] Left joins for stream-static (not inner)
+
+## Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **Checkpoint corruption after schema change** | Checkpoints are tied to the query plan. Schema changes require a new checkpoint location. Back up the old checkpoint before changing |
+| **OOM on stateful operations** | Enable RocksDB state store: `spark.conf.set("spark.sql.streaming.stateStore.providerClass", "com.databricks.sql.streaming.state.RocksDBStateStoreProvider")` |
+| **`availableNow` trigger processes no data** | Ensure the source has new data since the last checkpoint. Check that the checkpoint path is correct and accessible |
+| **Stream-static join returns stale data** | The static side is read once per micro-batch by default. Use `spark.sql.streaming.forceDeleteTempCheckpointLocation` or refresh the static DataFrame |
+| **`foreachBatch` MERGE has duplicates** | Use `txnVersion` and `txnAppId` for idempotent writes: `deltaTable.merge(...).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()` |
+| **Auto Loader `cloudFiles` schema inference fails** | Set `cloudFiles.schemaLocation` to a persistent path. For schema evolution, use `cloudFiles.schemaEvolutionMode = "addNewColumns"` |
+| **Watermark delay too aggressive** | Late data arriving after the watermark is dropped silently. Set watermark delay >= max expected lateness of your data |
+| **Streaming query silently stops** | Check the Spark UI for exceptions. Add a `StreamingQueryListener` or monitor `query.lastProgress` for null batches |
