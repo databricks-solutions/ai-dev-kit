@@ -5,12 +5,21 @@ Provides common functions used across all CLI wrapper scripts:
 - setup_path(): Add skill_test to Python path
 - create_cli_context(): Create CLIContext with proper base_path
 """
+
+import os
 import sys
 from pathlib import Path
+
+# Fix protobuf v6 C-extension incompatibility with MLflow.
+# The cpp FieldDescriptor is missing `is_repeated`, causing json_format to fail.
+# Force pure-Python implementation unless the user has explicitly set it.
+if "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION" not in os.environ:
+    os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
 # Load .env file if present
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass  # python-dotenv not installed, skip

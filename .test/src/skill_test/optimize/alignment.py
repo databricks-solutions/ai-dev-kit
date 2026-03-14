@@ -97,3 +97,29 @@ def align_judge(
     except Exception as e:
         logger.warning("MemAlign alignment failed for %s: %s", skill_name, e)
         return judge
+
+
+def align_judges(
+    skill_name: str,
+    judges: dict[str, Any],
+    reflection_lm: str = "openai:/gpt-4o-mini",
+) -> dict[str, Any]:
+    """Align multiple judges with human feedback using MemAlign.
+
+    Convenience wrapper that calls ``align_judge`` on each judge in the dict.
+    Judges that can't be aligned (insufficient traces) are returned unchanged.
+
+    Args:
+        skill_name: Name of the skill to load traces for.
+        judges: Dict mapping judge names to judge instances
+            (e.g. ``{"correctness": cj, "completeness": cmj, "guideline_adherence": gj}``).
+        reflection_lm: LLM for MemAlign's reflection step.
+
+    Returns:
+        Dict with same keys, values are aligned judges where possible.
+    """
+    aligned: dict[str, Any] = {}
+    for name, judge in judges.items():
+        logger.info("Aligning judge '%s' for skill '%s'", name, skill_name)
+        aligned[name] = align_judge(skill_name, judge, reflection_lm=reflection_lm)
+    return aligned
