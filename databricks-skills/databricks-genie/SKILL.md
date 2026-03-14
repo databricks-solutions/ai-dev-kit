@@ -35,8 +35,7 @@ Use this skill when:
 | `create_or_update_genie` | Create or update a Genie Space (supports `serialized_space`) |
 | `get_genie` |  Get space details (by ID and support `include_serialized_space` parameter) or list all spaces (no ID) |
 | `delete_genie` | Delete a Genie Space |
-| `export_genie` | Export a Genie Space with full serialized configuration |
-| `import_genie` | Import / clone a Genie Space from a serialized payload |
+| `migrate_genie` | Export (`type="export"`) or import (`type="import"`) a Genie Space for cloning / migration |
 
 ### Conversation API
 
@@ -97,14 +96,15 @@ ask_genie(
 Export a space (preserves all tables, instructions, SQL examples, and layout):
 
 ```python
-exported = export_genie(space_id="your_space_id")
+exported = migrate_genie(type="export", space_id="your_space_id")
 # exported["serialized_space"] contains the full config
 ```
 
 Clone to a new space (same catalog):
 
 ```python
-import_genie(
+migrate_genie(
+    type="import",
     warehouse_id=exported["warehouse_id"],
     serialized_space=exported["serialized_space"],
     title=exported["title"],  # override title; omit to keep original
@@ -112,7 +112,7 @@ import_genie(
 )
 ```
 
-> **Cross-workspace migration:** Each MCP server is workspace-scoped. Configure one server entry per workspace profile in your IDE's MCP config, then export from the source server and import via the target server. See [spaces.md §Migration](spaces.md#migrating-across-workspaces-with-catalog-remapping) for the full workflow.
+> **Cross-workspace migration:** Each MCP server is workspace-scoped. Configure one server entry per workspace profile in your IDE's MCP config, then `migrate_genie(type="export")` from the source server and `migrate_genie(type="import")` via the target server. See [spaces.md §Migration](spaces.md#migrating-across-workspaces-with-catalog-remapping) for the full workflow.
 
 ## Reference Files
 

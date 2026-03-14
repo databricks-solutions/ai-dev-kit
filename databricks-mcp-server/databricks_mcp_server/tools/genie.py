@@ -327,132 +327,107 @@ def delete_genie(space_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool
-def export_genie(space_id: str) -> Dict[str, Any]:
-    """
-    Export a Genie Space with its full serialized configuration.
-
-    Retrieves the complete Genie Space definition including tables, instructions,
-    SQL queries, and layout as a serialized JSON string. Use this to clone or
-    migrate a Genie Space to another workspace or location.
-
-    Requires at least CAN EDIT permission on the space.
-
-    Args:
-        space_id: The Genie space ID to export
-
-    Returns:
-        Dictionary with:
-        - space_id: The space ID
-        - title: The space title
-        - description: The description (if set)
-        - warehouse_id: The SQL warehouse ID
-        - serialized_space: JSON string with the full space configuration.
-          Pass this value directly to import_genie() to clone or migrate.
-
-    Example:
-        >>> result = export_genie("abc123...")
-        >>> print(result["title"])
-        "Sales Analytics"
-        >>> # Then clone it:
-        >>> import_genie(
-        ...     warehouse_id=result["warehouse_id"],
-        ...     serialized_space=result["serialized_space"],
-        ...     title="Sales Analytics (Clone)"
-        ... )
-    """
-    manager = _get_manager()
-    try:
-        result = manager.genie_export(space_id)
-        return {
-            "space_id": result.get("space_id", space_id),
-            "title": result.get("title", ""),
-            "description": result.get("description", ""),
-            "warehouse_id": result.get("warehouse_id", ""),
-            "serialized_space": result.get("serialized_space", ""),
-        }
-    except Exception as e:
-        return {"error": str(e), "space_id": space_id}
-
-
-@mcp.tool
-def import_genie(
-    warehouse_id: str,
-    serialized_space: str,
+def migrate_genie(
+    type: str,
+    space_id: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    serialized_space: Optional[str] = None,
     title: Optional[str] = None,
     description: Optional[str] = None,
     parent_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Create a new Genie Space from a serialized payload (import/clone/migrate).
+    Export or import a Genie Space for cloning and cross-workspace migration.
 
-    Use this to clone an existing Genie Space or migrate it to a new workspace.
-    The serialized_space string is obtained from export_genie().
+    type="export": Retrieve the full serialized configuration of an existing
+    Genie Space (tables, instructions, SQL queries, layout). Requires at least
+    CAN EDIT permission on the space.
 
-    Workflow:
-        1. Export: result = export_genie(source_space_id)
-        2. Import: import_genie(warehouse_id, result["serialized_space"], title="New Name")
+    type="import": Create a new Genie Space from a serialized payload obtained
+    via a prior export call.
 
     Args:
-        warehouse_id: SQL warehouse ID to associate with the new space.
+        type: Operation to perform — "export" or "import"
+        space_id: (export) The Genie space ID to export
+        warehouse_id: (import) SQL warehouse ID for the new space.
             Use list_warehouses() or get_best_warehouse() to find one.
-        serialized_space: The JSON string from export_genie() containing the full
-            space configuration (tables, instructions, SQL queries, layout).
-            Can also be constructed manually:
+        serialized_space: (import) JSON string from a prior export containing
+            the full space configuration. Can also be constructed manually:
             '{"version":2,"data_sources":{"tables":[{"identifier":"cat.schema.table"}]}}'
-        title: Optional title override (defaults to the exported space's title)
-        description: Optional description override
-        parent_path: Optional workspace folder path where the space will be registered
+        title: (import) Optional title override
+        description: (import) Optional description override
+        parent_path: (import) Optional workspace folder path for the new space
             (e.g., "/Workspace/Users/you@company.com/Genie Spaces")
 
     Returns:
-        Dictionary with:
-        - space_id: The newly created Genie space ID
-        - title: The space title
-        - description: The description
-        - operation: 'imported'
+        export: Dictionary with space_id, title, description, warehouse_id,
+            and serialized_space (JSON string with the full config).
+        import: Dictionary with space_id, title, description, and
+            operation='imported'.
 
     Example:
-        >>> # Clone a space within the same workspace
-        >>> exported = export_genie("abc123...")
-        >>> import_genie(
+        >>> exported = migrate_genie(type="export", space_id="abc123...")
+        >>> migrate_genie(
+        ...     type="import",
         ...     warehouse_id=exported["warehouse_id"],
         ...     serialized_space=exported["serialized_space"],
-        ...     title="Sales Analytics (Dev Copy)"
+        ...     title="Sales Analytics (Clone)"
         ... )
-        {"space_id": "def456...", "title": "Sales Analytics (Dev Copy)", "operation": "imported"}
+        {"space_id": "def456...", "title": "Sales Analytics (Clone)", "operation": "imported"}
     """
-    manager = _get_manager()
-    try:
-        result = manager.genie_import(
-            warehouse_id=warehouse_id,
-            serialized_space=serialized_space,
-            title=title,
-            description=description,
-            parent_path=parent_path,
-        )
-        space_id = result.get("space_id", "")
+    if type == "export":
+        if not space_id:
+            return {"error": "space_id is required for type='export'"}
+        manager = _get_manager()
+        try:
+            result = manager.genie_export(space_id)
+            return {
+                "space_id": result.get("space_id", space_id),
+                "title": result.get("title", ""),
+                "description": result.get("description", ""),
+                "warehouse_id": result.get("warehouse_id", ""),
+                "serialized_space": result.get("serialized_space", ""),
+            }
+        except Exception as e:
+            return {"error": str(e), "space_id": space_id}
 
-        # Track resource
-        if space_id:
-            try:
-                from ..manifest import track_resource
+    elif type == "import":
+        if not warehouse_id or not serialized_space:
+            return {"error": "warehouse_id and serialized_space are required for type='import'"}
+        manager = _get_manager()
+        try:
+            result = manager.genie_import(
+                warehouse_id=warehouse_id,
+                serialized_space=serialized_space,
+                title=title,
+                description=description,
+                parent_path=parent_path,
+            )
+            imported_space_id = result.get("space_id", "")
 
-                track_resource(
-                    resource_type="genie_space",
-                    name=title or result.get("title", space_id),
-                    resource_id=space_id,
-                )
-            except Exception:
-                pass
+            if imported_space_id:
+                try:
+                    from ..manifest import track_resource
 
-        return {
-            "space_id": space_id,
-            "title": result.get("title", title or ""),
-            "description": result.get("description", description or ""),
-            "operation": "imported",
-        }
-    except Exception as e:
-        return {"error": str(e)}
+                    track_resource(
+                        resource_type="genie_space",
+                        name=title or result.get("title", imported_space_id),
+                        resource_id=imported_space_id,
+                    )
+                except Exception:
+                    pass
+
+            return {
+                "space_id": imported_space_id,
+                "title": result.get("title", title or ""),
+                "description": result.get("description", description or ""),
+                "operation": "imported",
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    else:
+        return {"error": f"Invalid type '{type}'. Must be 'export' or 'import'."}
 
 
 # ============================================================================
