@@ -10,10 +10,7 @@ Each judge uses categorical ``Literal["excellent", "acceptable", "poor"]``
 feedback types for more reliable, alignable judgments. Scores are converted
 to floats via ``CATEGORICAL_SCORES``.
 
-Legacy judges (kept for backward compat):
-    _create_legacy_quality_judge — Single 0.0-1.0 quality scorer (renamed from
-        ``create_skill_quality_judge``).
-    effectiveness_judge — Compares WITH vs WITHOUT responses, returns verdict.
+Additional judges:
     regression_judge — Identifies specific ways a skill harms responses.
 
 Judge model resolution (highest priority first):
@@ -34,6 +31,7 @@ AI Gateway support:
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
 import time
@@ -89,33 +87,45 @@ def _is_rate_limit_error(exc: Exception) -> bool:
 # AI Gateway support
 # ---------------------------------------------------------------------------
 
-DATABRICKS_AI_GATEWAY_URL = os.environ.get("DATABRICKS_AI_GATEWAY_URL", "")
-
-
 def _get_gateway_base_url() -> str | None:
-    """Return the AI Gateway base URL if configured, else None."""
-    url = DATABRICKS_AI_GATEWAY_URL.strip()
+    """Return the AI Gateway base URL if configured, else None.
+
+    Reads os.environ at call time (not import time) so that env vars
+    set by runner.py's early config loading are picked up before judges
+    are created.
+
+    Strips common API path suffixes (e.g. ``/chat/completions``) that users
+    might include by mistake — litellm appends its own path to the base URL.
+    """
+    url = os.environ.get("DATABRICKS_AI_GATEWAY_URL", "").strip()
     if not url:
         return None
+    url = url.rstrip("/")
+    # Strip API path suffixes users might include by mistake
+    for suffix in ("/chat/completions", "/completions", "/embeddings"):
+        if url.endswith(suffix):
+            url = url[: -len(suffix)]
     return url.rstrip("/")
 
 
-def _to_litellm_model(model: str) -> tuple[str, str | None]:
-    """Convert a model string to (litellm_model, base_url) for completion calls.
+def _to_litellm_model(model: str) -> tuple[str, str | None, str | None]:
+    """Convert a model string to (litellm_model, base_url, api_key) for completion calls.
 
     If AI Gateway is configured and model is a databricks/ model, routes
-    through the gateway as an OpenAI-compatible endpoint. Otherwise returns
-    the model unchanged with no base_url override.
+    through the gateway as an OpenAI-compatible endpoint.  The OpenAI
+    provider in litellm does not auto-read ``DATABRICKS_TOKEN``, so we
+    pass it explicitly as ``api_key``.
 
     Returns:
-        (model_string, base_url_or_None)
+        (model_string, base_url_or_None, api_key_or_None)
     """
     gateway = _get_gateway_base_url()
     if gateway and model.startswith("databricks/"):
         # Route through AI Gateway as OpenAI-compatible endpoint
         endpoint_name = model.split("/", 1)[1]
-        return f"openai/{endpoint_name}", gateway
-    return model, None
+        api_key = os.environ.get("DATABRICKS_TOKEN") or os.environ.get("DATABRICKS_API_KEY", "")
+        return f"openai/{endpoint_name}", gateway, api_key or None
+    return model, None, None
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +151,11 @@ def _judge_inference_params() -> dict[str, Any] | None:
     """Build inference_params for make_judge if AI Gateway is configured."""
     gateway = _get_gateway_base_url()
     if gateway:
-        return {"base_url": gateway}
+        api_key = os.environ.get("DATABRICKS_TOKEN") or os.environ.get("DATABRICKS_API_KEY", "")
+        params: dict[str, Any] = {"base_url": gateway}
+        if api_key:
+            params["api_key"] = api_key
+        return params
     return None
 
 
@@ -159,7 +173,11 @@ def _to_judge_model_and_params(model: str) -> tuple[str, dict[str, Any] | None]:
             endpoint_name = model.split(":/", 1)[1]
         else:
             endpoint_name = model.split("/", 1)[1]
-        return f"openai:/{endpoint_name}", {"base_url": gateway}
+        api_key = os.environ.get("DATABRICKS_TOKEN") or os.environ.get("DATABRICKS_API_KEY", "")
+        params: dict[str, Any] = {"base_url": gateway}
+        if api_key:
+            params["api_key"] = api_key
+        return f"openai:/{endpoint_name}", params
     return _to_judge_uri(model), _judge_inference_params()
 
 
@@ -184,12 +202,14 @@ def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> A
 
     last_err: Exception | None = None
     for model_str in models_to_try:
-        litellm_model, base_url = _to_litellm_model(model_str)
+        litellm_model, base_url, api_key = _to_litellm_model(model_str)
 
         call_kwargs = dict(kwargs)
         call_kwargs["model"] = litellm_model
         if base_url:
             call_kwargs["base_url"] = base_url
+        if api_key:
+            call_kwargs["api_key"] = api_key
 
         for attempt in range(max_retries):
             if attempt > 0:
@@ -486,144 +506,6 @@ def create_guideline_adherence_judge(
 
 
 # ---------------------------------------------------------------------------
-# Legacy quality judge (renamed, kept for backward compatibility)
-# ---------------------------------------------------------------------------
-
-_QUALITY_INSTRUCTIONS = """\
-You are an expert evaluator for Databricks skill documentation quality.
-Rate the response on a scale from 0.0 to 1.0 based on how well it addresses
-the user's question using correct, complete, and relevant information.
-
-## Evaluation Criteria
-
-1. **Relevance** (does the response address the question?)
-2. **Completeness** (are all parts of the question answered?)
-3. **Correctness** (are the facts and API references accurate?)
-4. **Pattern adherence** (does the response follow expected code patterns?)
-5. **API accuracy** (are function names, parameters, and syntax correct?)
-
-## Expected Facts, Patterns, and Guidelines
-
-{{ expectations }}
-
-## Input
-
-Question: {{ inputs }}
-Response: {{ outputs }}
-
-## Instructions
-
-Return a score between 0.0 and 1.0 where:
-- 1.0 = perfect response, all facts present, all patterns correct
-- 0.7 = good response, most facts present, minor gaps
-- 0.4 = partial response, significant gaps or inaccuracies
-- 0.1 = poor response, mostly wrong or off-topic
-- 0.0 = completely wrong or empty
-
-Provide detailed rationale explaining:
-- Which expected facts are present vs missing
-- Which patterns are correctly followed vs violated
-- Specific API or syntax errors found
-- What would need to change to improve the score
-"""
-
-
-def _create_legacy_quality_judge(
-    skill_guidelines: list[str] | None = None,
-    judge_model: str | None = None,
-) -> Any:
-    """Create a universal quality judge for scoring responses (legacy).
-
-    Renamed from ``create_skill_quality_judge``. Kept for backward compatibility.
-
-    Args:
-        skill_guidelines: Optional per-skill evaluation principles from
-            ground_truth.yaml guidelines across all test cases.
-        judge_model: LLM model for the judge. Defaults to GEPA_JUDGE_LM env
-            or databricks/databricks-claude-sonnet-4-6.
-    """
-    instructions = _QUALITY_INSTRUCTIONS
-    if skill_guidelines:
-        principles = "\n".join(f"- {g}" for g in skill_guidelines)
-        instructions += f"\n\n## Domain-Specific Principles\n{principles}\n"
-
-    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="skill_quality",
-        model=model_uri,
-        instructions=instructions,
-        feedback_value_type=float,
-        inference_params=inference_params,
-    )
-
-
-# Backward-compatible alias
-create_skill_quality_judge = _create_legacy_quality_judge
-
-
-# ---------------------------------------------------------------------------
-# Effectiveness judge — WITH vs WITHOUT comparison
-# ---------------------------------------------------------------------------
-
-_EFFECTIVENESS_INSTRUCTIONS = """\
-You are comparing two responses to the same question to determine whether
-a skill document helped or hurt the agent's response quality.
-
-The inputs contain three fields separated by markers:
-- QUESTION: the user's question
-- WITH-SKILL RESPONSE: generated with the skill document in context
-- WITHOUT-SKILL RESPONSE: generated without any skill document
-
-The expectations contain the expected facts and patterns.
-
-## Inputs
-
-{{ inputs }}
-
-## Expected Information
-
-{{ expectations }}
-
-## Instructions
-
-Determine whether the skill IMPROVED, maintained (SAME), or REGRESSED the
-response quality. Return one of exactly: "improved", "same", "regressed".
-
-An "improved" verdict means the WITH-skill response is meaningfully better:
-more accurate facts, better code patterns, correct API usage that the
-WITHOUT response got wrong.
-
-A "regressed" verdict means the skill actively HURT the response: introduced
-incorrect information, deprecated APIs, or confused the agent.
-
-"same" means no meaningful difference.
-
-Provide detailed rationale explaining:
-- What the skill added or removed from the response
-- Specific facts/patterns that differ between WITH and WITHOUT
-- Whether the skill taught something the model didn't already know
-- If regressed: what specifically the skill got wrong
-"""
-
-
-def create_effectiveness_judge(judge_model: str | None = None) -> Any:
-    """Create a WITH vs WITHOUT comparison judge.
-
-    Args:
-        judge_model: LLM model for the judge. Defaults to GEPA_JUDGE_LM env
-            or databricks/databricks-claude-sonnet-4-6.
-    """
-    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="skill_effectiveness",
-        model=model_uri,
-        instructions=_EFFECTIVENESS_INSTRUCTIONS,
-        feedback_value_type=str,
-        inference_params=inference_params,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Regression judge — identifies how a skill harms responses
 # ---------------------------------------------------------------------------
 
@@ -684,34 +566,63 @@ def create_regression_judge(judge_model: str | None = None) -> Any:
 def run_judge_safe(
     judge: Any,
     *,
-    inputs: Any,
+    inputs: Any = None,
     outputs: Any | None = None,
     expectations: Any | None = None,
+    trace: Any | None = None,
     name: str = "judge",
+    timeout: int = 90,
 ) -> JudgeFeedback:
-    """Run a judge with error handling and model fallback.
+    """Run a judge with error handling, timeout, and model fallback.
+
+    Supports both field-based judges (``inputs``/``outputs``/``expectations``)
+    and trace-based judges (``trace``/``expectations``).
+
+    Each judge call is wrapped in a ``ThreadPoolExecutor`` with a timeout
+    to prevent indefinite hangs from trace-based judges (which trigger
+    MLflow's multi-round tool-calling loop).
 
     On rate limit errors, recreates the judge with fallback models and
-    retries. On other errors, returns zero-score feedback so evaluation
-    never crashes from a judge failure.
+    retries.  On other errors or timeouts, returns zero-score feedback so
+    evaluation never crashes from a judge failure.
     """
-    kwargs: dict[str, Any] = {"inputs": inputs}
+    kwargs: dict[str, Any] = {}
+    if trace is not None:
+        kwargs["trace"] = trace
+    if inputs is not None:
+        kwargs["inputs"] = inputs
     if outputs is not None:
         kwargs["outputs"] = outputs
     if expectations is not None:
         kwargs["expectations"] = expectations
 
+    def _call_judge(j):
+        return j(**kwargs)
+
     # Try the primary judge first
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
-        fb = judge(**kwargs)
+        future = pool.submit(_call_judge, judge)
+        try:
+            fb = future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            logger.warning("Judge '%s' timed out after %ds", name, timeout)
+            return JudgeFeedback(value=0.0, rationale=f"Judge timed out after {timeout}s", name=name)
+        finally:
+            # shutdown(wait=False) so a still-running judge thread doesn't block
+            pool.shutdown(wait=False)
         return JudgeFeedback(
             value=fb.value,
             rationale=fb.rationale or "",
             name=name,
         )
+    except concurrent.futures.TimeoutError:
+        # Already handled above, but keep for safety
+        return JudgeFeedback(value=0.0, rationale=f"Judge timed out after {timeout}s", name=name)
     except Exception as e:
+        pool.shutdown(wait=False)
         if not _is_rate_limit_error(e):
-            logger.warning("Judge '%s' failed: %s", name, e)
+            logger.debug("Judge '%s' failed: %s", name, e)
             return JudgeFeedback(value=0.0, rationale=f"Judge error: {e}", name=name)
 
     # Rate limit hit — try fallback models
@@ -728,7 +639,16 @@ def run_judge_safe(
                 feedback_value_type=judge._feedback_value_type,
                 inference_params=inference_params,
             )
-            fb = fallback_judge(**kwargs)
+            fb_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            try:
+                future = fb_pool.submit(_call_judge, fallback_judge)
+                fb = future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                fb_pool.shutdown(wait=False)
+                logger.warning("Fallback '%s' timed out after %ds, trying next", fallback_model, timeout)
+                continue
+            finally:
+                fb_pool.shutdown(wait=False)
             logger.info("Judge '%s' succeeded with fallback model '%s'", name, fallback_model)
             return JudgeFeedback(
                 value=fb.value,
@@ -743,9 +663,239 @@ def run_judge_safe(
             continue
 
     # All fallbacks exhausted
-    logger.error("Judge '%s': all models rate limited", name)
+    logger.error("Judge '%s': all models rate limited or timed out", name)
     return JudgeFeedback(
         value=0.0,
-        rationale="All models rate limited — no judge score available",
+        rationale="All models rate limited or timed out — no judge score available",
         name=name,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Trace-based judges (for --agent-eval)
+#
+# These use {{ trace }} which activates MLflow's tool-calling loop, giving
+# the judge access to list_spans, get_root_span, search_trace_regex, AND
+# our custom read_eval_criteria / read_eval_reference tools.
+# ---------------------------------------------------------------------------
+
+_TRACE_CORRECTNESS_INSTRUCTIONS_PREFIX = """\
+You are evaluating a Claude Code agent's execution trace for CORRECTNESS.
+Focus ONLY on whether the agent's actions and outputs are factually and technically correct.
+
+"""
+
+_TRACE_CORRECTNESS_INSTRUCTIONS_BODY = """\
+
+## What to evaluate
+
+1. **Output accuracy** — Is the final response factually correct?
+2. **API correctness** — Are tool calls using correct parameters and syntax?
+3. **Code correctness** — Is any generated code syntactically valid and runnable?
+4. **Tool call correctness** — Did the agent use the right tools for the task?
+
+## How to evaluate
+
+1. Use list_spans to see the full execution flow
+2. Use get_root_span to read the final response
+3. Use read_eval_criteria to load domain-specific rubrics matching the trace
+4. Use search_trace_regex to verify specific patterns in the output
+
+## Task expectations
+
+{{ expectations }}
+
+Analyze {{ trace }} and return one of exactly: "excellent", "acceptable", "poor".
+
+- "excellent" = all outputs correct, right tools used, valid code/SQL
+- "acceptable" = mostly correct, minor issues that don't break functionality
+- "poor" = significant errors, wrong tools, broken code
+
+Provide detailed rationale referencing specific spans and tool calls.
+"""
+
+_TRACE_COMPLETENESS_INSTRUCTIONS_PREFIX = """\
+You are evaluating a Claude Code agent's execution trace for COMPLETENESS.
+Focus ONLY on whether all parts of the task were addressed.
+
+"""
+
+_TRACE_COMPLETENESS_INSTRUCTIONS_BODY = """\
+
+## What to evaluate
+
+1. **Task completion** — Did the agent finish the requested task?
+2. **Coverage** — Are all parts of the question addressed?
+3. **Expected facts** — Are all expected facts present in the output?
+4. **Expected patterns** — Are all expected code patterns demonstrated?
+
+## How to evaluate
+
+1. Use get_root_span to read the final response text
+2. Use list_spans to verify multi-step tasks were fully executed
+3. Use search_trace_regex to check for expected patterns in outputs
+4. Use read_eval_criteria for domain-specific completeness rubrics
+
+## Task expectations
+
+{{ expectations }}
+
+Analyze {{ trace }} and return one of exactly: "excellent", "acceptable", "poor".
+
+- "excellent" = all parts addressed, all expected facts/patterns present
+- "acceptable" = most parts addressed, minor gaps
+- "poor" = significant parts missing or incomplete
+
+Provide detailed rationale referencing what was found vs missing.
+"""
+
+_TRACE_GUIDELINE_INSTRUCTIONS_PREFIX = """\
+You are evaluating a Claude Code agent's execution trace for GUIDELINE ADHERENCE.
+Focus ONLY on whether the agent followed Databricks-specific patterns and conventions.
+
+"""
+
+_TRACE_GUIDELINE_INSTRUCTIONS_BODY = """\
+
+## What to evaluate
+
+1. **Tool selection** — Did the agent use MCP tools instead of Bash workarounds?
+2. **Pattern compliance** — Does output follow Databricks conventions?
+3. **Best practices** — Did the agent follow recommended workflows?
+4. **Efficiency** — Was the execution path reasonable (not excessive tool calls)?
+
+## How to evaluate
+
+1. Use list_spans to review the tool call sequence
+2. Use read_eval_criteria to load domain-specific guidelines
+3. Use get_span on individual tool calls to check parameters
+4. Use search_trace_regex to verify Databricks-specific patterns
+
+## Task expectations and guidelines
+
+{{ expectations }}
+
+Analyze {{ trace }} and return one of exactly: "excellent", "acceptable", "poor".
+
+- "excellent" = correct tools, Databricks patterns, efficient execution
+- "acceptable" = mostly correct approach, minor deviations
+- "poor" = wrong tools, anti-patterns, or wasteful execution
+
+Provide detailed rationale referencing specific spans and tool choices.
+"""
+
+
+def create_trace_correctness_judge(
+    eval_criteria: Any,
+    skill_guidelines: list[str] | None = None,
+    judge_model: str | None = None,
+) -> Any:
+    """Create a trace-based correctness judge with adaptive eval criteria.
+
+    Uses ``{{ trace }}`` to activate MLflow's tool-calling loop.  The judge
+    can call ``read_eval_criteria`` and ``read_eval_reference`` to load
+    domain-specific rubrics.
+
+    Args:
+        eval_criteria: ``EvalCriteriaSet`` with loaded criteria skills.
+        skill_guidelines: Optional per-skill guidelines from manifest/ground_truth.
+        judge_model: LLM model for the judge.  Resolved via ``--judge-model``
+            CLI flag, ``GEPA_JUDGE_LM`` env var, or default.
+    """
+    criteria_block = eval_criteria.to_prompt(judge_model) if eval_criteria else ""
+    instructions = (
+        _TRACE_CORRECTNESS_INSTRUCTIONS_PREFIX
+        + criteria_block
+        + _TRACE_CORRECTNESS_INSTRUCTIONS_BODY
+    )
+
+    if skill_guidelines:
+        filtered = [
+            g
+            for g in skill_guidelines
+            if any(kw in g.lower() for kw in _CORRECTNESS_KEYWORDS)
+        ]
+        if filtered:
+            principles = "\n".join(f"- {g}" for g in filtered)
+            instructions += f"\n\n## Domain Correctness Principles\n{principles}\n"
+
+    model_uri, inference_params = _to_judge_model_and_params(
+        judge_model or DEFAULT_JUDGE_LM
+    )
+    return make_judge(
+        name="trace_correctness",
+        model=model_uri,
+        instructions=instructions,
+        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        inference_params=inference_params,
+    )
+
+
+def create_trace_completeness_judge(
+    eval_criteria: Any,
+    skill_guidelines: list[str] | None = None,
+    judge_model: str | None = None,
+) -> Any:
+    """Create a trace-based completeness judge with adaptive eval criteria.
+
+    Args:
+        eval_criteria: ``EvalCriteriaSet`` with loaded criteria skills.
+        skill_guidelines: Optional per-skill guidelines from manifest/ground_truth.
+        judge_model: LLM model for the judge.
+    """
+    criteria_block = eval_criteria.to_prompt(judge_model) if eval_criteria else ""
+    instructions = (
+        _TRACE_COMPLETENESS_INSTRUCTIONS_PREFIX
+        + criteria_block
+        + _TRACE_COMPLETENESS_INSTRUCTIONS_BODY
+    )
+
+    model_uri, inference_params = _to_judge_model_and_params(
+        judge_model or DEFAULT_JUDGE_LM
+    )
+    return make_judge(
+        name="trace_completeness",
+        model=model_uri,
+        instructions=instructions,
+        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        inference_params=inference_params,
+    )
+
+
+def create_trace_guideline_judge(
+    eval_criteria: Any,
+    skill_guidelines: list[str] | None = None,
+    judge_model: str | None = None,
+) -> Any:
+    """Create a trace-based guideline adherence judge with adaptive eval criteria.
+
+    Receives ALL guidelines (default_guidelines + per-test guidelines +
+    ``[FOCUS]`` guidelines from ``--focus``), making focus areas directly
+    evaluable by the trace-based judge.
+
+    Args:
+        eval_criteria: ``EvalCriteriaSet`` with loaded criteria skills.
+        skill_guidelines: All guidelines to evaluate against.
+        judge_model: LLM model for the judge.
+    """
+    criteria_block = eval_criteria.to_prompt(judge_model) if eval_criteria else ""
+    instructions = (
+        _TRACE_GUIDELINE_INSTRUCTIONS_PREFIX
+        + criteria_block
+        + _TRACE_GUIDELINE_INSTRUCTIONS_BODY
+    )
+
+    if skill_guidelines:
+        principles = "\n".join(f"- {g}" for g in skill_guidelines)
+        instructions += f"\n\n## Required Guidelines\n{principles}\n"
+
+    model_uri, inference_params = _to_judge_model_and_params(
+        judge_model or DEFAULT_JUDGE_LM
+    )
+    return make_judge(
+        name="trace_guideline_adherence",
+        model=model_uri,
+        instructions=instructions,
+        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        inference_params=inference_params,
     )

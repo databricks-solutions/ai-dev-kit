@@ -141,12 +141,18 @@ def main():
         default=None,
         help="Directory for GEPA checkpoints. Resumes from last state if dir exists.",
     )
-    # Agent evaluation flags
+    # Evaluation mode flags
+    parser.add_argument(
+        "--proxy",
+        action="store_true",
+        help="Use proxy (SkillBench) evaluator only. Faster but less accurate — "
+        "tests text generation, not real agent behavior.",
+    )
     parser.add_argument(
         "--agent-eval",
         action="store_true",
         help="Hybrid mode: use real Claude Code agent for baseline + validation, "
-        "proxy for GEPA iterations.",
+        "proxy for GEPA iterations. This is the DEFAULT when not using --proxy.",
     )
     parser.add_argument(
         "--agent-eval-full",
@@ -165,6 +171,13 @@ def main():
         type=int,
         default=300,
         help="Timeout per agent run in seconds (default: 300).",
+    )
+    parser.add_argument(
+        "--parallel-agents",
+        type=int,
+        default=3,
+        help="Number of parallel agent evaluations (default: 3). "
+        "Only affects --agent-eval and --agent-eval-full modes.",
     )
     parser.add_argument(
         "--mlflow-experiment",
@@ -212,6 +225,14 @@ def main():
 
     if not args.skill_name and not args.all and not args.tools_only:
         parser.error("Either provide a skill name or use --all")
+
+    # --focus requires agent evaluation (incompatible with --proxy)
+    if (args.focus_areas or args.focus_file) and args.proxy:
+        parser.error("--focus requires agent evaluation (incompatible with --proxy)")
+
+    # Default to agent eval (hybrid) unless --proxy is set
+    if not args.proxy and not args.agent_eval and not args.agent_eval_full:
+        args.agent_eval = True
 
     from skill_test.optimize.runner import optimize_skill
     from skill_test.optimize.review import (
@@ -339,6 +360,7 @@ def main():
                 mlflow_assessment_experiment=args.mlflow_assessments,
                 max_per_skill=args.max_per_skill,
                 focus_areas=focus_areas,
+                parallel_agents=args.parallel_agents,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:
@@ -399,6 +421,7 @@ def main():
                     mlflow_experiment=args.mlflow_experiment,
                     mlflow_assessment_experiment=args.mlflow_assessments,
                     focus_areas=focus_areas,
+                    parallel_agents=args.parallel_agents,
                 )
                 review_optimization(result)
                 if args.apply and not args.dry_run:
@@ -444,6 +467,7 @@ def main():
                 agent_timeout=args.agent_timeout,
                 mlflow_experiment=args.mlflow_experiment,
                 focus_areas=focus_areas,
+                parallel_agents=args.parallel_agents,
             )
             review_optimization(result)
             if args.apply and not args.dry_run:

@@ -10,8 +10,11 @@ Supports two evaluation modes:
 
 import copy
 import difflib
+import logging
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from gepa.optimize_anything import optimize_anything
 
@@ -110,8 +113,12 @@ def _compute_diff_summary(original: str, optimized: str) -> str:
     return summary
 
 
-def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating"):
+def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating", max_parallel: int = 1):
     """Run evaluator on tasks and return mean score, per-task scores, and per-task side_info.
+
+    Args:
+        max_parallel: When > 1, evaluations run in parallel using ThreadPoolExecutor.
+            Serial (1) is the default for proxy evaluators; parallel is used for agent evaluators.
 
     Returns:
         (mean_score, per_task_scores, side_info_by_id, side_info_by_input)
@@ -122,13 +129,67 @@ def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating"):
     per_task = {}
     side_info_by_id = {}
     side_info_by_input = {}
-    for i, inst in enumerate(gepa_instances):
-        task_id = tasks[i].get("id", f"task_{i}")
-        print(f"\r  {label}: {i + 1}/{total} ({task_id})...", end="", flush=True)
-        score, side_info = evaluator(candidate, inst)
-        per_task[task_id] = score
-        side_info_by_id[task_id] = side_info
-        side_info_by_input[inst.get("input", f"task_{i}")] = side_info
+
+    if max_parallel <= 1:
+        # Serial path (default — unchanged behavior)
+        for i, inst in enumerate(gepa_instances):
+            task_id = tasks[i].get("id", f"task_{i}")
+            print(f"\r  {label}: {i + 1}/{total} ({task_id})...", end="", flush=True)
+            score, side_info = evaluator(candidate, inst)
+            per_task[task_id] = score
+            side_info_by_id[task_id] = side_info
+            side_info_by_input[inst.get("input", f"task_{i}")] = side_info
+    else:
+        # Parallel path — ThreadPoolExecutor preserves cache sharing for baseline runs
+        import concurrent.futures
+
+        completed = 0
+
+        def _eval_task(idx, inst, task_id):
+            score, side_info = evaluator(candidate, inst)
+            return idx, task_id, inst, score, side_info
+
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel)
+        try:
+            futures = {}
+            for i, inst in enumerate(gepa_instances):
+                task_id = tasks[i].get("id", f"task_{i}")
+                futures[pool.submit(_eval_task, i, inst, task_id)] = i
+
+            try:
+                for future in concurrent.futures.as_completed(futures, timeout=900):
+                    try:
+                        idx, task_id, inst, score, side_info = future.result(timeout=900)
+                    except Exception as e:
+                        idx = futures[future]
+                        task_id = tasks[idx].get("id", f"task_{idx}")
+                        inst = gepa_instances[idx]
+                        score, side_info = 0.0, {"_error": str(e), "scores": {"final": 0.0}}
+                        logger.warning("Evaluator failed for task %s: %s", task_id, e)
+                    per_task[task_id] = score
+                    side_info_by_id[task_id] = side_info
+                    side_info_by_input[inst.get("input", f"task_{idx}")] = side_info
+                    completed += 1
+                    print(f"\r  {label}: {completed}/{total} ({task_id})...", end="", flush=True)
+            except TimeoutError:
+                # as_completed timeout — score remaining tasks as 0.0
+                for future, idx in futures.items():
+                    if not future.done():
+                        task_id = tasks[idx].get("id", f"task_{idx}")
+                        inst = gepa_instances[idx]
+                        per_task.setdefault(task_id, 0.0)
+                        side_info_by_id.setdefault(
+                            task_id, {"_error": "as_completed timeout (900s)", "scores": {"final": 0.0}}
+                        )
+                        side_info_by_input.setdefault(inst.get("input", f"task_{idx}"), side_info_by_id[task_id])
+                        future.cancel()
+                        logger.warning("Task %s timed out in as_completed (900s)", task_id)
+                print(f"\n  WARNING: {label} timed out after 900s — scoring remaining tasks as 0.0")
+            pool.shutdown(wait=True)
+        except Exception:
+            pool.shutdown(wait=False)
+            raise
+
     mean = sum(per_task.values()) / len(per_task) if per_task else 0.0
     print(f"\r  {label}: {total}/{total} done. Mean: {mean:.3f}        ")
     return mean, per_task, side_info_by_id, side_info_by_input
@@ -268,6 +329,8 @@ def optimize_skill(
     mlflow_experiment: str | None = None,
     mcp_config: dict | None = None,
     agent_allowed_tools: list[str] | None = None,
+    # Parallel agent evaluation
+    parallel_agents: int = 1,
     # MLflow assessment injection
     mlflow_assessment_experiment: str | None = None,
     # Cross-skill dataset
@@ -309,6 +372,26 @@ def optimize_skill(
         mcp_config: MCP server configuration for agent execution.
         agent_allowed_tools: Allowed tools for agent execution.
     """
+    # 0. Load agent settings into os.environ early (before judges are created)
+    import os
+    from ..agent.executor import _get_agent_env
+
+    _agent_env = _get_agent_env()
+    for _k, _v in _agent_env.items():
+        if _k.startswith(("DATABRICKS_", "MLFLOW_")):
+            os.environ.setdefault(_k, _v)
+
+    # Auto-derive AI Gateway URL from ANTHROPIC_BASE_URL if not explicitly set
+    if not os.environ.get("DATABRICKS_AI_GATEWAY_URL"):
+        _anthropic_base = _agent_env.get("ANTHROPIC_BASE_URL", "") or os.environ.get("ANTHROPIC_BASE_URL", "")
+        if "ai-gateway.cloud.databricks.com" in _anthropic_base:
+            from urllib.parse import urlparse
+
+            _parsed = urlparse(_anthropic_base)
+            _gw = f"{_parsed.scheme}://{_parsed.netloc}/mlflow/v1"
+            os.environ["DATABRICKS_AI_GATEWAY_URL"] = _gw
+            print(f"AI Gateway auto-detected: {_gw}")
+
     # 1. Load SKILL.md
     skill_path = find_skill_md(skill_name)
     if not tools_only and skill_path is None:
@@ -443,6 +526,20 @@ def optimize_skill(
         from .agent_evaluator import create_agent_evaluator, build_agent_eval_background
 
         print("Agent evaluation: ENABLED")
+        # Load tool_modules from manifest for eval criteria filtering
+        from pathlib import Path as _Path
+
+        _manifest_tool_modules = tool_modules  # CLI --tool-modules
+        if not _manifest_tool_modules:
+            _manifest_path = _Path(".test/skills") / skill_name / "manifest.yaml"
+            if _manifest_path.exists():
+                try:
+                    import yaml as _yaml
+                    _manifest_data = _yaml.safe_load(_manifest_path.read_text()) or {}
+                    _manifest_tool_modules = _manifest_data.get("tool_modules")
+                except Exception:
+                    pass
+
         agent_evaluator = create_agent_evaluator(
             skill_name,
             original_token_counts=original_token_counts,
@@ -453,6 +550,7 @@ def optimize_skill(
             agent_model=agent_model,
             agent_timeout=agent_timeout,
             mlflow_experiment=mlflow_experiment,
+            tool_modules=_manifest_tool_modules,
         )
 
         if agent_eval_full:
@@ -461,6 +559,9 @@ def optimize_skill(
             print("Mode: agent-eval-full (agent for ALL iterations)")
         else:
             print("Mode: agent-eval hybrid (proxy for GEPA, agent for baseline + validation)")
+
+    # Determine parallelism for evaluator calls (agent evaluator only)
+    _eval_max_parallel = parallel_agents if agent_eval_full else 1
 
     # 5. Get config (scaled by component count)
     num_components = len(seed_candidate)
@@ -542,7 +643,8 @@ def optimize_skill(
 
         print(f"\nScoring baseline ({len(train)} tasks, ~5 LLM calls each)...")
         original_score, original_per_task, si_by_id, _ = _evaluate_on_tasks(
-            evaluator, seed_candidate, train, label="Baseline"
+            evaluator, seed_candidate, train, label="Baseline",
+            max_parallel=_eval_max_parallel,
         )
         print(f"Current score: {original_score:.3f}")
         for task_id, score in original_per_task.items():
@@ -566,7 +668,8 @@ def optimize_skill(
         if agent_evaluator:
             print(f"\nAgent baseline ({len(train)} tasks)...")
             dry_run_agent_score, agent_per_task, dry_run_agent_si, _ = _evaluate_on_tasks(
-                agent_evaluator, seed_candidate, train, label="Agent baseline"
+                agent_evaluator, seed_candidate, train, label="Agent baseline",
+                max_parallel=parallel_agents,
             )
             print(f"Agent baseline score: {dry_run_agent_score:.3f}")
             for task_id, score in agent_per_task.items():
@@ -597,33 +700,59 @@ def optimize_skill(
         )
 
     # Evaluate original and capture per-task detail for baseline context
-    print(f"\nScoring baseline ({len(train)} tasks, ~5 LLM calls each)...")
+    _eval_label = "Agent baseline" if agent_eval_full else "Baseline"
+    _eval_desc = "2 agent runs + judges" if agent_eval_full else "~5 LLM calls"
+    print(f"\nScoring {_eval_label.lower()} ({len(train)} tasks, {_eval_desc} each)...")
     original_score, original_per_task, si_by_id, si_by_input = _evaluate_on_tasks(
-        evaluator, seed_candidate, train, label="Baseline"
+        evaluator, seed_candidate, train, label=_eval_label,
+        max_parallel=_eval_max_parallel,
     )
 
     # 6. Build background and objective
-    background = build_skillbench_background(
-        skill_name,
-        total_original_tokens,
-        component_names=list(seed_candidate.keys()),
-        baseline_scores=original_per_task,
-        baseline_side_info=si_by_id,
-        token_budget=token_budget,
-        assessment_summary=assessment_summary,
-        focus_areas=focus_areas,
-    )
-    objective = (
-        f"Refine and improve the existing '{skill_name}' skill. "
-        "Score: EFFECTIVENESS (30%) + QUALITY_COMPOSITE (20%) + FACT_PATTERN (15%) "
-        "+ GUIDELINE_ADHERENCE (10%) + EFFICIENCY (10%) + STRUCTURE (5%) - REGRESSION_PENALTY (10%). "
-        "Three judges evaluate independently: CORRECTNESS (facts/API/syntax), "
-        "COMPLETENESS (coverage), GUIDELINE_ADHERENCE (patterns). "
-        "Use per-dimension deltas in Judge_effectiveness to see WHERE improvement happened. "
-        "Use Missing_Facts and Missing_Patterns in side_info to see exactly what content to add. "
-        "Focus on what the agent would otherwise get wrong. "
-        "Be concise — remove redundant examples and verbose explanations."
-    )
+    if agent_eval_full:
+        from .agent_evaluator import build_agent_eval_background
+        background = build_agent_eval_background(
+            skill_name,
+            total_original_tokens,
+            baseline_scores=original_per_task,
+            baseline_side_info=si_by_id,
+            focus_areas=focus_areas,
+        )
+        objective = (
+            f"Refine and improve the existing '{skill_name}' skill. "
+            "Score: EFFECTIVENESS (25%) + CORRECTNESS (20%) + COMPLETENESS (15%) "
+            "+ GUIDELINE_ADHERENCE (15%) + ASSERTIONS (10%) + EXECUTION (5%) + TOKEN_SIZE (5%) "
+            "- REGRESSION_PENALTY (5%). "
+            "Three trace-based judges evaluate the agent's actual execution: "
+            "CORRECTNESS (facts/APIs/tool calls), COMPLETENESS (coverage), "
+            "GUIDELINE_ADHERENCE (patterns/tool selection). "
+            "Use per-dimension deltas to see WHERE improvement happened. "
+            "Use Missing_Facts and Missing_Patterns for exact content to add. "
+            "Focus on guiding the agent to use the RIGHT tools with CORRECT arguments. "
+            "Be concise — remove redundant examples and verbose instructions."
+        )
+    else:
+        background = build_skillbench_background(
+            skill_name,
+            total_original_tokens,
+            component_names=list(seed_candidate.keys()),
+            baseline_scores=original_per_task,
+            baseline_side_info=si_by_id,
+            token_budget=token_budget,
+            assessment_summary=assessment_summary,
+            focus_areas=focus_areas,
+        )
+        objective = (
+            f"Refine and improve the existing '{skill_name}' skill. "
+            "Score: EFFECTIVENESS (30%) + QUALITY_COMPOSITE (20%) + FACT_PATTERN (15%) "
+            "+ GUIDELINE_ADHERENCE (10%) + EFFICIENCY (10%) + STRUCTURE (5%) - REGRESSION_PENALTY (10%). "
+            "Three judges evaluate independently: CORRECTNESS (facts/API/syntax), "
+            "COMPLETENESS (coverage), GUIDELINE_ADHERENCE (patterns). "
+            "Use per-dimension deltas in Judge_effectiveness to see WHERE improvement happened. "
+            "Use Missing_Facts and Missing_Patterns in side_info to see exactly what content to add. "
+            "Focus on what the agent would otherwise get wrong. "
+            "Be concise — remove redundant examples and verbose explanations."
+        )
     if focus_areas:
         focus_text = "\n".join(f"- {f}" for f in focus_areas)
         objective += (
@@ -635,7 +764,8 @@ def optimize_skill(
     if agent_evaluator and not agent_eval_full:
         print(f"\n  Agent baseline scoring ({len(train)} tasks)...")
         agent_baseline_score, agent_baseline_per_task, agent_baseline_si, _ = _evaluate_on_tasks(
-            agent_evaluator, seed_candidate, train, label="Agent baseline"
+            agent_evaluator, seed_candidate, train, label="Agent baseline",
+            max_parallel=parallel_agents,
         )
         print(f"  Agent baseline score: {agent_baseline_score:.3f}")
         for task_id, score in agent_baseline_per_task.items():
@@ -695,7 +825,10 @@ def optimize_skill(
         total_metric_calls += result.total_metric_calls or 0
 
         candidate = result.best_candidate
-        pass_score, _, pass_si_by_id, _ = _evaluate_on_tasks(evaluator, candidate, train, label=f"Pass {pass_num}")
+        pass_score, _, pass_si_by_id, _ = _evaluate_on_tasks(
+            evaluator, candidate, train, label=f"Pass {pass_num}",
+            max_parallel=_eval_max_parallel,
+        )
         improvement = pass_score - best_score
 
         print(f"  Pass {pass_num} score: {pass_score:.4f} (delta: {'+' if improvement >= 0 else ''}{improvement:.4f})")
@@ -725,7 +858,10 @@ def optimize_skill(
 
     val_scores: dict[str, float] = {}
     if val:
-        _, val_scores, _, _ = _evaluate_on_tasks(evaluator, best, val, label="Validation")
+        _, val_scores, _, _ = _evaluate_on_tasks(
+            evaluator, best, val, label="Validation",
+            max_parallel=_eval_max_parallel,
+        )
 
     token_reduction_pct = (
         (total_original_tokens - optimized_token_count) / total_original_tokens * 100
@@ -742,7 +878,8 @@ def optimize_skill(
     if agent_evaluator and not agent_eval_full:
         print(f"\n  Agent validation scoring ({len(train)} tasks on best candidate)...")
         agent_validation_score, agent_val_per_task, agent_validation_si, _ = _evaluate_on_tasks(
-            agent_evaluator, best, train, label="Agent validation"
+            agent_evaluator, best, train, label="Agent validation",
+            max_parallel=parallel_agents,
         )
         print(f"  Agent validation score: {agent_validation_score:.3f}")
         for task_id, score in agent_val_per_task.items():
