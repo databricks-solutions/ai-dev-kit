@@ -8,40 +8,31 @@ python-dotenv>=1.0.1
 # Databricks SDK
 databricks-sdk>=0.81.0
 
+# Encryption for PAT storage
+cryptography>=42.0.0
+
 # Database
 sqlalchemy[asyncio]>=2.0.41
 alembic>=1.16.1
 psycopg[binary]>=3.2.0
 greenlet>=3.0.0
-psycopg2-binary>=2.9.11
 
 # Claude Agent SDK
 claude-agent-sdk>=0.1.39
 anthropic>=0.42.0
 
 # MLflow for tracing Claude Code conversations
+# Using base mlflow (no [databricks] extra) to avoid pulling boto3, azure-storage,
+# google-cloud-storage, databricks-agents, and their transitive deps (~50 MB).
+# The pre-installed container versions of Flask, pandas, pyarrow satisfy mlflow's constraints.
 # See: https://docs.databricks.com/aws/en/mlflow3/genai/tracing/integrations/claude-code
-mlflow[databricks]>=3.9.0
+mlflow>=3.9.0
 
 # MCP
 mcp>=1.0.0
 fastmcp>=0.1.0
 
-# Dependencies for databricks-tools-core
+# Dependencies for databricks-tools-core (only runtime-needed packages)
 requests>=2.31.0
 sqlglot>=20.0.0
 sqlfluff>=3.0.0
-litellm>=1.0.0
-pymupdf>=1.24.0
-
-# Conflict resolution pins for Databricks Apps pre-installed packages
-tenacity==9.0.0
-pillow==11.1.0
-websockets==15.0
-pyarrow==18.1.0
-markupsafe==3.0.2
-rich==14.0.0
-protobuf>=3.12.0,<5
-pandas==2.3.0
-flask==3.1.0
-werkzeug==3.1.3

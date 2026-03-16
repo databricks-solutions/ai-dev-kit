@@ -34,3 +34,6 @@ client/.vite/
 
 # OS
 .DS_Store
+
+# Local deploy manifests/cache
+.deploy-manifests/
