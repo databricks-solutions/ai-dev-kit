@@ -585,6 +585,8 @@ async def stream_agent_response(
         raise msg
       elif msg_type == 'message':
         # Handle different message types
+        msg_class = type(msg).__name__
+        print(f'[AGENT MSG] type={msg_class}', flush=True)
         if isinstance(msg, AssistantMessage):
           # Process content blocks
           for block in msg.content:
@@ -609,7 +611,14 @@ async def stream_agent_response(
                 'tool_input': block.input,
               }
             elif isinstance(block, ToolResultBlock):
-              yield _process_tool_result(block, ask_user_tool_ids)
+              result_event = _process_tool_result(block, ask_user_tool_ids)
+              content_preview = (result_event.get('content', '') or '')[:200]
+              print(
+                f"[AGENT TOOL_RESULT] from=AssistantMessage is_error={result_event.get('is_error')} "
+                f"preview={content_preview!r}",
+                flush=True,
+              )
+              yield result_event
 
         elif isinstance(msg, ResultMessage):
           yield {
@@ -631,10 +640,19 @@ async def stream_agent_response(
         elif isinstance(msg, UserMessage):
           # UserMessage can contain tool results (sent back to Claude after tool execution)
           msg_content = msg.content
+          content_types = [type(b).__name__ for b in msg_content] if isinstance(msg_content, list) else [type(msg_content).__name__]
+          print(f'[AGENT MSG] UserMessage content_types={content_types}', flush=True)
           if isinstance(msg_content, list):
             for block in msg_content:
               if isinstance(block, ToolResultBlock):
-                yield _process_tool_result(block, ask_user_tool_ids)
+                result_event = _process_tool_result(block, ask_user_tool_ids)
+                content_preview = (result_event.get('content', '') or '')[:200]
+                print(
+                  f"[AGENT TOOL_RESULT] from=UserMessage is_error={result_event.get('is_error')} "
+                  f"preview={content_preview!r}",
+                  flush=True,
+                )
+                yield result_event
           # Skip string content (just echo of user input)
 
         elif isinstance(msg, StreamEvent):
