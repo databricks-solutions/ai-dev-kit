@@ -8,7 +8,7 @@ If a customer has existing style guides, adopt theirs. Consistency with their co
 
 ### PEP 8 Compliance (enforced via Ruff)
 
-- Maximum line length: 88 characters (Ruff default)
+- Maximum line length: 120 characters
 - 4 spaces for indentation (no tabs)
 - Two blank lines between top-level definitions
 
@@ -16,7 +16,7 @@ If a customer has existing style guides, adopt theirs. Consistency with their co
 
 ```toml
 [tool.ruff]
-line-length = 88
+line-length = 120
 indent-width = 4
 
 [tool.ruff.lint]

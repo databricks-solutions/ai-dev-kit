@@ -2,14 +2,6 @@
 
 ## 2. Development Environment Setup
 
-### 2.1 Initial Developer Setup Checklist
-
-- [ ] Access to customer Databricks workspace(s)
-- [ ] Access to git repository
-- [ ] Added to communication channels (Slack/Teams)
-- [ ] Access to project tracking (Jira)
-- [ ] Invited to sprint ceremonies
-
 ### 2.2 Python Environment (uv)
 
 Use [uv](https://github.com/astral-sh/uv) for Python dependency management — fast, Rust-based, uses standard `pyproject.toml`.
@@ -102,14 +94,13 @@ uv run ruff format .
 
 ### 2.4 IDE Setup (VSCode / Cursor)
 
-See Databricks public documentation and internal search tools (Glean) for Databricks-specific IDE advice.
+See [Databricks documentation](https://docs.databricks.com/) for IDE setup and extension guidance.
 
 ### 2.5 Databricks CLI Setup
 
-```bash
-# install CLI
-brew tap databricks/tap && brew install databricks
+The Databricks CLI is a required dependency — install it for your platform via the [official instructions](https://docs.databricks.com/en/dev-tools/cli/install.html).
 
+```bash
 # authenticate (OAuth)
 databricks auth login --host https://workspace.cloud.databricks.com
 
