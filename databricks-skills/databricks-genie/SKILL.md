@@ -31,7 +31,6 @@ Use this skill when:
 
 | Tool | Purpose |
 |------|---------|
-| `list_genie` | List all Genie Spaces accessible to you |
 | `create_or_update_genie` | Create or update a Genie Space (supports `serialized_space`) |
 | `get_genie` |  Get space details (by ID and support `include_serialized_space` parameter) or list all spaces (no ID) |
 | `delete_genie` | Delete a Genie Space |
