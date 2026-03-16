@@ -134,7 +134,7 @@ for customer in customers:
 | UC resources | snake_case | `dev_sales.customers` |
 | Model endpoints | kebab-case | `customer-support-agent` |
 | DAB jobs | snake_case | `deploy_agent_model` |
-| Git branches | username/description | `niall/add-billing-tool` |
+| Git branches | username/description | `{username}/add-billing-tool` |
 
 **Tips:**
 - Functions: use verbs (`get_`, `process_`, `validate_`)

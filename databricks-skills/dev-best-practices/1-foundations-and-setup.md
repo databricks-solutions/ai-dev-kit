@@ -136,9 +136,9 @@ Adopt customer Git workflows when they exist. When building from scratch, use th
 
 ```bash
 # Good - clear ownership
-niall/add-billing-retry-logic
-niall/fix-vector-search-timeout
-luke/update-agent-config
+{username}/add-billing-retry-logic
+{username}/fix-vector-search-timeout
+{username}/update-agent-config
 
 # Bad - who owns this?
 feature/billing
@@ -152,19 +152,19 @@ fix/timeout-issue
 git checkout main && git pull origin main
 
 # 2. Create your branch
-git checkout -b niall/add-billing-tool
+git checkout -b {username}/add-billing-tool
 
 # 3. Stay synced (daily)
 git fetch origin && git rebase origin/main
 
 # 4. Push and create PR
-git push origin niall/add-billing-tool
+git push origin {username}/add-billing-tool
 gh pr create --title "[feature] Add billing tool"
 
 # 5. After merge, delete the branch
 git checkout main && git pull origin main
-git branch -d niall/add-billing-tool
-git push origin --delete niall/add-billing-tool
+git branch -d {username}/add-billing-tool
+git push origin --delete {username}/add-billing-tool
 ```
 
 **Key Principles:** Short-lived branches (days, not weeks), rebase daily, delete after merge, never push directly to main.
@@ -307,7 +307,7 @@ git fetch --prune
 
 ```bash
 git checkout main && git pull origin main
-git checkout -b niall/my-feature   # or checkout existing + rebase
+git checkout -b {username}/my-feature   # or checkout existing + rebase
 git rebase origin/main
 ```
 
@@ -323,7 +323,7 @@ uv run pytest tests/unit/ -x
 git add . && git commit -m "add customer lookup tool"
 
 # push regularly for backup and visibility
-git push origin niall/my-feature
+git push origin {username}/my-feature
 ```
 
 ### 5.3 Testing in Databricks
@@ -340,7 +340,7 @@ DAB dev mode auto-prefixes resources with `[dev your.name]` to prevent conflicts
 
 **Option 2: Git-Connected Notebooks** (for interactive testing)
 
-1. Push your branch: `git push origin niall/my-feature`
+1. Push your branch: `git push origin {username}/my-feature`
 2. In Databricks, open a Git-connected notebook
 3. Switch branches and pull via the Git dialog
 4. Import and test interactively
@@ -358,7 +358,7 @@ gh pr create --title "[feature] Add customer lookup tool"
 
 # After merge, clean up immediately
 git checkout main && git pull origin main
-git branch -d niall/my-feature
+git branch -d {username}/my-feature
 databricks bundle destroy -t dev   # clean up dev resources
 ```
 
@@ -381,7 +381,7 @@ Databricks compute costs accrue whenever clusters are running — treat compute 
 
 **Tables & Storage:**
 - Delete test/scratch tables when done with a task
-- Use `dev_{username}_*` naming for all dev tables (e.g., `dev_niall_customer_data`)
+- Use `dev_{username}_*` naming for all dev tables (e.g., `dev_{username}_customer_data`)
 - Never write to prod catalogs during development
 - Clean up intermediate checkpoint files from streaming jobs
 
@@ -396,10 +396,10 @@ Databricks compute costs accrue whenever clusters are running — treat compute 
 
 ```sql
 -- find tables you created in dev
-SHOW TABLES IN dev_catalog.dev_schema LIKE '*niall*';
+SHOW TABLES IN dev_catalog.dev_schema LIKE '*{username}*';
 
 -- drop dev tables when done
-DROP TABLE IF EXISTS dev_catalog.dev_schema.dev_niall_scratch;
+DROP TABLE IF EXISTS dev_catalog.dev_schema.dev_{username}_scratch;
 ```
 
 ```bash
