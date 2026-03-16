@@ -93,6 +93,13 @@ _IMAGE_PATH_RE = re.compile(
   r'[^\s\'"<>\]]*\.(?:png|jpg|jpeg|gif|svg|webp)',
   re.IGNORECASE,
 )
+_CLUSTER_ID_RE = re.compile(r'"cluster_id"\s*:\s*"([^"]+)"')
+_CLUSTER_NAME_RE = re.compile(r'"cluster_name"\s*:\s*"([^"]+)"')
+_CONTEXT_ID_RE = re.compile(r'"context_id"\s*:\s*"([^"]+)"')
+_cluster_name_cache: dict[str, str] = {
+  '__serverless__': 'Serverless Compute',
+  'serverless': 'Serverless Compute',
+}
 
 
 def _extract_image_paths(content: str) -> list[str]:
@@ -106,6 +113,19 @@ def _extract_image_paths(content: str) -> list[str]:
   return paths
 
 
+def _is_inline_image_tool(tool_name: str | None) -> bool:
+  """True for MCP tools whose output may include renderable image paths."""
+  if not tool_name:
+    return False
+  normalized = tool_name.strip()
+  return (
+    normalized == 'execute_databricks_command'
+    or normalized.endswith('__execute_databricks_command')
+    or normalized == 'check_operation_status'
+    or normalized.endswith('__check_operation_status')
+  )
+
+
 def _is_command_execution_tool(tool_name: str | None) -> bool:
   """True only for Databricks command-execution MCP tool names."""
   if not tool_name:
@@ -115,6 +135,81 @@ def _is_command_execution_tool(tool_name: str | None) -> bool:
     normalized == 'execute_databricks_command'
     or normalized.endswith('__execute_databricks_command')
   )
+
+
+def _resolve_cluster_name(cluster_id: str | None) -> str | None:
+  """Best-effort cluster name lookup from a cluster_id."""
+  if not cluster_id:
+    return None
+
+  cached = _cluster_name_cache.get(cluster_id)
+  if cached:
+    return cached
+
+  try:
+    client = _dt_auth.get_workspace_client()
+    cluster = client.clusters.get(cluster_id=cluster_id)
+    cluster_name = getattr(cluster, 'cluster_name', None)
+    if cluster_name:
+      _cluster_name_cache[cluster_id] = cluster_name
+      return cluster_name
+  except Exception:
+    logger.debug('Failed to resolve cluster name for cluster_id=%s', cluster_id, exc_info=True)
+
+  return None
+
+
+def _extract_command_execution_metadata(
+  content: str,
+  default_cluster_id: str | None = None,
+) -> dict[str, str]:
+  """Extract command execution metadata from tool output text."""
+  cluster_id: str | None = None
+  cluster_name: str | None = None
+  context_id: str | None = None
+
+  try:
+    parsed = json.loads(content)
+    if isinstance(parsed, dict):
+      raw_cluster_id = parsed.get('cluster_id')
+      raw_cluster_name = parsed.get('cluster_name')
+      raw_context_id = parsed.get('context_id')
+      if isinstance(raw_cluster_id, str) and raw_cluster_id:
+        cluster_id = raw_cluster_id
+      if isinstance(raw_cluster_name, str) and raw_cluster_name:
+        cluster_name = raw_cluster_name
+      if isinstance(raw_context_id, str) and raw_context_id:
+        context_id = raw_context_id
+  except Exception:
+    # Expected for mixed/plain outputs; fall back to regex below.
+    pass
+
+  if not cluster_id:
+    m = _CLUSTER_ID_RE.search(content)
+    if m:
+      cluster_id = m.group(1)
+  if not cluster_name:
+    m = _CLUSTER_NAME_RE.search(content)
+    if m:
+      cluster_name = m.group(1)
+  if not context_id:
+    m = _CONTEXT_ID_RE.search(content)
+    if m:
+      context_id = m.group(1)
+
+  if not cluster_id and default_cluster_id:
+    cluster_id = default_cluster_id
+  if not cluster_name:
+    cluster_name = _resolve_cluster_name(cluster_id)
+
+  metadata: dict[str, str] = {}
+  if cluster_id:
+    metadata['cluster_id'] = cluster_id
+  if cluster_name:
+    metadata['cluster_name'] = cluster_name
+  if context_id:
+    metadata['context_id'] = context_id
+  return metadata
 
 # Built-in Claude Code tools
 BUILTIN_TOOLS = [
@@ -371,7 +466,12 @@ def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancell
   context.run(run_with_context)
 
 
-def _process_tool_result(block: ToolResultBlock, ask_user_tool_ids: set[str]) -> dict:
+def _process_tool_result(
+  block: ToolResultBlock,
+  ask_user_tool_ids: set[str],
+  tool_name: str | None = None,
+  default_cluster_id: str | None = None,
+) -> dict:
   """Extract and normalize content from a ToolResultBlock for streaming."""
   content = block.content
   if isinstance(content, list):
@@ -381,6 +481,8 @@ def _process_tool_result(block: ToolResultBlock, ask_user_tool_ids: set[str]) ->
         texts.append(item['text'])
       elif isinstance(item, str):
         texts.append(item)
+      elif hasattr(item, 'text'):
+        texts.append(item.text)
       else:
         texts.append(str(item))
     content = '\n'.join(texts) if texts else str(block.content)
@@ -396,12 +498,20 @@ def _process_tool_result(block: ToolResultBlock, ask_user_tool_ids: set[str]) ->
     content = f'Tool execution interrupted: {content}. This may occur when operations exceed timeout limits or when the connection is interrupted. Check backend logs for more details.'
     logger.warning(f'Tool result error (improved): {content}')
 
-  return {
+  result = {
     'type': 'tool_result',
     'tool_use_id': block.tool_use_id,
     'content': content,
     'is_error': block.is_error,
   }
+  if _is_command_execution_tool(tool_name):
+    command_execution = _extract_command_execution_metadata(
+      content,
+      default_cluster_id=default_cluster_id,
+    )
+    if command_execution:
+      result['command_execution'] = command_execution
+  return result
 
 
 async def stream_agent_response(
@@ -729,11 +839,16 @@ async def stream_agent_response(
                 'tool_input': block.input,
               }
             elif isinstance(block, ToolResultBlock):
-              result_event = _process_tool_result(block, ask_user_tool_ids)
-              yield result_event
               raw_tid = block.tool_use_id
               tool_name = _tool_name_by_id.get(raw_tid, '') if raw_tid else _last_tool_use_name
-              if not block.is_error and _is_command_execution_tool(tool_name):
+              result_event = _process_tool_result(
+                block,
+                ask_user_tool_ids,
+                tool_name=tool_name,
+                default_cluster_id=cluster_id,
+              )
+              yield result_event
+              if not block.is_error and _is_inline_image_tool(tool_name):
                 for img_path in _extract_image_paths(result_event.get('content', '')):
                   if img_path not in _emitted_inline_image_paths:
                     _emitted_inline_image_paths.add(img_path)
@@ -766,11 +881,16 @@ async def stream_agent_response(
           if isinstance(msg_content, list):
             for block in msg_content:
               if isinstance(block, ToolResultBlock):
-                result_event = _process_tool_result(block, ask_user_tool_ids)
-                yield result_event
                 raw_tid = block.tool_use_id
                 tool_name = _tool_name_by_id.get(raw_tid, '') if raw_tid else _last_tool_use_name
-                if not block.is_error and _is_command_execution_tool(tool_name):
+                result_event = _process_tool_result(
+                  block,
+                  ask_user_tool_ids,
+                  tool_name=tool_name,
+                  default_cluster_id=cluster_id,
+                )
+                yield result_event
+                if not block.is_error and _is_inline_image_tool(tool_name):
                   for img_path in _extract_image_paths(result_event.get('content', '')):
                     if img_path not in _emitted_inline_image_paths:
                       _emitted_inline_image_paths.add(img_path)

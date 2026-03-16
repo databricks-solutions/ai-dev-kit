@@ -216,6 +216,7 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
     async def run_agent():
         """Run the agent and accumulate events in the stream."""
         final_text = ''
+        inline_image_paths: list[str] = []
         new_session_id: Optional[str] = None
         error_message: Optional[str] = None
         received_deltas = False
@@ -305,6 +306,7 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
                     content = event.get('content', '')
                     is_error = event.get('is_error', False)
                     tool_use_id = event.get('tool_use_id', '')
+                    command_execution = event.get('command_execution')
                     logger.debug(f'tool_result: tid={tool_use_id!r} content_len={len(str(content))}')
 
                     # Detect cascade failure pattern - "Stream closed" errors indicate
@@ -314,12 +316,15 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
                         # Add context to the error
                         content = f'MCP Connection Lost: The tool execution was interrupted because the internal communication channel broke. This usually happens after a long-running operation. Please start a new conversation to reset the connection. Original error: {content}'
 
-                    stream.add_event({
+                    tool_result_event = {
                         'type': 'tool_result',
                         'tool_use_id': tool_use_id,
                         'content': content,
                         'is_error': is_error,
-                    })
+                    }
+                    if isinstance(command_execution, dict):
+                        tool_result_event['command_execution'] = command_execution
+                    stream.add_event(tool_result_event)
 
                 elif event_type == 'result':
                     new_session_id = event.get('session_id')
@@ -365,6 +370,8 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
                 elif event_type == 'inline_image':
                     path = event.get('path', '')
                     stream.add_event({'type': 'inline_image', 'path': path})
+                    if path and path not in inline_image_paths:
+                        inline_image_paths.append(path)
 
                 elif event_type == 'thinking_delta':
                     stream.add_event({
@@ -395,6 +402,13 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
                 error_message = f'Agent communication interrupted: {error_message}. This typically occurs when the Claude subprocess terminates unexpectedly. Check backend logs for details.'
 
             stream.add_event({'type': 'error', 'error': error_message})
+
+        # Append image markdown for any images not already referenced in the text
+        image_markdown = '\n\n'.join(
+            f'![]({p})' for p in inline_image_paths if f']({p})' not in final_text
+        )
+        if image_markdown:
+            final_text = f'{final_text}\n\n{image_markdown}' if final_text else image_markdown
 
         # Save messages to storage after stream completes (if not cancelled)
         if not stream.is_cancelled:

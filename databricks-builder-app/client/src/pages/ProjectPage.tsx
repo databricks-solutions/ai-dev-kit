@@ -23,8 +23,14 @@ import {
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import sqlLang from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import pythonLang from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import bashLang from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import jsonLang from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import javascriptLang from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import typescriptLang from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SkillsExplorer } from '@/components/SkillsExplorer';
@@ -83,6 +89,14 @@ const PENDING_CONVERSATION_KEY = '__pending__';
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20MB
 
+SyntaxHighlighter.registerLanguage('sql', sqlLang);
+SyntaxHighlighter.registerLanguage('python', pythonLang);
+SyntaxHighlighter.registerLanguage('bash', bashLang);
+SyntaxHighlighter.registerLanguage('shell', bashLang);
+SyntaxHighlighter.registerLanguage('json', jsonLang);
+SyntaxHighlighter.registerLanguage('javascript', javascriptLang);
+SyntaxHighlighter.registerLanguage('typescript', typescriptLang);
+
 async function readImageAsBase64(file: File): Promise<{ data: string; mediaType: AttachedImage['mediaType'] }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -134,14 +148,17 @@ function buildActivityItemsFromExecutionEvents(events: unknown[]): ActivityItem[
     }
 
     if (type === 'tool_use') {
-      items.push({
+      const toolUseItem: ActivityItem = {
         id: String(event.tool_id ?? `tool-${items.length}`),
         type: 'tool_use',
         content: '',
         toolName: String(event.tool_name ?? ''),
         toolInput: (event.tool_input as Record<string, unknown> | undefined) ?? {},
         timestamp: Date.now(),
-      });
+      };
+      const existingIdx = items.findIndex((item) => item.id === toolUseItem.id);
+      if (existingIdx >= 0) items[existingIdx] = toolUseItem;
+      else items.push(toolUseItem);
       continue;
     }
 
@@ -221,6 +238,13 @@ function applyThinkingEventToItems(
       timestamp: Date.now(),
     },
   ];
+}
+
+function upsertActivityItem(items: ActivityItem[], nextItem: ActivityItem): ActivityItem[] {
+  const idx = items.findIndex((item) => item.id === nextItem.id);
+  return idx >= 0
+    ? items.map((item, itemIdx) => (itemIdx === idx ? nextItem : item))
+    : [...items, nextItem];
 }
 
 // Minimal activity indicator - shows only current tool being executed (non-verbose)
@@ -360,6 +384,7 @@ function VerboseItem({ item }: { item: ActivityItem }) {
   if (item.type === 'tool_result') {
     const preview = item.content.slice(0, 120).replace(/\n/g, ' ');
     const hasMore = item.content.length > 120;
+    const imagePaths = extractDatabricksImagePaths(item.content);
     return (
       <div className={cn('border-b border-[var(--color-border)]/20 last:border-0', item.isError && 'bg-[var(--color-error)]/5')}>
         <button
@@ -379,8 +404,15 @@ function VerboseItem({ item }: { item: ActivityItem }) {
           )}
         </button>
         {expanded && (
-          <div className="px-3 pb-2 ml-5 font-mono text-[10px] text-[var(--color-text-muted)] whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto bg-[var(--color-bg-secondary)]/30 rounded mx-3 mb-1 p-1.5">
-            {item.content}
+          <div className="px-3 pb-2 ml-5 text-[10px] text-[var(--color-text-muted)] leading-relaxed max-h-48 overflow-y-auto bg-[var(--color-bg-secondary)]/30 rounded mx-3 mb-1 p-1.5">
+            <div className="font-mono whitespace-pre-wrap">{item.content}</div>
+            {imagePaths.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {imagePaths.map((path) => (
+                  <DatabricksImage key={path} path={path} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -454,6 +486,34 @@ function isDatabricksFilePath(src: string): boolean {
     src.startsWith('/dbfs/') ||
     src.startsWith('/Volumes/')
   );
+}
+
+function extractDatabricksImagePaths(text: string): string[] {
+  if (!text) return [];
+  const re = /(?:dbfs:\/|\/(?:Volumes|Workspace|Users|Shared|dbfs)\/)[^\s"'`<>]+?\.(?:png|jpe?g|gif|webp)/gi;
+  const matches = text.match(re) ?? [];
+  return Array.from(new Set(matches));
+}
+
+function normalizeImagePathsToMarkdown(text: string): string {
+  if (!text) return text;
+  const markdownImagePaths = new Set(
+    Array.from(text.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)).map((match) => match[1])
+  );
+  return text
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
+      if (trimmed.startsWith('![') || /^\[[^\]]*\]\([^)]+\)$/.test(trimmed)) return line;
+      const matches = extractDatabricksImagePaths(trimmed);
+      if (matches.length === 1 && matches[0] === trimmed) {
+        if (markdownImagePaths.has(trimmed)) return line;
+        return line.replace(trimmed, `![](${trimmed})`);
+      }
+      return line;
+    })
+    .join('\n');
 }
 
 // Renders a Databricks-hosted image via the workspace proxy.
@@ -943,6 +1003,22 @@ export default function ProjectPage() {
     }
   }, []);
 
+  const updateConversationActivityItems = useCallback((
+    conversationId: string | null | undefined,
+    updater: (items: ActivityItem[]) => ActivityItem[]
+  ): void => {
+    const progressKey = conversationId ?? PENDING_CONVERSATION_KEY;
+    const existing = inProgressByConversationRef.current[progressKey] ?? { streamingText: '' };
+    const nextItems = updater(existing.activityItems ?? []);
+    inProgressByConversationRef.current[progressKey] = {
+      ...existing,
+      activityItems: nextItems,
+    };
+    if (currentConversationIdRef.current === conversationId) {
+      setActivityItems(nextItems);
+    }
+  }, []);
+
   // Keep queued user messages visually below the response that is currently finishing.
   const insertAssistantBeforeQueued = useCallback(
     (prev: Message[], assistant: Message, conversationId: string | null): Message[] => {
@@ -1149,17 +1225,18 @@ export default function ProjectPage() {
                   setStreamingText(buildDisplayText());
                 }
               } else if (type === 'tool_use') {
-                setActivityItems((prev) => [
-                  ...prev,
-                  {
-                    id: event.tool_id as string,
-                    type: 'tool_use',
-                    content: '',
-                    toolName: event.tool_name as string,
-                    toolInput: event.tool_input as Record<string, unknown>,
-                    timestamp: Date.now(),
-                  },
-                ]);
+                const toolItem: ActivityItem = {
+                  id: event.tool_id as string,
+                  type: 'tool_use',
+                  content: '',
+                  toolName: event.tool_name as string,
+                  toolInput: event.tool_input as Record<string, unknown>,
+                  timestamp: Date.now(),
+                };
+                updateConversationActivityItems(
+                  currentConversation.id,
+                  (items) => upsertActivityItem(items, toolItem)
+                );
               } else if (type === 'tool_result') {
                 const resultItem = {
                   id: `result-${event.tool_use_id}`,
@@ -1168,11 +1245,10 @@ export default function ProjectPage() {
                   isError: event.is_error as boolean,
                   timestamp: Date.now(),
                 };
-                setActivityItems((prev) => {
-                  const idx = prev.findIndex((i) => i.id === resultItem.id);
-                  if (idx >= 0) { const u = [...prev]; u[idx] = resultItem; return u; }
-                  return [...prev, resultItem];
-                });
+                updateConversationActivityItems(
+                  currentConversation.id,
+                  (items) => upsertActivityItem(items, resultItem)
+                );
               } else if (type === 'inline_image') {
                 const path = event.path as string;
                 if (!streamingImagesRef.current.includes(path)) {
@@ -1603,35 +1679,21 @@ export default function ProjectPage() {
             // instead replace the delta-built item with the authoritative complete block.
             const thinking = (event.thinking as string) || '';
             if (thinking) {
-              const progressKey = conversationId ?? PENDING_CONVERSATION_KEY;
-              const existing = inProgressByConversationRef.current[progressKey] ?? { streamingText: '' };
-              const nextItems = applyThinkingEventToItems(
-                existing.activityItems ?? [],
-                type as 'thinking' | 'thinking_delta',
-                thinking
+              updateConversationActivityItems(
+                conversationId,
+                (items) => applyThinkingEventToItems(items, type as 'thinking' | 'thinking_delta', thinking)
               );
-              inProgressByConversationRef.current[progressKey] = {
-                ...existing,
-                activityItems: nextItems,
-              };
-              if (currentConversationIdRef.current === conversationId) {
-                setActivityItems(nextItems);
-              }
             }
           } else if (type === 'tool_use') {
-            if (currentConversationIdRef.current === conversationId) {
-              setActivityItems((prev) => [
-                ...prev,
-                {
-                  id: event.tool_id as string,
-                  type: 'tool_use',
-                  content: '',
-                  toolName: event.tool_name as string,
-                  toolInput: event.tool_input as Record<string, unknown>,
-                  timestamp: Date.now(),
-                },
-              ]);
-            }
+            const toolItem: ActivityItem = {
+              id: event.tool_id as string,
+              type: 'tool_use',
+              content: '',
+              toolName: event.tool_name as string,
+              toolInput: event.tool_input as Record<string, unknown>,
+              timestamp: Date.now(),
+            };
+            updateConversationActivityItems(conversationId, (items) => upsertActivityItem(items, toolItem));
           } else if (type === 'tool_result') {
             let content = event.content as string;
 
@@ -1656,13 +1718,7 @@ export default function ProjectPage() {
               isError: event.is_error as boolean,
               timestamp: Date.now(),
             };
-            if (currentConversationIdRef.current === conversationId) {
-              setActivityItems((prev) => {
-                const idx = prev.findIndex((i) => i.id === resultItem.id);
-                if (idx >= 0) { const u = [...prev]; u[idx] = resultItem; return u; }
-                return [...prev, resultItem];
-              });
-            }
+            updateConversationActivityItems(conversationId, (items) => upsertActivityItem(items, resultItem));
           } else if (type === 'error') {
             let errorMsg = event.error as string;
 
@@ -1725,7 +1781,7 @@ export default function ProjectPage() {
           const images = streamingImagesRef.current;
           streamingImagesRef.current = [];
           const imageMarkdown = images
-            .filter((p) => !fullText.includes(`](${p})`))
+            .filter((p) => !fullText.includes(`](${p})`) && !fullText.includes(`(${p})`))
             .map((p) => `![](${p})`)
             .join('\n\n');
           const content = [fullText, imageMarkdown].filter(Boolean).join('\n\n');
@@ -1818,7 +1874,7 @@ export default function ProjectPage() {
         void sendPreparedMessage(next, false, next.queuedMessageId);
       }
     }
-  }, [projectId, currentConversation?.id, selectedClusterId, defaultCatalog, defaultSchema, selectedWarehouseId, workspaceFolder, mlflowExperimentName, appendTraceHistoryForConversation, setConversationStreamingState]);
+  }, [projectId, currentConversation?.id, selectedClusterId, defaultCatalog, defaultSchema, selectedWarehouseId, workspaceFolder, mlflowExperimentName, appendTraceHistoryForConversation, setConversationStreamingState, updateConversationActivityItems]);
 
   // Start an execution in another conversation while keeping the current chat live.
   const sendBackgroundMessage = useCallback(async (
@@ -1926,38 +1982,27 @@ export default function ProjectPage() {
         if (type === 'thinking' || type === 'thinking_delta') {
           const thinking = (event.thinking as string) || '';
           if (!thinking) return;
-          const existing = inProgressByConversationRef.current[conversationId] ?? { streamingText: '' };
-          const nextItems = applyThinkingEventToItems(
-            existing.activityItems ?? [],
-            type as 'thinking' | 'thinking_delta',
-            thinking
+          updateConversationActivityItems(
+            conversationId,
+            (items) => applyThinkingEventToItems(items, type as 'thinking' | 'thinking_delta', thinking)
           );
-          inProgressByConversationRef.current[conversationId] = {
-            ...existing,
-            activityItems: nextItems,
+          return;
+        }
+
+        if (type === 'tool_use') {
+          const toolItem: ActivityItem = {
+            id: event.tool_id as string,
+            type: 'tool_use',
+            content: '',
+            toolName: event.tool_name as string,
+            toolInput: event.tool_input as Record<string, unknown>,
+            timestamp: Date.now(),
           };
-          if (currentConversationIdRef.current === conversationId) {
-            setActivityItems(nextItems);
-          }
+          updateConversationActivityItems(conversationId, (items) => upsertActivityItem(items, toolItem));
           return;
         }
 
-        if (type === 'tool_use' && currentConversationIdRef.current === conversationId) {
-          setActivityItems((prev) => [
-            ...prev,
-            {
-              id: event.tool_id as string,
-              type: 'tool_use',
-              content: '',
-              toolName: event.tool_name as string,
-              toolInput: event.tool_input as Record<string, unknown>,
-              timestamp: Date.now(),
-            },
-          ]);
-          return;
-        }
-
-        if (type === 'tool_result' && currentConversationIdRef.current === conversationId) {
+        if (type === 'tool_result') {
           const resultItem = {
             id: `result-${event.tool_use_id}`,
             type: 'tool_result' as const,
@@ -1965,11 +2010,7 @@ export default function ProjectPage() {
             isError: Boolean(event.is_error),
             timestamp: Date.now(),
           };
-          setActivityItems((prev) => {
-            const idx = prev.findIndex((i) => i.id === resultItem.id);
-            if (idx >= 0) { const u = [...prev]; u[idx] = resultItem; return u; }
-            return [...prev, resultItem];
-          });
+          updateConversationActivityItems(conversationId, (items) => upsertActivityItem(items, resultItem));
         }
       },
       onError: (error) => {
@@ -1999,7 +2040,7 @@ export default function ProjectPage() {
         fetchConversations(projectId).then(setConversations).catch(() => undefined);
       },
     });
-  }, [projectId, selectedClusterId, defaultCatalog, defaultSchema, selectedWarehouseId, workspaceFolder, mlflowExperimentName, appendTraceHistoryForConversation, setConversationStreamingState]);
+  }, [projectId, selectedClusterId, defaultCatalog, defaultSchema, selectedWarehouseId, workspaceFolder, mlflowExperimentName, appendTraceHistoryForConversation, setConversationStreamingState, updateConversationActivityItems]);
 
   // Send message — allows new messages while streaming by queueing them.
   const handleSendMessage = useCallback(async () => {
@@ -2541,7 +2582,7 @@ export default function ProjectPage() {
                         {message.role === 'assistant' ? (
                           <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
                             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                              {message.content}
+                              {normalizeImagePathsToMarkdown(message.content)}
                             </ReactMarkdown>
                           </div>
                         ) : (
@@ -2600,7 +2641,7 @@ export default function ProjectPage() {
                   <div className="max-w-[85%] rounded-lg px-3 py-2 shadow-sm bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50">
                     <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                        {improveReadabilityForStreaming(streamingText)}
+                        {normalizeImagePathsToMarkdown(improveReadabilityForStreaming(streamingText))}
                       </ReactMarkdown>
                     </div>
                   </div>
@@ -2634,7 +2675,7 @@ export default function ProjectPage() {
                       <div className="max-w-[85%] rounded-lg px-3 py-2 shadow-sm bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/50">
                         <div className="prose prose-xs max-w-none text-[var(--color-text-primary)] text-[13px] leading-relaxed">
                           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                            {improveReadabilityForStreaming(streamingText)}
+                            {normalizeImagePathsToMarkdown(improveReadabilityForStreaming(streamingText))}
                           </ReactMarkdown>
                         </div>
                       </div>
