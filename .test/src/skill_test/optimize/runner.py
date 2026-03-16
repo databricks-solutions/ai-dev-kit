@@ -90,8 +90,12 @@ def _compute_diff_summary(original: str, optimized: str) -> str:
     if not diff:
         return "No changes"
 
-    added = sum(1 for line in diff if line.startswith("+") and not line.startswith("+++"))
-    removed = sum(1 for line in diff if line.startswith("-") and not line.startswith("---"))
+    added = sum(
+        1 for line in diff if line.startswith("+") and not line.startswith("+++")
+    )
+    removed = sum(
+        1 for line in diff if line.startswith("-") and not line.startswith("---")
+    )
 
     parts = []
     if added:
@@ -101,7 +105,11 @@ def _compute_diff_summary(original: str, optimized: str) -> str:
 
     changed_sections = set()
     for line in diff:
-        content = line[1:].strip() if line.startswith(("+", "-")) and not line.startswith(("+++", "---")) else ""
+        content = (
+            line[1:].strip()
+            if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
+            else ""
+        )
         if content.startswith("#"):
             changed_sections.add(content)
 
@@ -113,7 +121,9 @@ def _compute_diff_summary(original: str, optimized: str) -> str:
     return summary
 
 
-def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating", max_parallel: int = 1):
+def _evaluate_on_tasks(
+    evaluator, candidate, tasks, label: str = "Evaluating", max_parallel: int = 1
+):
     """Run evaluator on tasks and return mean score, per-task scores, and per-task side_info.
 
     Args:
@@ -159,18 +169,27 @@ def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating", m
             try:
                 for future in concurrent.futures.as_completed(futures, timeout=900):
                     try:
-                        idx, task_id, inst, score, side_info = future.result(timeout=900)
+                        idx, task_id, inst, score, side_info = future.result(
+                            timeout=900
+                        )
                     except Exception as e:
                         idx = futures[future]
                         task_id = tasks[idx].get("id", f"task_{idx}")
                         inst = gepa_instances[idx]
-                        score, side_info = 0.0, {"_error": str(e), "scores": {"final": 0.0}}
+                        score, side_info = (
+                            0.0,
+                            {"_error": str(e), "scores": {"final": 0.0}},
+                        )
                         logger.warning("Evaluator failed for task %s: %s", task_id, e)
                     per_task[task_id] = score
                     side_info_by_id[task_id] = side_info
                     side_info_by_input[inst.get("input", f"task_{idx}")] = side_info
                     completed += 1
-                    print(f"\r  {label}: {completed}/{total} ({task_id})...", end="", flush=True)
+                    print(
+                        f"\r  {label}: {completed}/{total} ({task_id})...",
+                        end="",
+                        flush=True,
+                    )
             except TimeoutError:
                 # as_completed timeout — score remaining tasks as 0.0
                 for future, idx in futures.items():
@@ -179,12 +198,22 @@ def _evaluate_on_tasks(evaluator, candidate, tasks, label: str = "Evaluating", m
                         inst = gepa_instances[idx]
                         per_task.setdefault(task_id, 0.0)
                         side_info_by_id.setdefault(
-                            task_id, {"_error": "as_completed timeout (900s)", "scores": {"final": 0.0}}
+                            task_id,
+                            {
+                                "_error": "as_completed timeout (900s)",
+                                "scores": {"final": 0.0},
+                            },
                         )
-                        side_info_by_input.setdefault(inst.get("input", f"task_{idx}"), side_info_by_id[task_id])
+                        side_info_by_input.setdefault(
+                            inst.get("input", f"task_{idx}"), side_info_by_id[task_id]
+                        )
                         future.cancel()
-                        logger.warning("Task %s timed out in as_completed (900s)", task_id)
-                print(f"\n  WARNING: {label} timed out after 900s — scoring remaining tasks as 0.0")
+                        logger.warning(
+                            "Task %s timed out in as_completed (900s)", task_id
+                        )
+                print(
+                    f"\n  WARNING: {label} timed out after 900s — scoring remaining tasks as 0.0"
+                )
             pool.shutdown(wait=True)
         except Exception:
             pool.shutdown(wait=False)
@@ -383,7 +412,9 @@ def optimize_skill(
 
     # Auto-derive AI Gateway URL from ANTHROPIC_BASE_URL if not explicitly set
     if not os.environ.get("DATABRICKS_AI_GATEWAY_URL"):
-        _anthropic_base = _agent_env.get("ANTHROPIC_BASE_URL", "") or os.environ.get("ANTHROPIC_BASE_URL", "")
+        _anthropic_base = _agent_env.get("ANTHROPIC_BASE_URL", "") or os.environ.get(
+            "ANTHROPIC_BASE_URL", ""
+        )
         if "ai-gateway.cloud.databricks.com" in _anthropic_base:
             from urllib.parse import urlparse
 
@@ -418,7 +449,9 @@ def optimize_skill(
 
     # Build read-only tool context string (for skill optimization)
     if tool_components:
-        tool_context_str = "\n\n".join(tool_components[k] for k in sorted(tool_components))
+        tool_context_str = "\n\n".join(
+            tool_components[k] for k in sorted(tool_components)
+        )
 
     # 2. Build seed_candidate (multi-component dict)
     seed_candidate: dict[str, str] = {}
@@ -451,11 +484,17 @@ def optimize_skill(
     # 3. Load datasets
     if tools_only:
         # Cross-skill dataset for tool optimization
-        train = create_cross_skill_dataset(max_per_skill=max_per_skill or 5, tool_modules=tool_modules)
+        train = create_cross_skill_dataset(
+            max_per_skill=max_per_skill or 5, tool_modules=tool_modules
+        )
         val = None
         if train:
-            source_skills = {t.get("metadata", {}).get("source_skill", "?") for t in train}
-            print(f"Cross-skill dataset: {len(train)} tasks from {len(source_skills)} skill(s)")
+            source_skills = {
+                t.get("metadata", {}).get("source_skill", "?") for t in train
+            }
+            print(
+                f"Cross-skill dataset: {len(train)} tasks from {len(source_skills)} skill(s)"
+            )
         else:
             # Fall back to single-skill dataset
             try:
@@ -487,7 +526,9 @@ def optimize_skill(
         if records:
             assessment_summary = summarize_assessment_patterns(records)
             assessment_by_task = match_assessments_to_tasks(records, train)
-            print(f"MLflow assessments: {len(records)} traces, {len(assessment_by_task)} tasks matched")
+            print(
+                f"MLflow assessments: {len(records)} traces, {len(assessment_by_task)} tasks matched"
+            )
             if assessment_summary:
                 print(f"  {assessment_summary.splitlines()[0]}")
         else:
@@ -505,7 +546,9 @@ def optimize_skill(
     print("Evaluator: skillbench (judge-driven)")
 
     if not effective_gen_model:
-        raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
+        raise ValueError(
+            "SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var."
+        )
     evaluator = create_skillbench_evaluator(
         skill_name,
         gen_model=effective_gen_model,
@@ -535,6 +578,7 @@ def optimize_skill(
             if _manifest_path.exists():
                 try:
                     import yaml as _yaml
+
                     _manifest_data = _yaml.safe_load(_manifest_path.read_text()) or {}
                     _manifest_tool_modules = _manifest_data.get("tool_modules")
                 except Exception:
@@ -558,7 +602,9 @@ def optimize_skill(
             evaluator = agent_evaluator
             print("Mode: agent-eval-full (agent for ALL iterations)")
         else:
-            print("Mode: agent-eval hybrid (proxy for GEPA, agent for baseline + validation)")
+            print(
+                "Mode: agent-eval hybrid (proxy for GEPA, agent for baseline + validation)"
+            )
 
     # Determine parallelism for evaluator calls (agent evaluator only)
     _eval_max_parallel = parallel_agents if agent_eval_full else 1
@@ -628,7 +674,9 @@ def optimize_skill(
         for comp, tokens in original_token_counts.items():
             print(f"  {comp}: {tokens:,} tokens")
         if tool_context_str:
-            print(f"Tool context (read-only): {count_tokens(tool_context_str):,} tokens")
+            print(
+                f"Tool context (read-only): {count_tokens(tool_context_str):,} tokens"
+            )
         print(f"Train tasks: {len(train)}")
         print(f"Val tasks: {len(val) if val else 'None (single-task mode)'}")
         print(f"Generation model: {effective_gen_model}")
@@ -643,7 +691,10 @@ def optimize_skill(
 
         print(f"\nScoring baseline ({len(train)} tasks, ~5 LLM calls each)...")
         original_score, original_per_task, si_by_id, _ = _evaluate_on_tasks(
-            evaluator, seed_candidate, train, label="Baseline",
+            evaluator,
+            seed_candidate,
+            train,
+            label="Baseline",
             max_parallel=_eval_max_parallel,
         )
         print(f"Current score: {original_score:.3f}")
@@ -667,9 +718,14 @@ def optimize_skill(
         dry_run_agent_si = None
         if agent_evaluator:
             print(f"\nAgent baseline ({len(train)} tasks)...")
-            dry_run_agent_score, agent_per_task, dry_run_agent_si, _ = _evaluate_on_tasks(
-                agent_evaluator, seed_candidate, train, label="Agent baseline",
-                max_parallel=parallel_agents,
+            dry_run_agent_score, agent_per_task, dry_run_agent_si, _ = (
+                _evaluate_on_tasks(
+                    agent_evaluator,
+                    seed_candidate,
+                    train,
+                    label="Agent baseline",
+                    max_parallel=parallel_agents,
+                )
             )
             print(f"Agent baseline score: {dry_run_agent_score:.3f}")
             for task_id, score in agent_per_task.items():
@@ -704,13 +760,17 @@ def optimize_skill(
     _eval_desc = "2 agent runs + judges" if agent_eval_full else "~5 LLM calls"
     print(f"\nScoring {_eval_label.lower()} ({len(train)} tasks, {_eval_desc} each)...")
     original_score, original_per_task, si_by_id, si_by_input = _evaluate_on_tasks(
-        evaluator, seed_candidate, train, label=_eval_label,
+        evaluator,
+        seed_candidate,
+        train,
+        label=_eval_label,
         max_parallel=_eval_max_parallel,
     )
 
     # 6. Build background and objective
     if agent_eval_full:
         from .agent_evaluator import build_agent_eval_background
+
         background = build_agent_eval_background(
             skill_name,
             total_original_tokens,
@@ -763,9 +823,14 @@ def optimize_skill(
     # 6b. Agent baseline scoring (hybrid mode: before GEPA loop)
     if agent_evaluator and not agent_eval_full:
         print(f"\n  Agent baseline scoring ({len(train)} tasks)...")
-        agent_baseline_score, agent_baseline_per_task, agent_baseline_si, _ = _evaluate_on_tasks(
-            agent_evaluator, seed_candidate, train, label="Agent baseline",
-            max_parallel=parallel_agents,
+        agent_baseline_score, agent_baseline_per_task, agent_baseline_si, _ = (
+            _evaluate_on_tasks(
+                agent_evaluator,
+                seed_candidate,
+                train,
+                label="Agent baseline",
+                max_parallel=parallel_agents,
+            )
         )
         print(f"  Agent baseline score: {agent_baseline_score:.3f}")
         for task_id, score in agent_baseline_per_task.items():
@@ -790,7 +855,11 @@ def optimize_skill(
     )
 
     # estimate_pass_duration expects the model name string, not the callable
-    _est_reflection_lm = _reflection_model_name if _reflection_model_name else str(reflection_lm or DEFAULT_GEN_LM)
+    _est_reflection_lm = (
+        _reflection_model_name
+        if _reflection_model_name
+        else str(reflection_lm or DEFAULT_GEN_LM)
+    )
     est_secs = estimate_pass_duration(
         config.engine.max_metric_calls,
         _est_reflection_lm,
@@ -805,7 +874,9 @@ def optimize_skill(
             )
 
     for pass_num in range(1, max_passes + 1):
-        print(f"\n  --- Pass {pass_num}/{max_passes} (best score so far: {best_score:.4f}) ---")
+        print(
+            f"\n  --- Pass {pass_num}/{max_passes} (best score so far: {best_score:.4f}) ---"
+        )
 
         pass_config = copy.deepcopy(config)
 
@@ -826,12 +897,17 @@ def optimize_skill(
 
         candidate = result.best_candidate
         pass_score, _, pass_si_by_id, _ = _evaluate_on_tasks(
-            evaluator, candidate, train, label=f"Pass {pass_num}",
+            evaluator,
+            candidate,
+            train,
+            label=f"Pass {pass_num}",
             max_parallel=_eval_max_parallel,
         )
         improvement = pass_score - best_score
 
-        print(f"  Pass {pass_num} score: {pass_score:.4f} (delta: {'+' if improvement >= 0 else ''}{improvement:.4f})")
+        print(
+            f"  Pass {pass_num} score: {pass_score:.4f} (delta: {'+' if improvement >= 0 else ''}{improvement:.4f})"
+        )
 
         if pass_score > best_score + improvement_threshold:
             best = dict(candidate)
@@ -859,7 +935,10 @@ def optimize_skill(
     val_scores: dict[str, float] = {}
     if val:
         _, val_scores, _, _ = _evaluate_on_tasks(
-            evaluator, best, val, label="Validation",
+            evaluator,
+            best,
+            val,
+            label="Validation",
             max_parallel=_eval_max_parallel,
         )
 
@@ -877,9 +956,14 @@ def optimize_skill(
 
     if agent_evaluator and not agent_eval_full:
         print(f"\n  Agent validation scoring ({len(train)} tasks on best candidate)...")
-        agent_validation_score, agent_val_per_task, agent_validation_si, _ = _evaluate_on_tasks(
-            agent_evaluator, best, train, label="Agent validation",
-            max_parallel=parallel_agents,
+        agent_validation_score, agent_val_per_task, agent_validation_si, _ = (
+            _evaluate_on_tasks(
+                agent_evaluator,
+                best,
+                train,
+                label="Agent validation",
+                max_parallel=parallel_agents,
+            )
         )
         print(f"  Agent validation score: {agent_validation_score:.3f}")
         for task_id, score in agent_val_per_task.items():

@@ -101,7 +101,9 @@ class UCDatasetSource:
 
     def load(self) -> List[EvalRecord]:
         """Placeholder for UC integration."""
-        raise NotImplementedError("UC datasets deferred to Phase 2. Use YAMLDatasetSource for now.")
+        raise NotImplementedError(
+            "UC datasets deferred to Phase 2. Use YAMLDatasetSource for now."
+        )
 
 
 def get_dataset_source(skill_name: str, base_path: Path = None) -> DatasetSource:

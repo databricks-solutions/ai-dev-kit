@@ -123,7 +123,9 @@ def fetch_assessments(
             }
         )
 
-    logger.info("Fetched %d traces with assessments from %s", len(records), experiment_name)
+    logger.info(
+        "Fetched %d traces with assessments from %s", len(records), experiment_name
+    )
     return records
 
 
@@ -150,9 +152,17 @@ def summarize_assessment_patterns(records: list[dict[str, Any]]) -> str:
     for rec in records:
         for a in rec.get("assessments", []):
             total_assessments += 1
-            name = getattr(a, "name", "") if not isinstance(a, dict) else a.get("name", "")
-            value = getattr(a, "value", None) if not isinstance(a, dict) else a.get("value")
-            rationale = getattr(a, "rationale", "") if not isinstance(a, dict) else a.get("rationale", "")
+            name = (
+                getattr(a, "name", "") if not isinstance(a, dict) else a.get("name", "")
+            )
+            value = (
+                getattr(a, "value", None) if not isinstance(a, dict) else a.get("value")
+            )
+            rationale = (
+                getattr(a, "rationale", "")
+                if not isinstance(a, dict)
+                else a.get("rationale", "")
+            )
 
             # Classify as positive/negative
             if isinstance(value, (int, float)):

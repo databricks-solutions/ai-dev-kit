@@ -42,7 +42,9 @@ def display_candidate(candidate: GRPCandidate) -> None:
     if candidate.execution_details:
         for i, detail in enumerate(candidate.execution_details):
             status = "PASS" if detail["success"] else "FAIL"
-            print(f"\n  Block {i + 1} ({detail['language']}) at line {detail['line']}: {status}")
+            print(
+                f"\n  Block {i + 1} ({detail['language']}) at line {detail['line']}: {status}"
+            )
             if detail["error"]:
                 print(f"    Error: {detail['error']}")
 
@@ -81,20 +83,30 @@ def prompt_review_decision(candidate: GRPCandidate) -> ApprovalMetadata:
         choice = input(f"\nYour decision [{reviewer}]: ").strip().lower()
 
         if choice == "a":
-            return ApprovalMetadata(approved=True, reviewer=reviewer, reason=None, expectations_edited=False)
+            return ApprovalMetadata(
+                approved=True, reviewer=reviewer, reason=None, expectations_edited=False
+            )
         elif choice == "r":
             reason = input("Rejection reason: ").strip()
             return ApprovalMetadata(
-                approved=False, reviewer=reviewer, reason=reason or "Rejected without reason", expectations_edited=False
+                approved=False,
+                reviewer=reviewer,
+                reason=reason or "Rejected without reason",
+                expectations_edited=False,
             )
         elif choice == "s":
             return ApprovalMetadata(
-                approved=False, reviewer=reviewer, reason="Skipped - pending", expectations_edited=False
+                approved=False,
+                reviewer=reviewer,
+                reason="Skipped - pending",
+                expectations_edited=False,
             )
         elif choice == "e":
             # In a real implementation, this would open an editor
             print("Expectation editing not yet implemented - approving as-is")
-            return ApprovalMetadata(approved=True, reviewer=reviewer, reason=None, expectations_edited=True)
+            return ApprovalMetadata(
+                approved=True, reviewer=reviewer, reason=None, expectations_edited=True
+            )
         else:
             print("Invalid choice. Please enter 'a', 'r', 's', or 'e'.")
 
@@ -127,7 +139,10 @@ def review_candidates_file(candidates_path: Path) -> Dict[str, int]:
                 code_block=d["code_block"],
                 relevant_sections=[
                     SkillSection(
-                        file_path=s["file"], section_name=s["section"], excerpt=s["excerpt"], line_number=s["line"]
+                        file_path=s["file"],
+                        section_name=s["section"],
+                        excerpt=s["excerpt"],
+                        line_number=s["line"],
                     )
                     for s in d.get("relevant_sections", [])
                 ],
@@ -145,7 +160,9 @@ def review_candidates_file(candidates_path: Path) -> Dict[str, int]:
             execution_details=c_data.get("execution_details", []),
             diagnosis=diagnosis,
             status=c_data.get("status", "pending"),
-            created_at=datetime.fromisoformat(c_data["created_at"]) if c_data.get("created_at") else datetime.now(),
+            created_at=datetime.fromisoformat(c_data["created_at"])
+            if c_data.get("created_at")
+            else datetime.now(),
         )
 
         approval = prompt_review_decision(candidate)

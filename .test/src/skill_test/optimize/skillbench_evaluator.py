@@ -164,7 +164,9 @@ class SkillBenchEvaluator:
         assessment_by_task: dict[str, list] | None = None,
     ):
         if not gen_model:
-            raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
+            raise ValueError(
+                "SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var."
+            )
         self.gen_model = gen_model
         self._baseline_response_cache: dict[str, str] = {}
         # Per-judge baseline caches (WITHOUT responses are stable across iterations)
@@ -177,9 +179,13 @@ class SkillBenchEvaluator:
         self._assessment_by_task = assessment_by_task or {}
 
         # Create three focused judge instances
-        self._correctness_judge = create_correctness_judge(skill_guidelines, judge_model=judge_model)
+        self._correctness_judge = create_correctness_judge(
+            skill_guidelines, judge_model=judge_model
+        )
         self._completeness_judge = create_completeness_judge(judge_model=judge_model)
-        self._guideline_adherence_judge = create_guideline_adherence_judge(skill_guidelines, judge_model=judge_model)
+        self._guideline_adherence_judge = create_guideline_adherence_judge(
+            skill_guidelines, judge_model=judge_model
+        )
         self._regression_judge = create_regression_judge(judge_model=judge_model)
 
     def _generate_response(self, prompt: str, skill_context: str | None = None) -> str:
@@ -242,7 +248,9 @@ class SkillBenchEvaluator:
 
         # Decode expectations
         expectations: dict[str, Any] = {}
-        expectations_json = example.get("additional_context", {}).get("expectations", "")
+        expectations_json = example.get("additional_context", {}).get(
+            "expectations", ""
+        )
         if expectations_json:
             try:
                 expectations = json.loads(expectations_json)
@@ -268,16 +276,19 @@ class SkillBenchEvaluator:
         facts_str = "\n".join(f"- {f}" for f in facts) if facts else "None specified"
         patterns_str = (
             "\n".join(
-                f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}" for p in patterns
+                f"- {p}"
+                if isinstance(p, str)
+                else f"- {p.get('description', p.get('pattern', ''))}"
+                for p in patterns
             )
             if patterns
             else "None specified"
         )
-        guidelines_str = "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
-
-        expectations_text = (
-            f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
+        guidelines_str = (
+            "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
         )
+
+        expectations_text = f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
 
         # make_judge requires expectations as dict, inputs/outputs as Any.
         expectations_dict = {"criteria": expectations_text}
@@ -342,7 +353,9 @@ class SkillBenchEvaluator:
         effectiveness_delta = (correctness_delta + completeness_delta) / 2.0
 
         # Quality composite: mean of all three WITH scores
-        quality_composite = (correctness_with + completeness_with + guideline_adherence_score) / 3.0
+        quality_composite = (
+            correctness_with + completeness_with + guideline_adherence_score
+        ) / 3.0
 
         # Derive effectiveness verdict
         if effectiveness_delta > 0.05:
@@ -371,7 +384,10 @@ class SkillBenchEvaluator:
             reg_val = regression_fb.value
             if isinstance(reg_val, bool):
                 regression_penalty = 1.0 if reg_val else 0.0
-            elif isinstance(reg_val, str) and reg_val.strip().lower() in ("yes", "true"):
+            elif isinstance(reg_val, str) and reg_val.strip().lower() in (
+                "yes",
+                "true",
+            ):
                 regression_penalty = 1.0
 
         # Phase 4: Deterministic fact/pattern assertions (zero LLM cost)
@@ -380,8 +396,16 @@ class SkillBenchEvaluator:
 
         fact_results = [r for r in with_results if r.assertion_type == "fact"]
         pattern_results = [r for r in with_results if r.assertion_type == "pattern"]
-        fact_score = sum(1 for r in fact_results if r.passed) / len(fact_results) if fact_results else 1.0
-        pattern_score = sum(1 for r in pattern_results if r.passed) / len(pattern_results) if pattern_results else 1.0
+        fact_score = (
+            sum(1 for r in fact_results if r.passed) / len(fact_results)
+            if fact_results
+            else 1.0
+        )
+        pattern_score = (
+            sum(1 for r in pattern_results if r.passed) / len(pattern_results)
+            if pattern_results
+            else 1.0
+        )
 
         # GEPA-friendly diagnostics from assertion comparison
         failure_summary = summarize_failures(with_results, without_results)
@@ -473,9 +497,13 @@ class SkillBenchEvaluator:
 
         # Assertion-based structured feedback — GEPA renders each key as a markdown header
         side_info["Missing_Facts"] = [r.rationale for r in fact_results if not r.passed]
-        side_info["Missing_Patterns"] = [r.rationale for r in pattern_results if not r.passed]
+        side_info["Missing_Patterns"] = [
+            r.rationale for r in pattern_results if not r.passed
+        ]
         side_info["Passed_Facts"] = [r.rationale for r in fact_results if r.passed]
-        side_info["Passed_Patterns"] = [r.rationale for r in pattern_results if r.passed]
+        side_info["Passed_Patterns"] = [
+            r.rationale for r in pattern_results if r.passed
+        ]
 
         # skill_md_specific_info — shown ONLY when reflecting on the skill component
         if failure_summary.get("Error") or failure_summary.get("Regressions"):
@@ -520,15 +548,20 @@ class SkillBenchEvaluator:
         # Inject matched real-world assessments from MLflow traces
         if self._assessment_by_task:
             task_id = example.get("additional_context", {}).get("task_id", "")
-            matched = self._assessment_by_task.get(task_id) or self._assessment_by_task.get(_prompt_hash(prompt), [])
+            matched = self._assessment_by_task.get(
+                task_id
+            ) or self._assessment_by_task.get(_prompt_hash(prompt), [])
             if matched:
                 side_info["real_world_assessments"] = [
-                    {"name": a.name, "value": a.value, "rationale": a.rationale} for a in matched
+                    {"name": a.name, "value": a.value, "rationale": a.rationale}
+                    for a in matched
                 ]
 
         # Derive diagnostic labels from assertions + judge verdicts
         # Find weakest dimension for targeted GEPA feedback
-        weakest_dim = "correctness" if correctness_with <= completeness_with else "completeness"
+        weakest_dim = (
+            "correctness" if correctness_with <= completeness_with else "completeness"
+        )
         weakest_score = min(correctness_with, completeness_with)
 
         if failure_summary.get("Error"):
@@ -541,7 +574,11 @@ class SkillBenchEvaluator:
                 regressed_dims.append(f"correctness({correctness_delta:+.2f})")
             if completeness_delta < -0.05:
                 regressed_dims.append(f"completeness({completeness_delta:+.2f})")
-            dims_str = ", ".join(regressed_dims) if regressed_dims else f"overall({effectiveness_delta:+.2f})"
+            dims_str = (
+                ", ".join(regressed_dims)
+                if regressed_dims
+                else f"overall({effectiveness_delta:+.2f})"
+            )
             side_info["Error"] = (
                 f"REGRESSION: {dims_str}. "
                 f"correctness: {correctness_with:.2f} (was {correctness_without:.2f}), "
@@ -665,7 +702,9 @@ def build_skillbench_background(
     baseline_desc = ""
     if baseline_scores:
         mean_score = sum(baseline_scores.values()) / len(baseline_scores)
-        baseline_desc = f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
+        baseline_desc = (
+            f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
+        )
 
         if baseline_side_info:
             needs_skill_ids = []
@@ -683,7 +722,9 @@ def build_skillbench_background(
 
     components_desc = ""
     if component_names and any(c.startswith("tools_") for c in component_names):
-        tool_modules = [c.replace("tools_", "") for c in component_names if c.startswith("tools_")]
+        tool_modules = [
+            c.replace("tools_", "") for c in component_names if c.startswith("tools_")
+        ]
         components_desc = (
             f"\nAlso optimizing MCP tool descriptions for: {', '.join(tool_modules)}. "
             "Keep docstrings accurate and concise — every token counts toward the budget."

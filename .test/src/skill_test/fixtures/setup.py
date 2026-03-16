@@ -147,10 +147,17 @@ def setup_test_catalog(
             warehouse_id=warehouse_id,
             timeout=60,
         )
-        return FixtureResult(success=True, message=f"Catalog '{catalog}' ready", details={"catalog": catalog})
+        return FixtureResult(
+            success=True,
+            message=f"Catalog '{catalog}' ready",
+            details={"catalog": catalog},
+        )
     except Exception as e:
         return FixtureResult(
-            success=False, message=f"Failed to create catalog '{catalog}'", error=str(e), details={"catalog": catalog}
+            success=False,
+            message=f"Failed to create catalog '{catalog}'",
+            error=str(e),
+            details={"catalog": catalog},
         )
 
 
@@ -183,7 +190,9 @@ def setup_test_schema(
             timeout=60,
         )
         return FixtureResult(
-            success=True, message=f"Schema '{catalog}.{schema}' ready", details={"catalog": catalog, "schema": schema}
+            success=True,
+            message=f"Schema '{catalog}.{schema}' ready",
+            details={"catalog": catalog, "schema": schema},
         )
     except Exception as e:
         return FixtureResult(
@@ -229,14 +238,24 @@ def setup_test_volume(
         return FixtureResult(
             success=True,
             message=f"Volume '{volume_path}' ready",
-            details={"catalog": catalog, "schema": schema, "volume": volume, "volume_path": volume_path},
+            details={
+                "catalog": catalog,
+                "schema": schema,
+                "volume": volume,
+                "volume_path": volume_path,
+            },
         )
     except Exception as e:
         return FixtureResult(
             success=False,
             message=f"Failed to create volume '{volume_path}'",
             error=str(e),
-            details={"catalog": catalog, "schema": schema, "volume": volume, "volume_path": volume_path},
+            details={
+                "catalog": catalog,
+                "schema": schema,
+                "volume": volume,
+                "volume_path": volume_path,
+            },
         )
 
 
@@ -281,7 +300,12 @@ def upload_test_files(
             if result.get("success", False):
                 uploaded.append(workspace_path)
             else:
-                failed.append({"path": workspace_path, "error": result.get("error", "Unknown error")})
+                failed.append(
+                    {
+                        "path": workspace_path,
+                        "error": result.get("error", "Unknown error"),
+                    }
+                )
         except Exception as e:
             failed.append({"path": workspace_path, "error": str(e)})
 
@@ -329,7 +353,9 @@ def create_test_table(
             timeout=120,
         )
         return FixtureResult(
-            success=True, message=f"Table '{full_name}' created", details={"table": full_name, "ddl": table.ddl}
+            success=True,
+            message=f"Table '{full_name}' created",
+            details={"table": full_name, "ddl": table.ddl},
         )
     except Exception as e:
         return FixtureResult(
@@ -370,7 +396,9 @@ def setup_fixtures(
         warehouse_id = mcp_get_best_warehouse()
 
     # 1. Create catalog
-    catalog_result = setup_test_catalog(config.catalog, mcp_execute_sql, warehouse_id=warehouse_id)
+    catalog_result = setup_test_catalog(
+        config.catalog, mcp_execute_sql, warehouse_id=warehouse_id
+    )
     results.append(("catalog", catalog_result))
     if not catalog_result.success:
         return FixtureResult(
@@ -381,7 +409,9 @@ def setup_fixtures(
         )
 
     # 2. Create schema
-    schema_result = setup_test_schema(config.catalog, config.schema, mcp_execute_sql, warehouse_id=warehouse_id)
+    schema_result = setup_test_schema(
+        config.catalog, config.schema, mcp_execute_sql, warehouse_id=warehouse_id
+    )
     results.append(("schema", schema_result))
     if not schema_result.success:
         return FixtureResult(
@@ -394,7 +424,11 @@ def setup_fixtures(
     # 3. Create volume (if files specified)
     if config.files:
         volume_result = setup_test_volume(
-            config.catalog, config.schema, config.volume, mcp_execute_sql, warehouse_id=warehouse_id
+            config.catalog,
+            config.schema,
+            config.volume,
+            mcp_execute_sql,
+            warehouse_id=warehouse_id,
         )
         results.append(("volume", volume_result))
         if not volume_result.success:
@@ -407,7 +441,12 @@ def setup_fixtures(
 
         # 4. Upload files
         upload_result = upload_test_files(
-            config.files, config.catalog, config.schema, config.volume, mcp_upload_file, base_path
+            config.files,
+            config.catalog,
+            config.schema,
+            config.volume,
+            mcp_upload_file,
+            base_path,
         )
         results.append(("files", upload_result))
         if not upload_result.success:
@@ -421,7 +460,11 @@ def setup_fixtures(
     # 5. Create tables
     for table in config.tables:
         table_result = create_test_table(
-            table, config.catalog, config.schema, mcp_execute_sql, warehouse_id=warehouse_id
+            table,
+            config.catalog,
+            config.schema,
+            mcp_execute_sql,
+            warehouse_id=warehouse_id,
         )
         results.append((f"table:{table.name}", table_result))
         if not table_result.success:
@@ -486,7 +529,9 @@ def teardown_fixtures(
             )
             results.append((f"drop_table:{table.name}", {"success": True}))
         except Exception as e:
-            results.append((f"drop_table:{table.name}", {"success": False, "error": str(e)}))
+            results.append(
+                (f"drop_table:{table.name}", {"success": False, "error": str(e)})
+            )
 
     # Drop volume
     if config.files:
@@ -530,7 +575,9 @@ def teardown_fixtures(
 
     return FixtureResult(
         success=success,
-        message="Teardown completed" if success else f"Teardown completed with {len(failures)} failures",
+        message="Teardown completed"
+        if success
+        else f"Teardown completed with {len(failures)} failures",
         error=str(failures) if failures else None,
         details={"results": results},
     )

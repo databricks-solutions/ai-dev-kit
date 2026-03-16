@@ -35,7 +35,9 @@ def setup_mlflow(config: SkillTestConfig) -> None:
     mlflow.set_experiment(config.mlflow.experiment_name)
 
 
-def load_scorer_config(skill_name: str, base_path: Optional[Path] = None) -> Dict[str, Any]:
+def load_scorer_config(
+    skill_name: str, base_path: Optional[Path] = None
+) -> Dict[str, Any]:
     """Load scorer configuration from skill manifest.
 
     Args:
@@ -61,7 +63,8 @@ def load_scorer_config(skill_name: str, base_path: Optional[Path] = None) -> Dic
             # Legacy format: convert to new format
             eval_scorers = manifest["evaluation"]["scorers"]
             return {
-                "enabled": eval_scorers.get("tier1", []) + eval_scorers.get("tier2", []),
+                "enabled": eval_scorers.get("tier1", [])
+                + eval_scorers.get("tier2", []),
                 "llm_scorers": eval_scorers.get("tier3", []),
             }
 
@@ -121,13 +124,17 @@ def build_scorers(scorer_config: Dict[str, Any]) -> List:
                     "Response must use modern APIs (not deprecated ones)",
                 ],
             )
-            scorers.append(create_guidelines_scorer(default_guidelines, "skill_quality"))
+            scorers.append(
+                create_guidelines_scorer(default_guidelines, "skill_quality")
+            )
         elif name.startswith("Guidelines:"):
             # Custom named guidelines: "Guidelines:my_name"
             custom_name = name.split(":", 1)[1]
             default_guidelines = scorer_config.get("default_guidelines", [])
             if default_guidelines:
-                scorers.append(create_guidelines_scorer(default_guidelines, custom_name))
+                scorers.append(
+                    create_guidelines_scorer(default_guidelines, custom_name)
+                )
 
     return scorers
 
@@ -183,7 +190,11 @@ def evaluate_skill(
 
     # Filter if requested
     if filter_category:
-        records = [r for r in records if r.metadata and r.metadata.get("category") == filter_category]
+        records = [
+            r
+            for r in records
+            if r.metadata and r.metadata.get("category") == filter_category
+        ]
 
     # Convert to MLflow format (Pattern 2: pre-computed outputs)
     eval_data = [r.to_eval_dict() for r in records]
@@ -220,7 +231,9 @@ def evaluate_skill(
         }
 
 
-def evaluate_routing(config: Optional[SkillTestConfig] = None, run_name: Optional[str] = None) -> Dict[str, Any]:
+def evaluate_routing(
+    config: Optional[SkillTestConfig] = None, run_name: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Evaluate skill routing accuracy.
 
@@ -237,7 +250,11 @@ def evaluate_routing(config: Optional[SkillTestConfig] = None, run_name: Optiona
 
     # Convert to MLflow format
     eval_data = [
-        {"inputs": {"prompt": r.inputs.get("prompt", "")}, "expectations": r.expectations or {}} for r in records
+        {
+            "inputs": {"prompt": r.inputs.get("prompt", "")},
+            "expectations": r.expectations or {},
+        }
+        for r in records
     ]
 
     # Routing-specific scorers

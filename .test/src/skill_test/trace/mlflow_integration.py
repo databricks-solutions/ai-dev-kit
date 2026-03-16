@@ -86,13 +86,17 @@ def get_trace_from_mlflow(
     artifact_path = None
     for name in artifact_names:
         try:
-            artifact_path = mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path=name)
+            artifact_path = mlflow.artifacts.download_artifacts(
+                run_id=run_id, artifact_path=name
+            )
             break
         except Exception:
             continue
 
     if artifact_path is None:
-        raise FileNotFoundError(f"No trace artifact found in run '{run_id}'. Looked for: {artifact_names}")
+        raise FileNotFoundError(
+            f"No trace artifact found in run '{run_id}'. Looked for: {artifact_names}"
+        )
 
     return parse_and_compute_metrics(artifact_path)
 
@@ -234,7 +238,9 @@ def list_trace_runs(
             order_by=["start_time DESC"],
         )
     except Exception as e:
-        raise ValueError(f"Failed to search runs in experiment '{experiment_name}': {e}") from e
+        raise ValueError(
+            f"Failed to search runs in experiment '{experiment_name}': {e}"
+        ) from e
 
     if runs.empty:
         return []
@@ -340,7 +346,9 @@ def _parse_mlflow_trace(trace: Any) -> TraceMetrics:
         metrics.start_time = datetime.fromtimestamp(trace_info.timestamp_ms / 1000)
         # Compute end_time from start_time + execution_time for duration_seconds property
         if trace_info.execution_time_ms:
-            metrics.end_time = metrics.start_time + timedelta(milliseconds=trace_info.execution_time_ms)
+            metrics.end_time = metrics.start_time + timedelta(
+                milliseconds=trace_info.execution_time_ms
+            )
 
     # Extract token usage from trace attributes if available
     if hasattr(trace_info, "request_metadata") and trace_info.request_metadata:
@@ -398,7 +406,8 @@ def get_trace_metrics(
     """
     # Check if source looks like a file path
     if isinstance(source, Path) or (
-        isinstance(source, str) and (source.endswith(".jsonl") or source.startswith(("/", "~", ".")))
+        isinstance(source, str)
+        and (source.endswith(".jsonl") or source.startswith(("/", "~", ".")))
     ):
         path = Path(source).expanduser()
         if not path.exists():

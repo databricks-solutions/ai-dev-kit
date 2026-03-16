@@ -266,7 +266,9 @@ class AgentEvaluator:
 
         # Decode expectations
         expectations: dict[str, Any] = {}
-        expectations_json = example.get("additional_context", {}).get("expectations", "")
+        expectations_json = example.get("additional_context", {}).get(
+            "expectations", ""
+        )
         if expectations_json:
             try:
                 expectations = json.loads(expectations_json)
@@ -287,7 +289,9 @@ class AgentEvaluator:
 
         # Phase 2: Run agent WITHOUT skill (cached)
         logger.info("Running agent WITHOUT skill (cached if available)...")
-        without_response, without_trace, without_mlflow_trace = self._get_baseline(prompt)
+        without_response, without_trace, without_mlflow_trace = self._get_baseline(
+            prompt
+        )
 
         with_response = with_result.response_text
         with_trace = with_result.trace_metrics.to_dict()
@@ -300,16 +304,18 @@ class AgentEvaluator:
         facts_str = "\n".join(f"- {f}" for f in facts) if facts else "None specified"
         patterns_str = (
             "\n".join(
-                f"- {p}" if isinstance(p, str) else f"- {p.get('description', p.get('pattern', ''))}"
+                f"- {p}"
+                if isinstance(p, str)
+                else f"- {p.get('description', p.get('pattern', ''))}"
                 for p in patterns
             )
             if patterns
             else "None specified"
         )
-        guidelines_str = "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
-        expectations_text = (
-            f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
+        guidelines_str = (
+            "\n".join(f"- {g}" for g in guidelines) if guidelines else "None specified"
         )
+        expectations_text = f"Expected facts:\n{facts_str}\n\nExpected patterns:\n{patterns_str}\n\nGuidelines:\n{guidelines_str}"
         expectations_dict = {"criteria": expectations_text}
 
         baseline_key = _prompt_hash(prompt)
@@ -321,8 +327,12 @@ class AgentEvaluator:
         # Circuit breaker: after first failure, skip trace judges entirely
         # to avoid wasting API calls on a model that can't handle them.
         def _judge_with_fallback(
-            trace_judge, field_judge, *,
-            mlflow_trace, response_text, judge_name,
+            trace_judge,
+            field_judge,
+            *,
+            mlflow_trace,
+            response_text,
+            judge_name,
         ) -> JudgeFeedback:
             """Try trace-based judge, fall back to field-based on failure."""
             with self._cache_lock:
@@ -357,16 +367,20 @@ class AgentEvaluator:
 
         # Correctness: WITH + WITHOUT (WITHOUT cached)
         correctness_with_fb = _judge_with_fallback(
-            self._trace_correctness_judge, self._field_correctness_judge,
+            self._trace_correctness_judge,
+            self._field_correctness_judge,
             mlflow_trace=with_result.mlflow_trace,
             response_text=with_response,
             judge_name="correctness_with",
         )
         with self._cache_lock:
-            need_correctness_baseline = baseline_key not in self._baseline_correctness_cache
+            need_correctness_baseline = (
+                baseline_key not in self._baseline_correctness_cache
+            )
         if need_correctness_baseline:
             fb = _judge_with_fallback(
-                self._trace_correctness_judge, self._field_correctness_judge,
+                self._trace_correctness_judge,
+                self._field_correctness_judge,
                 mlflow_trace=without_mlflow_trace,
                 response_text=without_response,
                 judge_name="correctness_without",
@@ -379,16 +393,20 @@ class AgentEvaluator:
 
         # Completeness: WITH + WITHOUT (WITHOUT cached)
         completeness_with_fb = _judge_with_fallback(
-            self._trace_completeness_judge, self._field_completeness_judge,
+            self._trace_completeness_judge,
+            self._field_completeness_judge,
             mlflow_trace=with_result.mlflow_trace,
             response_text=with_response,
             judge_name="completeness_with",
         )
         with self._cache_lock:
-            need_completeness_baseline = baseline_key not in self._baseline_completeness_cache
+            need_completeness_baseline = (
+                baseline_key not in self._baseline_completeness_cache
+            )
         if need_completeness_baseline:
             fb = _judge_with_fallback(
-                self._trace_completeness_judge, self._field_completeness_judge,
+                self._trace_completeness_judge,
+                self._field_completeness_judge,
                 mlflow_trace=without_mlflow_trace,
                 response_text=without_response,
                 judge_name="completeness_without",
@@ -401,7 +419,8 @@ class AgentEvaluator:
 
         # Guideline adherence: WITH only
         guideline_adherence_fb = _judge_with_fallback(
-            self._trace_guideline_judge, self._field_guideline_judge,
+            self._trace_guideline_judge,
+            self._field_guideline_judge,
             mlflow_trace=with_result.mlflow_trace,
             response_text=with_response,
             judge_name="guideline_adherence",
@@ -444,7 +463,10 @@ class AgentEvaluator:
             reg_val = regression_fb.value
             if isinstance(reg_val, bool):
                 regression_penalty = 1.0 if reg_val else 0.0
-            elif isinstance(reg_val, str) and reg_val.strip().lower() in ("yes", "true"):
+            elif isinstance(reg_val, str) and reg_val.strip().lower() in (
+                "yes",
+                "true",
+            ):
                 regression_penalty = 1.0
 
         # Phase 4: Deterministic fact/pattern assertions (zero LLM cost — static spine)
@@ -452,14 +474,28 @@ class AgentEvaluator:
         without_assertion_results = run_all_assertions(without_response, expectations)
 
         fact_results = [r for r in with_assertion_results if r.assertion_type == "fact"]
-        pattern_results = [r for r in with_assertion_results if r.assertion_type == "pattern"]
-        fact_score = sum(1 for r in fact_results if r.passed) / len(fact_results) if fact_results else 1.0
-        pattern_score = sum(1 for r in pattern_results if r.passed) / len(pattern_results) if pattern_results else 1.0
+        pattern_results = [
+            r for r in with_assertion_results if r.assertion_type == "pattern"
+        ]
+        fact_score = (
+            sum(1 for r in fact_results if r.passed) / len(fact_results)
+            if fact_results
+            else 1.0
+        )
+        pattern_score = (
+            sum(1 for r in pattern_results if r.passed) / len(pattern_results)
+            if pattern_results
+            else 1.0
+        )
 
-        failure_summary = summarize_failures(with_assertion_results, without_assertion_results)
+        failure_summary = summarize_failures(
+            with_assertion_results, without_assertion_results
+        )
 
         # Phase 5: Deterministic trace scorers (static spine)
-        behavioral_score, behavioral_details = _run_behavioral_scorers(with_trace, trace_expectations)
+        behavioral_score, behavioral_details = _run_behavioral_scorers(
+            with_trace, trace_expectations
+        )
         execution_success = _compute_execution_success(with_result)
 
         # Phase 6: Token efficiency
@@ -478,19 +514,25 @@ class AgentEvaluator:
             token_efficiency = 1.0
 
         # Composite score: trace judges subsume tool_correctness + behavioral
-        quality_composite = (correctness_with + completeness_with + guideline_adherence_score) / 3.0
+        quality_composite = (
+            correctness_with + completeness_with + guideline_adherence_score
+        ) / 3.0
         assertion_coverage = 0.5 * fact_score + 0.5 * pattern_score
 
-        final_score = max(0.0, min(1.0,
-            0.25 * effectiveness_delta
-            + 0.20 * correctness_with
-            + 0.15 * completeness_with
-            + 0.15 * guideline_adherence_score
-            + 0.10 * assertion_coverage
-            + 0.05 * execution_success
-            + 0.05 * token_efficiency
-            - 0.05 * regression_penalty
-        ))
+        final_score = max(
+            0.0,
+            min(
+                1.0,
+                0.25 * effectiveness_delta
+                + 0.20 * correctness_with
+                + 0.15 * completeness_with
+                + 0.15 * guideline_adherence_score
+                + 0.10 * assertion_coverage
+                + 0.05 * execution_success
+                + 0.05 * token_efficiency
+                - 0.05 * regression_penalty,
+            ),
+        )
 
         # Build rich side_info for GEPA reflection
         side_info: dict[str, Any] = {}
@@ -541,9 +583,13 @@ class AgentEvaluator:
 
         # Assertion-based structured feedback
         side_info["Missing_Facts"] = [r.rationale for r in fact_results if not r.passed]
-        side_info["Missing_Patterns"] = [r.rationale for r in pattern_results if not r.passed]
+        side_info["Missing_Patterns"] = [
+            r.rationale for r in pattern_results if not r.passed
+        ]
         side_info["Passed_Facts"] = [r.rationale for r in fact_results if r.passed]
-        side_info["Passed_Patterns"] = [r.rationale for r in pattern_results if r.passed]
+        side_info["Passed_Patterns"] = [
+            r.rationale for r in pattern_results if r.passed
+        ]
 
         if failure_summary.get("Error") or failure_summary.get("Regressions"):
             side_info["skill_md_specific_info"] = {
@@ -596,7 +642,9 @@ class AgentEvaluator:
             side_info["token_counts"]["budget"] = self._token_budget
 
         # Diagnostic labels
-        weakest_dim = "correctness" if correctness_with <= completeness_with else "completeness"
+        weakest_dim = (
+            "correctness" if correctness_with <= completeness_with else "completeness"
+        )
         weakest_score = min(correctness_with, completeness_with)
 
         if failure_summary.get("Error"):
@@ -607,7 +655,11 @@ class AgentEvaluator:
                 regressed_dims.append(f"correctness({correctness_delta:+.2f})")
             if completeness_delta < -0.05:
                 regressed_dims.append(f"completeness({completeness_delta:+.2f})")
-            dims_str = ", ".join(regressed_dims) if regressed_dims else f"overall({effectiveness_delta:+.2f})"
+            dims_str = (
+                ", ".join(regressed_dims)
+                if regressed_dims
+                else f"overall({effectiveness_delta:+.2f})"
+            )
             side_info["Error"] = (
                 f"REGRESSION: {dims_str}. "
                 f"correctness: {correctness_with:.2f} (was {correctness_without:.2f}), "
@@ -649,7 +701,9 @@ def create_agent_evaluator(
 
     skill_guidelines = _collect_skill_guidelines(skill_name)
     if skill_guidelines:
-        logger.info("Loaded %d domain guidelines for agent trace judges", len(skill_guidelines))
+        logger.info(
+            "Loaded %d domain guidelines for agent trace judges", len(skill_guidelines)
+        )
 
     return AgentEvaluator(
         original_token_counts=original_token_counts,
@@ -680,7 +734,9 @@ def build_agent_eval_background(
     baseline_desc = ""
     if baseline_scores:
         mean_score = sum(baseline_scores.values()) / len(baseline_scores)
-        baseline_desc = f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
+        baseline_desc = (
+            f"\nBASELINE: mean {mean_score:.3f} across {len(baseline_scores)} tasks."
+        )
 
         if baseline_side_info:
             needs_skill_ids = []
@@ -695,7 +751,9 @@ def build_agent_eval_background(
                 behavioral = info.get("behavioral_scores", {})
                 for scorer_name, result in behavioral.items():
                     if result.get("value") == "no":
-                        tool_issues.append(f"{tid}: {scorer_name} - {result.get('rationale', '')[:80]}")
+                        tool_issues.append(
+                            f"{tid}: {scorer_name} - {result.get('rationale', '')[:80]}"
+                        )
 
             if needs_skill_ids:
                 baseline_desc += f"\n  NEEDS_SKILL ({len(needs_skill_ids)} tasks): {', '.join(needs_skill_ids[:5])}"

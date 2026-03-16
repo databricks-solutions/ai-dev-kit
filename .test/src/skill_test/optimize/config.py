@@ -6,11 +6,20 @@ Uses the optimize_anything API with GEPAConfig/EngineConfig/ReflectionConfig.
 import os
 import warnings
 
-from gepa.optimize_anything import GEPAConfig, EngineConfig, ReflectionConfig, RefinerConfig
+from gepa.optimize_anything import (
+    GEPAConfig,
+    EngineConfig,
+    ReflectionConfig,
+    RefinerConfig,
+)
 
-DEFAULT_REFLECTION_LM = os.environ.get("GEPA_REFLECTION_LM", "databricks/databricks-claude-opus-4-6")
+DEFAULT_REFLECTION_LM = os.environ.get(
+    "GEPA_REFLECTION_LM", "databricks/databricks-claude-opus-4-6"
+)
 
-DEFAULT_GEN_LM = os.environ.get("GEPA_GEN_LM", "databricks/databricks-claude-sonnet-4-6")
+DEFAULT_GEN_LM = os.environ.get(
+    "GEPA_GEN_LM", "databricks/databricks-claude-sonnet-4-6"
+)
 
 DEFAULT_TOKEN_BUDGET: int | None = int(os.environ.get("GEPA_TOKEN_BUDGET", "0")) or None
 

@@ -20,7 +20,9 @@ class AssertionResult:
     assertion_type: str  # "pattern" | "fact"
 
 
-def _run_pattern_assertions(response: str, expected_patterns: list) -> list[AssertionResult]:
+def _run_pattern_assertions(
+    response: str, expected_patterns: list
+) -> list[AssertionResult]:
     """Run pattern assertions against a response.
 
     Each pattern spec can be a plain regex string or a dict with
@@ -59,7 +61,9 @@ def _run_pattern_assertions(response: str, expected_patterns: list) -> list[Asse
     return results
 
 
-def _run_fact_assertions(response: str, expected_facts: list[str]) -> list[AssertionResult]:
+def _run_fact_assertions(
+    response: str, expected_facts: list[str]
+) -> list[AssertionResult]:
     """Run fact assertions against a response.
 
     Exact substring match (case-insensitive). No fuzzy keyword overlap.
@@ -79,7 +83,9 @@ def _run_fact_assertions(response: str, expected_facts: list[str]) -> list[Asser
     return results
 
 
-def run_all_assertions(response: str, expectations: dict[str, Any]) -> list[AssertionResult]:
+def run_all_assertions(
+    response: str, expectations: dict[str, Any]
+) -> list[AssertionResult]:
     """Run all pattern + fact assertions, return binary pass/fail per assertion.
 
     Args:

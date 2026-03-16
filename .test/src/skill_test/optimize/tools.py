@@ -16,7 +16,12 @@ from typing import Any
 # Separator used between tools within a module's GEPA component text
 TOOL_SEPARATOR = "\n\n### TOOL: "
 
-MCP_TOOLS_DIR = Path(__file__).resolve().parents[5] / "databricks-mcp-server" / "databricks_mcp_server" / "tools"
+MCP_TOOLS_DIR = (
+    Path(__file__).resolve().parents[5]
+    / "databricks-mcp-server"
+    / "databricks_mcp_server"
+    / "tools"
+)
 
 
 @dataclass
@@ -132,7 +137,9 @@ def tools_to_gepa_components(
         all_parts = []
         for module_name, tools in sorted(tool_map.items()):
             for td in tools:
-                all_parts.append(f"### TOOL: {td.name} (module: {module_name})\n{td.docstring}")
+                all_parts.append(
+                    f"### TOOL: {td.name} (module: {module_name})\n{td.docstring}"
+                )
         return {"tool_descriptions": "\n\n".join(all_parts)}
 
 
@@ -155,7 +162,11 @@ def parse_gepa_component(component_text: str) -> dict[str, str]:
         lines = part.split("\n", 1)
         name_line = lines[0].strip()
         # Remove module annotation if present: "execute_sql (module: sql)"
-        name = re.match(r"(\w+)", name_line).group(1) if re.match(r"(\w+)", name_line) else name_line
+        name = (
+            re.match(r"(\w+)", name_line).group(1)
+            if re.match(r"(\w+)", name_line)
+            else name_line
+        )
         docstring = lines[1].strip() if len(lines) > 1 else ""
         tools[name] = docstring
     return tools
@@ -182,7 +193,9 @@ def write_tool_descriptions(
     for _module_name, tools in tool_map.items():
         for td in tools:
             if td.name in optimized:
-                updates_by_file.setdefault(td.source_path, []).append((td, optimized[td.name]))
+                updates_by_file.setdefault(td.source_path, []).append(
+                    (td, optimized[td.name])
+                )
 
     modified_files = []
     for file_path, updates in updates_by_file.items():
@@ -196,7 +209,11 @@ def write_tool_descriptions(
         for td, new_docstring in updates_sorted:
             # Find the function node
             for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef) and node.name == td.name and node.lineno == td.lineno:
+                if (
+                    isinstance(node, ast.FunctionDef)
+                    and node.name == td.name
+                    and node.lineno == td.lineno
+                ):
                     # Find the docstring node (first Expr with a Constant string)
                     if (
                         node.body
@@ -232,7 +249,9 @@ def write_tool_descriptions(
         try:
             ast.parse(new_source)
         except SyntaxError as e:
-            print(f"WARNING: Optimized source for {file_path.name} has syntax error: {e}")
+            print(
+                f"WARNING: Optimized source for {file_path.name} has syntax error: {e}"
+            )
             print("Skipping this file.")
             continue
 
@@ -249,7 +268,9 @@ def list_tool_modules(tools_dir: Path | None = None) -> list[str]:
     return sorted(f.stem for f in tools_dir.glob("*.py") if f.stem != "__init__")
 
 
-def get_tool_stats(tools_dir: Path | None = None, modules: list[str] | None = None) -> dict[str, Any]:
+def get_tool_stats(
+    tools_dir: Path | None = None, modules: list[str] | None = None
+) -> dict[str, Any]:
     """Get statistics about available MCP tools."""
     tool_map = extract_tool_descriptions(tools_dir=tools_dir, modules=modules)
     total_tools = sum(len(tools) for tools in tool_map.values())

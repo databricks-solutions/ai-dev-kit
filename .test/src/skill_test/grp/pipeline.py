@@ -71,7 +71,10 @@ def generate_candidate(skill_name: str, prompt: str, response: str) -> GRPCandid
     Executes code blocks to determine execution_success.
     """
     candidate = GRPCandidate(
-        id=f"grp_{datetime.now().strftime('%Y%m%d_%H%M%S')}", skill_name=skill_name, prompt=prompt, response=response
+        id=f"grp_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        skill_name=skill_name,
+        prompt=prompt,
+        response=response,
     )
 
     # Execute code blocks
@@ -95,7 +98,9 @@ def generate_candidate(skill_name: str, prompt: str, response: str) -> GRPCandid
                     break
 
             candidate.diagnosis = analyze_failure(
-                error=first_failure["error"] or "Unknown error", code_block=failed_code, skill_name=skill_name
+                error=first_failure["error"] or "Unknown error",
+                code_block=failed_code,
+                skill_name=skill_name,
             )
 
     return candidate
@@ -119,7 +124,12 @@ def save_candidates(candidates: List[GRPCandidate], output_path: Path) -> None:
                     "error": c.diagnosis.error,
                     "code_block": c.diagnosis.code_block,
                     "relevant_sections": [
-                        {"file": s.file_path, "section": s.section_name, "excerpt": s.excerpt, "line": s.line_number}
+                        {
+                            "file": s.file_path,
+                            "section": s.section_name,
+                            "excerpt": s.excerpt,
+                            "line": s.line_number,
+                        }
                         for s in c.diagnosis.relevant_sections
                     ],
                     "suggested_action": c.diagnosis.suggested_action,
@@ -164,7 +174,10 @@ def promote_approved(candidates_path: Path, ground_truth_path: Path) -> int:
             gt_case = {
                 "id": c["id"],
                 "inputs": {"prompt": c["prompt"]},
-                "outputs": {"response": c["response"], "execution_success": c["execution_success"]},
+                "outputs": {
+                    "response": c["response"],
+                    "execution_success": c["execution_success"],
+                },
                 "expectations": {},  # Filled by reviewer during approval
                 "metadata": {
                     "category": "happy_path",
@@ -229,7 +242,9 @@ def grp_interactive(
         # 3. FIX (if failed)
         if not candidate.execution_success:
             if retries >= max_retries:
-                return GRPResult(status="skipped", reason=f"Max retries ({max_retries}) exceeded")
+                return GRPResult(
+                    status="skipped", reason=f"Max retries ({max_retries}) exceeded"
+                )
 
             # Show diagnosis to human (in real implementation)
             # Human edits skill files...
@@ -243,7 +258,9 @@ def grp_interactive(
     approval = human_review_fn(candidate)
 
     if not approval.approved:
-        return GRPResult(status="rejected", case_id=candidate.id, reason=approval.reason)
+        return GRPResult(
+            status="rejected", case_id=candidate.id, reason=approval.reason
+        )
 
     # Record approval metadata
     candidate.status = "approved"

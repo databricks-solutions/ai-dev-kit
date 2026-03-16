@@ -94,7 +94,9 @@ def main():
             else:
                 i += 1
 
-        result = review(skill_name, ctx, batch=batch_mode, filter_success=filter_success)
+        result = review(
+            skill_name, ctx, batch=batch_mode, filter_success=filter_success
+        )
     elif subcommand == "trace-eval":
         # Parse trace-eval specific arguments
         trace_path = None

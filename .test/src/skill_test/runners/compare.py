@@ -80,7 +80,9 @@ def save_baseline(
     return baseline_path
 
 
-def load_baseline(skill_name: str, baselines_dir: Path = None) -> Optional[BaselineMetrics]:
+def load_baseline(
+    skill_name: str, baselines_dir: Path = None
+) -> Optional[BaselineMetrics]:
     """
     Load baseline metrics for a skill.
 
@@ -101,7 +103,10 @@ def load_baseline(skill_name: str, baselines_dir: Path = None) -> Optional[Basel
 
 
 def compare_baselines(
-    skill_name: str, current_metrics: Dict[str, float], threshold: float = 0.05, baselines_dir: Path = None
+    skill_name: str,
+    current_metrics: Dict[str, float],
+    threshold: float = 0.05,
+    baselines_dir: Path = None,
 ) -> ComparisonResult:
     """
     Compare current metrics against baseline.
@@ -127,7 +132,10 @@ def compare_baselines(
             new_metrics=list(current_metrics.keys()),
             removed_metrics=[],
             passed_gates=True,
-            details={k: {"current": v, "baseline": None, "delta": None} for k, v in current_metrics.items()},
+            details={
+                k: {"current": v, "baseline": None, "delta": None}
+                for k, v in current_metrics.items()
+            },
         )
 
     improved = []
@@ -143,13 +151,21 @@ def compare_baselines(
     for metric, current_value in current_metrics.items():
         if metric not in baseline_metrics:
             new_metrics.append(metric)
-            details[metric] = {"current": current_value, "baseline": None, "delta": None}
+            details[metric] = {
+                "current": current_value,
+                "baseline": None,
+                "delta": None,
+            }
             continue
 
         baseline_value = baseline_metrics[metric]
         delta = current_value - baseline_value
 
-        details[metric] = {"current": current_value, "baseline": baseline_value, "delta": delta}
+        details[metric] = {
+            "current": current_value,
+            "baseline": baseline_value,
+            "delta": delta,
+        }
 
         if abs(delta) < threshold:
             unchanged.append(metric)
@@ -162,7 +178,11 @@ def compare_baselines(
     for metric in baseline_metrics:
         if metric not in current_metrics:
             removed_metrics.append(metric)
-            details[metric] = {"current": None, "baseline": baseline_metrics[metric], "delta": None}
+            details[metric] = {
+                "current": None,
+                "baseline": baseline_metrics[metric],
+                "delta": None,
+            }
 
     # Determine if quality gates pass (no regressions in critical metrics)
     critical_metrics = ["syntax_valid/score/mean", "no_hallucinated_apis/score/mean"]
@@ -195,13 +215,17 @@ def format_comparison_report(result: ComparisonResult) -> str:
         lines.append(f"Improved ({len(result.improved)}):")
         for m in result.improved:
             d = result.details[m]
-            lines.append(f"  + {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})")
+            lines.append(
+                f"  + {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})"
+            )
 
     if result.regressed:
         lines.append(f"\nRegressed ({len(result.regressed)}):")
         for m in result.regressed:
             d = result.details[m]
-            lines.append(f"  - {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})")
+            lines.append(
+                f"  - {m}: {d['baseline']:.3f} -> {d['current']:.3f} ({d['delta']:+.3f})"
+            )
 
     if result.unchanged:
         lines.append(f"\nUnchanged ({len(result.unchanged)}):")

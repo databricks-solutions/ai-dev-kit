@@ -27,7 +27,9 @@ class SkillTask(TypedDict, total=False):
     id: str
     input: str  # The prompt (maps to DefaultDataInst.input)
     answer: str  # Expected response (maps to DefaultDataInst.answer)
-    additional_context: dict[str, str]  # Extra context (maps to DefaultDataInst.additional_context)
+    additional_context: dict[
+        str, str
+    ]  # Extra context (maps to DefaultDataInst.additional_context)
     expectations: dict[str, Any]  # Scorer expectations (not sent to GEPA directly)
     metadata: dict[str, Any]  # Category, difficulty, etc.
 
@@ -77,7 +79,9 @@ def _record_to_task(record: EvalRecord) -> SkillTask:
         # Also encode expectations into additional_context for GEPA reflection
         task["additional_context"]["expectations"] = json.dumps(record.expectations)
         # Human-readable summary for GEPA's reflection LM
-        task["additional_context"]["evaluation_criteria"] = _summarize_expectations(record.expectations)
+        task["additional_context"]["evaluation_criteria"] = _summarize_expectations(
+            record.expectations
+        )
     return task
 
 
@@ -191,7 +195,9 @@ def create_cross_skill_dataset(
         skill_names = sorted(
             d.name
             for d in base_path.iterdir()
-            if d.is_dir() and (d / "ground_truth.yaml").exists() and not d.name.startswith("_")
+            if d.is_dir()
+            and (d / "ground_truth.yaml").exists()
+            and not d.name.startswith("_")
         )
 
     # Filter skills by tool_modules relevance
@@ -244,7 +250,9 @@ def create_cross_skill_dataset(
     return merged
 
 
-def generate_bootstrap_tasks(skill_name: str, base_path: Path | None = None) -> list[SkillTask]:
+def generate_bootstrap_tasks(
+    skill_name: str, base_path: Path | None = None
+) -> list[SkillTask]:
     """Generate synthetic tasks from a SKILL.md when no ground_truth.yaml exists.
 
     Parses the SKILL.md for documented patterns and generates basic test prompts

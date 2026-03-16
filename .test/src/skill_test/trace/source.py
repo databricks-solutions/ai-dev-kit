@@ -156,7 +156,9 @@ def get_trace_from_best_source(
         try:
             from .mlflow_integration import get_latest_trace_run, get_trace_from_mlflow
 
-            experiment = status.experiment_name or f"/Shared/{skill_name}-skill-test-traces"
+            experiment = (
+                status.experiment_name or f"/Shared/{skill_name}-skill-test-traces"
+            )
 
             run_id = get_latest_trace_run(experiment)
             if run_id:

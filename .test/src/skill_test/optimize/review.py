@@ -46,8 +46,12 @@ def save_result(result: OptimizationResult) -> tuple[Path | None, Path | None]:
         Tuple of (optimized_skill_path, metadata_path), either may be None on error.
     """
     # Check if this is a tools-only result (no skill content to save)
-    has_tool_components = result.components and any(k.startswith("tools_") for k in result.components)
-    is_tools_only = has_tool_components and result.original_content == result.optimized_content
+    has_tool_components = result.components and any(
+        k.startswith("tools_") for k in result.components
+    )
+    is_tools_only = (
+        has_tool_components and result.original_content == result.optimized_content
+    )
 
     if result.improvement <= 0 and not is_tools_only:
         return None, None
@@ -58,7 +62,11 @@ def save_result(result: OptimizationResult) -> tuple[Path | None, Path | None]:
     metadata_path = None
 
     # Write the optimized SKILL.md (skip for tools-only — no skill changes)
-    if not is_tools_only and result.optimized_content and result.optimized_content != result.original_content:
+    if (
+        not is_tools_only
+        and result.optimized_content
+        and result.optimized_content != result.original_content
+    ):
         optimized_path = results_dir / "optimized_SKILL.md"
         optimized_path.write_text(result.optimized_content)
 
@@ -79,7 +87,9 @@ def save_result(result: OptimizationResult) -> tuple[Path | None, Path | None]:
 
     # Save tool components if present
     if result.components:
-        tool_components = {k: v for k, v in result.components.items() if k.startswith("tools_")}
+        tool_components = {
+            k: v for k, v in result.components.items() if k.startswith("tools_")
+        }
         if tool_components:
             metadata["has_tool_components"] = True
             # Save each tool component
@@ -283,7 +293,9 @@ def review_optimization(result: OptimizationResult) -> None:
     saved_skill, saved_meta = save_result(result)
     if saved_skill:
         print(f"  Saved: {saved_skill}")
-        print(f"  Apply: uv run python .test/scripts/optimize.py {result.skill_name} --apply-last")
+        print(
+            f"  Apply: uv run python .test/scripts/optimize.py {result.skill_name} --apply-last"
+        )
     elif result.original_content == result.optimized_content:
         print("  No improvement found -- nothing saved.")
     print(f"{'=' * 60}\n")
@@ -336,7 +348,9 @@ def apply_optimization(result: OptimizationResult) -> Path | None:
                 for f in modified:
                     print(f"  {f}")
 
-    print(f"  Quality: {result.original_score:.3f} -> {result.optimized_score:.3f} ({result.improvement:+.3f})")
+    print(
+        f"  Quality: {result.original_score:.3f} -> {result.optimized_score:.3f} ({result.improvement:+.3f})"
+    )
     print(
         f"  Tokens: {result.original_token_count:,} -> {result.optimized_token_count:,} "
         f"({result.token_reduction_pct:+.1f}%)"

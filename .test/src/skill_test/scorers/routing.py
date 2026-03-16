@@ -43,7 +43,12 @@ SKILL_TRIGGERS = {
         "dashboard app",
         "data app",
     ],
-    "databricks-asset-bundles": ["dabs", "databricks asset bundle", "deploy", "bundle.yaml"],
+    "databricks-asset-bundles": [
+        "dabs",
+        "databricks asset bundle",
+        "deploy",
+        "bundle.yaml",
+    ],
     "databricks-python-sdk": [
         "python sdk",
         "databricks-sdk",
@@ -74,7 +79,11 @@ SKILL_TRIGGERS = {
         "supervisor",
     ],
     "databricks-lakebase-provisioned": ["lakebase", "postgresql", "postgres"],
-    "databricks-model-serving": ["model serving", "serving endpoint", "inference endpoint"],
+    "databricks-model-serving": [
+        "model serving",
+        "serving endpoint",
+        "inference endpoint",
+    ],
 }
 
 
@@ -93,7 +102,9 @@ def detect_skills_from_prompt(prompt: str) -> Set[str]:
 
 
 @scorer
-def skill_routing_accuracy(inputs: Dict[str, Any], expectations: Dict[str, Any]) -> Feedback:
+def skill_routing_accuracy(
+    inputs: Dict[str, Any], expectations: Dict[str, Any]
+) -> Feedback:
     """
     Score skill routing accuracy.
 

@@ -54,7 +54,9 @@ class CLIContext:
 
     # Configuration
     base_path: Path = field(default_factory=lambda: Path(".test/skills"))
-    execution_config: DatabricksExecutionConfig = field(default_factory=DatabricksExecutionConfig)
+    execution_config: DatabricksExecutionConfig = field(
+        default_factory=DatabricksExecutionConfig
+    )
 
     def has_databricks_tools(self) -> bool:
         """Check if Databricks execution tools are available."""
@@ -113,7 +115,11 @@ def run(
     # Load ground truth
     gt_path = ctx.base_path / skill_name / "ground_truth.yaml"
     if not gt_path.exists():
-        return {"success": False, "error": f"No ground_truth.yaml found for skill '{skill_name}'", "path": str(gt_path)}
+        return {
+            "success": False,
+            "error": f"No ground_truth.yaml found for skill '{skill_name}'",
+            "path": str(gt_path),
+        }
 
     source = YAMLDatasetSource(gt_path)
     records = source.load()
@@ -129,7 +135,11 @@ def run(
         response = record.outputs.get("response", "") if record.outputs else ""
 
         # Execute code blocks
-        if ctx.has_databricks_tools() and ctx.mcp_execute_command and ctx.mcp_execute_sql:
+        if (
+            ctx.has_databricks_tools()
+            and ctx.mcp_execute_command
+            and ctx.mcp_execute_sql
+        ):
             exec_result = execute_code_blocks_on_databricks(
                 response,
                 ctx.execution_config,
@@ -212,7 +222,9 @@ def regression(
     # Compare metrics
     baseline_metrics = baseline.get("metrics", {})
     current_metrics = {
-        "pass_rate": current["passed"] / current["total"] if current["total"] > 0 else 0,
+        "pass_rate": current["passed"] / current["total"]
+        if current["total"] > 0
+        else 0,
         "total_tests": current["total"],
         "passed_tests": current["passed"],
     }
@@ -272,7 +284,11 @@ def init(
     skill_dir = ctx.base_path / skill_name
 
     if skill_dir.exists():
-        return {"success": False, "error": f"Skill '{skill_name}' already has test definitions", "path": str(skill_dir)}
+        return {
+            "success": False,
+            "error": f"Skill '{skill_name}' already has test definitions",
+            "path": str(skill_dir),
+        }
 
     # Create directory
     skill_dir.mkdir(parents=True, exist_ok=True)
@@ -288,10 +304,15 @@ def init(
             {
                 "id": f"{skill_name}_001",
                 "inputs": {"prompt": "Example prompt for the skill"},
-                "outputs": {"response": "Example response from the skill", "execution_success": True},
+                "outputs": {
+                    "response": "Example response from the skill",
+                    "execution_success": True,
+                },
                 "expectations": {
                     "expected_facts": ["fact1", "fact2"],
-                    "expected_patterns": [{"pattern": "pattern_to_match", "min_count": 1}],
+                    "expected_patterns": [
+                        {"pattern": "pattern_to_match", "min_count": 1}
+                    ],
                     "guidelines": ["Guideline for evaluation"],
                     # Per-test trace expectations (override manifest defaults)
                     # "tool_limits": {"mcp__databricks__create_pipeline": 1},
@@ -352,7 +373,11 @@ def init(
                 "expected_files": [],  # File patterns that should be created
             },
         },
-        "quality_gates": {"syntax_valid": 1.0, "pattern_adherence": 0.9, "execution_success": 0.8},
+        "quality_gates": {
+            "syntax_valid": 1.0,
+            "pattern_adherence": 0.9,
+            "execution_success": 0.8,
+        },
     }
     manifest_path = skill_dir / "manifest.yaml"
     with open(manifest_path, "w") as f:
@@ -574,7 +599,9 @@ def interactive(
     """
     test_id = f"grp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    result = InteractiveResult(success=False, test_id=test_id, skill_name=skill_name, execution_mode="local")
+    result = InteractiveResult(
+        success=False, test_id=test_id, skill_name=skill_name, execution_mode="local"
+    )
 
     # 1. Set up fixtures if provided
     if fixture_config and ctx.mcp_execute_sql and ctx.mcp_upload_file:
@@ -659,8 +686,13 @@ def interactive(
                 "catalog": fixture_config.catalog,
                 "schema": fixture_config.schema,
                 "volume": fixture_config.volume,
-                "files": [{"local_path": f.local_path, "volume_path": f.volume_path} for f in fixture_config.files],
-                "tables": [{"name": t.name, "ddl": t.ddl} for t in fixture_config.tables],
+                "files": [
+                    {"local_path": f.local_path, "volume_path": f.volume_path}
+                    for f in fixture_config.files
+                ],
+                "tables": [
+                    {"name": t.name, "ddl": t.ddl} for t in fixture_config.tables
+                ],
                 "cleanup_after": fixture_config.cleanup_after,
             }
 
@@ -723,9 +755,7 @@ def interactive(
         result.auto_approved = False
         result.success = True
         failed_count = result.total_blocks - result.passed_blocks
-        result.message = (
-            f"{failed_count}/{result.total_blocks} code blocks failed. Saved to candidates.yaml for GRP review"
-        )
+        result.message = f"{failed_count}/{result.total_blocks} code blocks failed. Saved to candidates.yaml for GRP review"
 
     # 4. Tear down fixtures if configured
     if fixture_config and fixture_config.cleanup_after and ctx.mcp_execute_sql:
@@ -757,7 +787,10 @@ def interactive(
                 with open(manifest_path) as f:
                     manifest = yaml.safe_load(f) or {}
                 # Look for trace_expectations in scorers section or at top level
-                if "scorers" in manifest and "trace_expectations" in manifest["scorers"]:
+                if (
+                    "scorers" in manifest
+                    and "trace_expectations" in manifest["scorers"]
+                ):
                     expectations = manifest["scorers"]["trace_expectations"]
                 elif "trace_expectations" in manifest:
                     expectations = manifest["trace_expectations"]
@@ -810,7 +843,11 @@ def scorers(
     """
     manifest_path = ctx.base_path / skill_name / "manifest.yaml"
     if not manifest_path.exists():
-        return {"success": False, "error": f"No manifest found for skill '{skill_name}'", "path": str(manifest_path)}
+        return {
+            "success": False,
+            "error": f"No manifest found for skill '{skill_name}'",
+            "path": str(manifest_path),
+        }
 
     with open(manifest_path) as f:
         manifest = yaml.safe_load(f) or {}
@@ -865,7 +902,11 @@ def scorers_update(
     """
     manifest_path = ctx.base_path / skill_name / "manifest.yaml"
     if not manifest_path.exists():
-        return {"success": False, "error": f"No manifest found for skill '{skill_name}'", "path": str(manifest_path)}
+        return {
+            "success": False,
+            "error": f"No manifest found for skill '{skill_name}'",
+            "path": str(manifest_path),
+        }
 
     with open(manifest_path) as f:
         manifest = yaml.safe_load(f) or {}
@@ -876,12 +917,17 @@ def scorers_update(
         if "evaluation" in manifest and "scorers" in manifest["evaluation"]:
             eval_scorers = manifest["evaluation"]["scorers"]
             manifest["scorers"] = {
-                "enabled": eval_scorers.get("tier1", []) + eval_scorers.get("tier2", []),
+                "enabled": eval_scorers.get("tier1", [])
+                + eval_scorers.get("tier2", []),
                 "llm_scorers": eval_scorers.get("tier3", []),
                 "default_guidelines": [],
             }
         else:
-            manifest["scorers"] = {"enabled": [], "llm_scorers": [], "default_guidelines": []}
+            manifest["scorers"] = {
+                "enabled": [],
+                "llm_scorers": [],
+                "default_guidelines": [],
+            }
 
     scorer_config = manifest["scorers"]
 
@@ -973,7 +1019,9 @@ def setup_test_fixtures(
     gt_path = ctx.base_path / skill_name / "ground_truth.yaml"
     if not gt_path.exists():
         return FixtureResult(
-            success=False, message=f"No ground_truth.yaml found for skill '{skill_name}'", error="File not found"
+            success=False,
+            message=f"No ground_truth.yaml found for skill '{skill_name}'",
+            error="File not found",
         )
 
     with open(gt_path) as f:
@@ -987,13 +1035,19 @@ def setup_test_fixtures(
             break
 
     if not test_case:
-        return FixtureResult(success=False, message=f"Test case '{test_id}' not found", error="Test case not found")
+        return FixtureResult(
+            success=False,
+            message=f"Test case '{test_id}' not found",
+            error="Test case not found",
+        )
 
     # Check for fixtures
     fixtures_def = test_case.get("fixtures")
     if not fixtures_def:
         return FixtureResult(
-            success=True, message="No fixtures defined for this test case", details={"test_id": test_id}
+            success=True,
+            message="No fixtures defined for this test case",
+            details={"test_id": test_id},
         )
 
     # Create fixture config
@@ -1002,12 +1056,16 @@ def setup_test_fixtures(
     # Check for required MCP tools
     if not ctx.mcp_execute_sql:
         return FixtureResult(
-            success=False, message="MCP execute_sql tool required for fixture setup", error="Missing MCP tool"
+            success=False,
+            message="MCP execute_sql tool required for fixture setup",
+            error="Missing MCP tool",
         )
 
     if not ctx.mcp_upload_file and fixture_config.files:
         return FixtureResult(
-            success=False, message="MCP upload_file tool required for file fixtures", error="Missing MCP tool"
+            success=False,
+            message="MCP upload_file tool required for file fixtures",
+            error="Missing MCP tool",
         )
 
     # Set up fixtures
@@ -1136,7 +1194,9 @@ def trace_eval(
     elif trace_id:
         try:
             metrics = get_trace_by_id(trace_id)
-            traces_to_eval.append({"source": f"mlflow-trace:{trace_id}", "metrics": metrics})
+            traces_to_eval.append(
+                {"source": f"mlflow-trace:{trace_id}", "metrics": metrics}
+            )
         except Exception as e:
             return {
                 "success": False,
@@ -1160,7 +1220,9 @@ def trace_eval(
                 traces_to_eval.append({"source": str(jsonl_file), "metrics": metrics})
             except Exception as e:
                 # Log but continue with other files
-                traces_to_eval.append({"source": str(jsonl_file), "error": str(e), "metrics": None})
+                traces_to_eval.append(
+                    {"source": str(jsonl_file), "error": str(e), "metrics": None}
+                )
 
         if not traces_to_eval:
             return {
@@ -1234,7 +1296,9 @@ def trace_eval(
             except Exception as e:
                 trace_results["scorer_results"].append(
                     {
-                        "name": scorer.__name__ if hasattr(scorer, "__name__") else str(scorer),
+                        "name": scorer.__name__
+                        if hasattr(scorer, "__name__")
+                        else str(scorer),
                         "value": "error",
                         "rationale": str(e),
                     }

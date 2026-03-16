@@ -15,7 +15,9 @@ def python_syntax(outputs: Dict[str, Any]) -> Feedback:
     python_blocks = re.findall(r"```python\n(.*?)```", response, re.DOTALL)
 
     if not python_blocks:
-        return Feedback(name="python_syntax", value="skip", rationale="No Python code blocks found")
+        return Feedback(
+            name="python_syntax", value="skip", rationale="No Python code blocks found"
+        )
 
     errors = []
     for i, block in enumerate(python_blocks):
@@ -25,10 +27,16 @@ def python_syntax(outputs: Dict[str, Any]) -> Feedback:
             errors.append(f"Block {i + 1}: {e.msg} at line {e.lineno}")
 
     if errors:
-        return Feedback(name="python_syntax", value="no", rationale=f"Syntax errors: {'; '.join(errors)}")
+        return Feedback(
+            name="python_syntax",
+            value="no",
+            rationale=f"Syntax errors: {'; '.join(errors)}",
+        )
 
     return Feedback(
-        name="python_syntax", value="yes", rationale=f"All {len(python_blocks)} Python blocks parse successfully"
+        name="python_syntax",
+        value="yes",
+        rationale=f"All {len(python_blocks)} Python blocks parse successfully",
     )
 
 
@@ -40,29 +48,47 @@ def sql_syntax(outputs: Dict[str, Any]) -> Feedback:
     sql_blocks = re.findall(r"```sql\n(.*?)```", response, re.DOTALL)
 
     if not sql_blocks:
-        return Feedback(name="sql_syntax", value="skip", rationale="No SQL code blocks found")
+        return Feedback(
+            name="sql_syntax", value="skip", rationale="No SQL code blocks found"
+        )
 
     errors = []
     for i, block in enumerate(sql_blocks):
-        if not re.search(r"(SELECT|CREATE|INSERT|UPDATE|DELETE|WITH|MERGE)", block, re.I):
+        if not re.search(
+            r"(SELECT|CREATE|INSERT|UPDATE|DELETE|WITH|MERGE)", block, re.I
+        ):
             errors.append(f"Block {i + 1}: No recognizable SQL statement")
         if block.count("(") != block.count(")"):
             errors.append(f"Block {i + 1}: Unbalanced parentheses")
 
     if errors:
-        return Feedback(name="sql_syntax", value="no", rationale=f"SQL issues: {'; '.join(errors)}")
+        return Feedback(
+            name="sql_syntax", value="no", rationale=f"SQL issues: {'; '.join(errors)}"
+        )
 
-    return Feedback(name="sql_syntax", value="yes", rationale=f"All {len(sql_blocks)} SQL blocks look valid")
+    return Feedback(
+        name="sql_syntax",
+        value="yes",
+        rationale=f"All {len(sql_blocks)} SQL blocks look valid",
+    )
 
 
 @scorer
-def pattern_adherence(outputs: Dict[str, Any], expectations: Dict[str, Any]) -> List[Feedback]:
+def pattern_adherence(
+    outputs: Dict[str, Any], expectations: Dict[str, Any]
+) -> List[Feedback]:
     """Check for required patterns in response."""
     response = outputs.get("response", "")
     expected_patterns = expectations.get("expected_patterns", [])
 
     if not expected_patterns:
-        return [Feedback(name="pattern_adherence", value="skip", rationale="No expected_patterns defined")]
+        return [
+            Feedback(
+                name="pattern_adherence",
+                value="skip",
+                rationale="No expected_patterns defined",
+            )
+        ]
 
     feedbacks = []
     for pattern_spec in expected_patterns:
@@ -119,19 +145,35 @@ def no_hallucinated_apis(outputs: Dict[str, Any]) -> Feedback:
             found.append(description)
 
     if found:
-        return Feedback(name="no_hallucinated_apis", value="no", rationale=f"Issues: {'; '.join(found)}")
+        return Feedback(
+            name="no_hallucinated_apis",
+            value="no",
+            rationale=f"Issues: {'; '.join(found)}",
+        )
 
-    return Feedback(name="no_hallucinated_apis", value="yes", rationale="No common API hallucinations detected")
+    return Feedback(
+        name="no_hallucinated_apis",
+        value="yes",
+        rationale="No common API hallucinations detected",
+    )
 
 
 @scorer
-def expected_facts_present(outputs: Dict[str, Any], expectations: Dict[str, Any]) -> List[Feedback]:
+def expected_facts_present(
+    outputs: Dict[str, Any], expectations: Dict[str, Any]
+) -> List[Feedback]:
     """Check if expected facts are mentioned in response (per-fact granularity)."""
     response = outputs.get("response", "").lower()
     expected_facts = expectations.get("expected_facts", [])
 
     if not expected_facts:
-        return [Feedback(name="expected_facts", value="skip", rationale="No expected_facts defined")]
+        return [
+            Feedback(
+                name="expected_facts",
+                value="skip",
+                rationale="No expected_facts defined",
+            )
+        ]
 
     feedbacks = []
     for fact in expected_facts:

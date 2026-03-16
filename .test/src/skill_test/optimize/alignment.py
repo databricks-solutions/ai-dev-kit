@@ -92,7 +92,9 @@ def align_judge(
         )
         return aligned
     except ImportError:
-        logger.warning("MemAlignOptimizer not available. Install mlflow-deepeval for alignment support.")
+        logger.warning(
+            "MemAlignOptimizer not available. Install mlflow-deepeval for alignment support."
+        )
         return judge
     except Exception as e:
         logger.warning("MemAlign alignment failed for %s: %s", skill_name, e)

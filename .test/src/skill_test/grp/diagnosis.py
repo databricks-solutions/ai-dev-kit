@@ -50,7 +50,13 @@ def extract_sections(file_path: Path) -> List[Dict[str, Any]]:
         match = re.match(pattern, line)
         if match:
             if current_section:
-                sections.append({"name": current_section, "content": "\n".join(current_content), "line": current_line})
+                sections.append(
+                    {
+                        "name": current_section,
+                        "content": "\n".join(current_content),
+                        "line": current_line,
+                    }
+                )
             current_section = match.group(2)
             current_content = []
             current_line = i + 1
@@ -58,12 +64,20 @@ def extract_sections(file_path: Path) -> List[Dict[str, Any]]:
             current_content.append(line)
 
     if current_section:
-        sections.append({"name": current_section, "content": "\n".join(current_content), "line": current_line})
+        sections.append(
+            {
+                "name": current_section,
+                "content": "\n".join(current_content),
+                "line": current_line,
+            }
+        )
 
     return sections
 
 
-def find_relevant_sections(error: str, code_block: str, skill_name: str) -> List[SkillSection]:
+def find_relevant_sections(
+    error: str, code_block: str, skill_name: str
+) -> List[SkillSection]:
     """Find skill sections relevant to an error."""
     relevant = []
 
@@ -86,7 +100,9 @@ def find_relevant_sections(error: str, code_block: str, skill_name: str) -> List
             name_lower = section["name"].lower()
 
             # Check if section is relevant
-            relevance_score = sum(1 for kw in keywords if kw in section_lower or kw in name_lower)
+            relevance_score = sum(
+                1 for kw in keywords if kw in section_lower or kw in name_lower
+            )
 
             if relevance_score > 0:
                 # Extract a relevant excerpt (first 200 chars with keyword)
@@ -124,6 +140,13 @@ def analyze_failure(error: str, code_block: str, skill_name: str) -> Diagnosis:
     elif "import" in error.lower():
         suggested_action = "Verify import statements match documented patterns."
     elif "STREAMING TABLE" in code_block and "OR REFRESH" not in code_block:
-        suggested_action = "Update skill to emphasize 'CREATE OR REFRESH STREAMING TABLE' syntax."
+        suggested_action = (
+            "Update skill to emphasize 'CREATE OR REFRESH STREAMING TABLE' syntax."
+        )
 
-    return Diagnosis(error=error, code_block=code_block, relevant_sections=relevant, suggested_action=suggested_action)
+    return Diagnosis(
+        error=error,
+        code_block=code_block,
+        relevant_sections=relevant,
+        suggested_action=suggested_action,
+    )
