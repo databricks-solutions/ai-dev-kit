@@ -440,6 +440,16 @@ async def run_agent(
     env = _get_agent_env()
     if model:
         env["ANTHROPIC_MODEL"] = model
+    # Ensure subprocess doesn't think it's nested inside another Claude Code session.
+    # Instead of mutating os.environ (not thread-safe), exclude it from the subprocess env.
+    env.pop("CLAUDECODE", None)
+
+    # Pass Databricks auth env vars to MCP server processes
+    if mcp_config:
+        mcp_env = {k: v for k, v in env.items() if k.startswith(("DATABRICKS_",))}
+        for _server_name, server_cfg in mcp_config.items():
+            if "env" not in server_cfg and mcp_env:
+                server_cfg["env"] = mcp_env
 
     # Set up MLflow tracing via Stop hook
     mlflow_hook, mlflow_result = _get_mlflow_stop_hook(mlflow_experiment=mlflow_experiment, skill_name=skill_name)
