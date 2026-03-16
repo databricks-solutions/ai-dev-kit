@@ -201,3 +201,252 @@ The tool finds the existing space by name and updates it.
 - Add table and column comments
 - Include sample questions that demonstrate the vocabulary
 - Add instructions via the Databricks Genie UI
+
+---
+
+## Advanced: serialized_space API
+
+The `create_or_update_genie` tool only populates the basic sections. To fully configure a Genie Space (General Instructions, SQL Queries & Functions, Common SQL Expressions, Benchmarks), use the `serialized_space` API directly.
+
+### API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/2.0/genie/spaces/{id}?include_serialized_space=true` | Full space with serialized_space JSON |
+| `GET` | `/api/2.0/genie/spaces/{id}` | Basic space (no serialized_space) |
+| `PATCH` | `/api/2.0/genie/spaces/{id}` | Update serialized_space (**this works**) |
+| `PATCH` | `/api/2.0/data-rooms/{id}` | Update description/warehouse/tables only (NOT serialized_space) |
+
+> **Critical**: `PATCH /api/2.0/data-rooms/{id}` silently empties `table_identifiers` if not re-sent. Always include all table identifiers in every call.
+>
+> `PUT /api/2.0/genie/spaces/{id}` does NOT exist (returns 404).
+
+### serialized_space JSON Schema
+
+```json
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [{"id": "hex32chars", "question": ["question text"]}]
+  },
+  "data_sources": {
+    "tables": [{"identifier": "catalog.schema.table", "description": ["optional context"]}]
+  },
+  "instructions": {
+    "text_instructions": [{"id": "hex32chars", "content": ["Combined instructions string"]}],
+    "example_question_sqls": [{"id": "hex32chars", "question": ["Question?"], "sql": ["SELECT ..."]}],
+    "join_specs": [
+      {
+        "id": "hex32chars",
+        "left":  {"identifier": "catalog.schema.table_a", "alias": "table_a"},
+        "right": {"identifier": "catalog.schema.table_b", "alias": "table_b"},
+        "sql": [
+          "`table_a`.`key_col` = `table_b`.`key_col`",
+          "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_MANY--"
+        ],
+        "instruction": ["Human-readable description of why this join is used"]
+      }
+    ],
+    "sql_snippets": {
+      "filters": [{"id": "hex32chars", "sql": ["filter_expr"], "display_name": "label"}],
+      "expressions": [{"id": "hex32chars", "alias": "alias", "sql": ["SQL expr"]}],
+      "measures": [{"id": "hex32chars", "alias": "measure", "sql": ["AGG expr"]}]
+    }
+  },
+  "benchmarks": {
+    "questions": [
+      {"id": "hex32chars", "question": ["Business question?"],
+       "answer": [{"format": "SQL", "content": ["SELECT ..."]}]}
+    ]
+  }
+}
+```
+
+### Known Constraints
+
+- **`text_instructions`**: Maximum **1 item**. Combine all instructions into a single `content` string.
+- **All lists must be sorted by `id`** (lexicographic hex sort). The API returns 400 if not sorted.
+- **`data_sources.tables` must be sorted by `identifier`** alphabetically.
+- **`join_specs`**: Supported. See dedicated section below for exact format. The `sql` field takes **backtick-quoted `alias`.`COL`** syntax (NOT plain `table.column`) and a second element with the cardinality marker.
+- IDs must be 32-char hex strings: `uuid.uuid4().hex`.
+
+### join_specs: Format and Code Example
+
+The `join_specs` section populates the **Joins** tab in the Genie UI. Each spec defines a relationship between two tables, and Genie uses them to build JOINs automatically.
+
+#### Exact structure (reverse-engineered from Genie UI)
+
+```json
+{
+  "id": "hex32chars",
+  "left":  {"identifier": "catalog.schema.table_a", "alias": "table_a"},
+  "right": {"identifier": "catalog.schema.table_b", "alias": "table_b"},
+  "sql": [
+    "`table_a`.`CLAVE_BODEGA` = `table_b`.`CLAVE_BODEGA` AND `table_a`.`CLAVE_CLIENTE` = `table_b`.`CLAVE_CLIENTE`",
+    "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_MANY--"
+  ],
+  "instruction": ["Join to get all transactions for each client"]
+}
+```
+
+**Key fields:**
+
+| Field | Required | Notes |
+|---|---|---|
+| `left.identifier` | Yes | Full `catalog.schema.table` |
+| `left.alias` | Yes | Table name only (last segment after `.`) |
+| `right.identifier` / `right.alias` | Yes | Same as left |
+| `sql[0]` | Yes | Join condition using **`` `alias`.`COLUMN` ``** format with backticks |
+| `sql[1]` | Yes | Cardinality marker string (see below) |
+| `instruction` | Yes | List with 1 string: description of the join |
+
+**Cardinality markers (`sql[1]`):**
+
+```
+--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_ONE--
+--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_MANY--
+--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--
+--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_MANY--
+```
+
+> **Why it failed before**: We tried plain SQL like `table.col = table.col` — the API requires `` `alias`.`col` `` with backticks, plus the cardinality marker as a second `sql` element.
+
+#### Helper function
+
+```python
+RT_ONE_TO_ONE   = "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_ONE--"
+RT_ONE_TO_MANY  = "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_MANY--"
+RT_MANY_TO_ONE  = "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+RT_MANY_TO_MANY = "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_MANY--"
+
+def make_join(left_id, right_id, col_pairs, cardinality, instruction):
+    """
+    col_pairs: list of (left_col, right_col) tuples
+    Uses the short table name (after last dot) as alias.
+    """
+    left_alias  = left_id.split(".")[-1]
+    right_alias = right_id.split(".")[-1]
+    cond = " AND ".join(
+        f"`{left_alias}`.`{lc}` = `{right_alias}`.`{rc}`"
+        for lc, rc in col_pairs
+    )
+    return {
+        "id": uid(),
+        "left":  {"identifier": left_id,  "alias": left_alias},
+        "right": {"identifier": right_id, "alias": right_alias},
+        "sql": [cond, cardinality],
+        "instruction": [instruction],
+    }
+
+# Example usage:
+join_specs = sorted([
+    make_join(
+        "catalog.schema.dim_customer",
+        "catalog.schema.fact_orders",
+        [("customer_id", "customer_id")],
+        RT_ONE_TO_MANY,
+        "Join to get all orders for each customer"
+    ),
+    make_join(
+        "catalog.schema.fact_orders",
+        "catalog.schema.fact_order_items",
+        [("order_id", "order_id")],
+        RT_ONE_TO_MANY,
+        "Join to get line items for each order"
+    ),
+], key=lambda x: x["id"])  # MUST be sorted by id
+```
+
+### How to Apply serialized_space
+
+```python
+import requests, json, uuid
+
+WORKSPACE_URL = "https://adb-XXXXXXXXXXXXXXXXX.XX.azuredatabricks.net"
+TOKEN = "your_token"
+SPACE_ID = "your_space_id"
+HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
+
+def uid():
+    return uuid.uuid4().hex
+
+# 1. Fetch existing data to preserve sample_questions and tables
+resp = requests.get(
+    f"{WORKSPACE_URL}/api/2.0/genie/spaces/{SPACE_ID}?include_serialized_space=true",
+    headers=HEADERS
+)
+existing_ss = json.loads(resp.json()["serialized_space"])
+
+# 2. Build serialized_space
+serialized_space = {
+    "version": 2,
+    "config": {
+        "sample_questions": sorted(existing_ss["config"]["sample_questions"], key=lambda x: x["id"])
+    },
+    "data_sources": {
+        "tables": sorted(existing_ss["data_sources"]["tables"], key=lambda t: t["identifier"])
+    },
+    "instructions": {
+        # Only 1 text_instructions item allowed — combine all general instructions
+        "text_instructions": [{"id": uid(), "content": [
+            "TERMINOLOGY: 'active customers' = status = 2.\n\n"
+            "CURRENT STATE: Always filter with MAX(date_col) for snapshots."
+        ]}],
+        "example_question_sqls": sorted([
+            {"id": uid(), "question": ["How many active customers?"],
+             "sql": ["SELECT COUNT(*) FROM catalog.schema.customers WHERE status = 2"]}
+        ], key=lambda x: x["id"]),
+        "join_specs": sorted([
+            make_join(
+                "catalog.schema.dim_customer",
+                "catalog.schema.fact_orders",
+                [("customer_id", "customer_id")],
+                RT_ONE_TO_MANY,
+                "Join to get all orders for each customer"
+            ),
+        ], key=lambda x: x["id"]),
+        "sql_snippets": {
+            "filters": sorted([
+                {"id": uid(), "sql": ["status = 2"], "display_name": "active customers"}
+            ], key=lambda x: x["id"]),
+            "expressions": sorted([
+                {"id": uid(), "alias": "current_date_filter",
+                 "sql": ["(SELECT MAX(date_col) FROM catalog.schema.table)"]}
+            ], key=lambda x: x["id"]),
+            "measures": sorted([
+                {"id": uid(), "alias": "completion_rate",
+                 "sql": ["ROUND(100.0 * SUM(completed) / COUNT(*), 1)"]}
+            ], key=lambda x: x["id"]),
+        }
+    },
+    "benchmarks": {
+        "questions": sorted([
+            {"id": uid(), "question": ["How many active customers?"],
+             "answer": [{"format": "SQL", "content": [
+                 "SELECT COUNT(*) FROM catalog.schema.table WHERE status = 2"
+             ]}]}
+        ], key=lambda x: x["id"])
+    }
+}
+
+# 3. Apply via PATCH (400 if lists not sorted by id)
+response = requests.patch(
+    f"{WORKSPACE_URL}/api/2.0/genie/spaces/{SPACE_ID}",
+    headers=HEADERS,
+    json={"serialized_space": json.dumps(serialized_space)}
+)
+print(response.status_code)  # 200 = success
+```
+
+### UI Section Mapping
+
+| serialized_space section | Genie UI section |
+|---|---|
+| `instructions.text_instructions` | General Instructions |
+| `instructions.join_specs` | Joins |
+| `instructions.example_question_sqls` | SQL queries & functions |
+| `instructions.sql_snippets.filters` | Common SQL Expressions > Filters |
+| `instructions.sql_snippets.expressions` | Common SQL Expressions > Expressions |
+| `instructions.sql_snippets.measures` | Common SQL Expressions > Measures |
+| `benchmarks.questions` | Benchmarks |
+| `config.sample_questions` | Sample Questions (homepage) |
