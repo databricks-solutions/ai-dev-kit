@@ -59,6 +59,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
 - **databricks-jobs** - Multi-task workflows, triggers, schedules
 - **databricks-synthetic-data-gen** - Realistic test data with Faker
+- **databricks-lakebridge** - Lakebridge: analyze, transpile, and reconcile for data migration
 
 ### 🚀 Development & Deployment
 - **databricks-asset-bundles** - DABs for multi-environment deployments
