@@ -1616,15 +1616,20 @@ export default function ProjectPage() {
               inProgressByConversationRef.current[conversationId] = pending;
               delete inProgressByConversationRef.current[PENDING_CONVERSATION_KEY];
             }
-            // Eagerly set currentConversation so that messages queued while
-            // streaming use the correct conversation ID for queueing.
-            currentConversationIdRef.current = conversationId;
-            setCurrentConversation({
-              id: conversationId,
-              project_id: projectId,
-              title: 'New Chat',
-              created_at: new Date().toISOString(),
-            });
+            // Only bind UI to the newly-created conversation when this run still
+            // belongs to the currently viewed chat. If the user switched chats
+            // meanwhile, don't force navigation and risk cross-chat mingling.
+            if (
+              currentConversationIdRef.current === targetConversationId
+              || (targetConversationId === null && currentConversationIdRef.current === null)
+            ) {
+              setCurrentConversation({
+                id: conversationId,
+                project_id: projectId,
+                title: 'New Chat',
+                created_at: new Date().toISOString(),
+              });
+            }
             // Rebind any queued messages that were created before the
             // conversation existed (conversationId was null).
             for (const qm of queuedMessagesRef.current) {
@@ -1834,7 +1839,9 @@ export default function ProjectPage() {
 
           if (conversationId) {
             const conv = await fetchConversation(projectId, conversationId);
-            setCurrentConversation(conv);
+            if (currentConversationIdRef.current === conversationId) {
+              setCurrentConversation(conv);
+            }
           }
 
           // Refresh conversations after the run finishes so sidebar updates
