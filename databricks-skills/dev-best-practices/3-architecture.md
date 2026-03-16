@@ -1,6 +1,6 @@
 # Part III: Software Architecture
 
-Good architecture makes code easier to understand, test, and hand off. Customers inherit everything we build — our architectural choices become their long-term maintenance burden.
+Good architecture makes code easier to understand, test, and hand off. The team that inherits the system inherits every architectural choice as their long-term maintenance burden.
 
 ## 6.1 Design Principles
 
@@ -129,7 +129,6 @@ def process_customer_orders(df: DataFrame) -> DataFrame:
 
 ## 6.2 Project Structure
 
-See also the [example repository](https://github.com/databricks-field-eng/reusable-ip-ai/tree/main/reusable_ip/projects/dabs/repo_template).
 
 ```
 project-root/
@@ -501,7 +500,7 @@ Document significant decisions so future maintainers understand why things are t
 | Overall system | Design Doc | New systems, major features, significant architecture changes |
 | Focused decision | Decision Doc | Choosing between options for a specific component |
 
-Keep all documentation in the project's Google Drive folder (owned by the TPM). Link from the Reference Doc.
+Keep documentation in your project's shared document store (e.g. Confluence, Google Drive, Notion). Link from the Reference Doc.
 
 ## 6.10 System Design
 
@@ -510,9 +509,9 @@ Keep all documentation in the project's Google Drive folder (owned by the TPM). 
 | Task Type | Design Approach |
 |-----------|----------------|
 | Bug fix, small feature | Jump in, no formal design |
-| New component or service | Sketch on LucidChart, then build |
+| New component or service | Sketch on a diagramming tool (e.g. LucidChart, Miro, draw.io), then build |
 | New system, major feature | Write a Design Doc, get sign-off before building |
-| Cross-team or customer-facing | Design Doc required |
+| Cross-team or external-facing | Design Doc required |
 
 ### Start with Requirements
 
@@ -538,4 +537,4 @@ Design for predicted failures. Prioritize operational simplicity — complex fai
 | Trade-off | We Chose | Because | Implication |
 |-----------|---------|---------|------------|
 | Latency vs Cost | Higher latency | Serverless reduces ops burden | P95 ~800ms, not ~200ms |
-| Flexibility vs Simplicity | Simpler design | 8-week timeline, handoff to customer | Adding new data sources requires significant refactor |
+| Flexibility vs Simplicity | Simpler design | Timeline constraint, prioritize maintainability | Adding new data sources requires significant refactor |

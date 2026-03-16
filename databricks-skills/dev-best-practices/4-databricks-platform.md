@@ -229,15 +229,15 @@ changes = spark.read.format("delta") \
 - Terminate all interactive clusters
 - Ensure no scheduled jobs are running unnecessarily in dev
 
-### 9.2 Engagement Exit Checklist
+### 9.2 Project Handoff Checklist
 
 - [ ] All personal dev resources deleted (`databricks bundle destroy`)
 - [ ] Production resources documented in Reference Doc
-- [ ] Ownership transferred to customer team
+- [ ] Ownership transferred to the team taking over
 - [ ] Developer access removed or downgraded
 - [ ] Service principal credentials rotated (if temporary dev access was granted)
 - [ ] No orphaned resources (clusters, jobs, endpoints)
-- [ ] Customer can deploy and operate independently
+- [ ] Receiving team can deploy and operate independently
 
 ---
 
@@ -271,4 +271,4 @@ Common credential types to manage: external API keys, service principal secrets,
 - **Principle of least privilege** — request only the access you need
 - **Use service principals** for production jobs, not personal credentials
 - **Document access grants** — track what access was granted and why
-- **Remove access at engagement end** — don't leave orphaned permissions
+- **Remove access when no longer needed** — don't leave orphaned permissions

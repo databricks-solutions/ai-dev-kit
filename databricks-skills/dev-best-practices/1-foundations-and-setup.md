@@ -116,7 +116,7 @@ databricks auth login --host https://prod.databricks.com --profile prod
 
 ## 3. Git & Collaboration
 
-Adopt customer Git workflows when they exist. When building from scratch, use the following practices.
+Adopt the project's existing Git workflows when they exist. When building from scratch, use the following practices.
 
 ### 3.1 Git Fundamentals
 
@@ -239,7 +239,7 @@ Why the change is required
 
 ## Testing
 - How you tested it (e.g., runs successfully in notebook, dev model deployed)
-- Link to JIRA ticket if applicable
+- Link to issue tracker ticket (e.g. Jira, GitHub Issues) if applicable
 ```
 
 **Self-review before requesting review:**
@@ -262,7 +262,7 @@ Use **Ready PR** when: code is complete and tested, all checklist items done, se
 
 ### 3.6 Code Review Culture
 
-**Reviewer:** Review within 4 hours during active engagement. Distinguish blockers from suggestions.
+**Reviewer:** Review within 4 hours. Distinguish blockers from suggestions.
 
 **Author:** Respond to every comment. Push back respectfully if you disagree.
 
@@ -366,7 +366,7 @@ databricks bundle destroy -t dev   # clean up dev resources
 
 - **Terminate clusters** — don't leave them running overnight
 - **Push your work** — even WIP; protects against laptop loss
-- **Update the team** — quick Slack: "finished X, starting Y tomorrow, blocked on Z"
+- **Update the team** — via your preferred channel (Slack, Teams, etc.): "finished X, starting Y tomorrow, blocked on Z"
 
 ### 5.7 Cost Consciousness
 

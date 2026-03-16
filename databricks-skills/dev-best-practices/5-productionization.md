@@ -1,6 +1,6 @@
 # Part VI: Productionization
 
-Productionization is where development teams deliver lasting value. It's not enough to build something that works in a notebook — we need to deliver systems that are tested, observable, deployable, and maintainable by the customer team after we leave.
+Productionization is where development teams deliver lasting value. It's not enough to build something that works in a notebook — we need to deliver systems that are tested, observable, deployable, and maintainable by the team that owns it long-term.
 
 ## 11. Observability & Monitoring
 
@@ -207,7 +207,7 @@ jobs:
 
 ## 13. Documentation & Handoff
 
-Documentation is how knowledge survives the engagement. The customer team will maintain this system after the project team leaves.
+Documentation is how knowledge survives a transition. The team that takes over will maintain this system after the original project team moves on.
 
 ### 13.1 Documentation Artifacts
 
@@ -262,7 +262,7 @@ Brief description (2–3 sentences) of what this system does.
 
 ### 13.3 Knowledge Transfer
 
-Conduct knowledge transfer sessions before the engagement ends:
+Before transitioning ownership of the system, conduct knowledge transfer sessions:
 
 | Session | Duration | Audience | Content |
 |---------|---------|----------|--------|
@@ -297,8 +297,8 @@ Before considering a system production-ready:
 **Handoff:**
 - [ ] Reference Doc complete and reviewed
 - [ ] Knowledge transfer sessions completed
-- [ ] Customer team trained
-- [ ] Customer can deploy independently
+- [ ] Receiving team trained
+- [ ] Receiving team can deploy independently
 - [ ] Access controls configured (principle of least privilege)
 
-See also [**4-databricks-platform.md §9.2 (Engagement Exit Checklist)**](4-databricks-platform.md) for resource cleanup tasks.
+See also [**4-databricks-platform.md §9.2 (Project Handoff Checklist)**](4-databricks-platform.md) for resource cleanup tasks.

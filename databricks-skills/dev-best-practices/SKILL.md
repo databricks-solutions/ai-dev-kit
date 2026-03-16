@@ -5,13 +5,13 @@ description: "Databricks development best practices: Git workflow, code quality,
 
 # Databricks Development Best Practices
 
-A practical guide for writing code, collaborating, and shipping production-ready solutions on Databricks — from environment setup to customer handoff.
+A practical guide for writing code, collaborating, and shipping production-ready solutions on Databricks — from environment setup to production handoff.
 
 ## Core Philosophy
 
 - **Platform-First:** Default to Databricks platform features before building custom solutions. Document all platform gaps for R&D feedback.
-- **Build for Handoff:** Every line of code, architecture decision, and configuration should anticipate customer ownership.
-- **Leave It Better:** Actively improve what you touch — this compounds value across engagements.
+- **Build for Handoff:** Every line of code, architecture decision, and configuration should anticipate long-term ownership by the team that maintains it.
+- **Leave It Better:** Actively improve what you touch — this compounds value over time.
 - **System Design = Implementation Quality:** Thoughtful architecture matters as much as clean, tested code.
 
 ## Reference Files

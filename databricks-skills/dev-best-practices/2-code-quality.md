@@ -1,8 +1,8 @@
 # Part II: Code Quality Standards
 
-Code quality isn't about perfection — it's about writing code that's easy to understand, maintain, and hand off. Customers inherit our code — every shortcut becomes their technical debt.
+Code quality isn't about perfection — it's about writing code that's easy to understand, maintain, and hand off. The team that inherits the code inherits every shortcut as technical debt.
 
-If a customer has existing style guides, adopt theirs. Consistency with their codebase matters more than our preferences.
+If the project has existing style guides, adopt them. Consistency with the existing codebase matters more than personal preferences.
 
 ## 4.1 Python Standards
 
