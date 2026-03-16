@@ -158,9 +158,7 @@ def deploy_app(
     # In some API/SDK combinations, the immediate deploy response can still point
     # to the previously active deployment. Poll briefly for the active deployment
     # to transition so callers can reliably detect a redeploy.
-    if not new_deployment_id or (
-        previous_deployment_id and new_deployment_id == previous_deployment_id
-    ):
+    if not new_deployment_id or (previous_deployment_id and new_deployment_id == previous_deployment_id):
         deadline = time.time() + 60
         while time.time() < deadline:
             try:

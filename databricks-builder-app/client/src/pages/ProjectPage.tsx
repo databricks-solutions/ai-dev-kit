@@ -1005,6 +1005,11 @@ export default function ProjectPage() {
           const conv = await fetchConversation(projectId, preferredConversationId);
           const executionState = preferredExecutionState
             ?? await fetchExecutions(projectId, conv.id).catch(() => ({ active: null, recent: [] }));
+          const hasActiveExecution = executionState.active?.status === 'running';
+          if (hasActiveExecution && executionState.active?.id) {
+            // Recover per-conversation streaming state after refresh/navigation.
+            setConversationStreamingState(conv.id, true, executionState.active.id);
+          }
           const persistedTraceHistory = buildTraceHistoryFromExecutions(executionState.recent);
           setCurrentConversation(conv);
           setMessages(conv.messages || []);
@@ -1056,7 +1061,7 @@ export default function ProjectPage() {
     };
 
     loadData();
-  }, [projectId, navigate]);
+  }, [projectId, navigate, setConversationStreamingState]);
 
   // Keep selected conversation ID available to async stream callbacks.
   useEffect(() => {
@@ -1296,9 +1301,14 @@ export default function ProjectPage() {
       shouldAutoCreateOnNextSendRef.current = false;
       const conv = await fetchConversation(projectId, conversationId);
       const executionState = await fetchExecutions(projectId, conversationId).catch(() => ({ active: null, recent: [] }));
+      const hasActiveExecution = executionState.active?.status === 'running';
+      if (hasActiveExecution && executionState.active?.id) {
+        // If local refs were reset, rebuild streaming ownership from backend truth.
+        setConversationStreamingState(conversationId, true, executionState.active.id);
+      }
       const persistedTraceHistory = buildTraceHistoryFromExecutions(executionState.recent);
       const inProgress = inProgressByConversationRef.current[conversationId];
-      const isConvStreaming = streamingConversationIdsRef.current.has(conversationId);
+      const isConvStreaming = streamingConversationIdsRef.current.has(conversationId) || hasActiveExecution;
       const activeExecutionItems = executionState.active
         ? buildActivityItemsFromExecutionEvents(executionState.active.events || [])
         : [];
@@ -2410,14 +2420,14 @@ export default function ProjectPage() {
             <button
               onClick={() => setVerbose((v) => !v)}
               className={cn(
-                'flex items-center justify-center h-9 w-9 rounded-lg transition-all',
+                'flex items-center justify-center h-7 w-7 rounded-lg transition-all',
                 verbose
                   ? 'bg-purple-500/10 text-purple-400 ring-2 ring-purple-500/20'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]'
               )}
               title={verbose ? 'Thinking ON — showing full agent trace' : 'Thinking OFF — click to show full agent trace'}
             >
-              <Brain className="h-4.5 w-4.5" />
+              <Brain className="h-3.5 w-3.5" />
             </button>
             {/* Settings button */}
             <div className="relative" ref={configPanelRef}>

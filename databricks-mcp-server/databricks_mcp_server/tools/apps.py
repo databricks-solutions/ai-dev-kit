@@ -195,8 +195,8 @@ def get_app(
                 "using your workspace-supported method (for example Databricks UI Logs tab)."
             )
             result["logs_cli_commands"] = [
-                #f"databricks apps get {name} -o json",
-                #f"databricks apps list-deployments {name} -o json",
+                # f"databricks apps get {name} -o json",
+                # f"databricks apps list-deployments {name} -o json",
                 f"databricks apps logs {name} --tail-lines 100",
             ]
 
