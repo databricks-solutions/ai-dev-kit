@@ -9,11 +9,10 @@ Use this skill when you need to authenticate to a Databricks workspace or config
 
 ## Authenticate to a workspace
 
-```bash
-# OAuth (recommended) — opens browser to complete login
-databricks auth login --host https://<your-workspace>.azuredatabricks.net
+For initial CLI setup and install instructions, see [dev-best-practices §2.5](../dev-best-practices/1-foundations-and-setup.md).
 
-# Store under a named profile
+```bash
+# Store under a named profile (for multi-workspace workflows)
 databricks auth login --host https://<your-workspace>.azuredatabricks.net --profile my-profile
 ```
 

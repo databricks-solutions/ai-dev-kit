@@ -48,3 +48,4 @@ A practical guide for writing code, collaborating, and shipping production-ready
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** — Python SDK implementation reference
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** — Unity Catalog operations and system tables
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** — Job orchestration patterns
+- **[databricks-config](../databricks-config/SKILL.md)** — profile and authentication setup for CLI/SDK
