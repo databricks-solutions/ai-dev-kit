@@ -98,6 +98,7 @@ Common configuration keys (all values must be strings):
 | `spark.sql.shuffle.partitions` | Number of shuffle partitions (`"auto"` recommended) |
 | `pipelines.numRetries` | Number of retries on transient failures |
 | `pipelines.trigger.interval` | Trigger interval for continuous pipelines, e.g., `"1 hour"` |
+| `pipelines.reset.allowed` | Set to `"false"` to preserve Delta table data on full refresh |
 | `spark.databricks.delta.preview.enabled` | Enable Delta preview features (`"true"`) |
 
 ### `run_as` Object - Pipeline Execution Identity
