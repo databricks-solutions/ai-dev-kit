@@ -1,6 +1,6 @@
 ---
 name: databricks-lakebase-autoscale
-description: "Patterns and best practices for using Lakebase Autoscaling (next-gen managed PostgreSQL) with autoscaling, branching, scale-to-zero, and instant restore."
+description: "Patterns and best practices for Lakebase Autoscaling (next-gen managed PostgreSQL). Use when creating or managing Lakebase Autoscaling projects, configuring autoscaling compute or scale-to-zero, working with database branching for dev/test workflows, implementing reverse ETL via synced tables, or connecting applications to Lakebase with OAuth credentials."
 ---
 
 # Lakebase Autoscaling
@@ -290,5 +290,5 @@ These features are NOT yet supported in Lakebase Autoscaling:
 - **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps that can use Lakebase for persistence
 - **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python apps with Lakebase backend
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for project management and token generation
-- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps with Lakebase resources
+- **[databricks-bundles](../databricks-bundles/SKILL.md)** - deploying apps with Lakebase resources
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - scheduling reverse ETL sync jobs

@@ -1,6 +1,6 @@
 """SQL tools - Execute SQL queries and get table information."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from databricks_tools_core.sql import (
     execute_sql as _execute_sql,
@@ -14,6 +14,45 @@ from databricks_tools_core.sql import (
 from ..server import mcp
 
 
+def _format_results_markdown(rows: List[Dict[str, Any]]) -> str:
+    """Format SQL results as a markdown table.
+
+    Markdown tables state column names once in the header instead of repeating
+    them on every row (as JSON does), reducing token usage by ~50%.
+
+    Args:
+        rows: List of row dicts from the SQL executor.
+
+    Returns:
+        Markdown table string, or "(no results)" if empty.
+    """
+    if not rows:
+        return "(no results)"
+
+    columns = list(rows[0].keys())
+
+    # Build header
+    header = "| " + " | ".join(columns) + " |"
+    separator = "| " + " | ".join("---" for _ in columns) + " |"
+
+    # Build rows — convert None to empty string, stringify everything
+    data_lines = []
+    for row in rows:
+        cells = []
+        for col in columns:
+            val = row.get(col)
+            cell = "" if val is None else str(val)
+            # Escape pipe characters inside cell values
+            cell = cell.replace("|", "\\|")
+            cells.append(cell)
+        data_lines.append("| " + " | ".join(cells) + " |")
+
+    parts = [header, separator] + data_lines
+    # Append row count for awareness
+    parts.append(f"\n({len(rows)} row{'s' if len(rows) != 1 else ''})")
+    return "\n".join(parts)
+
+
 @mcp.tool
 def execute_sql(
     sql_query: str,
@@ -22,7 +61,8 @@ def execute_sql(
     schema: str = None,
     timeout: int = 180,
     query_tags: str = None,
-) -> List[Dict[str, Any]]:
+    output_format: str = "markdown",
+) -> Union[str, List[Dict[str, Any]]]:
     """
     Execute a SQL query on a Databricks SQL Warehouse.
 
@@ -40,11 +80,15 @@ def execute_sql(
         timeout: Timeout in seconds (default: 180)
         query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701").
             Appears in system.query.history and Query History UI.
+        output_format: Result format — "markdown" (default) or "json".
+            Markdown tables are ~50% smaller than JSON because column names appear
+            only once in the header instead of on every row. Use "json" when you
+            need machine-parseable output.
 
     Returns:
-        List of dictionaries, each representing a row with column names as keys.
+        Markdown table string (default) or list of row dictionaries (if output_format="json").
     """
-    return _execute_sql(
+    rows = _execute_sql(
         sql_query=sql_query,
         warehouse_id=warehouse_id,
         catalog=catalog,
@@ -52,6 +96,9 @@ def execute_sql(
         timeout=timeout,
         query_tags=query_tags,
     )
+    if output_format == "json":
+        return rows
+    return _format_results_markdown(rows)
 
 
 @mcp.tool
@@ -63,6 +110,7 @@ def execute_sql_multi(
     timeout: int = 180,
     max_workers: int = 4,
     query_tags: str = None,
+    output_format: str = "markdown",
 ) -> Dict[str, Any]:
     """
     Execute multiple SQL statements with dependency-aware parallelism.
@@ -82,11 +130,14 @@ def execute_sql_multi(
         timeout: Timeout per query in seconds (default: 180)
         max_workers: Maximum parallel queries per group (default: 4)
         query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701").
+        output_format: Result format — "markdown" (default) or "json".
+            Markdown tables are ~50% smaller than JSON because column names appear
+            only once in the header instead of on every row.
 
     Returns:
         Dictionary with results per query and execution summary.
     """
-    return _execute_sql_multi(
+    result = _execute_sql_multi(
         sql_content=sql_content,
         warehouse_id=warehouse_id,
         catalog=catalog,
@@ -95,6 +146,13 @@ def execute_sql_multi(
         max_workers=max_workers,
         query_tags=query_tags,
     )
+    # Format sample_results in each query result if markdown requested
+    if output_format != "json" and "results" in result:
+        for query_result in result["results"].values():
+            sample = query_result.get("sample_results")
+            if sample and isinstance(sample, list) and len(sample) > 0:
+                query_result["sample_results"] = _format_results_markdown(sample)
+    return result
 
 
 @mcp.tool

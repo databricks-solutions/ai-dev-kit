@@ -11,7 +11,7 @@ Run in your project root:
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
 
 # Install specific skills
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-asset-bundles agent-evaluation
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-bundles agent-evaluation
 
 # Pin MLflow skills to a specific version
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --mlflow-version v1.0.0
@@ -33,10 +33,10 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ## Available Skills
 
 ### 🤖 AI & Agents
+- **databricks-ai-functions** - Built-in AI Functions (ai_classify, ai_extract, ai_summarize, ai_query, ai_forecast, ai_parse_document, and more) with SQL and PySpark patterns, function selection guidance, document processing pipelines, and custom RAG (parse → chunk → index → query)
 - **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
 - **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
 - **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints
-- **databricks-parsing** - Parse documents (PDF, DOCX, images) with ai_parse_document for custom RAG pipelines
 - **databricks-unstructured-pdf-generation** - Generate synthetic PDFs for RAG
 - **databricks-vector-search** - Vector similarity search for RAG and semantic search
 
@@ -61,7 +61,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-synthetic-data-gen** - Realistic test data with Faker
 
 ### 🚀 Development & Deployment
-- **databricks-asset-bundles** - DABs for multi-environment deployments
+- **databricks-bundles** - DABs for multi-environment deployments
 - **databricks-app-apx** - Full-stack apps (FastAPI + React)
 - **databricks-app-python** - Python web apps (Dash, Streamlit, Flask) with foundation model integration
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API

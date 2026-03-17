@@ -80,9 +80,9 @@ $script:ListSkills   = $false
 # Databricks skills (bundled in repo)
 $script:Skills = @(
     "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-app-python",
-    "databricks-asset-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
+    "databricks-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
-    "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-parsing",
+    "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-ai-functions",
     "databricks-python-sdk", "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
     "databricks-synthetic-data-gen", "databricks-unity-catalog", "databricks-unstructured-pdf-generation",
     "databricks-vector-search", "databricks-zerobus-ingest", "spark-python-data-source"
@@ -105,7 +105,7 @@ $script:CoreSkills = @("databricks-config", "databricks-docs", "databricks-pytho
 
 $script:ProfileDataEngineer = @(
     "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
-    "databricks-jobs", "databricks-asset-bundles", "databricks-dbsql", "databricks-iceberg",
+    "databricks-jobs", "databricks-bundles", "databricks-dbsql", "databricks-iceberg",
     "databricks-zerobus-ingest", "spark-python-data-source", "databricks-metric-views",
     "databricks-synthetic-data-gen"
 )
@@ -114,7 +114,7 @@ $script:ProfileAnalyst = @(
 )
 $script:ProfileAiMlEngineer = @(
     "databricks-agent-bricks", "databricks-vector-search", "databricks-model-serving",
-    "databricks-genie", "databricks-parsing", "databricks-unstructured-pdf-generation",
+    "databricks-genie", "databricks-ai-functions", "databricks-unstructured-pdf-generation",
     "databricks-mlflow-evaluation", "databricks-synthetic-data-gen", "databricks-jobs"
 )
 $script:ProfileAiMlMlflow = @(
@@ -125,7 +125,7 @@ $script:ProfileAiMlMlflow = @(
 $script:ProfileAppDeveloper = @(
     "databricks-app-python", "databricks-app-apx", "databricks-lakebase-autoscale",
     "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
-    "databricks-jobs", "databricks-asset-bundles"
+    "databricks-jobs", "databricks-bundles"
 )
 
 # Selected skills (populated during profile selection)
@@ -1102,7 +1102,7 @@ function Invoke-PromptCustomSkills {
         @{ Label = "Spark Pipelines";      Value = "databricks-spark-declarative-pipelines"; State = ($preselected -contains "databricks-spark-declarative-pipelines"); Hint = "SDP/LDP, CDC, SCD Type 2" }
         @{ Label = "Streaming";            Value = "databricks-spark-structured-streaming";  State = ($preselected -contains "databricks-spark-structured-streaming");  Hint = "Real-time streaming" }
         @{ Label = "Jobs & Workflows";     Value = "databricks-jobs";                        State = ($preselected -contains "databricks-jobs");                        Hint = "Multi-task orchestration" }
-        @{ Label = "Asset Bundles";        Value = "databricks-asset-bundles";               State = ($preselected -contains "databricks-asset-bundles");               Hint = "DABs deployment" }
+        @{ Label = "Asset Bundles";        Value = "databricks-bundles";               State = ($preselected -contains "databricks-bundles");               Hint = "DABs deployment" }
         @{ Label = "Databricks SQL";       Value = "databricks-dbsql";                       State = ($preselected -contains "databricks-dbsql");                       Hint = "SQL warehouse queries" }
         @{ Label = "Iceberg";              Value = "databricks-iceberg";                     State = ($preselected -contains "databricks-iceberg");                     Hint = "Apache Iceberg tables" }
         @{ Label = "Zerobus Ingest";       Value = "databricks-zerobus-ingest";              State = ($preselected -contains "databricks-zerobus-ingest");              Hint = "Streaming ingestion" }
@@ -1114,7 +1114,7 @@ function Invoke-PromptCustomSkills {
         @{ Label = "Vector Search";        Value = "databricks-vector-search";               State = ($preselected -contains "databricks-vector-search");               Hint = "Similarity search" }
         @{ Label = "Model Serving";        Value = "databricks-model-serving";               State = ($preselected -contains "databricks-model-serving");               Hint = "Deploy models/agents" }
         @{ Label = "MLflow Evaluation";    Value = "databricks-mlflow-evaluation";           State = ($preselected -contains "databricks-mlflow-evaluation");           Hint = "Model evaluation" }
-        @{ Label = "Parsing";              Value = "databricks-parsing";                     State = ($preselected -contains "databricks-parsing");                     Hint = "Document parsing for RAG" }
+        @{ Label = "AI Functions";          Value = "databricks-ai-functions";                State = ($preselected -contains "databricks-ai-functions");                Hint = "AI Functions, document parsing & RAG" }
         @{ Label = "Unstructured PDF";     Value = "databricks-unstructured-pdf-generation"; State = ($preselected -contains "databricks-unstructured-pdf-generation"); Hint = "Synthetic PDFs for RAG" }
         @{ Label = "Synthetic Data";       Value = "databricks-synthetic-data-gen";          State = ($preselected -contains "databricks-synthetic-data-gen");          Hint = "Generate test data" }
         @{ Label = "Lakebase Autoscale";   Value = "databricks-lakebase-autoscale";          State = ($preselected -contains "databricks-lakebase-autoscale");          Hint = "Managed PostgreSQL" }

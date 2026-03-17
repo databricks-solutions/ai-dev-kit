@@ -55,7 +55,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 
 
 ### Install in existing project
-By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.  
+By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
 _Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, or .gemini_
 
 #### Mac / Linux

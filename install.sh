@@ -88,7 +88,7 @@ MIN_SDK_VERSION="0.85.0"
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
 # Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-aibi-dashboards databricks-app-python databricks-asset-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-app-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -103,11 +103,11 @@ APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/ski
 CORE_SKILLS="databricks-config databricks-docs databricks-python-sdk databricks-unity-catalog"
 
 # Profile definitions (non-core skills only — core skills are always added)
-PROFILE_DATA_ENGINEER="databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-jobs databricks-asset-bundles databricks-dbsql databricks-iceberg databricks-zerobus-ingest spark-python-data-source databricks-metric-views databricks-synthetic-data-gen"
+PROFILE_DATA_ENGINEER="databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-jobs databricks-bundles databricks-dbsql databricks-iceberg databricks-zerobus-ingest spark-python-data-source databricks-metric-views databricks-synthetic-data-gen"
 PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie databricks-metric-views"
-PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-vector-search databricks-model-serving databricks-genie databricks-parsing databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
+PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-model-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
-PROFILE_APP_DEVELOPER="databricks-app-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-asset-bundles"
+PROFILE_APP_DEVELOPER="databricks-app-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-bundles"
 
 # Selected skills (populated during profile selection)
 SELECTED_SKILLS=""
@@ -900,7 +900,7 @@ prompt_custom_skills() {
         "Spark Pipelines|databricks-spark-declarative-pipelines|$(_is_preselected databricks-spark-declarative-pipelines)|SDP/LDP, CDC, SCD Type 2" \
         "Structured Streaming|databricks-spark-structured-streaming|$(_is_preselected databricks-spark-structured-streaming)|Real-time streaming" \
         "Jobs & Workflows|databricks-jobs|$(_is_preselected databricks-jobs)|Multi-task orchestration" \
-        "Asset Bundles|databricks-asset-bundles|$(_is_preselected databricks-asset-bundles)|DABs deployment" \
+        "Asset Bundles|databricks-bundles|$(_is_preselected databricks-bundles)|DABs deployment" \
         "Databricks SQL|databricks-dbsql|$(_is_preselected databricks-dbsql)|SQL warehouse queries" \
         "Iceberg|databricks-iceberg|$(_is_preselected databricks-iceberg)|Apache Iceberg tables" \
         "Zerobus Ingest|databricks-zerobus-ingest|$(_is_preselected databricks-zerobus-ingest)|Streaming ingestion" \
@@ -912,7 +912,7 @@ prompt_custom_skills() {
         "Vector Search|databricks-vector-search|$(_is_preselected databricks-vector-search)|Similarity search" \
         "Model Serving|databricks-model-serving|$(_is_preselected databricks-model-serving)|Deploy models/agents" \
         "MLflow Evaluation|databricks-mlflow-evaluation|$(_is_preselected databricks-mlflow-evaluation)|Model evaluation" \
-        "Parsing|databricks-parsing|$(_is_preselected databricks-parsing)|Document parsing for RAG" \
+        "AI Functions|databricks-ai-functions|$(_is_preselected databricks-ai-functions)|AI Functions, document parsing & RAG" \
         "Unstructured PDF|databricks-unstructured-pdf-generation|$(_is_preselected databricks-unstructured-pdf-generation)|Synthetic PDFs for RAG" \
         "Synthetic Data|databricks-synthetic-data-gen|$(_is_preselected databricks-synthetic-data-gen)|Generate test data" \
         "Lakebase Autoscale|databricks-lakebase-autoscale|$(_is_preselected databricks-lakebase-autoscale)|Managed PostgreSQL" \
@@ -1086,7 +1086,7 @@ install_skills() {
     # Determine target directories (array so paths with spaces work)
     for tool in $TOOLS; do
         case $tool in
-            claude) dirs=("$base_dir/.claude/skills") ;;
+            claude) dirs+=("$base_dir/.claude/skills") ;;
             cursor) echo "$TOOLS" | grep -q claude || dirs+=("$base_dir/.cursor/skills") ;;
             copilot) dirs+=("$base_dir/.github/skills") ;;
             codex) dirs+=("$base_dir/.agents/skills") ;;
@@ -1209,7 +1209,7 @@ write_mcp_json() {
         msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
     fi
 
-    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
+    if [ -f "$VENV_PYTHON" ]; then
         "$VENV_PYTHON" -c "
 import json, sys
 try:
@@ -1218,6 +1218,13 @@ except: cfg = {}
 cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'defer_loading': True, 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
 with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 " 2>/dev/null && return
+    fi
+
+    # Fallback: only safe for new files — refuse to overwrite existing files
+    # that may contain other settings (e.g. ~/.claude.json)
+    if [ -f "$path" ]; then
+        warn "Cannot merge MCP config into $path without Python. Add manually."
+        return
     fi
 
     cat > "$path" << EOF
@@ -1410,7 +1417,7 @@ write_mcp_configs() {
     for tool in $TOOLS; do
         case $tool in
             claude)
-                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude/mcp.json" || write_mcp_json "$base_dir/.mcp.json"
+                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude.json" || write_mcp_json "$base_dir/.mcp.json"
                 ok "Claude MCP config"
                 # Add version check hook to Claude settings
                 local check_script="$REPO_DIR/.claude-plugin/check_update.sh"

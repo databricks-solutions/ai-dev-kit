@@ -326,7 +326,7 @@ resources:
 
 ## Related Skills
 
-- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - Deploy jobs via Databricks Asset Bundles
+- **[databricks-bundles](../databricks-bundles/SKILL.md)** - Deploy jobs via Databricks Asset Bundles
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Configure pipelines triggered by jobs
 
 ## Resources
