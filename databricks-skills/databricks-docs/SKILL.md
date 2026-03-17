@@ -1,6 +1,6 @@
 ---
 name: databricks-docs
-description: "Databricks documentation reference. Use as a lookup resource alongside other skills and MCP tools for comprehensive guidance."
+description: "Databricks documentation reference via llms.txt index. Use when other skills do not cover a topic, looking up unfamiliar Databricks features, or needing authoritative docs on APIs, configurations, or platform capabilities."
 ---
 
 # Databricks Documentation Reference

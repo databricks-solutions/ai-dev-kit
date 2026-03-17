@@ -1,6 +1,6 @@
 ---
 name: databricks-lakebase-autoscale
-description: "Patterns and best practices for using Lakebase Autoscaling (next-gen managed PostgreSQL) with autoscaling, branching, scale-to-zero, and instant restore."
+description: "Patterns and best practices for Lakebase Autoscaling (next-gen managed PostgreSQL). Use when creating or managing Lakebase Autoscaling projects, configuring autoscaling compute or scale-to-zero, working with database branching for dev/test workflows, implementing reverse ETL via synced tables, or connecting applications to Lakebase with OAuth credentials."
 ---
 
 # Lakebase Autoscaling
