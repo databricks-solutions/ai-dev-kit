@@ -290,5 +290,5 @@ These features are NOT yet supported in Lakebase Autoscaling:
 - **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps that can use Lakebase for persistence
 - **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python apps with Lakebase backend
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for project management and token generation
-- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - deploying apps with Lakebase resources
+- **[databricks-bundles](../databricks-bundles/SKILL.md)** - deploying apps with Lakebase resources
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - scheduling reverse ETL sync jobs
