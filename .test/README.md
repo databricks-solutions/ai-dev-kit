@@ -67,14 +67,14 @@ Agent evaluation runs a real Claude Code instance via the [Claude Agent SDK](htt
 }
 ```
 
-| Field | Purpose |
-|-------|---------|
-| `ANTHROPIC_MODEL` | Default model the agent uses |
-| `ANTHROPIC_BASE_URL` | Claude API endpoint (Databricks AI Gateway or direct) |
-| `ANTHROPIC_AUTH_TOKEN` | Auth token — supports `${VAR:-default}` interpolation |
-| `ANTHROPIC_CUSTOM_HEADERS` | Extra headers (e.g., coding agent mode for Databricks) |
-| `DATABRICKS_CONFIG_PROFILE` | Databricks CLI profile for MCP tools |
-| `DATABRICKS_API_KEY` | Databricks token for MCP tool calls |
+| Field | Purpose                                                                 |
+|-------|-------------------------------------------------------------------------|
+| `ANTHROPIC_MODEL` | Default model the agent uses. Currently points to Databricks by default |
+| `ANTHROPIC_BASE_URL` | Claude API endpoint (Databricks AI Gateway or direct)                   |
+| `ANTHROPIC_AUTH_TOKEN` | Auth token — supports `${VAR:-default}` interpolation                   |
+| `ANTHROPIC_CUSTOM_HEADERS` | Extra headers (e.g., coding agent mode for Databricks)                  |
+| `DATABRICKS_CONFIG_PROFILE` | Databricks CLI profile for MCP tools                                    |
+| `DATABRICKS_API_KEY` | Databricks token for MCP tool calls                                     |
 
 The `${VAR:-default}` syntax lets you reference environment variables with fallbacks. The agent runs with `bypassPermissions` mode so it doesn't prompt for tool approval.
 
