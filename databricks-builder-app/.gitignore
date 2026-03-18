@@ -32,5 +32,8 @@ client/.vite/
 .vscode/
 *.swp
 
+# Local docs/notes
+docs/TODO.md
+
 # OS
 .DS_Store
