@@ -8,24 +8,24 @@ The `--focus` flag lets you steer skill optimization with natural language. It u
 
 ```bash
 # Single focus area
-uv run python .test/scripts/optimize.py databricks-asset-bundles \
+uv run python .test/scripts/optimize.py databricks-bundles \
   --focus "prefix all catalogs with customer_ prefix"
 
 # Multiple focus areas
-uv run python .test/scripts/optimize.py databricks-asset-bundles \
+uv run python .test/scripts/optimize.py databricks-bundles \
   --focus "prefix all catalogs with customer_ prefix" \
   --focus "always use serverless compute"
 
 # Focus areas from a file
-uv run python .test/scripts/optimize.py databricks-asset-bundles \
+uv run python .test/scripts/optimize.py databricks-bundles \
   --focus-file my_focus_areas.txt
 
 # Dry run to see what would change
-uv run python .test/scripts/optimize.py databricks-asset-bundles \
+uv run python .test/scripts/optimize.py databricks-bundles \
   --focus "prefix all catalogs with customer_ prefix" --dry-run
 
 # Combined with presets
-uv run python .test/scripts/optimize.py databricks-asset-bundles \
+uv run python .test/scripts/optimize.py databricks-bundles \
   --focus "use DLT for all pipeline examples" --preset quick
 ```
 

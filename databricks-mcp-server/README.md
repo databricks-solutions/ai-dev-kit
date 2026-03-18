@@ -175,7 +175,7 @@ Claude now has both:
 │  Skills (knowledge)          MCP Tools (actions)            │
 │  └── .claude/skills/         └── .claude/mcp.json           │
 │      ├── sdp-writer              └── databricks server      │
-│      ├── databricks-asset-bundles                          │
+│      ├── databricks-bundles                          │
 │      └── ...                                                │
 └──────────────────────────────┬──────────────────────────────┘
                                │ MCP Protocol (stdio)

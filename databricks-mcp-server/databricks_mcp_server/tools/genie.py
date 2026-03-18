@@ -42,12 +42,18 @@ def create_or_update_genie(
     description: Optional[str] = None,
     sample_questions: Optional[List[str]] = None,
     space_id: Optional[str] = None,
+    serialized_space: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create or update a Genie Space for SQL-based data exploration.
 
     A Genie Space allows users to ask natural language questions about data
     and get SQL-generated answers. It connects to tables in Unity Catalog.
+
+    When serialized_space is provided, the space is created/updated using the
+    full serialized configuration via the public /api/2.0/genie/spaces API.
+    This preserves all instructions, SQL examples, and settings from the source.
+    Obtain a serialized_space string via export_genie().
 
     Args:
         display_name: Display name for the Genie space
@@ -58,6 +64,10 @@ def create_or_update_genie(
         description: Optional description of what the Genie space does
         sample_questions: Optional list of sample questions to help users
         space_id: Optional existing space_id to update instead of create
+        serialized_space: Optional full serialized space config JSON string
+            (from export_genie). When provided, tables/instructions/SQL examples
+            from the serialized config are used and the public genie/spaces API
+            is called instead of data-rooms.
 
     Returns:
         Dictionary with:
@@ -75,6 +85,15 @@ def create_or_update_genie(
         ...     sample_questions=["What were total sales last month?"]
         ... )
         {"space_id": "abc123...", "display_name": "Sales Analytics", "operation": "created", ...}
+
+        >>> # Update with serialized config (preserves all instructions and SQL examples)
+        >>> exported = export_genie("abc123...")
+        >>> create_or_update_genie(
+        ...     display_name="Sales Analytics",
+        ...     table_identifiers=[],
+        ...     space_id="abc123...",
+        ...     serialized_space=exported["serialized_space"]
+        ... )
     """
     try:
         description = with_description_footer(description)
@@ -88,44 +107,84 @@ def create_or_update_genie(
 
         operation = "created"
 
-        if space_id:
-            existing = manager.genie_get(space_id)
-            if existing:
-                operation = "updated"
-                manager.genie_update(
+        # When serialized_space is provided
+        if serialized_space:
+            if space_id:
+                # Update existing space with serialized config
+                manager.genie_update_with_serialized_space(
                     space_id=space_id,
-                    display_name=display_name,
+                    serialized_space=serialized_space,
+                    title=display_name,
                     description=description,
                     warehouse_id=warehouse_id,
-                    table_identifiers=table_identifiers,
-                    sample_questions=sample_questions,
                 )
-            else:
-                return {"error": f"Genie space {space_id} not found"}
-        else:
-            existing = manager.genie_find_by_name(display_name)
-            if existing:
                 operation = "updated"
-                manager.genie_update(
-                    space_id=existing.space_id,
-                    display_name=display_name,
-                    description=description,
-                    warehouse_id=warehouse_id,
-                    table_identifiers=table_identifiers,
-                    sample_questions=sample_questions,
-                )
-                space_id = existing.space_id
             else:
-                result = manager.genie_create(
-                    display_name=display_name,
-                    warehouse_id=warehouse_id,
-                    table_identifiers=table_identifiers,
-                    description=description,
-                )
-                space_id = result.get("space_id", "")
+                # Check if exists by name, then create or update
+                existing = manager.genie_find_by_name(display_name)
+                if existing:
+                    operation = "updated"
+                    space_id = existing.space_id
+                    manager.genie_update_with_serialized_space(
+                        space_id=space_id,
+                        serialized_space=serialized_space,
+                        title=display_name,
+                        description=description,
+                        warehouse_id=warehouse_id,
+                    )
+                else:
+                    result = manager.genie_import(
+                        warehouse_id=warehouse_id,
+                        serialized_space=serialized_space,
+                        title=display_name,
+                        description=description,
+                    )
+                    space_id = result.get("space_id", "")
 
-                if sample_questions and space_id:
-                    manager.genie_add_sample_questions_batch(space_id, sample_questions)
+        # When serialized_space is not provided
+        else:
+            if space_id:
+                # Update existing space by ID
+                existing = manager.genie_get(space_id)
+                if existing:
+                    operation = "updated"
+                    manager.genie_update(
+                        space_id=space_id,
+                        display_name=display_name,
+                        description=description,
+                        warehouse_id=warehouse_id,
+                        table_identifiers=table_identifiers,
+                        sample_questions=sample_questions,
+                    )
+                else:
+                    return {"error": f"Genie space {space_id} not found"}
+            else:
+                # Check if exists by name first
+                existing = manager.genie_find_by_name(display_name)
+                if existing:
+                    operation = "updated"
+                    manager.genie_update(
+                        space_id=existing.space_id,
+                        display_name=display_name,
+                        description=description,
+                        warehouse_id=warehouse_id,
+                        table_identifiers=table_identifiers,
+                        sample_questions=sample_questions,
+                    )
+                    space_id = existing.space_id
+                else:
+                    # Create new
+                    result = manager.genie_create(
+                        display_name=display_name,
+                        warehouse_id=warehouse_id,
+                        table_identifiers=table_identifiers,
+                        description=description,
+                    )
+                    space_id = result.get("space_id", "")
+
+                    # Add sample questions if provided
+                    if sample_questions and space_id:
+                        manager.genie_add_sample_questions_batch(space_id, sample_questions)
 
         response = {
             "space_id": space_id,
@@ -154,7 +213,7 @@ def create_or_update_genie(
 
 
 @mcp.tool
-def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
+def get_genie(space_id: Optional[str] = None, include_serialized_space: bool = False) -> Dict[str, Any]:
     """
     Get details of a Genie Space, or list all spaces.
 
@@ -163,13 +222,27 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
 
     Args:
         space_id: The Genie space ID. If omitted, lists all spaces.
+        include_serialized_space: If True, include the full serialized space configuration
+            in the response (requires at least CAN EDIT permission). Useful when you
+            want to inspect or export the space config. Default: False.
 
     Returns:
-        Single space dict (if space_id provided) or {"spaces": [...]}.
+        Single space dictionary with Genie space details including:
+            - space_id: The space ID
+            - display_name: The display name
+            - description: The description
+            - warehouse_id: The SQL warehouse ID
+            - table_identifiers: List of configured tables
+            - sample_questions: List of sample questions
+            - serialized_space: Full space config JSON string (only when include_serialized_space=True)
+        Multiple spaces: List of space dictionaries (only when space_id is omitted)
 
     Example:
         >>> get_genie("abc123...")
         {"space_id": "abc123...", "display_name": "Sales Analytics", ...}
+
+        >>> get_genie("abc123...", include_serialized_space=True)
+        {"space_id": "abc123...", ..., "serialized_space": "{\"version\":1,...}"}
 
         >>> get_genie()
         {"spaces": [{"space_id": "abc123...", "title": "Sales Analytics", ...}, ...]}
@@ -185,7 +258,7 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
             questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
             sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
 
-            return {
+            response = {
                 "space_id": result.get("space_id", space_id),
                 "display_name": result.get("display_name", ""),
                 "description": result.get("description", ""),
@@ -193,6 +266,13 @@ def get_genie(space_id: Optional[str] = None) -> Dict[str, Any]:
                 "table_identifiers": result.get("table_identifiers", []),
                 "sample_questions": sample_questions,
             }
+
+            if include_serialized_space:
+                exported = manager.genie_export(space_id)
+                response["serialized_space"] = exported.get("serialized_space", "")
+
+            return response
+
         except Exception as e:
             return {"error": f"Failed to get Genie space {space_id}: {e}"}
 
@@ -244,6 +324,110 @@ def delete_genie(space_id: str) -> Dict[str, Any]:
         return {"success": True, "space_id": space_id}
     except Exception as e:
         return {"success": False, "space_id": space_id, "error": str(e)}
+
+
+@mcp.tool
+def migrate_genie(
+    type: str,
+    space_id: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    serialized_space: Optional[str] = None,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    parent_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Export or import a Genie Space for cloning and cross-workspace migration.
+
+    type="export": Retrieve the full serialized configuration of an existing
+    Genie Space (tables, instructions, SQL queries, layout). Requires at least
+    CAN EDIT permission on the space.
+
+    type="import": Create a new Genie Space from a serialized payload obtained
+    via a prior export call.
+
+    Args:
+        type: Operation to perform — "export" or "import"
+        space_id: (export) The Genie space ID to export
+        warehouse_id: (import) SQL warehouse ID for the new space.
+            Use list_warehouses() or get_best_warehouse() to find one.
+        serialized_space: (import) JSON string from a prior export containing
+            the full space configuration. Can also be constructed manually:
+            '{"version":2,"data_sources":{"tables":[{"identifier":"cat.schema.table"}]}}'
+        title: (import) Optional title override
+        description: (import) Optional description override
+        parent_path: (import) Optional workspace folder path for the new space
+            (e.g., "/Workspace/Users/you@company.com/Genie Spaces")
+
+    Returns:
+        export: Dictionary with space_id, title, description, warehouse_id,
+            and serialized_space (JSON string with the full config).
+        import: Dictionary with space_id, title, description, and
+            operation='imported'.
+
+    Example:
+        >>> exported = migrate_genie(type="export", space_id="abc123...")
+        >>> migrate_genie(
+        ...     type="import",
+        ...     warehouse_id=exported["warehouse_id"],
+        ...     serialized_space=exported["serialized_space"],
+        ...     title="Sales Analytics (Clone)"
+        ... )
+        {"space_id": "def456...", "title": "Sales Analytics (Clone)", "operation": "imported"}
+    """
+    if type == "export":
+        if not space_id:
+            return {"error": "space_id is required for type='export'"}
+        manager = _get_manager()
+        try:
+            result = manager.genie_export(space_id)
+            return {
+                "space_id": result.get("space_id", space_id),
+                "title": result.get("title", ""),
+                "description": result.get("description", ""),
+                "warehouse_id": result.get("warehouse_id", ""),
+                "serialized_space": result.get("serialized_space", ""),
+            }
+        except Exception as e:
+            return {"error": str(e), "space_id": space_id}
+
+    elif type == "import":
+        if not warehouse_id or not serialized_space:
+            return {"error": "warehouse_id and serialized_space are required for type='import'"}
+        manager = _get_manager()
+        try:
+            result = manager.genie_import(
+                warehouse_id=warehouse_id,
+                serialized_space=serialized_space,
+                title=title,
+                description=description,
+                parent_path=parent_path,
+            )
+            imported_space_id = result.get("space_id", "")
+
+            if imported_space_id:
+                try:
+                    from ..manifest import track_resource
+
+                    track_resource(
+                        resource_type="genie_space",
+                        name=title or result.get("title", imported_space_id),
+                        resource_id=imported_space_id,
+                    )
+                except Exception:
+                    pass
+
+            return {
+                "space_id": imported_space_id,
+                "title": result.get("title", title or ""),
+                "description": result.get("description", description or ""),
+                "operation": "imported",
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    else:
+        return {"error": f"Invalid type '{type}'. Must be 'export' or 'import'."}
 
 
 # ============================================================================

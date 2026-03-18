@@ -252,7 +252,7 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 ## Related Skills
 
 - **databricks-unity-catalog** - Managing catalogs, schemas, and volumes
-- **databricks-asset-bundles** - DABs for production deployment
+- **databricks-bundles** - DABs for production deployment
 
 ## Common Issues
 

@@ -80,7 +80,7 @@ $script:ListSkills   = $false
 # Databricks skills (bundled in repo)
 $script:Skills = @(
     "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-app-python",
-    "databricks-asset-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
+    "databricks-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
     "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-ai-functions",
     "databricks-python-sdk", "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
@@ -105,7 +105,7 @@ $script:CoreSkills = @("databricks-config", "databricks-docs", "databricks-pytho
 
 $script:ProfileDataEngineer = @(
     "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
-    "databricks-jobs", "databricks-asset-bundles", "databricks-dbsql", "databricks-iceberg",
+    "databricks-jobs", "databricks-bundles", "databricks-dbsql", "databricks-iceberg",
     "databricks-zerobus-ingest", "spark-python-data-source", "databricks-metric-views",
     "databricks-synthetic-data-gen"
 )
@@ -125,7 +125,7 @@ $script:ProfileAiMlMlflow = @(
 $script:ProfileAppDeveloper = @(
     "databricks-app-python", "databricks-app-apx", "databricks-lakebase-autoscale",
     "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
-    "databricks-jobs", "databricks-asset-bundles"
+    "databricks-jobs", "databricks-bundles"
 )
 
 # Selected skills (populated during profile selection)
@@ -1102,7 +1102,7 @@ function Invoke-PromptCustomSkills {
         @{ Label = "Spark Pipelines";      Value = "databricks-spark-declarative-pipelines"; State = ($preselected -contains "databricks-spark-declarative-pipelines"); Hint = "SDP/LDP, CDC, SCD Type 2" }
         @{ Label = "Streaming";            Value = "databricks-spark-structured-streaming";  State = ($preselected -contains "databricks-spark-structured-streaming");  Hint = "Real-time streaming" }
         @{ Label = "Jobs & Workflows";     Value = "databricks-jobs";                        State = ($preselected -contains "databricks-jobs");                        Hint = "Multi-task orchestration" }
-        @{ Label = "Asset Bundles";        Value = "databricks-asset-bundles";               State = ($preselected -contains "databricks-asset-bundles");               Hint = "DABs deployment" }
+        @{ Label = "Asset Bundles";        Value = "databricks-bundles";               State = ($preselected -contains "databricks-bundles");               Hint = "DABs deployment" }
         @{ Label = "Databricks SQL";       Value = "databricks-dbsql";                       State = ($preselected -contains "databricks-dbsql");                       Hint = "SQL warehouse queries" }
         @{ Label = "Iceberg";              Value = "databricks-iceberg";                     State = ($preselected -contains "databricks-iceberg");                     Hint = "Apache Iceberg tables" }
         @{ Label = "Zerobus Ingest";       Value = "databricks-zerobus-ingest";              State = ($preselected -contains "databricks-zerobus-ingest");              Hint = "Streaming ingestion" }
