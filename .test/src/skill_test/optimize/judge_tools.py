@@ -117,7 +117,6 @@ class ReadEvalReferenceTool(JudgeTool):
         if normalized.startswith("..") or os.path.isabs(normalized):
             return f"Error: Invalid file path '{file_path}'. Must be relative."
         if normalized not in skill.references:
-            available_refs = list(skill.references.keys())
             return f"Error: File '{file_path}' not found in '{skill_name}'"
         return skill.references[normalized]
 
