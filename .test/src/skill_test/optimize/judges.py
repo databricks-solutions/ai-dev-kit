@@ -83,6 +83,81 @@ def _is_rate_limit_error(exc: Exception) -> bool:
     )
 
 
+def _is_workspace_error(exc: Exception) -> bool:
+    """Detect workspace-level errors where retrying or falling back is pointless.
+
+    Catches 403/IP ACL blocks, auth failures, and network errors that indicate
+    the entire workspace is unreachable — not just a single model rate limit.
+    """
+    msg = str(exc).lower()
+    return any(
+        phrase in msg
+        for phrase in [
+            "403",
+            "forbidden",
+            "ip access list",
+            "ip acl",
+            "not on the ip access list",
+            "unauthorized",
+            "401",
+            "authentication failed",
+            "invalid token",
+            "could not resolve host",
+            "connection refused",
+            "network is unreachable",
+            "name or service not known",
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Global LLM call budget
+# ---------------------------------------------------------------------------
+
+
+class _LLMCallBudget:
+    """Thread-safe counter that enforces a global cap on LLM API calls.
+
+    Configurable via GEPA_MAX_LLM_CALLS env var.  When unset or 0 the budget
+    is unlimited.
+    """
+
+    def __init__(self):
+        import threading as _threading
+
+        self._lock = _threading.Lock()
+        self._count = 0
+        max_str = os.environ.get("GEPA_MAX_LLM_CALLS", "0")
+        try:
+            self._max = int(max_str)
+        except ValueError:
+            self._max = 0
+
+    @property
+    def max_calls(self) -> int:
+        return self._max
+
+    @property
+    def count(self) -> int:
+        with self._lock:
+            return self._count
+
+    def acquire(self) -> bool:
+        """Increment counter. Returns False if budget exhausted."""
+        with self._lock:
+            if self._max > 0 and self._count >= self._max:
+                return False
+            self._count += 1
+            return True
+
+    def exhausted(self) -> bool:
+        with self._lock:
+            return self._max > 0 and self._count >= self._max
+
+
+_llm_budget = _LLMCallBudget()
+
+
 # ---------------------------------------------------------------------------
 # AI Gateway support
 # ---------------------------------------------------------------------------
@@ -194,10 +269,21 @@ def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> A
     the fallback chain. Each model gets ``max_retries`` attempts with
     exponential backoff before moving to the next.
 
+    Workspace-level errors (403/IP ACL/auth) are raised immediately —
+    fallback models hit the same blocked workspace and would all fail.
+
+    Respects the global LLM call budget (``GEPA_MAX_LLM_CALLS``).
+
     Also supports AI Gateway: if DATABRICKS_AI_GATEWAY_URL is set,
     databricks/ models are routed through the gateway.
     """
     import litellm
+
+    if not _llm_budget.acquire():
+        raise RuntimeError(
+            f"GEPA LLM call budget exhausted ({_llm_budget.max_calls} calls). "
+            "Set GEPA_MAX_LLM_CALLS to increase or unset to disable."
+        )
 
     models_to_try = [model] + [m for m in _get_fallback_models() if m != model]
 
@@ -220,6 +306,13 @@ def completion_with_fallback(*, model: str, max_retries: int = 3, **kwargs) -> A
                 return litellm.completion(**call_kwargs)
             except Exception as e:
                 last_err = e
+                # Workspace-level errors: fail fast, no fallback
+                if _is_workspace_error(e):
+                    logger.error(
+                        "Workspace error (fail-fast): %s — not trying fallback models",
+                        e,
+                    )
+                    raise
                 if _is_rate_limit_error(e):
                     if attempt == max_retries - 1:
                         logger.warning(
@@ -600,6 +693,14 @@ def run_judge_safe(
     def _call_judge(j):
         return j(**kwargs)
 
+    # Budget check — return zero-score gracefully when budget exhausted
+    if _llm_budget.exhausted():
+        return JudgeFeedback(
+            value=0.0,
+            rationale=f"LLM call budget exhausted ({_llm_budget.max_calls} calls)",
+            name=name,
+        )
+
     # Try the primary judge first
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
@@ -622,6 +723,10 @@ def run_judge_safe(
         return JudgeFeedback(value=0.0, rationale=f"Judge timed out after {timeout}s", name=name)
     except Exception as e:
         pool.shutdown(wait=False)
+        # Workspace-level errors: return zero immediately, skip fallback chain
+        if _is_workspace_error(e):
+            logger.error("Judge '%s' hit workspace error (fail-fast): %s", name, e)
+            return JudgeFeedback(value=0.0, rationale=f"Workspace error: {e}", name=name)
         if not _is_rate_limit_error(e):
             logger.debug("Judge '%s' failed: %s", name, e)
             return JudgeFeedback(value=0.0, rationale=f"Judge error: {e}", name=name)
@@ -661,6 +766,10 @@ def run_judge_safe(
                 name=name,
             )
         except Exception as fallback_err:
+            # Workspace errors in fallback: stop trying — same workspace
+            if _is_workspace_error(fallback_err):
+                logger.error("Fallback '%s' hit workspace error (fail-fast): %s", fallback_model, fallback_err)
+                break
             if _is_rate_limit_error(fallback_err):
                 logger.warning("Fallback '%s' also rate limited, trying next", fallback_model)
                 continue

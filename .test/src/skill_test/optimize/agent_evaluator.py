@@ -157,6 +157,9 @@ class AgentEvaluator:
         self._mlflow_experiment = mlflow_experiment
         self._skill_name = skill_name
 
+        # Cache WITH-skill evaluation results keyed on (prompt_hash, candidate_hash)
+        self._with_skill_cache: dict[str, tuple[float, dict]] = {}
+
         # Caches for WITHOUT-skill runs (keyed by prompt hash)
         self._baseline_response_cache: dict[str, str] = {}
         self._baseline_trace_cache: dict[str, dict] = {}
@@ -257,6 +260,14 @@ class AgentEvaluator:
         """Inner evaluation logic, called by __call__ with error handling."""
         skill_md = candidate.get("skill_md", "")
         prompt = example.get("input", "")
+
+        # Check candidate-level cache
+        candidate_hash = hashlib.sha256(
+            json.dumps(candidate, sort_keys=True).encode()
+        ).hexdigest()[:16]
+        cache_key = f"{_prompt_hash(prompt)}:{candidate_hash}"
+        if cache_key in self._with_skill_cache:
+            return self._with_skill_cache[cache_key]
 
         # Decode expectations
         expectations: dict[str, Any] = {}
@@ -628,6 +639,9 @@ class AgentEvaluator:
                 f"correctness={correctness_with:.2f}, completeness={completeness_with:.2f}, "
                 f"guideline_adherence={guideline_adherence_score:.2f}"
             )
+
+        # Store in candidate-level cache
+        self._with_skill_cache[cache_key] = (final_score, side_info)
 
         return final_score, side_info
 

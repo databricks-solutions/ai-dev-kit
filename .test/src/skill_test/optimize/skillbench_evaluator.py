@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 from typing import Any, Callable
@@ -77,7 +78,11 @@ class _RateLimiter:
 
 
 # Module-level rate limiter shared across evaluator instances.
-_rate_limiter = _RateLimiter(max_concurrent=4, min_interval=0.2)
+# Configurable via env vars for workspaces with stricter rate limits.
+_rate_limiter = _RateLimiter(
+    max_concurrent=int(os.environ.get("GEPA_MAX_CONCURRENT_LLM", "4")),
+    min_interval=float(os.environ.get("GEPA_MIN_LLM_INTERVAL", "0.2")),
+)
 
 
 def _completion_with_backoff(*, max_retries: int = 3, **kwargs) -> Any:
@@ -176,6 +181,11 @@ class SkillBenchEvaluator:
         self._tool_context = tool_context or ""
         self._assessment_by_task = assessment_by_task or {}
 
+        # Cache WITH-skill evaluation results keyed on (prompt_hash, candidate_hash)
+        # to avoid re-evaluation when GEPA calls the evaluator multiple times on
+        # the same candidate-task pair.
+        self._with_skill_cache: dict[str, tuple[float, dict]] = {}
+
         # Create three focused judge instances
         self._correctness_judge = create_correctness_judge(skill_guidelines, judge_model=judge_model)
         self._completeness_judge = create_completeness_judge(judge_model=judge_model)
@@ -224,6 +234,15 @@ class SkillBenchEvaluator:
         """
         skill_md = candidate.get("skill_md", "")
 
+        # Check candidate-level cache
+        prompt = example.get("input", "")
+        candidate_hash = hashlib.sha256(
+            json.dumps(candidate, sort_keys=True).encode()
+        ).hexdigest()[:16]
+        cache_key = f"{_prompt_hash(prompt)}:{candidate_hash}"
+        if cache_key in self._with_skill_cache:
+            return self._with_skill_cache[cache_key]
+
         # Build combined context: skill + read-only tool descriptions
         # During skill optimization, tools come from self._tool_context (read-only).
         # During tool optimization, tools come from candidate keys (optimizable).
@@ -237,8 +256,6 @@ class SkillBenchEvaluator:
             full_context += "\n\n## Available MCP Tools\n\n" + "\n\n".join(tool_parts)
         elif self._tool_context:
             full_context += "\n\n## Available MCP Tools\n\n" + self._tool_context
-
-        prompt = example.get("input", "")
 
         # Decode expectations
         expectations: dict[str, Any] = {}
@@ -553,6 +570,9 @@ class SkillBenchEvaluator:
                 f"correctness={correctness_with:.2f}, completeness={completeness_with:.2f}, "
                 f"guideline_adherence={guideline_adherence_score:.2f}"
             )
+
+        # Store in candidate-level cache
+        self._with_skill_cache[cache_key] = (final_score, side_info)
 
         return final_score, side_info
 

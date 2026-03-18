@@ -515,6 +515,45 @@ def optimize_skill(
     print(f"Judge model: {effective_judge_model}")
     print("Evaluator: skillbench (judge-driven)")
 
+    # --- Preflight workspace connectivity check ---
+    from .judges import _is_workspace_error, _llm_budget
+
+    if _llm_budget.max_calls:
+        print(f"LLM call budget: {_llm_budget.max_calls} (GEPA_MAX_LLM_CALLS)")
+
+    def _preflight_check(model: str) -> None:
+        """Make a single minimal API call to verify workspace connectivity."""
+        import litellm
+        from .judges import _to_litellm_model
+
+        litellm_model, base_url, api_key = _to_litellm_model(model)
+        call_kwargs: dict[str, Any] = {
+            "model": litellm_model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+        }
+        if base_url:
+            call_kwargs["base_url"] = base_url
+        if api_key:
+            call_kwargs["api_key"] = api_key
+        try:
+            litellm.completion(**call_kwargs)
+        except Exception as e:
+            if _is_workspace_error(e):
+                raise SystemExit(
+                    f"\n*** Preflight check FAILED ***\n"
+                    f"Workspace is unreachable for model '{model}':\n  {e}\n\n"
+                    f"Check your IP ACL, auth token, and network connectivity.\n"
+                    f"No LLM calls were wasted."
+                ) from e
+            # Rate limits / transient errors are okay at this stage
+            logger.debug("Preflight non-fatal error (continuing): %s", e)
+
+    print("Preflight connectivity check...", end=" ", flush=True)
+    # Check the gen model (used for every evaluation)
+    _preflight_check(effective_gen_model)
+    print("OK")
+
     if not effective_gen_model:
         raise ValueError("SkillBench evaluator requires a gen_model. Pass --gen-model or set GEPA_GEN_LM env var.")
     evaluator = create_skillbench_evaluator(
@@ -971,6 +1010,13 @@ def optimize_skill(
             mlflow_run_id = mlflow.active_run().info.run_id
     except Exception:
         pass
+
+    # Log total LLM call count
+    from .judges import _llm_budget
+
+    print(f"\nTotal LLM API calls: {_llm_budget.count}")
+    if _llm_budget.max_calls:
+        print(f"  Budget: {_llm_budget.count}/{_llm_budget.max_calls}")
 
     return OptimizationResult(
         skill_name=skill_name,

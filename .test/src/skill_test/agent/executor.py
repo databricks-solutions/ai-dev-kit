@@ -33,6 +33,25 @@ logger = logging.getLogger(__name__)
 _mlflow_env_lock = threading.Lock()
 _mlflow_env_configured = False
 
+# Serialize process_transcript calls across parallel agents to avoid
+# burst HTTP load on the MLflow tracking server when multiple agents
+# finish concurrently (e.g. --parallel-agents 3).
+# Lazy per-loop factory: asyncio.Semaphore binds to the running loop at
+# creation time. When _run_in_fresh_loop creates a new loop the module-level
+# semaphore would crash with "attached to a different loop". Instead we
+# cache one semaphore per event-loop id.
+_transcript_semaphores: dict[int, asyncio.Semaphore] = {}
+_transcript_semaphore_lock = threading.Lock()
+
+
+def _get_transcript_semaphore() -> asyncio.Semaphore:
+    """Return a Semaphore(1) bound to the current running event loop."""
+    loop_id = id(asyncio.get_running_loop())
+    with _transcript_semaphore_lock:
+        if loop_id not in _transcript_semaphores:
+            _transcript_semaphores[loop_id] = asyncio.Semaphore(1)
+        return _transcript_semaphores[loop_id]
+
 
 @dataclass
 class AgentEvent:
@@ -391,20 +410,34 @@ def _get_mlflow_stop_hook(mlflow_experiment: str | None = None, skill_name: str 
             # Run process_transcript synchronously — it does HTTP I/O per span
             # so can take 20-40s for large sessions. Use a generous timeout to
             # prevent hangs from rate limits or network issues.
+            # Serialize across parallel agents to avoid burst HTTP load on the
+            # MLflow tracking server when multiple agents finish concurrently.
             loop = asyncio.get_running_loop()
-            try:
-                trace = await asyncio.wait_for(
-                    loop.run_in_executor(None, process_transcript, transcript_path, session_id),
-                    timeout=120.0,
-                )
-            except asyncio.TimeoutError:
-                print(
-                    f"    [MLflow] ERROR: process_transcript timed out after 120s "
-                    f"(session={session_id}). This may indicate rate limiting or "
-                    f"network issues. Continuing without trace."
-                )
-                result_holder["trace"] = None
-                return {"continue": True}
+            max_retries = 3
+            trace = None
+            async with _get_transcript_semaphore():
+                for attempt in range(max_retries):
+                    try:
+                        trace = await asyncio.wait_for(
+                            loop.run_in_executor(None, process_transcript, transcript_path, session_id),
+                            timeout=300.0,
+                        )
+                        break
+                    except asyncio.TimeoutError:
+                        if attempt < max_retries - 1:
+                            wait = 2 ** (attempt + 1)  # 2s, 4s
+                            print(
+                                f"    [MLflow] process_transcript attempt {attempt + 1} timed out, "
+                                f"retrying in {wait}s..."
+                            )
+                            await asyncio.sleep(wait)
+                        else:
+                            print(
+                                f"    [MLflow] ERROR: process_transcript timed out after {max_retries} "
+                                f"attempts (session={session_id}). Continuing without trace."
+                            )
+                            result_holder["trace"] = None
+                            return {"continue": True}
 
             result_holder["trace"] = trace
 
