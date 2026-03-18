@@ -1,7 +1,7 @@
 skill:
-  name: "databricks-asset-bundles"
-  source_path: "databricks-skills/databricks-asset-bundles"
-  description: "Create and configure Databricks Asset Bundles (DABs) for multi-environment deployments"
+  name: "databricks-bundles"
+  source_path: "databricks-skills/databricks-bundles"
+  description: "Create and configure Declarative Automation Bundles (formerly Asset Bundles) for multi-environment deployments"
 
 tool_modules: [jobs, pipelines]
 
