@@ -236,9 +236,7 @@ class SkillBenchEvaluator:
 
         # Check candidate-level cache
         prompt = example.get("input", "")
-        candidate_hash = hashlib.sha256(
-            json.dumps(candidate, sort_keys=True).encode()
-        ).hexdigest()[:16]
+        candidate_hash = hashlib.sha256(json.dumps(candidate, sort_keys=True).encode()).hexdigest()[:16]
         cache_key = f"{_prompt_hash(prompt)}:{candidate_hash}"
         if cache_key in self._with_skill_cache:
             return self._with_skill_cache[cache_key]
