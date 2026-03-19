@@ -149,7 +149,7 @@ uv run python .test/scripts/optimize.py databricks-metric-views --include-tools 
 When `--tool-modules` is specified, both tool stats and the cross-skill dataset are filtered:
 
 - **Tool stats** report only the requested modules (e.g., `Tool modules: 1, tools: 5` for `--tool-modules sql`).
-- **Cross-skill dataset** includes only skills whose `tool_modules` in `manifest.yaml` overlap with the requested modules. Skills that *don't declare* `tool_modules` are always included as a safe fallback (e.g., `databricks-config`, `databricks-docs`). This means the dataset won't shrink to *only* SQL skills — general-purpose skills without the field are kept so the evaluator still has broad coverage.
+- **Cross-skill dataset** includes only skills whose `tool_modules` in `manifest.yaml` overlap with the requested modules. Skills that *don't declare* `tool_modules` are always included as a safe fallback (e.g., `databricks-docs`, `dev-best-practices`). This means the dataset won't shrink to *only* SQL skills — general-purpose skills without the field are kept so the evaluator still has broad coverage.
 
 To reduce the dataset further, add `tool_modules` to any remaining skills that should be excluded for certain module filters. Without `--tool-modules`, all skills are included regardless (no regression).
 

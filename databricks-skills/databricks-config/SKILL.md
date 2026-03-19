@@ -1,22 +1,67 @@
 ---
 name: databricks-config
-description: "Manage Databricks workspace connections: check current workspace, switch profiles, list available workspaces, or authenticate to a new workspace. Use when the user mentions \"switch workspace\", \"which workspace\", \"current profile\", \"databrickscfg\", \"connect to workspace\", or \"databricks auth\"."
+description: "Set up Databricks CLI authentication and profiles. Use when you need to authenticate to a Databricks workspace, manage named profiles, or verify your current connection."
 ---
 
-Use the `manage_workspace` MCP tool for all workspace operations. Do NOT edit `~/.databrickscfg`, use Bash, or use the Databricks CLI.
+# Databricks CLI Auth & Profile Setup
 
-## Steps
+Use this skill when you need to authenticate to a Databricks workspace or configure named profiles for multi-workspace workflows. For a full dev environment setup (IDE, SDK, project structure), see [dev-best-practices §2](../dev-best-practices/1-foundations-and-setup.md).
 
-1. Call `ToolSearch` with query `select:mcp__databricks__manage_workspace` to load the tool.
+## Authenticate to a workspace
 
-2. Map user intent to action:
-   - status / which workspace / current → `action="status"`
-   - list / available workspaces → `action="list"`
-   - switch to X → call `list` first to find the profile name, then `action="switch", profile="<name>"` (or `host="<url>"` if a URL was given)
-   - login / connect / authenticate → `action="login", host="<url>"`
+For initial CLI setup and install instructions, see [dev-best-practices §2.5](../dev-best-practices/1-foundations-and-setup.md).
 
-3. Call `mcp__databricks__manage_workspace` with the action and any parameters.
+```bash
+# Store under a named profile (for multi-workspace workflows)
+databricks auth login --host https://<your-workspace>.azuredatabricks.net --profile my-profile
+```
 
-4. Present the result. For `status`/`switch`/`login`: show host, profile, username. For `list`: formatted table with the active profile marked.
+## Multiple workspaces with named profiles
 
-> **Note:** The switch is session-scoped — it resets on MCP server restart. For permanent profile setup, use `databricks auth login -p <profile>` and update `~/.databrickscfg` with `cluster_id` or `serverless_compute_id = auto`.
+```bash
+# Set up separate profiles per environment
+databricks auth login --host https://dev.databricks.com  --profile dev
+databricks auth login --host https://prod.databricks.com --profile prod
+
+# Use a profile for CLI commands
+databricks jobs list --profile prod
+```
+
+## Verify your connection
+
+```bash
+# Check current user and workspace
+databricks current-user me
+
+# Check a specific profile
+databricks current-user me --profile dev
+```
+
+## View and edit profiles
+
+```bash
+# Show all configured profiles
+databricks auth profiles
+
+# Config file location
+cat ~/.databrickscfg
+```
+
+## Set a default profile
+
+Add `DATABRICKS_CONFIG_PROFILE=<profile>` to your shell profile (`.zshrc`, `.bashrc`) or export it in your session:
+
+```bash
+export DATABRICKS_CONFIG_PROFILE=dev
+```
+
+## Troubleshooting
+
+- **Token expired:** Re-run `databricks auth login` for the relevant profile.
+- **Wrong workspace:** Check `databricks current-user me` — confirm the host matches.
+- **SDK not picking up profile:** Set `DATABRICKS_CONFIG_PROFILE` or pass `profile` explicitly in code.
+
+```python
+from databricks.sdk import WorkspaceClient
+w = WorkspaceClient(profile="dev")
+```
