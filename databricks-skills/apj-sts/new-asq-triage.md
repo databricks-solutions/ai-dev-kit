@@ -7,6 +7,10 @@ Goal: Triage incoming ASQs for the APJ STS Team and respond to requestor for cla
 ### 1. Retrieve New ASQs
 Start by getting a list of all the new ASQs in the **Technical_Onboarding_Services_APJ** queue in SFDC where the attached use case is **not** in Validating or Lost stage.
 
+If an ASQ has **no use case linked** in the ASQ fields:
+- Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** asking them to attach the relevant use case to the ASQ before it can be triaged.
+- Change the status of the ASQ to **'Under Review'**.
+
 ### 2. Handle Validating/Lost Stage Use Cases
 For any ASQs with attached use case in Validating or Lost stage:
 - Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** stating STS requires use cases to be within U3-U5 stages.
@@ -23,15 +27,22 @@ If the workspace type is not specified and the workspace checklist is not filled
 - Change the status of the ASQs to **'Under Review'**.
 
 If the workspace type is specified but the workspace checklist has **not** been attached:
-- Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** requesting them to fill out and attach the workspace setup checklist. Include a link to [go/wssetup-cheatsheet](https://sites.google.com/databricks.com/sts-workspace-setup) to help them complete the checklist.
-- Change the status of the ASQs to **'Under Review'**.
+- **Assign the ASQ to the most suitable engineer** (do not leave it in the queue) and set status to **'Under Review'** so the engineer can follow up directly.
+- Update the SFDC activity/chatter feed using a **structured Salesforce Mention** to the requestor and assigned engineer, stating that no attached document can be seen and the checklist is required before kicking off. Use the language: *"we are unable to see any attached document on this ASQ"*. Include a link to [go/wssetup-cheatsheet](https://sites.google.com/databricks.com/sts-workspace-setup) to help them complete the checklist.
 
 ### 4. Validate Against STS Catalog
-For all non-workspace-setup ASQs with attached use cases not in Validating or Lost stage:
-- Analyse the request and ask to validate it is covered in the [go/sts catalog](https://docs.google.com/presentation/d/1EcxZB5Q5bT3waYUMDM72OcxCEpz6XaXtmJzzPqwSu0E/edit#slide=id.g148df5594df_0_673) of services.
-- If the ASQ requested is not covered by the catalog:
-  - Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** stating the request is outside of STS scope.
-  - Change the status of the ASQs to **'On Hold'**.
+For **all** ASQs with attached use cases not in Validating or Lost stage (including workspace setup ASQs), validate the request against the [go/sts catalog](https://docs.google.com/presentation/d/1EcxZB5Q5bT3waYUMDM72OcxCEpz6XaXtmJzzPqwSu0E/edit#slide=id.g148df5594df_0_673) of services.
+
+**Explicit exclusion — DBR Migration:** The STS catalog explicitly states DBR Migration is **NOT an ASQ service**. If the primary ask involves a DBR runtime upgrade, set the ASQ to **'On Hold'** and redirect the requestor to:
+- Share the "Mastering DBR Migrations at Scale" blog post
+- Post questions in **#dbr-migration-squad**
+- Invite the customer to the monthly **Databricks Office Hours: DBR Migration**
+
+**Partial scope:** If an ASQ has mixed scope (some components in scope, some out), set to **'On Hold'**, clearly state which parts are outside STS scope, and invite the requestor to refile a focused ASQ for the in-scope components.
+
+If the ASQ requested is fully not covered by the catalog:
+- Update the SFDC activity/chatter feed to inform the requestor using a **structured Salesforce Mention** stating the request is outside of STS scope.
+- Change the status of the ASQs to **'On Hold'**.
 
 ### 5. Validate Launch Accelerator ASQs
 For ASQs with category **Launch Accelerator**:
@@ -48,8 +59,10 @@ For ASQs that qualify for STS support, recommend which APJ STS engineer the requ
 - The outcome/ask of the ASQ.
 - [Engineer expertise](https://docs.google.com/spreadsheets/d/1vn6LmBVBlthTvyNDJpJLIryIfSy1pU6mN7wFXYobaWE/edit?gid=793712447#gid=793712447).
 - [Engineer capacity for coming week and assignment wishlist](https://docs.google.com/spreadsheets/d/127ULgyQH8eDvqNJA5r35xeYvHHfS4_vjnO-BnqEvTNo/edit?gid=2004962154#gid=2004962154).
+- **Real-time workload:** Also query SFDC directly for each engineer's current **In Progress** ASQs to get an accurate workload count. The capacity spreadsheet is filled weekly and may be stale — engineers may have ASQs past their end date that are still showing as active.
 - Upcoming planned holidays on engineer calendar.
 - Take into account if the ASQ requestor has requested for a specific engineer.
+- **Sequential/linked ASQs:** When multiple ASQs from the same account are submitted as a phased engagement, note the dependency and assign the same engineer to all phases for continuity.
 
 #### Region/Language Rules
 - **Korea** ASQs can be assigned only to **Haley**.
