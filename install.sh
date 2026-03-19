@@ -1430,8 +1430,19 @@ write_mcp_configs() {
                 ;;
             cursor)
                 if [ "$SCOPE" = "global" ]; then
-                    warn "Cursor global: configure in Settings > MCP"
-                    msg "  Command: $VENV_PYTHON | Args: $MCP_ENTRY"
+                    warn "Cursor global: manual MCP configuration required"
+                    msg "  1. Open ${B}Cursor → Settings → Cursor Settings → Tools & MCP${N}"
+                    msg "  2. Click ${B}New MCP Server${N}"
+                    msg "  3. Add the following JSON config:"
+                    msg "     {"
+                    msg "       \"mcpServers\": {"
+                    msg "         \"databricks\": {"
+                    msg "           \"command\": \"$VENV_PYTHON\","
+                    msg "           \"args\": [\"$MCP_ENTRY\"],"
+                    msg "           \"env\": {\"DATABRICKS_CONFIG_PROFILE\": \"$PROFILE\"}"
+                    msg "         }"
+                    msg "       }"
+                    msg "     }"
                 else
                     write_mcp_json "$base_dir/.cursor/mcp.json"
                     ok "Cursor MCP config"

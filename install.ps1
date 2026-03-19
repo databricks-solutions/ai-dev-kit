@@ -1523,8 +1523,19 @@ function Write-McpConfigs {
             }
             "cursor" {
                 if ($script:Scope -eq "global") {
-                    Write-Warn "Cursor global: configure in Settings > MCP"
-                    Write-Msg "  Command: $($script:VenvPython) | Args: $($script:McpEntry)"
+                    Write-Warn "Cursor global: manual MCP configuration required"
+                    Write-Msg "  1. Open Cursor -> Settings -> Cursor Settings -> Tools & MCP"
+                    Write-Msg "  2. Click New MCP Server"
+                    Write-Msg "  3. Add the following JSON config:"
+                    Write-Msg "     {"
+                    Write-Msg "       `"mcpServers`": {"
+                    Write-Msg "         `"databricks`": {"
+                    Write-Msg "           `"command`": `"$($script:VenvPython)`","
+                    Write-Msg "           `"args`": [`"$($script:McpEntry)`"],"
+                    Write-Msg "           `"env`": {`"DATABRICKS_CONFIG_PROFILE`": `"$($script:Profile)`"}"
+                    Write-Msg "         }"
+                    Write-Msg "       }"
+                    Write-Msg "     }"
                 } else {
                     Write-McpJson (Join-Path $BaseDir ".cursor\mcp.json")
                     Write-Ok "Cursor MCP config"
