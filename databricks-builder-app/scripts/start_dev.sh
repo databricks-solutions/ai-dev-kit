@@ -36,7 +36,7 @@ trap cleanup SIGINT SIGTERM
 
 # Start backend
 echo "Starting backend on http://localhost:8000..."
-uvicorn server.app:app --reload --port 8000 --reload-dir server &
+uv run uvicorn server.app:app --reload --port 8000 --reload-dir server &
 BACKEND_PID=$!
 
 # Wait a moment for backend to start

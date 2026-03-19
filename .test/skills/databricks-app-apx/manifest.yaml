@@ -1,4 +1,5 @@
 skill_name: databricks-app-apx
+tool_modules: [apps, serving]
 description: Build full-stack Databricks applications using APX framework (FastAPI + React).
 scorers:
   enabled:

@@ -3,6 +3,8 @@ skill:
   source_path: "databricks-skills/databricks-spark-declarative-pipelines"
   description: "Streaming tables, CDC, medallion architecture"
 
+tool_modules: [pipelines, compute]
+
 evaluation:
   datasets:
     - path: ground_truth.yaml

@@ -54,6 +54,7 @@ Thumbs.db
 *conf*.json
 *.secret
 credentials.json
+claude_agent_settings.json
 
 # Resource tracking manifest (created by MCP server)
 .databricks-resources.json

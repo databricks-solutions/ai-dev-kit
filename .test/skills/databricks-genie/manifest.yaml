@@ -1,4 +1,5 @@
 skill_name: databricks-genie
+tool_modules: [genie, sql]
 description: Test cases for databricks-genie skill
 triggers:
 - databricks-genie related prompt

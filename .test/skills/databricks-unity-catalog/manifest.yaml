@@ -1,4 +1,5 @@
 skill_name: databricks-unity-catalog
+tool_modules: [unity_catalog, sql]
 description: Unity Catalog system tables and volumes. Use when querying system tables (audit, lineage, billing) or working
   with volume file operations (upload, download, list files in /Volumes/).
 scorers:

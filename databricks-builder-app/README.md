@@ -173,7 +173,7 @@ Skills provide specialized guidance for Databricks development tasks. They are m
 3. The agent can invoke skills using the `Skill` tool: `skill: "sdp"`
 
 Skills include:
-- **databricks-asset-bundles**: Databricks Asset Bundles configuration
+- **databricks-bundles**: DABs configuration
 - **databricks-app-apx**: Full-stack apps with APX framework (FastAPI + React)
 - **databricks-app-python**: Python apps with Dash, Streamlit, Flask
 - **databricks-python-sdk**: Python SDK patterns
@@ -211,7 +211,7 @@ projects/
   - SQL warehouse (for SQL queries)
   - Cluster (for Python/PySpark execution)
   - Unity Catalog enabled (recommended)
-- PostgreSQL database (Lakebase) for project persistence
+- PostgreSQL database (Lakebase) for project persistence — autoscale or provisioned
 
 ### Quick Start
 
@@ -244,13 +244,23 @@ DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
 DATABRICKS_TOKEN=dapi...
 
 # Required: Database for project persistence (pick ONE option)
-# Option A — Static connection URL (simplest for local dev):
-LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
 
-# Option B — Dynamic OAuth via Databricks SDK:
+# Option A — Autoscale Lakebase (recommended, scales to zero):
+LAKEBASE_ENDPOINT=projects/<project-name>/branches/production/endpoints/primary
+LAKEBASE_DATABASE_NAME=databricks_postgres
+
+# Option B — Provisioned Lakebase (fixed capacity):
 # LAKEBASE_INSTANCE_NAME=your-lakebase-instance
 # LAKEBASE_DATABASE_NAME=databricks_postgres
+
+# Option C — Static connection URL (any type, simplest for local dev):
+# LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
 ```
+
+The app auto-detects the mode based on which variable is set:
+- `LAKEBASE_ENDPOINT` → autoscale mode (`client.postgres` API, host looked up automatically)
+- `LAKEBASE_INSTANCE_NAME` → provisioned mode (`client.database` API)
+- `LAKEBASE_PG_URL` → static URL mode (no OAuth token refresh)
 
 See `.env.example` for the full list of available settings including LLM provider, skills configuration, and MLflow tracing. The app loads `.env.local` (not `.env`) at startup.
 
@@ -541,10 +551,16 @@ databricks apps get my-builder-app
 
 The app requires a PostgreSQL database (Lakebase) for storing projects, conversations, and messages.
 
-1. Go to your Databricks workspace
-2. Navigate to **Catalog** → **Lakebase**
-3. Click **Create Instance**
-4. Note the instance name (e.g., `my-lakebase-instance`)
+**Autoscale Lakebase** (recommended — scales to zero when idle):
+1. Go to your Databricks workspace → **Catalog** → **Lakebase**
+2. Click **Create** → select **Autoscale**
+3. Note the endpoint resource name (e.g., `projects/my-app/branches/production/endpoints/primary`)
+4. Set in `app.yaml`: `LAKEBASE_ENDPOINT=projects/my-app/branches/production/endpoints/primary`
+
+**Provisioned Lakebase** (fixed capacity):
+1. Go to **Catalog** → **Lakebase** → **Create** → select **Provisioned**
+2. Note the instance name (e.g., `my-lakebase-instance`)
+3. Set in `app.yaml`: `LAKEBASE_INSTANCE_NAME=my-lakebase-instance`
 
 #### 4. Add Lakebase as an App Resource
 
@@ -577,11 +593,19 @@ command:
   - "$DATABRICKS_APP_PORT"
 
 env:
-  # Required: Your Lakebase instance name
-  - name: LAKEBASE_INSTANCE_NAME
-    value: "<your-lakebase-instance-name>"
+  # Required: Lakebase database (pick ONE option)
+
+  # Option A — Autoscale Lakebase (recommended):
+  - name: LAKEBASE_ENDPOINT
+    value: "projects/<project-name>/branches/production/endpoints/primary"
   - name: LAKEBASE_DATABASE_NAME
     value: "databricks_postgres"
+
+  # Option B — Provisioned Lakebase:
+  # - name: LAKEBASE_INSTANCE_NAME
+  #   value: "<your-lakebase-instance-name>"
+  # - name: LAKEBASE_DATABASE_NAME
+  #   value: "databricks_postgres"
 
   # Skills to enable (comma-separated)
   - name: ENABLED_SKILLS

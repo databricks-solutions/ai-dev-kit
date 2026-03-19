@@ -436,6 +436,11 @@ async def stream_progress(execution_id: str, body: StreamProgressRequest):
 
             # Check if stream is complete or cancelled
             if stream.is_complete or stream.is_cancelled:
+                # Drain any events added between last poll and completion
+                remaining, _ = stream.get_events_since(last_timestamp)
+                for event in remaining:
+                    if event.get('type') != 'stream.completed':
+                        yield sse_event(event)
                 yield sse_event({
                     'type': 'stream.completed',
                     'is_error': stream.error is not None,

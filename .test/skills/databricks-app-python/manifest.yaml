@@ -3,6 +3,8 @@ skill:
   source_path: "databricks-skills/databricks-app-python"
   description: "Python Databricks Apps: Dash, Streamlit, Gradio, Flask, FastAPI, Reflex"
 
+tool_modules: [apps, serving]
+
 evaluation:
   datasets:
     - path: ground_truth.yaml

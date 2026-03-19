@@ -48,14 +48,16 @@ def get_url_and_connect_args():
 
   if not url:
     # Try dynamic OAuth mode
+    endpoint_name = os.environ.get('LAKEBASE_ENDPOINT')
     instance_name = os.environ.get('LAKEBASE_INSTANCE_NAME')
     database_name = os.environ.get('LAKEBASE_DATABASE_NAME', 'databricks_postgres')
 
-    if not instance_name:
+    if not endpoint_name and not instance_name:
       raise ValueError(
         'Database not configured. Set either:\n'
         '  - LAKEBASE_PG_URL (static URL with password), or\n'
-        '  - LAKEBASE_INSTANCE_NAME (dynamic OAuth)'
+        '  - LAKEBASE_ENDPOINT and LAKEBASE_DATABASE_NAME (autoscale, dynamic OAuth), or\n'
+        '  - LAKEBASE_INSTANCE_NAME and LAKEBASE_DATABASE_NAME (provisioned, dynamic OAuth)'
       )
 
     # Generate token using Databricks SDK
@@ -64,11 +66,20 @@ def get_url_and_connect_args():
     from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION
 
     w = WorkspaceClient(product=PRODUCT_NAME, product_version=PRODUCT_VERSION)
-    instance = w.database.get_database_instance(name=instance_name)
-    cred = w.database.generate_database_credential(
-      request_id=str(uuid.uuid4()),
-      instance_names=[instance.name],
-    )
+
+    if endpoint_name:
+      # Autoscale mode: look up host from endpoint, token via client.postgres
+      endpoint = w.postgres.get_endpoint(name=endpoint_name)
+      host = endpoint.status.hosts.host
+      cred = w.postgres.generate_database_credential(endpoint=endpoint_name)
+    else:
+      # Provisioned mode: look up host from instance, token via client.database
+      instance = w.database.get_database_instance(name=instance_name)
+      host = instance.read_write_dns
+      cred = w.database.generate_database_credential(
+        request_id=str(uuid.uuid4()),
+        instance_names=[instance_name],
+      )
 
     # Get current user email for username
     me = w.current_user.me()
@@ -79,7 +90,6 @@ def get_url_and_connect_args():
     encoded_username = quote(username, safe='')
 
     # Build URL with token as password
-    host = instance.read_write_dns
     url = f'postgresql://{encoded_username}:{cred.token}@{host}:5432/{database_name}?sslmode=require'
 
     # Resolve hostname for DNS workaround (macOS issue)

@@ -31,6 +31,7 @@ from ..scorers.trace import (
 def setup_mlflow(config: SkillTestConfig) -> None:
     """Configure MLflow from environment variables."""
     mlflow.set_tracking_uri(config.mlflow.tracking_uri)
+    mlflow.set_registry_uri("databricks-uc")
     mlflow.set_experiment(config.mlflow.experiment_name)
 
 

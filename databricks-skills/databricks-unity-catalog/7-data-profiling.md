@@ -237,6 +237,28 @@ w.data_quality.delete_monitor(
 
 ---
 
+## Anomaly Detection
+
+Anomaly detection is enabled at the **schema level**, not per table. Once enabled, Databricks automatically scans all tables in the schema at the same frequency they are updated.
+
+```python
+from databricks.sdk.service.dataquality import Monitor, AnomalyDetectionConfig
+
+schema_info = w.schemas.get("catalog.schema")
+
+monitor = w.data_quality.create_monitor(
+    monitor=Monitor(
+        object_type="schema",
+        object_id=schema_info.schema_id,
+        anomaly_detection_config=AnomalyDetectionConfig(),
+    ),
+)
+```
+
+> **Note:** Anomaly detection requires `MANAGE SCHEMA` or `MANAGE CATALOG` privileges and serverless compute enabled on the workspace.
+
+---
+
 ## Output Tables
 
 When a monitor is created, two metric tables are generated in the specified output schema:

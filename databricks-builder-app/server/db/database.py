@@ -112,6 +112,7 @@ def _get_workspace_client():
                 host=os.environ.get('DATABRICKS_HOST', ''),
                 client_id=os.environ.get('DATABRICKS_CLIENT_ID', ''),
                 client_secret=os.environ.get('DATABRICKS_CLIENT_SECRET', ''),
+                auth_type='oauth-m2m',
                 **product_kwargs,
             )
         # Development mode - use default SDK auth
@@ -124,8 +125,10 @@ def _get_workspace_client():
 def _generate_lakebase_token(instance_name: str) -> Optional[str]:
     """Generate a fresh OAuth token for Lakebase connection.
 
+    Supports both autoscale (LAKEBASE_ENDPOINT) and provisioned (instance_name) modes.
+
     Args:
-        instance_name: Lakebase instance name
+        instance_name: Lakebase instance name (provisioned) or endpoint name (autoscale)
 
     Returns:
         OAuth token string or None if generation fails
@@ -135,10 +138,16 @@ def _generate_lakebase_token(instance_name: str) -> Optional[str]:
         return None
 
     try:
-        cred = client.database.generate_database_credential(
-            request_id=str(uuid.uuid4()),
-            instance_names=[instance_name],
-        )
+        endpoint_name = os.environ.get("LAKEBASE_ENDPOINT")
+        if endpoint_name:
+            # Autoscale: use client.postgres with the endpoint resource name
+            cred = client.postgres.generate_database_credential(endpoint=endpoint_name)
+        else:
+            # Provisioned: use client.database with instance_names
+            cred = client.database.generate_database_credential(
+                request_id=str(uuid.uuid4()),
+                instance_names=[instance_name],
+            )
         logger.info(f"Generated new Lakebase token for instance: {instance_name}")
         return cred.token
     except Exception as e:
@@ -325,35 +334,44 @@ def init_database(database_url: Optional[str] = None) -> AsyncEngine:
         url, connect_args = _prepare_async_url(url)
     else:
         # Dynamic token mode - build URL from components
+        endpoint_name = os.environ.get("LAKEBASE_ENDPOINT")
         instance_name = os.environ.get("LAKEBASE_INSTANCE_NAME")
         database_name = os.environ.get("LAKEBASE_DATABASE_NAME")
 
-        if not instance_name or not database_name:
+        if not (endpoint_name or instance_name) or not database_name:
             raise ValueError(
                 "No database configuration found. Set either:\n"
                 "  - LAKEBASE_PG_URL (static URL with password), or\n"
-                "  - LAKEBASE_INSTANCE_NAME and LAKEBASE_DATABASE_NAME (dynamic OAuth)"
+                "  - LAKEBASE_ENDPOINT and LAKEBASE_DATABASE_NAME (autoscale, dynamic OAuth), or\n"
+                "  - LAKEBASE_INSTANCE_NAME and LAKEBASE_DATABASE_NAME (provisioned, dynamic OAuth)"
             )
 
-        _lakebase_instance_name = instance_name
-
-        # Fetch instance to get the correct host
         client = _get_workspace_client()
         if not client:
             raise ValueError("Could not create Databricks WorkspaceClient")
 
-        instance = client.database.get_database_instance(name=instance_name)
-        host = instance.read_write_dns
+        if endpoint_name:
+            # Autoscale mode: look up host from endpoint resource, token via client.postgres
+            _lakebase_instance_name = endpoint_name
+            endpoint = client.postgres.get_endpoint(name=endpoint_name)
+            host = endpoint.status.hosts.host
+            logger.info(f"Using autoscale Lakebase endpoint: {endpoint_name} ({host})")
+        else:
+            # Provisioned mode: look up host from instance, token via client.database
+            _lakebase_instance_name = instance_name
+            instance = client.database.get_database_instance(name=instance_name)
+            host = instance.read_write_dns
+            logger.info(f"Using provisioned Lakebase instance: {instance_name} ({host})")
 
         # Generate initial token
-        _current_token = _generate_lakebase_token(instance_name)
+        _current_token = _generate_lakebase_token(_lakebase_instance_name)
         if not _current_token:
             raise ValueError(
-                f"Failed to generate initial Lakebase token for instance: {instance_name}"
+                f"Failed to generate initial Lakebase token for: {_lakebase_instance_name}"
             )
 
         # Get username (prefer explicit env var for Databricks Apps where service principal is used)
-        username = os.environ.get("LAKEBASE_USERNAME") or _get_current_user_email() or instance_name
+        username = os.environ.get("LAKEBASE_USERNAME") or _get_current_user_email() or _lakebase_instance_name
 
         # Resolve hostname for DNS workaround (macOS Python DNS issues with long hostnames)
         global _resolved_hostaddr
@@ -370,7 +388,6 @@ def init_database(database_url: Optional[str] = None) -> AsyncEngine:
             port=int(os.environ.get("DATABRICKS_DATABASE_PORT", "5432")),
             database=database_name,
         )
-        logger.info(f"Using dynamic OAuth tokens for Lakebase instance: {instance_name} ({host})")
 
         # Connect args for psycopg3 with DNS workaround
         connect_args = {

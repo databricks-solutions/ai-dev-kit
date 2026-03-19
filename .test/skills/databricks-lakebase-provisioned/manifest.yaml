@@ -1,4 +1,5 @@
 skill_name: databricks-lakebase-provisioned
+tool_modules: [lakebase, sql]
 description: Patterns and best practices for using Lakebase Provisioned (Databricks managed PostgreSQL) for OLTP workloads.
 scorers:
   enabled:

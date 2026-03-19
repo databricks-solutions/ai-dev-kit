@@ -138,7 +138,7 @@ databricks bundle deploy --target prod
    **Using Python API?** → Read [5-python-api.md](5-python-api.md)
    **Migrating from DLT?** → Read [6-dlt-migration.md](6-dlt-migration.md)
    **Advanced configuration?** → Read [7-advanced-configuration.md](7-advanced-configuration.md)
-   **Validating?** → Read [validation-checklist.md](validation-checklist.md)
+   **Validating?** → Read [7-advanced-configuration.md](7-advanced-configuration.md) (dry_run, development mode)
 
 2. Follow the instructions in the relevant guide
 
@@ -526,7 +526,7 @@ def enriched_orders():
 | **Streaming reads fail** | For file ingestion in a streaming table, you must use the `STREAM` keyword with `read_files`: `FROM STREAM read_files(...)`. For table streams use `FROM stream(table)`. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
 | **Timeout during run** | Increase `timeout`, or use `wait_for_completion=False` and check status with `get_pipeline` |
 | **MV doesn't refresh** | Enable row tracking on source tables |
-| **SCD2: query column not found** | Lakeflow uses `__START_AT` and `__END_AT` (double underscore), not `START_AT`/`END_AT`. Use `WHERE __END_AT IS NULL` for current rows. See [3-scd-patterns.md](3-scd-patterns.md). |
+| **SCD2: query column not found** | Lakeflow uses `__START_AT` and `__END_AT` (double underscore), not `START_AT`/`END_AT`. Use `WHERE __END_AT IS NULL` for current rows. See [3-scd-query-patterns.md](3-scd-query-patterns.md). |
 | **AUTO CDC parse error at APPLY/SEQUENCE** | Put `APPLY AS DELETE WHEN` **before** `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source (omit `_rescued_data` unless bronze uses rescue data). Omit `TRACK HISTORY ON *` if it causes "end of input" errors; default is equivalent. See [2-streaming-patterns.md](2-streaming-patterns.md). |
 | **"Cannot create streaming table from batch query"** | In a streaming table query, use `FROM STREAM read_files(...)` so `read_files` leverages Auto Loader; `FROM read_files(...)` alone is batch. See [1-ingestion-patterns.md](1-ingestion-patterns.md) and [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
 
@@ -572,6 +572,6 @@ For advanced configuration options (development mode, continuous pipelines, cust
 ## Related Skills
 
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - for orchestrating and scheduling pipeline runs
-- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - for multi-environment deployment of pipeline projects
+- **[databricks-bundles](../databricks-bundles/SKILL.md)** - for multi-environment deployment of pipeline projects
 - **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - for generating test data to feed into pipelines
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for catalog/schema/volume management and governance

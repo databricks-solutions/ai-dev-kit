@@ -140,30 +140,30 @@ df_bronze.writeStream \
 
 ### Pattern 3: Real-Time Mode (Sub-Second Latency)
 
-Use RTM for < 800ms latency requirements:
+Use RTM for sub-second (as low as 5ms) latency requirements. Requires DBR 16.4 LTS+:
 
 ```python
-# Real-time trigger (Databricks 13.3+)
+# Real-time trigger (DBR 16.4 LTS+)
+# Requirements: dedicated cluster, no autoscaling, no Photon, outputMode("update")
+# Spark config on cluster: spark.databricks.streaming.realTimeMode.enabled = true
 query = (enriched_df
     .select(col("key"), col("value"))
     .writeStream
     .format("kafka")
     .option("kafka.bootstrap.servers", brokers)
     .option("topic", "output-events")
-    .trigger(realTime=True)  # Enable RTM
+    .outputMode("update")         # RTM only supports update mode
+    .trigger(realTime="5 minutes")  # PySpark requires specifying the checkpoint interval
     .option("checkpointLocation", checkpoint_path)
     .start()
 )
 
-# RTM Cluster Requirements
-spark.conf.set("spark.databricks.photon.enabled", "true")
-spark.conf.set("spark.sql.streaming.stateStore.providerClass", 
-               "com.databricks.sql.streaming.state.RocksDBStateProvider")
-
 # When to use RTM:
-# - Latency < 800ms required
-# - Photon enabled
-# - Fixed-size cluster (no autoscaling)
+# - Sub-second latency required (achieves as low as 5ms E2E)
+# - Photon must be DISABLED (not supported with RTM)
+# - Autoscaling must be DISABLED
+# - Dedicated (single-user) cluster only
+# - forEachBatch is NOT supported in RTM
 ```
 
 ### Pattern 4: Event Enrichment (Kafka to Kafka with Delta)
