@@ -99,7 +99,7 @@ APX_SKILLS="databricks-app-apx"
 APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # Agent skills (fetched from databricks/databricks-agent-skills repo)
-AGENT_SKILLS="databricks databricks-apps databricks-jobs databricks-lakebase databricks-pipelines"
+AGENT_SKILLS="databricks databricks-apps databricks-jobs:databricks-jobs-bundles databricks-lakebase databricks-pipelines"
 AGENT_SKILLS_RAW_URL="https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
 AGENT_SKILLS_API_URL="https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
@@ -244,8 +244,8 @@ if [ "${LIST_SKILLS:-false}" = true ]; then
     echo ""
     echo -e "${B}Agent Skills${N} (from databricks/databricks-agent-skills repo)"
     echo "────────────────────────────────"
-    for skill in $AGENT_SKILLS; do
-        echo -e "    $skill"
+    for entry in $AGENT_SKILLS; do
+        echo -e "    ${entry#*:}"
     done
     echo ""
     echo -e "${D}Usage: bash install.sh --skills-profile data-engineer,ai-ml-engineer${N}"
@@ -681,8 +681,8 @@ resolve_skills() {
                 mlflow_skills="${mlflow_skills:+$mlflow_skills }$skill"
             elif echo "$APX_SKILLS" | grep -qw "$skill"; then
                 apx_skills="${apx_skills:+$apx_skills }$skill"
-            elif echo "$AGENT_SKILLS" | grep -qw "$skill"; then
-                agent_skills="${agent_skills:+$agent_skills }$skill"
+            elif echo "$AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | grep -qw "$skill"; then
+                agent_skills="${agent_skills:+$agent_skills }$(echo "$AGENT_SKILLS" | tr ' ' '\n' | grep -w ".*:${skill}\|^${skill}$")"
             else
                 db_skills="${db_skills:+$db_skills }$skill"
             fi
@@ -942,7 +942,7 @@ prompt_custom_skills() {
         "App APX|databricks-app-apx|$(_is_preselected databricks-app-apx)|FastAPI + React" \
         "Agent: Databricks|databricks|$(_is_preselected databricks)|CLI auth, data exploration" \
         "Agent: Apps|databricks-apps|$(_is_preselected databricks-apps)|AppKit + all frameworks" \
-        "Agent: Jobs|databricks-jobs|$(_is_preselected databricks-jobs)|Lakeflow Jobs" \
+        "Agent: Jobs|databricks-jobs-bundles|$(_is_preselected databricks-jobs-bundles)|Lakeflow Jobs (bundle scaffold)" \
         "Agent: Lakebase|databricks-lakebase|$(_is_preselected databricks-lakebase)|Lakebase OLTP" \
         "Agent: Pipelines|databricks-pipelines|$(_is_preselected databricks-pipelines)|Declarative Pipelines" \
         "MLflow Onboarding|mlflow-onboarding|$(_is_preselected mlflow-onboarding)|Getting started" \
@@ -1137,7 +1137,9 @@ install_skills() {
     msg "Installing ${B}${total_count}${N} skills"
 
     # Build set of all skills being installed now
-    local all_new_skills="$SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_SKILLS"
+    local agent_install_names
+    agent_install_names=$(echo "$SELECTED_AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | tr '\n' ' ')
+    local all_new_skills="$SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $agent_install_names"
 
     # Clean up previously installed skills that are no longer selected
     # Check scope-local manifest first, fall back to global for upgrades from older versions
@@ -1218,33 +1220,35 @@ install_skills() {
             # Fetch the full repo tree once (single API call) for all skills
             local agent_tree
             agent_tree=$(curl -fsSL "$AGENT_SKILLS_API_URL" 2>/dev/null)
-            for skill in $SELECTED_AGENT_SKILLS; do
-                local dest_dir="$dir/$skill"
+            for entry in $SELECTED_AGENT_SKILLS; do
+                local src_name="${entry%%:*}"
+                local install_name="${entry#*:}"
+                local dest_dir="$dir/$install_name"
                 mkdir -p "$dest_dir"
-                # Extract all file paths under skills/<skill>/ from the tree
+                # Extract all file paths under skills/<src_name>/ from the tree
                 local files
                 files=$(echo "$agent_tree" \
-                    | grep -o '"path":"skills/'"$skill"'/[^"]*"' \
+                    | grep -o '"path":"skills/'"$src_name"'/[^"]*"' \
                     | grep '\.' \
                     | sed 's/"path":"//;s/"$//')
                 if [ -z "$files" ]; then
                     rmdir "$dest_dir" 2>/dev/null || true
-                    warn "Could not fetch agent skill '$skill'"
+                    warn "Could not fetch agent skill '$src_name'"
                     continue
                 fi
                 local ok_flag=0
                 while IFS= read -r filepath; do
                     [ -z "$filepath" ] && continue
-                    local rel="${filepath#skills/$skill/}"
+                    local rel="${filepath#skills/$src_name/}"
                     local dest="$dest_dir/$rel"
                     mkdir -p "$(dirname "$dest")"
-                    curl -fsSL "$AGENT_SKILLS_RAW_URL/$skill/${rel}" -o "$dest" 2>/dev/null && ok_flag=1 || true
+                    curl -fsSL "$AGENT_SKILLS_RAW_URL/$src_name/${rel}" -o "$dest" 2>/dev/null && ok_flag=1 || true
                 done <<< "$files"
                 if [ "$ok_flag" -eq 1 ]; then
-                    echo "$dir|$skill" >> "$manifest.tmp"
+                    echo "$dir|$install_name" >> "$manifest.tmp"
                 else
                     rm -rf "$dest_dir"
-                    warn "Could not install agent skill '$skill'"
+                    warn "Could not install agent skill '$src_name'"
                 fi
             done
             ok "Agent skills ($agent_count) → ${dir#$HOME/}"

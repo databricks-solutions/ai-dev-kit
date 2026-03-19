@@ -101,7 +101,7 @@ $script:ApxSkills = @("databricks-app-apx")
 $ApxRawUrl = "https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # Agent skills (fetched from databricks/databricks-agent-skills repo)
-$script:AgentSkills = @("databricks", "databricks-apps", "databricks-jobs", "databricks-lakebase", "databricks-pipelines")
+$script:AgentSkills = @("databricks", "databricks-apps", "databricks-jobs:databricks-jobs-bundles", "databricks-lakebase", "databricks-pipelines")
 $AgentSkillsRawUrl = "https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
 $AgentSkillsApiUrl = "https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
@@ -184,7 +184,7 @@ if ($script:ListSkills) {
     Write-Host ""
     Write-Host "Agent Skills (from databricks/databricks-agent-skills repo)" -ForegroundColor White
     Write-Host "--------------------------------"
-    foreach ($s in $script:AgentSkills) { Write-Host "    $s" }
+    foreach ($s in $script:AgentSkills) { Write-Host "    $($s -replace '^.*:', '')" }
     Write-Host ""
     Write-Host "Usage: .\install.ps1 --skills-profile data-engineer,ai-ml-engineer" -ForegroundColor DarkGray
     Write-Host "       .\install.ps1 --skills databricks-jobs,databricks-dbsql" -ForegroundColor DarkGray
@@ -863,8 +863,8 @@ function Resolve-Skills {
                 $mlflowSkills += $skill
             } elseif ($script:ApxSkills -contains $skill) {
                 $apxSkills += $skill
-            } elseif ($script:AgentSkills -contains $skill) {
-                $agentSkills += $skill
+            } elseif ($script:AgentSkills | ForEach-Object { $_ -replace '^.*:', '' } | Where-Object { $_ -eq $skill }) {
+                $agentSkills += ($script:AgentSkills | Where-Object { ($_ -replace '^.*:', '') -eq $skill })
             } else {
                 $dbSkills += $skill
             }
@@ -1143,7 +1143,7 @@ function Invoke-PromptCustomSkills {
         @{ Label = "App APX";              Value = "databricks-app-apx";                     State = ($preselected -contains "databricks-app-apx");                     Hint = "FastAPI + React" }
         @{ Label = "Agent: Databricks";    Value = "databricks";                             State = ($preselected -contains "databricks");                             Hint = "CLI auth, data exploration" }
         @{ Label = "Agent: Apps";          Value = "databricks-apps";                        State = ($preselected -contains "databricks-apps");                        Hint = "AppKit + all frameworks" }
-        @{ Label = "Agent: Jobs";          Value = "databricks-jobs";                        State = ($preselected -contains "databricks-jobs");                        Hint = "Lakeflow Jobs" }
+        @{ Label = "Agent: Jobs";          Value = "databricks-jobs-bundles";               State = ($preselected -contains "databricks-jobs-bundles");               Hint = "Lakeflow Jobs (bundle scaffold)" }
         @{ Label = "Agent: Lakebase";      Value = "databricks-lakebase";                    State = ($preselected -contains "databricks-lakebase");                    Hint = "Lakebase OLTP" }
         @{ Label = "Agent: Pipelines";     Value = "databricks-pipelines";                   State = ($preselected -contains "databricks-pipelines");                   Hint = "Declarative Pipelines" }
         @{ Label = "MLflow Onboarding";    Value = "mlflow-onboarding";                      State = ($preselected -contains "mlflow-onboarding");                      Hint = "Getting started" }
@@ -1195,7 +1195,7 @@ function Install-Skills {
     $allNewSkills += $script:SelectedSkills
     $allNewSkills += $script:SelectedMlflowSkills
     $allNewSkills += $script:SelectedApxSkills
-    $allNewSkills += $script:SelectedAgentSkills
+    $allNewSkills += $script:SelectedAgentSkills | ForEach-Object { $_ -replace '^.*:', '' }
 
     # Clean up previously installed skills that are no longer selected
     # Check scope-local manifest first, fall back to global for upgrades from older versions
@@ -1302,37 +1302,39 @@ function Install-Skills {
             }
             if ($agentTree) {
                 $prevEAP3 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-                foreach ($skill in $script:SelectedAgentSkills) {
-                    $destDir = Join-Path $dir $skill
+                foreach ($entry in $script:SelectedAgentSkills) {
+                    $srcName = ($entry -split ':')[0]
+                    $installName = ($entry -replace '^.*:', '')
+                    $destDir = Join-Path $dir $installName
                     if (-not (Test-Path $destDir)) {
                         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
                     }
-                    # Extract all file paths under skills/<skill>/ that contain a dot (i.e. are files not dirs)
-                    $filePaths = [regex]::Matches($agentTree, '"path":"(skills/' + [regex]::Escape($skill) + '/[^"]*\.[^"]*)"') |
+                    # Extract all file paths under skills/<srcName>/ that contain a dot (i.e. are files not dirs)
+                    $filePaths = [regex]::Matches($agentTree, '"path":"(skills/' + [regex]::Escape($srcName) + '/[^"]*\.[^"]*)"') |
                         ForEach-Object { $_.Groups[1].Value }
                     if (-not $filePaths) {
                         Remove-Item $destDir -ErrorAction SilentlyContinue
-                        Write-Warn "Could not fetch agent skill '$skill'"
+                        Write-Warn "Could not fetch agent skill '$srcName'"
                         continue
                     }
                     $okFlag = $false
                     foreach ($filePath in $filePaths) {
-                        $rel = $filePath.Substring("skills/$skill/".Length)
+                        $rel = $filePath.Substring("skills/$srcName/".Length)
                         $dest = Join-Path $destDir ($rel -replace '/', '\')
                         $destParent = Split-Path $dest -Parent
                         if (-not (Test-Path $destParent)) {
                             New-Item -ItemType Directory -Path $destParent -Force | Out-Null
                         }
                         try {
-                            Invoke-WebRequest -Uri "$AgentSkillsRawUrl/$skill/$rel" -OutFile $dest -UseBasicParsing -ErrorAction Stop
+                            Invoke-WebRequest -Uri "$AgentSkillsRawUrl/$srcName/$rel" -OutFile $dest -UseBasicParsing -ErrorAction Stop
                             $okFlag = $true
                         } catch {}
                     }
                     if ($okFlag) {
-                        $manifestEntries += "$dir|$skill"
+                        $manifestEntries += "$dir|$installName"
                     } else {
                         Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
-                        Write-Warn "Could not install agent skill '$skill'"
+                        Write-Warn "Could not install agent skill '$srcName'"
                     }
                 }
                 $ErrorActionPreference = $prevEAP3
