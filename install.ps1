@@ -79,7 +79,7 @@ $script:ListSkills   = $false
 
 # Databricks skills (bundled in repo)
 $script:Skills = @(
-    "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-apps",
+    "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-apps-python",
     "databricks-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
     "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-ai-functions",
@@ -128,7 +128,7 @@ $script:ProfileAiMlMlflow = @(
     "retrieving-mlflow-traces", "searching-mlflow-docs"
 )
 $script:ProfileAppDeveloper = @(
-    "databricks-apps", "databricks-app-apx", "databricks-lakebase-autoscale",
+    "databricks-apps-python", "databricks-app-apx", "databricks-lakebase-autoscale",
     "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
     "databricks-jobs", "databricks-bundles"
 )
@@ -1139,7 +1139,7 @@ function Invoke-PromptCustomSkills {
         @{ Label = "Synthetic Data";       Value = "databricks-synthetic-data-gen";          State = ($preselected -contains "databricks-synthetic-data-gen");          Hint = "Generate test data" }
         @{ Label = "Lakebase Autoscale";   Value = "databricks-lakebase-autoscale";          State = ($preselected -contains "databricks-lakebase-autoscale");          Hint = "Managed PostgreSQL" }
         @{ Label = "Lakebase Provisioned"; Value = "databricks-lakebase-provisioned";        State = ($preselected -contains "databricks-lakebase-provisioned");        Hint = "Provisioned PostgreSQL" }
-        @{ Label = "App (AppKit + Python)"; Value = "databricks-apps";                        State = ($preselected -contains "databricks-apps");                        Hint = "AppKit, Dash, Streamlit, Flask" }
+        @{ Label = "App (AppKit + Python)"; Value = "databricks-apps-python";                 State = ($preselected -contains "databricks-apps-python");                 Hint = "AppKit, Dash, Streamlit, Flask" }
         @{ Label = "App APX";              Value = "databricks-app-apx";                     State = ($preselected -contains "databricks-app-apx");                     Hint = "FastAPI + React" }
         @{ Label = "Agent: Databricks";    Value = "databricks";                             State = ($preselected -contains "databricks");                             Hint = "CLI auth, data exploration" }
         @{ Label = "Agent: Apps";          Value = "databricks-apps";                        State = ($preselected -contains "databricks-apps");                        Hint = "AppKit + all frameworks" }
