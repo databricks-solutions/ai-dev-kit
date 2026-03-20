@@ -35,9 +35,10 @@ _resolved_hostaddr = None
 def get_url_and_connect_args():
   """Get database URL and connect_args from environment.
 
-  Supports two modes:
+  Supports three modes:
   1. Static URL: Uses LAKEBASE_PG_URL directly
-  2. Dynamic OAuth: Builds URL from LAKEBASE_INSTANCE_NAME + generates token
+  2. Autoscale OAuth: Builds URL from LAKEBASE_ENDPOINT + generates token via client.postgres
+  3. Provisioned OAuth: Builds URL from LAKEBASE_INSTANCE_NAME + generates token via client.database
 
   Returns tuple of (url, connect_args) for psycopg2 driver.
   """

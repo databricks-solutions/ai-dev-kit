@@ -274,7 +274,7 @@ def _build_lakebase_url(
     """Build Lakebase connection URL (without password - injected via do_connect).
 
     Args:
-        instance_name: Lakebase instance name
+        instance_name: Lakebase instance name (provisioned) or endpoint resource name (autoscale)
         database_name: Database name to connect to
         username: Database username (defaults to current user's email)
         host: Database host (defaults to instance endpoint)
@@ -402,7 +402,7 @@ def init_database(database_url: Optional[str] = None) -> AsyncEngine:
         url,
         pool_size=int(os.environ.get("DB_POOL_SIZE", "5")),
         max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", "10")),
-        pool_pre_ping=False,  # Per cookbook
+        pool_pre_ping=True,
         pool_recycle=int(os.environ.get("DB_POOL_RECYCLE_INTERVAL", "3600")),
         pool_timeout=int(os.environ.get("DB_POOL_TIMEOUT", "10")),
         echo=False,
@@ -449,9 +449,40 @@ async def get_session() -> AsyncSession:
     return factory()
 
 
+# Retry settings for scale-to-zero wake-up (autoscale Lakebase)
+_SESSION_MAX_RETRIES = int(os.environ.get("DB_SESSION_MAX_RETRIES", "3"))
+_SESSION_RETRY_BASE_DELAY = float(os.environ.get("DB_SESSION_RETRY_DELAY", "1.0"))
+
+
+def _is_connection_error(exc: Exception) -> bool:
+    """Check if an exception is a transient connection error worth retrying."""
+    from sqlalchemy.exc import OperationalError, InterfaceError
+
+    if not isinstance(exc, (OperationalError, InterfaceError, OSError)):
+        return False
+
+    msg = str(exc).lower()
+    transient_patterns = [
+        "connection refused",
+        "connection reset",
+        "connection timed out",
+        "could not connect",
+        "connection failed",
+        "server closed the connection",
+        "ssl connection has been closed",
+        "broken pipe",
+        "network is unreachable",
+        "password authentication failed",  # can occur during compute wake-up
+    ]
+    return any(p in msg for p in transient_patterns)
+
+
 @asynccontextmanager
 async def session_scope() -> AsyncGenerator[AsyncSession, None]:
     """Provide a transactional scope around a series of operations.
+
+    Retries on transient connection errors (e.g., autoscale compute waking
+    from idle) with exponential backoff before propagating the failure.
 
     Yields:
         SQLAlchemy AsyncSession instance
@@ -460,15 +491,31 @@ async def session_scope() -> AsyncGenerator[AsyncSession, None]:
         async with session_scope() as session:
             result = await session.execute(select(Model))
     """
-    session = await get_session()
-    try:
-        yield session
-        await session.commit()
-    except Exception:
-        await session.rollback()
-        raise
-    finally:
-        await session.close()
+    last_exc: Optional[Exception] = None
+
+    for attempt in range(_SESSION_MAX_RETRIES + 1):
+        session = await get_session()
+        try:
+            yield session
+            await session.commit()
+            return
+        except Exception as exc:
+            await session.rollback()
+            if attempt < _SESSION_MAX_RETRIES and _is_connection_error(exc):
+                delay = _SESSION_RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    f"Database connection error (attempt {attempt + 1}/{_SESSION_MAX_RETRIES + 1}), "
+                    f"retrying in {delay:.1f}s: {exc}"
+                )
+                last_exc = exc
+                await asyncio.sleep(delay)
+                continue
+            raise
+        finally:
+            await session.close()
+
+    if last_exc:
+        raise last_exc
 
 
 async def create_tables():
@@ -489,6 +536,10 @@ def is_postgres_configured() -> bool:
             os.environ.get("LAKEBASE_INSTANCE_NAME")
             and os.environ.get("LAKEBASE_DATABASE_NAME")
         )
+        or (
+            os.environ.get("LAKEBASE_ENDPOINT")
+            and os.environ.get("LAKEBASE_DATABASE_NAME")
+        )
     )
 
 
@@ -496,8 +547,11 @@ def is_dynamic_token_mode() -> bool:
     """Check if using dynamic OAuth token mode (vs static URL)."""
     return bool(
         not os.environ.get("LAKEBASE_PG_URL")
-        and os.environ.get("LAKEBASE_INSTANCE_NAME")
         and os.environ.get("LAKEBASE_DATABASE_NAME")
+        and (
+            os.environ.get("LAKEBASE_INSTANCE_NAME")
+            or os.environ.get("LAKEBASE_ENDPOINT")
+        )
     )
 
 
