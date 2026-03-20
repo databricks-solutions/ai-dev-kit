@@ -989,14 +989,12 @@ check_deps() {
     if [ "$INSTALL_MCP" = true ]; then
         if command -v uv >/dev/null 2>&1; then
             PKG="uv"
-        elif command -v pip3 >/dev/null 2>&1; then
-            PKG="pip3"
-        elif command -v pip >/dev/null 2>&1; then
-            PKG="pip"
+            ok "$PKG ($(uv --version 2>/dev/null || echo 'unknown version'))"
         else
-            die "Python package manager required. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
+            die "uv is required but not found on your PATH.
+   Install it with: ${B}curl -LsSf https://astral.sh/uv/install.sh | sh${N}
+   Then re-run this installer."
         fi
-        ok "$PKG"
     fi
 }
 
@@ -1064,13 +1062,8 @@ setup_mcp() {
     fi
 
     msg "Installing Python dependencies..."
-    if [ "$PKG" = "uv" ]; then
-        $arch_prefix uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
-        $arch_prefix uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
-    else
-        [ ! -d "$VENV_DIR" ] && $arch_prefix python3 -m venv "$VENV_DIR"
-        $arch_prefix "$VENV_PYTHON" -m pip install -q -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server"
-    fi
+    $arch_prefix uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
+    $arch_prefix uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
 
     "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
     ok "MCP server ready"

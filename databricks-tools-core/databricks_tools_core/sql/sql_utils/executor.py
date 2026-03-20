@@ -87,6 +87,7 @@ class SQLExecutor:
             exec_params["row_limit"] = row_limit
         if query_tags:
             from databricks.sdk.service.sql import QueryTag
+
             exec_params["query_tags"] = [
                 QueryTag(key=k.strip(), value=v.strip())
                 for pair in query_tags.split(",")
