@@ -171,12 +171,8 @@ class AgentEvaluator:
         skill_paths = discover_skill_paths(tool_modules=tool_modules)
 
         # --- Focused field-based judges (1 LLM call each) ---
-        self._correctness_judge = create_correctness_judge(
-            skill_paths=skill_paths, judge_model=judge_model
-        )
-        self._completeness_judge = create_completeness_judge(
-            skill_paths=skill_paths, judge_model=judge_model
-        )
+        self._correctness_judge = create_correctness_judge(skill_paths=skill_paths, judge_model=judge_model)
+        self._completeness_judge = create_completeness_judge(skill_paths=skill_paths, judge_model=judge_model)
         self._guideline_judge = create_guideline_adherence_judge(
             skill_paths=skill_paths,
             skill_guidelines=skill_guidelines,
