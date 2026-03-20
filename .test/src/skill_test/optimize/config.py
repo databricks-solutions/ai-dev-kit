@@ -138,6 +138,11 @@ _configure_litellm_retries()
 _REFLECTION_OVERHEAD_MULTIPLIER = 3
 
 PRESETS: dict[str, GEPAConfig] = {
+    "minimal": GEPAConfig(
+        engine=EngineConfig(max_metric_calls=8, parallel=True),
+        reflection=ReflectionConfig(reflection_lm=DEFAULT_REFLECTION_LM),
+        refiner=RefinerConfig(max_refinements=1),
+    ),
     "quick": GEPAConfig(
         engine=EngineConfig(max_metric_calls=15, parallel=True),
         reflection=ReflectionConfig(reflection_lm=DEFAULT_REFLECTION_LM),
@@ -163,6 +168,7 @@ PRESETS: dict[str, GEPAConfig] = {
 
 # Base max_metric_calls per preset (used to scale by component count)
 PRESET_BASE_CALLS: dict[str, int] = {
+    "minimal": 8,
     "quick": 15,
     "standard": 50,
     "thorough": 150,
@@ -171,6 +177,7 @@ PRESET_BASE_CALLS: dict[str, int] = {
 # Per-preset caps: safety net so component scaling never exceeds a reasonable
 # ceiling.  Important for --tools-only mode which has many tool components.
 PRESET_MAX_CALLS: dict[str, int] = {
+    "minimal": 15,
     "quick": 45,
     "standard": 150,
     "thorough": 300,

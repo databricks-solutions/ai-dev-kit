@@ -90,7 +90,7 @@ The default evaluator (`skillbench_evaluator.py`) uses `litellm.completion` to g
 
 1. **Generate WITH-skill response** — `litellm.completion` with skill + tool descriptions as system context, temperature=0
 2. **Generate WITHOUT-skill response** — Same prompt, no skill. Cached by prompt hash (computed once, reused across all GEPA iterations)
-3. **Multi-judge scoring** — Three focused judges score responses with categorical `"excellent"` / `"acceptable"` / `"poor"` verdicts:
+3. **Multi-judge scoring** — Three focused field-based judges score responses with binary `"yes"` / `"no"` verdicts (1 LLM call each):
    - **Correctness judge** — scores WITH + WITHOUT (WITHOUT cached). Evaluates factual accuracy, API correctness, code syntax.
    - **Completeness judge** — scores WITH + WITHOUT (WITHOUT cached). Evaluates question coverage, expected facts/patterns presence.
    - **Guideline adherence judge** — scores WITH only (meaningless without skill). Evaluates Databricks patterns, conventions, `--focus` areas.
@@ -100,7 +100,7 @@ The default evaluator (`skillbench_evaluator.py`) uses `litellm.completion` to g
 
 **Cost per task:** 5 LLM calls initially (correctness×2 + completeness×2 + guideline_adherence×1). After caching WITHOUT calls: 3 LLM calls per task on subsequent iterations.
 
-**Categorical-to-float conversion:** `excellent=1.0`, `acceptable=0.6`, `poor=0.0`. Nonlinear: "acceptable" contributes positively (above 0.5) but the 0.4 gap to "excellent" incentivizes GEPA to push higher.
+**Binary-to-float conversion:** `yes=1.0`, `no=0.0`. Binary verdicts produce more reliable, consistent judgments than categorical or continuous scales.
 
 ### Proxy scoring weights
 
@@ -128,25 +128,25 @@ The agent evaluator (`agent_evaluator.py`) runs a **real Claude Code instance** 
 
 1. **Run agent WITH skill** — Claude Code executes with candidate SKILL.md injected as system prompt
 2. **Run agent WITHOUT skill** — Same task, no skill (cached by prompt hash)
-3. **Quality judge** — Scores final response text
-4. **Effectiveness delta** — score_with - score_without
-5. **Tool correctness** — MLflow `ToolCallCorrectness` judge on actual tool calls
-6. **Tool efficiency** — MLflow `ToolCallEfficiency` judge or deterministic `tool_count` scorer
-7. **Behavioral compliance** — Deterministic trace scorers (`required_tools`, `banned_tools`, `tool_sequence`)
-8. **Execution success** — Ratio of successful tool calls
-9. **Token efficiency** — Candidate size vs budget
+3. **Focused field-based judges** — Same binary yes/no judges as the proxy evaluator (correctness, completeness, guideline adherence)
+4. **Effectiveness delta** — per-dimension score_with - score_without
+5. **Assertion coverage** — Deterministic fact/pattern checks from `assertions.py`
+6. **Execution success** — Ratio of successful tool calls
+7. **Token efficiency** — Candidate size vs budget
+8. **Regression penalty** — Conditional penalty when regression detected
 
 ### Agent scoring weights
 
 | Weight | Dimension | Source |
 |--------|-----------|--------|
-| **20%** | Content quality | `quality_judge` on final response text |
-| **20%** | Skill effectiveness | WITH vs WITHOUT delta |
-| **20%** | Tool call correctness | MLflow `ToolCallCorrectness` or `required_tools` scorer |
-| **10%** | Tool call efficiency | MLflow `ToolCallEfficiency` or `tool_count` scorer |
-| **15%** | Behavioral compliance | Deterministic trace scorers |
-| **10%** | Execution success | Ratio of successful tool calls |
+| **20%** | Effectiveness delta | WITH vs WITHOUT per-dimension delta |
+| **20%** | Correctness | Focused field-based judge (1 LLM call) |
+| **15%** | Completeness | Focused field-based judge (1 LLM call) |
+| **15%** | Guideline adherence | Focused field-based judge (1 LLM call) |
+| **15%** | Assertion coverage | Deterministic `expected_facts` + `expected_patterns` |
+| **5%** | Execution success | Ratio of successful tool calls |
 | **5%** | Token efficiency | Smaller candidates score higher |
+| **-5%** | Regression penalty | Conditional penalty when regression detected |
 
 ### Two modes
 
@@ -224,11 +224,11 @@ side_info = {
     "Task": "Create a metric view for order analytics...",
 
     # Per-dimension judge feedback — GEPA sees each as a separate section
-    "Judge_correctness_with":    {"verdict": "acceptable", "score": 0.6, "rationale": "..."},
-    "Judge_correctness_without": {"verdict": "poor",       "score": 0.0, "rationale": "..."},
-    "Judge_completeness_with":   {"verdict": "excellent",  "score": 1.0, "rationale": "..."},
-    "Judge_completeness_without":{"verdict": "poor",       "score": 0.0, "rationale": "..."},
-    "Judge_guideline_adherence": {"verdict": "acceptable", "score": 0.6, "rationale": "..."},
+    "Judge_correctness_with":    {"verdict": "yes", "score": 1.0, "rationale": "..."},
+    "Judge_correctness_without": {"verdict": "no",  "score": 0.0, "rationale": "..."},
+    "Judge_completeness_with":   {"verdict": "yes", "score": 1.0, "rationale": "..."},
+    "Judge_completeness_without":{"verdict": "no",  "score": 0.0, "rationale": "..."},
+    "Judge_guideline_adherence": {"verdict": "yes", "score": 1.0, "rationale": "..."},
 
     # Per-dimension effectiveness deltas
     "Judge_effectiveness": {
@@ -255,15 +255,15 @@ side_info = {
         "Regressions": "",
     },
     "scores": {
-        "correctness_with": 0.6,
+        "correctness_with": 1.0,
         "correctness_without": 0.0,
         "completeness_with": 1.0,
         "completeness_without": 0.0,
-        "guideline_adherence": 0.6,
-        "quality_composite": 0.73,    # mean of (0.6 + 1.0 + 0.6) / 3
-        "correctness_delta": 0.6,
+        "guideline_adherence": 1.0,
+        "quality_composite": 1.0,     # mean of (1.0 + 1.0 + 1.0) / 3
+        "correctness_delta": 1.0,
         "completeness_delta": 1.0,
-        "skill_effectiveness": 0.8,   # mean of deltas
+        "skill_effectiveness": 1.0,   # mean of deltas
         "effectiveness_verdict": "improved",
         "regression_penalty": 0.0,
         "fact_coverage": 0.67,        # 2/3 facts passed
@@ -332,18 +332,18 @@ The framework uses two complementary scoring mechanisms:
 
 ### 1. Multi-judge architecture (LLM-based)
 
-Built with [MLflow's `make_judge`](https://mlflow.org/docs/latest/genai/eval-monitor/scorers/llm-judge/custom-judges/) (`judges.py`). Three focused custom judges evaluate independent dimensions:
+Built with [MLflow's `make_judge`](https://mlflow.org/docs/latest/genai/eval-monitor/scorers/llm-judge/custom-judges/) (`judges.py`). Three focused field-based judges evaluate independent dimensions, each making exactly 1 LLM call:
 
 | Judge | Focus | Feedback type | Runs on | GEPA signal |
 |-------|-------|--------------|---------|-------------|
-| **Correctness** | Facts, API references, code syntax | `Literal["excellent", "acceptable", "poor"]` | WITH + WITHOUT | `Judge_correctness_with` / `Judge_correctness_without` |
-| **Completeness** | All parts addressed, expected info | `Literal["excellent", "acceptable", "poor"]` | WITH + WITHOUT | `Judge_completeness_with` / `Judge_completeness_without` |
-| **Guideline adherence** | Databricks patterns, conventions | `Literal["excellent", "acceptable", "poor"]` | WITH only | `Judge_guideline_adherence` |
+| **Correctness** | Facts, API references, code syntax | `Literal["yes", "no"]` | WITH + WITHOUT | `Judge_correctness_with` / `Judge_correctness_without` |
+| **Completeness** | All parts addressed, expected info | `Literal["yes", "no"]` | WITH + WITHOUT | `Judge_completeness_with` / `Judge_completeness_without` |
+| **Guideline adherence** | Databricks patterns, conventions | `Literal["yes", "no"]` | WITH only | `Judge_guideline_adherence` |
 | **Regression** | What the skill broke (conditional) | `bool` | Conditional | `Regression_Analysis` |
 
-Each judge returns a categorical verdict with detailed rationale. Verdicts are converted to floats: `excellent=1.0`, `acceptable=0.6`, `poor=0.0`.
+Each judge returns a binary verdict with detailed rationale. Verdicts are converted to floats via `_safe_parse_score`: `yes=1.0`, `no=0.0`.
 
-**Why categorical over numeric?** Categorical `Literal` types produce more reliable, consistent judgments than continuous 0.0–1.0 scores. They're also compatible with [MemAlign](https://mlflow.org/docs/latest/genai/eval-monitor/scorers/llm-judge/custom-judges/#alignment) for judge calibration with human feedback.
+**Why binary over categorical?** Binary `Literal["yes", "no"]` verdicts produce more reliable, consistent judgments than categorical (`excellent/acceptable/poor`) or continuous 0.0–1.0 scales. Two domain experts are more likely to agree on a yes/no answer than a three-way categorical label. Binary verdicts are also compatible with [MemAlign](https://mlflow.org/docs/latest/genai/eval-monitor/scorers/llm-judge/custom-judges/#alignment) for judge calibration with human feedback.
 
 **Why three judges (not one, not five)?** The previous single quality judge collapsed 5 criteria into one score. When a mutation improved correctness but hurt completeness, the score barely moved — GEPA couldn't distinguish which dimension improved. Three judges cover core evaluation dimensions:
 1. **Correctness** → GEPA can target: fix API errors, update deprecated patterns
@@ -383,80 +383,36 @@ Effectiveness is derived per-dimension: `correctness_delta = correctness_with - 
 
 Judges can adaptively load domain-specific rubrics during scoring. Evaluation criteria are packaged as SKILL.md files in `.test/eval-criteria/` — the same format used by agent skills. This implements the `Skill`/`SkillSet` data model from the [MLflow #21255 design spec](https://github.com/mlflow/mlflow/issues/21255#issuecomment-3997922398).
 
-### Discovery and parsing (`eval_criteria.py`)
+### Discovery and filtering (`discover_skill_paths()` in `judges.py`)
 
-`discover_eval_criteria()` scans `.test/eval-criteria/` for subdirectories containing a `SKILL.md` file. Each is parsed into an `EvalCriteriaSkill` dataclass:
+`discover_skill_paths()` scans `.test/eval-criteria/` for subdirectories containing a `SKILL.md` file. It parses each file's YAML frontmatter to check the `applies_to` metadata field and filters based on the skill's `tool_modules`:
+
+- **`applies_to: [sql]`** — only included when the skill declares `tool_modules` containing `sql`
+- **`applies_to: []`** (or omitted) — always included (general-purpose criteria, e.g., `general-quality`, `tool-selection`)
+
+The function returns a list of directory paths that are passed to `make_judge(skills=[...])` when the native MLflow `skills=` parameter is available (PR #21725). Until then, judges operate without criteria and rely on their instructions plus deterministic assertions.
+
+### How judges receive criteria
+
+When `make_judge` supports the `skills=` parameter, criteria paths are passed directly:
 
 ```python
-@dataclass
-class EvalCriteriaSkill:
-    name: str                    # From frontmatter (e.g., "sql-correctness")
-    description: str             # One-line description for judge prompt
-    path: Path                   # Directory path
-    metadata: dict[str, Any]     # Full YAML frontmatter metadata
-    body: str                    # Markdown body (the actual rubric)
-    references: dict[str, str]   # {relative_path: content} from references/
-    applies_to: list[str]        # tool_modules filter (from metadata.applies_to)
+make_judge(
+    name="correctness",
+    instructions=...,
+    model=...,
+    feedback_value_type=Literal["yes", "no"],
+    skills=[".test/eval-criteria/general-quality", ".test/eval-criteria/sql-correctness"],
+)
 ```
 
-`EvalCriteriaSet` holds all parsed criteria and provides:
-- **`filter_by_modules(tool_modules)`** — returns subset matching the skill's `tool_modules`. Criteria with empty `applies_to` are always included (general-purpose).
-- **`to_prompt(model)`** — generates a lightweight listing for system-prompt injection. Uses XML format for Claude models, Markdown for others. Only includes name + description (~50-100 tokens per criteria), not the full body.
-- **`get_skill(name)`** — lookup by name for tool invocation.
+MLflow handles on-demand loading — the judge reads the SKILL.md rubric and `references/` files when relevant to the response being evaluated. This keeps judge prompts small while giving access to deep domain rubrics.
 
-### Tool registration (`judge_tools.py`)
+### Forward compatibility
 
-Two tools are registered in MLflow's global `JudgeToolRegistry` via `register_eval_tools()`:
+The `_make_judge_with_skills()` helper in `judges.py` detects whether the installed MLflow version supports `skills=` via signature inspection. When MLflow ships the native API from the #21255 spec, no code changes are needed — the parameter will be automatically passed through.
 
-| Tool | Arguments | Returns |
-|------|-----------|---------|
-| `read_eval_criteria` | `skill_name` | Full rubric body (markdown) |
-| `read_eval_reference` | `skill_name`, `file_path` | Reference document content |
-
-These implement `ReadSkillTool` and `ReadSkillReferenceTool` from the MLflow #21255 spec. Both accept a `trace: Trace` parameter (required by the `JudgeTool` interface) but route lookups through the internal `EvalCriteriaSet`. Registration is idempotent — safe to call multiple times per process.
-
-`ReadEvalReferenceTool` includes path traversal protection: normalized paths starting with `..` or absolute paths are rejected.
-
-### System prompt injection
-
-When judges are created, the `EvalCriteriaSet` is passed to each judge factory function (`make_correctness_judge`, `make_completeness_judge`, `make_guideline_adherence_judge`). The criteria listing is injected into the judge's system prompt via `to_prompt()`:
-
-**Claude models (XML):**
-```xml
-<available_skills>
-  <skill>
-    <name>sql-correctness</name>
-    <description>SQL evaluation criteria for Databricks...</description>
-  </skill>
-  ...
-</available_skills>
-```
-
-**Other models (Markdown):**
-```markdown
-## Available Evaluation Criteria
-
-- **sql-correctness**: SQL evaluation criteria for Databricks...
-```
-
-The judge sees the listing and decides whether to call `read_eval_criteria` based on the trace content. This keeps the system prompt small while giving judges access to deep domain rubrics on demand.
-
-### `applies_to` filtering
-
-Criteria are filtered by `tool_modules` from the skill's `manifest.yaml`:
-
-- **`applies_to: [sql]`** — only available when evaluating skills with `tool_modules` containing `sql`
-- **`applies_to: []`** (or omitted) — always available (e.g., `general-quality`, `tool-selection`)
-
-Filtering happens at evaluator initialization: `discover_eval_criteria()` loads all criteria, then `filter_by_modules()` narrows the set before tool registration and judge creation.
-
-### Future: MLflow native `make_judge(skills=[...])`
-
-This module is a bridge implementation. When MLflow ships the native `make_judge(skills=[...])` API from the #21255 spec, replace:
-- `eval_criteria.py` → `from mlflow.genai.skills import SkillSet`
-- `judge_tools.py` → MLflow's built-in skill tools (auto-registered via type annotation)
-
-The SKILL.md files and `references/` directories remain unchanged — only the loading/registration code changes.
+The SKILL.md files and `references/` directories remain unchanged — only the discovery mechanism lives in `judges.py` instead of separate modules.
 
 ---
 
@@ -566,13 +522,14 @@ Example: `--include-tools --tool-modules sql serving` (3 components: `skill_md` 
 
 | Weight | Dimension | What it measures |
 |--------|-----------|-----------------|
-| **20%** | Content quality | `quality_judge` on final response text |
-| **20%** | Skill effectiveness | WITH vs WITHOUT delta |
-| **20%** | Tool call correctness | Did the agent use the right tools? |
-| **10%** | Tool call efficiency | Did the agent use a reasonable number of calls? |
-| **15%** | Behavioral compliance | Required/banned tools, tool sequence |
-| **10%** | Execution success | Ratio of successful tool calls |
+| **20%** | Effectiveness delta | WITH vs WITHOUT per-dimension delta |
+| **20%** | Correctness | Focused field-based judge (1 LLM call) |
+| **15%** | Completeness | Focused field-based judge (1 LLM call) |
+| **15%** | Guideline adherence | Focused field-based judge (1 LLM call) |
+| **15%** | Assertion coverage | Deterministic `expected_facts` + `expected_patterns` |
+| **5%** | Execution success | Ratio of successful tool calls |
 | **5%** | Token efficiency | Smaller candidates score higher |
+| **-5%** | Regression penalty | Conditional penalty when regression detected |
 
 ---
 
@@ -656,21 +613,13 @@ Optimizing both simultaneously creates a **confounding variable problem**:
                  completeness_judge,            event streaming,
                  guideline_adherence_judge,     TraceMetrics builder)
                  regression_judge,
+                 discover_skill_paths(),
                  model fallback)
                      │
-                     ├─── eval_criteria.py
-                     │    (discover + parse SKILL.md
-                     │     rubrics from eval-criteria/)
-                     │
-                     └─── judge_tools.py
-                          (register read_eval_criteria +
-                           read_eval_reference as
-                           MLflow JudgeTools)
-                          │
-                          ▼
+                     ▼
                   MLflow make_judge              MLflow Tracing
                   (scoring + rationale +         (process_transcript)
-                   adaptive criteria tools)
+                   skills= for criteria)
                                                           │
                                                           ▼
                                                 assessment_fetcher.py
