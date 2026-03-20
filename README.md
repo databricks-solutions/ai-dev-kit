@@ -8,7 +8,7 @@
 
 ## Overview
 
-AI-Driven Development (vibe coding) on Databricks just got a whole lot better. The **AI Dev Kit** gives your AI coding assistant (Claude Code, Cursor, Windsurf, etc.) the trusted sources it needs to build faster and smarter on Databricks.
+AI-Driven Development (vibe coding) on Databricks just got a whole lot better. The **AI Dev Kit** gives your AI coding assistant (Claude Code, Cursor, Antigravity, Windsurf, etc.) the trusted sources it needs to build faster and smarter on Databricks.
 
 <p align="center">
   <img src="databricks-tools-core/docs/architecture.svg" alt="Architecture" width="700">
@@ -53,11 +53,12 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
   - [Claude Code](https://claude.ai/code)
   - [Cursor](https://cursor.com)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+  - [Antigravity](https://antigravity.google)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, or .gemini_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, or .agents_
 
 #### Mac / Linux
 
@@ -85,7 +86,7 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 **Install for specific tools only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity
 ```
 
 </details>
@@ -125,7 +126,7 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 **Install for specific tools only**
 
 ```powershell
-.\install.ps1 -Tools cursor,gemini
+.\install.ps1 -Tools cursor,gemini,antigravity
 ```
 
 </details>

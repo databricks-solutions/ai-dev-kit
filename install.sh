@@ -2,7 +2,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, and Gemini CLI.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, and Antigravity.
 #
 # Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
@@ -149,7 +149,7 @@ while [ $# -gt 0 ]; do
             echo "  --mcp-only            Skip skills installation"
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
-            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
+            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity"
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
@@ -502,24 +502,27 @@ detect_tools() {
     local has_codex=false
     local has_copilot=false
     local has_gemini=false
+    local has_antigravity=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
     command -v codex >/dev/null 2>&1 && has_codex=true
     { [ -d "/Applications/Visual Studio Code.app" ] || command -v code >/dev/null 2>&1; } && has_copilot=true
     { command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/local/gemini" ]; } && has_gemini=true
+    { [ -d "/Applications/Antigravity.app" ] || command -v antigravity >/dev/null 2>&1; } && has_antigravity=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found"
-    [ "$has_claude" = true ]  && claude_state="on"  && claude_hint="detected"
-    [ "$has_cursor" = true ]  && cursor_state="on"  && cursor_hint="detected"
-    [ "$has_codex" = true ]   && codex_state="on"   && codex_hint="detected"
-    [ "$has_copilot" = true ] && copilot_state="on"  && copilot_hint="detected"
-    [ "$has_gemini" = true ]  && gemini_state="on"   && gemini_hint="detected"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found"
+    [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
+    [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
+    [ "$has_codex" = true ]         && codex_state="on"         && codex_hint="detected"
+    [ "$has_copilot" = true ]       && copilot_state="on"       && copilot_hint="detected"
+    [ "$has_gemini" = true ]        && gemini_state="on"        && gemini_hint="detected"
+    [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
@@ -535,15 +538,17 @@ detect_tools() {
             "GitHub Copilot|copilot|${copilot_state}|${copilot_hint}" \
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
             "Gemini CLI|gemini|${gemini_state}|${gemini_hint}" \
+            "Antigravity|antigravity|${antigravity_state}|${antigravity_hint}" \
         )
     else
         # Silent: use detected defaults
         local tools=""
-        [ "$has_claude" = true ]  && tools="claude"
-        [ "$has_cursor" = true ]  && tools="${tools:+$tools }cursor"
-        [ "$has_copilot" = true ] && tools="${tools:+$tools }copilot"
-        [ "$has_codex" = true ]   && tools="${tools:+$tools }codex"
-        [ "$has_gemini" = true ]  && tools="${tools:+$tools }gemini"
+        [ "$has_claude" = true ]        && tools="claude"
+        [ "$has_cursor" = true ]        && tools="${tools:+$tools }cursor"
+        [ "$has_copilot" = true ]       && tools="${tools:+$tools }copilot"
+        [ "$has_codex" = true ]         && tools="${tools:+$tools }codex"
+        [ "$has_gemini" = true ]        && tools="${tools:+$tools }gemini"
+        [ "$has_antigravity" = true ]   && tools="${tools:+$tools }antigravity"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -1091,6 +1096,13 @@ install_skills() {
             copilot) dirs+=("$base_dir/.github/skills") ;;
             codex) dirs+=("$base_dir/.agents/skills") ;;
             gemini) dirs+=("$base_dir/.gemini/skills") ;;
+            antigravity)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.gemini/antigravity/skills")
+                else
+                    dirs+=("$base_dir/.agents/skills")
+                fi
+                ;;
         esac
     done
 
@@ -1462,6 +1474,10 @@ write_mcp_configs() {
                 fi
                 ok "Gemini CLI MCP config"
                 ;;
+            antigravity)
+                write_gemini_mcp_json "$HOME/.gemini/antigravity/mcp_config.json"
+                ok "Antigravity MCP config"
+                ;;
         esac
     done
 }
@@ -1503,6 +1519,10 @@ summary() {
         fi
         if echo "$TOOLS" | grep -q gemini; then
             msg "${step}. Launch Gemini CLI in your project: ${B}gemini${N}"
+            step=$((step + 1))
+        fi
+        if echo "$TOOLS" | grep -q antigravity; then
+            msg "${step}. Open your project in Antigravity to use Databricks skills and MCP tools"
             step=$((step + 1))
         fi
         msg "${step}. Open your project in your tool of choice"

@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, and Gemini CLI.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, and Antigravity.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -233,7 +233,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
@@ -567,15 +567,18 @@ function Invoke-DetectTools {
     $hasCopilot = ($null -ne (Get-Command code -ErrorAction SilentlyContinue)) -or
                   (Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe")
     $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
+    $hasAntigravity = ($null -ne (Get-Command antigravity -ErrorAction SilentlyContinue)) -or
+                      (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe")
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
     $codexState   = $hasCodex;   $codexHint   = if ($hasCodex)   { "detected" } else { "not found" }
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
     $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
+    $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -586,11 +589,12 @@ function Invoke-DetectTools {
     }
 
     $items = @(
-        @{ Label = "Claude Code";    Value = "claude";  State = $claudeState;  Hint = $claudeHint }
-        @{ Label = "Cursor";         Value = "cursor";  State = $cursorState;  Hint = $cursorHint }
-        @{ Label = "GitHub Copilot"; Value = "copilot"; State = $copilotState; Hint = $copilotHint }
-        @{ Label = "OpenAI Codex";   Value = "codex";   State = $codexState;   Hint = $codexHint }
-        @{ Label = "Gemini CLI";     Value = "gemini";  State = $geminiState;  Hint = $geminiHint }
+        @{ Label = "Claude Code";    Value = "claude";       State = $claudeState;       Hint = $claudeHint }
+        @{ Label = "Cursor";         Value = "cursor";       State = $cursorState;       Hint = $cursorHint }
+        @{ Label = "GitHub Copilot"; Value = "copilot";      State = $copilotState;      Hint = $copilotHint }
+        @{ Label = "OpenAI Codex";   Value = "codex";        State = $codexState;        Hint = $codexHint }
+        @{ Label = "Gemini CLI";     Value = "gemini";       State = $geminiState;       Hint = $geminiHint }
+        @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1153,6 +1157,13 @@ function Install-Skills {
             "copilot" { $dirs += Join-Path $BaseDir ".github\skills" }
             "codex"   { $dirs += Join-Path $BaseDir ".agents\skills" }
             "gemini"  { $dirs += Join-Path $BaseDir ".gemini\skills" }
+            "antigravity" {
+                if ($script:Scope -eq "global") {
+                    $dirs += Join-Path $env:USERPROFILE ".gemini\antigravity\skills"
+                } else {
+                    $dirs += Join-Path $BaseDir ".agents\skills"
+                }
+            }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1559,6 +1570,10 @@ function Write-McpConfigs {
                 }
                 Write-Ok "Gemini CLI MCP config"
             }
+            "antigravity" {
+                Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\antigravity\mcp_config.json")
+                Write-Ok "Antigravity MCP config"
+            }
         }
     }
 }
@@ -1608,6 +1623,10 @@ function Show-Summary {
     }
     if ($script:Tools -match 'gemini') {
         Write-Msg "$step. Launch Gemini CLI in your project: gemini"
+        $step++
+    }
+    if ($script:Tools -match 'antigravity') {
+        Write-Msg "$step. Open your project in Antigravity to use Databricks skills and MCP tools"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"
