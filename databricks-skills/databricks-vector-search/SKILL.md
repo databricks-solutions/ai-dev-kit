@@ -320,29 +320,74 @@ The following MCP tools are available for managing Vector Search infrastructure.
 
 | Tool | Description |
 |------|-------------|
-| `create_vs_endpoint` | Create endpoint (STANDARD or STORAGE_OPTIMIZED). Async — check status with `get_vs_endpoint` |
-| `get_vs_endpoint` | Get endpoint details and status by name |
-| `list_vs_endpoints` | List all Vector Search endpoints in the workspace |
-| `delete_vs_endpoint` | Delete an endpoint (indexes must be deleted first) |
+| `create_or_update_vs_endpoint` | Create or update an endpoint (STANDARD or STORAGE_OPTIMIZED). Idempotent — returns existing if found |
+| `get_vs_endpoint` | Get endpoint details by name. Omit `name` to list all endpoints in the workspace |
+| `delete_vs_endpoint` | Delete an endpoint (all indexes must be deleted first) |
+
+```python
+# Create or update an endpoint
+result = create_or_update_vs_endpoint(name="my-vs-endpoint", endpoint_type="STANDARD")
+# Returns {"name": "my-vs-endpoint", "endpoint_type": "STANDARD", "created": True}
+
+# List all endpoints
+endpoints = get_vs_endpoint()  # omit name to list all
+```
 
 ### Index Management
 
 | Tool | Description |
 |------|-------------|
-| `create_vs_index` | Create a Delta Sync or Direct Access index on an endpoint |
-| `get_vs_index` | Get index details, status, and configuration |
-| `list_vs_indexes` | List all indexes on an endpoint |
-| `delete_vs_index` | Delete an index |
-| `sync_vs_index` | Trigger sync for TRIGGERED pipeline indexes |
+| `create_or_update_vs_index` | Create or update an index. Idempotent — auto-triggers initial sync for DELTA_SYNC indexes |
+| `get_vs_index` | Get index details by `index_name`. Pass `endpoint_name` (no `index_name`) to list all indexes on an endpoint |
+| `delete_vs_index` | Delete an index by fully-qualified name (catalog.schema.index_name) |
+
+```python
+# Create a Delta Sync index with managed embeddings
+result = create_or_update_vs_index(
+    name="catalog.schema.my_index",
+    endpoint_name="my-vs-endpoint",
+    primary_key="id",
+    index_type="DELTA_SYNC",
+    delta_sync_index_spec={
+        "source_table": "catalog.schema.docs",
+        "embedding_source_columns": [{"name": "content", "embedding_model_endpoint_name": "databricks-gte-large-en"}],
+        "pipeline_type": "TRIGGERED"
+    }
+)
+
+# Get a specific index by name — parameter is index_name, not name
+index = get_vs_index(index_name="catalog.schema.my_index")
+
+# List all indexes on an endpoint
+indexes = get_vs_index(endpoint_name="my-vs-endpoint")
+```
 
 ### Query and Data
 
 | Tool | Description |
 |------|-------------|
 | `query_vs_index` | Query index with `query_text`, `query_vector`, or hybrid (`query_type="HYBRID"`) |
-| `upsert_vs_data` | Upsert vectors into a Direct Access index |
-| `delete_vs_data` | Delete vectors from a Direct Access index by primary key |
-| `scan_vs_index` | Retrieve all vectors from an index (for debugging/export) |
+| `manage_vs_data` | CRUD operations on Direct Access indexes. `operation`: `"upsert"`, `"delete"`, `"scan"`, `"sync"` |
+
+```python
+# Query an index
+results = query_vs_index(
+    index_name="catalog.schema.my_index",
+    columns=["id", "content"],
+    query_text="machine learning best practices",
+    num_results=5
+)
+
+# Upsert data into a Direct Access index
+manage_vs_data(
+    index_name="catalog.schema.my_index",
+    operation="upsert",
+    inputs_json=[{"id": "doc1", "content": "...", "embedding": [0.1, 0.2, ...]}]
+)
+
+# Trigger manual sync for a TRIGGERED pipeline index
+manage_vs_data(index_name="catalog.schema.my_index", operation="sync")
+```
 
 ## Notes
 
