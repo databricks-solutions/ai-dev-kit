@@ -149,6 +149,37 @@ description: "What this teaches"
 ...
 ```
 
+## Developing Skills
+
+For contributors creating new skills, ai-dev-kit provides a guided authoring workflow and evaluation framework.
+
+### Quick Start (Contributors)
+
+1. **Use the authoring skill** — Clone the repo and ask Claude: "Help me create a new skill for [feature]". The `skill-authoring` skill (in `.skill-authoring/`) will guide you through the full workflow: interview, draft, test, validate, register.
+
+2. **Or start manually** — Copy the template and fill in the sections:
+   ```bash
+   cp -r databricks-skills/TEMPLATE databricks-skills/your-skill-name
+   # Edit SKILL.md with your content
+   ```
+
+3. **Generate test scaffolding**:
+   ```bash
+   /skill-test your-skill-name init
+   ```
+
+4. **Run quick trigger validation**:
+   ```bash
+   uv run python .test/scripts/quick_trigger.py your-skill-name
+   ```
+
+5. **Run full evaluation**:
+   ```bash
+   uv run python .test/scripts/run_eval.py your-skill-name
+   ```
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor guide and quality checklist.
+
 ## Troubleshooting
 
 **Skills not loading?** Check `.claude/skills/` exists and each skill has `SKILL.md`
