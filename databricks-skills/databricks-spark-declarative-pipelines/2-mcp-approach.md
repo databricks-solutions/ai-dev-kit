@@ -4,10 +4,9 @@ Use MCP tools to create, run, and iterate on **SDP pipelines**. The **primary to
 
 ### Step 1: Write Pipeline Files Locally
 
-Create `.sql` or `.py` files in a local folder. For SQL/Python syntax examples, see:
-- [SKILL.md - General SDP development guidance](SKILL.md#general-sdp-development-guidance)
-- [1-ingestion-patterns.md](1-ingestion-patterns.md) for ingestion patterns
-- [5-python-api.md](5-python-api.md) for Python API reference
+Create `.sql` or `.py` files in a local folder. For syntax examples, see:
+- [sql/1-syntax-basics.md](sql/1-syntax-basics.md) for SQL syntax
+- [python/1-syntax-basics.md](python/1-syntax-basics.md) for Python syntax
 
 ### Step 2: Upload to Databricks Workspace
 

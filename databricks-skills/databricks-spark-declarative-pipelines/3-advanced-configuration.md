@@ -348,3 +348,77 @@ You can copy pipeline settings from the Databricks UI (Pipeline Settings > JSON)
 ```
 
 **Note**: Explicit tool parameters (`name`, `root_path`, `catalog`, `schema`, `workspace_file_paths`) always take precedence over values in `extra_settings`.
+
+---
+
+## Multi-Schema Patterns
+
+**Default: Single target schema per pipeline.** Each pipeline has one target `catalog` and `schema` where all tables are written. Use table name prefixes to distinguish layers (e.g., `bronze_*`, `silver_*`, `gold_*`).
+
+For advanced use cases where you need separate schemas per layer, use pipeline parameters.
+
+### Option 1: Same Catalog, Separate Schemas
+
+Set pipeline defaults to bronze, use parameters for silver/gold:
+
+```python
+from pyspark import pipelines as dp
+from pyspark.sql.functions import col
+
+# Pull variables from pipeline configuration
+silver_schema = spark.conf.get("silver_schema")  # e.g., "silver"
+gold_schema   = spark.conf.get("gold_schema")    # e.g., "gold"
+landing_schema = spark.conf.get("landing_schema")  # e.g., "landing"
+
+# Bronze → uses default catalog/schema (set to bronze in pipeline settings)
+@dp.table(name="orders_bronze")
+def orders_bronze():
+    return spark.readStream.table(f"{landing_schema}.orders_raw")
+
+# Silver → same catalog, schema from parameter
+@dp.table(name=f"{silver_schema}.orders_clean")
+def orders_clean():
+    return spark.read.table("orders_bronze").filter(col("order_id").isNotNull())
+
+# Gold → same catalog, schema from parameter
+@dp.materialized_view(name=f"{gold_schema}.orders_by_date")
+def orders_by_date():
+    return (spark.read.table(f"{silver_schema}.orders_clean")
+            .groupBy("order_date").count())
+```
+
+### Option 2: Custom Catalog/Schema Per Layer
+
+For cross-catalog scenarios:
+
+```python
+from pyspark import pipelines as dp
+from pyspark.sql.functions import col
+
+# Pull variables from pipeline configuration
+silver_catalog = spark.conf.get("silver_catalog")
+silver_schema  = spark.conf.get("silver_schema")
+gold_catalog   = spark.conf.get("gold_catalog")
+gold_schema    = spark.conf.get("gold_schema")
+
+# Bronze → uses pipeline defaults
+@dp.table(name="orders_bronze")
+def orders_bronze():
+    return spark.readStream.format("cloudFiles").load("/Volumes/...")
+
+# Silver → custom catalog + schema
+@dp.table(name=f"{silver_catalog}.{silver_schema}.orders_clean")
+def orders_clean():
+    return spark.read.table("orders_bronze").filter(col("order_id").isNotNull())
+
+# Gold → custom catalog + schema
+@dp.materialized_view(name=f"{gold_catalog}.{gold_schema}.orders_by_date")
+def orders_by_date():
+    return (spark.read.table(f"{silver_catalog}.{silver_schema}.orders_clean")
+            .groupBy("order_date").count())
+```
+
+**Key points:**
+- Multipart names in `@dp.table(name=...)` let you publish to explicit catalog.schema targets
+- Unqualified names use pipeline defaults
+- Use fully-qualified names when crossing catalogs

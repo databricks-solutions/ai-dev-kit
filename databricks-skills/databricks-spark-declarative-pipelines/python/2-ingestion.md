@@ -10,22 +10,7 @@ Data ingestion patterns using the modern `pyspark.pipelines` API.
 
 ## Auto Loader (Cloud Files)
 
-**IMPORTANT**: When using `spark.readStream.format("cloudFiles")`, you **must specify a `cloudFiles.schemaLocation`** for schema metadata storage.
-
-### Schema Location
-
-**Never use the source data volume** - causes permission conflicts.
-
-**Recommended pattern:**
-```
-/Volumes/{catalog}/{schema}/{pipeline_name}_metadata/schemas/{table_name}
-```
-
-Configure in pipeline settings:
-```yaml
-configuration:
-  schema_location_base: /Volumes/my_catalog/pipeline_metadata/my_pipeline/schemas
-```
+Auto Loader incrementally processes new files. In SDP pipelines, schema location and checkpoints are managed automatically.
 
 ### Basic Pattern
 
@@ -33,15 +18,12 @@ configuration:
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
-schema_location_base = spark.conf.get("schema_location_base")
-
 @dp.table(name="bronze_orders", cluster_by=["order_date"])
 def bronze_orders():
     return (
         spark.readStream
         .format("cloudFiles")
         .option("cloudFiles.format", "json")
-        .option("cloudFiles.schemaLocation", f"{schema_location_base}/bronze_orders")
         .option("cloudFiles.inferColumnTypes", "true")
         .load("/Volumes/my_catalog/my_schema/raw/orders/")
         .withColumn("_ingested_at", F.current_timestamp())
@@ -51,7 +33,6 @@ def bronze_orders():
 
 **Key options:**
 - `cloudFiles.format`: `json`, `csv`, `parquet`, `avro`, `text`, `binaryFile`
-- `cloudFiles.schemaLocation`: Required for schema inference
 - `cloudFiles.inferColumnTypes`: Infer types (default strings)
 - `cloudFiles.schemaHints`: Hint specific column types
 
@@ -64,7 +45,6 @@ def bronze_events():
         spark.readStream
         .format("cloudFiles")
         .option("cloudFiles.format", "json")
-        .option("cloudFiles.schemaLocation", f"{schema_location_base}/bronze_events")
         .option("rescuedDataColumn", "_rescued_data")
         .load("/Volumes/catalog/schema/raw/events/")
         .withColumn("_ingested_at", F.current_timestamp())
@@ -149,17 +129,15 @@ input_path = spark.conf.get("input_path")
 
 ## Best Practices
 
-1. **Always specify schemaLocation** for Auto Loader (required in Python)
-
-2. **Add ingestion metadata:**
+1. **Add ingestion metadata:**
 ```python
 .withColumn("_ingested_at", F.current_timestamp())
 .withColumn("_source_file", F.col("_metadata.file_path"))
 ```
 
-3. **Handle rescue data** - route malformed records to quarantine
+2. **Handle rescue data** - route malformed records to quarantine
 
-4. **Use pipeline parameters** for paths and connection strings
+3. **Use pipeline parameters** for paths and connection strings
 
 ---
 
@@ -167,7 +145,6 @@ input_path = spark.conf.get("input_path")
 
 | Issue | Solution |
 |-------|----------|
-| Missing schemaLocation error | Always specify `cloudFiles.schemaLocation` |
-| Schema location permission error | Use dedicated metadata volume, not source data volume |
 | Files not picked up | Verify path and format match actual files |
+| Schema evolution breaking | Use `rescuedDataColumn` and monitor `_rescued_data` |
 | Kafka lag increasing | Check downstream bottlenecks |

@@ -56,7 +56,6 @@ def bronze_events():
     return (
         spark.readStream.format("cloudFiles")
         .option("cloudFiles.format", "json")
-        .option("cloudFiles.schemaLocation", f"{schema_location}/bronze_events")
         .load("/Volumes/my_catalog/my_schema/raw/events/")
         .withColumn("_ingested_at", F.current_timestamp())
         .withColumn("ingestion_date", F.current_date())
@@ -362,8 +361,6 @@ serverless: true
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
-schema_location = spark.conf.get("schema_location_base")
-
 # Bronze: Optimized ingestion
 @dp.table(
     name="bronze_orders",
@@ -377,7 +374,6 @@ def bronze_orders():
     return (
         spark.readStream.format("cloudFiles")
         .option("cloudFiles.format", "json")
-        .option("cloudFiles.schemaLocation", f"{schema_location}/bronze_orders")
         .load("/Volumes/my_catalog/my_schema/raw/orders/")
         .withColumn("_ingested_at", F.current_timestamp())
         .withColumn("order_date", F.to_date("order_timestamp"))

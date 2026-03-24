@@ -213,10 +213,9 @@ df = spark.readStream.table("catalog.schema.source_table")
 # Unqualified name (uses pipeline's default catalog/schema)
 df = spark.read.table("source_table")
 
-# Read from file with Auto Loader
+# Read from file with Auto Loader (schema location managed automatically in SDP)
 df = spark.readStream.format("cloudFiles") \
     .option("cloudFiles.format", "json") \
-    .option("cloudFiles.schemaLocation", "/Volumes/.../schemas") \
     .load("/Volumes/catalog/schema/raw/data/")
 ```
 
@@ -246,7 +245,6 @@ Access configuration values set in pipeline settings:
 # Get parameter value
 catalog = spark.conf.get("target_catalog")
 schema = spark.conf.get("target_schema")
-schema_location = spark.conf.get("schema_location_base")
 
 # With default
 env = spark.conf.get("environment", "dev")
@@ -254,7 +252,7 @@ env = spark.conf.get("environment", "dev")
 @dp.table(name=f"{catalog}.{schema}.my_table")
 def my_table():
     return spark.readStream.format("cloudFiles") \
-        .option("cloudFiles.schemaLocation", f"{schema_location}/my_table") \
+        .option("cloudFiles.format", "json") \
         .load("/Volumes/...")
 ```
 

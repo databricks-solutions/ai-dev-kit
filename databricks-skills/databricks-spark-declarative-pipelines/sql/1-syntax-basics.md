@@ -52,6 +52,28 @@ GROUP BY report_date;
 - Automatically refreshes incrementally when source changes
 - Use for aggregations and reporting tables
 
+### View (Persisted)
+
+A regular view published to Unity Catalog. Unlike materialized views, it doesn't store data - the query runs each time the view is accessed.
+
+```sql
+CREATE VIEW taxi_raw AS
+SELECT * FROM read_files("/Volumes/catalog/schema/raw/taxi/");
+
+CREATE VIEW active_customers AS
+SELECT customer_id, name, email
+FROM dim_customers
+WHERE status = 'active';
+```
+
+**Key points:**
+- Persisted in Unity Catalog (visible outside pipeline)
+- No data storage - query executes on access
+- Cannot use streaming queries or constraints
+- Requires Unity Catalog pipeline with default publishing mode
+
+**Documentation:** [CREATE VIEW reference](https://docs.databricks.com/aws/en/ldp/developer/ldp-sql-ref-create-view)
+
 ### Temporary View
 
 Pipeline-scoped view, not persisted. Useful for intermediate transformations.
@@ -69,11 +91,21 @@ WHERE quantity > 0;
 **Key points:**
 - Exists only during pipeline execution
 - No storage cost
+- Not visible outside pipeline
 - Useful before AUTO CDC flows
+
+### Choosing Between View Types
+
+| Type | Persisted | Stores Data | Streaming | Use Case |
+|------|-----------|-------------|-----------|----------|
+| **Materialized View** | Yes | Yes | No | Aggregations, reporting tables |
+| **View** | Yes | No | No | Simple transformations, external access |
+| **Temporary View** | No | No | Yes | Intermediate steps, before AUTO CDC |
 
 ---
 
 ## Data Quality (Expectations)
+**Documentation:** [Expectations]https://docs.databricks.com/aws/en/ldp/expectations)
 
 ### Constraint Syntax
 
@@ -107,25 +139,13 @@ WHERE amount > 0 AND customer_id IS NOT NULL;
 
 ## Liquid Clustering
 
-Recommended over legacy PARTITION BY. Automatically optimizes data layout.
+Use `CLUSTER BY` instead of legacy `PARTITION BY`. See **[5-performance.md](5-performance.md#liquid-clustering-recommended)** for detailed guidance on key selection by layer.
 
 ```sql
--- Manual cluster keys (recommended for known patterns)
 CREATE OR REPLACE STREAMING TABLE bronze_events
 CLUSTER BY (event_type, event_date)
 AS SELECT ...;
-
--- Automatic cluster key selection
-CREATE OR REPLACE STREAMING TABLE bronze_events
-CLUSTER BY (AUTO)
-AS SELECT ...;
 ```
-
-**Guidelines:**
-- First key: Most selective filter (e.g., customer_id)
-- Second key: Next common filter (e.g., date)
-- Limit to 4 keys
-- Use `AUTO` if unsure about query patterns
 
 ---
 
