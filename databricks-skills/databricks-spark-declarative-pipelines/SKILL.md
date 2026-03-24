@@ -5,44 +5,64 @@ description: "Creates, configures, and updates Databricks Lakeflow Spark Declara
 
 # Lakeflow Spark Declarative Pipelines (SDP)
 
-IMPORTANT: If this is a new pipeline (one does not already exist), see Quick Start. Be sure to use whatever language user has specified only (Python or SQL). Be sure to use Databricks Asset Bundles for new projects.
-
 ---
 
 ## Critical Rules (always follow)
 - **MUST** confirm language as Python or SQL. Stick with that language unless told otherwise.
-- **MUST** if not modifying an existing pipeline, use [Quick Start](#quick-start) below.
-- **MUST** create serverless pipelines  by default. ** Only use classic clusters if user explicitly requires R language, Spark RDD APIs, or JAR libraries.
+- **MUST** create serverless pipelines by default. Only use classic clusters if user explicitly requires R language, Spark RDD APIs, or JAR libraries.
+- **MUST** choose the right workflow based on context (see below).
 
+## Choose Your Workflow
 
-## Required Steps
+**First, determine which workflow to use:**
 
-Copy this checklist and verify each item:
+### Option A: Standalone Pipeline Project (use `databricks pipelines init`)
+
+Use this when the user wants to **create a new, standalone SDP project** that will have its own Asset Bundle:
+- User asks: "Create a new pipeline project", "Build me an SDP from scratch", "Set up a new data pipeline"
+- No existing `databricks.yml` in the workspace
+- The pipeline IS the project (not part of a larger demo/app)
+
+→ See [Standalone Pipeline with Asset Bundle](#standalone-pipeline-with-asset-bundle) below
+
+### Option B: Pipeline within Existing Bundle (edit the bundle)
+
+Use this when the pipeline is **part of an existing Databricks Asset Bundle project**:
+- There's already a `databricks.yml` file in the project
+- User is adding a pipeline to an existing app/demo
+
+→ See [8-project-initialization.md](8-project-initialization.md) for adding pipelines to existing bundles
+
+### Option C: Rapid Iteration with MCP Tools (no bundle management)
+
+Use this when you need to **quickly create, test, and iterate** on a pipeline without managing bundle files:
+- User wants to "just run a pipeline and see if it works"
+- Part of a larger demo where bundle is managed separately, or the DAB bundle will be created at the end as you want to quickly test the project first
+- Prototyping or experimenting with pipeline logic
+- User explicitly asks to use MCP tools
+
+→ See [10-mcp-approach.md](10-mcp-approach.md) for MCP-based workflow
+
+---
+
+## Required Checklist
+
+Before writing pipeline code, make sure you have:
 ```
 - [ ] Language selected: Python or SQL
-- [ ] Compute type decided: serverless or classic compute
-- [ ] Decide on multiple catalogs or schemas vs. all in one default schema
-- [ ] Consider what should be parameterized at the pipeline level to make deployment easy.
-- [ ] Consider [Multi-Schema Patterns](#multi-schema-patterns) below, ask if unclear on best choices.
-- [ ] Consider [Modern Defaults](#modern-defaults) below, ask if unclear on best choices.
+- [ ] Workflow chosen: Standalone DAB / Existing DAB / MCP iteration
+- [ ] Compute type: serverless (default) or classic
+- [ ] Schema strategy: single schema with prefixes vs. multi-schema
+- [ ] Consider [Multi-Schema Patterns](#multi-schema-patterns) and [Modern Defaults](#modern-defaults)
+```
 
+---
 
-## Quick Start: Initialize New Pipeline Project
+## Standalone Pipeline with Asset Bundle
 
-**RECOMMENDED**: Use `databricks pipelines init` to create production-ready Asset Bundle projects with multi-environment support.
-
-### When to Use Bundle Initialization
-
-Use bundle initialization for **New pipeline projects** for a professional structure from the start
-
-Use manual workflow for:
-- Quick prototyping without multi-environment needs
-- Existing manual projects you want to continue
-- Learning/experimentation
+Use `databricks pipelines init` when building a **standalone pipeline project** with its own multi-environment deployment.
 
 ### Step 1: Initialize Project
-
-I will automatically run this command when you request a new pipeline:
 
 ```bash
 databricks pipelines init
@@ -68,9 +88,9 @@ my_pipeline/
 
 ### Step 2: Customize Transformations
 
-Replace the example code created by the init process with custom transformation files in `src/transformations/` based on provided requirements, using best practice guidance from this skill.
+Replace the example code in `src/transformations/` with your pipeline logic, using best practices from this skill.
 
-**For Python pipelines using cloudFiles**: Ask the user where to store Auto Loader schema metadata. Recommend:
+**For Python pipelines using cloudFiles**: Store Auto Loader schema metadata in a volume:
 ```
 /Volumes/{catalog}/{schema}/{pipeline_name}_metadata/schemas
 ```
@@ -88,6 +108,8 @@ databricks bundle run my_pipeline_etl
 databricks bundle deploy --target prod
 ```
 
+See **[8-project-initialization.md](8-project-initialization.md)** for complete details on bundle initialization, migration, and troubleshooting.
+
 
 ## Quick Reference
 
@@ -103,46 +125,22 @@ databricks bundle deploy --target prod
 
 ---
 
-## Detailed guides
+## Task-Based Routing
 
-**Ingestion patterns**: Use [1-ingestion-patterns.md](1-ingestion-patterns.md) when planning how to get new data into your Lakeflow pipeline —- covers file formats, batch/streaming options, and tips for incremental and full loads. (Keywords: Auto Loader, Kafka, Event Hub, Kinesis, file formats)
+After choosing your workflow (see [Choose Your Workflow](#choose-your-workflow)), determine the specific task:
 
-**Streaming pipeline patterns**: See [2-streaming-patterns.md](2-streaming-patterns.md) for designing pipelines with streaming data sources, change data detection, triggers, and windowing. (Keywords: deduplication, windowing, stateful operations, joins)
-
-**SCD query patterns**: See [3-scd-query-patterns.md](3-scd-query-patterns.md) for querying Slowly Changing Dimensions Type 2 history tables, including current state queries, point-in-time analysis, temporal joins, and change tracking. (Keywords: SCD Type 2 history tables, temporal joins, querying historical data)
-
-**Performance tuning**: Use [4-performance-tuning.md](4-performance-tuning.md) for optimizing pipelines with Liquid Clustering, state management, and best practices for high-performance streaming workloads. (Keywords: Liquid Clustering, optimization, state management)
-
-**Python API reference**: See [5-python-api.md](5-python-api.md) for the modern `pyspark.pipelines` (dp) API reference and migration from legacy `dlt` API patterns. (Keywords: dp API, dlt API comparison)
-
-**DLT migration**: Use [6-dlt-migration.md](6-dlt-migration.md) when migrating existing Delta Live Tables (DLT) pipelines to Spark Declarative Pipelines (SDP). (Keywords: migrating DLT pipelines to SDP)
-
-**Advanced configuration**: See [7-advanced-configuration.md](7-advanced-configuration.md) for advanced pipeline settings including development mode, continuous execution, notifications, Python dependencies, and custom cluster configurations. (Keywords: extra_settings parameter reference, examples)
-
-**Project initialization**: Use [8-project-initialization.md](8-project-initialization.md) for setting up new pipeline projects with `databricks pipelines init`, Asset Bundles, multi-environment deployments, and language detection logic. (Keywords: databricks pipelines init, Asset Bundles, language detection, migration guides)
-
-**AUTO CDC patterns**: Use [9-auto_cdc.md](9-auto_cdc.md) for implementing Change Data Capture with AUTO CDC, including Slow Changing Dimensions (SCD Type 1 and Type 2) for tracking changes and deduplication. (Keywords: AUTO CDC, Slow Changing Dimension, SCD, SCD Type 1, SCD Type 2, change data capture, deduplication)
-
----
-
-## Workflow
-
-1. Determine the task type:
-
-   **Setting up new project?** → Read [8-project-initialization.md](8-project-initialization.md) first
-   **Creating new pipeline?** → Read [1-ingestion-patterns.md](1-ingestion-patterns.md)
-   **Creating stream table?** → Read [2-streaming-patterns.md](2-streaming-patterns.md)
-   **Querying SCD history tables?** → Read [3-scd-query-patterns.md](3-scd-query-patterns.md)
-   **Implementing AUTO CDC or SCD?** → Read [9-auto_cdc.md](9-auto_cdc.md)
-   **Performance issues?** → Read [4-performance-tuning.md](4-performance-tuning.md)
-   **Using Python API?** → Read [5-python-api.md](5-python-api.md)
-   **Migrating from DLT?** → Read [6-dlt-migration.md](6-dlt-migration.md)
-   **Advanced configuration?** → Read [7-advanced-configuration.md](7-advanced-configuration.md)
-   **Validating?** → Read [7-advanced-configuration.md](7-advanced-configuration.md) (dry_run, development mode)
-
-2. Follow the instructions in the relevant guide
-
-3. Repeat for next task type
+| Task | Guide |
+|------|-------|
+| **Setting up standalone pipeline project** | [8-project-initialization.md](8-project-initialization.md) |
+| **Rapid iteration with MCP tools** | [10-mcp-approach.md](10-mcp-approach.md) |
+| **Ingesting data (Auto Loader, Kafka, files)** | [1-ingestion-patterns.md](1-ingestion-patterns.md) |
+| **Streaming tables & change detection** | [2-streaming-patterns.md](2-streaming-patterns.md) |
+| **Querying SCD Type 2 history tables** | [3-scd-query-patterns.md](3-scd-query-patterns.md) |
+| **Implementing AUTO CDC or SCD** | [9-auto_cdc.md](9-auto_cdc.md) |
+| **Performance optimization** | [4-performance-tuning.md](4-performance-tuning.md) |
+| **Python API reference** | [5-python-api.md](5-python-api.md) |
+| **Migrating from DLT** | [6-dlt-migration.md](6-dlt-migration.md) |
+| **Advanced configuration** | [7-advanced-configuration.md](7-advanced-configuration.md) |
 ---
 
 ## Official Documentation
@@ -270,28 +268,13 @@ Example: `/Volumes/my_catalog/pipeline_metadata/orders_pipeline_metadata/schemas
 See **[8-project-initialization.md](8-project-initialization.md)** for detailed language detection logic.
 
 
-## Option 1: Pipelines with DABs: 
-Use asset bundles and pipeline CLI.
-See [Quick Start](#quick-start) and **[8-project-initialization.md](8-project-initialization.md)** for complete details.
-
-## Option 2: Manual Workflow (Advanced)
-
-For rapid prototyping, experimentation, or when you prefer direct control without Asset Bundles, use the manual workflow with MCP tools.
-
-Use MCP tools to create, run, and iterate on **serverless SDP pipelines**. The **primary tool is `create_or_update_pipeline`** which handles the entire lifecycle.
-
-**IMPORTANT: Always create serverless pipelines (default).** Only use classic clusters if user explicitly ask for classic, pro, advances compute or requires R language, Spark RDD APIs, or JAR libraries.
-
-See **[10-mcp-approach.md](10-mcp-approach.md)** for detailed guide.
-
-
 ## Best Practices (2026)
 
 ### Project Structure
-- **Default to `databricks pipelines init`** for new projects (creates Asset Bundle)
-- **Use Asset Bundles** for multi-environment deployments (dev/staging/prod)
-- **Manual structure only** for quick prototypes or legacy migration
-- **Medallion architecture**: Two approaches work with Asset Bundles:
+- **Standalone pipeline projects**: Use `databricks pipelines init` for Asset Bundle with multi-environment support
+- **Pipeline in existing bundle**: Add to `resources/*.pipeline.yml`
+- **Rapid iteration/prototyping**: Use MCP tools, formalize in bundle later
+- **Medallion architecture**: Two file organization approaches:
   - **Flat structure** (template default): `bronze_*.sql`, `silver_*.sql`, `gold_*.sql` in `transformations/`
   - **Subdirectories**: `transformations/bronze/`, `transformations/silver/`, `transformations/gold/`
   - Both work with the `transformations/**` glob pattern - choose based on team preference

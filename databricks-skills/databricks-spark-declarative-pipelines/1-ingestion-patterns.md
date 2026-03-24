@@ -20,7 +20,7 @@ SELECT
   _metadata.file_path AS source_file,
   _metadata.file_modification_time AS file_timestamp
 FROM STREAM read_files(
-  '/mnt/raw/orders/',
+  '/Volumes/my_catalog/my_schema/raw/orders/',
   format => 'json',
   schemaHints => 'order_id STRING, amount DECIMAL(10,2)'
 );
@@ -50,7 +50,7 @@ SELECT
   *,
   current_timestamp() AS _ingested_at
 FROM STREAM read_files(
-  '/mnt/raw/customers/',
+  '/Volumes/my_catalog/my_schema/raw/customers/',
   format => 'json',
   schemaHints => 'customer_id STRING, email STRING',
   mode => 'PERMISSIVE'  -- Handles schema changes gracefully
@@ -71,7 +71,7 @@ FROM read_files(
 **CSV**:
 ```sql
 FROM read_files(
-  '/mnt/raw/data/',
+  '/Volumes/my_catalog/my_schema/raw/data/',
   format => 'csv',
   schemaHints => 'id STRING, name STRING, amount DECIMAL(10,2)',
   header => true,
@@ -90,7 +90,7 @@ FROM read_files(
 **Avro**:
 ```sql
 FROM read_files(
-  '/mnt/raw/events/',
+  '/Volumes/my_catalog/my_schema/raw/events/',
   format => 'avro',
   schemaHints => 'event_id STRING, event_time TIMESTAMP'
 )
@@ -101,7 +101,7 @@ FROM read_files(
 **Explicit hints** (recommended for production):
 ```sql
 FROM read_files(
-  '/mnt/raw/sales/',
+  '/Volumes/my_catalog/my_schema/raw/sales/',
   format => 'json',
   schemaHints => 'sale_id STRING, customer_id STRING, amount DECIMAL(10,2), sale_date DATE'
 )
@@ -110,7 +110,7 @@ FROM read_files(
 **Partial hints** (infer remaining columns):
 ```sql
 FROM read_files(
-  '/mnt/raw/data/',
+  '/Volumes/my_catalog/my_schema/raw/data/',
   format => 'json',
   schemaHints => 'id STRING, critical_field DECIMAL(10,2)'  -- Others auto-inferred
 )
@@ -179,7 +179,7 @@ SELECT
   current_timestamp() AS _ingested_at,
   CASE WHEN _rescued_data IS NOT NULL THEN TRUE ELSE FALSE END AS has_parsing_errors
 FROM read_files(
-  '/mnt/raw/events/',
+  '/Volumes/my_catalog/my_schema/raw/events/',
   format => 'json',
   schemaHints => 'event_id STRING, event_time TIMESTAMP'
 );
@@ -353,13 +353,13 @@ FROM read_files(...)
 ```sql
 -- ✅ Explicit schema prevents surprises
 FROM read_files(
-  '/mnt/data/',
+  '/Volumes/my_catalog/my_schema/data/',
   format => 'json',
   schemaHints => 'id STRING, amount DECIMAL(10,2), date DATE'
 )
 
 -- ❌ Fully inferred schemas can drift
-FROM read_files('/mnt/data/', format => 'json')
+FROM read_files('/Volumes/my_catalog/my_schema/data/', format => 'json')
 ```
 
 ### 4. Handle Rescue Data for Quality

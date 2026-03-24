@@ -345,6 +345,90 @@ GROUP BY window(kafka_timestamp, '1 minute');
 
 ---
 
+## Python API Examples
+
+For Python, use modern `pyspark.pipelines` API. See [5-python-api.md](5-python-api.md) for complete guidance.
+
+### Deduplication (Python)
+
+```python
+from pyspark import pipelines as dp
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+
+@dp.table(name="silver_events_dedup", cluster_by=["event_date"])
+def silver_events_dedup():
+    """Deduplicate by event_id, keeping first occurrence."""
+    window_spec = Window.partitionBy("event_id").orderBy("event_timestamp")
+    return (
+        spark.readStream.table("bronze_events")
+        .withColumn("rn", F.row_number().over(window_spec))
+        .filter(F.col("rn") == 1)
+        .drop("rn")
+    )
+```
+
+### Windowed Aggregations (Python)
+
+```python
+@dp.table(name="silver_sensor_5min", cluster_by=["sensor_id"])
+def silver_sensor_5min():
+    """5-minute tumbling window aggregations."""
+    return (
+        spark.readStream.table("bronze_sensor_events")
+        .groupBy(
+            F.col("sensor_id"),
+            F.window("event_timestamp", "5 minutes")
+        )
+        .agg(
+            F.avg("temperature").alias("avg_temperature"),
+            F.min("temperature").alias("min_temperature"),
+            F.max("temperature").alias("max_temperature"),
+            F.count("*").alias("event_count")
+        )
+    )
+```
+
+### Stream-to-Static Join (Python)
+
+```python
+@dp.table(name="silver_sales_enriched", cluster_by=["product_id"])
+def silver_sales_enriched():
+    """Enrich streaming sales with static product dimension."""
+    sales = spark.readStream.table("bronze_sales")
+    products = spark.read.table("dim_products")
+    return (
+        sales.join(products, "product_id", "left")
+        .select(
+            "sale_id", "product_id", "quantity", "sale_timestamp",
+            "product_name", "category", "price"
+        )
+    )
+```
+
+### Session Windows (Python)
+
+```python
+@dp.table(name="silver_user_sessions")
+def silver_user_sessions():
+    """Group user events into sessions with 30-minute inactivity timeout."""
+    return (
+        spark.readStream.table("bronze_user_events")
+        .groupBy(
+            F.col("user_id"),
+            F.session_window("event_timestamp", "30 minutes")
+        )
+        .agg(
+            F.min("event_timestamp").alias("session_start"),
+            F.max("event_timestamp").alias("session_end"),
+            F.count("*").alias("event_count"),
+            F.collect_list("event_type").alias("event_sequence")
+        )
+    )
+```
+
+---
+
 ## Common Issues
 
 | Issue | Solution |

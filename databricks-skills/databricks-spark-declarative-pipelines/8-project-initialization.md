@@ -4,6 +4,49 @@
 
 The `databricks pipelines init` command scaffolds a complete Databricks Asset Bundle project for Lakeflow Spark Declarative Pipelines, providing a production-ready structure with multi-environment support, pipeline configuration, and sample transformation files.
 
+---
+
+## Adding a Pipeline to an Existing Bundle
+
+If you already have a `databricks.yml` for a larger project (e.g., an app with jobs, dashboards, etc.) and want to add a pipeline:
+
+### Step 1: Create Pipeline Resource File
+
+Create `resources/my_pipeline.pipeline.yml`:
+
+```yaml
+resources:
+  pipelines:
+    my_pipeline:
+      name: my_pipeline
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      libraries:
+        - file:
+            path: ../src/pipelines/my_pipeline/
+```
+
+### Step 2: Add Pipeline Source Files
+
+Create your pipeline transformation files:
+
+```
+src/pipelines/my_pipeline/
+├── bronze_ingest.sql
+├── silver_clean.sql
+└── gold_summary.sql
+```
+
+### Step 3: Deploy
+
+```bash
+databricks bundle deploy
+databricks bundle run my_pipeline
+```
+
+That's it - the pipeline is now part of your existing bundle and shares the same targets/variables.
+
 **Benefits of Asset Bundles:**
 - Multi-environment deployments (dev/staging/prod)
 - Infrastructure as code with `databricks.yml`

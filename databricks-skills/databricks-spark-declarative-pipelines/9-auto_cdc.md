@@ -24,7 +24,7 @@ AUTO CDC automatically handles Change Data Capture (CDC) to track changes in you
   - Correcting data errors (typos)
   - Updating attributes where history doesn't matter
   - Maintaining single current record per key
-- **Syntax**: `stored_as_scd_type="1"` (string)
+- **Syntax**: Python `stored_as_scd_type="1"` (string), SQL `STORED AS SCD TYPE 1`
 
 ### SCD Type 2 (History tracking)
 - **Creates new row** for each change
@@ -34,11 +34,66 @@ AUTO CDC automatically handles Change Data Capture (CDC) to track changes in you
   - Product price history
   - Employee role changes
   - Any dimension requiring temporal analysis
-- **Syntax**: `stored_as_scd_type=2` (integer)
+- **Syntax**: Python `stored_as_scd_type=2` (integer), SQL `STORED AS SCD TYPE 2`
 
 ---
 
-## Pattern: Cleaning + AUTO CDC
+## SQL Syntax
+
+### SCD Type 2 (SQL)
+
+```sql
+-- Step 1: Create target table
+CREATE OR REFRESH STREAMING TABLE dim_customers;
+
+-- Step 2: Create AUTO CDC flow
+CREATE FLOW customers_scd2_flow AS
+AUTO CDC INTO dim_customers
+FROM stream(customers_cdc_clean)
+KEYS (customer_id)
+APPLY AS DELETE WHEN operation = "DELETE"
+SEQUENCE BY event_timestamp
+COLUMNS * EXCEPT (operation, _ingested_at, _source_file)
+STORED AS SCD TYPE 2;
+```
+
+**Note:** Put `APPLY AS DELETE WHEN` before `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source.
+
+### SCD Type 1 (SQL)
+
+```sql
+-- Step 1: Create target table
+CREATE OR REFRESH STREAMING TABLE orders_current;
+
+-- Step 2: Create AUTO CDC flow (SCD Type 1)
+CREATE FLOW orders_scd1_flow AS
+AUTO CDC INTO orders_current
+FROM stream(orders_clean)
+KEYS (order_id)
+SEQUENCE BY updated_timestamp
+COLUMNS * EXCEPT (_ingested_at)
+STORED AS SCD TYPE 1;
+```
+
+### Selective History Tracking (SQL)
+
+```sql
+-- Only track history when price or cost changes
+CREATE FLOW products_scd2_flow AS
+AUTO CDC INTO products_history
+FROM stream(products_clean)
+KEYS (product_id)
+SEQUENCE BY modified_at
+COLUMNS * EXCEPT (operation)
+STORED AS SCD TYPE 2
+TRACK HISTORY ON price, cost;
+```
+
+---
+
+## Python Syntax
+
+### Pattern: Cleaning + AUTO CDC
 
 ### Step 1: Clean and Validate Data
 

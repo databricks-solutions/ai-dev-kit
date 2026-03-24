@@ -1,12 +1,193 @@
-# DLT to SDP Migration Guide
+# Migration Guide: DLT to SDP
 
-Guide for migrating Delta Live Tables (DLT) Python pipelines to Spark Declarative Pipelines (SDP) SQL.
+Guide for migrating from Delta Live Tables (DLT) to Spark Declarative Pipelines (SDP).
 
-⚠️ **For NEW Python SDP pipelines**: Use modern `pyspark.pipelines` API. See [5-python-api.md](5-python-api.md).
+**Two migration paths:**
+1. **DLT Python → SDP Python** (dlt → dp): Same language, new API
+2. **DLT Python → SDP SQL**: Change language for simpler pipelines
 
 ---
 
-## Migration Decision Matrix
+## Migration Path 1: DLT Python → SDP Python (dlt → dp)
+
+Use this when staying with Python but moving to the modern `pyspark.pipelines` API.
+
+### Quick Reference
+
+| Aspect | Legacy (`dlt`) | Modern (`dp`) |
+|--------|---------------|----------------|
+| **Import** | `import dlt` | `from pyspark import pipelines as dp` |
+| **Table decorator** | `@dlt.table()` | `@dp.table()` |
+| **Read table** | `dlt.read("table")` | `spark.read.table("table")` |
+| **Read stream** | `dlt.read_stream("table")` | `spark.readStream.table("table")` |
+| **CDC/SCD** | `dlt.apply_changes()` | `dp.create_auto_cdc_flow()` |
+| **Clustering** | `partition_cols=["date"]` | `cluster_by=["date", "col2"]` |
+
+### Step-by-Step Migration
+
+#### Step 1: Update Imports
+
+```python
+# Before
+import dlt
+
+# After
+from pyspark import pipelines as dp
+```
+
+#### Step 2: Update Decorators
+
+```python
+# Before
+@dlt.table(name="my_table")
+
+# After
+@dp.table(name="my_table")
+```
+
+#### Step 3: Update Table Reads
+
+```python
+# Before
+@dlt.table(name="silver_events")
+def silver_events():
+    return dlt.read("bronze_events").filter(...)
+
+# After
+@dp.table(name="silver_events")
+def silver_events():
+    return spark.read.table("bronze_events").filter(...)
+```
+
+```python
+# Before (streaming)
+@dlt.table(name="silver_events")
+def silver_events():
+    return dlt.read_stream("bronze_events").filter(...)
+
+# After (streaming)
+@dp.table(name="silver_events")
+def silver_events():
+    return spark.readStream.table("bronze_events").filter(...)
+```
+
+#### Step 4: Update Expectations
+
+```python
+# Before
+@dlt.table(name="silver")
+@dlt.expect_or_drop("valid_id", "id IS NOT NULL")
+
+# After (identical syntax, just change dlt → dp)
+@dp.table(name="silver")
+@dp.expect_or_drop("valid_id", "id IS NOT NULL")
+```
+
+#### Step 5: Update CDC/SCD Operations
+
+```python
+# Before
+dlt.create_streaming_table("customers_history")
+dlt.apply_changes(
+    target="customers_history",
+    source="customers_cdc",
+    keys=["customer_id"],
+    sequence_by="event_timestamp",
+    stored_as_scd_type="2"
+)
+
+# After
+from pyspark.sql.functions import col
+
+dp.create_streaming_table("customers_history")
+dp.create_auto_cdc_flow(
+    target="customers_history",
+    source="customers_cdc",
+    keys=["customer_id"],
+    sequence_by=col("event_timestamp"),  # Note: use col()
+    stored_as_scd_type=2                  # Note: integer, not string
+)
+```
+
+**Key differences:**
+- `apply_changes()` → `create_auto_cdc_flow()`
+- `sequence_by` takes a Column object (`col("...")`) not a string
+- `stored_as_scd_type` is integer `2` for Type 2, string `"1"` for Type 1
+
+#### Step 6: Update Clustering (Partitioning → Liquid Clustering)
+
+```python
+# Before (legacy partitioning)
+@dlt.table(
+    name="bronze_events",
+    partition_cols=["event_date"],
+    table_properties={"pipelines.autoOptimize.zOrderCols": "event_type"}
+)
+
+# After (Liquid Clustering)
+@dp.table(
+    name="bronze_events",
+    cluster_by=["event_date", "event_type"]
+)
+```
+
+### Complete Before/After Example
+
+**Before (DLT):**
+```python
+import dlt
+from pyspark.sql import functions as F
+
+@dlt.table(name="bronze_orders", partition_cols=["order_date"])
+def bronze_orders():
+    return spark.readStream.format("cloudFiles").load("/data/orders")
+
+@dlt.table(name="silver_orders")
+@dlt.expect_or_drop("valid_amount", "amount > 0")
+def silver_orders():
+    return dlt.read_stream("bronze_orders").filter(F.col("status") == "completed")
+
+dlt.create_streaming_table("dim_customers")
+dlt.apply_changes(
+    target="dim_customers",
+    source="customers_cdc",
+    keys=["customer_id"],
+    sequence_by="updated_at",
+    stored_as_scd_type="2"
+)
+```
+
+**After (SDP):**
+```python
+from pyspark import pipelines as dp
+from pyspark.sql import functions as F
+
+@dp.table(name="bronze_orders", cluster_by=["order_date"])
+def bronze_orders():
+    return spark.readStream.format("cloudFiles").load("/data/orders")
+
+@dp.table(name="silver_orders")
+@dp.expect_or_drop("valid_amount", "amount > 0")
+def silver_orders():
+    return spark.readStream.table("bronze_orders").filter(F.col("status") == "completed")
+
+dp.create_streaming_table("dim_customers")
+dp.create_auto_cdc_flow(
+    target="dim_customers",
+    source="customers_cdc",
+    keys=["customer_id"],
+    sequence_by=F.col("updated_at"),
+    stored_as_scd_type=2
+)
+```
+
+---
+
+## Migration Path 2: DLT Python → SDP SQL
+
+Use this when simplifying pipelines by converting to SQL.
+
+### Decision Matrix
 
 | Feature/Pattern | DLT Python | SDP SQL | Recommendation |
 |-----------------|------------|---------|----------------|
@@ -17,45 +198,42 @@ Guide for migrating Delta Live Tables (DLT) Python pipelines to Spark Declarativ
 | SCD Type 1/2 | ✓ | ✓ | **Migrate to SQL** (AUTO CDC) |
 | Simple joins | ✓ | ✓ | **Migrate to SQL** |
 | Auto Loader | ✓ | ✓ | **Migrate to SQL** (read_files) |
-| Streaming sources (Kafka) | ✓ | ✓ | **Migrate to SQL** (read_stream) |
+| Streaming sources (Kafka) | ✓ | ✓ | **Migrate to SQL** (read_kafka) |
 | Complex Python UDFs | ✓ | ❌ | **Stay in Python** |
 | External API calls | ✓ | ❌ | **Stay in Python** |
 | Custom libraries | ✓ | ❌ | **Stay in Python** |
-| Complex apply functions | ✓ | ❌ | **Stay in Python** or simplify |
 | ML model inference | ✓ | ❌ | **Stay in Python** |
 
-**Rule**: If 80%+ is SQL-expressible, migrate to SDP SQL. If heavy Python logic, stay with DLT Python or use hybrid.
+**Rule**: If 80%+ is SQL-expressible, migrate to SDP SQL. If heavy Python logic, stay with Python (use modern `dp` API).
 
----
+### Side-by-Side Conversions
 
-## Side-by-Side: Key Patterns
+#### Basic Streaming Table
 
-### Basic Streaming Table
-
-**DLT Python**:
+**DLT Python:**
 ```python
 @dlt.table(name="bronze_sales", comment="Raw sales")
 def bronze_sales():
     return (
         spark.readStream.format("cloudFiles")
         .option("cloudFiles.format", "json")
-        .load("/mnt/raw/sales")
+        .load("/Volumes/my_catalog/my_schema/raw/sales")
         .withColumn("_ingested_at", F.current_timestamp())
     )
 ```
 
-**SDP SQL**:
+**SDP SQL:**
 ```sql
 CREATE OR REPLACE STREAMING TABLE bronze_sales
 COMMENT 'Raw sales'
 AS
 SELECT *, current_timestamp() AS _ingested_at
-FROM read_files('/mnt/raw/sales', format => 'json');
+FROM STREAM read_files('/Volumes/my_catalog/my_schema/raw/sales', format => 'json');
 ```
 
-### Filtering and Transformations
+#### Filtering and Transformations
 
-**DLT Python**:
+**DLT Python:**
 ```python
 @dlt.table(name="silver_sales")
 @dlt.expect_or_drop("valid_amount", "amount > 0")
@@ -69,7 +247,7 @@ def silver_sales():
     )
 ```
 
-**SDP SQL**:
+**SDP SQL:**
 ```sql
 CREATE OR REPLACE STREAMING TABLE silver_sales AS
 SELECT
@@ -80,9 +258,9 @@ FROM STREAM bronze_sales
 WHERE amount > 0 AND sale_id IS NOT NULL;
 ```
 
-### SCD Type 2
+#### SCD Type 2
 
-**DLT Python**:
+**DLT Python:**
 ```python
 dlt.create_streaming_table("customers_history")
 
@@ -96,7 +274,7 @@ dlt.apply_changes(
 )
 ```
 
-**SDP SQL** (clause order: APPLY AS DELETE WHEN before SEQUENCE BY; only EXCEPT columns that exist in source; omit TRACK HISTORY ON * if it causes parse errors):
+**SDP SQL:**
 ```sql
 CREATE OR REFRESH STREAMING TABLE customers_history;
 
@@ -110,59 +288,46 @@ COLUMNS * EXCEPT (operation, _ingested_at, _source_file)
 STORED AS SCD TYPE 2;
 ```
 
-### Joins
+**Note:** In SQL, put `APPLY AS DELETE WHEN` before `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source.
 
-**DLT Python**:
+#### Joins
+
+**DLT Python:**
 ```python
 @dlt.table(name="silver_sales_enriched")
 def silver_sales_enriched():
     sales = dlt.read_stream("silver_sales")
     products = dlt.read("dim_products")
-
-    return (
-        sales.join(products, "product_id", "left")
-        .select(sales["*"], products["product_name"], products["category"])
-    )
+    return sales.join(products, "product_id", "left")
 ```
 
-**SDP SQL**:
+**SDP SQL:**
 ```sql
 CREATE OR REPLACE STREAMING TABLE silver_sales_enriched AS
-SELECT
-  s.*,
-  p.product_name,
-  p.category
+SELECT s.*, p.product_name, p.category
 FROM STREAM silver_sales s
 LEFT JOIN dim_products p ON s.product_id = p.product_id;
 ```
 
----
+### Handling Expectations
 
-## Handling Expectations
-
-**DLT Python**:
+**DLT Python:**
 ```python
 @dlt.expect_or_drop("valid_amount", "amount > 0")
 @dlt.expect_or_fail("critical_id", "id IS NOT NULL")
 ```
 
-**SDP SQL - Basic**:
+**SDP SQL - Basic** (equivalent to expect_or_drop):
 ```sql
--- Use WHERE (equivalent to expect_or_drop)
 WHERE amount > 0 AND id IS NOT NULL
 ```
 
-**SDP SQL - Quarantine Pattern** (for auditing):
+**SDP SQL - Quarantine Pattern** (for auditing dropped records):
 ```sql
 -- Flag invalid records
 CREATE OR REPLACE STREAMING TABLE bronze_data_flagged AS
-SELECT
-  *,
-  CASE
-    WHEN amount <= 0 THEN TRUE
-    WHEN id IS NULL THEN TRUE
-    ELSE FALSE
-  END AS is_invalid
+SELECT *,
+  CASE WHEN amount <= 0 OR id IS NULL THEN TRUE ELSE FALSE END AS is_invalid
 FROM STREAM bronze_data;
 
 -- Clean for downstream
@@ -174,38 +339,27 @@ CREATE OR REPLACE STREAMING TABLE silver_data_quarantine AS
 SELECT * FROM STREAM bronze_data_flagged WHERE is_invalid;
 ```
 
-**Migration**: `@dlt.expect_or_drop` → WHERE clause or quarantine pattern.
+### Handling UDFs
 
----
+#### Simple UDFs → SQL CASE
 
-## Handling UDFs
-
-### Simple UDFs (Migrate to SQL)
-
-**DLT Python**:
+**DLT Python:**
 ```python
 @F.udf(returnType=StringType())
 def categorize_amount(amount):
-    if amount > 1000:
-        return "High"
-    elif amount > 100:
-        return "Medium"
-    else:
-        return "Low"
+    if amount > 1000: return "High"
+    elif amount > 100: return "Medium"
+    else: return "Low"
 
 @dlt.table(name="sales_categorized")
 def sales_categorized():
-    return (
-        dlt.read("sales")
-        .withColumn("category", categorize_amount(F.col("amount")))
-    )
+    return dlt.read("sales").withColumn("category", categorize_amount(F.col("amount")))
 ```
 
-**SDP SQL** (CASE expression):
+**SDP SQL:**
 ```sql
 CREATE OR REPLACE MATERIALIZED VIEW sales_categorized AS
-SELECT
-  *,
+SELECT *,
   CASE
     WHEN amount > 1000 THEN 'High'
     WHEN amount > 100 THEN 'Medium'
@@ -214,18 +368,15 @@ SELECT
 FROM sales;
 ```
 
-### Complex UDFs (Stay in Python)
+#### Complex UDFs → Stay in Python
 
-**Keep in Python for**:
+Keep in Python if:
 - Complex conditional logic
 - External API calls
 - Custom algorithms
 - ML inference
 
-**Options**:
-1. Keep transformation in Python DLT
-2. Create hybrid (SQL + Python for specific UDFs)
-3. Refactor to SQL built-ins if possible
+Use modern `dp` API instead of `dlt`.
 
 ---
 
@@ -239,18 +390,18 @@ Document:
 - External dependencies
 - Expectations and quality rules
 
-### Step 2: Categorize
+### Step 2: Choose Path
 
-**Easy to migrate**: Filters, aggregations, simple CASE
-**Moderate**: UDFs rewritable as SQL
-**Hard**: Complex Python, external calls, ML
+- **80%+ SQL-expressible** → Migrate to SDP SQL
+- **Heavy Python logic** → Migrate to SDP Python (`dp` API)
+- **Mixed** → Hybrid (SQL for most, Python for complex)
 
 ### Step 3: Migrate by Layer
 
-1. **Bronze** (ingestion): Convert Auto Loader to read_files()
-2. **Silver** (cleansing): Convert expectations to WHERE/quarantine
+1. **Bronze** (ingestion): `cloudFiles` → `read_files()` or keep `cloudFiles` with `dp`
+2. **Silver** (cleansing): `dlt.expect*` → WHERE clause or `dp.expect*`
 3. **Gold** (aggregations): Usually straightforward
-4. **SCD/CDC**: Use AUTO CDC
+4. **SCD/CDC**: `apply_changes` → AUTO CDC or `create_auto_cdc_flow`
 
 ### Step 4: Test
 
@@ -263,15 +414,15 @@ Document:
 
 ## When NOT to Migrate
 
-**Stay with DLT Python if**:
-1. Heavy Python UDF usage (>30% of logic)
-2. External API calls required
-3. Custom ML model inference
-4. Complex stateful operations not in SQL
-5. Existing pipeline works well, team prefers Python
-6. Limited SQL expertise
+**Stay with current approach if:**
+1. Pipeline works well and team is comfortable
+2. Heavy Python UDF usage (>30% of logic)
+3. External API calls required
+4. Custom ML model inference
+5. Complex stateful operations not expressible in SQL
+6. Limited time/resources for migration
 
-**Consider hybrid**: SQL for most, Python for complex logic.
+**Key**: DLT and SDP are both fully supported. Migrate for simplicity or new features, not necessity.
 
 ---
 
@@ -279,20 +430,17 @@ Document:
 
 | Issue | Solution |
 |-------|----------|
+| `sequence_by` type error | Use `col("column")` not string in `dp.create_auto_cdc_flow()` |
 | UDF doesn't translate | Keep in Python or refactor with SQL built-ins |
 | Expectations differ | Use quarantine pattern to audit dropped records |
-| Performance degradation | Use CLUSTER BY for Liquid Clustering, review joins |
-| Schema evolution different | Use `mode => 'PERMISSIVE'` in read_files() |
+| Performance degradation | Use `CLUSTER BY` for Liquid Clustering |
+| Schema evolution different | Use `mode => 'PERMISSIVE'` in `read_files()` |
+| AUTO CDC parse error | Put `APPLY AS DELETE WHEN` before `SEQUENCE BY` |
 
 ---
 
-## Summary
+## Related Documentation
 
-**Migration Path**:
-1. Use decision matrix (80%+ SQL-expressible → migrate)
-2. Migrate by layer (bronze → silver → gold)
-3. Handle expectations with WHERE/quarantine
-4. Translate simple UDFs to CASE expressions
-5. Keep complex Python logic in Python
-
-**Key**: DLT Python and SDP SQL are both fully supported. Migrate for simplicity, not necessity.
+- **[5-python-api.md](5-python-api.md)** - Modern `dp` API reference
+- **[9-auto_cdc.md](9-auto_cdc.md)** - CDC patterns in detail
+- **[SKILL.md](SKILL.md)** - Main skill entry point

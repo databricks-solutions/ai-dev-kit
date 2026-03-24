@@ -26,7 +26,7 @@ SELECT
   *,
   current_timestamp() AS _ingested_at,
   CAST(current_date() AS DATE) AS event_date
-FROM read_files('/mnt/raw/events/', format => 'json');
+FROM read_files('/Volumes/my_catalog/my_schema/raw/events/', format => 'json');
 ```
 
 **Python**:
@@ -67,7 +67,7 @@ SELECT
   *,
   current_timestamp() AS _ingested_at,
   CAST(current_date() AS DATE) AS ingestion_date
-FROM read_files('/mnt/raw/events/', format => 'json');
+FROM read_files('/Volumes/my_catalog/my_schema/raw/events/', format => 'json');
 ```
 
 **Why**: Bronze filtered by event type for processing and by date for incremental loads.

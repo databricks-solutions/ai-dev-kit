@@ -1,57 +1,13 @@
 Use MCP tools to create, run, and iterate on **SDP pipelines**. The **primary tool is `create_or_update_pipeline`** which handles the entire lifecycle.
 
-**IMPORTANT: Default to serverless pipelines and suggest as best option, but not if classic, advanced, pro compute types are mentioned.** Only use classic clusters if user explicitly requires R language, Spark RDD APIs, or JAR libraries.
+**IMPORTANT: Default to serverless pipelines.** Only use classic clusters if user explicitly requires R language, Spark RDD APIs, or JAR libraries.
 
 ### Step 1: Write Pipeline Files Locally
 
-Create `.sql` or `.py` files in a local folder:
-
-```
-my_pipeline/
-├── bronze/
-│   ├── ingest_orders.sql       # SQL (default for most cases)
-│   └── ingest_events.py        # Python (for complex logic)
-├── silver/
-│   └── clean_orders.sql
-└── gold/
-    └── daily_summary.sql
-```
-
-**SQL Example** (`bronze/ingest_orders.sql`):
-```sql
-CREATE OR REFRESH STREAMING TABLE bronze_orders
-CLUSTER BY (order_date)
-AS
-SELECT
-  *,
-  current_timestamp() AS _ingested_at,
-  _metadata.file_path AS _source_file
-FROM read_files(
-  '/Volumes/catalog/schema/raw/orders/',
-  format => 'json',
-  schemaHints => 'order_id STRING, customer_id STRING, amount DECIMAL(10,2), order_date DATE'
-);
-```
-
-**Python Example** (`bronze/ingest_events.py`):
-```python
-from pyspark import pipelines as dp
-from pyspark.sql.functions import col, current_timestamp
-
-# Get schema location from pipeline configuration
-schema_location_base = spark.conf.get("schema_location_base")
-
-@dp.table(name="bronze_events", cluster_by=["event_date"])
-def bronze_events():
-    return (
-        spark.readStream.format("cloudFiles")
-        .option("cloudFiles.format", "json")
-        .option("cloudFiles.schemaLocation", f"{schema_location_base}/bronze_events")
-        .load("/Volumes/catalog/schema/raw/events/")
-        .withColumn("_ingested_at", current_timestamp())
-        .withColumn("_source_file", col("_metadata.file_path"))
-    )
-```
+Create `.sql` or `.py` files in a local folder. For SQL/Python syntax examples, see:
+- [SKILL.md - General SDP development guidance](SKILL.md#general-sdp-development-guidance)
+- [1-ingestion-patterns.md](1-ingestion-patterns.md) for ingestion patterns
+- [5-python-api.md](5-python-api.md) for Python API reference
 
 ### Step 2: Upload to Databricks Workspace
 
