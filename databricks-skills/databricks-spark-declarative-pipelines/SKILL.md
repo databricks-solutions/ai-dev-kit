@@ -80,12 +80,10 @@ Before writing pipeline code, make sure you have:
 
 | Concept | Details |
 |---------|---------|
-| **Names** | SDP = Spark Declarative Pipelines = LDP = Lakeflow Declarative Pipelines = Lakeflow Pipelines (all interchangeable) |
+| **Names** | SDP = Spark Declarative Pipelines = LDP = Lakeflow Declarative Pipelines (all interchangeable) |
 | **Python Import** | `from pyspark import pipelines as dp` |
 | **Primary Decorators** | `@dp.table()`, `@dp.materialized_view()`, `@dp.temporary_view()` |
-| **Temporary Views** | `@dp.temporary_view()` creates in-pipeline temporary views (no catalog/schema, no cluster_by). Useful for intermediate logic before AUTO CDC or when a view needs multiple references without persistence. |
 | **Replaces** | Delta Live Tables (DLT) with `import dlt` |
-| **Based On** | Apache Spark 4.1+ (Databricks' modern data pipeline framework) |
 | **Docs** | https://docs.databricks.com/aws/en/ldp/developer/python-dev |
 
 ---
@@ -206,11 +204,12 @@ For detailed syntax, see [sql/1-syntax-basics.md](sql/1-syntax-basics.md) or [py
 - In Databricks Asset Bundles, set these under resources.pipelines.<pipeline>.configuration; validate with databricks bundle validate.
 
 ### Modern Defaults
-- **CLUSTER BY** (Liquid Clustering), not PARTITION BY - see [sql/5-performance.md](sql/5-performance.md) or [python/5-performance.md](python/5-performance.md)
-- **Raw `.sql`/`.py` files**, not notebooks
-- **Serverless compute ONLY** - Do not use classic clusters unless explicitly required
+- **Raw `.sql`/`.py` files for transformations** - NOT notebooks. Pipeline code must be plain files.
+- **Databricks notebook source for explorations** - Use `# Databricks notebook source` format with `# COMMAND ----------` separators for ad-hoc queries. See [examples/exploration_notebook.py](examples/exploration_notebook.py).
+- **Serverless compute** - Do not use classic clusters unless explicitly required (R, RDD APIs, JAR libraries)
 - **Unity Catalog** (required for serverless)
-- **read_files()** when using SQL for cloud storage ingestion - see [sql/2-ingestion.md](sql/2-ingestion.md)
+- **CLUSTER BY** (Liquid Clustering), not PARTITION BY - see [sql/5-performance.md](sql/5-performance.md) or [python/5-performance.md](python/5-performance.md)
+- **read_files()** for SQL cloud storage ingestion - see [sql/2-ingestion.md](sql/2-ingestion.md)
 
 ### Multi-Schema Patterns
 
