@@ -22,6 +22,32 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# VALIDATION
+# =============================================================================
+
+
+def _validate_volume_path(catalog: str, schema: str, volume: str) -> None:
+    """Validate that the catalog, schema, and volume exist.
+
+    Raises:
+        ValueError: If any of the components don't exist
+    """
+    w = get_workspace_client()
+
+    # Check schema exists (this implicitly checks catalog too)
+    try:
+        w.schemas.get(full_name=f"{catalog}.{schema}")
+    except Exception as e:
+        raise ValueError(f"Schema '{catalog}.{schema}' does not exist: {e}") from e
+
+    # Check volume exists
+    try:
+        w.volumes.read(name=f"{catalog}.{schema}.{volume}")
+    except Exception as e:
+        raise ValueError(f"Volume '{catalog}.{schema}.{volume}' does not exist: {e}") from e
+
+
+# =============================================================================
 # PROMPTS
 # =============================================================================
 
@@ -295,8 +321,16 @@ def generate_single_pdf(
 
     Returns:
         PDFGenerationResult with paths and success status
+
+    Raises:
+        ValueError: If catalog, schema, or volume don't exist
     """
+    # Validate volume path exists before doing any LLM work
+    _validate_volume_path(catalog, schema, volume)
+
     try:
+        import time
+
         # Generate safe filename from model identifier
         safe_name = doc_spec.model.replace(" ", "_").replace("-", "_").lower()
 
@@ -307,12 +341,14 @@ def generate_single_pdf(
         system_prompt = _get_html_system_prompt(doc_size)
         max_tokens = _SIZE_CONFIG[doc_size]["max_tokens"]
 
+        t0 = time.time()
         html_content = call_llm(
             prompt=html_prompt,
             system_prompt=system_prompt,
             mini=True,
             max_tokens=max_tokens,
         )
+        logger.info(f"[{safe_name}] LLM call took {time.time() - t0:.1f}s")
 
         # Step 2: Convert HTML to PDF
         pdf_filename = f"{safe_name}.pdf"
@@ -410,17 +446,25 @@ def generate_pdf_documents(
 
     Returns:
         PDFBatchResult with success status and statistics
+
+    Raises:
+        ValueError: If catalog, schema, or volume don't exist
     """
     volume_path = f"/Volumes/{catalog}/{schema}/{volume}/{folder}"
     errors: list[str] = []
 
     logger.info(f"Starting PDF generation: {count} documents to {volume_path}")
 
+    # Validate volume path exists before doing any LLM work
+    _validate_volume_path(catalog, schema, volume)
+
     try:
         # Clear folder if requested
         if overwrite_folder:
             logger.info(f"Clearing existing folder contents: {volume_path}")
             _delete_folder_contents(catalog, schema, volume, folder)
+
+        import time
 
         # Step 1: Generate document specifications
         logger.info(f"Step 1: Generating {count} document specifications...")
@@ -438,6 +482,7 @@ of document specifications. Each document should have:
 - question: string
 - guideline: string"""
 
+        t0 = time.time()
         doc_list_response = call_llm(
             prompt=doc_list_prompt,
             system_prompt=system_prompt,
@@ -445,6 +490,7 @@ of document specifications. Each document should have:
             max_tokens=8000,
             response_format="json_object",
         )
+        logger.info(f"Step 1 LLM call took {time.time() - t0:.1f}s")
 
         try:
             response_data = json.loads(doc_list_response)

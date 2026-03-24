@@ -11,7 +11,7 @@ from databricks_tools_core.pdf.models import DocumentSpecification
 from ..server import mcp
 
 
-@mcp.tool
+@mcp.tool(timeout=300.0)
 def generate_and_upload_pdfs(
     catalog: str,
     schema: str,
@@ -101,7 +101,7 @@ def generate_and_upload_pdfs(
     }
 
 
-@mcp.tool
+@mcp.tool(timeout=60.0)
 def generate_and_upload_pdf(
     title: str,
     description: str,
