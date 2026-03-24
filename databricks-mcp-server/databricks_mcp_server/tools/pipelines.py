@@ -261,7 +261,9 @@ def get_pipeline_events(
     }
     filter_expr = level_filters.get(event_log_level.upper(), level_filters["WARN"])
 
-    events = _get_pipeline_events(pipeline_id=pipeline_id, max_results=max_results, filter=filter_expr, update_id=update_id)
+    events = _get_pipeline_events(
+        pipeline_id=pipeline_id, max_results=max_results, filter=filter_expr, update_id=update_id
+    )
     return [e.as_dict() if hasattr(e, "as_dict") else vars(e) for e in events]
 
 

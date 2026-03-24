@@ -553,7 +553,8 @@ def get_update(
 
     # Optionally include config
     if include_config and update_info.config:
-        result["config"] = update_info.config.as_dict() if hasattr(update_info.config, "as_dict") else vars(update_info.config)
+        config = update_info.config
+        result["config"] = config.as_dict() if hasattr(config, "as_dict") else vars(config)
 
     return result
 
