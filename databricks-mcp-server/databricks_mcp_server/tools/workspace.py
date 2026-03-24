@@ -6,7 +6,6 @@ import subprocess
 from typing import Any, Dict, List, Optional
 
 from databricks_tools_core.auth import (
-    clear_active_workspace,
     get_active_workspace,
     get_workspace_client,
     set_active_workspace,
