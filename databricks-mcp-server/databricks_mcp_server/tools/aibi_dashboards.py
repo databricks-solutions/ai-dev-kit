@@ -46,6 +46,8 @@ def create_or_update_dashboard(
     warehouse_id: str,
     publish: bool = True,
     genie_space_id: str = None,
+    catalog: str = None,
+    schema: str = None,
 ) -> Dict[str, Any]:
     """Create or update an AI/BI dashboard from JSON content.
 
@@ -170,6 +172,12 @@ def create_or_update_dashboard(
         genie_space_id: Optional Genie space ID to link to the dashboard.
             When provided, enables the "Ask Genie" button on the dashboard,
             allowing users to ask natural language questions about the data.
+        catalog: Default catalog for datasets. Doesn't affect fully qualified
+            table references (e.g., catalog.schema.table). Use when your SQL
+            queries use unqualified table names.
+        schema: Default schema for datasets. Doesn't affect fully qualified
+            table references (e.g., schema.table). Use when your SQL queries
+            use unqualified table names.
 
     Returns:
         Dictionary with success, status, dashboard_id, path, url, published, error.
@@ -185,6 +193,8 @@ def create_or_update_dashboard(
         warehouse_id=warehouse_id,
         publish=publish,
         genie_space_id=genie_space_id,
+        catalog=catalog,
+        schema=schema,
     )
 
     # Track resource on successful create/update

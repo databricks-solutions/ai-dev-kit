@@ -298,6 +298,8 @@ def deploy_dashboard(
     dashboard_name: str,
     warehouse_id: str,
     genie_space_id: Optional[str] = None,
+    dataset_catalog: Optional[str] = None,
+    dataset_schema: Optional[str] = None,
 ) -> DashboardDeploymentResult:
     """Deploy a dashboard to Databricks workspace.
 
@@ -312,6 +314,8 @@ def deploy_dashboard(
         dashboard_name: Display name for the dashboard
         warehouse_id: SQL warehouse ID
         genie_space_id: Optional Genie space ID to link to dashboard
+        dataset_catalog: Default catalog for datasets (doesn't affect fully qualified names)
+        dataset_schema: Default schema for datasets (doesn't affect fully qualified names)
 
     Returns:
         DashboardDeploymentResult with deployment status and details
@@ -350,17 +354,30 @@ def deploy_dashboard(
         if existing_dashboard_id:
             try:
                 logger.info(f"Updating existing dashboard: {dashboard_name}")
-                updated = w.lakeview.update(dashboard_id=existing_dashboard_id, dashboard=dashboard)
+                updated = w.lakeview.update(
+                    dashboard_id=existing_dashboard_id,
+                    dashboard=dashboard,
+                    dataset_catalog=dataset_catalog,
+                    dataset_schema=dataset_schema,
+                )
                 dashboard_id = updated.dashboard_id
                 status = "updated"
             except Exception as e:
                 logger.warning(f"Failed to update dashboard {existing_dashboard_id}: {e}. Creating new.")
-                created = w.lakeview.create(dashboard=dashboard)
+                created = w.lakeview.create(
+                    dashboard=dashboard,
+                    dataset_catalog=dataset_catalog,
+                    dataset_schema=dataset_schema,
+                )
                 dashboard_id = created.dashboard_id
                 status = "created"
         else:
             logger.info(f"Creating new dashboard: {dashboard_name}")
-            created = w.lakeview.create(dashboard=dashboard)
+            created = w.lakeview.create(
+                dashboard=dashboard,
+                dataset_catalog=dataset_catalog,
+                dataset_schema=dataset_schema,
+            )
             dashboard_id = created.dashboard_id
             status = "created"
 
@@ -401,6 +418,8 @@ def create_or_update_dashboard(
     warehouse_id: str,
     publish: bool = True,
     genie_space_id: Optional[str] = None,
+    catalog: Optional[str] = None,
+    schema: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create or update a dashboard.
 
@@ -417,6 +436,10 @@ def create_or_update_dashboard(
         publish: Whether to publish after create/update (default: True)
         genie_space_id: Optional Genie space ID to link to dashboard.
             When provided, enables the "Ask Genie" button on the dashboard.
+        catalog: Default catalog for datasets. Doesn't affect fully qualified
+            table references (e.g., catalog.schema.table).
+        schema: Default schema for datasets. Doesn't affect fully qualified
+            table references (e.g., schema.table).
 
     Returns:
         Dictionary with:
@@ -432,6 +455,8 @@ def create_or_update_dashboard(
         dashboard_name=display_name,
         warehouse_id=warehouse_id,
         genie_space_id=genie_space_id,
+        dataset_catalog=catalog,
+        dataset_schema=schema,
     )
 
     return {
