@@ -576,7 +576,7 @@ For technical best practices (Liquid Clustering, serverless, etc.), see **[SKILL
 
 ## References
 
-- **[SKILL.md](SKILL.md)** - Main development workflow and MCP tools
+- **[SKILL.md](../SKILL.md)** - Main development workflow and MCP tools
 - **[Databricks Asset Bundles Documentation](https://docs.databricks.com/dev-tools/bundles/)** - Official bundle reference
 - **[Pipeline Configuration Reference](https://docs.databricks.com/aws/en/ldp/configure-pipeline)** - Pipeline settings
 - **[Databricks CLI Reference](https://docs.databricks.com/dev-tools/cli/)** - CLI commands and options
