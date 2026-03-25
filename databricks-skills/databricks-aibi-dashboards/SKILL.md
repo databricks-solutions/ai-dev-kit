@@ -57,7 +57,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 ### 1) DATASET ARCHITECTURE
 
-- **One dataset per domain** (e.g., orders, customers, products)
+- **One dataset per domain whenever possible** (e.g., orders, customers, products). Dataset shared on widget will benefit the same filter, reuse the same base dataset as much as possible (adding group by at the widget level for example)
 - **Exactly ONE valid SQL query per dataset** (no multiple queries separated by `;`)
 - Always use **fully-qualified table names**: `catalog.schema.table_name`
 - SELECT must include all dimensions needed by widgets and all derived columns via `AS` aliases
@@ -154,18 +154,15 @@ y=12: Table (w=6, h=6) - Detailed data
 
 ### 5) CARDINALITY & READABILITY (CRITICAL)
 
-**Dashboard readability depends on limiting distinct values:**
-
-| Dimension Type | Max Values | Examples |
-|----------------|------------|----------|
-| Chart color/groups | **3-8** | 4 regions, 5 product lines, 3 tiers |
-| Filters | 4-10 | 8 countries, 5 channels |
-| High cardinality | **Table only** | customer_id, order_id, SKU |
+**Dashboard readability depends on limiting distinct values.**
 
 **Before creating any chart with color/grouping:**
 1. Check column cardinality (use `get_table_stats_and_schema` to see distinct values)
-2. If >10 distinct values, aggregate to higher level OR use TOP-N + "Other" bucket
-3. For high-cardinality dimensions, use a table widget instead of a chart
+2. If too many distinct values for a readable chart, you MUST either:
+   - Aggregate to a higher abstraction level (region instead of store, tier instead of customer_id)
+   - Use TOP-N + "Other" bucketing in the dataset SQL: use `ROW_NUMBER()` to rank, then `CASE WHEN rn <= N THEN dimension ELSE 'Other' END` to bucket remaining values together
+   - Use a table widget instead of a chart
+3. **A chart with too many categories is useless** - users can't read or compare anything. Adapt the number of categories based on the chart type to keep it readable.
 
 ### 6) QUALITY CHECKLIST
 

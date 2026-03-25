@@ -70,3 +70,12 @@ Common errors and fixes for AI/BI dashboards.
 - Multiple items in the `lines` array are **concatenated**, not displayed on separate lines
 - Use **separate text widgets** for title and subtitle at different y positions
 - Example: title at y=0 with height=1, subtitle at y=1 with height=1
+
+## Chart is unreadable (too many bars/lines/slices)
+
+**Problem**: Chart has too many categories making it impossible to read or compare values.
+
+**Solution**:
+- Use TOP-N + "Other" bucketing in your dataset SQL (use `ROW_NUMBER()` to rank, then bucket remaining values as "Other")
+- Or aggregate to a higher abstraction level (region instead of store)
+- Or use a **table widget** instead for high-cardinality data
