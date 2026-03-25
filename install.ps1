@@ -101,7 +101,7 @@ $script:ApxSkills = @("databricks-app-apx")
 $ApxRawUrl = "https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # Agent skills (fetched from databricks/databricks-agent-skills repo)
-$script:AgentSkills = @("databricks", "databricks-apps", "databricks-jobs:databricks-jobs-bundles", "databricks-lakebase", "databricks-pipelines")
+$script:AgentSkills = @("databricks", "databricks-apps", "databricks-lakebase")
 $AgentSkillsRawUrl = "https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
 $AgentSkillsApiUrl = "https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
@@ -132,7 +132,7 @@ $script:ProfileAppDeveloper = @(
     "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
     "databricks-jobs", "databricks-bundles"
 )
-$script:ProfileAppDeveloperAgent = @("databricks", "databricks-apps", "databricks-lakebase", "databricks-pipelines")
+$script:ProfileAppDeveloperAgent = @("databricks", "databricks-apps", "databricks-lakebase")
 
 # Selected skills (populated during profile selection)
 $script:SelectedSkills = @()
@@ -1143,9 +1143,7 @@ function Invoke-PromptCustomSkills {
         @{ Label = "App APX";              Value = "databricks-app-apx";                     State = ($preselected -contains "databricks-app-apx");                     Hint = "FastAPI + React" }
         @{ Label = "Agent: Databricks";    Value = "databricks";                             State = ($preselected -contains "databricks");                             Hint = "CLI auth, data exploration" }
         @{ Label = "Agent: Apps";          Value = "databricks-apps";                        State = ($preselected -contains "databricks-apps");                        Hint = "AppKit + all frameworks" }
-        @{ Label = "Agent: Jobs";          Value = "databricks-jobs-bundles";               State = ($preselected -contains "databricks-jobs-bundles");               Hint = "Lakeflow Jobs (bundle scaffold)" }
         @{ Label = "Agent: Lakebase";      Value = "databricks-lakebase";                    State = ($preselected -contains "databricks-lakebase");                    Hint = "Lakebase OLTP" }
-        @{ Label = "Agent: Pipelines";     Value = "databricks-pipelines";                   State = ($preselected -contains "databricks-pipelines");                   Hint = "Declarative Pipelines" }
         @{ Label = "MLflow Onboarding";    Value = "mlflow-onboarding";                      State = ($preselected -contains "mlflow-onboarding");                      Hint = "Getting started" }
         @{ Label = "Agent Evaluation";     Value = "agent-evaluation";                       State = ($preselected -contains "agent-evaluation");                       Hint = "Evaluate AI agents" }
         @{ Label = "MLflow Tracing";       Value = "instrumenting-with-mlflow-tracing";      State = ($preselected -contains "instrumenting-with-mlflow-tracing");      Hint = "Instrument with tracing" }

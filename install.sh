@@ -99,7 +99,7 @@ APX_SKILLS="databricks-app-apx"
 APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # Agent skills (fetched from databricks/databricks-agent-skills repo)
-AGENT_SKILLS="databricks databricks-apps databricks-jobs:databricks-jobs-bundles databricks-lakebase databricks-pipelines"
+AGENT_SKILLS="databricks databricks-apps databricks-lakebase"
 AGENT_SKILLS_RAW_URL="https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
 AGENT_SKILLS_API_URL="https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
@@ -113,7 +113,7 @@ PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie da
 PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-model-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
 PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-bundles"
-PROFILE_APP_DEVELOPER_AGENT="databricks databricks-apps databricks-lakebase databricks-pipelines"
+PROFILE_APP_DEVELOPER_AGENT="databricks databricks-apps databricks-lakebase"
 
 # Selected skills (populated during profile selection)
 SELECTED_SKILLS=""
@@ -190,7 +190,7 @@ if [ "${LIST_SKILLS:-false}" = true ]; then
     echo -e "${B}Available Skill Profiles${N}"
     echo "────────────────────────────────"
     echo ""
-    echo -e "  ${B}all${N}              All 39 skills (default)"
+    echo -e "  ${B}all${N}              All 37 skills (default)"
     echo -e "  ${B}data-engineer${N}    Pipelines, Spark, Jobs, Streaming (14 skills)"
     echo -e "  ${B}analyst${N}          Dashboards, SQL, Genie, Metrics (8 skills)"
     echo -e "  ${B}ai-ml-engineer${N}   Agents, RAG, Vector Search, MLflow (17 skills)"
@@ -942,9 +942,7 @@ prompt_custom_skills() {
         "App APX|databricks-app-apx|$(_is_preselected databricks-app-apx)|FastAPI + React" \
         "Agent: Databricks|databricks|$(_is_preselected databricks)|CLI auth, data exploration" \
         "Agent: Apps|databricks-apps|$(_is_preselected databricks-apps)|AppKit + all frameworks" \
-        "Agent: Jobs|databricks-jobs-bundles|$(_is_preselected databricks-jobs-bundles)|Lakeflow Jobs (bundle scaffold)" \
         "Agent: Lakebase|databricks-lakebase|$(_is_preselected databricks-lakebase)|Lakebase OLTP" \
-        "Agent: Pipelines|databricks-pipelines|$(_is_preselected databricks-pipelines)|Declarative Pipelines" \
         "MLflow Onboarding|mlflow-onboarding|$(_is_preselected mlflow-onboarding)|Getting started" \
         "Agent Evaluation|agent-evaluation|$(_is_preselected agent-evaluation)|Evaluate AI agents" \
         "MLflow Tracing|instrumenting-with-mlflow-tracing|$(_is_preselected instrumenting-with-mlflow-tracing)|Instrument with tracing" \
