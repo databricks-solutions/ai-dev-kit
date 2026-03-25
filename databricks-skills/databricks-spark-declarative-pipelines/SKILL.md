@@ -572,6 +572,6 @@ For advanced configuration options (development mode, continuous pipelines, cust
 ## Related Skills
 
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - for orchestrating and scheduling pipeline runs
-- **[databricks-asset-bundles](../databricks-asset-bundles/SKILL.md)** - for multi-environment deployment of pipeline projects
+- **[databricks-bundles](../databricks-bundles/SKILL.md)** - for multi-environment deployment of pipeline projects
 - **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - for generating test data to feed into pipelines
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - for catalog/schema/volume management and governance

@@ -1,4 +1,5 @@
 skill_name: databricks-dbsql
+tool_modules: [sql]
 description: 'Databricks SQL (DBSQL) advanced features and SQL warehouse capabilities. This skill MUST be invoked when the
   user mentions: "DBSQL", "Databricks SQL", "SQL warehouse", "SQL scripting", "stored procedure", "CALL procedure", "materialized
   view", "CREATE MATERIALIZED VIEW", "pipe syntax", "|>", "geospatial", "H3", "ST_", "spatial SQL", "collation", "COLLATE",

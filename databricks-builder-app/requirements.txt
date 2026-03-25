@@ -31,7 +31,6 @@ fastmcp>=0.1.0
 requests>=2.31.0
 sqlglot>=20.0.0
 sqlfluff>=3.0.0
-litellm>=1.0.0
 pymupdf>=1.24.0
 
 # Conflict resolution pins for Databricks Apps pre-installed packages

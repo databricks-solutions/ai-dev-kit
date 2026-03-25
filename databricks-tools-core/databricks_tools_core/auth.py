@@ -160,28 +160,30 @@ def get_workspace_client() -> WorkspaceClient:
     # Cross-workspace: explicit token overrides env OAuth so tool operations
     # target the caller-specified workspace instead of the app's own workspace
     if force and host and token:
-        return tag_client(WorkspaceClient(host=host, token=token, **product_kwargs))
+        return tag_client(WorkspaceClient(host=host, token=token, auth_type="pat", **product_kwargs))
 
-    # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M
-    # This prevents the SDK from detecting other auth methods like PAT or config file
+    # In Databricks Apps (OAuth credentials in env), explicitly use OAuth M2M.
+    # Setting auth_type="oauth-m2m" prevents the SDK from also reading
+    # DATABRICKS_TOKEN from os.environ and raising a "more than one
+    # authorization method configured" validation error.
     if _has_oauth_credentials():
         oauth_host = host or os.environ.get("DATABRICKS_HOST", "")
         client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
         client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
 
-        # Explicitly configure OAuth M2M to prevent auth conflicts
         return tag_client(
             WorkspaceClient(
                 host=oauth_host,
                 client_id=client_id,
                 client_secret=client_secret,
+                auth_type="oauth-m2m",
                 **product_kwargs,
             )
         )
 
     # Development mode: use explicit token if provided
     if host and token:
-        return tag_client(WorkspaceClient(host=host, token=token, **product_kwargs))
+        return tag_client(WorkspaceClient(host=host, token=token, auth_type="pat", **product_kwargs))
 
     if host:
         return tag_client(WorkspaceClient(host=host, **product_kwargs))

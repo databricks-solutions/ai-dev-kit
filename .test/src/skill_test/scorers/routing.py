@@ -43,7 +43,7 @@ SKILL_TRIGGERS = {
         "dashboard app",
         "data app",
     ],
-    "databricks-asset-bundles": ["dabs", "databricks asset bundle", "deploy", "bundle.yaml"],
+    "databricks-bundles": ["dabs", "databricks asset bundle", "deploy", "bundle.yaml"],
     "databricks-python-sdk": [
         "python sdk",
         "databricks-sdk",

@@ -43,7 +43,7 @@ usage() {
   echo "Prerequisites:"
   echo "  1. Databricks CLI configured (databricks auth login)"
   echo "  2. App created in Databricks (databricks apps create <app-name>)"
-  echo "  3. Lakebase added as app resource (for database)"
+  echo "  3. Lakebase configured (autoscale: set LAKEBASE_ENDPOINT; provisioned: add-resource)"
   echo "  4. app.yaml configured with your settings"
   echo ""
   echo "Example:"
@@ -235,20 +235,69 @@ cp -r "$REPO_ROOT/databricks-tools-core/databricks_tools_core/"* "$STAGING_DIR/p
 mkdir -p "$STAGING_DIR/packages/databricks_mcp_server"
 cp -r "$REPO_ROOT/databricks-mcp-server/databricks_mcp_server/"* "$STAGING_DIR/packages/databricks_mcp_server/"
 
-# Copy skills (preserve directory structure)
-echo "  Copying skills..."
+# Install all skills (databricks + MLflow + APX) via install_skills.sh
+echo "  Installing all skills via install_skills.sh..."
+INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
+if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
+  echo -e "${RED}Error: install_skills.sh not found at ${INSTALL_SKILLS_SCRIPT}${NC}"
+  exit 1
+fi
+
+SKILLS_TEMP_DIR=$(mktemp -d)
+trap "rm -rf '$SKILLS_TEMP_DIR'" EXIT
+
+# Create a marker file so install_skills.sh skips the "not a project root" prompt
+touch "$SKILLS_TEMP_DIR/databricks.yml"
+
+# Run install_skills.sh to download all skills (databricks, MLflow, APX)
+(cd "$SKILLS_TEMP_DIR" && bash "$INSTALL_SKILLS_SCRIPT")
+
+# Copy installed skills into the staging directory
 mkdir -p "$STAGING_DIR/skills"
-SKILLS_DIR="$REPO_ROOT/databricks-skills"
-if [ -d "$SKILLS_DIR" ]; then
-  for skill_dir in "$SKILLS_DIR"/*/; do
+INSTALLED_SKILLS_DIR="$SKILLS_TEMP_DIR/.claude/skills"
+if [ -d "$INSTALLED_SKILLS_DIR" ]; then
+  for skill_dir in "$INSTALLED_SKILLS_DIR"/*/; do
+    [ -d "$skill_dir" ] || continue
     skill_name=$(basename "$skill_dir")
-    # Skip template and non-skill directories
-    if [ "$skill_name" != "TEMPLATE" ] && [ -f "$skill_dir/SKILL.md" ]; then
-      # Create skill directory and copy contents (cp -r dir/ copies contents, not dir itself)
+    if [ -f "$skill_dir/SKILL.md" ]; then
       mkdir -p "$STAGING_DIR/skills/$skill_name"
       cp -r "$skill_dir"* "$STAGING_DIR/skills/$skill_name/"
     fi
   done
+fi
+
+# Dynamically set ENABLED_SKILLS in app.yaml based on installed skills
+SKILL_NAMES=""
+for skill_dir in "$STAGING_DIR/skills"/*/; do
+  [ -d "$skill_dir" ] || continue
+  if [ -f "$skill_dir/SKILL.md" ]; then
+    name=$(basename "$skill_dir")
+    if [ -n "$SKILL_NAMES" ]; then
+      SKILL_NAMES="${SKILL_NAMES},${name}"
+    else
+      SKILL_NAMES="${name}"
+    fi
+  fi
+done
+if [ -n "$SKILL_NAMES" ]; then
+  echo "  Patching ENABLED_SKILLS with $(echo "$SKILL_NAMES" | tr ',' '\n' | wc -l | tr -d ' ') skills..."
+  python3 -c "
+import re, sys
+path = sys.argv[1]
+skills = sys.argv[2]
+with open(path) as f:
+    text = f.read()
+text = re.sub(
+    r'(- name: ENABLED_SKILLS\n\s+value: )\"[^\"]*\"',
+    r'\1\"' + skills + '\"',
+    text,
+)
+with open(path, 'w') as f:
+    f.write(text)
+" "$STAGING_DIR/app.yaml" "$SKILL_NAMES"
+  echo -e "  ${GREEN}✓${NC} ENABLED_SKILLS updated"
+else
+  echo -e "  ${YELLOW}Warning: No skills found to set in ENABLED_SKILLS${NC}"
 fi
 
 # Remove __pycache__ directories
@@ -286,9 +335,49 @@ if echo "$DEPLOY_OUTPUT" | grep -q '"state":"SUCCEEDED"'; then
   echo ""
   echo "  Next steps:"
   echo "    1. Open the app URL in your browser"
-  echo "    2. If this is first deployment, add Lakebase as an app resource:"
-  echo "       databricks apps add-resource $APP_NAME --resource-type database \\"
-  echo "         --resource-name lakebase --database-instance <instance-name>"
+  echo "    2. If this is first deployment, configure Lakebase:"
+  echo ""
+  echo "       Autoscale Lakebase (recommended):"
+  echo "         Set LAKEBASE_ENDPOINT in app.yaml — no add-resource needed."
+  echo ""
+  echo "       Provisioned Lakebase:"
+  echo "         databricks apps add-resource $APP_NAME --resource-type database \\"
+  echo "           --resource-name lakebase --database-instance <instance-name>"
+  echo ""
+
+  # Clean up old deployment source directories
+  echo -e "${YELLOW}Cleaning up old deployments...${NC}"
+  SP_CLIENT_ID=$(echo "$APP_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('service_principal_client_id', ''))" 2>/dev/null || echo "")
+  CURRENT_DEPLOYMENT_ID=$(echo "$APP_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('active_deployment', {}).get('deployment_id', ''))" 2>/dev/null || echo "")
+
+  if [ -n "$SP_CLIENT_ID" ] && [ -n "$CURRENT_DEPLOYMENT_ID" ]; then
+    SP_SRC_PATH="/Workspace/Users/${SP_CLIENT_ID}/src"
+    OLD_DIRS=$(databricks workspace list "$SP_SRC_PATH" --output json 2>/dev/null | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+objects = data if isinstance(data, list) else data.get('objects', [])
+current = '$CURRENT_DEPLOYMENT_ID'
+for obj in objects:
+    path = obj.get('path', '')
+    name = path.rsplit('/', 1)[-1] if '/' in path else path
+    if name != current and obj.get('object_type', '') == 'DIRECTORY':
+        print(path)
+" 2>/dev/null || echo "")
+
+    if [ -n "$OLD_DIRS" ]; then
+      CLEANED=0
+      while IFS= read -r dir_path; do
+        if databricks workspace delete "$dir_path" --recursive 2>/dev/null; then
+          CLEANED=$((CLEANED + 1))
+        fi
+      done <<< "$OLD_DIRS"
+      echo -e "  ${GREEN}✓${NC} Removed $CLEANED old deployment(s)"
+    else
+      echo -e "  ${GREEN}✓${NC} No old deployments to clean up"
+    fi
+  else
+    echo -e "  ${YELLOW}⚠${NC} Could not determine deployment info, skipping cleanup"
+  fi
   echo ""
 else
   echo ""

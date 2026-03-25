@@ -115,7 +115,7 @@ test_cases:
     expectations:
       expected_skills:
         - "databricks-spark-declarative-pipelines"
-        - "databricks-asset-bundles"
+        - "databricks-bundles"
       is_multi_skill: true
     metadata:
       category: "multi_skill"

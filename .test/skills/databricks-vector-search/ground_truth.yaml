@@ -297,6 +297,74 @@ test_cases:
     difficulty: easy
     source: auto_generated
 
+- id: vs_mcp_create_endpoint_008
+  inputs:
+    prompt: "Use MCP tools to create a vector search endpoint called my-rag-endpoint"
+  outputs:
+    response: |
+      ```python
+      result = create_or_update_vs_endpoint(
+          name="my-rag-endpoint",
+          endpoint_type="STANDARD"
+      )
+      ```
+
+      The `create_or_update_vs_endpoint` tool is idempotent — it returns the existing endpoint if one with that name already exists.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "create_or_update_vs_endpoint is the correct MCP tool name"
+    - "The tool is idempotent"
+    expected_patterns:
+    - pattern: "create_or_update_vs_endpoint"
+      min_count: 1
+      description: "Uses correct MCP tool name (not create_vs_endpoint)"
+    guidelines:
+    - "Must use create_or_update_vs_endpoint, NOT create_vs_endpoint"
+    - "Must mention that the tool is idempotent"
+  metadata:
+    category: happy_path
+    difficulty: easy
+    source: manual
+
+- id: vs_mcp_manage_data_009
+  inputs:
+    prompt: "How do I upsert documents into a Direct Access vector search index using MCP tools?"
+  outputs:
+    response: |
+      ```python
+      result = manage_vs_data(
+          index_name="catalog.schema.my_index",
+          operation="upsert",
+          inputs_json=[
+              {"id": "doc1", "content": "Sample document", "embedding": [0.1, 0.2, ...]},
+              {"id": "doc2", "content": "Another document", "embedding": [0.3, 0.4, ...]}
+          ]
+      )
+      ```
+
+      Use `manage_vs_data` with `operation="upsert"` to insert or update vectors. Other supported operations: `"delete"`, `"scan"`, `"sync"`.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "manage_vs_data is the correct MCP tool for data operations"
+    - "operation parameter accepts upsert, delete, scan, sync"
+    - "inputs_json contains the vector data to upsert"
+    expected_patterns:
+    - pattern: "manage_vs_data"
+      min_count: 1
+      description: "Uses manage_vs_data (not upsert_vs_data)"
+    - pattern: "upsert"
+      min_count: 1
+      description: "Specifies upsert operation"
+    guidelines:
+    - "Must use manage_vs_data with operation='upsert', NOT upsert_vs_data"
+    - "Must mention other available operations (delete, scan, sync)"
+  metadata:
+    category: happy_path
+    difficulty: medium
+    source: manual
+
 - id: vs_embedding_models_007
   inputs:
     prompt: "What embedding models are available for vector search indexes?"

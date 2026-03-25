@@ -173,7 +173,7 @@ Skills provide specialized guidance for Databricks development tasks. They are m
 3. The agent can invoke skills using the `Skill` tool: `skill: "sdp"`
 
 Skills include:
-- **databricks-asset-bundles**: Databricks Asset Bundles configuration
+- **databricks-bundles**: DABs configuration
 - **databricks-app-apx**: Full-stack apps with APX framework (FastAPI + React)
 - **databricks-app-python**: Python apps with Dash, Streamlit, Flask
 - **databricks-python-sdk**: Python SDK patterns
@@ -211,7 +211,7 @@ projects/
   - SQL warehouse (for SQL queries)
   - Cluster (for Python/PySpark execution)
   - Unity Catalog enabled (recommended)
-- PostgreSQL database (Lakebase) for project persistence
+- PostgreSQL database (Lakebase) for project persistence — autoscale or provisioned
 
 ### Quick Start
 
@@ -244,13 +244,23 @@ DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
 DATABRICKS_TOKEN=dapi...
 
 # Required: Database for project persistence (pick ONE option)
-# Option A — Static connection URL (simplest for local dev):
-LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
 
-# Option B — Dynamic OAuth via Databricks SDK:
+# Option A — Autoscale Lakebase (recommended, scales to zero):
+LAKEBASE_ENDPOINT=projects/<project-name>/branches/production/endpoints/primary
+LAKEBASE_DATABASE_NAME=databricks_postgres
+
+# Option B — Provisioned Lakebase (fixed capacity):
 # LAKEBASE_INSTANCE_NAME=your-lakebase-instance
 # LAKEBASE_DATABASE_NAME=databricks_postgres
+
+# Option C — Static connection URL (any type, simplest for local dev):
+# LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
 ```
+
+The app auto-detects the mode based on which variable is set:
+- `LAKEBASE_ENDPOINT` → autoscale mode (`client.postgres` API, host looked up automatically)
+- `LAKEBASE_INSTANCE_NAME` → provisioned mode (`client.database` API)
+- `LAKEBASE_PG_URL` → static URL mode (no OAuth token refresh)
 
 See `.env.example` for the full list of available settings including LLM provider, skills configuration, and MLflow tracing. The app loads `.env.local` (not `.env`) at startup.
 
@@ -493,18 +503,21 @@ databricks auth login --host https://your-workspace.cloud.databricks.com
 # 2. Create the app (first time only)
 databricks apps create my-builder-app
 
-# 3. Add Lakebase as a resource (first time only)
+# 3. Configure app.yaml (copy and edit the example)
+cp app.yaml.example app.yaml
+# Edit app.yaml — set LAKEBASE_ENDPOINT (autoscale) or LAKEBASE_INSTANCE_NAME (provisioned)
+
+# 4. (Provisioned Lakebase only) Add Lakebase as an app resource
+#    Skip this step if using autoscale — it connects via OAuth directly.
 databricks apps add-resource my-builder-app \
   --resource-type database \
   --resource-name lakebase \
   --database-instance <your-lakebase-instance-name>
 
-# 4. Configure app.yaml (copy and edit the example)
-cp app.yaml.example app.yaml
-# Edit app.yaml with your Lakebase instance name and other settings
-
 # 5. Deploy
 ./scripts/deploy.sh my-builder-app
+
+# 6. Grant database permissions to the app's service principal (see Section 7)
 ```
 
 ### Step-by-Step Deployment Guide
@@ -541,12 +554,22 @@ databricks apps get my-builder-app
 
 The app requires a PostgreSQL database (Lakebase) for storing projects, conversations, and messages.
 
-1. Go to your Databricks workspace
-2. Navigate to **Catalog** → **Lakebase**
-3. Click **Create Instance**
-4. Note the instance name (e.g., `my-lakebase-instance`)
+**Autoscale Lakebase** (recommended — scales to zero when idle):
+1. Go to your Databricks workspace → **Catalog** → **Lakebase**
+2. Click **Create** → select **Autoscale**
+3. Note the endpoint resource name (e.g., `projects/my-app/branches/production/endpoints/primary`)
+4. Set in `app.yaml`: `LAKEBASE_ENDPOINT=projects/my-app/branches/production/endpoints/primary`
+
+**Provisioned Lakebase** (fixed capacity):
+1. Go to **Catalog** → **Lakebase** → **Create** → select **Provisioned**
+2. Note the instance name (e.g., `my-lakebase-instance`)
+3. Set in `app.yaml`: `LAKEBASE_INSTANCE_NAME=my-lakebase-instance`
 
 #### 4. Add Lakebase as an App Resource
+
+**Autoscale Lakebase**: Skip this step. Autoscale connects via OAuth using `LAKEBASE_ENDPOINT` — no app resource needed.
+
+**Provisioned Lakebase**: Add the instance as an app resource:
 
 ```bash
 databricks apps add-resource my-builder-app \
@@ -577,11 +600,19 @@ command:
   - "$DATABRICKS_APP_PORT"
 
 env:
-  # Required: Your Lakebase instance name
-  - name: LAKEBASE_INSTANCE_NAME
-    value: "<your-lakebase-instance-name>"
+  # Required: Lakebase database (pick ONE option)
+
+  # Option A — Autoscale Lakebase (recommended):
+  - name: LAKEBASE_ENDPOINT
+    value: "projects/<project-name>/branches/production/endpoints/primary"
   - name: LAKEBASE_DATABASE_NAME
     value: "databricks_postgres"
+
+  # Option B — Provisioned Lakebase:
+  # - name: LAKEBASE_INSTANCE_NAME
+  #   value: "<your-lakebase-instance-name>"
+  # - name: LAKEBASE_DATABASE_NAME
+  #   value: "databricks_postgres"
 
   # Skills to enable (comma-separated)
   - name: ENABLED_SKILLS
@@ -623,24 +654,88 @@ The deploy script will:
 
 #### 7. Grant Database Permissions
 
-After the first deployment, grant table permissions to the app's service principal:
+After the first deployment, the app's service principal needs two things:
+1. A **Lakebase OAuth role** (so it can authenticate via OAuth tokens)
+2. **PostgreSQL grants** on the `builder_app` schema (so it can create/read/write tables)
+
+##### Step 7a: Find the service principal's client ID
+
+```bash
+SP_CLIENT_ID=$(databricks apps get my-builder-app --output json | jq -r '.service_principal_client_id')
+echo $SP_CLIENT_ID
+```
+
+##### Step 7b: Create a Lakebase OAuth role for the SP
+
+> **Important**: Do NOT use PostgreSQL `CREATE ROLE` directly. Lakebase Autoscaling requires
+> roles to be created through the Databricks API so the OAuth authentication layer recognizes them.
+
+```python
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.postgres import Role, RoleRoleSpec, RoleAuthMethod, RoleIdentityType
+
+w = WorkspaceClient()
+
+# Replace with your branch path and SP client ID
+branch = "projects/<project-id>/branches/<branch-id>"
+sp_client_id = "<sp-client-id>"
+
+w.postgres.create_role(
+    parent=branch,
+    role=Role(
+        spec=RoleRoleSpec(
+            postgres_role=sp_client_id,
+            auth_method=RoleAuthMethod.LAKEBASE_OAUTH_V1,
+            identity_type=RoleIdentityType.SERVICE_PRINCIPAL,
+        )
+    ),
+).wait()
+```
+
+Or via CLI:
+
+```bash
+databricks postgres create-role \
+  "projects/<project-id>/branches/<branch-id>" \
+  --json '{
+    "spec": {
+      "postgres_role": "<sp-client-id>",
+      "auth_method": "LAKEBASE_OAUTH_V1",
+      "identity_type": "SERVICE_PRINCIPAL"
+    }
+  }'
+```
+
+**Provisioned Lakebase**: This step is not needed — adding the instance as an app resource
+(Step 4) automatically configures authentication.
+
+##### Step 7c: Grant PostgreSQL permissions
+
+Connect to your Lakebase database as your own user (via psql or a notebook) and run:
 
 ```sql
--- Run this in a Databricks notebook or SQL editor
--- Replace <service-principal-id> with your app's service principal
+-- Replace <sp-client-id> with the service_principal_client_id
 
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public
-  TO `<service-principal-id>`;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public
-  TO `<service-principal-id>`;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT ALL ON TABLES TO `<service-principal-id>`;
+-- 1. Allow the SP to create the builder_app schema
+GRANT CREATE ON DATABASE databricks_postgres TO "<sp-client-id>";
+
+-- 2. Create the schema and grant full access
+CREATE SCHEMA IF NOT EXISTS builder_app;
+GRANT USAGE ON SCHEMA builder_app TO "<sp-client-id>";
+GRANT ALL PRIVILEGES ON SCHEMA builder_app TO "<sp-client-id>";
+
+-- 3. Grant access to any existing tables/sequences (needed if you ran migrations locally)
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA builder_app TO "<sp-client-id>";
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA builder_app TO "<sp-client-id>";
+
+-- 4. Ensure the SP has access to future tables/sequences created by other users
+ALTER DEFAULT PRIVILEGES IN SCHEMA builder_app
+  GRANT ALL ON TABLES TO "<sp-client-id>";
+ALTER DEFAULT PRIVILEGES IN SCHEMA builder_app
+  GRANT ALL ON SEQUENCES TO "<sp-client-id>";
 ```
 
-To find your app's service principal ID:
-```bash
-databricks apps get my-builder-app --output json | jq '.service_principal_id'
-```
+After granting permissions, redeploy the app so it can run migrations with the new role.
 
 #### 8. Access Your App
 
@@ -682,33 +777,29 @@ Skills are copied from the sibling `databricks-skills/` directory. Ensure:
 2. The skill name in `ENABLED_SKILLS` matches a directory in `databricks-skills/`
 3. The skill directory contains a `SKILL.md` file
 
-#### "Permission denied for table projects" or Database Errors
+#### "password authentication failed" or "Permission denied for table projects"
 
-When using a shared Lakebase instance, you need to grant the app's service principal permissions on the tables:
+See [Section 7: Grant Database Permissions](#7-grant-database-permissions) for the complete setup.
 
-```bash
-# 1. Get your app's service principal ID
-databricks apps get my-builder-app --output json | python3 -c "import sys, json; print(json.load(sys.stdin)['service_principal_id'])"
-```
+Common causes:
 
-2. Connect to your Lakebase instance via psql or a Databricks notebook, then run:
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `password authentication failed` | Lakebase OAuth role missing or created via SQL instead of API | Create the role via `w.postgres.create_role()` with `LAKEBASE_OAUTH_V1` auth (Step 7b) |
+| `permission denied for table` | SP lacks PostgreSQL grants on schema/tables | Run the GRANT statements (Step 7c) |
+| `schema "builder_app" does not exist` | SP lacks `CREATE` on the database | `GRANT CREATE ON DATABASE databricks_postgres TO "<sp-client-id>"` |
+| `relation does not exist` | Migrations haven't run | Redeploy the app, or run `alembic upgrade head` locally |
 
-```sql
--- Replace <service-principal-id> with the ID from step 1
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "<service-principal-id>";
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "<service-principal-id>";
-GRANT USAGE ON SCHEMA public TO "<service-principal-id>";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "<service-principal-id>";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "<service-principal-id>";
-```
-
-Alternatively, if you have a fresh/private Lakebase instance, the app's migrations will create the tables with proper ownership automatically.
+> **Autoscale Lakebase pitfall**: Do NOT use `CREATE ROLE ... LOGIN` in PostgreSQL directly.
+> Lakebase Autoscaling requires roles to be created through the Databricks API so that OAuth
+> token authentication works. Manually created roles get `NO_LOGIN` auth and will fail with
+> "password authentication failed".
 
 #### App shows blank page or "Not Found"
 
 Check the app logs in Databricks:
 ```bash
-databricks apps get-logs my-builder-app
+databricks apps logs my-builder-app
 ```
 
 Common causes:

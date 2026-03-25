@@ -73,7 +73,8 @@ async def lifespan(app: FastAPI):
     logger.warning(
       'Database not configured. Set either:\n'
       '  - LAKEBASE_PG_URL (static URL with password), or\n'
-      '  - LAKEBASE_INSTANCE_NAME and LAKEBASE_DATABASE_NAME (dynamic OAuth)'
+      '  - LAKEBASE_ENDPOINT and LAKEBASE_DATABASE_NAME (autoscale, dynamic OAuth), or\n'
+      '  - LAKEBASE_INSTANCE_NAME and LAKEBASE_DATABASE_NAME (provisioned, dynamic OAuth)'
     )
 
   yield

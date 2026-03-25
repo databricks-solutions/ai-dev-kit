@@ -65,7 +65,7 @@ if [ ! -f "$PROJECT_DIR/.env.local" ]; then
     echo "║  1. DATABRICKS_HOST  - Your workspace URL                      ║"
     echo "║  2. DATABRICKS_TOKEN - Your personal access token              ║"
     echo "║  3. LAKEBASE_PG_URL  - PostgreSQL connection string            ║"
-    echo "║     (or LAKEBASE_INSTANCE_NAME for Databricks Apps)            ║"
+    echo "║     (or LAKEBASE_ENDPOINT / LAKEBASE_INSTANCE_NAME)            ║"
     echo "║                                                                ║"
     echo "║  See .env.example for all available options.                   ║"
     echo "║                                                                ║"

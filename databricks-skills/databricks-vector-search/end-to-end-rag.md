@@ -119,13 +119,13 @@ query_vs_index(
 The filter syntax depends on the endpoint type used when creating the index.
 
 ```python
-# Storage-Optimized endpoint (used in this walkthrough): SQL-like filter_string
+# Storage-Optimized endpoint (used in this walkthrough): SQL-like filter syntax
 query_vs_index(
     index_name="catalog.schema.knowledge_base_index",
     columns=["doc_id", "title", "content"],
     query_text="How do I govern my data?",
     num_results=3,
-    filter_string="category = 'governance'"
+    filters="category = 'governance'"
 )
 
 # Standard endpoint (if you created a Standard endpoint instead): JSON filters_json
@@ -236,4 +236,4 @@ Then sync — the index automatically handles deletions via Delta change data fe
 | **"Column not found in index"** | Column must be in `columns_to_sync`. Recreate index with the column included |
 | **Embeddings not computed** | Ensure `embedding_model_endpoint_name` is a valid serving endpoint |
 | **Stale results after table update** | For TRIGGERED pipelines, you must call `sync_vs_index` manually |
-| **Filter not working** | Standard endpoints use `filters_json` (dict), Storage-Optimized use `filter_string` (SQL) |
+| **Filter not working** | Standard endpoints use dict-format filters (`filters_json`), Storage-Optimized use SQL-like string filters (`filters`) |

@@ -1,9 +1,9 @@
 ---
-name: databricks-asset-bundles
-description: "Create and configure Databricks Asset Bundles (DABs) with best practices for multi-environment deployments. Use when working with: (1) Creating new DAB projects, (2) Adding resources (dashboards, pipelines, jobs, alerts), (3) Configuring multi-environment deployments, (4) Setting up permissions, (5) Deploying or running bundle resources"
+name: databricks-bundles
+description: "Create and configure Declarative Automation Bundles (formerly Asset Bundles) with best practices for multi-environment deployments (CICD). Use when working with: (1) Creating new DAB projects, (2) Adding resources (dashboards, pipelines, jobs, alerts), (3) Configuring multi-environment deployments, (4) Setting up permissions, (5) Deploying or running bundle resources"
 ---
 
-# Databricks Asset Bundle (DABs) Writer
+# DABs Writer
 
 ## Overview
 Create DABs for multi-environment deployment (dev/staging/prod).
@@ -317,7 +317,7 @@ databricks bundle destroy -t prod --auto-approve
 
 ## Resources
 
-- [Databricks Asset Bundles Documentation](https://docs.databricks.com/dev-tools/bundles/)
+- [DABs Documentation](https://docs.databricks.com/dev-tools/bundles/)
 - [Bundle Resources Reference](https://docs.databricks.com/dev-tools/bundles/resources)
 - [Bundle Configuration Reference](https://docs.databricks.com/dev-tools/bundles/settings)
 - [Supported Resource Types](https://docs.databricks.com/aws/en/dev-tools/bundles/resources#resource-types)

@@ -19,19 +19,16 @@ echo "================================================"
 echo "Profile: $PROFILE"
 echo ""
 
-# Check if local skills are installed
-if [ ! -d "$LOCAL_SKILLS_DIR" ] || [ -z "$(ls -A "$LOCAL_SKILLS_DIR" 2>/dev/null)" ]; then
-    echo "Error: Local skills not found at $LOCAL_SKILLS_DIR"
-    echo ""
-    echo "Please run ./install_skills.sh first to install skills locally."
-    echo "This will install both Databricks and MLflow skills."
-    echo ""
-    echo "Example:"
-    echo "  cd databricks-skills"
-    echo "  ./install_skills.sh"
-    echo "  ./install_to_dbx_assistant.sh $PROFILE"
-    exit 1
+# Install all skills (databricks + MLflow + APX) via install_skills.sh
+echo "  Installing all skills via install_skills.sh..."
+INSTALL_SKILLS_SCRIPT="$PROJECT_ROOT/databricks-skills/install_skills.sh"
+if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
+  echo -e "${RED}Error: install_skills.sh not found at ${INSTALL_SKILLS_SCRIPT}${NC}"
+  exit 1
 fi
+
+# Run install_skills.sh to download all skills (databricks, MLflow, APX)
+(bash "$INSTALL_SKILLS_SCRIPT")
 
 # Get current user email
 USER_EMAIL=$(databricks current-user me --profile "$PROFILE" --output json 2>/dev/null | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('userName', ''))" 2>/dev/null || echo "")
@@ -113,8 +110,8 @@ skills_count=$(find "$LOCAL_SKILLS_DIR" -maxdepth 1 -type d -exec test -f {}/SKI
 echo "  $skills_count skills deployed to: $SKILLS_PATH"
 echo ""
 echo "To use:"
-echo "  1. Open a Databricks notebook"
-echo "  2. Open the Assistant panel"
+echo "  1. Open a Databricks notebook/sql query/anywhere in the workspace"
+echo "  2. Open the Genie Code panel"
 echo "  3. Switch to 'Agent' mode"
 echo "  4. Ask: 'Create a dashboard for my sales data'"
 echo ""

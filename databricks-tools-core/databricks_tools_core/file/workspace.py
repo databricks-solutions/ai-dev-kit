@@ -146,10 +146,15 @@ def upload_folder(
     Uses parallel uploads with ThreadPoolExecutor for performance.
     Automatically handles all file types using ImportFormat.AUTO.
 
+    Follows `cp -r` semantics:
+    - With trailing slash or /* (e.g., "pipeline/" or "pipeline/*"): copies contents into workspace_folder
+    - Without trailing slash (e.g., "pipeline"): creates workspace_folder/pipeline/
+
     Args:
-        local_folder: Path to local folder to upload
+        local_folder: Path to local folder to upload. Add trailing slash to copy
+            contents only, omit to preserve folder name.
         workspace_folder: Target path in Databricks workspace
-            (e.g., "/Users/user@example.com/my-project")
+            (e.g., "/Workspace/Users/user@example.com/my-project")
         max_workers: Maximum number of parallel upload threads (default: 10)
         overwrite: Whether to overwrite existing files (default: True)
 
@@ -161,24 +166,46 @@ def upload_folder(
         ValueError: If local folder is not a directory
 
     Example:
+        >>> # Copy folder preserving name: creates /Workspace/.../dest/my-project/
         >>> result = upload_folder(
         ...     local_folder="/path/to/my-project",
-        ...     workspace_folder="/Users/me@example.com/my-project"
+        ...     workspace_folder="/Workspace/Users/me@example.com/dest"
+        ... )
+        >>> # Copy contents only: files go directly into /Workspace/.../dest/
+        >>> result = upload_folder(
+        ...     local_folder="/path/to/my-project/",
+        ...     workspace_folder="/Workspace/Users/me@example.com/dest"
         ... )
         >>> print(f"Uploaded {result.successful}/{result.total_files} files")
         >>> if not result.success:
         ...     for failed in result.get_failed_uploads():
         ...         print(f"Failed: {failed.local_path} - {failed.error}")
     """
+    # Check if user wants to copy contents only (trailing slash or /*) or preserve folder name
+    # Supports: "folder/", "folder/*", "folder\\*" (Windows)
+    copy_contents_suffixes = ("/", os.sep, "/*", os.sep + "*")
+    copy_contents_only = local_folder.endswith(copy_contents_suffixes)
+
+    # Strip /* or * suffix before validation
+    clean_local_folder = local_folder.rstrip("*").rstrip("/").rstrip(os.sep)
+
     # Validate local folder
-    local_folder = os.path.abspath(local_folder)
-    if not os.path.exists(local_folder):
-        raise FileNotFoundError(f"Local folder not found: {local_folder}")
-    if not os.path.isdir(local_folder):
-        raise ValueError(f"Path is not a directory: {local_folder}")
+    local_folder_abs = os.path.abspath(clean_local_folder)
+    if not os.path.exists(local_folder_abs):
+        raise FileNotFoundError(f"Local folder not found: {local_folder_abs}")
+    if not os.path.isdir(local_folder_abs):
+        raise ValueError(f"Path is not a directory: {local_folder_abs}")
 
     # Normalize workspace path (remove trailing slash)
     workspace_folder = workspace_folder.rstrip("/")
+
+    # If not copying contents only, append the source folder name to destination
+    if not copy_contents_only:
+        folder_name = os.path.basename(local_folder_abs)
+        workspace_folder = f"{workspace_folder}/{folder_name}"
+
+    # Use absolute path for file collection
+    local_folder = local_folder_abs
 
     # Initialize client
     w = get_workspace_client()
