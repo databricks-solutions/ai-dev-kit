@@ -64,10 +64,10 @@ run_pipeline(
 
 ### Step 4: Validate Results
 
-**On Success** - Use `get_table_details` to verify tables (NOT manual SQL COUNT queries):
+**On Success** - Use `get_table_stats_and_schema` to verify tables (NOT manual SQL COUNT queries):
 ```
-# MCP Tool: get_table_details
-get_table_details(
+# MCP Tool: get_table_stats_and_schema
+get_table_stats_and_schema(
     catalog="my_catalog",
     schema="my_schema",
     table_names=["bronze_orders", "silver_orders", "gold_daily_summary"]
@@ -113,7 +113,7 @@ get_pipeline(pipeline_id="<pipeline_id>")
 | Tool | Description |
 |------|-------------|
 | `upload_to_workspace` | Upload files/folders to workspace (handles files, folders, globs) |
-| `get_table_details` | **Use this to validate tables** - returns schema, row counts, and stats in one call. Do NOT use `execute_sql` with COUNT queries. |
+| `get_table_stats_and_schema` | **Use this to validate tables** - returns schema, row counts, and stats in one call. Do NOT use `execute_sql` with COUNT queries. |
 | `execute_sql` | Run ad-hoc SQL to inspect actual data content (not for row counts) |
 
 ---

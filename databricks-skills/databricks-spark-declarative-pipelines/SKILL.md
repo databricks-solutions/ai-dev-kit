@@ -290,8 +290,8 @@ After running a pipeline (via DAB or MCP), you **MUST** validate both the execut
 Even if the pipeline reports SUCCESS, you **MUST** verify the data is correct:
 
 ```
-# MCP Tool: get_table_details - validates schema, row counts, and stats
-get_table_details(
+# MCP Tool: get_table_stats_and_schema - validates schema, row counts, and stats
+get_table_stats_and_schema(
     catalog="my_catalog",
     schema="my_schema",
     table_names=["bronze_*", "silver_*", "gold_*"]  # Use glob patterns
@@ -309,7 +309,7 @@ get_table_details(
 If validation reveals problems, trace upstream to find the root cause:
 
 1. **Start from the problematic table** - identify what's wrong (empty, wrong counts, bad data)
-2. **Check its source table** - use `get_table_details` on the upstream table
+2. **Check its source table** - use `get_table_stats_and_schema` on the upstream table
 3. **Trace back to bronze** - continue until you find where the issue originates
 4. **Common causes:**
    - Bronze empty → source files missing or path incorrect
@@ -319,7 +319,7 @@ If validation reveals problems, trace upstream to find the root cause:
 
 5. **Fix the SQL/Python code**, re-upload, and re-run the pipeline
 
-**Do NOT use `execute_sql` with COUNT queries for validation** - `get_table_details` is faster and returns more information in a single call.
+**Do NOT use `execute_sql` with COUNT queries for validation** - `get_table_stats_and_schema` is faster and returns more information in a single call.
 
 ---
 
@@ -327,7 +327,7 @@ If validation reveals problems, trace upstream to find the root cause:
 
 | Issue | Solution |
 |-------|----------|
-| **Empty output tables** | Use `get_table_details` to check upstream sources. Verify source files exist and paths are correct. |
+| **Empty output tables** | Use `get_table_stats_and_schema` to check upstream sources. Verify source files exist and paths are correct. |
 | **Pipeline stuck INITIALIZING** | Normal for serverless, wait a few minutes |
 | **"Column not found"** | Check `schemaHints` match actual data |
 | **Streaming reads fail** | For file ingestion in a streaming table, you must use the `STREAM` keyword with `read_files`: `FROM STREAM read_files(...)`. For table streams use `FROM stream(table)`. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
