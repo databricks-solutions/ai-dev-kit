@@ -11,7 +11,7 @@ set -e
 PROFILE=${1:-"DEFAULT"}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-LOCAL_SKILLS_DIR="$PROJECT_ROOT/.claude/skills"
+LOCAL_SKILLS_DIR="$SCRIPT_DIR/.claude/skills"
 
 echo "================================================"
 echo "Deploying Skills to Databricks Assistant"
