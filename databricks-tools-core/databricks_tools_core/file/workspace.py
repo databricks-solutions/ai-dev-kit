@@ -263,11 +263,14 @@ def _upload_glob(
             ],
         )
 
-    # Get the base directory (the part before any glob characters)
-    base_dir = os.path.dirname(pattern.split("*")[0].split("?")[0].rstrip("/"))
-    if not base_dir:
-        base_dir = "."
-    base_dir = os.path.abspath(base_dir)
+    # Get the base directory - this is the directory containing the glob pattern
+    # e.g., for "/path/to/folder/*.py", base_dir is "/path/to/folder"
+    # For "/path/to/folder/*", base_dir is "/path/to/folder"
+    pattern_dir = os.path.dirname(pattern)
+    if pattern_dir:
+        base_dir = os.path.abspath(pattern_dir)
+    else:
+        base_dir = os.getcwd()
 
     # Create workspace root directory
     try:
@@ -282,8 +285,8 @@ def _upload_glob(
     for match in matches:
         match = os.path.abspath(match)
         if os.path.isfile(match):
-            # Single file - use its name relative to base_dir
-            rel_path = os.path.relpath(match, base_dir)
+            # Single file - use just its filename (files are at the base_dir level)
+            rel_path = os.path.basename(match)
             all_files.append((match, rel_path))
         elif os.path.isdir(match):
             # Directory - collect all files recursively
