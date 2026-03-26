@@ -1,7 +1,7 @@
 test_cases:
   - id: "sdp_bronze_ingestion_001"
     inputs:
-      prompt: "Create a bronze ingestion pipeline for JSON files in /Volumes/raw/orders"
+      prompt: "I have JSON files in `/Volumes/main/test/raw/orders` with schema: `order_id STRING, customer_id STRING, order_date DATE, amount DOUBLE, status STRING`. Create a bronze streaming table to ingest them."
     outputs:
       response: |
         Here's a bronze ingestion pipeline using Spark Declarative Pipelines:
@@ -59,7 +59,7 @@ test_cases:
 
   - id: "sdp_cdc_scd2_sql_001"
     inputs:
-      prompt: "Implement auto_cdc with SCD Type 2 for tracking customer dimension changes"
+      prompt: "I have a bronze table `bronze_customers_cdc` with CDC events: `customer_id STRING, customer_name STRING, email STRING, phone STRING, address STRING, event_timestamp TIMESTAMP, operation STRING`. Create a silver table that tracks customer history with SCD Type 2 using SQL."
     outputs:
       response: |
         Here's an AUTO CDC implementation with SCD Type 2 using SQL:
@@ -144,7 +144,7 @@ test_cases:
 
   - id: "sdp_silver_transform_001"
     inputs:
-      prompt: "Create a silver transformation that cleans and deduplicates order data"
+      prompt: "I have a bronze table `bronze_orders` with columns: `order_id STRING, customer_id STRING, order_date DATE, amount DOUBLE, status STRING, _ingested_at TIMESTAMP`. Create a silver table that cleans and deduplicates this data."
     outputs:
       response: |
         Here's a silver transformation for order data:
@@ -211,7 +211,7 @@ test_cases:
 
   - id: "sdp_gold_aggregate_001"
     inputs:
-      prompt: "Create a gold aggregate table for daily sales metrics"
+      prompt: "I have a silver table `silver_orders` with columns: `order_id STRING, customer_id STRING, order_date DATE, amount DECIMAL(10,2), status STRING`. Show me how to create a gold table for daily sales metrics."
     outputs:
       response: |
         Here's a gold aggregate for daily sales metrics:
@@ -264,7 +264,7 @@ test_cases:
 
   - id: "sdp_streaming_windowed_001"
     inputs:
-      prompt: "Create a streaming pipeline for IoT sensor data with 5-minute tumbling window aggregations"
+      prompt: "I have JSON files in `/Volumes/main/test/raw/sensors` with schema: `sensor_id STRING, temperature DOUBLE, humidity DOUBLE, event_timestamp TIMESTAMP`. Show me how to create a streaming pipeline with 5-minute tumbling window aggregations."
     outputs:
       response: |
         Here's a streaming pipeline for IoT sensor data with windowed aggregations:
@@ -354,7 +354,7 @@ test_cases:
 
   - id: "sdp_bronze_python_001"
     inputs:
-      prompt: "Create a bronze ingestion pipeline using Python only (no SQL) for JSON files in /Volumes/raw/order"
+      prompt: "I have JSON files in `/Volumes/main/test/raw/orders` with schema: `order_id STRING, customer_id STRING, order_date DATE, amount DOUBLE, status STRING`. Show me how to create a bronze streaming table using Python, including the file name. Show only the Python code."
     outputs:
       response: |
         Here's a bronze ingestion pipeline using Python with the modern `pyspark.pipelines` API:
@@ -417,7 +417,7 @@ test_cases:
 
   - id: "sdp_cdc_scd2_python_001"
     inputs:
-      prompt: "Implement auto_cdc using Python with SCD Type 2 for tracking customer dimension changes"
+      prompt: "I have a bronze table `bronze_customers_cdc` with CDC events: `customer_id STRING, customer_name STRING, email STRING, phone STRING, address STRING, event_timestamp TIMESTAMP, operation STRING`. Show me how to create a silver table using Python that tracks customer history with SCD Type 2."
     outputs:
       response: |
         Here's an AUTO CDC implementation with SCD Type 2 using Python and the modern `pyspark.pipelines` API:

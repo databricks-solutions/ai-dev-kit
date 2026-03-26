@@ -6,6 +6,7 @@ to apply the optimized SKILL.md to the repository.
 After each optimization run, results are saved to:
     .test/skills/<skill-name>/optimized_SKILL.md   — the optimized content
     .test/skills/<skill-name>/last_optimization.md  — summary with scores and diff
+    .test/skills/<skill-name>/runs/<timestamp>/    — detailed per-task results (gitignored)
 
 Use ``--apply-last`` to apply a saved result without re-running optimization.
 """
@@ -17,6 +18,103 @@ from pathlib import Path
 
 from .runner import OptimizationResult
 from .utils import find_skill_md as _find_skill_md
+
+
+def save_detailed_run_results(result: OptimizationResult) -> Path | None:
+    """Save detailed per-task results to a timestamped run folder.
+
+    Creates a run directory with:
+    - run_summary.json: Overall metrics and scores
+    - tasks/<task_id>.json: Full details per task including:
+      - Actual response (full, not truncated)
+      - Without-skill baseline response
+      - Judge verdicts and rationales
+      - Expected facts/patterns and pass/fail status
+
+    The runs folder is gitignored so these detailed logs don't clutter the repo.
+
+    Returns:
+        Path to the run directory, or None if no side_info available.
+    """
+    si = result.skillbench_side_info or {}
+    if not si:
+        return None
+
+    # Create timestamped run directory
+    results_dir = _get_results_dir(result.skill_name)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    run_dir = results_dir / "runs" / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write overall summary
+    summary = {
+        "skill_name": result.skill_name,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "original_score": result.original_score,
+        "optimized_score": result.optimized_score,
+        "improvement": result.improvement,
+        "original_token_count": result.original_token_count,
+        "optimized_token_count": result.optimized_token_count,
+        "token_reduction_pct": result.token_reduction_pct,
+        "evaluator_type": getattr(result, "evaluator_type", "skillbench"),
+        "mlflow_run_id": result.mlflow_run_id,
+        "task_count": len(si),
+        "tasks": {},
+    }
+
+    # Per-task score summary
+    for task_id, info in si.items():
+        scores = info.get("scores", {})
+        summary["tasks"][task_id] = {
+            "final_score": scores.get("final", 0.0),
+            "correctness_with": scores.get("correctness_with", 0.0),
+            "completeness_with": scores.get("completeness_with", 0.0),
+            "guideline_adherence": scores.get("guideline_adherence", 0.0),
+            "skill_effectiveness": scores.get("skill_effectiveness", 0.0),
+            "error": info.get("Error", ""),
+        }
+
+    (run_dir / "run_summary.json").write_text(json.dumps(summary, indent=2))
+
+    # Write detailed per-task files
+    tasks_dir = run_dir / "tasks"
+    tasks_dir.mkdir(exist_ok=True)
+
+    for task_id, info in si.items():
+        task_detail = {
+            "task_id": task_id,
+            "task_prompt": info.get("Task", ""),
+            # Full responses (not truncated)
+            "actual_response": info.get("Actual_Full", info.get("Actual", "")),
+            "without_response": info.get("Without_Full", ""),
+            "expected_reference": info.get("Expected", ""),
+            # Judge feedback with full rationales
+            "judges": {
+                "correctness_with": info.get("Judge_correctness_with", {}),
+                "correctness_without": info.get("Judge_correctness_without", {}),
+                "completeness_with": info.get("Judge_completeness_with", {}),
+                "completeness_without": info.get("Judge_completeness_without", {}),
+                "guideline_adherence": info.get("Judge_guideline_adherence", {}),
+                "effectiveness": info.get("Judge_effectiveness", {}),
+            },
+            # Assertion results
+            "missing_facts": info.get("Missing_Facts", []),
+            "missing_patterns": info.get("Missing_Patterns", []),
+            "passed_facts": info.get("Passed_Facts", []),
+            "passed_patterns": info.get("Passed_Patterns", []),
+            # Regression analysis if present
+            "regression_analysis": info.get("Regression_Analysis", {}),
+            # All scores
+            "scores": info.get("scores", {}),
+            # Error summary
+            "error": info.get("Error", ""),
+        }
+
+        # Sanitize task_id for filename
+        safe_task_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in task_id)
+        (tasks_dir / f"{safe_task_id}.json").write_text(json.dumps(task_detail, indent=2))
+
+    return run_dir
 
 
 def _get_results_dir(skill_name: str) -> Path:
@@ -286,6 +384,12 @@ def review_optimization(result: OptimizationResult) -> None:
         print(f"  Apply: uv run python .test/scripts/optimize.py {result.skill_name} --apply-last")
     elif result.original_content == result.optimized_content:
         print("  No improvement found -- nothing saved.")
+
+    # Save detailed run results (full responses, judge rationales)
+    run_dir = save_detailed_run_results(result)
+    if run_dir:
+        print(f"  Detailed results: {run_dir}")
+        print(f"    View task details: cat {run_dir}/tasks/<task_id>.json")
     print(f"{'=' * 60}\n")
 
 

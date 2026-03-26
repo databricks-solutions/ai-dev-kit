@@ -509,7 +509,13 @@ class SkillBenchEvaluator:
         if reference_answer:
             side_info["Expected"] = reference_answer[:2000]
         if with_response:
+            # Truncated for GEPA reflection context
             side_info["Actual"] = with_response[:2000]
+            # Full response for detailed run reports (persisted to disk)
+            side_info["Actual_Full"] = with_response
+        if without_response:
+            # Full baseline response for comparison in detailed reports
+            side_info["Without_Full"] = without_response
 
         # Score breakdown (scores dict feeds GEPA's Pareto frontier)
         side_info["scores"] = {

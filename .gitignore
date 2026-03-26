@@ -64,6 +64,9 @@ claude_agent_settings.json
 htmlcov/
 .pytest_cache/
 
+# Skill test run results (detailed per-task logs with full responses)
+.test/skills/*/runs/
+
 # MCP Server logs
 *.log
 mcp.json
