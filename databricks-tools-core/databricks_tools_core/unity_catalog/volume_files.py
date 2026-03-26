@@ -571,7 +571,7 @@ def delete_from_volume(volume_path: str, recursive: bool = False, max_workers: i
 
     # Check if path is a file or directory
     try:
-        metadata = w.files.get_metadata(volume_path)
+        w.files.get_metadata(volume_path)
         is_directory = False
     except Exception:
         # get_metadata fails for directories, try listing

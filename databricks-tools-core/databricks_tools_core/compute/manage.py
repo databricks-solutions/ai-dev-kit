@@ -440,7 +440,6 @@ def create_sql_warehouse(
 
     from databricks.sdk.service.sql import (
         CreateWarehouseRequestWarehouseType,
-        EndpointInfoWarehouseType,
     )
 
     # Map warehouse type string to enum
