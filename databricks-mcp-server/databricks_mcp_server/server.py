@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
 
+from .agentguard.middleware import AgentGuardMiddleware
 from .middleware import TimeoutHandlingMiddleware
 
 
@@ -131,6 +132,7 @@ if sys.platform == "win32":
 
 # Register middleware (see middleware.py for details on each)
 mcp.add_middleware(TimeoutHandlingMiddleware())
+mcp.add_middleware(AgentGuardMiddleware())
 
 if sys.platform == "win32":
     _patch_tool_decorator_for_windows()
@@ -156,3 +158,4 @@ from .tools import (  # noqa: F401, E402
     workspace,
     pdf,
 )
+from .agentguard import commands as _agentguard_commands  # noqa: F401, E402
