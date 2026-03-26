@@ -1,39 +1,52 @@
-"""File tools - Upload and delete files and folders in Databricks workspace."""
+"""File tools - Upload files and folders to Databricks workspace."""
 
 from typing import Dict, Any
 
 from databricks_tools_core.file import (
-    upload_to_workspace as _upload_to_workspace,
-    delete_from_workspace as _delete_from_workspace,
+    upload_folder as _upload_folder,
+    upload_file as _upload_file,
 )
 
 from ..server import mcp
 
 
-@mcp.tool(timeout=300)
-def upload_to_workspace(
-    local_path: str,
-    workspace_path: str,
+@mcp.tool
+def upload_folder(
+    local_folder: str,
+    workspace_folder: str,
     max_workers: int = 10,
     overwrite: bool = True,
 ) -> Dict[str, Any]:
     """
-    Upload local file(s) or folder(s) to Databricks workspace.
+    Upload an entire local folder to Databricks workspace.
 
-    Supports single files, folders, and glob patterns. Auto-creates directories.
+    Uses parallel uploads with ThreadPoolExecutor for performance.
+    Automatically handles all file types.
+
+    Follows `cp -r` semantics:
+    - With trailing slash or /* (e.g., "pipeline/" or "pipeline/*"): copies contents into workspace_folder
+    - Without trailing slash (e.g., "pipeline"): creates workspace_folder/pipeline/
 
     Args:
-        local_path: Local path - file, folder, or glob (e.g., "*.py", "/path/*")
-        workspace_path: Target workspace path (e.g., "/Workspace/Users/user@example.com/project")
-        max_workers: Parallel upload threads (default: 10)
-        overwrite: Overwrite existing files (default: True)
+        local_folder: Path to local folder to upload. Add trailing slash to copy
+            contents only, omit to preserve folder name.
+        workspace_folder: Target path in Databricks workspace
+            (e.g., "/Workspace/Users/user@example.com/my-project")
+        max_workers: Maximum parallel upload threads (default: 10)
+        overwrite: Whether to overwrite existing files (default: True)
 
     Returns:
-        Dictionary with total_files, successful, failed, success
+        Dictionary with upload statistics:
+        - local_folder: Source folder path
+        - remote_folder: Target workspace path
+        - total_files: Number of files found
+        - successful: Number of successful uploads
+        - failed: Number of failed uploads
+        - success: True if all uploads succeeded
     """
-    result = _upload_to_workspace(
-        local_path=local_path,
-        workspace_path=workspace_path,
+    result = _upload_folder(
+        local_folder=local_folder,
+        workspace_folder=workspace_folder,
         max_workers=max_workers,
         overwrite=overwrite,
     )
@@ -50,30 +63,35 @@ def upload_to_workspace(
     }
 
 
-@mcp.tool(timeout=60)
-def delete_from_workspace(
+@mcp.tool
+def upload_file(
+    local_path: str,
     workspace_path: str,
-    recursive: bool = False,
+    overwrite: bool = True,
 ) -> Dict[str, Any]:
     """
-    Delete a file or folder from Databricks workspace.
-
-    SAFETY: Cannot delete protected paths (user home folders, repos roots, /Workspace/Shared).
-    Path must be at least one level deeper than these protected roots.
+    Upload a single file to Databricks workspace.
 
     Args:
-        workspace_path: Path to file or folder (e.g., "/Workspace/Users/user@example.com/project")
-        recursive: Delete folder contents (required for non-empty folders)
+        local_path: Path to local file
+        workspace_path: Target path in Databricks workspace
+        overwrite: Whether to overwrite existing file (default: True)
 
     Returns:
-        Dictionary with workspace_path, success, error
+        Dictionary with:
+        - local_path: Source file path
+        - remote_path: Target workspace path
+        - success: True if upload succeeded
+        - error: Error message if failed
     """
-    result = _delete_from_workspace(
+    result = _upload_file(
+        local_path=local_path,
         workspace_path=workspace_path,
-        recursive=recursive,
+        overwrite=overwrite,
     )
     return {
-        "workspace_path": result.workspace_path,
+        "local_path": result.local_path,
+        "remote_path": result.remote_path,
         "success": result.success,
         "error": result.error,
     }

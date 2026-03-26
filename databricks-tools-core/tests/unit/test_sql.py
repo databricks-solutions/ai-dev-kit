@@ -2,7 +2,6 @@
 
 from unittest import mock
 
-import pytest
 from databricks.sdk.service.sql import State, StatementState
 
 from databricks_tools_core.sql import execute_sql, execute_sql_multi

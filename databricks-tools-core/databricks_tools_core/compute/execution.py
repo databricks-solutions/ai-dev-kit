@@ -670,52 +670,53 @@ def execute_databricks_command(
         raise
 
 
-def run_python_file_on_databricks(
+_FILE_EXT_LANGUAGE = {
+    ".py": "python",
+    ".scala": "scala",
+    ".sql": "sql",
+    ".r": "r",
+}
+
+
+def run_file_on_databricks(
     file_path: str,
     cluster_id: Optional[str] = None,
     context_id: Optional[str] = None,
+    language: Optional[str] = None,
     timeout: int = 600,
     destroy_context_on_completion: bool = False,
+    workspace_path: Optional[str] = None,
 ) -> ExecutionResult:
     """
-    Read a local Python file and execute it on a Databricks cluster.
+    Read a local file and execute it on a Databricks cluster.
 
-    This is useful for running data generation scripts or other Python code
-    that has been written locally and needs to be executed on Databricks.
+    Supports Python, Scala, SQL, and R files. If ``language`` is not specified,
+    it is auto-detected from the file extension (.py, .scala, .sql, .r).
 
-    If context_id is provided, reuses the existing context (faster, maintains state).
-    If not provided, creates a new context.
+    Two modes:
+    - **Ephemeral** (default): Sends code directly via Command Execution API.
+      No artifact is saved in the workspace.
+    - **Persistent**: If ``workspace_path`` is provided, also uploads the file
+      as a notebook to that workspace path so it is visible in the Databricks UI.
 
     Args:
-        file_path: Local path to the Python file to execute
-        cluster_id: ID of the cluster to run the code on. If not provided,
-                   auto-selects a running cluster (prefers "shared" or "demo").
-        context_id: Optional existing execution context ID. If provided, reuses it
-                   for faster execution and state preservation.
-        timeout: Maximum time to wait for execution (seconds, default 600)
+        file_path: Local path to the file to execute.
+        cluster_id: ID of the cluster to run on. If not provided, auto-selects
+                   a running cluster (prefers "shared" or "demo").
+        context_id: Optional existing execution context ID for reuse.
+        language: Programming language ("python", "scala", "sql", "r").
+                 If omitted, auto-detected from file extension.
+        timeout: Maximum time to wait for execution (seconds, default 600).
         destroy_context_on_completion: If True, destroys the context after execution.
-                                       Default is False to allow reuse.
+        workspace_path: Optional workspace path to persist the file as a notebook
+            (e.g. "/Workspace/Users/user@company.com/my-project/train").
+            If omitted, no workspace artifact is created.
 
     Returns:
         ExecutionResult with output, error, and context info for reuse.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist
-        NoRunningClusterError: If no cluster_id provided and no running cluster found
-        DatabricksError: If API request fails
-
-    Example:
-        >>> # First execution - creates context
-        >>> result = run_python_file_on_databricks(file_path="/path/to/script.py")
-        >>> print(result.context_id)  # Save this for follow-up
-        >>>
-        >>> # Follow-up execution - reuses context (faster)
-        >>> result2 = run_python_file_on_databricks(
-        ...     file_path="/path/to/another_script.py",
-        ...     cluster_id=result.cluster_id,
-        ...     context_id=result.context_id
-        ... )
     """
+    import os
+
     # Read the file contents
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -728,12 +729,61 @@ def run_python_file_on_databricks(
     if not code.strip():
         return ExecutionResult(success=False, error=f"File is empty: {file_path}")
 
+    # Auto-detect language from file extension if not specified
+    if language is None:
+        ext = os.path.splitext(file_path)[1].lower()
+        language = _FILE_EXT_LANGUAGE.get(ext, "python")
+
+    # Persist to workspace if requested
+    if workspace_path:
+        try:
+            _upload_to_workspace(code, language, workspace_path)
+        except Exception as e:
+            return ExecutionResult(success=False, error=f"Failed to upload to workspace: {e}")
+
     # Execute the code on Databricks
     return execute_databricks_command(
         code=code,
         cluster_id=cluster_id,
         context_id=context_id,
-        language="python",
+        language=language,
         timeout=timeout,
         destroy_context_on_completion=destroy_context_on_completion,
     )
+
+
+def _upload_to_workspace(code: str, language: str, workspace_path: str) -> None:
+    """Upload code as a notebook to the Databricks workspace for persistence."""
+    import base64
+
+    from databricks.sdk.service.workspace import ImportFormat, Language
+
+    lang_map = {
+        "python": Language.PYTHON,
+        "scala": Language.SCALA,
+        "sql": Language.SQL,
+        "r": Language.R,
+    }
+
+    w = get_workspace_client()
+    lang_enum = lang_map.get(language.lower(), Language.PYTHON)
+    content_b64 = base64.b64encode(code.encode("utf-8")).decode("utf-8")
+
+    # Ensure parent directory exists
+    parent = workspace_path.rsplit("/", 1)[0]
+    try:
+        w.workspace.mkdirs(parent)
+    except Exception:
+        pass  # Directory may already exist
+
+    w.workspace.import_(
+        path=workspace_path,
+        content=content_b64,
+        language=lang_enum,
+        format=ImportFormat.SOURCE,
+        overwrite=True,
+    )
+
+
+# Keep old name as alias for backwards compatibility
+run_python_file_on_databricks = run_file_on_databricks
