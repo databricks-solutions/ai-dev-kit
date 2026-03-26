@@ -142,7 +142,7 @@ Install pip dependencies for serverless pipelines:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `kind` | str | `"BUNDLE"` (Databricks Asset Bundles) or `"DEFAULT"` |
+| `kind` | str | `"BUNDLE"` (DABs) or `"DEFAULT"` |
 | `metadata_file_path` | str | Path to deployment metadata file |
 
 ### Edition Comparison

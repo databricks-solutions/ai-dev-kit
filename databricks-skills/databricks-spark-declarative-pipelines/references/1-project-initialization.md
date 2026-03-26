@@ -1,6 +1,6 @@
 # Project Initialization
 
-Two approaches for creating SDP pipelines with Asset Bundles:
+Two approaches for creating SDP pipelines with Declarative Automation Bundles (DABs):
 - **Option A**: Standalone new project using `databricks pipelines init`
 - **Option B**: Adding a pipeline to an existing bundle
 
@@ -8,7 +8,7 @@ Two approaches for creating SDP pipelines with Asset Bundles:
 
 ## Option A: Standalone New Pipeline Project
 
-Use `databricks pipelines init` to scaffold a complete Databricks Asset Bundle project with multi-environment support, pipeline configuration, and sample transformation files.
+Use `databricks pipelines init` to scaffold a complete DAB project with multi-environment support, pipeline configuration, and sample transformation files.
 
 ### Command Reference
 
@@ -240,7 +240,7 @@ databricks pipelines start-update --pipeline-id <id>
 
 ## Medallion Architecture
 
-For bronze/silver/gold organization, two file structure approaches work with Asset Bundles:
+For bronze/silver/gold organization, two file structure approaches work with Declarative Automation Bundles (DABs):
 
 ### Option 1: Flat Structure with Prefixes (Recommended)
 
@@ -577,7 +577,7 @@ For technical best practices (Liquid Clustering, serverless, etc.), see **[SKILL
 ## References
 
 - **[SKILL.md](../SKILL.md)** - Main development workflow and MCP tools
-- **[Databricks Asset Bundles Documentation](https://docs.databricks.com/dev-tools/bundles/)** - Official bundle reference
+- **[Declarative Automation Bundles (DABs) Documentation](https://docs.databricks.com/dev-tools/bundles/)** - Official bundle reference
 - **[Pipeline Configuration Reference](https://docs.databricks.com/aws/en/ldp/configure-pipeline)** - Pipeline settings
 - **[Databricks CLI Reference](https://docs.databricks.com/dev-tools/cli/)** - CLI commands and options
 - **[sql/2-ingestion.md](sql/2-ingestion.md)** or **[python/2-ingestion.md](python/2-ingestion.md)** - Data ingestion patterns

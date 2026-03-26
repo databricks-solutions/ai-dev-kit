@@ -37,22 +37,46 @@ description: "Creates, configures, and updates Databricks Lakeflow Spark Declara
 - **MUST** choose the right workflow based on context (see below).
 - When the user provides table schema and asks for code, respond directly with the code. Don't ask clarifying questions if the request is clear.
 
+## Tools
+- List files in volume: `databricks fs ls dbfs:/Volumes/{catalog}/{schema}/{volume}/{path} --profile {PROFILE}`
+- Query data: `databricks experimental aitools tools query --profile {PROFILE} --warehouse abc123 "SELECT 1 FROM catalog.schema.table"`
+- Discover schema: `databricks experimental aitools tools discover-schema --profile {PROFILE} catalog.schema.table1 catalog.schema.table2`
+- Pipelines CLI: `databricks pipelines init|deploy|run|logs|stop` or use `databricks pipelines --help` for more options
+
 ## Choose Your Workflow
 
 **First, determine which workflow to use:**
 
 ### Option A: Standalone New Pipeline Project (use `databricks pipelines init`)
 
-Use this when the user wants to **create a new, standalone SDP project** that will have its own Asset Bundle:
-- User asks: "Create a new pipeline project", "Build me an SDP from scratch", "Set up a new data pipeline"
+Use this when the user wants to **create a new, standalone SDP project** that will have its own DAB:
+- User asks: "Create a new pipeline", "Build me an SDP", "Set up a new data pipeline"
 - No existing `databricks.yml` in the workspace
 - The pipeline IS the project (not part of a larger demo/app)
 
+
+Use `databricks pipeline` CLI commands:
+```bash
+databricks pipelines init --output-dir . --config-file init-config.json
+```
+
+**Example init-config.json:**
+```json
+{
+  "project_name": "customer_pipeline",
+  "initial_catalog": "prod_catalog",
+  "use_personal_schema": "no",
+  "initial_language": "sql"
+}
+```
+
 → See [1-project-initialization.md](references/1-project-initialization.md)
+→ 
+
 
 ### Option B: Pipeline within Existing Bundle (edit the bundle)
 
-Use this when the pipeline is **part of an existing Databricks Asset Bundle project**:
+Use this when the pipeline is **part of an existing DAB project**:
 - There's already a `databricks.yml` file in the project
 - User is adding a pipeline to an existing app/demo
 
@@ -230,7 +254,7 @@ For detailed syntax, see [sql/1-syntax-basics.md](references/sql/1-syntax-basics
 - **Databricks notebook source for explorations** - Use `# Databricks notebook source` format with `# COMMAND ----------` separators for ad-hoc queries. See [examples/exploration_notebook.py](scripts/exploration_notebook.py).
 - **Serverless compute** - Do not use classic clusters unless explicitly required (R, RDD APIs, JAR libraries)
 - **Unity Catalog** (required for serverless)
-- **CLUSTER BY** (Liquid Clustering), not PARTITION BY - see [sql/5-performance.md](references/sql/5-performance.md) or [python/5-performance.md](references/python/5-performance.md)
+- **CLUSTER BY** (Liquid Clustering), not PARTITION BY with ZORDER - see [sql/5-performance.md](references/sql/5-performance.md) or [python/5-performance.md](references/python/5-performance.md)
 - **read_files()** for SQL cloud storage ingestion - see [sql/2-ingestion.md](references/sql/2-ingestion.md)
 
 ### Multi-Schema Patterns
