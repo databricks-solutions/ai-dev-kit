@@ -1,13 +1,14 @@
 """
 File - Workspace File Operations
 
-Functions for uploading files and folders to Databricks Workspace.
+Functions for uploading and deleting files and folders in Databricks Workspace.
 Uses Databricks Workspace API via SDK.
 """
 
 import glob
 import io
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,6 +18,15 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ImportFormat
 
 from ..auth import get_workspace_client
+
+
+@dataclass
+class DeleteResult:
+    """Result from deleting a workspace path"""
+
+    workspace_path: str
+    success: bool
+    error: Optional[str] = None
 
 
 @dataclass
@@ -398,3 +408,107 @@ def _parallel_upload(
         failed=failed,
         results=results,
     )
+
+
+def _is_protected_path(workspace_path: str) -> bool:
+    """
+    Check if a path is a protected root folder that should not be deleted.
+
+    Protected paths include:
+    - /Workspace/Users/<email> (user home folders)
+    - /Users/<email> (legacy user home folders)
+    - /Workspace/Shared (shared folder root)
+    - /Workspace/Repos/<email> (user repos root)
+    - /Repos/<email> (legacy repos root)
+
+    Args:
+        workspace_path: The workspace path to check
+
+    Returns:
+        True if the path is protected, False otherwise
+    """
+    # Normalize path: remove trailing slashes, handle /Workspace prefix
+    path = workspace_path.rstrip("/")
+    if not path:
+        path = "/"
+
+    # Pattern for user home folders: /Workspace/Users/<email> or /Users/<email>
+    # Must have at least one more level (subfolder) to be deletable
+    user_home_patterns = [
+        r"^/Workspace/Users/[^/]+$",  # /Workspace/Users/user@example.com
+        r"^/Users/[^/]+$",  # /Users/user@example.com
+    ]
+
+    # Pattern for repos root: /Workspace/Repos/<email> or /Repos/<email>
+    repos_patterns = [
+        r"^/Workspace/Repos/[^/]+$",  # /Workspace/Repos/user@example.com
+        r"^/Repos/[^/]+$",  # /Repos/user@example.com
+    ]
+
+    # Check all protected patterns
+    all_patterns = user_home_patterns + repos_patterns + [
+        r"^/Workspace/Shared$",  # Shared folder root
+        r"^/Workspace/Users$",  # Users folder root
+        r"^/Users$",  # Legacy users root
+        r"^/Workspace/Repos$",  # Repos folder root
+        r"^/Repos$",  # Legacy repos root
+        r"^/Workspace$",  # Workspace root
+        r"^/$",  # Root
+    ]
+
+    for pattern in all_patterns:
+        if re.match(pattern, path):
+            return True
+
+    return False
+
+
+def delete_from_workspace(workspace_path: str, recursive: bool = False) -> DeleteResult:
+    """
+    Delete a file or folder from Databricks workspace.
+
+    SAFETY: Cannot delete protected paths like user home folders. Path must be
+    at least one level deeper than the user folder, e.g.:
+    - OK: /Workspace/Users/user@example.com/my_folder
+    - BLOCKED: /Workspace/Users/user@example.com
+
+    Args:
+        workspace_path: Path to file or folder in workspace
+            (e.g., "/Workspace/Users/user@example.com/my-project")
+        recursive: If True, delete folder and all contents. Required for non-empty folders.
+            (default: False)
+
+    Returns:
+        DeleteResult with success status
+
+    Example:
+        >>> # Delete a single file
+        >>> result = delete_from_workspace(
+        ...     "/Workspace/Users/me@example.com/old_script.py"
+        ... )
+
+        >>> # Delete a folder and all contents
+        >>> result = delete_from_workspace(
+        ...     "/Workspace/Users/me@example.com/old_project",
+        ...     recursive=True
+        ... )
+    """
+    workspace_path = workspace_path.rstrip("/")
+
+    # Safety check: prevent deletion of protected paths
+    if _is_protected_path(workspace_path):
+        return DeleteResult(
+            workspace_path=workspace_path,
+            success=False,
+            error=f"Cannot delete protected path: {workspace_path}. "
+            "User home folders, repos roots, and shared folders cannot be deleted. "
+            "You must specify a subfolder within these locations.",
+        )
+
+    try:
+        w = get_workspace_client()
+        w.workspace.delete(workspace_path, recursive=recursive)
+        return DeleteResult(workspace_path=workspace_path, success=True)
+
+    except Exception as e:
+        return DeleteResult(workspace_path=workspace_path, success=False, error=str(e))

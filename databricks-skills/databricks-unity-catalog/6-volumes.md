@@ -49,16 +49,33 @@ list_volume_files(
 # Returns: [{"name": "file.csv", "path": "...", "is_directory": false, "file_size": 1024, "last_modified": "..."}]
 ```
 
-### Upload File to Volume
+### Upload to Volume
 
 ```python
-# Upload a local file
+# Upload a single file
 upload_to_volume(
     local_path="/tmp/data.csv",
-    volume_path="/Volumes/main/default/my_volume/data.csv",
-    overwrite=True
+    volume_path="/Volumes/main/default/my_volume/data.csv"
 )
-# Returns: {"local_path": "...", "volume_path": "...", "success": true}
+
+# Upload a folder (recursive)
+upload_to_volume(
+    local_path="/tmp/my_data",
+    volume_path="/Volumes/main/default/my_volume/my_data"
+)
+
+# Upload folder contents (not the folder itself)
+upload_to_volume(
+    local_path="/tmp/my_data/*",
+    volume_path="/Volumes/main/default/my_volume/destination"
+)
+
+# Upload with glob pattern
+upload_to_volume(
+    local_path="/tmp/*.csv",
+    volume_path="/Volumes/main/default/my_volume/csv_files"
+)
+# Returns: {"total_files": 5, "successful": 5, "failed": 0, "success": true}
 ```
 
 ### Download File from Volume
@@ -83,14 +100,25 @@ create_volume_directory(
 # Returns: {"volume_path": "...", "success": true}
 ```
 
-### Delete File
+### Delete from Volume
 
 ```python
-# Delete a file
-delete_volume_file(
+# Delete a single file
+delete_from_volume(
     volume_path="/Volumes/main/default/my_volume/old_data.csv"
 )
-# Returns: {"volume_path": "...", "success": true}
+
+# Delete an empty directory
+delete_from_volume(
+    volume_path="/Volumes/main/default/my_volume/empty_folder"
+)
+
+# Delete a directory and all contents (recursive)
+delete_from_volume(
+    volume_path="/Volumes/main/default/my_volume/old_folder",
+    recursive=True
+)
+# Returns: {"files_deleted": 10, "directories_deleted": 3, "success": true}
 ```
 
 ### Get File Info

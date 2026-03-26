@@ -1,5 +1,6 @@
 """Pipeline tools - Manage Spark Declarative Pipelines (SDP)."""
 
+import re
 from typing import List, Dict, Any
 
 from databricks_tools_core.identity import get_default_tags
@@ -164,9 +165,11 @@ def start_update(
     full_refresh: bool = False,
     full_refresh_selection: List[str] = None,
     validate_only: bool = False,
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
     Start a pipeline update or dry-run validation.
+
+    If an update is already running, returns the existing update's status instead of failing.
 
     Args:
         pipeline_id: Pipeline ID
@@ -176,16 +179,37 @@ def start_update(
         validate_only: If True, validates without updating data (dry run)
 
     Returns:
-        Dictionary with update_id for polling status.
+        Dictionary with update_id and status. If an update was already running,
+        includes update details so you know the current state.
     """
-    update_id = _start_update(
-        pipeline_id=pipeline_id,
-        refresh_selection=refresh_selection,
-        full_refresh=full_refresh,
-        full_refresh_selection=full_refresh_selection,
-        validate_only=validate_only,
-    )
-    return {"update_id": update_id}
+    try:
+        update_id = _start_update(
+            pipeline_id=pipeline_id,
+            refresh_selection=refresh_selection,
+            full_refresh=full_refresh,
+            full_refresh_selection=full_refresh_selection,
+            validate_only=validate_only,
+        )
+        return {"update_id": update_id, "started": True}
+    except Exception as e:
+        error_msg = str(e)
+        # Check if this is an "active update already exists" error
+        # Pattern: "An active update 'UUID' already exists for pipeline 'UUID'."
+        match = re.search(r"active update ['\"]([a-f0-9-]+)['\"]", error_msg, re.IGNORECASE)
+        if match:
+            existing_update_id = match.group(1)
+            # Fetch the existing update status
+            update_response = _get_update(pipeline_id=pipeline_id, update_id=existing_update_id)
+            update_dict = update_response.as_dict() if hasattr(update_response, "as_dict") else vars(update_response)
+            return {
+                "update_id": existing_update_id,
+                "started": False,
+                "already_running": True,
+                "update": update_dict,
+                "message": "An update is already running. Returning its current status.",
+            }
+        # Re-raise other errors
+        raise
 
 
 @mcp.tool(timeout=30)

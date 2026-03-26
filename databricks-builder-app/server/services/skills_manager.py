@@ -43,8 +43,7 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
     'manage_uc_connections', 'manage_uc_tags', 'manage_uc_security_policies',
     'manage_uc_monitors', 'manage_uc_sharing',
     'list_volume_files', 'upload_to_volume', 'download_from_volume',
-    'delete_volume_file', 'delete_volume_directory', 'create_volume_directory',
-    'get_volume_file_info',
+    'delete_from_volume', 'create_volume_directory', 'get_volume_file_info',
   ],
   # APX (FastAPI+React) and Python (Dash/Streamlit/etc.) share the same
   # app lifecycle tools — the skill content differs, not the MCP operations.

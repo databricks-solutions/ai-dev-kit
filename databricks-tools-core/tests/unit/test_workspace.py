@@ -1,4 +1,4 @@
-"""Unit tests for workspace file upload functions."""
+"""Unit tests for workspace file upload and delete functions."""
 
 import os
 import tempfile
@@ -9,10 +9,13 @@ import pytest
 
 from databricks_tools_core.file.workspace import (
     upload_to_workspace,
+    delete_from_workspace,
     _collect_files,
     _collect_directories,
+    _is_protected_path,
     UploadResult,
     FolderUploadResult,
+    DeleteResult,
 )
 
 
@@ -262,3 +265,123 @@ class TestUploadToWorkspace:
             # Cleanup
             test_file.unlink()
             test_dir.rmdir()
+
+
+class TestIsProtectedPath:
+    """Tests for _is_protected_path helper function."""
+
+    def test_user_home_folder_is_protected(self):
+        """Should protect user home folders."""
+        assert _is_protected_path("/Workspace/Users/user@example.com") is True
+        assert _is_protected_path("/Workspace/Users/user@example.com/") is True
+        assert _is_protected_path("/Users/user@example.com") is True
+        assert _is_protected_path("/Users/user@example.com/") is True
+
+    def test_user_subfolder_is_not_protected(self):
+        """Should allow deletion of user subfolders."""
+        assert _is_protected_path("/Workspace/Users/user@example.com/my_folder") is False
+        assert _is_protected_path("/Workspace/Users/user@example.com/project/src") is False
+        assert _is_protected_path("/Users/user@example.com/my_folder") is False
+
+    def test_repos_root_is_protected(self):
+        """Should protect repos root folders."""
+        assert _is_protected_path("/Workspace/Repos/user@example.com") is True
+        assert _is_protected_path("/Repos/user@example.com") is True
+
+    def test_repos_subfolder_is_not_protected(self):
+        """Should allow deletion of repos subfolders."""
+        assert _is_protected_path("/Workspace/Repos/user@example.com/my_repo") is False
+        assert _is_protected_path("/Repos/user@example.com/my_repo") is False
+
+    def test_shared_root_is_protected(self):
+        """Should protect shared folder root."""
+        assert _is_protected_path("/Workspace/Shared") is True
+
+    def test_shared_subfolder_is_not_protected(self):
+        """Should allow deletion of shared subfolders."""
+        assert _is_protected_path("/Workspace/Shared/team_folder") is False
+
+    def test_root_paths_are_protected(self):
+        """Should protect root-level paths."""
+        assert _is_protected_path("/") is True
+        assert _is_protected_path("/Workspace") is True
+        assert _is_protected_path("/Workspace/Users") is True
+        assert _is_protected_path("/Users") is True
+        assert _is_protected_path("/Workspace/Repos") is True
+        assert _is_protected_path("/Repos") is True
+
+
+class TestDeleteFromWorkspace:
+    """Tests for delete_from_workspace function."""
+
+    @mock.patch("databricks_tools_core.file.workspace.get_workspace_client")
+    def test_delete_file_succeeds(self, mock_get_client):
+        """Should delete a file successfully."""
+        mock_client = mock.Mock()
+        mock_get_client.return_value = mock_client
+
+        result = delete_from_workspace(
+            workspace_path="/Workspace/Users/test@example.com/my_folder/file.py",
+        )
+
+        assert result.success
+        mock_client.workspace.delete.assert_called_once_with(
+            "/Workspace/Users/test@example.com/my_folder/file.py", recursive=False
+        )
+
+    @mock.patch("databricks_tools_core.file.workspace.get_workspace_client")
+    def test_delete_folder_recursive(self, mock_get_client):
+        """Should delete a folder recursively."""
+        mock_client = mock.Mock()
+        mock_get_client.return_value = mock_client
+
+        result = delete_from_workspace(
+            workspace_path="/Workspace/Users/test@example.com/my_folder",
+            recursive=True,
+        )
+
+        assert result.success
+        mock_client.workspace.delete.assert_called_once_with(
+            "/Workspace/Users/test@example.com/my_folder", recursive=True
+        )
+
+    @mock.patch("databricks_tools_core.file.workspace.get_workspace_client")
+    def test_delete_protected_path_fails(self, mock_get_client):
+        """Should fail when trying to delete protected paths."""
+        mock_client = mock.Mock()
+        mock_get_client.return_value = mock_client
+
+        result = delete_from_workspace(
+            workspace_path="/Workspace/Users/test@example.com",
+        )
+
+        assert not result.success
+        assert "protected path" in result.error.lower()
+        mock_client.workspace.delete.assert_not_called()
+
+    @mock.patch("databricks_tools_core.file.workspace.get_workspace_client")
+    def test_delete_protected_path_with_trailing_slash_fails(self, mock_get_client):
+        """Should fail even with trailing slash."""
+        mock_client = mock.Mock()
+        mock_get_client.return_value = mock_client
+
+        result = delete_from_workspace(
+            workspace_path="/Workspace/Users/test@example.com/",
+        )
+
+        assert not result.success
+        assert "protected path" in result.error.lower()
+
+    @mock.patch("databricks_tools_core.file.workspace.get_workspace_client")
+    def test_delete_handles_api_error(self, mock_get_client):
+        """Should handle API errors gracefully."""
+        mock_client = mock.Mock()
+        mock_client.workspace.delete.side_effect = Exception("Not found")
+        mock_get_client.return_value = mock_client
+
+        result = delete_from_workspace(
+            workspace_path="/Workspace/Users/test@example.com/my_folder",
+        )
+
+        assert not result.success
+        assert "Not found" in result.error
