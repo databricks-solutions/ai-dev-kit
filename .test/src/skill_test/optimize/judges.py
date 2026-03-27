@@ -1,17 +1,19 @@
 """MLflow judge factories for skill evaluation.
 
-Multi-judge architecture with three focused custom ``make_judge`` instances:
+Focused single-question judges that each make 1 LLM call:
 
-    correctness_judge      — Are facts, API references, and code syntax accurate?
-    completeness_judge     — Are all parts of the question addressed?
-    guideline_adherence_judge — Does the response follow Databricks-specific patterns?
+    correctness_judge       — Is the response factually and technically correct?
+    completeness_judge      — Does the response fully address the question?
+    guideline_adherence_judge — Does the response follow Databricks conventions?
+    regression_judge        — Does the skill harm the response?
 
-Each judge uses categorical ``Literal["excellent", "acceptable", "poor"]``
-feedback types for more reliable, alignable judgments. Scores are converted
-to floats via ``CATEGORICAL_SCORES``.
+Each judge uses binary ``Literal["yes", "no"]`` feedback for unambiguous verdicts
+(Anthropic best practice: "two domain experts would reach the same verdict").
+Scores are converted to floats via ``_safe_parse_score``.
 
-Additional judges:
-    regression_judge — Identifies specific ways a skill harms responses.
+Eval criteria are loaded on-demand via ``skills=`` parameter on ``make_judge()``
+(MLflow PR #21725). When ``skills=`` is not yet supported, judges operate without
+criteria — the deterministic scorers and assertions provide the static spine.
 
 Judge model resolution (highest priority first):
     1. Explicit ``judge_model`` argument to factory functions
@@ -32,12 +34,15 @@ AI Gateway support:
 from __future__ import annotations
 
 import concurrent.futures
+import inspect
 import logging
 import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
+import yaml
 from mlflow.genai.judges import make_judge
 
 logger = logging.getLogger(__name__)
@@ -104,8 +109,11 @@ def _is_workspace_error(exc: Exception) -> bool:
             "invalid token",
             "could not resolve host",
             "connection refused",
+            "connection error",
             "network is unreachable",
             "name or service not known",
+            "no such host",
+            "token refresh",
         ]
     )
 
@@ -365,224 +373,205 @@ def _safe_parse_score(raw_value: Any) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Categorical scoring
+# Skill discovery (static spine + adaptive layer from Issue #21255)
 # ---------------------------------------------------------------------------
 
-CATEGORICAL_SCORES: dict[str, float] = {
-    "excellent": 1.0,
-    "acceptable": 0.6,
-    "poor": 0.0,
-}
 
+def discover_skill_paths(criteria_dir: str = ".test/eval-criteria", tool_modules: list[str] | None = None) -> list[str]:
+    """Return skill directory paths, optionally filtered by applies_to metadata.
 
-def _categorical_to_float(verdict: str | float) -> float:
-    """Convert a categorical verdict to a float score.
+    Static spine: criteria with empty ``applies_to`` are always included.
+    Adaptive layer: criteria with ``applies_to`` only included when matching
+    ``tool_modules``.
 
-    Handles ``Literal["excellent", "acceptable", "poor"]`` from the new
-    multi-judge architecture as well as raw floats from legacy judges.
+    These paths are passed to ``make_judge(skills=[...])`` when the native
+    MLflow skills= parameter is available (PR #21725).
     """
-    if isinstance(verdict, (int, float)):
-        return max(0.0, min(1.0, float(verdict)))
-    key = str(verdict).strip().lower()
-    return CATEGORICAL_SCORES.get(key, 0.0)
+    base = Path(criteria_dir)
+    if not base.is_dir():
+        return []
+    paths = []
+    for d in sorted(base.iterdir()):
+        if not d.is_dir() or not (d / "SKILL.md").exists():
+            continue
+        if tool_modules:
+            try:
+                content = (d / "SKILL.md").read_text(encoding="utf-8")
+                parts = content.split("---")
+                if len(parts) >= 3:
+                    fm = yaml.safe_load(parts[1]) or {}
+                    applies_to = fm.get("metadata", {}).get("applies_to", [])
+                    if applies_to and not any(m in applies_to for m in tool_modules):
+                        continue
+            except Exception:
+                pass
+        paths.append(str(d))
+    if paths:
+        logger.info("Discovered %d eval criteria skills: %s", len(paths), ", ".join(Path(p).name for p in paths))
+        try:
+            from .eval_criteria import SkillSet
+            from .judge_tools import register_skill_tools
+
+            register_skill_tools(SkillSet(paths))
+        except Exception as exc:
+            logger.debug("Could not register skill tools: %s", exc)
+    return paths
+
+
+def _make_judge_with_skills(
+    *,
+    name: str,
+    instructions: str,
+    model: str,
+    feedback_value_type: Any,
+    inference_params: dict[str, Any] | None = None,
+    skill_paths: list[str] | None = None,
+) -> Any:
+    """Create a judge, passing skills= if supported by the installed MLflow.
+
+    Forward-compatible: when MLflow gains ``skills=`` support (PR #21725),
+    the eval criteria will be loaded on-demand by the judge. Until then,
+    judges operate without criteria and rely on the instructions alone.
+    """
+    kwargs: dict[str, Any] = {
+        "name": name,
+        "instructions": instructions,
+        "model": model,
+        "feedback_value_type": feedback_value_type,
+    }
+    if inference_params:
+        kwargs["inference_params"] = inference_params
+
+    # Pass skills= if make_judge supports it (native path, PR #21725)
+    if skill_paths:
+        if "skills" in inspect.signature(make_judge).parameters:
+            kwargs["skills"] = skill_paths
+        else:
+            # Local injection for MLflow versions without skills= support
+            from .eval_criteria import SkillSet
+
+            skill_set = SkillSet(skill_paths)
+            criteria_block = skill_set.to_prompt_inline()
+            if criteria_block:
+                kwargs["instructions"] = criteria_block + "\n\n" + instructions
+
+    return make_judge(**kwargs)
 
 
 # ---------------------------------------------------------------------------
-# Correctness judge — facts, API references, code syntax accuracy
+# Correctness judge — facts, API references, code syntax accuracy (1 LLM call)
 # ---------------------------------------------------------------------------
-
-_CORRECTNESS_KEYWORDS = {
-    "api",
-    "syntax",
-    "correct",
-    "deprecated",
-    "modern",
-    "function",
-    "parameter",
-    "error",
-    "version",
-}
 
 _CORRECTNESS_INSTRUCTIONS = """\
-You are an expert evaluator for Databricks skill documentation CORRECTNESS.
-Focus ONLY on whether facts, API references, and code syntax are accurate.
+Is the response factually and technically correct?
 
-## What to evaluate
-
-1. **Factual accuracy** — are stated facts correct?
-2. **API accuracy** — are function names, parameters, and return types correct?
-3. **Code syntax** — is the code syntactically valid and runnable?
-4. **Currency** — are APIs current (not deprecated)?
-
-Do NOT evaluate completeness or style — only correctness.
-
-## Expected Information
+Check:
+- API names exist and are current (not deprecated)
+- Code syntax is valid and runnable
+- Function parameters and return types are correct
+- No hallucinated features or invented APIs
 
 {{ expectations }}
-
-## Input
 
 Question: {{ inputs }}
 Response: {{ outputs }}
 
-## Instructions
-
-Return one of exactly: "excellent", "acceptable", "poor".
-
-- "excellent" = all facts, APIs, and syntax are correct
-- "acceptable" = mostly correct with minor inaccuracies that don't break functionality
-- "poor" = contains significant factual errors, wrong APIs, or broken syntax
-
-Provide detailed rationale explaining:
-- Specific factual errors found (or confirming correctness)
-- API references that are wrong or deprecated
-- Syntax issues in code examples
+Return "yes" if correct, "no" if it contains significant factual errors.
 """
 
 
 def create_correctness_judge(
-    skill_guidelines: list[str] | None = None,
+    skill_paths: list[str] | None = None,
     judge_model: str | None = None,
 ) -> Any:
-    """Create a correctness-focused judge with categorical feedback.
+    """Create a focused correctness judge with binary yes/no feedback.
 
-    Args:
-        skill_guidelines: Optional guidelines — only correctness-related ones
-            (matching keywords like api, syntax, correct, deprecated) are injected.
-        judge_model: LLM model for the judge.
+    Uses ``{{ inputs }}/{{ outputs }}`` (field-based) — 1 LLM call, no
+    agentic tool-calling loop.
     """
-    instructions = _CORRECTNESS_INSTRUCTIONS
-    if skill_guidelines:
-        # Filter for correctness-related guidelines
-        filtered = [g for g in skill_guidelines if any(kw in g.lower() for kw in _CORRECTNESS_KEYWORDS)]
-        if filtered:
-            principles = "\n".join(f"- {g}" for g in filtered)
-            instructions += f"\n\n## Domain-Specific Correctness Principles\n{principles}\n"
-
     model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="skill_correctness",
+    return _make_judge_with_skills(
+        name="correctness",
+        instructions=_CORRECTNESS_INSTRUCTIONS,
         model=model_uri,
-        instructions=instructions,
-        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        feedback_value_type=Literal["yes", "no"],
         inference_params=inference_params,
+        skill_paths=skill_paths,
     )
 
 
 # ---------------------------------------------------------------------------
-# Completeness judge — all parts addressed, all expected info present
+# Completeness judge — all parts addressed, expected info present (1 LLM call)
 # ---------------------------------------------------------------------------
 
 _COMPLETENESS_INSTRUCTIONS = """\
-You are an expert evaluator for Databricks skill documentation COMPLETENESS.
-Focus ONLY on whether all parts of the question are addressed and all expected
-information is present.
+Does the response fully address the question?
 
-## What to evaluate
-
-1. **Question coverage** — are all parts of the question answered?
-2. **Expected facts** — are all expected facts present?
-3. **Expected patterns** — are all expected code patterns demonstrated?
-4. **Depth** — is the response detailed enough to be actionable?
-
-Do NOT evaluate correctness or style — only completeness.
-
-## Expected Information
+Check:
+- All parts of the question are answered
+- Expected facts are present
+- Expected code patterns are demonstrated
+- Response is detailed enough to be actionable
 
 {{ expectations }}
-
-## Input
 
 Question: {{ inputs }}
 Response: {{ outputs }}
 
-## Instructions
-
-Return one of exactly: "excellent", "acceptable", "poor".
-
-- "excellent" = all parts addressed, all expected facts and patterns present
-- "acceptable" = most parts addressed, minor gaps in coverage
-- "poor" = significant parts of the question unanswered or major facts missing
-
-Provide detailed rationale explaining:
-- Which parts of the question are addressed vs unanswered
-- Which expected facts are present vs missing
-- Which expected patterns are demonstrated vs absent
+Return "yes" if complete, "no" if significant parts are missing.
 """
 
 
 def create_completeness_judge(
+    skill_paths: list[str] | None = None,
     judge_model: str | None = None,
 ) -> Any:
-    """Create a completeness-focused judge with categorical feedback.
+    """Create a focused completeness judge with binary yes/no feedback.
 
-    Args:
-        judge_model: LLM model for the judge.
+    Uses ``{{ inputs }}/{{ outputs }}`` (field-based) — 1 LLM call, no
+    agentic tool-calling loop.
     """
     model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="skill_completeness",
-        model=model_uri,
+    return _make_judge_with_skills(
+        name="completeness",
         instructions=_COMPLETENESS_INSTRUCTIONS,
-        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        model=model_uri,
+        feedback_value_type=Literal["yes", "no"],
         inference_params=inference_params,
+        skill_paths=skill_paths,
     )
 
 
 # ---------------------------------------------------------------------------
-# Guideline adherence judge — Databricks patterns and practices
+# Guideline adherence judge — Databricks patterns and practices (1 LLM call)
 # ---------------------------------------------------------------------------
 
 _GUIDELINE_ADHERENCE_INSTRUCTIONS = """\
-You are an expert evaluator for Databricks skill documentation GUIDELINE ADHERENCE.
-Focus ONLY on whether the response follows Databricks-specific patterns,
-conventions, and guidelines.
+Does the response follow Databricks conventions and best practices?
 
-## What to evaluate
-
-1. **Pattern adherence** — does the response follow expected code patterns?
-2. **Convention compliance** — does it use Databricks-specific conventions?
-3. **Best practice alignment** — does it follow recommended practices?
-4. **Guideline compliance** — does it adhere to the specific guidelines listed below?
-
-Do NOT evaluate general correctness or completeness — only guideline adherence.
-
-## Expected Information
+Check:
+- Follows expected code patterns and conventions
+- Uses recommended Databricks APIs and workflows
+- Adheres to the specific guidelines listed below
 
 {{ expectations }}
-
-## Input
 
 Question: {{ inputs }}
 Response: {{ outputs }}
 
-## Instructions
-
-Return one of exactly: "excellent", "acceptable", "poor".
-
-- "excellent" = follows all guidelines and patterns precisely
-- "acceptable" = follows most guidelines with minor deviations
-- "poor" = ignores or violates important guidelines
-
-Provide detailed rationale explaining:
-- Which guidelines are followed vs violated
-- Which patterns are correctly demonstrated vs missing
-- Specific deviations from expected practices
+Return "yes" if guidelines are followed, "no" if important guidelines are violated.
 """
 
 
 def create_guideline_adherence_judge(
+    skill_paths: list[str] | None = None,
     skill_guidelines: list[str] | None = None,
     judge_model: str | None = None,
 ) -> Any:
-    """Create a guideline adherence judge with categorical feedback.
+    """Create a focused guideline adherence judge with binary yes/no feedback.
 
     Receives ALL guidelines (default_guidelines + per-test guidelines +
     [FOCUS] guidelines from ``--focus``), making focus areas directly evaluable.
-
-    Args:
-        skill_guidelines: All guidelines to evaluate against.
-        judge_model: LLM model for the judge.
     """
     instructions = _GUIDELINE_ADHERENCE_INSTRUCTIONS
     if skill_guidelines:
@@ -590,17 +579,18 @@ def create_guideline_adherence_judge(
         instructions += f"\n\n## Required Guidelines\n{principles}\n"
 
     model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="skill_guideline_adherence",
-        model=model_uri,
+    return _make_judge_with_skills(
+        name="guideline-adherence",
         instructions=instructions,
-        feedback_value_type=Literal["excellent", "acceptable", "poor"],
+        model=model_uri,
+        feedback_value_type=Literal["yes", "no"],
         inference_params=inference_params,
+        skill_paths=skill_paths,
     )
 
 
 # ---------------------------------------------------------------------------
-# Regression judge — identifies how a skill harms responses
+# Regression judge — identifies how a skill harms responses (1 LLM call)
 # ---------------------------------------------------------------------------
 
 _REGRESSION_INSTRUCTIONS = """\
@@ -644,7 +634,7 @@ def create_regression_judge(judge_model: str | None = None) -> Any:
     """
     model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
     return make_judge(
-        name="skill_regression",
+        name="regression",
         model=model_uri,
         instructions=_REGRESSION_INSTRUCTIONS,
         feedback_value_type=bool,
@@ -663,26 +653,19 @@ def run_judge_safe(
     inputs: Any = None,
     outputs: Any | None = None,
     expectations: Any | None = None,
-    trace: Any | None = None,
     name: str = "judge",
     timeout: int = 90,
 ) -> JudgeFeedback:
     """Run a judge with error handling, timeout, and model fallback.
 
-    Supports both field-based judges (``inputs``/``outputs``/``expectations``)
-    and trace-based judges (``trace``/``expectations``).
-
-    Each judge call is wrapped in a ``ThreadPoolExecutor`` with a timeout
-    to prevent indefinite hangs from trace-based judges (which trigger
-    MLflow's multi-round tool-calling loop).
+    All judges are field-based (``inputs``/``outputs``/``expectations``),
+    each making exactly 1 LLM call.
 
     On rate limit errors, recreates the judge with fallback models and
     retries.  On other errors or timeouts, returns zero-score feedback so
     evaluation never crashes from a judge failure.
     """
     kwargs: dict[str, Any] = {}
-    if trace is not None:
-        kwargs["trace"] = trace
     if inputs is not None:
         kwargs["inputs"] = inputs
     if outputs is not None:
@@ -782,212 +765,4 @@ def run_judge_safe(
         value=0.0,
         rationale="All models rate limited or timed out — no judge score available",
         name=name,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Trace-based judges (for --agent-eval)
-#
-# These use {{ trace }} which activates MLflow's tool-calling loop, giving
-# the judge access to list_spans, get_root_span, search_trace_regex, AND
-# our custom read_eval_criteria / read_eval_reference tools.
-# ---------------------------------------------------------------------------
-
-_TRACE_CORRECTNESS_INSTRUCTIONS_PREFIX = """\
-You are evaluating a Claude Code agent's execution trace for CORRECTNESS.
-Focus ONLY on whether the agent's actions and outputs are factually and technically correct.
-
-"""
-
-_TRACE_CORRECTNESS_INSTRUCTIONS_BODY = """\
-
-## What to evaluate
-
-1. **Output accuracy** — Is the final response factually correct?
-2. **API correctness** — Are tool calls using correct parameters and syntax?
-3. **Code correctness** — Is any generated code syntactically valid and runnable?
-4. **Tool call correctness** — Did the agent use the right tools for the task?
-
-## How to evaluate
-
-1. Use list_spans to see the full execution flow
-2. Use get_root_span to read the final response
-3. Use read_eval_criteria to load domain-specific rubrics matching the trace
-4. Use search_trace_regex to verify specific patterns in the output
-
-## Task expectations
-
-{{ expectations }}
-
-Analyze {{ trace }} and return one of exactly: "excellent", "acceptable", "poor".
-
-- "excellent" = all outputs correct, right tools used, valid code/SQL
-- "acceptable" = mostly correct, minor issues that don't break functionality
-- "poor" = significant errors, wrong tools, broken code
-
-Provide detailed rationale referencing specific spans and tool calls.
-"""
-
-_TRACE_COMPLETENESS_INSTRUCTIONS_PREFIX = """\
-You are evaluating a Claude Code agent's execution trace for COMPLETENESS.
-Focus ONLY on whether all parts of the task were addressed.
-
-"""
-
-_TRACE_COMPLETENESS_INSTRUCTIONS_BODY = """\
-
-## What to evaluate
-
-1. **Task completion** — Did the agent finish the requested task?
-2. **Coverage** — Are all parts of the question addressed?
-3. **Expected facts** — Are all expected facts present in the output?
-4. **Expected patterns** — Are all expected code patterns demonstrated?
-
-## How to evaluate
-
-1. Use get_root_span to read the final response text
-2. Use list_spans to verify multi-step tasks were fully executed
-3. Use search_trace_regex to check for expected patterns in outputs
-4. Use read_eval_criteria for domain-specific completeness rubrics
-
-## Task expectations
-
-{{ expectations }}
-
-Analyze {{ trace }} and return one of exactly: "excellent", "acceptable", "poor".
-
-- "excellent" = all parts addressed, all expected facts/patterns present
-- "acceptable" = most parts addressed, minor gaps
-- "poor" = significant parts missing or incomplete
-
-Provide detailed rationale referencing what was found vs missing.
-"""
-
-_TRACE_GUIDELINE_INSTRUCTIONS_PREFIX = """\
-You are evaluating a Claude Code agent's execution trace for GUIDELINE ADHERENCE.
-Focus ONLY on whether the agent followed Databricks-specific patterns and conventions.
-
-"""
-
-_TRACE_GUIDELINE_INSTRUCTIONS_BODY = """\
-
-## What to evaluate
-
-1. **Tool selection** — Did the agent use MCP tools instead of Bash workarounds?
-2. **Pattern compliance** — Does output follow Databricks conventions?
-3. **Best practices** — Did the agent follow recommended workflows?
-4. **Efficiency** — Was the execution path reasonable (not excessive tool calls)?
-
-## How to evaluate
-
-1. Use list_spans to review the tool call sequence
-2. Use read_eval_criteria to load domain-specific guidelines
-3. Use get_span on individual tool calls to check parameters
-4. Use search_trace_regex to verify Databricks-specific patterns
-
-## Task expectations and guidelines
-
-{{ expectations }}
-
-Analyze {{ trace }} and return one of exactly: "excellent", "acceptable", "poor".
-
-- "excellent" = correct tools, Databricks patterns, efficient execution
-- "acceptable" = mostly correct approach, minor deviations
-- "poor" = wrong tools, anti-patterns, or wasteful execution
-
-Provide detailed rationale referencing specific spans and tool choices.
-"""
-
-
-def create_trace_correctness_judge(
-    eval_criteria: Any,
-    skill_guidelines: list[str] | None = None,
-    judge_model: str | None = None,
-) -> Any:
-    """Create a trace-based correctness judge with adaptive eval criteria.
-
-    Uses ``{{ trace }}`` to activate MLflow's tool-calling loop.  The judge
-    can call ``read_eval_criteria`` and ``read_eval_reference`` to load
-    domain-specific rubrics.
-
-    Args:
-        eval_criteria: ``EvalCriteriaSet`` with loaded criteria skills.
-        skill_guidelines: Optional per-skill guidelines from manifest/ground_truth.
-        judge_model: LLM model for the judge.  Resolved via ``--judge-model``
-            CLI flag, ``GEPA_JUDGE_LM`` env var, or default.
-    """
-    criteria_block = eval_criteria.to_prompt(judge_model) if eval_criteria else ""
-    instructions = _TRACE_CORRECTNESS_INSTRUCTIONS_PREFIX + criteria_block + _TRACE_CORRECTNESS_INSTRUCTIONS_BODY
-
-    if skill_guidelines:
-        filtered = [g for g in skill_guidelines if any(kw in g.lower() for kw in _CORRECTNESS_KEYWORDS)]
-        if filtered:
-            principles = "\n".join(f"- {g}" for g in filtered)
-            instructions += f"\n\n## Domain Correctness Principles\n{principles}\n"
-
-    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="trace_correctness",
-        model=model_uri,
-        instructions=instructions,
-        feedback_value_type=Literal["excellent", "acceptable", "poor"],
-        inference_params=inference_params,
-    )
-
-
-def create_trace_completeness_judge(
-    eval_criteria: Any,
-    skill_guidelines: list[str] | None = None,
-    judge_model: str | None = None,
-) -> Any:
-    """Create a trace-based completeness judge with adaptive eval criteria.
-
-    Args:
-        eval_criteria: ``EvalCriteriaSet`` with loaded criteria skills.
-        skill_guidelines: Optional per-skill guidelines from manifest/ground_truth.
-        judge_model: LLM model for the judge.
-    """
-    criteria_block = eval_criteria.to_prompt(judge_model) if eval_criteria else ""
-    instructions = _TRACE_COMPLETENESS_INSTRUCTIONS_PREFIX + criteria_block + _TRACE_COMPLETENESS_INSTRUCTIONS_BODY
-
-    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="trace_completeness",
-        model=model_uri,
-        instructions=instructions,
-        feedback_value_type=Literal["excellent", "acceptable", "poor"],
-        inference_params=inference_params,
-    )
-
-
-def create_trace_guideline_judge(
-    eval_criteria: Any,
-    skill_guidelines: list[str] | None = None,
-    judge_model: str | None = None,
-) -> Any:
-    """Create a trace-based guideline adherence judge with adaptive eval criteria.
-
-    Receives ALL guidelines (default_guidelines + per-test guidelines +
-    ``[FOCUS]`` guidelines from ``--focus``), making focus areas directly
-    evaluable by the trace-based judge.
-
-    Args:
-        eval_criteria: ``EvalCriteriaSet`` with loaded criteria skills.
-        skill_guidelines: All guidelines to evaluate against.
-        judge_model: LLM model for the judge.
-    """
-    criteria_block = eval_criteria.to_prompt(judge_model) if eval_criteria else ""
-    instructions = _TRACE_GUIDELINE_INSTRUCTIONS_PREFIX + criteria_block + _TRACE_GUIDELINE_INSTRUCTIONS_BODY
-
-    if skill_guidelines:
-        principles = "\n".join(f"- {g}" for g in skill_guidelines)
-        instructions += f"\n\n## Required Guidelines\n{principles}\n"
-
-    model_uri, inference_params = _to_judge_model_and_params(judge_model or DEFAULT_JUDGE_LM)
-    return make_judge(
-        name="trace_guideline_adherence",
-        model=model_uri,
-        instructions=instructions,
-        feedback_value_type=Literal["excellent", "acceptable", "poor"],
-        inference_params=inference_params,
     )

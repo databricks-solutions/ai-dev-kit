@@ -37,11 +37,12 @@ from ..scorers.universal import python_syntax, sql_syntax, no_hallucinated_apis
 from .assertions import run_all_assertions, summarize_failures
 from .judges import (
     JudgeFeedback,
-    _categorical_to_float,
+    _safe_parse_score,
     create_correctness_judge,
     create_completeness_judge,
     create_guideline_adherence_judge,
     create_regression_judge,
+    discover_skill_paths,
     run_judge_safe,
     completion_with_fallback,
 )
@@ -146,7 +147,7 @@ class SkillBenchEvaluator:
     """GEPA-compatible evaluator using three focused judges for scoring + diagnostics.
 
     Uses correctness, completeness, and guideline adherence judges with
-    categorical ``Literal["excellent", "acceptable", "poor"]`` feedback types.
+    binary ``Literal["yes", "no"]`` feedback types.
     Produces decomposed signals for GEPA's reflection LM.
 
     Args:
@@ -186,10 +187,15 @@ class SkillBenchEvaluator:
         # the same candidate-task pair.
         self._with_skill_cache: dict[str, tuple[float, dict]] = {}
 
+        # Discover eval criteria skill paths (static spine + adaptive layer)
+        skill_paths = discover_skill_paths()
+
         # Create three focused judge instances
-        self._correctness_judge = create_correctness_judge(skill_guidelines, judge_model=judge_model)
-        self._completeness_judge = create_completeness_judge(judge_model=judge_model)
-        self._guideline_adherence_judge = create_guideline_adherence_judge(skill_guidelines, judge_model=judge_model)
+        self._correctness_judge = create_correctness_judge(skill_paths=skill_paths, judge_model=judge_model)
+        self._completeness_judge = create_completeness_judge(skill_paths=skill_paths, judge_model=judge_model)
+        self._guideline_adherence_judge = create_guideline_adherence_judge(
+            skill_paths=skill_paths, skill_guidelines=skill_guidelines, judge_model=judge_model
+        )
         self._regression_judge = create_regression_judge(judge_model=judge_model)
 
     def _generate_response(self, prompt: str, skill_context: str | None = None) -> str:
@@ -345,11 +351,11 @@ class SkillBenchEvaluator:
         )
 
         # Convert categorical verdicts to float scores
-        correctness_with = _categorical_to_float(correctness_with_fb.value)
-        correctness_without = _categorical_to_float(correctness_without_fb.value)
-        completeness_with = _categorical_to_float(completeness_with_fb.value)
-        completeness_without = _categorical_to_float(completeness_without_fb.value)
-        guideline_adherence_score = _categorical_to_float(guideline_adherence_fb.value)
+        correctness_with = _safe_parse_score(correctness_with_fb.value)
+        correctness_without = _safe_parse_score(correctness_without_fb.value)
+        completeness_with = _safe_parse_score(completeness_with_fb.value)
+        completeness_without = _safe_parse_score(completeness_without_fb.value)
+        guideline_adherence_score = _safe_parse_score(guideline_adherence_fb.value)
 
         # Per-dimension effectiveness deltas
         correctness_delta = correctness_with - correctness_without

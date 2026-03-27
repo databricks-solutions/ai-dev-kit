@@ -335,7 +335,7 @@ eval-criteria/
 
 ### How it works
 
-Judges receive a lightweight listing of available criteria in their system prompt. When a criteria's description matches the trace being evaluated, the judge calls `read_eval_criteria` to load the full rubric and `read_eval_reference` for detailed reference material. This keeps judge prompts small while giving access to deep domain knowledge.
+`discover_skill_paths()` in `judges.py` scans `.test/eval-criteria/` for subdirectories containing a `SKILL.md` file, filtering by `applies_to` metadata against the skill's `tool_modules`. The discovered paths are passed to `make_judge(skills=[...])` when MLflow supports the native `skills=` parameter, enabling on-demand loading of domain-specific rubrics during scoring.
 
 ### `applies_to` filtering
 
@@ -376,7 +376,7 @@ Each candidate skill is evaluated per-task using a WITH vs WITHOUT comparison:
 
 1. **Generate WITH-skill response** — LLM generates with SKILL.md in context
 2. **Generate WITHOUT-skill response** — LLM generates without skill (cached)
-3. **Three focused judges** — each returns categorical `"excellent"` / `"acceptable"` / `"poor"` verdicts:
+3. **Three focused field-based judges** — each makes 1 LLM call and returns binary `"yes"` / `"no"` verdicts:
    - **Correctness judge** (WITH + WITHOUT) — facts, API references, code syntax accuracy
    - **Completeness judge** (WITH + WITHOUT) — all parts addressed, expected info present
    - **Guideline adherence judge** (WITH only) — Databricks-specific patterns and practices
@@ -397,7 +397,7 @@ Each candidate skill is evaluated per-task using a WITH vs WITHOUT comparison:
 | Structure | 5% | Syntax validation (Python, SQL, no hallucinated APIs) |
 | Regression penalty | -10% | Explicit penalty when regression_judge detects harm |
 
-**Categorical-to-float conversion:** `excellent=1.0`, `acceptable=0.6`, `poor=0.0`. The nonlinear scale incentivizes GEPA to push from "acceptable" to "excellent" (0.4 gap).
+**Binary-to-float conversion:** `yes=1.0`, `no=0.0`. Binary verdicts produce more reliable, consistent judgments than categorical or continuous scales.
 
 ### How GEPA uses evaluation feedback
 
@@ -430,15 +430,16 @@ Runs a real Claude Code agent and adds tool-call scoring:
 
 | Component | Weight |
 |-----------|--------|
-| Content quality | 20% |
-| Skill effectiveness | 20% |
-| Tool call correctness | 20% |
-| Behavioral compliance | 15% |
-| Execution success | 10% |
-| Tool call efficiency | 10% |
+| Effectiveness delta | 20% |
+| Correctness | 20% |
+| Completeness | 15% |
+| Guideline adherence | 15% |
+| Assertion coverage | 15% |
+| Execution success | 5% |
 | Token efficiency | 5% |
+| Regression penalty | -5% |
 
-The agent evaluator also uses `assertions.py` for structured `Missing_Facts`/`Missing_Patterns` feedback. Tool-call judges use MLflow's `ToolCallCorrectness`/`ToolCallEfficiency` when available, falling back to deterministic trace scorers.
+The agent evaluator uses the same focused field-based judges as the proxy evaluator, plus `assertions.py` for structured `Missing_Facts`/`Missing_Patterns` feedback and deterministic trace scorers for behavioral compliance.
 
 ---
 
@@ -470,8 +471,6 @@ The agent evaluator also uses `assertions.py` for structured `Missing_Facts`/`Mi
 │       ├── assertions.py        # Deterministic fact/pattern assertions (zero LLM cost)
 │       ├── assessment_fetcher.py # MLflow assessment injection
 │       ├── judges.py            # MLflow quality judge factory + fallback chain
-│       ├── eval_criteria.py     # Eval criteria discovery + SKILL.md parser
-│       ├── judge_tools.py       # MLflow JudgeTool registration for criteria
 │       ├── config.py            # Presets, model registration
 │       ├── splitter.py          # Train/val dataset splitting
 │       ├── tools.py             # MCP tool description extraction

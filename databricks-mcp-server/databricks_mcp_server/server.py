@@ -154,4 +154,5 @@ from .tools import (  # noqa: F401, E402
     user,
     apps,
     workspace,
+    pdf,
 )

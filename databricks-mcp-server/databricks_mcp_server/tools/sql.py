@@ -8,6 +8,7 @@ from databricks_tools_core.sql import (
     list_warehouses as _list_warehouses,
     get_best_warehouse as _get_best_warehouse,
     get_table_details as _get_table_details,
+    get_volume_folder_details as _get_volume_folder_details,
     TableStatLevel,
 )
 
@@ -214,4 +215,37 @@ def get_table_details(
         warehouse_id=warehouse_id,
     )
     # Convert to dict for JSON serialization
+    return result.model_dump(exclude_none=True) if hasattr(result, "model_dump") else result
+
+
+@mcp.tool
+def get_volume_folder_details(
+    volume_path: str,
+    format: str = "parquet",
+    table_stat_level: str = "SIMPLE",
+    warehouse_id: str = None,
+) -> Dict[str, Any]:
+    """
+    Get schema and statistics for data files in a Databricks Volume folder.
+
+    Similar to get_table_details but for raw files stored in Volumes.
+
+    Args:
+        volume_path: Path to the volume folder. Can be:
+            - "catalog/schema/volume/path" (e.g., "ai_dev_kit/demo/raw_data/customers")
+            - "/Volumes/catalog/schema/volume/path"
+        format: Data format - "parquet", "csv", "json", "delta", or "file" (just list files).
+        table_stat_level: Level of statistics - "NONE", "SIMPLE" (default), or "DETAILED".
+        warehouse_id: Optional warehouse ID. If not provided, auto-selects one.
+
+    Returns:
+        Dictionary with schema, row count, column stats, and sample data.
+    """
+    level = TableStatLevel[table_stat_level.upper()]
+    result = _get_volume_folder_details(
+        volume_path=volume_path,
+        format=format,
+        table_stat_level=level,
+        warehouse_id=warehouse_id,
+    )
     return result.model_dump(exclude_none=True) if hasattr(result, "model_dump") else result

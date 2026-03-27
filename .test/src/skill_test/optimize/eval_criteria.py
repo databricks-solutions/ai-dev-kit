@@ -1,7 +1,4 @@
-"""Evaluation criteria packaged as Agent Skills (SKILL.md format).
-
-Implements the Skill/SkillSet data model from MLflow #21255 design spec
-(https://github.com/mlflow/mlflow/issues/21255#issuecomment-3997922398).
+"""SKILL.md parsing for evaluation criteria (mirrors PR #21725 Skill/SkillSet naming).
 
 Each eval criteria is a folder with SKILL.md (YAML frontmatter + markdown body)
 and optional ``references/`` directory with detailed rubrics.
@@ -27,17 +24,17 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Data model (matches Skill dataclass from spec)
+# Data model (matches Skill dataclass from PR #21725)
 # ---------------------------------------------------------------------------
 
 
 @dataclass
-class EvalCriteriaSkill:
+class Skill:
     """Parsed evaluation criteria skill.
 
-    Mirrors the ``Skill`` dataclass from the MLflow #21255 design spec::
+    Mirrors the ``Skill`` dataclass from MLflow PR #21725::
 
-        name, description, path, metadata, body, references
+        name, description, path, metadata, body, references, applies_to
     """
 
     name: str
@@ -50,50 +47,38 @@ class EvalCriteriaSkill:
 
 
 # ---------------------------------------------------------------------------
-# Container (matches SkillSet from spec)
+# Container (matches SkillSet from PR #21725)
 # ---------------------------------------------------------------------------
 
 
-class EvalCriteriaSet:
+class SkillSet:
     """Container for evaluation criteria skills.
 
-    Parses SKILL.md files eagerly at creation time.  Generates system-prompt
-    blocks for judge injection and provides lookup-by-name for tool invocation.
+    Parses SKILL.md files eagerly at creation time.  Provides prompt generation
+    for judge instruction injection and lookup-by-name for tool invocation.
     """
 
     def __init__(self, paths: list[str | Path]):
-        self.skills: list[EvalCriteriaSkill] = []
+        self.skills: list[Skill] = []
         for p in paths:
             try:
                 self.skills.append(self._load_skill(p))
             except Exception as exc:
                 logger.warning("Failed to load eval criteria from %s: %s", p, exc)
-        self._by_name: dict[str, EvalCriteriaSkill] = {s.name: s for s in self.skills}
+        self._by_name: dict[str, Skill] = {s.name: s for s in self.skills}
 
     # -- public API --
 
-    def to_prompt(self, model: str | None = None) -> str:
-        """Generate available-criteria block for system-prompt injection.
-
-        Per spec: XML for Claude models, Markdown for others.
-        Only includes frontmatter (name + description) — ~50-100 tokens per skill.
-        """
-        if not self.skills:
-            return ""
-        if model and _is_claude_model(model):
-            return self._to_xml()
-        return self._to_markdown()
-
-    def get_skill(self, name: str) -> EvalCriteriaSkill | None:
+    def get_skill(self, name: str) -> Skill | None:
         return self._by_name.get(name)
 
-    def filter_by_modules(self, tool_modules: list[str]) -> "EvalCriteriaSet":
+    def filter_by_modules(self, tool_modules: list[str]) -> "SkillSet":
         """Return subset of criteria matching *tool_modules*.
 
         Criteria with empty ``applies_to`` are always included (general-purpose).
         """
         filtered = [s for s in self.skills if not s.applies_to or any(m in s.applies_to for m in tool_modules)]
-        result = EvalCriteriaSet.__new__(EvalCriteriaSet)
+        result = SkillSet.__new__(SkillSet)
         result.skills = filtered
         result._by_name = {s.name: s for s in filtered}
         return result
@@ -102,42 +87,46 @@ class EvalCriteriaSet:
     def names(self) -> list[str]:
         return [s.name for s in self.skills]
 
-    # -- prompt formatting --
+    def to_prompt_inline(self) -> str:
+        """Full body + references for instruction injection (current use).
 
-    def _to_xml(self) -> str:
-        """XML format for Claude models (per Agent Skills integration spec)."""
-        lines = ["<available_skills>"]
-        for s in self.skills:
-            lines.append("  <skill>")
-            lines.append(f"    <name>{s.name}</name>")
-            lines.append(f"    <description>{s.description}</description>")
-            lines.append("  </skill>")
-        lines.append("</available_skills>")
-        lines.append("")
-        lines.append(
-            "You have access to evaluation criteria skills that provide "
-            "domain-specific rubrics. Use the read_eval_criteria tool to load "
-            "a skill's full content when it is relevant to the trace you are "
-            "evaluating. Use read_eval_reference to access detailed rubrics "
-            "within a skill."
-        )
-        return "\n".join(lines)
+        Inlines every skill's body and reference files into a single prompt
+        block suitable for prepending to judge instructions.
+        """
+        if not self.skills:
+            return ""
+        sections: list[str] = ["# Evaluation Criteria\n"]
+        for skill in self.skills:
+            sections.append(f"## {skill.name}\n")
+            sections.append(skill.body.strip())
+            for ref_path, ref_content in skill.references.items():
+                sections.append(f"\n### Reference: {ref_path}\n")
+                sections.append(ref_content.strip())
+            sections.append("")
+        return "\n".join(sections)
 
-    def _to_markdown(self) -> str:
-        """Markdown format for OpenAI / Gemini / other models."""
+    def to_prompt_summary(self) -> str:
+        """Name + description only (future tool-based use).
+
+        Generates a compact summary block listing available criteria so that
+        an agentic judge can decide which to load via tools.
+        """
+        if not self.skills:
+            return ""
         lines = ["## Available Evaluation Criteria", ""]
         for s in self.skills:
             lines.append(f"- **{s.name}**: {s.description}")
         lines.append("")
         lines.append(
-            "Use the read_eval_criteria tool to load relevant criteria. Use read_eval_reference for detailed rubrics."
+            "Use the read_skill tool to load relevant criteria. "
+            "Use read_skill_file for detailed rubrics within a skill."
         )
         return "\n".join(lines)
 
     # -- loading --
 
     @staticmethod
-    def _load_skill(path: str | Path) -> EvalCriteriaSkill:
+    def _load_skill(path: str | Path) -> Skill:
         """Parse a SKILL.md file and eagerly load references."""
         path = Path(path).resolve()
         skill_md = path / "SKILL.md" if path.is_dir() else path
@@ -155,7 +144,7 @@ class EvalCriteriaSet:
 
         references = _load_references(skill_dir)
 
-        return EvalCriteriaSkill(
+        return Skill(
             name=name,
             description=description,
             path=skill_dir,
@@ -173,12 +162,12 @@ class EvalCriteriaSet:
 
 def discover_eval_criteria(
     criteria_dir: str | Path = ".test/eval-criteria",
-) -> EvalCriteriaSet:
+) -> SkillSet:
     """Auto-discover all eval-criteria skill folders in *criteria_dir*."""
     base = Path(criteria_dir)
     if not base.is_dir():
         logger.debug("Eval criteria directory not found: %s", base)
-        return EvalCriteriaSet([])
+        return SkillSet([])
     paths = sorted(d for d in base.iterdir() if d.is_dir() and (d / "SKILL.md").exists())
     if paths:
         logger.info(
@@ -186,17 +175,12 @@ def discover_eval_criteria(
             len(paths),
             ", ".join(p.name for p in paths),
         )
-    return EvalCriteriaSet(paths)
+    return SkillSet(paths)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _is_claude_model(model: str) -> bool:
-    low = model.lower()
-    return any(k in low for k in ("claude", "anthropic"))
 
 
 def _parse_frontmatter(content: str) -> tuple[dict, str]:

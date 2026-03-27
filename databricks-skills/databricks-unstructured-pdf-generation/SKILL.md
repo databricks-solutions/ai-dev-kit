@@ -9,14 +9,21 @@ Generate realistic synthetic PDF documents using LLM for RAG (Retrieval-Augmente
 
 ## Overview
 
-This skill uses the `generate_pdf_documents` MCP tool to create professional PDF documents with:
-- LLM-generated content based on your description
-- Accompanying JSON files with questions and evaluation guidelines (for RAG testing)
-- Automatic upload to Unity Catalog Volumes
+This skill provides two MCP tools for creating professional PDF documents:
+
+1. **`generate_and_upload_pdfs`** - Generate multiple PDFs from a description (LLM generates document specs)
+2. **`generate_and_upload_pdf`** - Generate one PDF with precise control over content
+
+Both tools:
+- Use LLM to generate professional HTML content, then convert to PDF
+- Create accompanying JSON files with questions and evaluation guidelines (for RAG testing)
+- Upload directly to Unity Catalog Volumes
 
 ## Quick Start
 
-Use the `generate_pdf_documents` MCP tool:
+### Generate Multiple PDFs (Batch)
+
+Use the `generate_and_upload_pdfs` MCP tool:
 - `catalog`: "my_catalog"
 - `schema`: "my_schema"
 - `description`: "Technical documentation for a cloud infrastructure platform including setup guides, troubleshooting procedures, and API references."
@@ -24,18 +31,23 @@ Use the `generate_pdf_documents` MCP tool:
 
 This generates 10 PDF documents and saves them to `/Volumes/my_catalog/my_schema/raw_data/pdf_documents/` (using default volume and folder).
 
-### With Custom Location
+### Generate a Single PDF (Precise Control)
 
-Use the `generate_pdf_documents` MCP tool:
+Use the `generate_and_upload_pdf` MCP tool when you need control over exactly what document to create:
+- `title`: "API Authentication Guide"
+- `description`: "Complete guide to REST API authentication for a cloud platform including OAuth2, API keys, and JWT tokens."
+- `question`: "What authentication methods are supported?"
+- `guideline`: "Answer should mention OAuth2, API keys, and JWT with use cases"
 - `catalog`: "my_catalog"
 - `schema`: "my_schema"
-- `description`: "HR policy documents..."
-- `count`: 10
-- `volume`: "custom_volume"
-- `folder`: "hr_policies"
-- `overwrite_folder`: true
 
-## Parameters
+## Tool 1: generate_and_upload_pdfs (Batch)
+
+Generates multiple PDFs using a 2-step LLM process:
+1. LLM generates diverse document specifications based on your description
+2. PDFs are generated in parallel from those specifications
+
+### Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -43,10 +55,28 @@ Use the `generate_pdf_documents` MCP tool:
 | `schema` | string | Yes | - | Schema name |
 | `description` | string | Yes | - | Detailed description of what PDFs should contain |
 | `count` | int | Yes | - | Number of PDFs to generate |
-| `volume` | string | No | `raw_data` | Volume name (created if not exists) |
+| `volume` | string | No | `raw_data` | Volume name (must exist) |
 | `folder` | string | No | `pdf_documents` | Folder within volume for output files |
 | `doc_size` | string | No | `MEDIUM` | Document size: `SMALL` (~1 page), `MEDIUM` (~5 pages), `LARGE` (~10+ pages) |
 | `overwrite_folder` | bool | No | `false` | If true, deletes existing folder contents first |
+
+## Tool 2: generate_and_upload_pdf (Precise Control)
+
+Generates exactly one PDF with full control over its content and metadata.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `title` | string | Yes | - | Document title (also used to generate filename) |
+| `description` | string | Yes | - | What this document should contain, including domain context |
+| `question` | string | Yes | - | A question answerable by reading this document |
+| `guideline` | string | Yes | - | How to evaluate if an answer is correct |
+| `catalog` | string | Yes | - | Unity Catalog name |
+| `schema` | string | Yes | - | Schema name |
+| `volume` | string | No | `raw_data` | Volume name (must exist) |
+| `folder` | string | No | `pdf_documents` | Folder within volume |
+| `doc_size` | string | No | `MEDIUM` | Document size: `SMALL`, `MEDIUM`, `LARGE` |
 
 ### Document Size Guide
 
@@ -77,7 +107,7 @@ For each document, the tool creates two files:
 
 ### Pattern 1: HR Policy Documents
 
-Use the `generate_pdf_documents` MCP tool:
+Use the `generate_and_upload_pdfs` MCP tool:
 - `catalog`: "ai_dev_kit"
 - `schema`: "hr_demo"
 - `description`: "HR policy documents for a technology company including employee handbook, leave policies, performance review procedures, benefits guide, and workplace conduct guidelines."
@@ -87,7 +117,7 @@ Use the `generate_pdf_documents` MCP tool:
 
 ### Pattern 2: Technical Documentation
 
-Use the `generate_pdf_documents` MCP tool:
+Use the `generate_and_upload_pdfs` MCP tool:
 - `catalog`: "ai_dev_kit"
 - `schema`: "tech_docs"
 - `description`: "Technical documentation for a SaaS analytics platform including installation guides, API references, troubleshooting procedures, security best practices, and integration tutorials."
@@ -97,7 +127,7 @@ Use the `generate_pdf_documents` MCP tool:
 
 ### Pattern 3: Financial Reports
 
-Use the `generate_pdf_documents` MCP tool:
+Use the `generate_and_upload_pdfs` MCP tool:
 - `catalog`: "ai_dev_kit"
 - `schema`: "finance_demo"
 - `description`: "Financial documents for a retail company including quarterly reports, expense policies, budget guidelines, and audit procedures."
@@ -107,7 +137,7 @@ Use the `generate_pdf_documents` MCP tool:
 
 ### Pattern 4: Training Materials
 
-Use the `generate_pdf_documents` MCP tool:
+Use the `generate_and_upload_pdfs` MCP tool:
 - `catalog`: "ai_dev_kit"
 - `schema`: "training"
 - `description`: "Training materials for new software developers including onboarding guides, coding standards, code review procedures, and deployment workflows."
@@ -119,7 +149,7 @@ Use the `generate_pdf_documents` MCP tool:
 
 1. **Ask for destination**: Default to `ai_dev_kit` catalog, ask user for schema name
 2. **Get description**: Ask what kind of documents they need
-3. **Generate PDFs**: Call `generate_pdf_documents` MCP tool with appropriate parameters
+3. **Generate PDFs**: Call `generate_and_upload_pdfs` MCP tool with appropriate parameters
 4. **Verify output**: Check the volume path for generated files
 
 ## Best Practices
@@ -161,29 +191,25 @@ for q in questions:
     is_correct = evaluate_response(response, q["guideline"])
 ```
 
-## Environment Configuration
+## LLM Configuration
 
-The tool requires LLM configuration via environment variables:
+The tools automatically discover `databricks-gpt-*` endpoints in your workspace. Override with environment variables if needed:
 
 ```bash
-# Databricks Foundation Models (default)
-LLM_PROVIDER=DATABRICKS
-DATABRICKS_MODEL=databricks-meta-llama-3-3-70b-instruct
-
-# Or Azure OpenAI
-LLM_PROVIDER=AZURE
-AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_DEPLOYMENT=gpt-4o
+# Optional: Override auto-discovery
+DATABRICKS_MODEL=databricks-gpt-5-4           # Main model for content generation
+DATABRICKS_MODEL_NANO=databricks-gpt-5-4-nano # Smaller model (used by default for speed)
 ```
+
+**Auto-discovery**: If no environment variables are set, the tool lists all serving endpoints and finds the latest `databricks-gpt-*` endpoint (highest version number, must be in READY state).
 
 ## Common Issues
 
 | Issue | Solution |
 |-------|----------|
-| **"No LLM endpoint configured"** | Set `DATABRICKS_MODEL` or `AZURE_OPENAI_DEPLOYMENT` environment variable |
-| **"Volume does not exist"** | The tool creates volumes automatically; ensure you have CREATE VOLUME permission |
-| **"PDF generation timeout"** | Reduce `count` or check LLM endpoint availability |
+| **"No LLM endpoint configured"** | No `databricks-gpt-*` endpoints found. Either deploy one or set `DATABRICKS_MODEL` environment variable |
+| **"Volume does not exist"** | Create the volume first; the tool does not auto-create volumes |
+| **"PDF generation timeout"** | Reduce `count` or use `doc_size: "SMALL"` |
 | **Low quality content** | Provide more detailed `description` with specific topics and document types |
 
 ## Related Skills

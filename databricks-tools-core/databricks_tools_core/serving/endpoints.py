@@ -7,6 +7,8 @@ Functions for checking status and querying Databricks Model Serving endpoints.
 import logging
 from typing import Any, Dict, List, Optional
 
+from databricks.sdk.service.serving import ChatMessage
+
 from ..auth import get_workspace_client
 
 logger = logging.getLogger(__name__)
@@ -132,8 +134,8 @@ def query_serving_endpoint(
     query_kwargs: Dict[str, Any] = {"name": name}
 
     if messages is not None:
-        # Chat/Agent endpoint
-        query_kwargs["messages"] = messages
+        # Chat/Agent endpoint - convert dicts to ChatMessage objects
+        query_kwargs["messages"] = [ChatMessage.from_dict(m) for m in messages]
         if max_tokens is not None:
             query_kwargs["max_tokens"] = max_tokens
         if temperature is not None:
@@ -200,12 +202,12 @@ def query_serving_endpoint(
     return result
 
 
-def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
+def list_serving_endpoints(limit: Optional[int] = 50) -> List[Dict[str, Any]]:
     """
     List Model Serving endpoints in the workspace.
 
     Args:
-        limit: Maximum number of endpoints to return (default: 50)
+        limit: Maximum number of endpoints to return (default: 50). Pass None for all.
 
     Returns:
         List of endpoint dictionaries with keys:

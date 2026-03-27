@@ -23,8 +23,13 @@ def upload_folder(
     Uses parallel uploads with ThreadPoolExecutor for performance.
     Automatically handles all file types.
 
+    Follows `cp -r` semantics:
+    - With trailing slash or /* (e.g., "pipeline/" or "pipeline/*"): copies contents into workspace_folder
+    - Without trailing slash (e.g., "pipeline"): creates workspace_folder/pipeline/
+
     Args:
-        local_folder: Path to local folder to upload
+        local_folder: Path to local folder to upload. Add trailing slash to copy
+            contents only, omit to preserve folder name.
         workspace_folder: Target path in Databricks workspace
             (e.g., "/Workspace/Users/user@example.com/my-project")
         max_workers: Maximum parallel upload threads (default: 10)

@@ -115,7 +115,7 @@ expected_patterns:
 
 **What it is:** Natural-language evaluation criteria passed to the LLM judge. The judge scores how well the response follows each guideline.
 
-**How it steers optimization:** Guidelines are the most flexible steering mechanism. They influence the quality score (30% of total) and effectiveness score (40% of total).
+**How it steers optimization:** Guidelines are the most flexible steering mechanism. They influence the guideline adherence score (15% of total) and the quality composite (20% of total, which averages correctness + completeness + guideline adherence).
 
 **Example focus prompt:** `"Must parameterize catalog names with a prefix variable"`
 
