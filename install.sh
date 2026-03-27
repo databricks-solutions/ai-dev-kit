@@ -667,7 +667,7 @@ resolve_skills() {
         local user_list
         user_list=$(echo "$USER_SKILLS" | tr ',' ' ')
         # Separate into DB, MLflow, and APX buckets, always include core
-        db_skills="$CORE_SKILLS"
+        db_skills=""
         for skill in $user_list; do
             if echo "$MLFLOW_SKILLS" | grep -qw "$skill"; then
                 mlflow_skills="${mlflow_skills:+$mlflow_skills }$skill"

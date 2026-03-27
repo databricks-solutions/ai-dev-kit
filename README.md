@@ -166,15 +166,15 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
   **Basic installation** (uses DEFAULT profile)
 
 ```bash
-cd ai-dev-kit/databricks-skills
-./install_skills_to_genie_code.sh
+#Execute from root folder (/ai-dev-kit)
+./databricks-skills/install_skills_to_genie_code.sh
 ```
 
 **Advance installation** (uses provided profile)
 
 ```bash
-cd ai-dev-kit/databricks-skills
-./install_skills_to_genie_code <profile_name>
+#Execute from root folder (/ai-dev-kit)
+./databricks-skills/install_skills_to_genie_code <profile_name>
 ```
 
 **Skill modification or Custom Skill**
