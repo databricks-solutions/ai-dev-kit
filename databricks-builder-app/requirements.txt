@@ -342,7 +342,7 @@ charset-normalizer==3.4.6 \
     --hash=sha256:fcce033e4021347d80ed9c66dcf1e7b1546319834b74445f561d2e2221de5659
     # via requests
 claude-agent-sdk==0.1.49 \
-    --hash=sha256:a869330d4a15b12c96ae24144b8e29999ff25315267f248634986179e9536a04
+    --hash=sha256:e4a3c3abac8a2013a40970d0a1d745a64bcb1750f8a62b656e01776715245098
     # via databricks-builder-app (pyproject.toml)
 click==8.3.1 \
     --hash=sha256:12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a \
