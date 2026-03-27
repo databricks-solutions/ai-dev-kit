@@ -1,52 +1,53 @@
 """File tools - Upload and delete files and folders in Databricks workspace."""
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 from databricks_tools_core.file import (
-    upload_to_workspace as _upload_to_workspace,
     delete_from_workspace as _delete_from_workspace,
+    upload_to_workspace as _upload_to_workspace,
 )
 
 from ..server import mcp
 
 
 @mcp.tool
-def upload_folder(
-    local_folder: str,
-    workspace_folder: str,
+def upload_to_workspace(
+    local_path: str,
+    workspace_path: str,
     max_workers: int = 10,
     overwrite: bool = True,
 ) -> Dict[str, Any]:
     """
-    Upload an entire local folder to Databricks workspace.
+    Upload files or folders to Databricks workspace.
 
-    Uses parallel uploads with ThreadPoolExecutor for performance.
-    Automatically handles all file types.
-
-    Follows `cp -r` semantics:
-    - With trailing slash or /* (e.g., "pipeline/" or "pipeline/*"): copies contents into workspace_folder
-    - Without trailing slash (e.g., "pipeline"): creates workspace_folder/pipeline/
+    Handles single files, folders, and glob patterns. This is the unified upload
+    function for all workspace file operations.
 
     Args:
-        local_folder: Path to local folder to upload. Add trailing slash to copy
-            contents only, omit to preserve folder name.
-        workspace_folder: Target path in Databricks workspace
+        local_path: Path to local file, folder, or glob pattern.
+            - Single file: "/path/to/file.py"
+            - Folder: "/path/to/folder" (preserves folder name)
+            - Folder contents: "/path/to/folder/" or "/path/to/folder/*"
+            - Glob pattern: "/path/to/*.py"
+            - Tilde expansion: "~/projects/file.py"
+        workspace_path: Target path in Databricks workspace
             (e.g., "/Workspace/Users/user@example.com/my-project")
         max_workers: Maximum parallel upload threads (default: 10)
         overwrite: Whether to overwrite existing files (default: True)
 
     Returns:
         Dictionary with upload statistics:
-        - local_folder: Source folder path
+        - local_folder: Source path
         - remote_folder: Target workspace path
         - total_files: Number of files found
         - successful: Number of successful uploads
         - failed: Number of failed uploads
         - success: True if all uploads succeeded
+        - failed_uploads: List of failed uploads with error details (if any)
     """
     result = _upload_to_workspace(
-        local_path=local_folder,
-        workspace_path=workspace_folder,
+        local_path=local_path,
+        workspace_path=workspace_path,
         max_workers=max_workers,
         overwrite=overwrite,
     )
@@ -57,50 +58,41 @@ def upload_folder(
         "successful": result.successful,
         "failed": result.failed,
         "success": result.success,
-        "failed_uploads": [{"local_path": r.local_path, "error": r.error} for r in result.get_failed_uploads()]
+        "failed_uploads": [
+            {"local_path": r.local_path, "error": r.error} for r in result.get_failed_uploads()
+        ]
         if result.failed > 0
         else [],
     }
 
 
 @mcp.tool
-def upload_file(
-    local_path: str,
+def delete_from_workspace(
     workspace_path: str,
-    overwrite: bool = True,
+    recursive: bool = False,
 ) -> Dict[str, Any]:
     """
-    Upload a single file to Databricks workspace.
+    Delete a file or folder from Databricks workspace.
+
+    Includes safety checks to prevent accidental deletion of protected paths
+    like user home folders, repos roots, and shared folder roots.
 
     Args:
-        local_path: Path to local file
-        workspace_path: Target path in Databricks workspace
-        overwrite: Whether to overwrite existing file (default: True)
+        workspace_path: Path to delete in Databricks workspace
+        recursive: If True, delete folder and all contents (default: False)
 
     Returns:
         Dictionary with:
-        - local_path: Source file path
-        - remote_path: Target workspace path
-        - success: True if upload succeeded
+        - workspace_path: Path that was deleted
+        - success: True if deletion succeeded
         - error: Error message if failed
     """
-    result = _upload_to_workspace(
-        local_path=local_path,
+    result = _delete_from_workspace(
         workspace_path=workspace_path,
-        overwrite=overwrite,
+        recursive=recursive,
     )
-    # For single file, return simplified result
-    if result.total_files == 1 and result.results:
-        single_result = result.results[0]
-        return {
-            "local_path": single_result.local_path,
-            "remote_path": single_result.remote_path,
-            "success": single_result.success,
-            "error": single_result.error,
-        }
     return {
-        "local_path": result.local_folder,
-        "remote_path": result.remote_folder,
+        "workspace_path": result.workspace_path,
         "success": result.success,
-        "error": result.results[0].error if result.results else None,
+        "error": result.error,
     }

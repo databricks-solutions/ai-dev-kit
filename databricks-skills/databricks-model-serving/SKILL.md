@@ -180,7 +180,7 @@ Then deploy via UI or SDK. See [1-classical-ml.md](1-classical-ml.md).
 
 | Tool | Purpose |
 |------|---------|
-| `upload_folder` | Upload agent files to workspace |
+| `upload_to_workspace` | Upload agent files to workspace |
 | `execute_code` | Install packages, test agent, log model |
 
 ### Deployment

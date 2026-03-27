@@ -89,6 +89,23 @@ def _upload_single_file(w: WorkspaceClient, local_path: str, remote_path: str, o
         return UploadResult(local_path=local_path, remote_path=remote_path, success=True)
 
     except Exception as e:
+        error_msg = str(e).lower()
+        # Handle type mismatch errors (e.g., overwriting notebook with file or vice versa)
+        # When overwrite=True, delete the existing item and retry
+        if overwrite and "type mismatch" in error_msg:
+            try:
+                w.workspace.delete(remote_path)
+                w.workspace.upload(
+                    path=remote_path,
+                    content=io.BytesIO(content),
+                    format=ImportFormat.AUTO,
+                    overwrite=False,
+                )
+                return UploadResult(local_path=local_path, remote_path=remote_path, success=True)
+            except Exception as retry_error:
+                return UploadResult(
+                    local_path=local_path, remote_path=remote_path, success=False, error=str(retry_error)
+                )
         return UploadResult(local_path=local_path, remote_path=remote_path, success=False, error=str(e))
 
 

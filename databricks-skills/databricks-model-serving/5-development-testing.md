@@ -134,7 +134,7 @@ execute_code(
 
 1. Read the error from the output
 2. Fix the local file (`agent.py` or `test_agent.py`)
-3. Re-upload: `upload_folder(...)`
+3. Re-upload: `upload_to_workspace(...)`
 4. Re-run: `execute_code(file_path=...)`
 
 ### Iteration Tips
@@ -189,7 +189,7 @@ print(response.content)
 
 | Step | MCP Tool | Purpose |
 |------|----------|---------|
-| Upload files | `upload_folder` | Sync local files to workspace |
+| Upload files | `upload_to_workspace` | Sync local files to workspace |
 | Install packages | `execute_code` | Set up dependencies |
 | Restart Python | `execute_code` | Apply package changes |
 | Test agent | `execute_code` (with `file_path`) | Run test script |

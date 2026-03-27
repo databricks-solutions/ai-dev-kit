@@ -46,36 +46,11 @@ class TimeoutHandlingMiddleware(Middleware):
         try:
             return await call_next(context)
 
-        except asyncio.TimeoutError as e:
-            logger.warning(
-                "Tool '%s' timed out (asyncio.TimeoutError). Returning structured result.",
-                tool_name,
-            )
-            return ToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=json.dumps(
-                            {
-                                "error": True,
-                                "error_type": "timeout",
-                                "tool": tool_name,
-                                "message": str(e) or "Operation timed out",
-                                "action_required": (
-                                    "Operation may still be in progress. "
-                                    "Do NOT retry the same call. "
-                                    "Use the appropriate get/status tool to check current state."
-                                ),
-                            }
-                        ),
-                    )
-                ]
-            )
-
         except TimeoutError as e:
-            # Built-in TimeoutError (may be raised by some libraries)
+            # In Python 3.11+, asyncio.TimeoutError is an alias for TimeoutError,
+            # so this single handler catches both
             logger.warning(
-                "Tool '%s' timed out (TimeoutError). Returning structured result.",
+                "Tool '%s' timed out. Returning structured result.",
                 tool_name,
             )
             return ToolResult(
