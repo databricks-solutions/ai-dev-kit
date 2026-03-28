@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, and Antigravity.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity and OpenCode.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -233,7 +233,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,opencode"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
@@ -569,6 +569,7 @@ function Invoke-DetectTools {
     $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
     $hasAntigravity = ($null -ne (Get-Command antigravity -ErrorAction SilentlyContinue)) -or
                       (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe")
+	$hasOpencode  = $null -ne (Get-Command opencode -ErrorAction SilentlyContinue)
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -576,9 +577,10 @@ function Invoke-DetectTools {
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
     $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
+	$opencodeState  = $hasOpencode;  $opencodeHint  = if ($hasOpencode)  { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasOpencode) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -595,6 +597,7 @@ function Invoke-DetectTools {
         @{ Label = "OpenAI Codex";   Value = "codex";        State = $codexState;        Hint = $codexHint }
         @{ Label = "Gemini CLI";     Value = "gemini";       State = $geminiState;       Hint = $geminiHint }
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
+		@{ Label = "OpenCode";    Value = "opencode";  State = $opencodeState;  Hint = $opencodeHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1164,6 +1167,7 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".agents\skills"
                 }
             }
+			"opencode"  { $dirs += Join-Path $BaseDir ".opencode\skills" }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1517,6 +1521,63 @@ Try asking: "List my SQL warehouses" or "Show my Unity Catalog schemas"
     Write-Ok "GEMINI.md"
 }
 
+function Write-OpenCodeMcpJson {
+    param([string]$Path)
+
+    $dir = Split-Path $Path -Parent
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+
+    # Backup existing
+    if (Test-Path $Path) {
+        Copy-Item $Path "$Path.bak" -Force
+        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
+    }
+
+    # Try to merge with existing config
+    if ((Test-Path $Path) -and (Test-Path $script:VenvPython)) {
+        try {
+            $existing = Get-Content $Path -Raw | ConvertFrom-Json
+        } catch {
+            $existing = $null
+        }
+    }
+
+    if ($existing) {
+		if (-not $existing.'$schema') {
+            $existing | Add-Member -NotePropertyName "$schema" -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+        if (-not $existing.mcp) {
+            $existing | Add-Member -NotePropertyName "mcp" -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+        $dbEntry = [PSCustomObject]@{
+            type = "local"
+			command    = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
+            environment     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
+			enabled = $false
+        }
+        $existing.mcp | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
+        $existing  = $existing | ConvertTo-Json -Depth 10
+		$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+		[System.IO.File]::WriteAllLines($Path, $existing, $Utf8NoBomEncoding)
+    } else {
+		$config = [PSCustomObject]@{
+			'$schema' = 'https://opencode.ai/config.json'
+			mcp = @{
+				databricks = @{
+					type    = 'local'
+					command = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
+					environment     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
+					enabled = $false
+				}
+			}
+		} | ConvertTo-Json -Depth 3
+		$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+		[System.IO.File]::WriteAllLines($Path, $config, $Utf8NoBomEncoding)
+    }
+}
+
 function Write-McpConfigs {
     param([string]$BaseDir)
 
@@ -1588,6 +1649,17 @@ function Write-McpConfigs {
                 }
                 Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\antigravity\mcp_config.json")
                 Write-Ok "Antigravity MCP config"
+            }
+			"opencode" {
+                if ($script:Scope -eq "global") {
+                    Write-OpenCodeMcpJson (Join-Path $env:USERPROFILE ".config\opencode\opencode.json")
+                } else {
+                    Write-OpenCodeMcpJson (Join-Path $BaseDir "opencode.json")
+					
+                }
+                Write-Ok "OpenCode CLI MCP config"
+				Write-Warn "OpenCode: MCP servers are disabled by default."
+                Write-Msg "  Enable in: opencode -> /mcps -> Toggle 'databricks' by pressing spacebar"
             }
         }
     }
