@@ -1,24 +1,43 @@
 ---
-name: template
-description: "A brief one-sentence description of what this skill helps with."
+name: your-skill-name
+description: "Brief description of what this skill does. Use when [specific scenario 1], [specific scenario 2], or when the user mentions [keyword1], [keyword2], [keyword3]."
 ---
 
-# Skill Name
+# Skill Title
+
+One-paragraph summary of what this skill covers and why it exists.
+
+## When to Use
+
+Use this skill when:
+- Building or configuring [specific feature]
+- Working with [specific API or tool]
+- The user mentions [domain keywords]
 
 ## Overview
 
-A short paragraph explaining what this skill does and when to use it.
+Brief conceptual summary. Tables work well for comparing options:
+
+| Component | Description | When to Use |
+|-----------|-------------|-------------|
+| **Option A** | What it does | Best for X |
+| **Option B** | What it does | Best for Y |
 
 ## Quick Start
 
-Simple example showing the most common use case:
+The simplest, most common use case. Must be complete and copy-pasteable:
 
 ```python
-# Example code or command
-example_function(
-    parameter1="value1",
-    parameter2="value2"
+from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+
+# Example: the most common operation for this skill
+result = w.some_api.create(
+    name="my-resource",
+    config={"key": "value"}
 )
+print(f"Created: {result.name}")
 ```
 
 ## Common Patterns
@@ -26,29 +45,35 @@ example_function(
 ### Pattern 1: Basic Usage
 
 ```python
-# Simple example
-basic_example()
+# Description of what this pattern does
+w.some_api.basic_operation(
+    param1="value1",
+    param2="value2"
+)
 ```
 
-### Pattern 2: Advanced Usage
+### Pattern 2: Advanced Configuration
 
 ```python
-# More complex example
-advanced_example(
-    option1=True,
-    option2="custom"
+# When you need more control over behavior
+w.some_api.advanced_operation(
+    param1="value1",
+    advanced_config={
+        "setting1": True,
+        "setting2": "custom"
+    }
 )
 ```
 
 ## Reference Files
 
-Link to supporting documentation files if needed:
-- [example_file1.md](example_file1.md) - Description of what this covers
-- [example_file2.md](example_file2.md) - Description of what this covers
+Link to supporting documentation if SKILL.md would exceed ~400 lines:
+- [detailed-api-reference.md](detailed-api-reference.md) - Exhaustive API parameters and options
+- [migration-guide.md](migration-guide.md) - Migrating from deprecated patterns
 
 ## Common Issues
 
 | Issue | Solution |
 |-------|----------|
-| **Problem description** | How to fix it |
-| **Another problem** | Another solution |
+| **`PERMISSION_DENIED` error** | Grant required permissions via Unity Catalog |
+| **Resource not found** | Verify the resource exists in the correct catalog/schema |
