@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
 
+from .agentguard.middleware import AgentGuardMiddleware
 from .middleware import TimeoutHandlingMiddleware
 
 
@@ -131,6 +132,7 @@ if sys.platform == "win32":
 
 # Register middleware (see middleware.py for details on each)
 mcp.add_middleware(TimeoutHandlingMiddleware())
+mcp.add_middleware(AgentGuardMiddleware())
 
 # Apply async wrapper on Windows to prevent event loop deadlocks.
 # TODO: FastMCP 3.x automatically wraps sync functions in asyncio.to_thread().
@@ -159,3 +161,4 @@ from .tools import (  # noqa: F401, E402
     workspace,
     pdf,
 )
+from .agentguard import commands as _agentguard_commands  # noqa: F401, E402

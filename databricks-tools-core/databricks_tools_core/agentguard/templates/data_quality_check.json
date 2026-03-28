@@ -1,0 +1,36 @@
+{
+  "_description": "Scope for running data quality analysis. Agent can read target tables and write results to a dedicated dq_results schema. No deletes, no resource modifications.",
+  "_variables": ["catalog", "schema", "target_table"],
+  "_example_usage": "agentguard_start(mode='enforce', scope_template='data_quality_check', scope_variables={'catalog': 'main', 'schema': 'production', 'target_table': 'customer_orders'})",
+
+  "tables": {
+    "read": [
+      "${catalog}.${schema}.${target_table}",
+      "${catalog}.${schema}.${target_table}_*",
+      "${catalog}.information_schema.*"
+    ],
+    "write": [
+      "${catalog}.dq_results.*"
+    ],
+    "ddl": [
+      "${catalog}.dq_results.*"
+    ],
+    "delete": []
+  },
+  "clusters": {
+    "read": ["*"],
+    "write": [],
+    "ddl": [],
+    "delete": []
+  },
+  "files": {
+    "read": ["*/dq_configs/*", "*/quality_rules/*"],
+    "write": ["*/dq_results/*"],
+    "ddl": [],
+    "delete": []
+  },
+
+  "default_deny": true,
+  "max_actions": 200,
+  "max_write_actions": 30
+}
