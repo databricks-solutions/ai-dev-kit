@@ -37,7 +37,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 | `get_table_stats_and_schema` | **STEP 1**: Get table schemas for designing queries |
 | `execute_sql` | **STEP 3**: Test SQL queries - MANDATORY before deployment! |
 | `get_best_warehouse` | Get available warehouse ID |
-| `create_or_update_dashboard` | **STEP 5**: Deploy dashboard JSON (only after validation!) |
+| `create_or_update_dashboard` | **STEP 5**: Deploy dashboard JSON. Optional params: `genie_space_id` (link Genie), `catalog`/`schema` (defaults for unqualified table names) |
 | `get_dashboard` | Get dashboard details by ID, or list all dashboards (omit dashboard_id) |
 | `delete_dashboard` | Move dashboard to trash |
 | `publish_dashboard` | Publish (`publish=True`) or unpublish (`publish=False`) a dashboard |
@@ -46,10 +46,10 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 | What are you building? | Reference |
 |------------------------|-----------|
-| Any widget (text, counter, table, chart) | [1-widget-specifications.md](1-widget-specifications.md) |
-| Dashboard with filters (global or page-level) | [2-filters.md](2-filters.md) |
-| Need a complete working template to adapt | [3-examples.md](3-examples.md) |
-| Debugging a broken dashboard | [4-troubleshooting.md](4-troubleshooting.md) |
+| Any widget | [1-widget-specifications.md](1-widget-specifications.md) (version table lists all widgets) |
+| Dashboard with filters | [3-filters.md](3-filters.md) |
+| Complete working template | [4-examples.md](4-examples.md) |
+| Debugging errors | [5-troubleshooting.md](5-troubleshooting.md) |
 
 ---
 
@@ -57,7 +57,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 ### 1) DATASET ARCHITECTURE
 
-- **One dataset per domain** (e.g., orders, customers, products)
+- **One dataset per domain whenever possible** (e.g., orders, customers, products). Dataset shared on widget will benefit the same filter, reuse the same base dataset as much as possible (adding group by at the widget level for example)
 - **Exactly ONE valid SQL query per dataset** (no multiple queries separated by `;`)
 - Always use **fully-qualified table names**: `catalog.schema.table_name`
 - SELECT must include all dimensions needed by widgets and all derived columns via `AS` aliases
@@ -66,59 +66,29 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 ### 2) WIDGET FIELD EXPRESSIONS
 
-> **CRITICAL: Field Name Matching Rule**
-> The `name` in `query.fields` MUST exactly match the `fieldName` in `encodings`.
-> If they don't match, the widget shows "no selected fields to visualize" error!
+> **CRITICAL**: The `name` in `query.fields` MUST exactly match `fieldName` in `encodings`.
+> Mismatch = "no selected fields to visualize" error.
 
-**Correct pattern for aggregations:**
 ```json
-// In query.fields:
-{"name": "sum(spend)", "expression": "SUM(`spend`)"}
+// CORRECT: names match
+"fields": [{"name": "sum(spend)", "expression": "SUM(`spend`)"}]
+"encodings": {"value": {"fieldName": "sum(spend)", ...}}
 
-// In encodings (must match!):
-{"fieldName": "sum(spend)", "displayName": "Total Spend"}
+// WRONG: "spend" ≠ "sum(spend)"
+"fields": [{"name": "spend", "expression": "SUM(`spend`)"}]
 ```
 
-**WRONG - names don't match:**
-```json
-// In query.fields:
-{"name": "spend", "expression": "SUM(`spend`)"}  // name is "spend"
-
-// In encodings:
-{"fieldName": "sum(spend)", ...}  // ERROR: "sum(spend)" ≠ "spend"
-```
-
-Allowed expressions in widget queries (you CANNOT use CAST or other SQL in expressions):
-
-**For numbers:**
-```json
-{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}
-{"name": "avg(price)", "expression": "AVG(`price`)"}
-{"name": "count(orders)", "expression": "COUNT(`order_id`)"}
-{"name": "countdistinct(customers)", "expression": "COUNT(DISTINCT `customer_id`)"}
-{"name": "min(date)", "expression": "MIN(`order_date`)"}
-{"name": "max(date)", "expression": "MAX(`order_date`)"}
-```
-
-**For dates** (use daily for timeseries, weekly/monthly for grouped comparisons):
-```json
-{"name": "daily(date)", "expression": "DATE_TRUNC(\"DAY\", `date`)"}
-{"name": "weekly(date)", "expression": "DATE_TRUNC(\"WEEK\", `date`)"}
-{"name": "monthly(date)", "expression": "DATE_TRUNC(\"MONTH\", `date`)"}
-```
-
-**Simple field reference** (for pre-aggregated data):
-```json
-{"name": "category", "expression": "`category`"}
-```
-
-If you need conditional logic or multi-field formulas, compute a derived column in the dataset SQL first.
+See [1-widget-specifications.md](1-widget-specifications.md) for full expression reference.
 
 ### 3) SPARK SQL PATTERNS
 
 - Date math: `date_sub(current_date(), N)` for days, `add_months(current_date(), -N)` for months
 - Date truncation: `DATE_TRUNC('DAY'|'WEEK'|'MONTH'|'QUARTER'|'YEAR', column)`
 - **AVOID** `INTERVAL` syntax - use functions instead
+- **Add ORDER BY** when visualization depends on data order:
+  - Time series: `ORDER BY date` for chronological display
+  - Rankings/Top-N: `ORDER BY metric DESC LIMIT 10` for "Top 10" charts
+  - Categorical charts: `ORDER BY metric DESC` to show largest values first
 
 ### 4) LAYOUT (6-Column Grid, NO GAPS)
 
@@ -126,13 +96,11 @@ Each widget has a position: `{"x": 0, "y": 0, "width": 2, "height": 4}`
 
 **CRITICAL**: Each row must fill width=6 exactly. No gaps allowed.
 
-**Recommended widget sizes:**
-
 | Widget Type | Width | Height | Notes |
 |-------------|-------|--------|-------|
 | Text header | 6 | 1 | Full width; use SEPARATE widgets for title and subtitle |
 | Counter/KPI | 2 | **3-4** | **NEVER height=2** - too cramped! |
-| Line/Bar chart | 3 | **5-6** | Pair side-by-side to fill row |
+| Line/Bar/Area chart | 3 | **5-6** | Pair side-by-side to fill row |
 | Pie chart | 3 | **5-6** | Needs space for legend |
 | Full-width chart | 6 | 5-7 | For detailed time series |
 | Table | 6 | 5-8 | Full width for readability |
@@ -150,17 +118,17 @@ y=12: Table (w=6, h=6) - Detailed data
 
 ### 5) CARDINALITY & READABILITY (CRITICAL)
 
-**Dashboard readability depends on limiting distinct values:**
+**Dashboard readability depends on limiting distinct values.** These are guidelines - adjust based on your use case:
 
-| Dimension Type | Max Values | Examples |
-|----------------|------------|----------|
-| Chart color/groups | **3-8** | 4 regions, 5 product lines, 3 tiers |
-| Filters | 4-10 | 8 countries, 5 channels |
-| High cardinality | **Table only** | customer_id, order_id, SKU |
+| Dimension Type | Suggested Max | Examples |
+|----------------|---------------|----------|
+| Chart color/groups | ~3-8 values | 4 regions, 5 product lines, 3 tiers |
+| Filter dropdowns | ~4-15 values | 8 countries, 5 channels |
+| High cardinality | Use table widget | customer_id, order_id, SKU |
 
 **Before creating any chart with color/grouping:**
 1. Check column cardinality (use `get_table_stats_and_schema` to see distinct values)
-2. If >10 distinct values, aggregate to higher level OR use TOP-N + "Other" bucket
+2. If too many distinct values, aggregate to higher level OR use TOP-N + "Other" bucket
 3. For high-cardinality dimensions, use a table widget instead of a chart
 
 ### 6) QUALITY CHECKLIST
@@ -169,7 +137,7 @@ Before deploying, verify:
 1. All widget names use only alphanumeric + hyphens + underscores
 2. All rows sum to width=6 with no gaps
 3. KPIs use height 3-4, charts use height 5-6
-4. Chart dimensions have ≤8 distinct values
+4. Chart dimensions have reasonable cardinality (see guidance above)
 5. All widget fieldNames match dataset columns exactly
 6. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
 7. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row

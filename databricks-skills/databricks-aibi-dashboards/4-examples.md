@@ -49,7 +49,6 @@ dashboard = {
         "displayName": "NYC Taxi Overview",
         "pageType": "PAGE_TYPE_CANVAS",
         "layout": [
-            # Text header - NO spec block! Use SEPARATE widgets for title and subtitle!
             {
                 "widget": {
                     "name": "title",
@@ -68,7 +67,6 @@ dashboard = {
                 },
                 "position": {"x": 0, "y": 1, "width": 6, "height": 1}
             },
-            # Counter - version 2, width 2!
             {
                 "widget": {
                     "name": "total-trips",
@@ -135,7 +133,6 @@ dashboard = {
                 },
                 "position": {"x": 4, "y": 2, "width": 2, "height": 3}
             },
-            # Bar chart - version 3
             {
                 "widget": {
                     "name": "trips-by-zip",
@@ -162,7 +159,6 @@ dashboard = {
                 },
                 "position": {"x": 0, "y": 5, "width": 6, "height": 5}
             },
-            # Table - version 2, minimal column props!
             {
                 "widget": {
                     "name": "zip-table",
@@ -241,7 +237,7 @@ dashboard_with_filters = {
                             }
                         }],
                         "spec": {
-                            "version": 2,  # Version 2 for counters!
+                            "version": 2,
                             "widgetType": "counter",
                             "encodings": {
                                 "value": {"fieldName": "total_revenue", "displayName": "Total Revenue"}
@@ -256,7 +252,7 @@ dashboard_with_filters = {
         {
             "name": "filters",
             "displayName": "Filters",
-            "pageType": "PAGE_TYPE_GLOBAL_FILTERS",  # Required for global filter page!
+            "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
             "layout": [
                 {
                     "widget": {
@@ -267,22 +263,21 @@ dashboard_with_filters = {
                                 "datasetName": "sales",
                                 "fields": [
                                     {"name": "region", "expression": "`region`"}
-                                    # DO NOT use associative_filter_predicate_group - causes SQL errors!
                                 ],
-                                "disaggregated": False  # False for filters!
+                                "disaggregated": False
                             }
                         }],
                         "spec": {
-                            "version": 2,  # Version 2 for filters!
-                            "widgetType": "filter-multi-select",  # NOT "filter"!
+                            "version": 2,
+                            "widgetType": "filter-multi-select",
                             "encodings": {
                                 "fields": [{
                                     "fieldName": "region",
                                     "displayName": "Region",
-                                    "queryName": "ds_sales_region"  # Must match query name!
+                                    "queryName": "ds_sales_region"
                                 }]
                             },
-                            "frame": {"showTitle": True, "title": "Region"}  # Always show title!
+                            "frame": {"showTitle": True, "title": "Region"}
                         }
                     },
                     "position": {"x": 0, "y": 0, "width": 2, "height": 2}
