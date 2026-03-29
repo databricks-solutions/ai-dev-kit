@@ -60,6 +60,45 @@ class TestCollectFiles:
         assert len(files) == 1
         assert files[0][1] == "file.py"
 
+    def test_skips_node_modules(self, tmp_path):
+        """Should skip node_modules directories."""
+        (tmp_path / "app.py").write_text("content")
+        (tmp_path / "node_modules").mkdir()
+        (tmp_path / "node_modules" / "lodash").mkdir()
+        (tmp_path / "node_modules" / "lodash" / "index.js").write_text("module")
+
+        files = _collect_files(str(tmp_path))
+
+        assert len(files) == 1
+        assert files[0][1] == "app.py"
+
+    def test_skips_venv_directories(self, tmp_path):
+        """Should skip venv and .venv directories."""
+        (tmp_path / "app.py").write_text("content")
+        (tmp_path / "venv").mkdir()
+        (tmp_path / "venv" / "bin").mkdir()
+        (tmp_path / "venv" / "bin" / "python").write_text("binary")
+        (tmp_path / ".venv").mkdir()
+        (tmp_path / ".venv" / "lib").mkdir()
+
+        files = _collect_files(str(tmp_path))
+
+        assert len(files) == 1
+        assert files[0][1] == "app.py"
+
+    def test_skips_build_artifacts(self, tmp_path):
+        """Should skip dist and build directories."""
+        (tmp_path / "app.py").write_text("content")
+        (tmp_path / "dist").mkdir()
+        (tmp_path / "dist" / "bundle.js").write_text("bundled")
+        (tmp_path / "build").mkdir()
+        (tmp_path / "build" / "output.js").write_text("built")
+
+        files = _collect_files(str(tmp_path))
+
+        assert len(files) == 1
+        assert files[0][1] == "app.py"
+
 
 class TestCollectDirectories:
     """Tests for _collect_directories helper function."""
@@ -85,6 +124,24 @@ class TestCollectDirectories:
 
         assert "visible" in dirs
         assert ".hidden" not in dirs
+
+    def test_skips_excluded_directories(self, tmp_path):
+        """Should skip node_modules, venv, dist, build, and other excluded dirs."""
+        (tmp_path / "src").mkdir()
+        (tmp_path / "node_modules").mkdir()
+        (tmp_path / "venv").mkdir()
+        (tmp_path / "dist").mkdir()
+        (tmp_path / "build").mkdir()
+        (tmp_path / "__pycache__").mkdir()
+
+        dirs = _collect_directories(str(tmp_path))
+
+        assert "src" in dirs
+        assert "node_modules" not in dirs
+        assert "venv" not in dirs
+        assert "dist" not in dirs
+        assert "build" not in dirs
+        assert "__pycache__" not in dirs
 
 
 class TestUploadToWorkspace:
