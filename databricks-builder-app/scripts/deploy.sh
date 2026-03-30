@@ -349,18 +349,19 @@ cred = w.postgres.generate_database_credential(endpoint=sys.argv[1])
 user = w.current_user.me().user_name
 sp = sys.argv[2]
 
-conn = psycopg.connect(f'postgresql://{quote(user, safe="")}:{cred.token}@{ep.status.hosts.host}:5432/databricks_postgres?sslmode=require')
+conn = psycopg.connect(f'postgresql://{quote(user, safe=str())}:{cred.token}@{ep.status.hosts.host}:5432/databricks_postgres?sslmode=require')
 conn.autocommit = True
 cur = conn.cursor()
+q = chr(34)
 for sql in [
-    f'GRANT CREATE ON DATABASE databricks_postgres TO "{sp}"',
+    f'GRANT CREATE ON DATABASE databricks_postgres TO {q}{sp}{q}',
     'CREATE SCHEMA IF NOT EXISTS builder_app',
-    f'GRANT USAGE ON SCHEMA builder_app TO "{sp}"',
-    f'GRANT ALL PRIVILEGES ON SCHEMA builder_app TO "{sp}"',
-    f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA builder_app TO "{sp}"',
-    f'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA builder_app TO "{sp}"',
-    f'ALTER DEFAULT PRIVILEGES IN SCHEMA builder_app GRANT ALL ON TABLES TO "{sp}"',
-    f'ALTER DEFAULT PRIVILEGES IN SCHEMA builder_app GRANT ALL ON SEQUENCES TO "{sp}"',
+    f'GRANT USAGE ON SCHEMA builder_app TO {q}{sp}{q}',
+    f'GRANT ALL PRIVILEGES ON SCHEMA builder_app TO {q}{sp}{q}',
+    f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA builder_app TO {q}{sp}{q}',
+    f'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA builder_app TO {q}{sp}{q}',
+    f'ALTER DEFAULT PRIVILEGES IN SCHEMA builder_app GRANT ALL ON TABLES TO {q}{sp}{q}',
+    f'ALTER DEFAULT PRIVILEGES IN SCHEMA builder_app GRANT ALL ON SEQUENCES TO {q}{sp}{q}',
 ]:
     cur.execute(sql)
 cur.close()
