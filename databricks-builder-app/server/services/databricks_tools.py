@@ -72,8 +72,24 @@ def _get_all_sdk_tools():
     sdk_tools = []
     tool_names = []
 
+    # Get registered tools from FastMCP (handle different API versions)
+    registered_tools = None
+
+    # Attempt 1: FastMCP 3.1.1+ with _tool_manager._tools (sync, local dev)
+    if hasattr(mcp, '_tool_manager') and hasattr(getattr(mcp, '_tool_manager'), '_tools'):
+        registered_tools = mcp._tool_manager._tools
+        logger.info('Loaded tools via _tool_manager._tools')
+
+    # Attempt 2: Async list_tools() (deployed FastMCP version)
+    if registered_tools is None and hasattr(mcp, 'list_tools'):
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            tools_list = executor.submit(lambda: asyncio.run(mcp.list_tools())).result()
+        registered_tools = {t.name: t for t in tools_list}
+        logger.info(f'Loaded tools via list_tools(): {list(registered_tools.keys())}')
+
     # Wrap all Databricks MCP tools
-    for name, mcp_tool in mcp._tool_manager._tools.items():
+    for name, mcp_tool in registered_tools.items():
         input_schema = _convert_schema(mcp_tool.parameters)
         sdk_tool = _make_wrapper(name, mcp_tool.description, input_schema, mcp_tool.fn)
         sdk_tools.append(sdk_tool)

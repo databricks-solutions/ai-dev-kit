@@ -139,10 +139,10 @@ export DATABRICKS_CONFIG_PROFILE="your-profile"
 
 ## Installing Packages via MCP
 
-Use `execute_databricks_command`:
+Use `execute_code`:
 
 ```
-execute_databricks_command(
+execute_code(
     code="%pip install -U mlflow==3.6.0 databricks-langchain langgraph==0.3.4 databricks-agents pydantic"
 )
 ```
@@ -150,7 +150,7 @@ execute_databricks_command(
 Then restart Python:
 
 ```
-execute_databricks_command(
+execute_code(
     code="dbutils.library.restartPython()",
     cluster_id="<cluster_id>",
     context_id="<context_id>"
@@ -174,7 +174,7 @@ for pkg in packages:
 Via MCP:
 
 ```
-execute_databricks_command(
+execute_code(
     code="""
 import pkg_resources
 for pkg in ['mlflow', 'langchain', 'langgraph', 'pydantic', 'databricks-langchain']:

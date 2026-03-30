@@ -18,7 +18,7 @@ ctx = CLIContext(
 ctx = CLIContext(
     mcp_execute_command=mcp__databricks__execute_databricks_command,
     mcp_execute_sql=mcp__databricks__execute_sql,
-    mcp_upload_file=mcp__databricks__upload_file,
+    mcp_upload_to_volume=mcp__databricks__upload_to_volume,
     mcp_get_best_warehouse=mcp__databricks__get_best_warehouse,
     mcp_get_best_cluster=mcp__databricks__get_best_cluster,
 )
@@ -156,7 +156,7 @@ config = TestFixtureConfig(
 )
 
 # Set up fixtures
-result = setup_fixtures(config, mcp_execute_sql, mcp_upload_file, mcp_get_best_warehouse)
+result = setup_fixtures(config, mcp_execute_sql, mcp_upload_to_volume, mcp_get_best_warehouse)
 
 # Tear down when done
 teardown_fixtures(config, mcp_execute_sql, mcp_get_best_warehouse)

@@ -64,7 +64,7 @@ def _find_index_by_name(index_name: str) -> Optional[Dict[str, Any]]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def create_or_update_vs_endpoint(
     name: str,
     endpoint_type: str = "STANDARD",
@@ -108,7 +108,7 @@ def create_or_update_vs_endpoint(
     return {**result, "created": True}
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_vs_endpoint(
     name: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -140,7 +140,7 @@ def get_vs_endpoint(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def delete_vs_endpoint(name: str) -> Dict[str, Any]:
     """
     Delete a Vector Search endpoint.
@@ -165,7 +165,7 @@ def delete_vs_endpoint(name: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def create_or_update_vs_index(
     name: str,
     endpoint_name: str,
@@ -256,7 +256,7 @@ def create_or_update_vs_index(
     return {**result, "created": True}
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_vs_index(
     index_name: Optional[str] = None,
     endpoint_name: Optional[str] = None,
@@ -312,7 +312,7 @@ def get_vs_index(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def delete_vs_index(index_name: str) -> Dict[str, Any]:
     """
     Delete a Vector Search index.
@@ -335,7 +335,7 @@ def delete_vs_index(index_name: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def query_vs_index(
     index_name: str,
     columns: List[str],
@@ -402,7 +402,7 @@ def query_vs_index(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def manage_vs_data(
     index_name: str,
     operation: str,

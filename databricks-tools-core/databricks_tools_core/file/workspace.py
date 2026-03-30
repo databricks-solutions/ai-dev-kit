@@ -5,8 +5,10 @@ Functions for uploading files and folders to Databricks Workspace.
 Uses Databricks Workspace API via SDK.
 """
 
+import glob
 import io
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,7 +32,7 @@ class UploadResult:
 
 @dataclass
 class FolderUploadResult:
-    """Result from uploading a folder"""
+    """Result from uploading a folder or multiple files"""
 
     local_folder: str
     remote_folder: str
@@ -42,11 +44,20 @@ class FolderUploadResult:
     @property
     def success(self) -> bool:
         """Returns True if all files were uploaded successfully"""
-        return self.failed == 0
+        return self.failed == 0 and self.total_files > 0
 
     def get_failed_uploads(self) -> List[UploadResult]:
         """Returns list of failed uploads"""
         return [r for r in self.results if not r.success]
+
+
+@dataclass
+class DeleteResult:
+    """Result from a workspace delete operation"""
+
+    workspace_path: str
+    success: bool
+    error: Optional[str] = None
 
 
 def _upload_single_file(w: WorkspaceClient, local_path: str, remote_path: str, overwrite: bool = True) -> UploadResult:
@@ -78,6 +89,23 @@ def _upload_single_file(w: WorkspaceClient, local_path: str, remote_path: str, o
         return UploadResult(local_path=local_path, remote_path=remote_path, success=True)
 
     except Exception as e:
+        error_msg = str(e).lower()
+        # Handle type mismatch errors (e.g., overwriting notebook with file or vice versa)
+        # When overwrite=True, delete the existing item and retry
+        if overwrite and "type mismatch" in error_msg:
+            try:
+                w.workspace.delete(remote_path)
+                w.workspace.upload(
+                    path=remote_path,
+                    content=io.BytesIO(content),
+                    format=ImportFormat.AUTO,
+                    overwrite=False,
+                )
+                return UploadResult(local_path=local_path, remote_path=remote_path, success=True)
+            except Exception as retry_error:
+                return UploadResult(
+                    local_path=local_path, remote_path=remote_path, success=False, error=str(retry_error)
+                )
         return UploadResult(local_path=local_path, remote_path=remote_path, success=False, error=str(e))
 
 
@@ -321,3 +349,305 @@ def upload_file(local_path: str, workspace_path: str, overwrite: bool = True) ->
             pass
 
     return _upload_single_file(w, local_path, workspace_path, overwrite)
+
+
+def _is_protected_path(workspace_path: str) -> bool:
+    """
+    Check if a workspace path is protected from deletion.
+
+    Protected paths include:
+    - Root paths (/, /Workspace, /Users, /Repos)
+    - User home folders (/Workspace/Users/user@example.com, /Users/user@example.com)
+    - Repos user roots (/Workspace/Repos/user@example.com, /Repos/user@example.com)
+    - Shared folder root (/Workspace/Shared)
+
+    Args:
+        workspace_path: Path to check
+
+    Returns:
+        True if the path is protected, False otherwise
+    """
+    # Normalize path: remove trailing slashes
+    path = workspace_path.rstrip("/")
+
+    # Root paths are always protected
+    protected_roots = {
+        "",
+        "/",
+        "/Workspace",
+        "/Workspace/Users",
+        "/Workspace/Repos",
+        "/Workspace/Shared",
+        "/Users",
+        "/Repos",
+    }
+    if path in protected_roots:
+        return True
+
+    # User home folders: /Workspace/Users/user@example.com or /Users/user@example.com
+    # Pattern: exactly one level below Users (the email)
+    user_home_pattern = r"^(/Workspace)?/Users/[^/]+$"
+    if re.match(user_home_pattern, path):
+        return True
+
+    # Repos user roots: /Workspace/Repos/user@example.com or /Repos/user@example.com
+    repos_pattern = r"^(/Workspace)?/Repos/[^/]+$"
+    if re.match(repos_pattern, path):
+        return True
+
+    return False
+
+
+def upload_to_workspace(
+    local_path: str,
+    workspace_path: str,
+    max_workers: int = 10,
+    overwrite: bool = True,
+) -> FolderUploadResult:
+    """
+    Upload files or folders to Databricks workspace.
+
+    Handles single files, folders, and glob patterns. This is the unified upload
+    function that replaces both upload_file and upload_folder.
+
+    Args:
+        local_path: Path to local file, folder, or glob pattern.
+            - Single file: "/path/to/file.py"
+            - Folder: "/path/to/folder" (preserves folder name)
+            - Folder contents: "/path/to/folder/" or "/path/to/folder/*"
+            - Glob pattern: "/path/to/*.py"
+            - Tilde expansion: "~/projects/file.py"
+        workspace_path: Target path in Databricks workspace
+        max_workers: Maximum parallel upload threads (default: 10)
+        overwrite: Whether to overwrite existing files (default: True)
+
+    Returns:
+        FolderUploadResult with upload statistics
+
+    Example:
+        >>> # Upload single file
+        >>> result = upload_to_workspace(
+        ...     local_path="/path/to/script.py",
+        ...     workspace_path="/Workspace/Users/me@example.com/script.py",
+        ... )
+        >>> # Upload folder preserving name
+        >>> result = upload_to_workspace(
+        ...     local_path="/path/to/project",
+        ...     workspace_path="/Workspace/Users/me@example.com/dest",
+        ... )
+        >>> # Upload folder contents only
+        >>> result = upload_to_workspace(
+        ...     local_path="/path/to/project/",
+        ...     workspace_path="/Workspace/Users/me@example.com/dest",
+        ... )
+        >>> # Upload with glob pattern
+        >>> result = upload_to_workspace(
+        ...     local_path="/path/to/*.py",
+        ...     workspace_path="/Workspace/Users/me@example.com/scripts",
+        ... )
+    """
+    # Expand ~ in path
+    local_path = os.path.expanduser(local_path)
+
+    # Normalize workspace path (remove trailing slash)
+    workspace_path = workspace_path.rstrip("/")
+
+    # Check if this is a glob pattern (contains * or ?)
+    has_glob = "*" in local_path or "?" in local_path
+
+    if has_glob:
+        return _upload_glob_pattern(local_path, workspace_path, max_workers, overwrite)
+
+    # Check if path exists
+    if not os.path.exists(local_path.rstrip("/")):
+        error_result = UploadResult(
+            local_path=local_path,
+            remote_path=workspace_path,
+            success=False,
+            error=f"Path not found: {local_path}",
+        )
+        return FolderUploadResult(
+            local_folder=local_path,
+            remote_folder=workspace_path,
+            total_files=1,
+            successful=0,
+            failed=1,
+            results=[error_result],
+        )
+
+    # Single file
+    if os.path.isfile(local_path):
+        result = upload_file(local_path, workspace_path, overwrite)
+        return FolderUploadResult(
+            local_folder=local_path,
+            remote_folder=workspace_path,
+            total_files=1,
+            successful=1 if result.success else 0,
+            failed=0 if result.success else 1,
+            results=[result],
+        )
+
+    # Directory - use existing upload_folder logic
+    return upload_folder(local_path, workspace_path, max_workers, overwrite)
+
+
+def _upload_glob_pattern(
+    pattern: str,
+    workspace_path: str,
+    max_workers: int = 10,
+    overwrite: bool = True,
+) -> FolderUploadResult:
+    """
+    Upload files matching a glob pattern.
+
+    Args:
+        pattern: Glob pattern (e.g., "*.py", "**/*.sql")
+        workspace_path: Target workspace folder
+        max_workers: Maximum parallel upload threads
+        overwrite: Whether to overwrite existing files
+
+    Returns:
+        FolderUploadResult with upload statistics
+    """
+    # Expand the glob pattern
+    matches = glob.glob(pattern, recursive=True)
+
+    if not matches:
+        error_result = UploadResult(
+            local_path=pattern,
+            remote_path=workspace_path,
+            success=False,
+            error=f"No files match pattern: {pattern}",
+        )
+        return FolderUploadResult(
+            local_folder=pattern,
+            remote_folder=workspace_path,
+            total_files=1,
+            successful=0,
+            failed=1,
+            results=[error_result],
+        )
+
+    # Separate files and directories
+    files = [m for m in matches if os.path.isfile(m)]
+    dirs = [m for m in matches if os.path.isdir(m)]
+
+    # Get the base directory from the pattern for relative path calculation
+    pattern_base = os.path.dirname(pattern.split("*")[0].rstrip("/")) or "."
+    pattern_base = os.path.abspath(pattern_base)
+
+    w = get_workspace_client()
+
+    # Create workspace directory
+    try:
+        w.workspace.mkdirs(workspace_path)
+    except Exception:
+        pass
+
+    results = []
+    successful = 0
+    failed = 0
+
+    # Upload files from matched directories
+    for dir_path in dirs:
+        dir_files = _collect_files(dir_path)
+        for local_file, rel_path in dir_files:
+            # Calculate relative path from pattern base
+            dir_name = os.path.basename(dir_path)
+            remote_path = f"{workspace_path}/{dir_name}/{rel_path.replace(os.sep, '/')}"
+
+            # Create parent directory
+            parent_dir = str(Path(remote_path).parent)
+            try:
+                w.workspace.mkdirs(parent_dir)
+            except Exception:
+                pass
+
+            result = _upload_single_file(w, local_file, remote_path, overwrite)
+            results.append(result)
+            if result.success:
+                successful += 1
+            else:
+                failed += 1
+
+    # Upload individual files
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_file = {}
+        for local_file in files:
+            # Use just the filename for the remote path
+            filename = os.path.basename(local_file)
+            remote_path = f"{workspace_path}/{filename}"
+            future = executor.submit(_upload_single_file, w, local_file, remote_path, overwrite)
+            future_to_file[future] = (local_file, remote_path)
+
+        for future in as_completed(future_to_file):
+            result = future.result()
+            results.append(result)
+            if result.success:
+                successful += 1
+            else:
+                failed += 1
+
+    return FolderUploadResult(
+        local_folder=pattern,
+        remote_folder=workspace_path,
+        total_files=len(results),
+        successful=successful,
+        failed=failed,
+        results=results,
+    )
+
+
+def delete_from_workspace(
+    workspace_path: str,
+    recursive: bool = False,
+) -> DeleteResult:
+    """
+    Delete a file or folder from Databricks workspace.
+
+    Includes safety checks to prevent accidental deletion of protected paths
+    like user home folders, repos roots, and shared folder roots.
+
+    Args:
+        workspace_path: Path to delete in Databricks workspace
+        recursive: If True, delete folder and all contents (default: False)
+
+    Returns:
+        DeleteResult with success status
+
+    Example:
+        >>> # Delete a single file
+        >>> result = delete_from_workspace(
+        ...     workspace_path="/Workspace/Users/me@example.com/old_file.py",
+        ... )
+        >>> # Delete a folder recursively
+        >>> result = delete_from_workspace(
+        ...     workspace_path="/Workspace/Users/me@example.com/old_project",
+        ...     recursive=True,
+        ... )
+    """
+    # Normalize path
+    workspace_path = workspace_path.rstrip("/")
+
+    # Safety check: prevent deletion of protected paths
+    if _is_protected_path(workspace_path):
+        return DeleteResult(
+            workspace_path=workspace_path,
+            success=False,
+            error=f"Cannot delete protected path: {workspace_path}. "
+            "User home folders, repos roots, and system folders are protected.",
+        )
+
+    try:
+        w = get_workspace_client()
+        w.workspace.delete(workspace_path, recursive=recursive)
+        return DeleteResult(
+            workspace_path=workspace_path,
+            success=True,
+        )
+    except Exception as e:
+        return DeleteResult(
+            workspace_path=workspace_path,
+            success=False,
+            error=str(e),
+        )

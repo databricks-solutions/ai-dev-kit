@@ -227,7 +227,7 @@ def _manage_workspace_impl(
             }
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_workspace(
     action: str,
     profile: Optional[str] = None,

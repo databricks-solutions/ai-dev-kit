@@ -8,7 +8,7 @@ Production-ready templates you can adapt for your use case.
 import json
 
 # Step 1: Check table schema
-table_info = get_table_details(catalog="samples", schema="nyctaxi")
+table_info = get_table_stats_and_schema(catalog="samples", schema="nyctaxi")
 
 # Step 2: Test queries
 execute_sql("SELECT COUNT(*) as trips, AVG(fare_amount) as avg_fare, AVG(trip_distance) as avg_distance FROM samples.nyctaxi.trips")

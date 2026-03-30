@@ -15,7 +15,7 @@ from databricks_tools_core.spark_declarative_pipelines.pipelines import (
     delete_pipeline,
     find_pipeline_by_name,
 )
-from databricks_tools_core.file.workspace import upload_folder
+from databricks_tools_core.file.workspace import upload_to_workspace
 
 
 logger = logging.getLogger(__name__)
@@ -115,9 +115,9 @@ def uploaded_pipeline_files(workspace_client, workspace_path: str):
     logger.info(f"Uploading pipeline files to {workspace_path}")
 
     # Upload the pipelines folder to workspace
-    result = upload_folder(
-        local_folder=str(PIPELINES_DIR),
-        workspace_folder=workspace_path,
+    result = upload_to_workspace(
+        local_path=str(PIPELINES_DIR),
+        workspace_path=workspace_path,
         overwrite=True,
     )
 

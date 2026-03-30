@@ -160,7 +160,7 @@ def _to_dict_list(items: list) -> List[Dict[str, Any]]:
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_objects(
     object_type: str,
     action: str,
@@ -357,7 +357,7 @@ def manage_uc_objects(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_grants(
     action: str,
     securable_type: str,
@@ -417,7 +417,7 @@ def manage_uc_grants(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_storage(
     resource_type: str,
     action: str,
@@ -529,7 +529,7 @@ def manage_uc_storage(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_connections(
     action: str,
     name: str = None,
@@ -607,7 +607,7 @@ def manage_uc_connections(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_tags(
     action: str,
     object_type: str = None,
@@ -707,7 +707,7 @@ def manage_uc_tags(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_security_policies(
     action: str,
     table_name: str = None,
@@ -790,7 +790,7 @@ def manage_uc_security_policies(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_monitors(
     action: str,
     table_name: str,
@@ -848,7 +848,7 @@ def manage_uc_monitors(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_uc_sharing(
     resource_type: str,
     action: str,
@@ -952,7 +952,7 @@ def manage_uc_sharing(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_metric_views(
     action: str,
     full_name: str,

@@ -55,17 +55,32 @@ def _patch_subprocess_stdin():
     subprocess.Popen = _PatchedPopen
 
 
+
+
+def _wrap_sync_in_thread(fn):
+    """Wrap a sync function to run in asyncio.to_thread(), preserving metadata."""
+
+    @functools.wraps(fn)
+    async def async_wrapper(**kwargs):
+        return await asyncio.to_thread(fn, **kwargs)
+
+    return async_wrapper
+
+
+# Apply subprocess patch early — before any Databricks SDK import (Windows only)
+if sys.platform == "win32":
+    _patch_subprocess_stdin()
+
+
 def _patch_tool_decorator_for_windows():
     """Wrap sync tool functions in asyncio.to_thread() on Windows.
 
     FastMCP's FunctionTool.run() calls sync functions directly on the asyncio
     event loop thread, which blocks the stdio transport's I/O tasks. On Windows
-    (ProactorEventLoop), this causes a deadlock — all MCP tools hang indefinitely.
+    with ProactorEventLoop this causes a deadlock where all MCP tools hang.
 
     This patch intercepts @mcp.tool registration to wrap sync functions so they
     run in a thread pool, yielding control back to the event loop for I/O.
-
-    See: https://github.com/modelcontextprotocol/python-sdk/issues/671
     """
     original_tool = mcp.tool
 
@@ -89,21 +104,6 @@ def _patch_tool_decorator_for_windows():
         return original_tool(fn, *args, **kwargs)
 
     mcp.tool = patched_tool
-
-
-def _wrap_sync_in_thread(fn):
-    """Wrap a sync function to run in asyncio.to_thread(), preserving metadata."""
-
-    @functools.wraps(fn)
-    async def async_wrapper(**kwargs):
-        return await asyncio.to_thread(fn, **kwargs)
-
-    return async_wrapper
-
-
-# Apply subprocess patch early — before any Databricks SDK import
-if sys.platform == "win32":
-    _patch_subprocess_stdin()
 
 # ---------------------------------------------------------------------------
 # Server initialisation
@@ -132,6 +132,9 @@ if sys.platform == "win32":
 # Register middleware (see middleware.py for details on each)
 mcp.add_middleware(TimeoutHandlingMiddleware())
 
+# Apply async wrapper on Windows to prevent event loop deadlocks.
+# TODO: FastMCP 3.x automatically wraps sync functions in asyncio.to_thread().
+#       Test if this Windows-specific patch is still needed with FastMCP 3.x.
 if sys.platform == "win32":
     _patch_tool_decorator_for_windows()
 

@@ -6,8 +6,7 @@ from databricks_tools_core.unity_catalog import (
     list_volume_files as _list_volume_files,
     upload_to_volume as _upload_to_volume,
     download_from_volume as _download_from_volume,
-    delete_volume_file as _delete_volume_file,
-    delete_volume_directory as _delete_volume_directory,
+    delete_from_volume as _delete_from_volume,
     create_volume_directory as _create_volume_directory,
     get_volume_file_metadata as _get_volume_file_metadata,
 )
@@ -15,7 +14,7 @@ from databricks_tools_core.unity_catalog import (
 from ..server import mcp
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def list_volume_files(volume_path: str, max_results: int = 500) -> Dict[str, Any]:
     """
     List files and directories in a Unity Catalog volume path.
@@ -58,37 +57,47 @@ def list_volume_files(volume_path: str, max_results: int = 500) -> Dict[str, Any
     }
 
 
-@mcp.tool
+@mcp.tool(timeout=300)
 def upload_to_volume(
     local_path: str,
     volume_path: str,
+    max_workers: int = 4,
     overwrite: bool = True,
 ) -> Dict[str, Any]:
     """
-    Upload a local file to a Unity Catalog volume.
+    Upload local file(s) or folder(s) to a Unity Catalog volume.
+
+    Supports single files, folders, and glob patterns. Auto-creates directories.
 
     Args:
-        local_path: Path to local file to upload
-        volume_path: Target path in volume (e.g., "/Volumes/catalog/schema/volume/data.csv")
-        overwrite: Whether to overwrite existing file (default: True)
+        local_path: Local path - file, folder, or glob (e.g., "*.csv", "/path/*")
+        volume_path: Target volume path (e.g., "/Volumes/catalog/schema/volume/data")
+        max_workers: Parallel upload threads (default: 4)
+        overwrite: Overwrite existing files (default: True)
 
     Returns:
-        Dictionary with local_path, volume_path, success, and error (if failed)
+        Dictionary with total_files, successful, failed, success
     """
     result = _upload_to_volume(
         local_path=local_path,
         volume_path=volume_path,
+        max_workers=max_workers,
         overwrite=overwrite,
     )
     return {
-        "local_path": result.local_path,
-        "volume_path": result.volume_path,
+        "local_folder": result.local_folder,
+        "remote_folder": result.remote_folder,
+        "total_files": result.total_files,
+        "successful": result.successful,
+        "failed": result.failed,
         "success": result.success,
-        "error": result.error,
+        "failed_uploads": [{"local_path": r.local_path, "error": r.error} for r in result.get_failed_uploads()]
+        if result.failed > 0
+        else [],
     }
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def download_from_volume(
     volume_path: str,
     local_path: str,
@@ -118,45 +127,40 @@ def download_from_volume(
     }
 
 
-@mcp.tool
-def delete_volume_file(volume_path: str) -> Dict[str, Any]:
+@mcp.tool(timeout=120)
+def delete_from_volume(
+    volume_path: str,
+    recursive: bool = False,
+    max_workers: int = 4,
+) -> Dict[str, Any]:
     """
-    Delete a file from a Unity Catalog volume.
+    Delete a file or directory from a Unity Catalog volume.
+
+    For directories, use recursive=True to delete contents. Deletes in parallel (be careful with this).
 
     Args:
-        volume_path: Path to file in volume (e.g., "/Volumes/catalog/schema/volume/file.csv")
+        volume_path: Path to file or directory (e.g., "/Volumes/catalog/schema/volume/folder")
+        recursive: Delete directory contents (required for non-empty dirs)
+        max_workers: Parallel delete threads (default: 4)
 
     Returns:
-        Dictionary with volume_path and success status
+        Dictionary with success, files_deleted, directories_deleted, error
     """
-    try:
-        _delete_volume_file(volume_path)
-        return {"volume_path": volume_path, "success": True}
-    except Exception as e:
-        return {"volume_path": volume_path, "success": False, "error": str(e)}
+    result = _delete_from_volume(
+        volume_path=volume_path,
+        recursive=recursive,
+        max_workers=max_workers,
+    )
+    return {
+        "volume_path": result.volume_path,
+        "success": result.success,
+        "files_deleted": result.files_deleted,
+        "directories_deleted": result.directories_deleted,
+        "error": result.error,
+    }
 
 
-@mcp.tool
-def delete_volume_directory(volume_path: str) -> Dict[str, Any]:
-    """
-    Delete an empty directory from a Unity Catalog volume.
-
-    Note: Directory must be empty. Delete all contents first.
-
-    Args:
-        volume_path: Path to directory in volume
-
-    Returns:
-        Dictionary with volume_path and success status
-    """
-    try:
-        _delete_volume_directory(volume_path)
-        return {"volume_path": volume_path, "success": True}
-    except Exception as e:
-        return {"volume_path": volume_path, "success": False, "error": str(e)}
-
-
-@mcp.tool
+@mcp.tool(timeout=30)
 def create_volume_directory(volume_path: str) -> Dict[str, Any]:
     """
     Create a directory in a Unity Catalog volume.
@@ -177,7 +181,7 @@ def create_volume_directory(volume_path: str) -> Dict[str, Any]:
         return {"volume_path": volume_path, "success": False, "error": str(e)}
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_volume_file_info(volume_path: str) -> Dict[str, Any]:
     """
     Get metadata for a file in a Unity Catalog volume.

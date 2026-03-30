@@ -1,19 +1,16 @@
-# Project Initialization with databricks pipelines init
+# Project Initialization
 
-## Overview
-
-The `databricks pipelines init` command scaffolds a complete Databricks Asset Bundle project for Lakeflow Spark Declarative Pipelines, providing a production-ready structure with multi-environment support, pipeline configuration, and sample transformation files.
-
-**Benefits of Asset Bundles:**
-- Multi-environment deployments (dev/staging/prod)
-- Infrastructure as code with `databricks.yml`
-- Built-in CI/CD integration
-- Version control for pipeline configuration
-- Automated deployment workflows
+Two approaches for creating SDP pipelines with Declarative Automation Bundles (DABs):
+- **Option A**: Standalone new project using `databricks pipelines init`
+- **Option B**: Adding a pipeline to an existing bundle
 
 ---
 
-## Command Reference
+## Option A: Standalone New Pipeline Project
+
+Use `databricks pipelines init` to scaffold a complete DAB project with multi-environment support, pipeline configuration, and sample transformation files.
+
+### Command Reference
 
 ### Interactive Mode
 
@@ -241,184 +238,83 @@ databricks pipelines start-update --pipeline-id <id>
 
 ---
 
-## Language Detection (for Claude)
-
-When a user requests a new Lakeflow pipeline, Claude should detect the appropriate language from keywords in the prompt.
-
-### CRITICAL: Explicit Language Requests
-
-**If the user explicitly mentions a language, use it without asking:**
-
-| User Says | Action |
-|-----------|--------|
-| "Python pipeline", "Python SDP", "use Python" | **Use Python immediately** |
-| "SQL pipeline", "SQL files", "use SQL" | **Use SQL immediately** |
-| "Python Spark Declarative Pipeline" | **Use Python immediately** |
-
-**DO NOT ask for clarification when the user explicitly states a language.** This is the most common mistake - ignoring an explicit language request.
-
-### SQL Indicators (Default Choice When Ambiguous)
-
-**Keywords:**
-- "sql files", ".sql"
-- "simple", "basic", "straightforward"
-- "aggregations", "joins", "transformations"
-- "materialized view", "CREATE OR REFRESH"
-- "SELECT", "GROUP BY", "WHERE"
-
-**Context:**
-- User mentions only data transformations without complex logic
-- Request focuses on filtering, joining, aggregating data
-- No mention of custom functions or external integrations
-- **No explicit mention of "Python"**
-
-**Default Behavior**: Prefer SQL only when ambiguous AND no Python indicators present
-
-### Python Indicators
-
-**Keywords:**
-- "Python", "python files", ".py", "@dp.table"
-- "UDF", "user-defined function", "custom function"
-- "complex logic", "complex transformations"
-- "ML", "machine learning", "inference", "model"
-- "API", "external API", "REST", "HTTP"
-- "pandas", "numpy", "pyspark"
-- "decorator", "pyspark.pipelines"
-
-**Context:**
-- User needs custom data processing beyond SQL capabilities
-- Request mentions integrating with external services
-- Task requires ML model inference or scoring
-- Dynamic schema or path generation needed
-
-### Ambiguous Cases (Ask User)
-
-**Only ask when ALL conditions are met:**
-- User did NOT explicitly mention "Python" or "SQL"
-- Mixed signals present (some SQL keywords, some Python keywords)
-- OR no clear indicators either way
-
-**Response:**
-```
-I can create this pipeline using either SQL or Python:
-
-- **SQL**: Best for transformations, aggregations, joins (simpler, faster to develop)
-- **Python**: Best for custom logic, UDFs, ML inference, external APIs
-
-Which would you prefer?
-```
-
----
-
 ## Medallion Architecture
 
-For bronze/silver/gold organization, Asset Bundles support two approaches. Both work with the `transformations/**` glob pattern in pipeline configuration.
+For bronze/silver/gold organization, two file structure approaches work with Declarative Automation Bundles (DABs):
 
-### Option 1: Flat Structure with Naming (Template Default, SQL Example)
+### Option 1: Flat Structure with Prefixes (Recommended)
 
 ```
 transformations/
-├── bronze_raw_orders.sql          # Raw data ingestion
-├── bronze_raw_events.sql
-├── bronze_raw_customers.sql
-├── silver_cleaned_orders.sql      # Cleaned and validated
-├── silver_joined_data.sql
-├── silver_customer_profiles.sql
-├── gold_daily_metrics.sql         # Business aggregations
-├── gold_customer_summary.sql
-└── gold_revenue_analysis.sql
+├── bronze_orders.sql
+├── bronze_events.sql
+├── silver_orders.sql
+├── silver_events.sql
+├── gold_daily_metrics.sql
+└── gold_summary.sql
 ```
 
-**Advantages:**
-- Matches the official `databricks pipelines init` template structure
-- All files visible at one level
-- Simple file listing and discovery
-- Clear naming provides logical organization
-
-### Option 2: Subdirectories by Layer, SQL Example
+### Option 2: Subdirectories by Layer
 
 ```
 transformations/
 ├── bronze/
-│   ├── raw_orders.sql
-│   ├── raw_events.sql
-│   └── raw_customers.sql
+│   └── orders.sql
 ├── silver/
-│   ├── cleaned_orders.sql
-│   ├── joined_data.sql
-│   └── customer_profiles.sql
+│   └── orders.sql
 └── gold/
-    ├── daily_metrics.sql
-    ├── customer_summary.sql
-    └── revenue_analysis.sql
+    └── daily_metrics.sql
 ```
 
-**Advantages:**
-- Physical separation of layers
-- Familiar structure for teams using manual workflow
-- Easier to navigate large projects with many files
-- Works with `transformations/**` glob pattern
+Both work with `transformations/**` glob pattern. Choose based on team preference.
 
-**Both approaches are technically valid** - the `**` in the glob pattern matches files recursively. Choose based on team preference and project size.
+For syntax examples, see:
+- **[sql/1-syntax-basics.md](sql/1-syntax-basics.md)** - SQL table definitions
+- **[python/1-syntax-basics.md](python/1-syntax-basics.md)** - Python decorators
+- **[sql/2-ingestion.md](sql/2-ingestion.md)** - Bronze layer ingestion patterns
 
-### Example Bronze Layer (SQL)
+---
 
-```sql
--- File: bronze_raw_orders.sql
-CREATE OR REFRESH STREAMING TABLE bronze_raw_orders
-CLUSTER BY (order_date)
-COMMENT "Raw order data ingested from cloud storage"
-AS
-SELECT
-  *,
-  current_timestamp() AS _ingested_at,
-  _metadata.file_path AS _source_file
-FROM read_files(
-  '/Volumes/main/raw_data/orders/',
-  format => 'json',
-  schemaHints => 'order_id STRING, customer_id STRING, amount DECIMAL(10,2), order_date DATE'
-);
+## Option B: Adding a Pipeline to an Existing Bundle
+
+If you already have a `databricks.yml` for a larger project (e.g., an app with jobs, dashboards, etc.) and want to add a pipeline:
+
+### Step 1: Create Pipeline Resource File
+
+Create `resources/my_pipeline.pipeline.yml`:
+
+```yaml
+resources:
+  pipelines:
+    my_pipeline:
+      name: my_pipeline
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      libraries:
+        - file:
+            path: ../src/pipelines/my_pipeline/
 ```
 
-### Example Silver Layer (SQL)
+### Step 2: Add Pipeline Source Files
 
-```sql
--- File: silver_cleaned_orders.sql
-CREATE OR REFRESH MATERIALIZED VIEW silver_cleaned_orders
-CLUSTER BY (order_date)
-COMMENT "Cleaned and validated orders with customer enrichment"
-AS
-SELECT
-  o.order_id,
-  o.customer_id,
-  o.amount,
-  o.order_date,
-  c.customer_name,
-  c.customer_segment
-FROM LIVE.bronze_raw_orders o
-INNER JOIN LIVE.bronze_raw_customers c
-  ON o.customer_id = c.customer_id
-WHERE o.amount > 0  -- Remove invalid orders
-  AND o.order_date >= '2020-01-01';
+Create your pipeline transformation files:
+
+```
+src/pipelines/my_pipeline/
+├── bronze_ingest.sql
+├── silver_clean.sql
+└── gold_summary.sql
 ```
 
-### Example Gold Layer (SQL)
+### Step 3: Deploy
 
-```sql
--- File: gold_daily_metrics.sql
-CREATE OR REFRESH MATERIALIZED VIEW gold_daily_metrics
-CLUSTER BY (metric_date)
-COMMENT "Daily business metrics for reporting"
-AS
-SELECT
-  order_date AS metric_date,
-  COUNT(DISTINCT customer_id) AS unique_customers,
-  COUNT(*) AS total_orders,
-  SUM(amount) AS total_revenue,
-  AVG(amount) AS avg_order_value
-FROM LIVE.silver_cleaned_orders
-GROUP BY order_date;
+```bash
+databricks bundle deploy
+databricks bundle run my_pipeline
 ```
+
+That's it - the pipeline is now part of your existing bundle and shares the same targets/variables.
 
 ---
 
@@ -609,7 +505,7 @@ For advanced pipeline configuration options beyond the bundle initialization:
 - **Custom notifications**: Email or webhook alerts
 - **Non-serverless clusters**: When serverless limitations apply
 
-See [7-advanced-configuration.md](7-advanced-configuration.md) for detailed examples.
+See [3-advanced-configuration.md](3-advanced-configuration.md) for detailed examples.
 
 ---
 
@@ -668,45 +564,22 @@ resources:
 
 ## Best Practices
 
-### Project Organization
+1. **One table per file** - Each `.sql` or `.py` file defines a single table/view
+2. **Use variables** - Parameterize catalog and schema names for environment portability
+3. **Sensitive data** - Use secrets (`{{secrets/scope/key}}`), not hardcoded values
+4. **Test in dev first** - Run `databricks bundle validate` before deploy
+5. **Version control** - Track `databricks.yml` and pipeline configs in git
 
-1. **Use descriptive file names**: `bronze_orders_raw.sql` not just `orders.sql`
-2. **Choose structure approach**:
-   - **Flat with prefixes**: `bronze_*`, `silver_*`, `gold_*` (template default)
-   - **Subdirectories**: `bronze/`, `silver/`, `gold/` folders (also valid)
-   - Both work with `transformations/**` glob pattern
-3. **One table per file**: Each file defines a single table or view
-4. **Be consistent**: Pick one approach and use it throughout the project
-
-### Configuration Management
-
-1. **Use variables**: Parameterize catalog and schema names
-2. **Separate environments**: Define dev/staging/prod targets
-3. **Version control**: Track `databricks.yml` and pipeline configs in git
-4. **Sensitive data**: Use secrets, not hardcoded values
-
-### Development Workflow
-
-1. **Start with dev**: Always test in development environment first
-2. **Validate locally**: Run `databricks bundle validate` before deploy
-3. **Incremental changes**: Deploy and test small changes frequently
-4. **Use explorations**: Ad-hoc notebooks for data exploration
-
-### Deployment Strategy
-
-1. **CI/CD integration**: Automate deployments with GitHub Actions, GitLab CI
-2. **Approval gates**: Require approval for production deployments
-3. **Rollback plan**: Keep previous bundle versions for quick rollback
-4. **Monitor pipelines**: Set up notifications for failures
+For technical best practices (Liquid Clustering, serverless, etc.), see **[SKILL.md](SKILL.md#best-practices-2026)**.
 
 ---
 
 ## References
 
-- **[SKILL.md](SKILL.md)** - Main development workflow and MCP tools
-- **[Databricks Asset Bundles Documentation](https://docs.databricks.com/dev-tools/bundles/)** - Official bundle reference
+- **[SKILL.md](../SKILL.md)** - Main development workflow and MCP tools
+- **[Declarative Automation Bundles (DABs) Documentation](https://docs.databricks.com/dev-tools/bundles/)** - Official bundle reference
 - **[Pipeline Configuration Reference](https://docs.databricks.com/aws/en/ldp/configure-pipeline)** - Pipeline settings
 - **[Databricks CLI Reference](https://docs.databricks.com/dev-tools/cli/)** - CLI commands and options
-- **[1-ingestion-patterns.md](1-ingestion-patterns.md)** - Data ingestion patterns
-- **[2-streaming-patterns.md](2-streaming-patterns.md)** - Streaming transformations
-- **[7-advanced-configuration.md](7-advanced-configuration.md)** - Advanced pipeline settings
+- **[sql/2-ingestion.md](sql/2-ingestion.md)** or **[python/2-ingestion.md](python/2-ingestion.md)** - Data ingestion patterns
+- **[sql/3-streaming-patterns.md](sql/3-streaming-patterns.md)** or **[python/3-streaming-patterns.md](python/3-streaming-patterns.md)** - Streaming transformations
+- **[3-advanced-configuration.md](3-advanced-configuration.md)** - Advanced pipeline settings

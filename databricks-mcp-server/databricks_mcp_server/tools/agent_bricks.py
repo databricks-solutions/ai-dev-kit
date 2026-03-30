@@ -469,7 +469,7 @@ def _mas_delete(tile_id: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=180)
 def manage_ka(
     action: str,
     name: str = None,
@@ -546,7 +546,7 @@ def manage_ka(
         return {"error": f"Invalid action '{action}'. Must be one of: create_or_update, get, find_by_name, delete"}
 
 
-@mcp.tool
+@mcp.tool(timeout=180)
 def manage_mas(
     action: str,
     name: str = None,

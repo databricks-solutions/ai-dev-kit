@@ -53,7 +53,7 @@ def _find_app_by_name(name: str) -> Optional[Dict[str, Any]]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=180)
 def create_or_update_app(
     name: str,
     source_code_path: Optional[str] = None,
@@ -129,7 +129,7 @@ def create_or_update_app(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_app(
     name: Optional[str] = None,
     name_contains: Optional[str] = None,
@@ -184,7 +184,7 @@ def get_app(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def delete_app(name: str) -> Dict[str, str]:
     """
     Delete a Databricks App.

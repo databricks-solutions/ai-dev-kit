@@ -81,12 +81,6 @@ Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
 ________________________________________________________________________________
 
-AGPL-3.0 License (https://www.gnu.org/licenses/agpl-3.0.html)
-
-  pymupdf
-  https://github.com/pymupdf/PyMuPDF
-  Copyright (c) 2015-2024 Artifex Software, Inc.
-
 ________________________________________________________________________________
 
 LGPL-3.0 License (https://www.gnu.org/licenses/lgpl-3.0.html)

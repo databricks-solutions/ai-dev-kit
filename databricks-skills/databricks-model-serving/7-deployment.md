@@ -263,7 +263,7 @@ client.update_endpoint(
 
 | Step | MCP Tool | Waits? |
 |------|----------|--------|
-| Upload deploy script | `upload_folder` | Yes |
+| Upload deploy script | `upload_to_workspace` | Yes |
 | Create job (one-time) | `manage_jobs` (action="create") | Yes |
 | Run deployment | `manage_job_runs` (action="run_now") | **No** - returns immediately |
 | Check job status | `manage_job_runs` (action="get") | Yes |

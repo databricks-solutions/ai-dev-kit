@@ -35,7 +35,7 @@ A web application that provides a Claude Code agent interface with integrated Da
 │  │ Read, Write, Edit│         │ execute_sql             │    │ sdp       │  │
 │  │ Glob, Grep, Skill│         │ create_or_update_pipeline    │ dabs      │  │
 │  └──────────────────┘         │ upload_folder           │    │ sdk       │  │
-│                               │ run_python_file         │    │ ...       │  │
+│                               │ execute_code            │    │ ...       │  │
 │                               │ ...                     │    └───────────┘  │
 │                               └─────────────────────────┘                   │
 │                                          │                                  │
@@ -159,9 +159,9 @@ options = ClaudeAgentOptions(
 Tools are exposed as `mcp__databricks__<tool_name>` and include:
 - SQL execution (`execute_sql`, `execute_sql_multi`)
 - Warehouse management (`list_warehouses`, `get_best_warehouse`)
-- Cluster execution (`execute_databricks_command`, `run_python_file_on_databricks`)
+- Cluster execution (`execute_code`)
 - Pipeline management (`create_or_update_pipeline`, `start_update`, etc.)
-- File operations (`upload_file`, `upload_folder`)
+- File operations (`upload_to_workspace`)
 
 ### 4. Skills System
 

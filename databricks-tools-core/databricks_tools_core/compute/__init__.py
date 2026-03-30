@@ -16,7 +16,6 @@ from .execution import (
     destroy_context,
     execute_databricks_command,
     run_file_on_databricks,
-    run_python_file_on_databricks,
 )
 
 from .serverless import (
@@ -47,7 +46,6 @@ __all__ = [
     "destroy_context",
     "execute_databricks_command",
     "run_file_on_databricks",
-    "run_python_file_on_databricks",
     "ServerlessRunResult",
     "run_code_on_serverless",
     "create_cluster",

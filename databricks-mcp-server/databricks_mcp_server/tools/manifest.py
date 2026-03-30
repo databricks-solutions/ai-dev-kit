@@ -28,7 +28,7 @@ def _delete_from_databricks(resource_type: str, resource_id: str) -> Optional[st
         return str(exc)
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def list_tracked_resources(type: Optional[str] = None) -> Dict[str, Any]:
     """
     List resources tracked in the project manifest.
@@ -55,7 +55,7 @@ def list_tracked_resources(type: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def delete_tracked_resource(
     type: str,
     resource_id: str,

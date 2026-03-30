@@ -34,7 +34,7 @@ register_deleter("genie_space", _delete_genie_resource)
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def create_or_update_genie(
     display_name: str,
     table_identifiers: List[str],
@@ -212,7 +212,7 @@ def create_or_update_genie(
         return {"error": f"Failed to create/update Genie space '{display_name}': {e}"}
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_genie(space_id: Optional[str] = None, include_serialized_space: bool = False) -> Dict[str, Any]:
     """
     Get details of a Genie Space, or list all spaces.
@@ -295,7 +295,7 @@ def get_genie(space_id: Optional[str] = None, include_serialized_space: bool = F
         return {"error": str(e)}
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def delete_genie(space_id: str) -> Dict[str, Any]:
     """
     Delete a Genie Space.
@@ -326,7 +326,7 @@ def delete_genie(space_id: str) -> Dict[str, Any]:
         return {"success": False, "space_id": space_id, "error": str(e)}
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def migrate_genie(
     type: str,
     space_id: Optional[str] = None,
@@ -435,7 +435,7 @@ def migrate_genie(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def ask_genie(
     space_id: str,
     question: str,

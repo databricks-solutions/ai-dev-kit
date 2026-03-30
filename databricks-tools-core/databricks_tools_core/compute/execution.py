@@ -783,7 +783,3 @@ def _upload_to_workspace(code: str, language: str, workspace_path: str) -> None:
         format=ImportFormat.SOURCE,
         overwrite=True,
     )
-
-
-# Keep old name as alias for backwards compatibility
-run_python_file_on_databricks = run_file_on_databricks

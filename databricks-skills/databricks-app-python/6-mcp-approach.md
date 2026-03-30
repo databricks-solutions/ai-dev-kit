@@ -22,10 +22,10 @@ my_app/
 ### Step 2: Upload to Workspace
 
 ```python
-# MCP Tool: upload_folder
-upload_folder(
-    local_folder="/path/to/my_app",
-    workspace_folder="/Workspace/Users/user@example.com/my_app"
+# MCP Tool: upload_to_workspace
+upload_to_workspace(
+    local_path="/path/to/my_app",
+    workspace_path="/Workspace/Users/user@example.com/my_app"
 )
 ```
 
@@ -52,7 +52,7 @@ app = get_app(name="my-dashboard", include_logs=True)
 ### Step 5: Iterate
 
 1. Fix issues in local files
-2. Re-upload with `upload_folder`
+2. Re-upload with `upload_to_workspace`
 3. Re-deploy with `create_or_update_app` (will update existing + deploy)
 4. Check `get_app(name=..., include_logs=True)` for errors
 5. Repeat until app is healthy
@@ -66,7 +66,7 @@ app = get_app(name="my-dashboard", include_logs=True)
 | **`create_or_update_app`** | Create app if it doesn't exist, optionally deploy (pass `source_code_path`) |
 | **`get_app`** | Get app details by name (with `include_logs=True` for logs), or list all apps |
 | **`delete_app`** | Delete an app |
-| **`upload_folder`** | Upload local folder to workspace (shared tool) |
+| **`upload_to_workspace`** | Upload files/folders to workspace (shared tool) |
 
 ---
 

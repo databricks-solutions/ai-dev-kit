@@ -84,7 +84,7 @@ def _find_branch(project_name: str, branch_id: str) -> Optional[Dict[str, Any]]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def create_or_update_lakebase_database(
     name: str,
     type: str = "provisioned",
@@ -156,7 +156,7 @@ def create_or_update_lakebase_database(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_lakebase_database(
     name: Optional[str] = None,
     type: Optional[str] = None,
@@ -227,7 +227,7 @@ def get_lakebase_database(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def delete_lakebase_database(
     name: str,
     type: str = "provisioned",
@@ -262,7 +262,7 @@ def delete_lakebase_database(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def create_or_update_lakebase_branch(
     project_name: str,
     branch_id: str,
@@ -364,7 +364,7 @@ def create_or_update_lakebase_branch(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def delete_lakebase_branch(name: str) -> Dict[str, Any]:
     """
     Delete a Lakebase Autoscale branch and its compute endpoints.
@@ -387,7 +387,7 @@ def delete_lakebase_branch(name: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def create_or_update_lakebase_sync(
     instance_name: str,
     source_table_name: str,
@@ -470,7 +470,7 @@ def create_or_update_lakebase_sync(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def delete_lakebase_sync(
     table_name: str,
     catalog_name: Optional[str] = None,
@@ -508,7 +508,7 @@ def delete_lakebase_sync(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def generate_lakebase_credential(
     instance_names: Optional[List[str]] = None,
     endpoint: Optional[str] = None,

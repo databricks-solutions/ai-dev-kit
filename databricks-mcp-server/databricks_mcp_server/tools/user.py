@@ -7,7 +7,7 @@ from databricks_tools_core.auth import get_current_username
 from ..server import mcp
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_current_user() -> Dict[str, Any]:
     """
     Get the current authenticated Databricks user's identity.

@@ -250,7 +250,7 @@ function OverviewSection() {
               <div>
                 <p className="font-medium text-[var(--color-text-heading)]">Execute on Databricks</p>
                 <p className="text-sm text-[var(--color-text-muted)] mt-1">
-                  Call <code className="px-1 py-0.5 rounded bg-[var(--color-background)] text-xs">run_python_file_on_databricks()</code> - auto-selects best cluster, creates execution context, installs required libraries
+                  Call <code className="px-1 py-0.5 rounded bg-[var(--color-background)] text-xs">execute_code(file_path=...)</code> - auto-selects best cluster, creates execution context, installs required libraries
                 </p>
               </div>
             </div>

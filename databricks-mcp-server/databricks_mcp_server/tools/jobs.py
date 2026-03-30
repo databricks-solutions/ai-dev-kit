@@ -39,7 +39,7 @@ register_deleter("job", _delete_job_resource)
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def manage_jobs(
     action: str,
     job_id: int = None,
@@ -221,7 +221,7 @@ def manage_jobs(
 # =============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=300)
 def manage_job_runs(
     action: str,
     job_id: int = None,

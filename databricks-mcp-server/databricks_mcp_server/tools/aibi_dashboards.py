@@ -38,7 +38,7 @@ register_deleter("dashboard", _delete_dashboard_resource)
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def create_or_update_dashboard(
     display_name: str,
     parent_path: str,
@@ -49,7 +49,7 @@ def create_or_update_dashboard(
     """Create or update an AI/BI dashboard from JSON content.
 
     CRITICAL: Before calling this tool, you MUST:
-    1. Call get_table_details() to get table schemas
+    1. Call get_table_stats_and_schema() to get table schemas
     2. Call execute_sql() to TEST EVERY dataset query
     If you skip validation, widgets WILL show errors!
 
@@ -204,7 +204,7 @@ def create_or_update_dashboard(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_dashboard(
     dashboard_id: str = None,
     page_size: int = 25,
@@ -239,7 +239,7 @@ def get_dashboard(
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def delete_dashboard(dashboard_id: str) -> Dict[str, str]:
     """Soft-delete an AI/BI dashboard by moving it to trash.
 
@@ -268,7 +268,7 @@ def delete_dashboard(dashboard_id: str) -> Dict[str, str]:
 # ============================================================================
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def publish_dashboard(
     dashboard_id: str,
     warehouse_id: str = None,

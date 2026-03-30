@@ -2,7 +2,7 @@
 Integration tests for table statistics functions.
 
 Tests:
-- get_table_details
+- get_table_stats_and_schema
 - TableStatLevel (NONE, SIMPLE, DETAILED)
 - GLOB pattern matching
 - Caching behavior
@@ -10,7 +10,7 @@ Tests:
 
 import pytest
 from databricks_tools_core.sql import (
-    get_table_details,
+    get_table_stats_and_schema,
     TableStatLevel,
     TableSchemaResult,
 )
@@ -18,11 +18,11 @@ from databricks_tools_core.sql import (
 
 @pytest.mark.integration
 class TestGetTableDetails:
-    """Tests for get_table_details function."""
+    """Tests for get_table_stats_and_schema function."""
 
     def test_get_all_tables(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should list all tables when table_names is empty."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=[],
@@ -41,7 +41,7 @@ class TestGetTableDetails:
 
     def test_get_specific_tables(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should get specific tables by exact name."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers", "orders"],
@@ -68,7 +68,7 @@ class TestGetTableDetails:
             warehouse_id=warehouse_id,
         )
 
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["raw_*"],
@@ -92,7 +92,7 @@ class TestGetTableDetails:
             warehouse_id=warehouse_id,
         )
 
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["dim_?"],
@@ -106,7 +106,7 @@ class TestGetTableDetails:
 
     def test_mixed_patterns_and_exact(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should handle mix of glob patterns and exact names."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers", "raw_*"],
@@ -124,7 +124,7 @@ class TestTableStatLevelNone:
 
     def test_stat_level_none_returns_ddl(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should return DDL without column stats."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -151,7 +151,7 @@ class TestTableStatLevelNone:
 
         # NONE level
         start = time.time()
-        get_table_details(
+        get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -162,7 +162,7 @@ class TestTableStatLevelNone:
 
         # SIMPLE level (should be slower due to stats collection)
         start = time.time()
-        get_table_details(
+        get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["orders"],  # Different table to avoid cache
@@ -183,7 +183,7 @@ class TestTableStatLevelSimple:
 
     def test_stat_level_simple_has_basic_stats(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should return basic column statistics."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -209,7 +209,7 @@ class TestTableStatLevelSimple:
 
     def test_stat_level_simple_excludes_heavy_stats(self, warehouse_id, test_catalog, test_schema, test_tables):
         """SIMPLE level should not include histograms/percentiles."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["orders"],
@@ -232,7 +232,7 @@ class TestTableStatLevelSimple:
 
         # First call (cache miss)
         start = time.time()
-        result1 = get_table_details(
+        result1 = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["products"],
@@ -242,7 +242,7 @@ class TestTableStatLevelSimple:
 
         # Second call (should hit cache)
         start = time.time()
-        result2 = get_table_details(
+        result2 = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["products"],
@@ -265,7 +265,7 @@ class TestTableStatLevelDetailed:
 
     def test_stat_level_detailed_has_all_stats(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Should return all column statistics including heavy ones."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["orders"],
@@ -288,7 +288,7 @@ class TestTableStatLevelDetailed:
 
     def test_stat_level_detailed_has_row_count(self, warehouse_id, test_catalog, test_schema, test_tables):
         """DETAILED level should include total row count."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -302,7 +302,7 @@ class TestTableStatLevelDetailed:
 
     def test_stat_level_detailed_has_sample_data(self, warehouse_id, test_catalog, test_schema, test_tables):
         """DETAILED level should include sample data."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -317,7 +317,7 @@ class TestTableStatLevelDetailed:
 
     def test_categorical_columns_have_value_counts(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Categorical columns with low cardinality should have value_counts."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["orders"],
@@ -342,7 +342,7 @@ class TestTableInfoStructure:
 
     def test_table_info_has_full_name(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Table name should be fully qualified."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -355,7 +355,7 @@ class TestTableInfoStructure:
 
     def test_ddl_contains_columns(self, warehouse_id, test_catalog, test_schema, test_tables):
         """DDL should contain column definitions."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -372,7 +372,7 @@ class TestTableInfoStructure:
 
     def test_column_types_detected(self, warehouse_id, test_catalog, test_schema, test_tables):
         """Column types should be correctly detected."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["products"],
@@ -400,7 +400,7 @@ class TestTableSchemaResult:
 
     def test_table_count_property(self, warehouse_id, test_catalog, test_schema, test_tables):
         """table_count property should return correct count."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers", "orders"],
@@ -411,7 +411,7 @@ class TestTableSchemaResult:
 
     def test_keep_basic_stats_method(self, warehouse_id, test_catalog, test_schema, test_tables):
         """keep_basic_stats() should remove heavy stats."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["orders"],
@@ -433,7 +433,7 @@ class TestTableSchemaResult:
 
     def test_remove_stats_method(self, warehouse_id, test_catalog, test_schema, test_tables):
         """remove_stats() should remove all column details."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],
@@ -460,7 +460,7 @@ class TestAutoWarehouseSelection:
 
     def test_auto_selects_warehouse(self, test_catalog, test_schema, test_tables):
         """Should auto-select warehouse if not provided."""
-        result = get_table_details(
+        result = get_table_stats_and_schema(
             catalog=test_catalog,
             schema=test_schema,
             table_names=["customers"],

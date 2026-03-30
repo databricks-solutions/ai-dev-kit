@@ -11,7 +11,7 @@ from databricks_tools_core.serving import (
 from ..server import mcp
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
     """
     Get the status of a Model Serving endpoint.
@@ -44,7 +44,7 @@ def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
     return _get_serving_endpoint_status(name=name)
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def query_serving_endpoint(
     name: str,
     messages: Optional[List[Dict[str, str]]] = None,
@@ -105,7 +105,7 @@ def query_serving_endpoint(
     )
 
 
-@mcp.tool
+@mcp.tool(timeout=30)
 def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
     """
     List Model Serving endpoints in the workspace.

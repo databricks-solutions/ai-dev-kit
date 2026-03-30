@@ -6,7 +6,7 @@ Functions for executing SQL queries, managing SQL warehouses, and getting table 
 
 from .sql import execute_sql, execute_sql_multi
 from .warehouse import list_warehouses, get_best_warehouse
-from .table_stats import get_table_details, get_volume_folder_details
+from .table_stats import get_table_stats_and_schema, get_volume_folder_details
 from .sql_utils import (
     SQLExecutionError,
     TableStatLevel,
@@ -26,7 +26,7 @@ __all__ = [
     "list_warehouses",
     "get_best_warehouse",
     # Table statistics
-    "get_table_details",
+    "get_table_stats_and_schema",
     "get_volume_folder_details",
     "TableStatLevel",
     "TableSchemaResult",

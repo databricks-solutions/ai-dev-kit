@@ -13,7 +13,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 1: Get table schemas via get_table_details(catalog, schema)  │
+│  STEP 1: Get table schemas via get_table_stats_and_schema(catalog, schema)  │
 ├─────────────────────────────────────────────────────────────────────┤
 │  STEP 2: Write SQL queries for each dataset                        │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -34,7 +34,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 | Tool | Description |
 |------|-------------|
-| `get_table_details` | **STEP 1**: Get table schemas for designing queries |
+| `get_table_stats_and_schema` | **STEP 1**: Get table schemas for designing queries |
 | `execute_sql` | **STEP 3**: Test SQL queries - MANDATORY before deployment! |
 | `get_best_warehouse` | Get available warehouse ID |
 | `create_or_update_dashboard` | **STEP 5**: Deploy dashboard JSON (only after validation!) |
@@ -55,7 +55,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 ## Implementation Guidelines
 
-### 1) DATASET ARCHITECTURE (STRICT)
+### 1) DATASET ARCHITECTURE
 
 - **One dataset per domain** (e.g., orders, customers, products)
 - **Exactly ONE valid SQL query per dataset** (no multiple queries separated by `;`)
@@ -159,7 +159,7 @@ y=12: Table (w=6, h=6) - Detailed data
 | High cardinality | **Table only** | customer_id, order_id, SKU |
 
 **Before creating any chart with color/grouping:**
-1. Check column cardinality (use `get_table_details` to see distinct values)
+1. Check column cardinality (use `get_table_stats_and_schema` to see distinct values)
 2. If >10 distinct values, aggregate to higher level OR use TOP-N + "Other" bucket
 3. For high-cardinality dimensions, use a table widget instead of a chart
 

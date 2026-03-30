@@ -1,5 +1,6 @@
 """Tests for the TimeoutHandlingMiddleware."""
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
 
@@ -35,50 +36,66 @@ async def test_normal_call_passes_through(middleware):
 
 
 @pytest.mark.asyncio
-async def test_timeout_returns_structured_result(middleware):
+async def test_timeout_error_returns_structured_result(middleware):
     """TimeoutError is caught and converted to a structured JSON result."""
     call_next = AsyncMock(side_effect=TimeoutError("Run did not complete within 3600 seconds"))
-    ctx = _make_context(
-        tool_name="wait_for_run",
-        arguments={"run_id": 42, "timeout": 3600},
-    )
+    ctx = _make_context(tool_name="wait_for_run")
 
     result = await middleware.on_call_tool(ctx, call_next)
 
-    # Should return a ToolResult, not raise
     assert result is not None
     assert len(result.content) == 1
 
     payload = json.loads(result.content[0].text)
-    assert payload["timed_out"] is True
+    assert payload["error"] is True
+    assert payload["error_type"] == "timeout"
     assert payload["tool"] == "wait_for_run"
-    assert payload["arguments"] == {"run_id": 42, "timeout": 3600}
     assert "3600 seconds" in payload["message"]
     assert "Do NOT retry" in payload["action_required"]
 
 
 @pytest.mark.asyncio
-async def test_non_timeout_exceptions_propagate(middleware):
-    """Non-timeout exceptions are NOT caught — they propagate normally."""
-    call_next = AsyncMock(side_effect=ValueError("bad input"))
-    ctx = _make_context()
+async def test_asyncio_timeout_error_returns_structured_result(middleware):
+    """asyncio.TimeoutError is caught and converted to a structured JSON result."""
+    call_next = AsyncMock(side_effect=asyncio.TimeoutError())
+    ctx = _make_context(tool_name="long_running_tool")
 
-    with pytest.raises(ValueError, match="bad input"):
-        await middleware.on_call_tool(ctx, call_next)
+    result = await middleware.on_call_tool(ctx, call_next)
+
+    assert result is not None
+    payload = json.loads(result.content[0].text)
+    assert payload["error"] is True
+    assert payload["error_type"] == "timeout"
+    assert payload["tool"] == "long_running_tool"
 
 
 @pytest.mark.asyncio
-async def test_timeout_preserves_arguments(middleware):
-    """The structured result includes the original arguments for debugging."""
-    call_next = AsyncMock(side_effect=TimeoutError("timed out"))
-    args = {"pipeline_id": "abc-123", "update_id": "upd-456", "timeout": 1800}
-    ctx = _make_context(
-        tool_name="wait_for_pipeline_update",
-        arguments=args,
-    )
+async def test_cancelled_error_returns_structured_result(middleware):
+    """asyncio.CancelledError is caught and converted to a structured JSON result."""
+    call_next = AsyncMock(side_effect=asyncio.CancelledError())
+    ctx = _make_context(tool_name="cancelled_tool")
 
     result = await middleware.on_call_tool(ctx, call_next)
-    payload = json.loads(result.content[0].text)
 
-    assert payload["arguments"] == args
-    assert payload["tool"] == "wait_for_pipeline_update"
+    assert result is not None
+    payload = json.loads(result.content[0].text)
+    assert payload["error"] is True
+    assert payload["error_type"] == "cancelled"
+    assert payload["tool"] == "cancelled_tool"
+
+
+@pytest.mark.asyncio
+async def test_generic_exception_returns_structured_result(middleware):
+    """Generic exceptions are caught and converted to structured JSON results."""
+    call_next = AsyncMock(side_effect=ValueError("bad input"))
+    ctx = _make_context(tool_name="failing_tool")
+
+    result = await middleware.on_call_tool(ctx, call_next)
+
+    # Should return a ToolResult, not raise
+    assert result is not None
+    payload = json.loads(result.content[0].text)
+    assert payload["error"] is True
+    assert payload["error_type"] == "ValueError"
+    assert payload["tool"] == "failing_tool"
+    assert "bad input" in payload["message"]

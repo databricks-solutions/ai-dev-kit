@@ -18,25 +18,13 @@ class MCPExecuteSQL(Protocol):
     ) -> List[Dict[str, Any]]: ...
 
 
-class MCPUploadFile(Protocol):
-    """Protocol for MCP upload_file tool."""
+class MCPUploadToVolume(Protocol):
+    """Protocol for MCP upload_to_volume tool (UC Volumes)."""
 
     def __call__(
         self,
         local_path: str,
-        workspace_path: str,
-        overwrite: bool = True,
-    ) -> Dict[str, Any]: ...
-
-
-class MCPUploadFolder(Protocol):
-    """Protocol for MCP upload_folder tool."""
-
-    def __call__(
-        self,
-        local_folder: str,
-        workspace_folder: str,
-        max_workers: int = 10,
+        volume_path: str,
         overwrite: bool = True,
     ) -> Dict[str, Any]: ...
 
@@ -245,7 +233,7 @@ def upload_test_files(
     catalog: str,
     schema: str,
     volume: str,
-    mcp_upload_file: MCPUploadFile,
+    mcp_upload_to_volume: MCPUploadToVolume,
     base_path: Optional[str] = None,
 ) -> FixtureResult:
     """Upload test files to UC volume.
@@ -255,7 +243,7 @@ def upload_test_files(
         catalog: Catalog name
         schema: Schema name
         volume: Volume name
-        mcp_upload_file: MCP tool for file upload
+        mcp_upload_to_volume: MCP tool for volume file upload
         base_path: Optional base path for resolving relative local paths
 
     Returns:
@@ -270,20 +258,20 @@ def upload_test_files(
         if base_path and not Path(local_path).is_absolute():
             local_path = str(Path(base_path) / local_path)
 
-        workspace_path = f"{volume_base}/{file_map.volume_path}"
+        target_path = f"{volume_base}/{file_map.volume_path}"
 
         try:
-            result = mcp_upload_file(
+            result = mcp_upload_to_volume(
                 local_path=local_path,
-                workspace_path=workspace_path,
+                volume_path=target_path,
                 overwrite=True,
             )
             if result.get("success", False):
-                uploaded.append(workspace_path)
+                uploaded.append(target_path)
             else:
-                failed.append({"path": workspace_path, "error": result.get("error", "Unknown error")})
+                failed.append({"path": target_path, "error": result.get("error", "Unknown error")})
         except Exception as e:
-            failed.append({"path": workspace_path, "error": str(e)})
+            failed.append({"path": target_path, "error": str(e)})
 
     success = len(failed) == 0
     return FixtureResult(
@@ -343,7 +331,7 @@ def create_test_table(
 def setup_fixtures(
     config: TestFixtureConfig,
     mcp_execute_sql: MCPExecuteSQL,
-    mcp_upload_file: MCPUploadFile,
+    mcp_upload_to_volume: MCPUploadToVolume,
     mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None,
     base_path: Optional[str] = None,
 ) -> FixtureResult:
@@ -355,7 +343,7 @@ def setup_fixtures(
     Args:
         config: TestFixtureConfig with all fixture definitions
         mcp_execute_sql: MCP tool for SQL execution
-        mcp_upload_file: MCP tool for file upload
+        mcp_upload_to_volume: MCP tool for volume file upload
         mcp_get_best_warehouse: Optional MCP tool for warehouse detection
         base_path: Optional base path for resolving relative file paths
 
@@ -407,7 +395,7 @@ def setup_fixtures(
 
         # 4. Upload files
         upload_result = upload_test_files(
-            config.files, config.catalog, config.schema, config.volume, mcp_upload_file, base_path
+            config.files, config.catalog, config.schema, config.volume, mcp_upload_to_volume, base_path
         )
         results.append(("files", upload_result))
         if not upload_result.success:

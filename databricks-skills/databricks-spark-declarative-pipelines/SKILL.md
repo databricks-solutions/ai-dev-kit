@@ -1,148 +1,188 @@
 ---
 name: databricks-spark-declarative-pipelines
-description: "Creates, configures, and updates Databricks Lakeflow Spark Declarative Pipelines (SDP/LDP) using serverless compute. Handles streaming tables, materialized views, CDC, SCD Type 2, and Auto Loader ingestion patterns. Use when building data pipelines, working with Delta Live Tables, ingesting streaming data, implementing change data capture, or when the user mentions SDP, LDP, DLT, Lakeflow pipelines, streaming tables, or bronze/silver/gold medallion architectures."
+description: "Creates, configures, and updates Databricks Lakeflow Spark Declarative Pipelines (SDP/LDP) using serverless compute. Handles data ingestion with streaming tables, materialized views, CDC, SCD Type 2, and Auto Loader ingestion patterns. Use when building data pipelines, working with Delta Live Tables, ingesting streaming data, implementing change data capture, or when the user mentions SDP, LDP, DLT, Lakeflow pipelines, streaming tables, or bronze/silver/gold medallion architectures."
 ---
 
 # Lakeflow Spark Declarative Pipelines (SDP)
 
-IMPORTANT: If this is a new pipeline (one does not already exist), see Quick Start. Be sure to use whatever language user has specified only (Python or SQL). Be sure to use Databricks Asset Bundles for new projects.
-
 ---
 
 ## Critical Rules (always follow)
-- **MUST** confirm language as Python or SQL. Stick with that language unless told otherwise.
-- **MUST** if not modifying an existing pipeline, use [Quick Start](#quick-start) below.
-- **MUST** create serverless pipelines  by default. ** Only use classic clusters if user explicitly requires R language, Spark RDD APIs, or JAR libraries.
+
+### Syntax: CREATE OR REFRESH (not CREATE OR REPLACE)
+- **MUST** use `CREATE OR REFRESH` for SDP objects:
+  - `CREATE OR REFRESH STREAMING TABLE` - for streaming tables
+  - `CREATE OR REFRESH MATERIALIZED VIEW` - for materialized views
+- **NEVER** use `CREATE OR REPLACE` - that is standard SQL syntax, not SDP syntax
+
+### Simplicity First
+- **MUST** create the minimal number of tables to solve the task
+- Simplicity first: prefer single pipeline even for multi-schema setups - use fully qualified names (`catalog.schema.table`)
+- When asked to "create a silver table" or "create a gold table", create **ONE table** - not a multi-layer pipeline
+- Don't add intermediate tables, staging tables, or helper views unless explicitly requested
+- A silver transformation = 1 streaming table reading from bronze
+- A gold aggregation = 1 materialized view reading from silver
+- Create bronze→silver→gold chains when the user asks for a "pipeline" or "medallion architecture" or full/detailed ingestion. Otherwise keep it simple - don't over engineer.
+
+### Language Selection
+- **MUST** know the language (Python or SQL). For simple task / pipeline / table creation, pick SQL. For complex pipeline with parametrized information, or if the user mentions python-related items pick python. If you have a doubt, ask the user. Stick with that language unless told otherwise.
+
+| User Says | Action |
+|-----------|--------|
+| "Python pipeline", "Python SDP", "use Python", "udf", "pandas", "ml inference", "pyspark" | **User wants Python** |
+| "SQL pipeline", "SQL files", "use SQL" | **User wants SQL** |
+| "Create a simple pipeline", "create a table", "an aggregation" | **Pick SQL as it's simple** |
+
+### Other Rules
+- **MUST** create serverless pipelines by default. Only use classic clusters if user explicitly requires R language, Spark RDD APIs, or JAR libraries.
+- **MUST** choose the right workflow based on context (see below).
+- When the user provides table schema and asks for code, respond directly with the code. Don't ask clarifying questions if the request is clear.
+
+## Tools
+- List files in volume: `databricks fs ls dbfs:/Volumes/{catalog}/{schema}/{volume}/{path} --profile {PROFILE}`
+- Query data: `databricks experimental aitools tools query --profile {PROFILE} --warehouse abc123 "SELECT 1 FROM catalog.schema.table"`
+- Discover schema: `databricks experimental aitools tools discover-schema --profile {PROFILE} catalog.schema.table1 catalog.schema.table2`
+- Pipelines CLI: `databricks pipelines init|deploy|run|logs|stop` or use `databricks pipelines --help` for more options
+
+## Choose Your Workflow
+
+**First, determine which workflow to use:**
+
+### Option A: Standalone New Pipeline Project (use `databricks pipelines init`)
+
+Use this when the user wants to **create a new, standalone SDP project** that will have its own DAB:
+- User asks: "Create a new pipeline", "Build me an SDP", "Set up a new data pipeline"
+- No existing `databricks.yml` in the workspace
+- The pipeline IS the project (not part of a larger demo/app)
 
 
-## Required Steps
+Use `databricks pipeline` CLI commands:
+```bash
+databricks pipelines init --output-dir . --config-file init-config.json
+```
 
-Copy this checklist and verify each item:
+**Example init-config.json:**
+```json
+{
+  "project_name": "customer_pipeline",
+  "initial_catalog": "prod_catalog",
+  "use_personal_schema": "no",
+  "initial_language": "sql"
+}
+```
+
+→ See [1-project-initialization.md](references/1-project-initialization.md)
+→ 
+
+
+### Option B: Pipeline within Existing Bundle (edit the bundle)
+
+Use this when the pipeline is **part of an existing DAB project**:
+- There's already a `databricks.yml` file in the project
+- User is adding a pipeline to an existing app/demo
+
+→ See [1-project-initialization.md](references/1-project-initialization.md) for adding pipelines to existing bundles
+
+### Option C: Rapid Iteration with MCP Tools (no bundle management)
+
+Use this when you need to **quickly create, test, and iterate** on a pipeline without managing bundle files:
+- User wants to "just run a pipeline and see if it works"
+- Part of a larger demo where bundle is managed separately, or the DAB bundle will be created at the end as you want to quickly test the project first
+- Prototyping or experimenting with pipeline logic
+- User explicitly asks to use MCP tools
+
+→ See [2-mcp-approach.md](references/2-mcp-approach.md) for MCP-based workflow
+
+---
+
+## Required Checklist
+
+Before writing pipeline code, make sure you have:
 ```
 - [ ] Language selected: Python or SQL
-- [ ] Compute type decided: serverless or classic compute
-- [ ] Decide on multiple catalogs or schemas vs. all in one default schema
-- [ ] Consider what should be parameterized at the pipeline level to make deployment easy.
-- [ ] Consider [Multi-Schema Patterns](#multi-schema-patterns) below, ask if unclear on best choices.
-- [ ] Consider [Modern Defaults](#modern-defaults) below, ask if unclear on best choices.
-
-
-## Quick Start: Initialize New Pipeline Project
-
-**RECOMMENDED**: Use `databricks pipelines init` to create production-ready Asset Bundle projects with multi-environment support.
-
-### When to Use Bundle Initialization
-
-Use bundle initialization for **New pipeline projects** for a professional structure from the start
-
-Use manual workflow for:
-- Quick prototyping without multi-environment needs
-- Existing manual projects you want to continue
-- Learning/experimentation
-
-### Step 1: Initialize Project
-
-I will automatically run this command when you request a new pipeline:
-
-```bash
-databricks pipelines init
+- [ ] Read the syntax basics: **SQL**: Always Read [sql/1-syntax-basics.md](references/sql/1-syntax-basics.md), **Python**: Always Read [python/1-syntax-basics.md](references/python/1-syntax-basics.md)
+- [ ] Workflow chosen: Standalone DAB / Existing DAB / MCP iteration
+- [ ] Compute type: serverless (default) or classic
+- [ ] Schema strategy: single schema with prefixes vs. multi-schema
+- [ ] Consider [Multi-Schema Patterns](#multi-schema-patterns) and [Modern Defaults](#modern-defaults)
 ```
 
-**Interactive Prompts:**
-- **Project name**: e.g., `customer_orders_pipeline`
-- **Initial catalog**: Unity Catalog name (e.g., `main`, `prod_catalog`)
-- **Personal schema per user?**: `yes` for dev (each user gets their own schema), `no` for prod
-- **Language**: SQL or Python (auto-detected from your request - see language detection below)
+**Then read additional guides based on what the pipeline needs, when you need it:**
+| If the pipeline needs... | Read |
+|--------------------------|------|
+| File ingestion (Auto Loader, JSON, CSV, Parquet) | `references/sql/2-ingestion.md` or `references/python/2-ingestion.md` |
+| Kafka, Event Hub, or Kinesis streaming | `references/sql/2-ingestion.md` or `references/python/2-ingestion.md` |
+| Deduplication, windowed aggregations, joins | `references/sql/3-streaming-patterns.md` or `references/python/3-streaming-patterns.md` |
+| CDC, SCD Type 1/2, or history tracking | `references/sql/4-cdc-patterns.md` or `references/python/4-cdc-patterns.md` |
+| Performance tuning, Liquid Clustering | `references/sql/5-performance.md` or `references/python/5-performance.md` |
 
-**Generated Structure:**
-```
-my_pipeline/
-├── databricks.yml              # Multi-environment config (dev/prod)
-├── resources/
-│   └── *_etl.pipeline.yml      # Pipeline resource definition
-└── src/
-    └── *_etl/
-        ├── explorations/       # Exploratory code in .ipynb
-        └── transformations/    # Your .sql or .py files here
-```
-
-### Step 2: Customize Transformations
-
-Replace the example code created by the init process with custom transformation files in `src/transformations/` based on provided requirements, using best practice guidance from this skill.
-
-**For Python pipelines using cloudFiles**: Ask the user where to store Auto Loader schema metadata. Recommend:
-```
-/Volumes/{catalog}/{schema}/{pipeline_name}_metadata/schemas
-```
-
-### Step 3: Deploy and Run
-
-```bash
-# Deploy to workspace (dev by default)
-databricks bundle deploy
-
-# Run pipeline
-databricks bundle run my_pipeline_etl
-
-# Deploy to production
-databricks bundle deploy --target prod
-```
-
+---
 
 ## Quick Reference
 
 | Concept | Details |
 |---------|---------|
-| **Names** | SDP = Spark Declarative Pipelines = LDP = Lakeflow Declarative Pipelines = Lakeflow Pipelines (all interchangeable) |
+| **Names** | SDP = Spark Declarative Pipelines = LDP = Lakeflow Declarative Pipelines (all interchangeable) |
+| **SQL Syntax** | `CREATE OR REFRESH STREAMING TABLE`, `CREATE OR REFRESH MATERIALIZED VIEW` |
 | **Python Import** | `from pyspark import pipelines as dp` |
 | **Primary Decorators** | `@dp.table()`, `@dp.materialized_view()`, `@dp.temporary_view()` |
-| **Temporary Views** | `@dp.temporary_view()` creates in-pipeline temporary views (no catalog/schema, no cluster_by). Useful for intermediate logic before AUTO CDC or when a view needs multiple references without persistence. |
-| **Replaces** | Delta Live Tables (DLT) with `import dlt` |
-| **Based On** | Apache Spark 4.1+ (Databricks' modern data pipeline framework) |
-| **Docs** | https://docs.databricks.com/aws/en/ldp/developer/python-dev |
+
+### Legacy APIs (Do NOT Use)
+
+| Legacy | Modern Replacement |
+|--------|-------------------|
+| `import dlt` | `from pyspark import pipelines as dp` |
+| `dlt.apply_changes()` | `dp.create_auto_cdc_flow()` |
+| `dlt.read()` / `dlt.read_stream()` | `spark.read` / `spark.readStream` |
+| `CREATE LIVE XXX` | `CREATE OR REFRESH STREAMING TABLE\|MATERIALIZED VIEW` |
+| `PARTITION BY` + `ZORDER` | `CLUSTER BY` (Liquid Clustering) |
+| `input_file_name()` | `_metadata.file_path` |
+| `target` parameter | `schema` parameter |
+
+### Streaming Table vs Materialized View
+
+| Use Case | Type | Pattern |
+|----------|------|---------|
+| Windowed aggregations (tumbling, sliding, session) | Streaming Table | `FROM stream(source)` + `GROUP BY window()` |
+| Full-table aggregations (totals, daily counts) | Materialized View | `FROM source` (no stream wrapper) |
+| CDC / SCD Type 2 | Streaming Table | `AUTO CDC INTO` or `dp.create_auto_cdc_flow()` |
+
+Use streaming tables for windowed aggregations to enable incremental processing. Use materialized views for simple aggregations that recompute fully on each refresh.
 
 ---
 
-## Detailed guides
+## Task-Based Routing
 
-**Ingestion patterns**: Use [1-ingestion-patterns.md](1-ingestion-patterns.md) when planning how to get new data into your Lakeflow pipeline —- covers file formats, batch/streaming options, and tips for incremental and full loads. (Keywords: Auto Loader, Kafka, Event Hub, Kinesis, file formats)
+After choosing your workflow (see [Choose Your Workflow](#choose-your-workflow)), determine the specific task:
 
-**Streaming pipeline patterns**: See [2-streaming-patterns.md](2-streaming-patterns.md) for designing pipelines with streaming data sources, change data detection, triggers, and windowing. (Keywords: deduplication, windowing, stateful operations, joins)
+**Choose documentation by language:**
 
-**SCD query patterns**: See [3-scd-query-patterns.md](3-scd-query-patterns.md) for querying Slowly Changing Dimensions Type 2 history tables, including current state queries, point-in-time analysis, temporal joins, and change tracking. (Keywords: SCD Type 2 history tables, temporal joins, querying historical data)
+### SQL Documentation
+| Task | Guide |
+|------|-------|
+| **SQL syntax basics** | [sql/1-syntax-basics.md](references/sql/1-syntax-basics.md) |
+| **Data ingestion (Auto Loader, Kafka)** | [sql/2-ingestion.md](references/sql/2-ingestion.md) |
+| **Streaming patterns (deduplication, windows)** | [sql/3-streaming-patterns.md](references/sql/3-streaming-patterns.md) |
+| **CDC patterns (AUTO CDC, SCD, queries)** | [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md) |
+| **Performance tuning** | [sql/5-performance.md](references/sql/5-performance.md) |
 
-**Performance tuning**: Use [4-performance-tuning.md](4-performance-tuning.md) for optimizing pipelines with Liquid Clustering, state management, and best practices for high-performance streaming workloads. (Keywords: Liquid Clustering, optimization, state management)
+### Python Documentation
+| Task | Guide |
+|------|-------|
+| **Python syntax basics** | [python/1-syntax-basics.md](references/python/1-syntax-basics.md) |
+| **Data ingestion (Auto Loader, Kafka)** | [python/2-ingestion.md](references/python/2-ingestion.md) |
+| **Streaming patterns (deduplication, windows)** | [python/3-streaming-patterns.md](references/python/3-streaming-patterns.md) |
+| **CDC patterns (AUTO CDC, SCD, queries)** | [python/4-cdc-patterns.md](references/python/4-cdc-patterns.md) |
+| **Performance tuning** | [python/5-performance.md](references/python/5-performance.md) |
 
-**Python API reference**: See [5-python-api.md](5-python-api.md) for the modern `pyspark.pipelines` (dp) API reference and migration from legacy `dlt` API patterns. (Keywords: dp API, dlt API comparison)
+### General Documentation
+| Task | Guide |
+|------|-------|
+| **Setting up standalone pipeline project** | [1-project-initialization.md](references/1-project-initialization.md) |
+| **Rapid iteration with MCP tools** | [2-mcp-approach.md](references/2-mcp-approach.md) |
+| **Advanced configuration** | [3-advanced-configuration.md](references/3-advanced-configuration.md) |
+| **Migrating from DLT** | [4-dlt-migration.md](references/4-dlt-migration.md) |
 
-**DLT migration**: Use [6-dlt-migration.md](6-dlt-migration.md) when migrating existing Delta Live Tables (DLT) pipelines to Spark Declarative Pipelines (SDP). (Keywords: migrating DLT pipelines to SDP)
-
-**Advanced configuration**: See [7-advanced-configuration.md](7-advanced-configuration.md) for advanced pipeline settings including development mode, continuous execution, notifications, Python dependencies, and custom cluster configurations. (Keywords: extra_settings parameter reference, examples)
-
-**Project initialization**: Use [8-project-initialization.md](8-project-initialization.md) for setting up new pipeline projects with `databricks pipelines init`, Asset Bundles, multi-environment deployments, and language detection logic. (Keywords: databricks pipelines init, Asset Bundles, language detection, migration guides)
-
-**AUTO CDC patterns**: Use [9-auto_cdc.md](9-auto_cdc.md) for implementing Change Data Capture with AUTO CDC, including Slow Changing Dimensions (SCD Type 1 and Type 2) for tracking changes and deduplication. (Keywords: AUTO CDC, Slow Changing Dimension, SCD, SCD Type 1, SCD Type 2, change data capture, deduplication)
-
----
-
-## Workflow
-
-1. Determine the task type:
-
-   **Setting up new project?** → Read [8-project-initialization.md](8-project-initialization.md) first
-   **Creating new pipeline?** → Read [1-ingestion-patterns.md](1-ingestion-patterns.md)
-   **Creating stream table?** → Read [2-streaming-patterns.md](2-streaming-patterns.md)
-   **Querying SCD history tables?** → Read [3-scd-query-patterns.md](3-scd-query-patterns.md)
-   **Implementing AUTO CDC or SCD?** → Read [9-auto_cdc.md](9-auto_cdc.md)
-   **Performance issues?** → Read [4-performance-tuning.md](4-performance-tuning.md)
-   **Using Python API?** → Read [5-python-api.md](5-python-api.md)
-   **Migrating from DLT?** → Read [6-dlt-migration.md](6-dlt-migration.md)
-   **Advanced configuration?** → Read [7-advanced-configuration.md](7-advanced-configuration.md)
-   **Validating?** → Read [7-advanced-configuration.md](7-advanced-configuration.md) (dry_run, development mode)
-
-2. Follow the instructions in the relevant guide
-
-3. Repeat for next task type
 ---
 
 ## Official Documentation
@@ -154,365 +194,126 @@ databricks bundle deploy --target prod
 - **[Change Data Capture (CDC)](https://docs.databricks.com/aws/en/ldp/cdc)** - AUTO CDC, SCD Type 1/2
 
 
-### Medallion Architecture Pattern                                                                                                                                                            
-  **Bronze Layer (Raw)**                                                                                                                                                                                                             
-  - Raw data ingested from sources in original format                                                                                                                                                                                
-  - Minimal transformations (append-only, add metadata like `_ingested_at`, `_source_file`)                                                                                                                                          
-  - Single source of truth preserving data lineage                                                                                                                                                                                   
-                                                                                                                                                                                                                                     
-  **Silver Layer (Validated)**                                                                                                                                                                                                       
-  - Cleaned and validated data.
-  - Might deduplicate here with auto_cdc, but often wait until the final step for auto_cdc if possible.                                                                                                                                                                                        
-  - Business logic applied (type casting, quality checks, filtering invalid records)                                                                                                                                                 
-  - Enterprise view of key business entities                                                                                                                                                                                         
-  - Enables self-service analytics and ML                                                                                                                                                                                            
-                                                                                                                                                                                                                                     
-  **Gold Layer (Business-Ready)**                                                                                                                                                                                                    
-  - Aggregated, denormalized, project-specific tables                                                                                                                                                                                
-  - Optimized for consumption (reporting, dashboards, BI tools)                                                                                                                                                                      
-  - Fewer joins, read-optimized data models
-  - Kimball star schema tables - dim_<entity_name>, fact_<entity_name>
-  - Deduplication often happens here via Slow Changing Dimensions (SCD), using auto_cdc. Sometimes that will happen upstream in silver instead, such as when joining multiple tables or business users plan to query the table from silver.                                                                                                                                                                       
-                                                                                                                                                                                                                                     
-  **Typical Flow (Can vary)**                                                                                                                                                                                                                  
-  Bronze: read_files() or spark.readStream.format("cloudFiles") → streaming table                                                                                                                                                                                             
-  Silver: read bronze → filter/clean/validate → streaming table
-  Gold: read silver → aggregate/denormalize → auto_cdc or materialized view                                                                                                                                                                      
-                                                                                                                                                                                                                        
-  Sources:                                                                                                                                                                                                                           
-  - https://www.databricks.com/glossary/medallion-architecture                                                                                                                                                                       
-  - https://docs.databricks.com/aws/en/lakehouse/medallion                                                                                                                                                                           
-  - https://www.databricks.com/blog/2022/06/24/data-warehousing-modeling-techniques-and-their-implementation-on-the-databricks-lakehouse-platform.html
-  
+### Medallion Architecture
+
+| Layer | SDP Pattern | Common Practices |
+|-------|-------------|------------------|
+| **Bronze** | `STREAM read_files()` → streaming table | Often adds `_metadata.file_path`, `_ingested_at`. Minimal transforms, append-only. |
+| **Silver** | `stream(bronze)` → streaming table | Clean/validate, type casting, quality filters. Prefer `DECIMAL(p,s)` for money. Dedup can happen here or gold. |
+| **Gold** | `AUTO CDC INTO` or materialized view | Aggregated, denormalized. SCD/dedup often via `AUTO CDC`. Star schema typically uses `dim_*`/`fact_*`. |
+
 **For medallion architecture** (bronze/silver/gold), two approaches work:
 - **Flat with naming** (template default): `bronze_*.sql`, `silver_*.sql`, `gold_*.sql`
 - **Subdirectories**: `bronze/orders.sql`, `silver/cleaned.sql`, `gold/summary.sql`
 
-Both work with the `transformations/**` glob pattern. Choose based on preference.
+Both work with the `transformations/**` glob pattern. Choose based on preference/existing.
 
-See **[8-project-initialization.md](8-project-initialization.md)** for complete details on bundle initialization, migration, and troubleshooting.
+See **[1-project-initialization.md](references/1-project-initialization.md)** for complete details on bundle initialization, migration, and troubleshooting.
 
 ---
 ## General SDP development guidance
-### Step 1: Write Pipeline Files Locally
 
-Create `.sql` or `.py` files in a local folder:
-
-```
-my_pipeline/
-├── bronze/
-│   ├── ingest_orders.sql       # SQL (default for most cases)
-│   └── ingest_events.py        # Python (for complex logic)
-├── silver/
-│   └── clean_orders.sql
-└── gold/
-    └── daily_summary.sql
-```
-
-**SQL Example** (`bronze/ingest_orders.sql`):
+**SQL Example:**
 ```sql
 CREATE OR REFRESH STREAMING TABLE bronze_orders
 CLUSTER BY (order_date)
-AS
-SELECT
-  *,
-  current_timestamp() AS _ingested_at,
-  _metadata.file_path AS _source_file
-FROM read_files(
-  '/Volumes/catalog/schema/raw/orders/',
-  format => 'json',
-  schemaHints => 'order_id STRING, customer_id STRING, amount DECIMAL(10,2), order_date DATE'
-);
+AS SELECT *, current_timestamp() AS _ingested_at
+FROM STREAM read_files('/Volumes/catalog/schema/raw/orders/', format => 'json');
 ```
 
-**Python Example** (`bronze/ingest_events.py`):
+**Python Example:**
 ```python
 from pyspark import pipelines as dp
-from pyspark.sql.functions import col, current_timestamp
-
-# Get schema location from pipeline configuration
-schema_location_base = spark.conf.get("schema_location_base")
 
 @dp.table(name="bronze_events", cluster_by=["event_date"])
 def bronze_events():
-    return (
-        spark.readStream.format("cloudFiles")
-        .option("cloudFiles.format", "json")
-        .option("cloudFiles.schemaLocation", f"{schema_location_base}/bronze_events")
-        .load("/Volumes/catalog/schema/raw/events/")
-        .withColumn("_ingested_at", current_timestamp())
-        .withColumn("_source_file", col("_metadata.file_path"))
-    )
+    return spark.readStream.format("cloudFiles").option("cloudFiles.format", "json").load("/Volumes/...")
 ```
 
-**IMPORTANT for Python Pipelines**: When using `spark.readStream.format("cloudFiles")` for cloud storage ingestion, with schema inference (no schema specified), you **must specify a schema location**.
-
-**Always ask the user** where to store Auto Loader schema metadata. Recommend:
-```
-/Volumes/{catalog}/{schema}/{pipeline_name}_metadata/schemas
-```
-
-Example: `/Volumes/my_catalog/pipeline_metadata/orders_pipeline_metadata/schemas`
-
-**Never use the source data volume** - this causes permission conflicts. The schema location should be configured in the pipeline settings and accessed via `spark.conf.get("schema_location_base")`.
-
-**Language Selection:**
-
-**CRITICAL RULE**: If the user explicitly mentions "Python" in their request (e.g., "Python Spark Declarative Pipeline", "Python SDP", "use Python"), **ALWAYS use Python without asking**. The same applies to SQL - if they say "SQL pipeline", use SQL.
-
-- **Explicit language request**: User says "Python" → Use Python. User says "SQL" → Use SQL. **Do not ask for clarification.**
-- **Auto-detection** (only when no explicit language mentioned):
-  - **SQL indicators**: "sql files", "simple transformations", "aggregations", "materialized view", "CREATE OR REFRESH"
-  - **Python indicators**: ".py files", "UDF", "complex logic", "ML inference", "external API", "@dp.table", "pandas", "decorator"
-- **Prompt for clarification** only when language intent is truly ambiguous (no explicit mention, mixed signals)
-- **Default to SQL** only when ambiguous AND no Python indicators present
-
-See **[8-project-initialization.md](8-project-initialization.md)** for detailed language detection logic.
-
-
-## Option 1: Pipelines with DABs: 
-Use asset bundles and pipeline CLI.
-See [Quick Start](#quick-start) and **[8-project-initialization.md](8-project-initialization.md)** for complete details.
-
-## Option 2: Manual Workflow (Advanced)
-
-For rapid prototyping, experimentation, or when you prefer direct control without Asset Bundles, use the manual workflow with MCP tools.
-
-Use MCP tools to create, run, and iterate on **serverless SDP pipelines**. The **primary tool is `create_or_update_pipeline`** which handles the entire lifecycle.
-
-**IMPORTANT: Always create serverless pipelines (default).** Only use classic clusters if user explicitly ask for classic, pro, advances compute or requires R language, Spark RDD APIs, or JAR libraries.
-
-See **[10-mcp-approach.md](10-mcp-approach.md)** for detailed guide.
-
+For detailed syntax, see [sql/1-syntax-basics.md](references/sql/1-syntax-basics.md) or [python/1-syntax-basics.md](references/python/1-syntax-basics.md).
 
 ## Best Practices (2026)
 
 ### Project Structure
-- **Default to `databricks pipelines init`** for new projects (creates Asset Bundle)
-- **Use Asset Bundles** for multi-environment deployments (dev/staging/prod)
-- **Manual structure only** for quick prototypes or legacy migration
-- **Medallion architecture**: Two approaches work with Asset Bundles:
-  - **Flat structure** (template default): `bronze_*.sql`, `silver_*.sql`, `gold_*.sql` in `transformations/`
-  - **Subdirectories**: `transformations/bronze/`, `transformations/silver/`, `transformations/gold/`
-  - Both work with the `transformations/**` glob pattern - choose based on team preference
-- See **[8-project-initialization.md](8-project-initialization.md)** for project setup details
+- **Standalone pipeline projects**: Use `databricks pipelines init` for Asset Bundle with multi-environment support
+- **Pipeline in existing bundle**: Add to `resources/*.pipeline.yml`
+- **Rapid iteration/prototyping**: Use MCP tools, formalize in bundle later
+- See **[1-project-initialization.md](references/1-project-initialization.md)** for project setup details
 
 ### Minimal pipeline config pointers
 - Define parameters in your pipeline’s configuration and access them in code with spark.conf.get("key").
 - In Databricks Asset Bundles, set these under resources.pipelines.<pipeline>.configuration; validate with databricks bundle validate.
 
 ### Modern Defaults
-- **CLUSTER BY** (Liquid Clustering), not PARTITION BY - see [4-performance-tuning.md](4-performance-tuning.md)
-- **Raw `.sql`/`.py` files**, not notebooks
-- **Serverless compute ONLY** - Do not use classic clusters unless explicitly required
+- **Always use raw `.sql`/`.py` files for the transformations files** - NO notebooks in your pipeline. Pipeline code must be plain files.
+- **Databricks notebook source for explorations** - Use `# Databricks notebook source` format with `# COMMAND ----------` separators for ad-hoc queries. See [examples/exploration_notebook.py](scripts/exploration_notebook.py).
+- **Serverless compute** - Do not use classic clusters unless explicitly required (R, RDD APIs, JAR libraries)
 - **Unity Catalog** (required for serverless)
-- **read_files()** when using SQL for cloud storage ingestion - see [1-ingestion-patterns.md](1-ingestion-patterns.md)
+- **CLUSTER BY** (Liquid Clustering), not PARTITION BY with ZORDER - see [sql/5-performance.md](references/sql/5-performance.md) or [python/5-performance.md](references/python/5-performance.md)
+- **read_files()** for SQL cloud storage ingestion - always consume a folder, not a single file - see [sql/2-ingestion.md](references/sql/2-ingestion.md)
 
 ### Multi-Schema Patterns
 
-**Default: Single target schema per pipeline.** Each pipeline has one target `catalog` and `schema` where all tables are written.
+**Preferred: One pipeline writing to multiple schemas** using fully qualified table names (`catalog.schema.table`). This keeps dependencies clear and is simpler to manage than multiple pipelines.
 
+- **Python**: `@dp.table(name="catalog.bronze_schema.orders")`
+- **SQL**: `CREATE OR REFRESH STREAMING TABLE catalog.silver_schema.orders_clean AS ...`
 
-#### Option 1: Single Pipeline, Single Schema with Prefixes (Recommended)
+For detailed examples, see **[3-advanced-configuration.md](references/3-advanced-configuration.md#multi-schema-patterns)**.
 
-Use one schema with table name prefixes to distinguish layers:
-
-```python
-# All tables write to: catalog.schema.bronze_*, silver_*, gold_*
-@dp.table(name="bronze_orders")  # → catalog.schema.bronze_orders
-@dp.table(name="silver_orders")  # → catalog.schema.silver_orders
-@dp.table(name="gold_summary")   # → catalog.schema.gold_summary
-```
-
-**Advantages:**
-- Simpler configuration (one pipeline)
-- All tables in one schema for easy discovery
-
-#### Option 2:
-Use varaiables to specific separate catalog and/or schema for different steps.
-
-Below are Python SDP examples that source variables from pipeline configs via spark.conf.get, and use the default catalog/schema for bronze.
-
-##### Same catalog, separate schemas; bronze uses pipeline defaults
-- Set your pipeline’s default catalog and default schema to the bronze layer (for example, catalog=my_catalog, schema=bronze). When you omit catalog/schema in code, reads/writes go to these defaults.
-- Use pipeline parameters for the other schemas and any source schema/path, retrieved in code with spark.conf.get(...).
-
-```python
-from pyspark import pipelines as dp
-from pyspark.sql.functions import col
-
-# Pull variables from pipeline configuration parameters
-silver_schema = spark.conf.get("silver_schema")  # e.g., "silver"
-gold_schema   = spark.conf.get("gold_schema")    # e.g., "gold"
-landing_schema = spark.conf.get("landing_schema")  # e.g., "landing"
-
-# Bronze → uses default catalog/schema (set to bronze in pipeline settings)
-@dp.table(name="orders_bronze")
-def orders_bronze():
-    # Read from another schema in the same default catalog
-    return spark.readStream.table(f"{landing_schema}.orders_raw")
-
-# Silver → same catalog, schema from parameter
-@dp.table(name=f"{silver_schema}.orders_clean")
-def orders_clean():
-    return (spark.read.table("orders_bronze")  # unqualified = default catalog/schema
-            .filter(col("order_id").isNotNull()))
-
-# Gold → same catalog, schema from parameter
-@dp.materialized_view(name=f"{gold_schema}.orders_by_date")
-def orders_by_date():
-    return (spark.read.table(f"{silver_schema}.orders_clean")
-            .groupBy("order_date")
-            .count().withColumnRenamed("count", "order_count"))
-```
-- Using unqualified names for bronze ensures it lands in the pipeline’s default catalog/schema; silver/gold are explicitly schema-qualified within the same catalog.
+**Fallback**: If all tables must be in the same schema, use name prefixes (`bronze_*`, `silver_*`, `gold_*`).
 
 ---
 
-##### Custom catalog/schema per layer; bronze still uses pipeline defaults
-- Keep bronze in the pipeline defaults (default catalog/schema set to your bronze layer). For silver/gold, use fully-qualified names with catalog and schema variables from pipeline configuration.
+## Post-Run Validation (Required)
 
-```python
-from pyspark import pipelines as dp
-from pyspark.sql.functions import col
+After running a pipeline (via DAB or MCP), you **MUST** validate both the execution status AND the actual data.
 
-# Pull variables from pipeline configuration parameters
-silver_catalog = spark.conf.get("silver_catalog")  # e.g., "my_catalog"
-silver_schema  = spark.conf.get("silver_schema")   # e.g., "silver"
-gold_catalog   = spark.conf.get("gold_catalog")    # e.g., "my_catalog"
-gold_schema    = spark.conf.get("gold_schema")     # e.g., "gold"
-landing_catalog = spark.conf.get("landing_catalog")  # optional, if source is in another catalog
-landing_schema  = spark.conf.get("landing_schema")
+### Step 1: Check Pipeline Execution Status
 
-# Bronze → uses default catalog/schema (set to bronze)
-@dp.table(name="orders_bronze")
-def orders_bronze():
-    # If source is in a specified catalog/schema:
-    return spark.readStream.table(f"{landing_catalog}.{landing_schema}.orders_raw")
+**From MCP (`run_pipeline` or `create_or_update_pipeline`):**
+- Check `result["success"]` and `result["state"]`
+- If failed, check `result["message"]` and `result["errors"]` for details
 
-# Silver → custom catalog + schema via parameters
-@dp.table(name=f"{silver_catalog}.{silver_schema}.orders_clean")
-def orders_clean():
-    # Read bronze by its unqualified name (defaults), or fully qualify if preferred
-    return (spark.read.table("orders_bronze")
-            .filter(col("order_id").isNotNull()))
+**From DAB (`databricks bundle run`):**
+- Check the command output for success/failure
+- Use `get_pipeline(pipeline_id=...)` to get detailed status and recent events
 
-# Gold → custom catalog + schema via parameters
-@dp.materialized_view(name=f"{gold_catalog}.{gold_schema}.orders_by_date}")
-def orders_by_date():
-    return (spark.read.table(f"{silver_catalog}.{silver_schema}.orders_clean")
-            .groupBy("order_date")
-            .count().withColumnRenamed("count", "order_count"))
+### Step 2: Validate Output Data
+
+Even if the pipeline reports SUCCESS, you **MUST** verify the data is correct:
+
 ```
-- Multipart names in the decorator’s name argument let you publish to explicit catalog.schema targets within one pipeline.
-- Unqualified reads/writes use the pipeline defaults; use fully-qualified names when crossing catalogs or when you need explicit namespace control.
-
----
-
-
-**Note:** The `@dp.table()` decorator does not currently support separate for `schema=` or `catalog=` parameters. The table parameter is a string that contains the catalog.schema.table_name, or it can leave off catalog and or schema to use the pipeilnes configured default target schema.
-
-### Reading Tables in Python
-
-**Modern SDP Best Practice:**
-- Use `spark.read.table()` for batch reads
-- Use `spark.readStream.table()` for streaming reads
-- Don't use `dp.read()` or `dp.read_stream()` (old syntax, no longer documented)
-- Don't use `dlt.read()` or `dlt.read_stream()` (legacy DLT API)
-
-**Key Point:** SDP automatically tracks table dependencies from standard Spark DataFrame operations. No special read APIs are needed.
-
-#### Three-Tier Identifier Resolution
-
-SDP supports three levels of table name qualification:
-
-| Level | Syntax | When to Use |
-|-------|--------|-------------|
-| **Unqualified** | `spark.read.table("my_table")` | Reading tables within the same pipeline's target catalog/schema (recommended) |
-| **Partially-qualified** | `spark.read.table("other_schema.my_table")` | Reading from different schema in same catalog |
-| **Fully-qualified** | `spark.read.table("other_catalog.other_schema.my_table")` | Reading from external catalogs/schemas |
-
-#### Option 1: Unqualified Names (Recommended for Pipeline Tables)
-
-**Best practice for tables within the same pipeline.** SDP resolves unqualified names to the pipeline's configured target catalog and schema. This makes code portable across environments (dev/prod).
-
-```python
-@dp.table(name="silver_clean")
-def silver_clean():
-    # Reads from pipeline's target catalog/schema (e.g., dev_catalog.dev_schema.bronze_raw)
-    return (
-        spark.read.table("bronze_raw")
-        .filter(F.col("valid") == True)
-    )
-
-@dp.table(name="silver_events")
-def silver_events():
-    # Streaming read from same pipeline's bronze_events table
-    return (
-        spark.readStream.table("bronze_events")
-        .withColumn("processed_at", F.current_timestamp())
-    )
+# MCP Tool: get_table_stats_and_schema - validates schema, row counts, and stats
+get_table_stats_and_schema(
+    catalog="my_catalog",
+    schema="my_schema",
+    table_names=["bronze_*", "silver_*", "gold_*"]  # Use glob patterns
+)
 ```
 
-#### Option 2: Pipeline Parameters (For External Sources)
+**Check for:**
+- Empty tables (row_count = 0) - indicates ingestion or filtering issues
+- Unexpected row counts - joins may have exploded or filtered too much
+- Missing columns - schema mismatch or transformation errors
+- NULL values in key columns - data quality issues
 
-**Use `spark.conf.get()` to parameterize external catalog/schema references.** Define parameters in pipeline configuration, then reference them at the module level.
+### Step 3: Debug Data Issues
 
-```python
-from pyspark import pipelines as dp
-from pyspark.sql import functions as F
+If validation reveals problems, trace upstream to find the root cause:
 
-# Get parameterized values at module level (evaluated once at pipeline start)
-source_catalog = spark.conf.get("source_catalog")
-source_schema = spark.conf.get("source_schema", "sales")  # with default
+1. **Start from the problematic table** - identify what's wrong (empty, wrong counts, bad data)
+2. **Check its source table** - use `get_table_stats_and_schema` on the upstream table
+3. **Trace back to bronze** - continue until you find where the issue originates
+4. **Common causes:**
+   - Bronze empty → source files missing or path incorrect
+   - Silver empty → filter too aggressive or join condition wrong
+   - Gold wrong counts → aggregation logic error or duplicate keys
+   - Data mismatch → type casting issues or NULL handling
 
-@dp.table(name="transaction_summary")
-def transaction_summary():
-    return (
-        spark.read.table(f"{source_catalog}.{source_schema}.transactions")
-        .groupBy("account_id")
-        .agg(
-            F.count("txn_id").alias("txn_count"),
-            F.sum("txn_amount").alias("account_revenue")
-        )
-    )
-```
+5. **Fix the SQL/Python code**, re-upload, and re-run the pipeline
 
-**Configure parameters in pipeline settings:**
-- **Asset Bundles**: Add to `pipeline.yml` under `configuration:`
-- **Manual/MCP**: Pass via `extra_settings.configuration` dict
-
-```yaml
-# In resources/my_pipeline.pipeline.yml
-configuration:
-  source_catalog: "shared_catalog"
-  source_schema: "sales"
-```
-
-#### Option 3: Fully-Qualified Names (For Fixed External References)
-
-Use when referencing specific external tables that don't change across environments:
-
-```python
-@dp.table(name="enriched_orders")
-def enriched_orders():
-    # Pipeline-internal table (unqualified)
-    orders = spark.read.table("bronze_orders")
-
-    # External reference table (fully-qualified)
-    products = spark.read.table("shared_catalog.reference.products")
-
-    return orders.join(products, "product_id")
-```
-
-#### Choosing the Right Approach
-
-| Scenario | Recommended Approach |
-|----------|---------------------|
-| Reading tables created in same pipeline | **Unqualified names** - portable, uses target catalog/schema |
-| Reading from external source that varies by environment | **Pipeline parameters** - configurable per deployment |
-| Reading from shared/reference tables with fixed location | **Fully-qualified names** - explicit and clear |
-| Mixed pipeline (some internal, some external) | **Combine approaches** - unqualified for internal, parameters for external |
+**Do NOT use `execute_sql` with COUNT queries for validation** - `get_table_stats_and_schema` is faster and returns more information in a single call.
 
 ---
 
@@ -520,15 +321,15 @@ def enriched_orders():
 
 | Issue | Solution |
 |-------|----------|
-| **Empty output tables** | Use `get_table_details` to verify, check upstream sources |
+| **Empty output tables** | Use `get_table_stats_and_schema` to check upstream sources. Verify source files exist and paths are correct. |
 | **Pipeline stuck INITIALIZING** | Normal for serverless, wait a few minutes |
 | **"Column not found"** | Check `schemaHints` match actual data |
 | **Streaming reads fail** | For file ingestion in a streaming table, you must use the `STREAM` keyword with `read_files`: `FROM STREAM read_files(...)`. For table streams use `FROM stream(table)`. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
 | **Timeout during run** | Increase `timeout`, or use `wait_for_completion=False` and check status with `get_pipeline` |
 | **MV doesn't refresh** | Enable row tracking on source tables |
-| **SCD2: query column not found** | Lakeflow uses `__START_AT` and `__END_AT` (double underscore), not `START_AT`/`END_AT`. Use `WHERE __END_AT IS NULL` for current rows. See [3-scd-query-patterns.md](3-scd-query-patterns.md). |
-| **AUTO CDC parse error at APPLY/SEQUENCE** | Put `APPLY AS DELETE WHEN` **before** `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source (omit `_rescued_data` unless bronze uses rescue data). Omit `TRACK HISTORY ON *` if it causes "end of input" errors; default is equivalent. See [2-streaming-patterns.md](2-streaming-patterns.md). |
-| **"Cannot create streaming table from batch query"** | In a streaming table query, use `FROM STREAM read_files(...)` so `read_files` leverages Auto Loader; `FROM read_files(...)` alone is batch. See [1-ingestion-patterns.md](1-ingestion-patterns.md) and [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
+| **SCD2: query column not found** | Lakeflow uses `__START_AT` and `__END_AT` (double underscore), not `START_AT`/`END_AT`. Use `WHERE __END_AT IS NULL` for current rows. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
+| **AUTO CDC parse error at APPLY/SEQUENCE** | Put `APPLY AS DELETE WHEN` **before** `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source (omit `_rescued_data` unless bronze uses rescue data). Omit `TRACK HISTORY ON *` if it causes "end of input" errors; default is equivalent. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
+| **"Cannot create streaming table from batch query"** | In a streaming table query, use `FROM STREAM read_files(...)` so `read_files` leverages Auto Loader; `FROM read_files(...)` alone is batch. See [sql/2-ingestion.md](references/sql/2-ingestion.md) and [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
 
 **For detailed errors**, the `result["message"]` from `create_or_update_pipeline` includes suggested next steps. Use `get_pipeline(pipeline_id=...)` which includes recent events and error details.
 
@@ -536,7 +337,7 @@ def enriched_orders():
 
 ## Advanced Pipeline Configuration
 
-For advanced configuration options (development mode, continuous pipelines, custom clusters, notifications, Python dependencies, etc.), see **[7-advanced-configuration.md](7-advanced-configuration.md)**.
+For advanced configuration options (development mode, continuous pipelines, custom clusters, notifications, Python dependencies, etc.), see **[3-advanced-configuration.md](references/3-advanced-configuration.md)**.
 
 ---
 

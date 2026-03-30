@@ -17,7 +17,7 @@ When evaluating tool selection in agent traces:
 ### 1. MCP Over Bash
 If a Databricks MCP tool exists for the operation, the agent MUST use it:
 - SQL queries → `mcp__databricks__execute_sql` (not `Bash` + `databricks sql`)
-- File uploads → `mcp__databricks__upload_file_to_volume` (not `Bash` + `databricks fs cp`)
+- File uploads → `mcp__databricks__upload_to_volume` (not `Bash` + `databricks fs cp`)
 - Job management → `mcp__databricks__create_job`, `mcp__databricks__run_job` (not REST API via curl)
 - Cluster ops → `mcp__databricks__create_cluster` (not CLI via Bash)
 - Workspace files → `mcp__databricks__workspace_get_object` (not Bash + `databricks workspace export`)

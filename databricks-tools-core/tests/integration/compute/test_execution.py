@@ -1,8 +1,8 @@
 """
 Integration tests for compute execution functions.
 
-Tests execute_databricks_command, run_file_on_databricks (with language detection,
-workspace_path persistence), and backwards-compatible run_python_file_on_databricks.
+Tests execute_databricks_command and run_file_on_databricks (with language detection,
+workspace_path persistence).
 """
 
 import logging
@@ -13,7 +13,6 @@ from pathlib import Path
 from databricks_tools_core.compute import (
     execute_databricks_command,
     run_file_on_databricks,
-    run_python_file_on_databricks,
     list_clusters,
     get_best_cluster,
     destroy_context,
@@ -194,8 +193,8 @@ class TestExecuteDatabricksCommand:
 
 
 @pytest.mark.integration
-class TestRunPythonFileOnDatabricks:
-    """Tests for run_python_file_on_databricks function."""
+class TestRunFileOnDatabricksBasic:
+    """Basic tests for run_file_on_databricks function."""
 
     def test_simple_file_execution(self, shared_context):
         """Should execute a simple Python file."""
@@ -207,7 +206,7 @@ class TestRunPythonFileOnDatabricks:
             temp_path = f.name
 
         try:
-            result = run_python_file_on_databricks(
+            result = run_file_on_databricks(
                 file_path=temp_path,
                 cluster_id=shared_context["cluster_id"],
                 context_id=shared_context["context_id"],
@@ -238,7 +237,7 @@ print(f"Row count: {df.count()}")
             temp_path = f.name
 
         try:
-            result = run_python_file_on_databricks(
+            result = run_file_on_databricks(
                 file_path=temp_path,
                 cluster_id=shared_context["cluster_id"],
                 context_id=shared_context["context_id"],
@@ -265,7 +264,7 @@ print(f"Row count: {df.count()}")
             temp_path = f.name
 
         try:
-            result = run_python_file_on_databricks(
+            result = run_file_on_databricks(
                 file_path=temp_path,
                 cluster_id=shared_context["cluster_id"],
                 context_id=shared_context["context_id"],
@@ -285,7 +284,7 @@ print(f"Row count: {df.count()}")
 
     def test_file_not_found(self):
         """Should handle missing file gracefully (no cluster needed)."""
-        result = run_python_file_on_databricks(file_path="/nonexistent/path/to/file.py", timeout=120)
+        result = run_file_on_databricks(file_path="/nonexistent/path/to/file.py", timeout=120)
 
         print("\n=== File Not Found Result ===")
         print(f"Success: {result.success}")
@@ -297,15 +296,10 @@ print(f"Row count: {df.count()}")
 
 @pytest.mark.integration
 class TestRunFileOnDatabricks:
-    """Tests for run_file_on_databricks (renamed from run_python_file_on_databricks).
+    """Tests for run_file_on_databricks.
 
-    Covers: language auto-detection, multi-language support, workspace_path persistence,
-    backwards compatibility alias.
+    Covers: language auto-detection, multi-language support, workspace_path persistence.
     """
-
-    def test_backwards_compat_alias(self):
-        """run_python_file_on_databricks should be an alias for run_file_on_databricks."""
-        assert run_python_file_on_databricks is run_file_on_databricks
 
     def test_python_auto_detect(self, shared_context):
         """Should auto-detect Python from .py extension."""

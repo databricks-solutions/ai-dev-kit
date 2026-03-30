@@ -122,6 +122,13 @@ Include column-level descriptions in the plan (these become column comments in U
 
 **Do NOT proceed to code generation until user approves the plan, including the catalog.**
 
+### Post-Generation Checklist
+
+After generating data, use `get_volume_folder_details` to validate the output matches requirements:
+- Row counts match the plan
+- Schema matches expected columns and types
+- Data distributions look reasonable (check column stats)
+
 ## Quick Start: Spark + Faker + Pandas UDFs
 
 ```python
@@ -131,8 +138,9 @@ from pyspark.sql.types import StringType, DoubleType
 import pandas as pd
 import numpy as np
 
-# Setup with managed dependencies (databricks-connect 16.4+)
-env = DatabricksEnv().withDependencies("faker", "pandas", "numpy")
+# Setup serverless session with dependencies installed on the cluster
+# IMPORTANT: Any library used inside Pandas UDFs (faker, holidays, etc.) must be listed here
+env = DatabricksEnv().withDependencies("faker")
 spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
 
 # Define Pandas UDFs
@@ -264,5 +272,6 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 | Referential integrity errors | Write master table to Delta first, read back for FK joins |
 | `PERSIST TABLE is not supported on serverless` | **NEVER use `.cache()` or `.persist()` with serverless** - write to Delta table first, then read back |
 | `F.window` vs `Window` confusion | Use `from pyspark.sql.window import Window` for `row_number()`, `rank()`, etc. `F.window` is for streaming only. |
+| Broadcast variables not supported | **NEVER use `spark.sparkContext.broadcast()` with serverless** |
 
 See [references/6-troubleshooting.md](references/6-troubleshooting.md) for full troubleshooting guide.

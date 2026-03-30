@@ -27,7 +27,7 @@ def _has_glob_pattern(name: str) -> bool:
     return any(c in name for c in ["*", "?", "[", "]"])
 
 
-def get_table_details(
+def get_table_stats_and_schema(
     catalog: str,
     schema: str,
     table_names: Optional[List[str]] = None,
@@ -35,7 +35,10 @@ def get_table_details(
     warehouse_id: Optional[str] = None,
 ) -> TableSchemaResult:
     """
-    Get detailed information about tables in a schema.
+    Get schema and statistics for tables in a Unity Catalog schema.
+
+    Returns column names, data types, row counts, and optionally detailed
+    column-level statistics (cardinality, min/max, histograms, percentiles).
 
     Supports three modes based on table_names:
     1. Empty list or None: List all tables in the schema
@@ -52,9 +55,10 @@ def get_table_details(
             - ["raw_*"]: Get all tables starting with "raw_"
             - ["*_customers", "orders"]: Mix of patterns and exact names
         table_stat_level: Level of statistics to collect:
-            - NONE: Just DDL, no stats (fast, no cache)
-            - SIMPLE: Basic stats with caching (default)
-            - DETAILED: Full stats including histograms, percentiles
+            - NONE: Schema only (column names, types) - fast, no stats
+            - SIMPLE: Schema + row count, basic column info (default)
+            - DETAILED: Full stats including cardinality, min/max,
+              null counts, histograms, and percentiles per column
         warehouse_id: Optional warehouse ID. If not provided, auto-selects one.
 
     Returns:
@@ -65,20 +69,20 @@ def get_table_details(
 
     Examples:
         >>> # Get all tables with basic stats
-        >>> result = get_table_details("my_catalog", "my_schema")
+        >>> result = get_table_stats_and_schema("my_catalog", "my_schema")
 
         >>> # Get specific tables
-        >>> result = get_table_details("my_catalog", "my_schema", ["customers", "orders"])
+        >>> result = get_table_stats_and_schema("my_catalog", "my_schema", ["customers", "orders"])
 
-        >>> # Get tables matching pattern with full stats
-        >>> result = get_table_details(
+        >>> # Get tables matching pattern with full stats (histograms, percentiles)
+        >>> result = get_table_stats_and_schema(
         ...     "my_catalog", "my_schema",
         ...     ["gold_*"],
         ...     table_stat_level=TableStatLevel.DETAILED
         ... )
 
-        >>> # Quick DDL-only lookup (no stats)
-        >>> result = get_table_details(
+        >>> # Quick schema-only lookup (no stats)
+        >>> result = get_table_stats_and_schema(
         ...     "my_catalog", "my_schema",
         ...     ["my_table"],
         ...     table_stat_level=TableStatLevel.NONE
@@ -253,7 +257,7 @@ def get_volume_folder_details(
     """
     Get detailed information about data files in a Databricks Volume folder.
 
-    Similar to get_table_details but for raw files stored in Volumes.
+    Similar to get_table_stats_and_schema but for raw files stored in Volumes.
     Uses SQL warehouse to read volume data via read_files() function.
 
     Args:

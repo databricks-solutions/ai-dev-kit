@@ -48,7 +48,7 @@ These libraries are essential for ZeroBus data ingestion:
 - **databricks-sdk>=0.85.0**: Databricks workspace client for authentication and metadata
 - **databricks-zerobus-ingest-sdk>=1.0.0**: ZeroBus SDK for high-performance streaming ingestion
 - **grpcio-tools**
-These are typically NOT pre-installed on Databricks. Install them using `execute_databricks_command` tool:
+These are typically NOT pre-installed on Databricks. Install them using `execute_code` tool:
 - `code`: "%pip install databricks-sdk>=VERSION databricks-zerobus-ingest-sdk>=VERSION"
 
 Save the returned `cluster_id` and `context_id` for subsequent calls.
@@ -121,9 +121,9 @@ You must always follow all the steps in the Workflow
 ## Workflow
 0. **Display the plan of your execution**
 1. **Determinate the type of client**
-2. **Get schema** Always use 4-protobuf-schema.md. Execute using the `run_python_file_on_databricks` MCP tool
-3. **Write Python code to a local file follow the instructions in the relevant guide to ingest with zerobus** in the project (e.g., `scripts/zerobus_ingest.py`). 
-4. **Execute on Databricks** using the `run_python_file_on_databricks` MCP tool
+2. **Get schema** Always use 4-protobuf-schema.md. Execute using the `execute_code` MCP tool
+3. **Write Python code to a local file follow the instructions in the relevant guide to ingest with zerobus** in the project (e.g., `scripts/zerobus_ingest.py`).
+4. **Execute on Databricks** using the `execute_code` MCP tool (with `file_path` parameter)
 5. **If execution fails**: Edit the local file to fix the error, then re-execute
 6. **Reuse the context** for follow-up executions by passing the returned `cluster_id` and `context_id`
 
@@ -141,7 +141,7 @@ You must always follow all the steps in the Workflow
 
 The first execution auto-selects a running cluster and creates an execution context. **Reuse this context for follow-up calls** - it's much faster (~1s vs ~15s) and shares variables/imports:
 
-**First execution** - use `run_python_file_on_databricks` tool:
+**First execution** - use `execute_code` tool:
 - `file_path`: "scripts/zerobus_ingest.py"
 
 Returns: `{ success, output, error, cluster_id, context_id, ... }`
@@ -151,7 +151,7 @@ Save `cluster_id` and `context_id` for follow-up calls.
 **If execution fails:**
 1. Read the error from the result
 2. Edit the local Python file to fix the issue
-3. Re-execute with same context using `run_python_file_on_databricks` tool:
+3. Re-execute with same context using `execute_code` tool:
    - `file_path`: "scripts/zerobus_ingest.py"
    - `cluster_id`: "<saved_cluster_id>"
    - `context_id`: "<saved_context_id>"
@@ -175,7 +175,7 @@ When execution fails:
 
 Databricks provides Spark, pandas, numpy, and common data libraries by default. **Only install a library if you get an import error.**
 
-Use `execute_databricks_command` tool:
+Use `execute_code` tool:
 - `code`: "%pip install databricks-zerobus-ingest-sdk>=1.0.0"
 - `cluster_id`: "<cluster_id>"
 - `context_id`: "<context_id>"
