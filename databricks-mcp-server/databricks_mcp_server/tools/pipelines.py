@@ -38,6 +38,8 @@ def create_pipeline(
 ) -> Dict[str, Any]:
     """Create a Spark Declarative Pipeline (SDP). Unity Catalog + serverless by default.
 
+    root_path: Workspace folder for pipeline files. workspace_file_paths: Notebook/file paths to include.
+    extra_settings: Additional config (clusters, photon, channel, etc).
     See databricks-spark-declarative-pipelines skill for configuration details.
     Returns: {pipeline_id}."""
     # Auto-inject default tags into extra_settings; user tags take precedence
@@ -201,6 +203,8 @@ def create_or_update_pipeline(
 ) -> Dict[str, Any]:
     """Create or update pipeline by name, optionally run. Unity Catalog + serverless.
 
+    root_path: Workspace folder for pipeline files. workspace_file_paths: Notebook/file paths to include.
+    extra_settings: Additional config (clusters, photon, etc). full_refresh: Reprocess all data.
     See databricks-spark-declarative-pipelines skill for configuration details.
     Returns: {pipeline_id, created, success, state, error_summary}."""
     # Auto-inject default tags into extra_settings; user tags take precedence

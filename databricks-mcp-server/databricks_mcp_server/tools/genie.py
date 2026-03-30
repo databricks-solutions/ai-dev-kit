@@ -46,7 +46,9 @@ def create_or_update_genie(
 ) -> Dict[str, Any]:
     """Create/update Genie Space for natural language SQL queries.
 
-    warehouse_id auto-detected if omitted. serialized_space (from export_genie) preserves instructions/SQL examples.
+    table_identifiers: ["catalog.schema.table", ...]. description: Explains space purpose to users.
+    sample_questions: Example questions shown to users. warehouse_id: auto-detected if omitted.
+    serialized_space: Full config from migrate_genie(type="export"), preserves instructions/SQL examples.
     See databricks-genie skill for configuration details.
     Returns: {space_id, display_name, operation: created|updated, warehouse_id, table_count}."""
     try:

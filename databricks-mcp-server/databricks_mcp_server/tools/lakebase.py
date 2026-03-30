@@ -239,6 +239,9 @@ def create_or_update_lakebase_branch(
 ) -> Dict[str, Any]:
     """Create/update Autoscale branch with compute endpoint. Branches are isolated copy-on-write environments.
 
+    source_branch: Branch to fork from (default: production). ttl_seconds: Auto-delete after N seconds.
+    is_protected: Prevent accidental deletion. autoscaling_limit_min/max_cu: Compute unit limits.
+    scale_to_zero_seconds: Idle time before scaling to zero.
     Returns: {branch details, endpoint connection info, created: bool}."""
     existing = _find_branch(project_name, branch_id)
 
@@ -330,7 +333,9 @@ def create_or_update_lakebase_sync(
 ) -> Dict[str, Any]:
     """Set up reverse ETL from Delta table to Lakebase. Creates catalog if needed, then synced table.
 
-    scheduling_policy: TRIGGERED/SNAPSHOT/CONTINUOUS. Returns: {catalog, synced_table, created}."""
+    source_table_name: Delta table (catalog.schema.table). target_table_name: Postgres destination.
+    primary_key_columns: Required for incremental sync. scheduling_policy: TRIGGERED/SNAPSHOT/CONTINUOUS.
+    Returns: {catalog, synced_table, created}."""
     # Derive catalog name from target table if not provided
     if not catalog_name:
         parts = target_table_name.split(".")

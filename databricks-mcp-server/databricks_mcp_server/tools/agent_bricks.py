@@ -482,7 +482,9 @@ def manage_ka(
     """Manage Knowledge Assistant (KA) - RAG-based document Q&A.
 
     Actions: create_or_update (name+volume_path), get (tile_id), find_by_name (name), delete (tile_id).
-    add_examples_from_volume: scan volume for JSON example files.
+    volume_path: UC Volume path with documents (e.g., /Volumes/catalog/schema/vol/docs).
+    description: What this KA does (shown to users). instructions: How KA should answer queries.
+    add_examples_from_volume: scan volume for JSON example files with question/guideline pairs.
     See agent-bricks skill for full details.
     Returns: create_or_update={tile_id, operation, endpoint_status}, get={tile_id, knowledge_sources, examples_count},
     find_by_name={found, tile_id, endpoint_name}, delete={success}."""
@@ -520,7 +522,9 @@ def manage_mas(
     """Manage Supervisor Agent (MAS) - orchestrates multiple agents for query routing.
 
     Actions: create_or_update (name+agents), get (tile_id), find_by_name (name), delete (tile_id).
-    agents: [{name, description, ONE OF: endpoint_name|genie_space_id|ka_tile_id|uc_function_name|connection_name}].
+    agents: [{name, description (critical for routing), ONE OF: endpoint_name|genie_space_id|ka_tile_id|uc_function_name|connection_name}].
+    description: What this MAS does. instructions: Routing rules for the supervisor.
+    examples: [{question, guideline}] to train routing behavior.
     See agent-bricks skill for full agent configuration details.
     Returns: create_or_update={tile_id, operation, endpoint_status, agents_count}, get={tile_id, agents, examples_count},
     find_by_name={found, tile_id, agents_count}, delete={success}."""

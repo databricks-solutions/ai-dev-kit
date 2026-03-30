@@ -67,7 +67,9 @@ def manage_jobs(
 
     create: requires name+tasks, serverless default, idempotent (returns existing if same name).
     get/update/delete: require job_id. find_by_name: returns job_id.
-    tasks: [{task_key, task_type (notebook_task/spark_python_task/etc), compute}].
+    tasks: [{task_key, notebook_task|spark_python_task|..., job_cluster_key or environment_key}].
+    job_clusters: Shared cluster definitions tasks can reference. environments: Serverless env configs.
+    schedule: {quartz_cron_expression, timezone_id}. git_source: {git_url, git_provider, git_branch}.
     See databricks-jobs skill for task configuration details.
     Returns: create={job_id}, get=full config, list={items}, find_by_name={job_id}, update/delete={status, job_id}."""
     act = action.lower()
