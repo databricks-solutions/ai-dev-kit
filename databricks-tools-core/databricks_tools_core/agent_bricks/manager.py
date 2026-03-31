@@ -997,7 +997,7 @@ class AgentBricksManager:
     ) -> Dict[str, Any]:
         """Update a Genie space using a serialized payload (full replacement).
 
-        Uses the public /api/2.0/genie/spaces/{space_id} endpoint (PUT) with
+        Uses the public /api/2.0/genie/spaces/{space_id} endpoint (PATCH) with
         serialized_space in the body. This replaces the entire space configuration.
 
         Args:
@@ -1019,7 +1019,7 @@ class AgentBricksManager:
             payload["description"] = description
         if warehouse_id:
             payload["warehouse_id"] = warehouse_id
-        return self._put(f"/api/2.0/genie/spaces/{space_id}", payload)
+        return self._patch(f"/api/2.0/genie/spaces/{space_id}", payload)
 
     def genie_list_questions(
         self, space_id: str, question_type: str = "SAMPLE_QUESTION"

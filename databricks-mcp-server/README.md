@@ -211,6 +211,28 @@ Claude now has both:
 
 The server is intentionally simple - each tool file just imports functions from `databricks-tools-core` and decorates them with `@mcp.tool`.
 
+### Running Integration Tests
+
+Integration tests run against a real Databricks workspace. Configure authentication first (see Step 3 above).
+
+```bash
+# Run all tests (excluding slow tests like cluster creation)
+python tests/integration/run_tests.py
+
+# Run all tests including slow tests
+python tests/integration/run_tests.py --all
+
+# Show report from the latest run
+python tests/integration/run_tests.py --report
+
+# Run with fewer parallel workers (default: 8)
+python tests/integration/run_tests.py -j 4
+```
+
+Results are saved to `tests/integration/.test-results/<timestamp>/` with logs for each test folder.
+
+See [tests/integration/README.md](tests/integration/README.md) for more details.
+
 To add a new tool:
 
 1. Add the function to `databricks-tools-core`

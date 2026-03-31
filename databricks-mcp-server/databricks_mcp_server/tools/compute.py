@@ -62,9 +62,12 @@ def execute_code(
     """Execute code on Databricks via serverless or cluster compute.
 
     Modes:
-    - serverless: No cluster needed, best for batch/one-off tasks, 30min max
-    - cluster: State persists via context_id, best for interactive work
     - auto (default): Serverless unless cluster_id/context_id given or language is scala/r
+    - serverless: No cluster needed, ~30s cold start, best for batch/one-off tasks
+    - cluster: State persists via context_id, best for interactive work (but slow ~2min one-off cluster startup)
+
+    - Cluster mode returns context_id. REUSE IT for subsequent calls to skip context creation (Variables/imports persist across calls).
+    - Serverless has no context reuse (~30s cold start each time).
 
     file_path: Run local file (.py/.scala/.sql/.r), auto-detects language.
     workspace_path: Save as notebook in workspace (omit for ephemeral).
@@ -196,6 +199,7 @@ def manage_cluster(
     - modify: Requires cluster_id. Only specified params change. Running clusters restart.
     - start: Requires cluster_id. ASK USER FIRST (costs money, 3-8min startup).
     - terminate: Reversible stop. Requires cluster_id.
+    - get: returns cluster details. Requires cluster_id.
     - delete: PERMANENT. CONFIRM WITH USER. Requires cluster_id.
 
     num_workers default 1, ignored if autoscale set. spark_conf: JSON string.
@@ -278,10 +282,21 @@ def manage_cluster(
             return {"success": False, "error": "cluster_id is required for delete action."}
         return _delete_cluster(cluster_id)
 
+    elif action == "get":
+        if not cluster_id:
+            return {"success": False, "error": "cluster_id is required for get action."}
+        try:
+            return _get_cluster_status(cluster_id)
+        except Exception as e:
+            # Handle case where cluster doesn't exist (e.g., after deletion)
+            if "does not exist" in str(e).lower():
+                return {"success": True, "cluster_id": cluster_id, "state": "DELETED", "exists": False}
+            return {"success": False, "error": str(e)}
+
     else:
         return {
             "success": False,
-            "error": f"Unknown action: {action!r}. Must be one of: create, modify, start, terminate, delete.",
+            "error": f"Unknown action: {action!r}. Must be one of: create, modify, start, terminate, delete, get.",
         }
 
 

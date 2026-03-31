@@ -46,8 +46,6 @@ def manage_dashboard(
     schema: Optional[str] = None,
     # For get/delete/publish/unpublish:
     dashboard_id: Optional[str] = None,
-    # For list:
-    page_size: int = 25,
     # For publish:
     embed_credentials: bool = True,
 ) -> Dict[str, Any]:
@@ -62,7 +60,7 @@ def manage_dashboard(
       Returns: {success, dashboard_id, path, url, published, error}.
     - get: Get dashboard details. Requires dashboard_id.
       Returns: dashboard config and metadata.
-    - list: List all dashboards. Optional page_size (default 25).
+    - list: List all dashboards.
       Returns: {dashboards: [...]}.
     - delete: Soft-delete (moves to trash). Requires dashboard_id.
       Returns: {status, message}.
@@ -72,7 +70,7 @@ def manage_dashboard(
     - unpublish: Unpublish dashboard. Requires dashboard_id.
       Returns: {status, dashboard_id}.
 
-    Workflow for create_or_update:
+Workflow for create_or_update:
     1. Write dashboard JSON to a local file (e.g., /tmp/my_dashboard.json)
     2. Test all SQL queries via execute_sql()
     3. Call manage_dashboard(action="create_or_update", dashboard_file_path="/tmp/my_dashboard.json", ...)
@@ -132,7 +130,7 @@ def manage_dashboard(
         return _get_dashboard(dashboard_id=dashboard_id)
 
     elif act == "list":
-        return _list_dashboards(page_size=page_size)
+        return _list_dashboards(page_size=200)
 
     elif act == "delete":
         if not dashboard_id:

@@ -6,7 +6,7 @@ Functions for managing Databricks Apps lifecycle using the Databricks SDK.
 
 from typing import Any, Dict, List, Optional
 
-from databricks.sdk.service.apps import AppDeployment
+from databricks.sdk.service.apps import App, AppDeployment
 
 from ..auth import get_workspace_client
 
@@ -26,7 +26,8 @@ def create_app(
         Dictionary with app details including name, url, and status.
     """
     w = get_workspace_client()
-    app = w.apps.create(name=name, description=description)
+    app_spec = App(name=name, description=description)
+    app = w.apps.create(app=app_spec).result()
     return _app_to_dict(app)
 
 
