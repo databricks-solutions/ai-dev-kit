@@ -98,7 +98,7 @@ def create_vs_index(
             if "columns_to_sync" in spec:
                 ds_kwargs["columns_to_sync"] = spec["columns_to_sync"]
 
-            kwargs["delta_sync_vector_index_spec"] = DeltaSyncVectorIndexSpecRequest(**ds_kwargs)
+            kwargs["delta_sync_index_spec"] = DeltaSyncVectorIndexSpecRequest(**ds_kwargs)
 
         elif index_type == "DIRECT_ACCESS" and direct_access_index_spec:
             spec = direct_access_index_spec

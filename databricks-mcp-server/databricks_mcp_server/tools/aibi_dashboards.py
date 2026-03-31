@@ -42,8 +42,6 @@ def manage_dashboard(
     publish: bool = True,
     # For get/delete/publish/unpublish:
     dashboard_id: Optional[str] = None,
-    # For list:
-    page_size: int = 25,
     # For publish:
     embed_credentials: bool = True,
 ) -> Dict[str, Any]:
@@ -56,7 +54,7 @@ def manage_dashboard(
       Returns: {success, dashboard_id, path, url, published, error}.
     - get: Get dashboard details. Requires dashboard_id.
       Returns: dashboard config and metadata.
-    - list: List all dashboards. Optional page_size (default 25).
+    - list: List all dashboards.
       Returns: {dashboards: [...]}.
     - delete: Soft-delete (moves to trash). Requires dashboard_id.
       Returns: {status, message}.
@@ -73,7 +71,7 @@ def manage_dashboard(
     - Versions: counter/table/filter=2, bar/line/pie=3
     - Layout: 6-column grid
     - Filter types: filter-multi-select, filter-single-select, filter-date-range-picker
-    - Text widget uses textbox_spec (no spec block)
+    - Text widget uses textbox_spec (no spec block)ƒ◊
 
     See databricks-aibi-dashboards skill for full widget structure reference."""
     act = action.lower()
@@ -116,7 +114,7 @@ def manage_dashboard(
         return _get_dashboard(dashboard_id=dashboard_id)
 
     elif act == "list":
-        return _list_dashboards(page_size=page_size)
+        return _list_dashboards(page_size=200)
 
     elif act == "delete":
         if not dashboard_id:

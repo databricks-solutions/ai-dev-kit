@@ -306,7 +306,9 @@ def _create_or_update_database(
 
     elif db_type == "autoscale":
         existing = _find_project_by_name(name)
-        if existing:
+        # Check if project actually exists (not just a NOT_FOUND response)
+        project_exists = existing and "error" not in existing and existing.get("state") != "NOT_FOUND"
+        if project_exists:
             result = _update_project(name=name, display_name=display_name)
             return {**result, "created": False, "type": "autoscale"}
         else:

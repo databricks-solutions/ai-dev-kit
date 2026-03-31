@@ -25,6 +25,7 @@ from .dashboards import (
     deploy_dashboard_sync,
     find_dashboard_by_path,
     get_dashboard,
+    get_dashboard_by_name,
     list_dashboards,
     publish_dashboard,
     trash_dashboard,
@@ -39,6 +40,7 @@ __all__ = [
     # CRUD operations
     "create_dashboard",
     "get_dashboard",
+    "get_dashboard_by_name",
     "list_dashboards",
     "find_dashboard_by_path",
     "update_dashboard",

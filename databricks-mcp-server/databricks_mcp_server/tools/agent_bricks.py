@@ -142,9 +142,12 @@ def _ka_get(tile_id: str) -> Dict[str, Any]:
     tile_data = ka_data.get("tile", {})
     status_data = ka_data.get("status", {})
 
-    # Get examples count
-    examples_response = manager.ka_list_examples(tile_id)
-    examples_count = len(examples_response.get("examples", []))
+    # Get examples count (handle failures gracefully)
+    try:
+        examples_response = manager.ka_list_examples(tile_id)
+        examples_count = len(examples_response.get("examples", []))
+    except Exception:
+        examples_count = 0
 
     return {
         "tile_id": tile_data.get("tile_id", tile_id),
@@ -397,9 +400,12 @@ def _mas_get(tile_id: str) -> Dict[str, Any]:
     tile_data = mas_data.get("tile", {})
     status_data = mas_data.get("status", {})
 
-    # Get examples count
-    examples_response = manager.mas_list_examples(tile_id)
-    examples_count = len(examples_response.get("examples", []))
+    # Get examples count (handle failures gracefully)
+    try:
+        examples_response = manager.mas_list_examples(tile_id)
+        examples_count = len(examples_response.get("examples", []))
+    except Exception:
+        examples_count = 0
 
     return {
         "tile_id": tile_data.get("tile_id", tile_id),

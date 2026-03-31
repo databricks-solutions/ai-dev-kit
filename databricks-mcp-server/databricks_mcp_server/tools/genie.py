@@ -343,20 +343,29 @@ def _get_genie_space(space_id: str, include_serialized_space: bool) -> Dict[str,
 
 
 def _list_genie_spaces() -> Dict[str, Any]:
-    """List all Genie Spaces."""
+    """List all Genie Spaces with pagination."""
     try:
         w = get_workspace_client()
-        response = w.genie.list_spaces()
         spaces = []
-        if response.spaces:
-            for space in response.spaces:
-                spaces.append(
-                    {
-                        "space_id": space.space_id,
-                        "title": space.title or "",
-                        "description": space.description or "",
-                    }
-                )
+        page_token = None
+
+        while True:
+            response = w.genie.list_spaces(page_size=200, page_token=page_token)
+            if response.spaces:
+                for space in response.spaces:
+                    spaces.append(
+                        {
+                            "space_id": space.space_id,
+                            "title": space.title or "",
+                            "description": space.description or "",
+                        }
+                    )
+            # Check for next page
+            if response.next_page_token:
+                page_token = response.next_page_token
+            else:
+                break
+
         return {"spaces": spaces}
     except Exception as e:
         return {"error": str(e)}

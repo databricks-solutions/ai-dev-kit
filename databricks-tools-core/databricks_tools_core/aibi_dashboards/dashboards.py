@@ -49,13 +49,13 @@ def get_dashboard(dashboard_id: str) -> Dict[str, Any]:
 
 
 def list_dashboards(
-    page_size: int = 25,
+    page_size: int = 100,
     page_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """List AI/BI dashboards in the workspace.
 
     Args:
-        page_size: Number of dashboards per page (default: 25)
+        page_size: Number of dashboards per page (default: 100)
         page_token: Token for pagination
 
     Returns:
@@ -102,6 +102,27 @@ def find_dashboard_by_path(dashboard_path: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"Error checking dashboard path {dashboard_path}: {e}")
         return None
+
+
+def get_dashboard_by_name(parent_path: str, display_name: str) -> Optional[Dict[str, Any]]:
+    """Get dashboard details by parent path and display name.
+
+    The dashboard file path is constructed as: {parent_path}/{display_name}.lvdash.json
+    This matches the naming convention used by create_dashboard and deploy_dashboard.
+
+    Args:
+        parent_path: Workspace folder path (e.g., /Workspace/Users/me/dashboards)
+        display_name: Dashboard display name (used as filename without .lvdash.json)
+
+    Returns:
+        Dictionary with dashboard details if found, None otherwise
+    """
+    dashboard_path = f"{parent_path}/{display_name}.lvdash.json"
+    dashboard_id = find_dashboard_by_path(dashboard_path)
+
+    if dashboard_id:
+        return get_dashboard(dashboard_id)
+    return None
 
 
 def create_dashboard(
