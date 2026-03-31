@@ -149,9 +149,7 @@ cd ai-dev-kit/databricks-builder-app
 For local development:
 
 ```bash
-./scripts/setup.sh        # Install dependencies
-# Edit .env.local with your credentials
-./scripts/start_dev.sh    # Start locally at http://localhost:3000
+./scripts/start_local.sh --profile <your-profile>   # Everything in one command
 ```
 
 See [`databricks-builder-app/`](databricks-builder-app/) for full documentation.
