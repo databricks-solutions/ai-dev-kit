@@ -12,6 +12,16 @@ from databricks.sdk.service.jobs import (
     JobCluster,
     JobEnvironment,
     JobSettings,
+    JobEmailNotifications,
+    WebhookNotifications,
+    JobNotificationSettings,
+    CronSchedule,
+    QueueSettings,
+    JobRunAs,
+    GitSource,
+    JobParameterDefinition,
+    JobsHealthRules,
+    JobDeployment,
 )
 
 from ..auth import get_workspace_client
@@ -210,31 +220,31 @@ def create_job(
                     env["spec"]["client"] = "4"
             kwargs["environments"] = [JobEnvironment.from_dict(env) for env in environments]
 
-        # Add optional parameters
+        # Add optional parameters, converting dicts to SDK objects
         if tags:
             kwargs["tags"] = tags
         if timeout_seconds is not None:
             kwargs["timeout_seconds"] = timeout_seconds
         if email_notifications:
-            kwargs["email_notifications"] = email_notifications
+            kwargs["email_notifications"] = JobEmailNotifications.from_dict(email_notifications)
         if webhook_notifications:
-            kwargs["webhook_notifications"] = webhook_notifications
+            kwargs["webhook_notifications"] = WebhookNotifications.from_dict(webhook_notifications)
         if notification_settings:
-            kwargs["notification_settings"] = notification_settings
+            kwargs["notification_settings"] = JobNotificationSettings.from_dict(notification_settings)
         if schedule:
-            kwargs["schedule"] = schedule
+            kwargs["schedule"] = CronSchedule.from_dict(schedule)
         if queue:
-            kwargs["queue"] = queue
+            kwargs["queue"] = QueueSettings.from_dict(queue)
         if run_as:
-            kwargs["run_as"] = run_as
+            kwargs["run_as"] = JobRunAs.from_dict(run_as)
         if git_source:
-            kwargs["git_source"] = git_source
+            kwargs["git_source"] = GitSource.from_dict(git_source)
         if parameters:
-            kwargs["parameters"] = parameters
+            kwargs["parameters"] = [JobParameterDefinition.from_dict(p) for p in parameters]
         if health:
-            kwargs["health"] = health
+            kwargs["health"] = JobsHealthRules.from_dict(health)
         if deployment:
-            kwargs["deployment"] = deployment
+            kwargs["deployment"] = JobDeployment.from_dict(deployment)
 
         # Add any extra settings
         kwargs.update(extra_settings)
