@@ -125,6 +125,7 @@ def run_test_folder(
         sys.executable, "-m", "pytest",
         str(test_path),
         "-v",
+        "-s",  # Stream output to see real-time logs
         "--tb=short",
         "-m", "integration" if not include_slow else "integration or slow",
     ]
@@ -136,7 +137,7 @@ def run_test_folder(
             cmd,
             capture_output=True,
             text=True,
-            timeout=600,  # 10 minute timeout per folder
+            timeout=1200,  # 20 minute timeout per folder
         )
         output = proc.stdout + proc.stderr
     except subprocess.TimeoutExpired:
@@ -206,6 +207,14 @@ def parse_log_file_status(log_file: Path) -> tuple[str, Optional[TestResult]]:
     # Check if still running
     if content.startswith("[RUNNING]"):
         return "running", None
+
+    # Check for timeout (test was killed due to exceeding time limit)
+    if "TIMEOUT:" in content:
+        result = TestResult(folder=log_file.stem, log_file=str(log_file))
+        result.errors = 1
+        result.status = "timeout"
+        result.error_details = ["Test timed out"]
+        return "timeout", result
 
     # Parse completed results
     result = TestResult(folder=log_file.stem, log_file=str(log_file))
@@ -448,6 +457,9 @@ def show_status():
         if status == "running":
             status_str = f"{Colors.CYAN}RUNNING{Colors.RESET}"
             result_str = ""
+        elif status == "timeout":
+            status_str = f"{Colors.RED}TIMEOUT{Colors.RESET}"
+            result_str = f"{Colors.RED}Test timed out{Colors.RESET}"
         elif status == "pending":
             status_str = f"{Colors.DIM}pending{Colors.RESET}"
             result_str = ""

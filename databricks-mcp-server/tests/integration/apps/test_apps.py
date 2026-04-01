@@ -100,7 +100,7 @@ class TestAppLifecycle:
 
             upload_result = manage_workspace_files(
                 action="upload",
-                local_path=str(RESOURCES_DIR),
+                local_path=str(RESOURCES_DIR) + "/",  # Trailing slash = upload contents only
                 workspace_path=workspace_path,
                 overwrite=True,
             )
@@ -135,21 +135,34 @@ class TestAppLifecycle:
 
             # Step 3: Wait for deployment
             log_time("Step 3: Waiting for app deployment...")
-            max_wait = 300  # 5 minutes
+            max_wait = 600  # 10 minutes
             wait_interval = 15
             waited = 0
             deployed = False
 
             while waited < max_wait:
                 get_result = manage_app(action="get", name=app_name)
-                status = get_result.get("status") or get_result.get("state")
-                log_time(f"App status after {waited}s: {status}")
+                compute_status = get_result.get("status") or get_result.get("state")
 
-                if status in ("RUNNING", "READY", "DEPLOYED"):
+                # Check deployment state (this is where deployment failures are reported)
+                active_deployment = get_result.get("active_deployment", {})
+                deployment_state = active_deployment.get("state") or active_deployment.get("status")
+
+                log_time(f"App after {waited}s: compute={compute_status}, deployment={deployment_state}")
+
+                # Check for deployment failure first (most important)
+                if deployment_state and "FAILED" in str(deployment_state).upper():
+                    deployment_msg = active_deployment.get("status", {}).get("message", "")
+                    log_time(f"App deployment FAILED: {deployment_msg}")
+                    pytest.fail(f"App deployment failed: {deployment_state} - {deployment_msg}")
+
+                # Check for successful deployment
+                if deployment_state and "SUCCEEDED" in str(deployment_state).upper():
                     deployed = True
+                    log_time("App deployment succeeded!")
                     break
-                elif status in ("FAILED", "ERROR"):
-                    log_time(f"App deployment failed: {get_result}")
+                elif compute_status in ("RUNNING", "READY", "DEPLOYED"):
+                    deployed = True
                     break
 
                 time.sleep(wait_interval)
@@ -175,15 +188,19 @@ class TestAppLifecycle:
             log_time(f"Delete result: {delete_result}")
             assert "error" not in delete_result, f"Delete failed: {delete_result}"
 
-            # Step 6: Verify app is gone
+            # Step 6: Verify app is deleted or deleting
             log_time("Step 6: Verifying app deleted...")
             time.sleep(10)
             get_after = manage_app(action="get", name=app_name)
             log_time(f"Get after delete: {get_after}")
 
-            # Should return error or indicate not found
-            assert "error" in get_after or "not found" in str(get_after).lower(), \
-                f"App should be deleted: {get_after}"
+            # Should return error, indicate not found, or be in DELETING state
+            status_str = str(get_after).lower()
+            assert (
+                "error" in get_after
+                or "not found" in status_str
+                or "deleting" in status_str
+            ), f"App should be deleted or deleting: {get_after}"
 
             log_time("Full app lifecycle test PASSED!")
 

@@ -28,10 +28,32 @@ def _get_manager() -> AgentBricksManager:
 
 
 def _delete_genie_resource(resource_id: str) -> None:
-    _get_manager().genie_delete(resource_id)
+    """Delete a genie space using SDK."""
+    w = get_workspace_client()
+    w.genie.trash_space(space_id=resource_id)
 
 
 register_deleter("genie_space", _delete_genie_resource)
+
+
+def _find_space_by_name(name: str) -> Optional[Any]:
+    """Find a Genie Space by name using SDK's list_spaces.
+
+    Returns the GenieSpaceInfo if found, None otherwise.
+    """
+    w = get_workspace_client()
+    page_token = None
+    while True:
+        response = w.genie.list_spaces(page_size=200, page_token=page_token)
+        if response.spaces:
+            for space in response.spaces:
+                if space.title == name:
+                    return space
+        if response.next_page_token:
+            page_token = response.next_page_token
+        else:
+            break
+    return None
 
 
 # ============================================================================
@@ -82,9 +104,10 @@ def manage_genie(
     act = action.lower()
 
     if act == "create_or_update":
-        if not display_name:
-            return {"error": "create_or_update requires: display_name"}
-        if not table_identifiers and not serialized_space:
+        # For updates with space_id, display_name is optional
+        if not space_id and not display_name:
+            return {"error": "create_or_update requires: display_name (or space_id for updates)"}
+        if not space_id and not table_identifiers and not serialized_space:
             return {"error": "create_or_update requires: table_identifiers (or serialized_space)"}
 
         return _create_or_update_genie_space(
@@ -208,9 +231,10 @@ def _create_or_update_genie_space(
 
         # When serialized_space is provided
         if serialized_space:
+            w = get_workspace_client()
             if space_id:
-                # Update existing space with serialized config
-                manager.genie_update_with_serialized_space(
+                # Update existing space with serialized config using SDK
+                w.genie.update_space(
                     space_id=space_id,
                     serialized_space=serialized_space,
                     title=display_name,
@@ -220,11 +244,12 @@ def _create_or_update_genie_space(
                 operation = "updated"
             else:
                 # Check if exists by name, then create or update
-                existing = manager.genie_find_by_name(display_name)
+                existing = _find_space_by_name(display_name)
                 if existing:
                     operation = "updated"
                     space_id = existing.space_id
-                    manager.genie_update_with_serialized_space(
+                    # Update existing space with serialized config using SDK
+                    w.genie.update_space(
                         space_id=space_id,
                         serialized_space=serialized_space,
                         title=display_name,
@@ -232,34 +257,47 @@ def _create_or_update_genie_space(
                         warehouse_id=warehouse_id,
                     )
                 else:
-                    result = manager.genie_import(
+                    # Create new space with serialized config using SDK
+                    w = get_workspace_client()
+                    space = w.genie.create_space(
                         warehouse_id=warehouse_id,
                         serialized_space=serialized_space,
                         title=display_name,
                         description=description,
                     )
-                    space_id = result.get("space_id", "")
+                    space_id = space.space_id or ""
 
         # When serialized_space is not provided
         else:
             if space_id:
-                # Update existing space by ID
-                existing = manager.genie_get(space_id)
-                if existing:
-                    operation = "updated"
-                    manager.genie_update(
+                # Update existing space by ID using SDK for proper partial updates
+                w = get_workspace_client()
+                try:
+                    # Use SDK's update_space which supports partial updates
+                    w.genie.update_space(
                         space_id=space_id,
-                        display_name=display_name,
                         description=description,
+                        title=display_name,
                         warehouse_id=warehouse_id,
-                        table_identifiers=table_identifiers,
-                        sample_questions=sample_questions,
                     )
-                else:
-                    return {"error": f"Genie space {space_id} not found"}
+                    operation = "updated"
+                    # Handle sample questions separately if provided
+                    if sample_questions is not None:
+                        manager.genie_update_sample_questions(space_id, sample_questions)
+                    # Handle table_identifiers if provided (requires full update via manager)
+                    if table_identifiers:
+                        manager.genie_update(
+                            space_id=space_id,
+                            display_name=display_name,
+                            description=description,
+                            warehouse_id=warehouse_id,
+                            table_identifiers=table_identifiers,
+                        )
+                except Exception as e:
+                    return {"error": f"Genie space {space_id} not found or update failed: {e}"}
             else:
-                # Check if exists by name first
-                existing = manager.genie_find_by_name(display_name)
+                # Check if exists by name first using SDK
+                existing = _find_space_by_name(display_name)
                 if existing:
                     operation = "updated"
                     manager.genie_update(
@@ -312,29 +350,44 @@ def _create_or_update_genie_space(
 
 
 def _get_genie_space(space_id: str, include_serialized_space: bool) -> Dict[str, Any]:
-    """Get a Genie Space by ID."""
+    """Get a Genie Space by ID using SDK."""
     try:
-        manager = _get_manager()
-        result = manager.genie_get(space_id)
+        w = get_workspace_client()
+        # Use SDK's include_serialized_space parameter if needed
+        space = w.genie.get_space(space_id=space_id, include_serialized_space=include_serialized_space)
 
-        if not result:
+        if not space:
             return {"error": f"Genie space {space_id} not found"}
 
+        # Get sample questions using manager (SDK doesn't have this method)
+        manager = _get_manager()
         questions_response = manager.genie_list_questions(space_id, question_type="SAMPLE_QUESTION")
         sample_questions = [q.get("question_text", "") for q in questions_response.get("curated_questions", [])]
 
+        # Extract table identifiers from serialized_space if available
+        # The SDK's GenieSpace doesn't expose tables as a direct attribute
+        table_identifiers = []
+        if space.serialized_space:
+            try:
+                import json
+                serialized = json.loads(space.serialized_space)
+                for table in serialized.get("tables", []):
+                    if table.get("table_identifier"):
+                        table_identifiers.append(table["table_identifier"])
+            except (json.JSONDecodeError, KeyError):
+                pass  # Tables will remain empty
+
         response = {
-            "space_id": result.get("space_id", space_id),
-            "display_name": result.get("display_name", ""),
-            "description": result.get("description", ""),
-            "warehouse_id": result.get("warehouse_id", ""),
-            "table_identifiers": result.get("table_identifiers", []),
+            "space_id": space.space_id or space_id,
+            "display_name": space.title or "",
+            "description": space.description or "",
+            "warehouse_id": space.warehouse_id or "",
+            "table_identifiers": table_identifiers,
             "sample_questions": sample_questions,
         }
 
         if include_serialized_space:
-            exported = manager.genie_export(space_id)
-            response["serialized_space"] = exported.get("serialized_space", "")
+            response["serialized_space"] = space.serialized_space or ""
 
         return response
 
@@ -372,10 +425,10 @@ def _list_genie_spaces() -> Dict[str, Any]:
 
 
 def _delete_genie_space(space_id: str) -> Dict[str, Any]:
-    """Delete a Genie Space."""
-    manager = _get_manager()
+    """Delete a Genie Space using SDK."""
     try:
-        manager.genie_delete(space_id)
+        w = get_workspace_client()
+        w.genie.trash_space(space_id=space_id)
         try:
             from ..manifest import remove_resource
 
@@ -388,16 +441,16 @@ def _delete_genie_space(space_id: str) -> Dict[str, Any]:
 
 
 def _export_genie_space(space_id: str) -> Dict[str, Any]:
-    """Export a Genie Space for migration/backup."""
-    manager = _get_manager()
+    """Export a Genie Space for migration/backup using SDK."""
     try:
-        result = manager.genie_export(space_id)
+        w = get_workspace_client()
+        space = w.genie.get_space(space_id=space_id, include_serialized_space=True)
         return {
-            "space_id": result.get("space_id", space_id),
-            "title": result.get("title", ""),
-            "description": result.get("description", ""),
-            "warehouse_id": result.get("warehouse_id", ""),
-            "serialized_space": result.get("serialized_space", ""),
+            "space_id": space.space_id or space_id,
+            "title": space.title or "",
+            "description": space.description or "",
+            "warehouse_id": space.warehouse_id or "",
+            "serialized_space": space.serialized_space or "",
         }
     except Exception as e:
         return {"error": str(e), "space_id": space_id}
@@ -410,17 +463,17 @@ def _import_genie_space(
     description: Optional[str],
     parent_path: Optional[str],
 ) -> Dict[str, Any]:
-    """Import a Genie Space from serialized config."""
-    manager = _get_manager()
+    """Import a Genie Space from serialized config using SDK."""
     try:
-        result = manager.genie_import(
+        w = get_workspace_client()
+        space = w.genie.create_space(
             warehouse_id=warehouse_id,
             serialized_space=serialized_space,
             title=title,
             description=description,
             parent_path=parent_path,
         )
-        imported_space_id = result.get("space_id", "")
+        imported_space_id = space.space_id or ""
 
         if imported_space_id:
             try:
@@ -428,7 +481,7 @@ def _import_genie_space(
 
                 track_resource(
                     resource_type="genie_space",
-                    name=title or result.get("title", imported_space_id),
+                    name=title or space.title or imported_space_id,
                     resource_id=imported_space_id,
                 )
             except Exception:
@@ -436,8 +489,8 @@ def _import_genie_space(
 
         return {
             "space_id": imported_space_id,
-            "title": result.get("title", title or ""),
-            "description": result.get("description", description or ""),
+            "title": space.title or title or "",
+            "description": space.description or description or "",
             "operation": "imported",
         }
     except Exception as e:

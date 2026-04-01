@@ -51,9 +51,15 @@ def manage_dashboard(
 ) -> Dict[str, Any]:
     """Manage AI/BI dashboards: create, update, get, list, delete, publish.
 
+    CRITICAL: Before calling this tool to create or edit a dashboard, you MUST:
+    0. Review the databricks-aibi-dashboards skill to understand widget definitions.
+       You must EXACTLY follow the JSON structure detailed in the skill.
+    1. Call get_table_stats_and_schema() to get table schemas for your queries.
+    2. Call execute_sql() to TEST EVERY dataset query before using in dashboard.
+    If you skip validation, widgets WILL show errors!
+
     Actions:
     - create_or_update: Create/update dashboard from local JSON file.
-      MUST test queries with execute_sql() first!
       Requires display_name, parent_path, dashboard_file_path, warehouse_id.
       Optional: genie_space_id (link Genie), catalog/schema (defaults for unqualified tables).
       publish=True (default) auto-publishes after create.

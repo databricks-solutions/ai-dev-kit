@@ -27,6 +27,13 @@ Use this skill when:
 
 ## MCP Tools
 
+| Tool | Purpose |
+|------|---------|
+| `manage_genie` | Create, get, list, delete, export, and import Genie Spaces |
+| `ask_genie` | Ask natural language questions to a Genie Space |
+| `get_table_stats_and_schema` | Inspect table schemas before creating a space |
+| `execute_sql` | Test SQL queries directly |
+
 ### manage_genie - Space Management
 
 | Action | Description | Required Params |
@@ -38,8 +45,9 @@ Use this skill when:
 | `export` | Export space config for migration/backup | space_id |
 | `import` | Import space from serialized config | warehouse_id, serialized_space |
 
-**Example usage:**
-```python
+**Example tool calls:**
+```
+# MCP Tool: manage_genie
 # Create a new space
 manage_genie(
     action="create_or_update",
@@ -49,15 +57,19 @@ manage_genie(
     sample_questions=["What were total sales last month?"]
 )
 
+# MCP Tool: manage_genie
 # Get space details with full config
 manage_genie(action="get", space_id="space_123", include_serialized_space=True)
 
+# MCP Tool: manage_genie
 # List all spaces
 manage_genie(action="list")
 
+# MCP Tool: manage_genie
 # Export for migration
 exported = manage_genie(action="export", space_id="space_123")
 
+# MCP Tool: manage_genie
 # Import to new workspace
 manage_genie(
     action="import",
@@ -71,7 +83,8 @@ manage_genie(
 
 Ask natural language questions to a Genie Space. Pass `conversation_id` for follow-up questions.
 
-```python
+```
+# MCP Tool: ask_genie
 # Start a new conversation
 result = ask_genie(
     space_id="space_123",
@@ -79,6 +92,7 @@ result = ask_genie(
 )
 # Returns: {question, conversation_id, message_id, status, sql, columns, data, row_count}
 
+# MCP Tool: ask_genie
 # Follow-up question in same conversation
 result = ask_genie(
     space_id="space_123",
@@ -87,20 +101,14 @@ result = ask_genie(
 )
 ```
 
-### Supporting Tools
-
-| Tool | Purpose |
-|------|---------|
-| `get_table_stats_and_schema` | Inspect table schemas before creating a space |
-| `execute_sql` | Test SQL queries directly |
-
 ## Quick Start
 
 ### 1. Inspect Your Tables
 
 Before creating a Genie Space, understand your data:
 
-```python
+```
+# MCP Tool: get_table_stats_and_schema
 get_table_stats_and_schema(
     catalog="my_catalog",
     schema="sales",
@@ -110,7 +118,8 @@ get_table_stats_and_schema(
 
 ### 2. Create the Genie Space
 
-```python
+```
+# MCP Tool: manage_genie
 manage_genie(
     action="create_or_update",
     display_name="Sales Analytics",
@@ -128,7 +137,8 @@ manage_genie(
 
 ### 3. Ask Questions (Conversation API)
 
-```python
+```
+# MCP Tool: ask_genie
 ask_genie(
     space_id="your_space_id",
     question="What were total sales last month?"
@@ -140,14 +150,16 @@ ask_genie(
 
 Export a space (preserves all tables, instructions, SQL examples, and layout):
 
-```python
+```
+# MCP Tool: manage_genie
 exported = manage_genie(action="export", space_id="your_space_id")
 # exported["serialized_space"] contains the full config
 ```
 
 Clone to a new space (same catalog):
 
-```python
+```
+# MCP Tool: manage_genie
 manage_genie(
     action="import",
     warehouse_id=exported["warehouse_id"],
