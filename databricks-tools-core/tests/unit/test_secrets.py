@@ -31,9 +31,7 @@ class TestCreateSecretScope:
 
         assert result["scope"] == "test-scope"
         assert result["status"] == "created"
-        mock_client.secrets.create_scope.assert_called_once_with(
-            scope="test-scope", initial_manage_principal=None
-        )
+        mock_client.secrets.create_scope.assert_called_once_with(scope="test-scope", initial_manage_principal=None)
 
     @mock.patch(_GET_CLIENT)
     def test_create_scope_with_principal(self, mock_get_client):
@@ -42,9 +40,7 @@ class TestCreateSecretScope:
 
         create_secret_scope(scope="test-scope", initial_manage_principal="users")
 
-        mock_client.secrets.create_scope.assert_called_once_with(
-            scope="test-scope", initial_manage_principal="users"
-        )
+        mock_client.secrets.create_scope.assert_called_once_with(scope="test-scope", initial_manage_principal="users")
 
     @mock.patch(_GET_CLIENT)
     def test_create_scope_already_exists(self, mock_get_client):
@@ -52,8 +48,11 @@ class TestCreateSecretScope:
         mock_client.secrets.create_scope.side_effect = ResourceAlreadyExists("Scope exists")
         mock_get_client.return_value = mock_client
 
-        with pytest.raises(Exception, match="already exists"):
-            create_secret_scope(scope="existing-scope")
+        result = create_secret_scope(scope="existing-scope")
+
+        assert result["scope"] == "existing-scope"
+        assert result["created"] is False
+        assert result["status"] == "already_exists"
 
 
 class TestListSecretScopes:

@@ -1,4 +1,14 @@
-"""Secrets management tools - Manage secret scopes and secrets."""
+"""Secrets management tools - Manage secret scopes and secrets.
+
+Provides 7 tools:
+- create_or_update_secret_scope: idempotent scope creation
+- list_secret_scopes: list all scopes
+- delete_secret_scope: delete a scope and all secrets
+- put_secret: create or update a secret (upsert)
+- get_secret: get metadata (existence, byte length) without exposing value
+- list_secrets: list keys in a scope (metadata only)
+- delete_secret: delete a single secret
+"""
 
 from typing import Any, Dict, List, Optional
 
@@ -12,7 +22,7 @@ from databricks_tools_core.secrets import (
     put_secret as _put_secret,
 )
 
-from ..manifest import register_deleter, remove_resource, track_resource
+from ..manifest import register_deleter
 from ..server import mcp
 
 
@@ -24,11 +34,15 @@ register_deleter("secret_scope", _delete_scope_resource)
 
 
 @mcp.tool(timeout=30)
-def create_secret_scope(
+def create_or_update_secret_scope(
     scope: str,
     initial_manage_principal: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create a new Databricks-backed secret scope.
+    """
+    Idempotent create for secret scopes. Returns existing if already present.
+
+    If the scope already exists, returns it with ``created: false``.
+    Otherwise creates it and returns with ``created: true``.
 
     Args:
         scope: Scope name (max 128 chars; alphanumeric, dashes, underscores, periods)
@@ -36,28 +50,38 @@ def create_secret_scope(
             MANAGE permission. If omitted, only the caller gets MANAGE.
 
     Returns:
-        Dictionary with scope name and status
+        Dictionary with:
+        - scope: Scope name
+        - status: "created" or "already_exists"
+        - created: True if newly created, False if already existed
+        - message: Confirmation message
 
     Example:
-        >>> create_secret_scope("my-app-secrets")
-        {"scope": "my-app-secrets", "status": "created", ...}
+        >>> create_or_update_secret_scope("my-app-secrets")
+        {"scope": "my-app-secrets", "status": "created", "created": true, ...}
     """
     result = _create_secret_scope(scope=scope, initial_manage_principal=initial_manage_principal)
 
-    try:
-        track_resource(resource_type="secret_scope", name=scope, resource_id=scope)
-    except Exception:
-        pass
+    if result.get("created"):
+        try:
+            from ..manifest import track_resource
+
+            track_resource(resource_type="secret_scope", name=scope, resource_id=scope)
+        except Exception:
+            pass
 
     return result
 
 
 @mcp.tool(timeout=30)
 def list_secret_scopes() -> List[Dict[str, Any]]:
-    """List all secret scopes in the workspace.
+    """
+    List all secret scopes in the workspace.
 
     Returns:
-        List of scope dicts with name and backend_type (DATABRICKS or AZURE_KEYVAULT)
+        List of scope dicts, each with:
+        - name: Scope name
+        - backend_type: "DATABRICKS" or "AZURE_KEYVAULT"
 
     Example:
         >>> list_secret_scopes()
@@ -68,7 +92,8 @@ def list_secret_scopes() -> List[Dict[str, Any]]:
 
 @mcp.tool(timeout=30)
 def delete_secret_scope(scope: str) -> Dict[str, Any]:
-    """Delete a secret scope and ALL secrets within it.
+    """
+    Delete a secret scope and ALL secrets within it.
 
     This is irreversible. All secrets in the scope are permanently deleted.
 
@@ -76,7 +101,10 @@ def delete_secret_scope(scope: str) -> Dict[str, Any]:
         scope: Name of the scope to delete
 
     Returns:
-        Dictionary with status ("deleted" or "not_found")
+        Dictionary with:
+        - scope: Scope name
+        - status: "deleted" or "not_found"
+        - message: Confirmation or error message
 
     Example:
         >>> delete_secret_scope("old-scope")
@@ -86,6 +114,8 @@ def delete_secret_scope(scope: str) -> Dict[str, Any]:
 
     if result.get("status") == "deleted":
         try:
+            from ..manifest import remove_resource
+
             remove_resource(resource_type="secret_scope", resource_id=scope)
         except Exception:
             pass
@@ -100,7 +130,8 @@ def put_secret(
     string_value: Optional[str] = None,
     bytes_value: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create or update a secret in a scope (upsert).
+    """
+    Create or update a secret in a scope (upsert).
 
     Exactly one of string_value or bytes_value must be provided.
     The secret value is NOT echoed back in the response for security.
@@ -112,7 +143,11 @@ def put_secret(
         bytes_value: The secret value as base64-encoded bytes
 
     Returns:
-        Dictionary with scope, key, and confirmation status
+        Dictionary with:
+        - scope: Scope name
+        - key: Secret key
+        - status: "created"
+        - message: Confirmation message
 
     Example:
         >>> put_secret("my-scope", "api-key", string_value="sk-abc123")
@@ -123,7 +158,8 @@ def put_secret(
 
 @mcp.tool(timeout=30)
 def get_secret(scope: str, key: str) -> Dict[str, Any]:
-    """Get metadata about a secret (existence and byte length).
+    """
+    Get metadata about a secret (existence and byte length).
 
     SECURITY: This tool intentionally does NOT return the secret value.
     It returns only whether the secret exists and its byte length, which
@@ -150,13 +186,16 @@ def get_secret(scope: str, key: str) -> Dict[str, Any]:
 
 @mcp.tool(timeout=30)
 def list_secrets(scope: str) -> List[Dict[str, Any]]:
-    """List secret keys in a scope (metadata only, no values).
+    """
+    List secret keys in a scope (metadata only, no values).
 
     Args:
         scope: Name of the secret scope
 
     Returns:
-        List of secret metadata dicts with key and last_updated_timestamp
+        List of secret metadata dicts, each with:
+        - key: Secret key name
+        - last_updated_timestamp: Milliseconds since epoch
 
     Example:
         >>> list_secrets("my-scope")
@@ -167,14 +206,19 @@ def list_secrets(scope: str) -> List[Dict[str, Any]]:
 
 @mcp.tool(timeout=30)
 def delete_secret(scope: str, key: str) -> Dict[str, Any]:
-    """Delete a secret from a scope.
+    """
+    Delete a secret from a scope.
 
     Args:
         scope: Name of the secret scope
         key: Secret key to delete
 
     Returns:
-        Dictionary with status ("deleted" or "not_found")
+        Dictionary with:
+        - scope: Scope name
+        - key: Secret key
+        - status: "deleted" or "not_found"
+        - message: Confirmation or error message
 
     Example:
         >>> delete_secret("my-scope", "old-key")

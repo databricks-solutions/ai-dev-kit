@@ -37,7 +37,8 @@ def create_secret_scope(
     scope: str,
     initial_manage_principal: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create a new Databricks-backed secret scope.
+    """
+    Create a new Databricks-backed secret scope.
 
     Args:
         scope: Scope name (max 128 chars; alphanumeric, dashes, underscores, periods).
@@ -47,7 +48,8 @@ def create_secret_scope(
     Returns:
         Dictionary with:
         - scope: The created scope name
-        - status: "created"
+        - status: "created" or "already_exists"
+        - created: True if newly created, False if already existed
         - message: Confirmation message
     """
     client = get_workspace_client()
@@ -58,17 +60,24 @@ def create_secret_scope(
             initial_manage_principal=initial_manage_principal,
         )
     except ResourceAlreadyExists:
-        raise Exception(f"Secret scope '{scope}' already exists.")
+        return {
+            "scope": scope,
+            "status": "already_exists",
+            "created": False,
+            "message": f"Secret scope '{scope}' already exists.",
+        }
 
     return {
         "scope": scope,
         "status": "created",
+        "created": True,
         "message": f"Secret scope '{scope}' created successfully.",
     }
 
 
 def list_secret_scopes() -> List[Dict[str, Any]]:
-    """List all secret scopes in the workspace.
+    """
+    List all secret scopes in the workspace.
 
     Returns:
         List of scope dicts, each with:
@@ -89,7 +98,8 @@ def list_secret_scopes() -> List[Dict[str, Any]]:
 
 
 def delete_secret_scope(scope: str) -> Dict[str, Any]:
-    """Delete a secret scope and all secrets within it.
+    """
+    Delete a secret scope and all secrets within it.
 
     This is irreversible. All secrets in the scope are permanently deleted.
 
@@ -130,7 +140,8 @@ def put_secret(
     string_value: Optional[str] = None,
     bytes_value: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create or update a secret in a scope.
+    """
+    Create or update a secret in a scope.
 
     If a secret with the same key already exists, it is overwritten (upsert).
     Exactly one of string_value or bytes_value must be provided.
@@ -180,7 +191,8 @@ def get_secret(
     key: str,
     return_value: bool = False,
 ) -> Dict[str, Any]:
-    """Get a secret's metadata, and optionally its value.
+    """
+    Get a secret's metadata, and optionally its value.
 
     By default (return_value=False), returns only metadata: whether the secret
     exists, its key, and the byte length of its value. This is safe to use in
@@ -237,7 +249,8 @@ def get_secret(
 
 
 def list_secrets(scope: str) -> List[Dict[str, Any]]:
-    """List secret keys in a scope.
+    """
+    List secret keys in a scope.
 
     Returns metadata only — secret values are never included.
 
@@ -266,7 +279,8 @@ def list_secrets(scope: str) -> List[Dict[str, Any]]:
 
 
 def delete_secret(scope: str, key: str) -> Dict[str, Any]:
-    """Delete a secret from a scope.
+    """
+    Delete a secret from a scope.
 
     Args:
         scope: Name of the secret scope.
