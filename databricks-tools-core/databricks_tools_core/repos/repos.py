@@ -118,7 +118,7 @@ def create_repo(
     try:
         repo = client.repos.create(url=url, provider=provider, path=path)
     except ResourceAlreadyExists:
-        return {"error": f"Repo already exists at path. Use a different path or delete the existing repo.", "url": url}
+        return {"error": "Repo already exists at path. Use a different path or delete the existing repo.", "url": url}
 
     return _serialize_repo(repo)
 

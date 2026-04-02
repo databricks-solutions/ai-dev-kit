@@ -125,7 +125,9 @@ class TestCreateRepo:
 
         assert result["id"] == 100
         assert result["provider"] == "gitHub"
-        mock_client.repos.create.assert_called_once_with(url="https://github.com/org/repo", provider="gitHub", path=None)
+        mock_client.repos.create.assert_called_once_with(
+            url="https://github.com/org/repo", provider="gitHub", path=None
+        )
 
     @mock.patch(_GET_CLIENT)
     def test_create_with_path(self, mock_get_client):
@@ -193,7 +195,7 @@ class TestUpdateRepo:
         mock_client.repos.get.return_value = _make_repo_info(branch=None, head_commit_id="tag123")
         mock_get_client.return_value = mock_client
 
-        result = update_repo(repo_id=12345, tag="v1.0.0")
+        update_repo(repo_id=12345, tag="v1.0.0")
 
         mock_client.repos.update.assert_called_once_with(repo_id=12345, branch=None, tag="v1.0.0")
 
