@@ -1,4 +1,12 @@
-"""Workspace object tools - Browse, read, and create workspace notebooks and directories."""
+"""Workspace object tools - Browse, read, and create workspace notebooks and directories.
+
+Provides 5 tools:
+- list_workspace_directory: browse workspace paths
+- get_workspace_object_status: get metadata for a single object
+- read_notebook: export notebook content in various formats
+- create_notebook: create or overwrite notebooks from inline content
+- create_workspace_directory: create directories (idempotent)
+"""
 
 from typing import Any, Dict, Optional
 
@@ -15,7 +23,8 @@ from ..server import mcp
 
 @mcp.tool(timeout=30)
 def list_workspace_directory(path: str) -> Dict[str, Any]:
-    """List files, notebooks, and directories at a workspace path.
+    """
+    List files, notebooks, and directories at a workspace path.
 
     Use this to browse the workspace filesystem and discover notebooks, files,
     and directories. Each object includes its type (NOTEBOOK, FILE, DIRECTORY,
@@ -26,7 +35,10 @@ def list_workspace_directory(path: str) -> Dict[str, Any]:
             "/Repos/user@example.com/my-repo", "/Shared")
 
     Returns:
-        Dictionary with objects list and count, or error if path not found
+        Dictionary with:
+        - path: The listed path
+        - objects: List of object dicts with path, object_type, language, object_id, size
+        - count: Number of objects returned
 
     Example:
         >>> list_workspace_directory("/Users/user@example.com")
@@ -37,7 +49,8 @@ def list_workspace_directory(path: str) -> Dict[str, Any]:
 
 @mcp.tool(timeout=30)
 def get_workspace_object_status(path: str) -> Dict[str, Any]:
-    """Get metadata for a workspace object (notebook, file, or directory).
+    """
+    Get metadata for a workspace object (notebook, file, or directory).
 
     Returns type, language, size, and timestamps for a single workspace object.
 
@@ -45,8 +58,14 @@ def get_workspace_object_status(path: str) -> Dict[str, Any]:
         path: Full workspace path to the object
 
     Returns:
-        Dictionary with path, object_type, language, object_id, size,
-        created_at, modified_at
+        Dictionary with:
+        - path: Full workspace path
+        - object_type: NOTEBOOK, FILE, DIRECTORY, LIBRARY, or REPO
+        - language: For notebooks — PYTHON, SQL, SCALA, or R
+        - object_id: Unique identifier
+        - size: File size in bytes (if applicable)
+        - created_at: Creation timestamp
+        - modified_at: Last modification timestamp
 
     Example:
         >>> get_workspace_object_status("/Users/user@example.com/my_notebook")
@@ -57,7 +76,8 @@ def get_workspace_object_status(path: str) -> Dict[str, Any]:
 
 @mcp.tool(timeout=30)
 def read_notebook(path: str, format: str = "SOURCE") -> Dict[str, Any]:
-    """Read/export a notebook or workspace file.
+    """
+    Read/export a notebook or workspace file.
 
     Use this to retrieve notebook source code or export in other formats.
     SOURCE format returns decoded text; binary formats return base64.
@@ -68,7 +88,11 @@ def read_notebook(path: str, format: str = "SOURCE") -> Dict[str, Any]:
             JUPYTER, DBC, RAW, R_MARKDOWN, AUTO
 
     Returns:
-        Dictionary with content, format, and is_base64 flag
+        Dictionary with:
+        - path: The notebook path
+        - content: Notebook content (decoded string for text formats, base64 for binary)
+        - format: The export format used
+        - is_base64: True if content is base64-encoded (binary formats)
 
     Example:
         >>> read_notebook("/Users/user@example.com/my_notebook")
@@ -85,7 +109,8 @@ def create_notebook(
     format: str = "SOURCE",
     overwrite: bool = False,
 ) -> Dict[str, Any]:
-    """Create or import a notebook in the workspace.
+    """
+    Create or import a notebook in the workspace.
 
     Pass plain source code for SOURCE format. For JUPYTER, pass the raw JSON.
     Parent directories must already exist.
@@ -99,7 +124,12 @@ def create_notebook(
         overwrite: If true, replaces existing notebook (default: false)
 
     Returns:
-        Dictionary with path, language, format, and success status
+        Dictionary with:
+        - path: The created notebook path
+        - language: Language used
+        - format: Import format used
+        - overwrite: Whether overwrite was enabled
+        - success: True on success
 
     Example:
         >>> create_notebook("/Users/me/hello", "print('hello world')")
@@ -110,7 +140,8 @@ def create_notebook(
 
 @mcp.tool(timeout=30)
 def create_workspace_directory(path: str) -> Dict[str, Any]:
-    """Create a directory in the workspace, including parent directories.
+    """
+    Create a directory in the workspace, including parent directories.
 
     This is idempotent — calling it on an existing directory succeeds silently.
 
@@ -119,7 +150,9 @@ def create_workspace_directory(path: str) -> Dict[str, Any]:
             (e.g. "/Users/user@example.com/my_project")
 
     Returns:
-        Dictionary with path and success status
+        Dictionary with:
+        - path: The created directory path
+        - success: True on success
 
     Example:
         >>> create_workspace_directory("/Users/me/my_project")

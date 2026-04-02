@@ -34,14 +34,16 @@ _VALID_LANGUAGES = {e.name for e in Language}
 
 def _serialize_object_info(obj: ObjectInfo) -> Dict[str, Any]:
     """Convert an ObjectInfo dataclass to a serializable dict."""
+    obj_type = getattr(obj, "object_type", None)
+    lang = getattr(obj, "language", None)
     return {
-        "path": obj.path,
-        "object_type": obj.object_type.name if obj.object_type else None,
-        "language": obj.language.name if obj.language else None,
-        "object_id": obj.object_id,
-        "size": obj.size,
-        "created_at": obj.created_at,
-        "modified_at": obj.modified_at,
+        "path": getattr(obj, "path", None),
+        "object_type": obj_type.name if obj_type else None,
+        "language": lang.name if lang else None,
+        "object_id": getattr(obj, "object_id", None),
+        "size": getattr(obj, "size", None),
+        "created_at": getattr(obj, "created_at", None),
+        "modified_at": getattr(obj, "modified_at", None),
     }
 
 
@@ -51,7 +53,8 @@ def _serialize_object_info(obj: ObjectInfo) -> Dict[str, Any]:
 
 
 def list_workspace_directory(path: str) -> Dict[str, Any]:
-    """List files and directories in a workspace path.
+    """
+    List files and directories in a workspace path.
 
     Args:
         path: Workspace path to list (e.g. "/Users/user@example.com").
@@ -74,14 +77,21 @@ def list_workspace_directory(path: str) -> Dict[str, Any]:
 
 
 def get_workspace_object_status(path: str) -> Dict[str, Any]:
-    """Get metadata for a workspace object (notebook, file, or directory).
+    """
+    Get metadata for a workspace object (notebook, file, or directory).
 
     Args:
         path: Workspace path to inspect.
 
     Returns:
-        Dictionary with object metadata: path, object_type, language, object_id,
-        size, created_at, modified_at.
+        Dictionary with:
+        - path: Full workspace path
+        - object_type: NOTEBOOK, FILE, DIRECTORY, LIBRARY, or REPO
+        - language: For notebooks — PYTHON, SQL, SCALA, or R
+        - object_id: Unique identifier
+        - size: File size in bytes (if applicable)
+        - created_at: Creation timestamp
+        - modified_at: Last modification timestamp
     """
     client = get_workspace_client()
 
@@ -94,7 +104,8 @@ def get_workspace_object_status(path: str) -> Dict[str, Any]:
 
 
 def read_notebook(path: str, format: str = "SOURCE") -> Dict[str, Any]:
-    """Read/export a notebook or workspace file.
+    """
+    Read/export a notebook or workspace file.
 
     Args:
         path: Workspace path of the notebook or file.
@@ -140,7 +151,8 @@ def create_notebook(
     format: str = "SOURCE",
     overwrite: bool = False,
 ) -> Dict[str, Any]:
-    """Create or import a notebook in the workspace.
+    """
+    Create or import a notebook in the workspace.
 
     Args:
         path: Workspace path for the notebook (e.g. "/Users/user@example.com/my_notebook").
@@ -188,7 +200,8 @@ def create_notebook(
 
 
 def create_workspace_directory(path: str) -> Dict[str, Any]:
-    """Create a directory in the workspace. Creates parent directories as needed.
+    """
+    Create a directory in the workspace. Creates parent directories as needed.
 
     Args:
         path: Workspace path for the directory.
