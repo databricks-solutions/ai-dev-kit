@@ -148,6 +148,7 @@ from .tools import (  # noqa: F401, E402
     agent_bricks,
     aibi_dashboards,
     serving,
+    secrets,
     unity_catalog,
     volume_files,
     genie,
