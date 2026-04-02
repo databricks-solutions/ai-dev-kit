@@ -73,20 +73,20 @@ class TimeoutHandlingMiddleware(Middleware):
                 "Tool '%s' timed out. Returning structured result.",
                 tool_name,
             )
-            error_data = {
-                "error": True,
-                "error_type": "timeout",
-                "tool": tool_name,
-                "message": str(e) or "Operation timed out",
-                "action_required": (
-                    "Operation may still be in progress. "
-                    "Do NOT retry the same call. "
-                    "Use the appropriate get/status tool to check current state."
-                ),
-            }
+            # Don't set structured_content for errors - it would be validated against
+            # the tool's outputSchema and fail (error dict doesn't match expected type)
             return ToolResult(
-                content=[TextContent(type="text", text=json.dumps(error_data))],
-                structured_content=error_data,
+                content=[TextContent(type="text", text=json.dumps({
+                    "error": True,
+                    "error_type": "timeout",
+                    "tool": tool_name,
+                    "message": str(e) or "Operation timed out",
+                    "action_required": (
+                        "Operation may still be in progress. "
+                        "Do NOT retry the same call. "
+                        "Use the appropriate get/status tool to check current state."
+                    ),
+                }))]
             )
 
         except anyio.get_cancelled_exc_class():
@@ -110,16 +110,14 @@ class TimeoutHandlingMiddleware(Middleware):
                 traceback.format_exc(),
             )
 
-            # Return a structured error response with both content and structured_content.
-            # structured_content is required when tools have an outputSchema defined
-            # (which fastmcp auto-generates from return type annotations like Dict[str, Any]).
-            error_data = {
-                "error": True,
-                "error_type": type(e).__name__,
-                "tool": tool_name,
-                "message": str(e),
-            }
+            # Return error as text content only - don't set structured_content.
+            # Setting structured_content would cause MCP SDK to validate it against
+            # the tool's outputSchema, which fails (error dict doesn't match expected type).
             return ToolResult(
-                content=[TextContent(type="text", text=json.dumps(error_data))],
-                structured_content=error_data,
+                content=[TextContent(type="text", text=json.dumps({
+                    "error": True,
+                    "error_type": type(e).__name__,
+                    "tool": tool_name,
+                    "message": str(e),
+                }))]
             )
