@@ -7,7 +7,8 @@ Functions for checking status and querying Databricks Model Serving endpoints.
 import logging
 from typing import Any, Dict, List, Optional
 
-from databricks.sdk.service.serving import ChatMessage
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.service.serving import ChatMessage, ServingEndpointAccessControlRequest
 
 from ..auth import get_workspace_client
 
@@ -248,3 +249,118 @@ def list_serving_endpoints(limit: Optional[int] = 50) -> List[Dict[str, Any]]:
         )
 
     return result
+
+
+def _resolve_endpoint_id(client: Any, name: str) -> str:
+    """Resolve serving endpoint name to its ID.
+
+    Args:
+        client: Workspace client.
+        name: Endpoint name.
+
+    Returns:
+        The endpoint's hex ID string.
+
+    Raises:
+        Exception: If endpoint not found.
+    """
+    try:
+        endpoint = client.serving_endpoints.get(name=name)
+    except (ResourceDoesNotExist, NotFound):
+        raise Exception(f"Endpoint '{name}' not found.")
+    return endpoint.id
+
+
+def get_serving_endpoint_permissions(name: str) -> Dict[str, Any]:
+    """Get the access control list for a serving endpoint.
+
+    Args:
+        name: Name of the serving endpoint.
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - permissions: List of ACL entries, each with:
+            - principal: User email, group name, or service principal name
+            - principal_type: "user", "group", or "service_principal"
+            - permission_level: CAN_VIEW, CAN_QUERY, or CAN_MANAGE
+            - inherited: Whether inherited from parent
+    """
+    client = get_workspace_client()
+    endpoint_id = _resolve_endpoint_id(client, name)
+
+    perms = client.serving_endpoints.get_permissions(serving_endpoint_id=endpoint_id)
+
+    result_perms = []
+    if perms.access_control_list:
+        for acl in perms.access_control_list:
+            # Determine principal type and name
+            if acl.user_name:
+                principal, principal_type = acl.user_name, "user"
+            elif acl.group_name:
+                principal, principal_type = acl.group_name, "group"
+            elif acl.service_principal_name:
+                principal, principal_type = acl.service_principal_name, "service_principal"
+            else:
+                continue
+
+            if acl.all_permissions:
+                for perm in acl.all_permissions:
+                    level = perm.permission_level.value if perm.permission_level else None
+                    result_perms.append({
+                        "principal": principal,
+                        "principal_type": principal_type,
+                        "permission_level": level,
+                        "inherited": perm.inherited or False,
+                    })
+
+    return {
+        "name": name,
+        "permissions": result_perms,
+    }
+
+
+def update_serving_endpoint_permissions(
+    name: str,
+    access_control_list: List[Dict[str, str]],
+) -> Dict[str, Any]:
+    """Update permissions for a serving endpoint (additive merge).
+
+    Grants or modifies permissions for users, groups, or service principals.
+    Existing permissions not in the list are left unchanged.
+
+    Args:
+        name: Name of the serving endpoint.
+        access_control_list: List of permission entries. Each dict should have:
+            - permission_level: "CAN_VIEW", "CAN_QUERY", or "CAN_MANAGE"
+            - One of: user_name, group_name, or service_principal_name
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - updated: Number of ACL entries applied
+        - message: Confirmation message
+    """
+    client = get_workspace_client()
+    endpoint_id = _resolve_endpoint_id(client, name)
+
+    acl_requests = [
+        ServingEndpointAccessControlRequest(
+            user_name=entry.get("user_name"),
+            group_name=entry.get("group_name"),
+            service_principal_name=entry.get("service_principal_name"),
+            permission_level=entry.get("permission_level"),
+        )
+        for entry in access_control_list
+    ]
+
+    client.serving_endpoints.update_permissions(
+        serving_endpoint_id=endpoint_id,
+        access_control_list=acl_requests,
+    )
+
+    return {
+        "name": name,
+        "updated": len(acl_requests),
+        "message": f"Permissions updated for endpoint '{name}'.",
+    }
