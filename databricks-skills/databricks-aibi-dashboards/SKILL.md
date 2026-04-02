@@ -7,6 +7,19 @@ description: "Create Databricks AI/BI dashboards. Use when creating, updating, o
 
 Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow these guidelines strictly.**
 
+## CRITICAL: Widget Version Requirements
+
+> **Wrong version = broken widget!** This is the #1 cause of dashboard errors.
+
+| Widget Type | Version | Notes |
+|-------------|---------|-------|
+| `counter` | **2** | KPI cards |
+| `table` | **2** | Data tables |
+| `bar`, `line`, `area`, `pie` | **3** | Charts |
+| `filter-*` | **2** | All filter types |
+
+---
+
 ## CRITICAL: MANDATORY VALIDATION WORKFLOW
 
 **You MUST follow this workflow exactly. Skipping validation causes broken dashboards.**
@@ -30,6 +43,23 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 ```
 
 **WARNING: If you deploy without testing queries, widgets WILL show "Invalid widget definition" errors!**
+
+## CRITICAL: Verify Data Matches Story
+
+Before finalizing, run validation queries to confirm the data tells the intended story:
+```sql
+-- Example: Verify spike is visible
+SELECT
+  CASE WHEN date < '2025-02-17' THEN 'Before' ELSE 'After' END as period,
+  AVG(total_returns_usd) as avg_daily_returns
+FROM gold_daily_summary
+GROUP BY 1;
+-- Should show significant difference between periods
+```
+
+If values don't match expectations (e.g., "spike should be 3x normal" but data shows 1.5x), fix the data generation before creating the dashboard.
+
+---
 
 ## Design Best Practices
 
@@ -96,6 +126,14 @@ manage_dashboard(action="get", dashboard_id="dashboard_123")
 manage_dashboard(action="list")
 ```
 
+## CRITICAL: Check JSON Structure Before Writing
+
+> **If you're unsure about the exact JSON structure for any widget, ALWAYS read these files first:**
+> - [1-widget-specifications.md](1-widget-specifications.md) - Widget definitions and encoding patterns
+> - [4-examples.md](4-examples.md) - Complete working dashboard template
+
+**Do NOT guess the JSON structure.** Wrong field names or missing properties cause broken widgets.
+
 ## Reference Files
 
 | What are you building? | Reference |
@@ -149,6 +187,13 @@ See [1-widget-specifications.md](1-widget-specifications.md) for full expression
 Each widget has a position: `{"x": 0, "y": 0, "width": 2, "height": 4}`
 
 **CRITICAL**: Each row must fill width=6 exactly. No gaps allowed.
+
+```
+CORRECT:                          WRONG:
+y=0: [w=6]                        y=0: [w=4]____  ← gap!
+y=1: [w=2][w=2][w=2]  ← fills 6   y=1: [w=1][w=1][w=1][w=1]__  ← gap!
+y=4: [w=3][w=3]       ← fills 6
+```
 
 | Widget Type | Width | Height | Notes |
 |-------------|-------|--------|-------|

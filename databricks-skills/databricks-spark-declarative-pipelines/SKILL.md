@@ -202,6 +202,17 @@ After choosing your workflow (see [Choose Your Workflow](#choose-your-workflow))
 | **Silver** | `stream(bronze)` → streaming table | Clean/validate, type casting, quality filters. Prefer `DECIMAL(p,s)` for money. Dedup can happen here or gold. |
 | **Gold** | `AUTO CDC INTO` or materialized view | Aggregated, denormalized. SCD/dedup often via `AUTO CDC`. Star schema typically uses `dim_*`/`fact_*`. |
 
+#### Gold Layer: Preserve Key Dimensions
+
+When aggregating data in gold tables, **keep the main business dimensions** to enable flexible analysis. Over-aggregating loses information that analysts may need later.
+
+**Guidance based on context:**
+- **If a dashboard is mentioned**: Include all dimensions that appear as filters. Dashboard filters only work if the underlying data has those columns.
+- **If analysis by dimension is mentioned** (e.g., "analyze by store", "breakdown by department"): Include those dimensions in the aggregation.
+- **If no specific instructions**: Default to keeping key business dimensions (location, department, product line, customer segment, time period) rather than aggregating them away. This preserves flexibility for future analysis.
+
+**Rule of thumb**: If users might want to slice the data by a dimension, include it in the gold table. It's easier to aggregate further in queries than to recover lost dimensions.
+
 **For medallion architecture** (bronze/silver/gold), two approaches work:
 - **Flat with naming** (template default): `bronze_*.sql`, `silver_*.sql`, `gold_*.sql`
 - **Subdirectories**: `bronze/orders.sql`, `silver/cleaned.sql`, `gold/summary.sql`
