@@ -3,9 +3,11 @@
 from typing import Any, Dict, List, Optional
 
 from databricks_tools_core.serving import (
+    get_serving_endpoint_permissions as _get_serving_endpoint_permissions,
     get_serving_endpoint_status as _get_serving_endpoint_status,
-    query_serving_endpoint as _query_serving_endpoint,
     list_serving_endpoints as _list_serving_endpoints,
+    query_serving_endpoint as _query_serving_endpoint,
+    update_serving_endpoint_permissions as _update_serving_endpoint_permissions,
 )
 
 from ..server import mcp
@@ -129,3 +131,56 @@ def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
         ]
     """
     return _list_serving_endpoints(limit=limit)
+
+
+@mcp.tool(timeout=30)
+def get_serving_endpoint_permissions(name: str) -> Dict[str, Any]:
+    """Get the access control list for a serving endpoint.
+
+    Returns all permissions including inherited ones (e.g. admins group).
+
+    Args:
+        name: Name of the serving endpoint
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - permissions: List of ACL entries with principal, principal_type,
+            permission_level (CAN_VIEW/CAN_QUERY/CAN_MANAGE), and inherited flag
+
+    Example:
+        >>> get_serving_endpoint_permissions("my-endpoint")
+        {"name": "my-endpoint", "permissions": [{"principal": "user@co.com", "permission_level": "CAN_MANAGE", ...}]}
+    """
+    return _get_serving_endpoint_permissions(name=name)
+
+
+@mcp.tool(timeout=30)
+def update_serving_endpoint_permissions(
+    name: str,
+    access_control_list: List[Dict[str, str]],
+) -> Dict[str, Any]:
+    """Update permissions for a serving endpoint (additive merge).
+
+    Grants or modifies permissions. Existing permissions not in the list
+    are left unchanged. Use CAN_VIEW, CAN_QUERY, or CAN_MANAGE.
+
+    Args:
+        name: Name of the serving endpoint
+        access_control_list: List of permission entries. Each dict needs:
+            - permission_level: "CAN_VIEW", "CAN_QUERY", or "CAN_MANAGE"
+            - One of: user_name, group_name, or service_principal_name
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - updated: Number of ACL entries applied
+        - message: Confirmation
+
+    Example:
+        >>> update_serving_endpoint_permissions("my-ep", access_control_list=[
+        ...     {"user_name": "user@co.com", "permission_level": "CAN_QUERY"}
+        ... ])
+        {"name": "my-ep", "updated": 1, "message": "Permissions updated..."}
+    """
+    return _update_serving_endpoint_permissions(name=name, access_control_list=access_control_list)
