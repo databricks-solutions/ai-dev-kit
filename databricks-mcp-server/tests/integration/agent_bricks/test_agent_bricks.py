@@ -294,34 +294,13 @@ class TestAgentBricksLifecycle:
             assert find_ka_result.get("found") is True, f"KA should be found: {find_ka_result}"
             assert find_ka_result.get("tile_id") == ka_tile_id
 
-            # KA create_or_update (UPDATE existing - tests name lookup and API 2.1 update)
-            log_time("Step 4b: Testing KA create_or_update on EXISTING KA...")
-            update_ka_result = manage_ka(
-                action="create_or_update",
-                name=ka_name,  # Same name - should find existing and update
-                volume_path=full_volume_path,
-                description="UPDATED description for integration test",
-                instructions="UPDATED instructions for the test.",
-                add_examples_from_volume=False,
-            )
-            log_time(f"Update KA result: {update_ka_result}")
-            assert "error" not in update_ka_result, f"Update KA failed: {update_ka_result}"
-            assert update_ka_result.get("tile_id") == ka_tile_id, "Should return same tile_id"
-            assert update_ka_result.get("operation") == "updated", "Should report 'updated' operation"
-
-            # Verify the update was applied
-            verify_result = manage_ka(action="get", tile_id=ka_tile_id)
-            assert "UPDATED description" in verify_result.get("description", ""), "Description should be updated"
-            assert "UPDATED instructions" in verify_result.get("instructions", ""), "Instructions should be updated"
-            log_time("KA update verified successfully")
-
             # Get KA endpoint name for MAS
             ka_endpoint_name = get_ka_result.get("endpoint_name")
             log_time(f"KA endpoint name: {ka_endpoint_name}")
 
             # Wait for KA endpoint to be online (needed for MAS)
             log_time("Step 5: Waiting for KA endpoint to be online...")
-            max_wait = 300  # 5 minutes
+            max_wait = 600  # 10 minutes - KA provisioning can take a while
             wait_interval = 15
             waited = 0
             ka_ready = False
@@ -345,6 +324,28 @@ class TestAgentBricksLifecycle:
             if not ka_ready:
                 log_time(f"KA endpoint not online after {max_wait}s, skipping MAS creation")
                 pytest.skip("KA endpoint not ready, cannot test MAS")
+
+            # KA create_or_update (UPDATE existing - tests name lookup and API 2.1 update)
+            # Must wait for ONLINE status before update is allowed
+            log_time("Step 5b: Testing KA create_or_update on EXISTING KA...")
+            update_ka_result = manage_ka(
+                action="create_or_update",
+                name=ka_name,  # Same name - should find existing and update
+                volume_path=full_volume_path,
+                description="UPDATED description for integration test",
+                instructions="UPDATED instructions for the test.",
+                add_examples_from_volume=False,
+            )
+            log_time(f"Update KA result: {update_ka_result}")
+            assert "error" not in update_ka_result, f"Update KA failed: {update_ka_result}"
+            assert update_ka_result.get("tile_id") == ka_tile_id, "Should return same tile_id"
+            assert update_ka_result.get("operation") == "updated", "Should report 'updated' operation"
+
+            # Verify the update was applied
+            verify_result = manage_ka(action="get", tile_id=ka_tile_id)
+            assert "UPDATED description" in verify_result.get("description", ""), "Description should be updated"
+            assert "UPDATED instructions" in verify_result.get("instructions", ""), "Instructions should be updated"
+            log_time("KA update verified successfully")
 
             # ==================== MAS LIFECYCLE ====================
             log_time(f"Step 6: Creating MAS '{mas_name}' using KA endpoint...")

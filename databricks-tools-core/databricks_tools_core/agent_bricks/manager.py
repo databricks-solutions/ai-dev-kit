@@ -330,11 +330,15 @@ class AgentBricksManager:
         for source_dict in knowledge_sources:
             files_source = source_dict.get("files_source", {})
             if files_source:
+                source_name = files_source.get("name", f"source_{sanitized_name}")
+                source_path = files_source.get("files", {}).get("path", "")
+                # API requires non-empty description - provide default if not specified
+                source_description = files_source.get("description") or f"Knowledge source from {source_path}"
                 source_obj = SDKKnowledgeSource(
-                    display_name=files_source.get("name", f"source_{sanitized_name}"),
-                    description=files_source.get("description", ""),
+                    display_name=source_name,
+                    description=source_description,
                     source_type="files",
-                    files=FilesSpec(path=files_source.get("files", {}).get("path", "")),
+                    files=FilesSpec(path=source_path),
                 )
                 created_source = self.w.knowledge_assistants.create_knowledge_source(
                     parent=created_ka.name,
