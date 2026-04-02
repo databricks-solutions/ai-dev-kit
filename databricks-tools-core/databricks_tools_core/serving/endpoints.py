@@ -1,12 +1,14 @@
 """
 Model Serving Endpoints Operations
 
-Functions for checking status and querying Databricks Model Serving endpoints.
+Functions for checking status, querying, and monitoring Databricks Model Serving endpoints.
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.serving import ChatMessage
 
 from ..auth import get_workspace_client
@@ -248,3 +250,104 @@ def list_serving_endpoints(limit: Optional[int] = 50) -> List[Dict[str, Any]]:
         )
 
     return result
+
+
+def _parse_prometheus_metrics(text: str) -> List[Dict[str, Any]]:
+    """Parse Prometheus exposition format into structured dicts.
+
+    Args:
+        text: Raw Prometheus/OpenMetrics text.
+
+    Returns:
+        List of metric dicts with name, labels, value, help, and type.
+    """
+    metrics = []
+    help_map: Dict[str, str] = {}
+    type_map: Dict[str, str] = {}
+
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("# HELP "):
+            parts = line[7:].split(" ", 1)
+            if len(parts) == 2:
+                help_map[parts[0]] = parts[1]
+            continue
+        if line.startswith("# TYPE "):
+            parts = line[7:].split(" ", 1)
+            if len(parts) == 2:
+                type_map[parts[0]] = parts[1]
+            continue
+        if line.startswith("#"):
+            continue
+
+        # Parse: metric_name{label="val",...} value [timestamp]
+        match = re.match(r'^([a-zA-Z_:][a-zA-Z0-9_:]*)\{?(.*?)\}?\s+(.+)$', line)
+        if not match:
+            continue
+
+        name = match.group(1)
+        labels_str = match.group(2)
+        # Value may be followed by optional timestamp — take first token only
+        value_str = match.group(3).split()[0]
+
+        labels = {}
+        if labels_str:
+            for pair in re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"', labels_str):
+                labels[pair[0]] = pair[1]
+
+        try:
+            value = float(value_str)
+        except ValueError:
+            value = value_str
+
+        metrics.append({
+            "name": name,
+            "labels": labels,
+            "value": value,
+            "help": help_map.get(name),
+            "type": type_map.get(name),
+        })
+
+    return metrics
+
+
+def export_serving_endpoint_metrics(name: str) -> Dict[str, Any]:
+    """Export health metrics for a serving endpoint.
+
+    Returns metrics in structured format, parsed from the Prometheus/OpenMetrics
+    exposition format returned by the API. Includes CPU, memory, request latency,
+    request counts, error rates, and GPU metrics (if applicable).
+
+    Args:
+        name: Name of the serving endpoint.
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - metrics: List of metric dicts, each with:
+            - name: Metric name (e.g. "cpu_usage_percentage")
+            - labels: Dict of label key-value pairs
+            - value: Numeric value
+            - help: Metric description
+            - type: Prometheus type (gauge, histogram, counter)
+        - raw: Raw Prometheus text (for direct scraping use)
+    """
+    client = get_workspace_client()
+
+    try:
+        response = client.serving_endpoints.export_metrics(name=name)
+        raw_text = response.contents.read().decode("utf-8")
+    except (ResourceDoesNotExist, NotFound):
+        raise Exception(f"Endpoint '{name}' not found.")
+    except Exception as e:
+        raise Exception(f"Failed to export metrics for endpoint '{name}': {str(e)}")
+
+    metrics = _parse_prometheus_metrics(raw_text)
+
+    return {
+        "name": name,
+        "metrics": metrics,
+        "raw": raw_text,
+    }

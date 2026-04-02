@@ -3,9 +3,10 @@
 from typing import Any, Dict, List, Optional
 
 from databricks_tools_core.serving import (
+    export_serving_endpoint_metrics as _export_serving_endpoint_metrics,
     get_serving_endpoint_status as _get_serving_endpoint_status,
-    query_serving_endpoint as _query_serving_endpoint,
     list_serving_endpoints as _list_serving_endpoints,
+    query_serving_endpoint as _query_serving_endpoint,
 )
 
 from ..server import mcp
@@ -129,3 +130,27 @@ def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
         ]
     """
     return _list_serving_endpoints(limit=limit)
+
+
+@mcp.tool(timeout=30)
+def export_serving_endpoint_metrics(name: str) -> Dict[str, Any]:
+    """Export health metrics for a serving endpoint.
+
+    Returns CPU, memory, request latency, error rates, and GPU utilization
+    (if applicable), parsed from the Prometheus/OpenMetrics format into
+    structured dicts. Also includes raw Prometheus text for scraping.
+
+    Args:
+        name: Name of the serving endpoint
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - metrics: List of metric dicts (name, labels, value, help, type)
+        - raw: Raw Prometheus exposition text
+
+    Example:
+        >>> export_serving_endpoint_metrics("my-endpoint")
+        {"name": "my-endpoint", "metrics": [{"name": "cpu_usage_percentage", "value": 12.5, ...}], ...}
+    """
+    return _export_serving_endpoint_metrics(name=name)
