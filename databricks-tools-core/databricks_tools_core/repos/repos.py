@@ -30,12 +30,12 @@ VALID_PROVIDERS = {
 def _serialize_repo(repo) -> Dict[str, Any]:
     """Convert a RepoInfo/CreateRepoResponse/GetRepoResponse to a serializable dict."""
     return {
-        "id": repo.id,
-        "path": repo.path,
-        "url": repo.url,
-        "provider": repo.provider,
-        "branch": repo.branch,
-        "head_commit_id": repo.head_commit_id,
+        "id": getattr(repo, "id", None),
+        "path": getattr(repo, "path", None),
+        "url": getattr(repo, "url", None),
+        "provider": getattr(repo, "provider", None),
+        "branch": getattr(repo, "branch", None),
+        "head_commit_id": getattr(repo, "head_commit_id", None),
     }
 
 
@@ -45,11 +45,13 @@ def _serialize_repo(repo) -> Dict[str, Any]:
 
 
 def list_repos(path_prefix: Optional[str] = None) -> Dict[str, Any]:
-    """List Git repos in the workspace.
+    """
+    List Git repos in the workspace.
 
     Args:
-        path_prefix: Optional path prefix to filter repos
-            (e.g. "/Repos/user@example.com").
+        path_prefix: Optional workspace path prefix to filter repos
+            (e.g. "/Repos/user@example.com"). Only repos whose path starts
+            with this prefix are returned.
 
     Returns:
         Dictionary with:
@@ -63,13 +65,20 @@ def list_repos(path_prefix: Optional[str] = None) -> Dict[str, Any]:
 
 
 def get_repo(repo_id: int) -> Dict[str, Any]:
-    """Get details for a specific Git repo.
+    """
+    Get details for a specific Git repo.
 
     Args:
         repo_id: Numeric ID of the repo.
 
     Returns:
-        Dictionary with repo details: id, path, url, provider, branch, head_commit_id.
+        Dictionary with:
+        - id: Repo ID
+        - path: Workspace path
+        - url: Remote Git URL
+        - provider: Git provider name
+        - branch: Current branch
+        - head_commit_id: Current commit SHA
     """
     client = get_workspace_client()
 
@@ -91,7 +100,8 @@ def create_repo(
     provider: str,
     path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Clone a Git repository into the workspace.
+    """
+    Clone a Git repository into the workspace.
 
     Args:
         url: URL of the remote Git repository (e.g. "https://github.com/org/repo").
@@ -128,7 +138,8 @@ def update_repo(
     branch: Optional[str] = None,
     tag: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Update a repo by switching to a different branch or tag.
+    """
+    Update a repo by switching to a different branch or tag.
 
     This pulls the latest from the remote and checks out the specified
     branch or tag. Exactly one of branch or tag must be provided.
@@ -139,7 +150,13 @@ def update_repo(
         tag: Tag name to check out (e.g. "v1.0.0").
 
     Returns:
-        Dictionary with updated repo details: id, path, url, provider, branch, head_commit_id.
+        Dictionary with:
+        - id: Repo ID
+        - path: Workspace path
+        - url: Remote Git URL
+        - provider: Git provider name
+        - branch: New checked-out branch
+        - head_commit_id: New commit SHA
     """
     if not branch and not tag:
         return {"error": "Exactly one of 'branch' or 'tag' must be provided.", "repo_id": repo_id}
@@ -159,7 +176,8 @@ def update_repo(
 
 
 def delete_repo(repo_id: int) -> Dict[str, Any]:
-    """Delete a Git repo from the workspace.
+    """
+    Delete a Git repo from the workspace.
 
     Args:
         repo_id: Numeric ID of the repo to delete.
@@ -167,7 +185,7 @@ def delete_repo(repo_id: int) -> Dict[str, Any]:
     Returns:
         Dictionary with:
         - repo_id: The deleted repo ID
-        - status: "deleted" or error details
+        - status: "deleted" or "not_found"
     """
     client = get_workspace_client()
 
