@@ -3,9 +3,11 @@
 from typing import Any, Dict, List, Optional
 
 from databricks_tools_core.serving import (
+    get_serving_endpoint_build_logs as _get_serving_endpoint_build_logs,
+    get_serving_endpoint_server_logs as _get_serving_endpoint_server_logs,
     get_serving_endpoint_status as _get_serving_endpoint_status,
-    query_serving_endpoint as _query_serving_endpoint,
     list_serving_endpoints as _list_serving_endpoints,
+    query_serving_endpoint as _query_serving_endpoint,
 )
 
 from ..server import mcp
@@ -129,3 +131,59 @@ def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
         ]
     """
     return _list_serving_endpoints(limit=limit)
+
+
+@mcp.tool(timeout=30)
+def get_serving_endpoint_build_logs(
+    name: str,
+    served_model_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get build logs for a served model in an endpoint.
+
+    Build logs show container image creation, dependency installation, and
+    model download. Use this to debug failed or stuck deployments.
+
+    Args:
+        name: Name of the serving endpoint
+        served_model_name: Name of the served model. If omitted, auto-resolved
+            from the endpoint config.
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - served_model_name: Resolved served model name
+        - logs: Build log text
+
+    Example:
+        >>> get_serving_endpoint_build_logs("my-endpoint")
+        {"name": "my-endpoint", "served_model_name": "model-1", "logs": "..."}
+    """
+    return _get_serving_endpoint_build_logs(name=name, served_model_name=served_model_name)
+
+
+@mcp.tool(timeout=30)
+def get_serving_endpoint_server_logs(
+    name: str,
+    served_model_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get runtime server logs for a served model in an endpoint.
+
+    Server logs show recent stdout/stderr from the model server, including
+    inference processing and errors. Use this to debug prediction failures.
+
+    Args:
+        name: Name of the serving endpoint
+        served_model_name: Name of the served model. If omitted, auto-resolved
+            from the endpoint config.
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - served_model_name: Resolved served model name
+        - logs: Recent server log lines
+
+    Example:
+        >>> get_serving_endpoint_server_logs("my-endpoint")
+        {"name": "my-endpoint", "served_model_name": "model-1", "logs": "..."}
+    """
+    return _get_serving_endpoint_server_logs(name=name, served_model_name=served_model_name)

@@ -7,6 +7,7 @@ Functions for checking status and querying Databricks Model Serving endpoints.
 import logging
 from typing import Any, Dict, List, Optional
 
+from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.serving import ChatMessage
 
 from ..auth import get_workspace_client
@@ -248,3 +249,116 @@ def list_serving_endpoints(limit: Optional[int] = 50) -> List[Dict[str, Any]]:
         )
 
     return result
+
+
+def _resolve_served_model_name(client: Any, name: str, served_model_name: Optional[str]) -> str:
+    """Resolve served_model_name from endpoint config if not provided.
+
+    Args:
+        client: Workspace client.
+        name: Endpoint name.
+        served_model_name: Explicit served model name, or None to auto-resolve.
+
+    Returns:
+        The resolved served model name.
+
+    Raises:
+        Exception: If endpoint not found or has no served entities.
+    """
+    if served_model_name:
+        return served_model_name
+
+    try:
+        endpoint = client.serving_endpoints.get(name=name)
+    except (ResourceDoesNotExist, NotFound):
+        raise Exception(f"Endpoint '{name}' not found.")
+
+    if endpoint.config and endpoint.config.served_entities:
+        resolved = endpoint.config.served_entities[0].name
+        if resolved:
+            return resolved
+
+    raise Exception(
+        f"Endpoint '{name}' has no served entities. Provide served_model_name explicitly."
+    )
+
+
+def get_serving_endpoint_build_logs(
+    name: str,
+    served_model_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get build logs for a served model in an endpoint.
+
+    Build logs contain container image creation output, dependency installation,
+    and model download steps. Use this to debug failed or stuck deployments.
+
+    Args:
+        name: Name of the serving endpoint.
+        served_model_name: Name of the served model. If omitted, auto-resolved
+            from the first served entity in the endpoint config.
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - served_model_name: Resolved served model name
+        - logs: Build log text (may be empty if no build has run)
+    """
+    client = get_workspace_client()
+    resolved_name = _resolve_served_model_name(client, name, served_model_name)
+
+    try:
+        response = client.serving_endpoints.build_logs(
+            name=name,
+            served_model_name=resolved_name,
+        )
+        return {
+            "name": name,
+            "served_model_name": resolved_name,
+            "logs": response.logs or "",
+        }
+    except (ResourceDoesNotExist, NotFound):
+        raise Exception(
+            f"Served model '{resolved_name}' not found on endpoint '{name}'. "
+            "Check the served model name with get_serving_endpoint_status()."
+        )
+
+
+def get_serving_endpoint_server_logs(
+    name: str,
+    served_model_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get runtime server logs for a served model in an endpoint.
+
+    Server logs contain recent stdout/stderr from the model server, including
+    inference request processing and application-level logging. Use this to
+    debug prediction errors or unexpected model behavior.
+
+    Args:
+        name: Name of the serving endpoint.
+        served_model_name: Name of the served model. If omitted, auto-resolved
+            from the first served entity in the endpoint config.
+
+    Returns:
+        Dictionary with:
+        - name: Endpoint name
+        - served_model_name: Resolved served model name
+        - logs: Recent server log lines (may be empty if no requests processed)
+    """
+    client = get_workspace_client()
+    resolved_name = _resolve_served_model_name(client, name, served_model_name)
+
+    try:
+        response = client.serving_endpoints.logs(
+            name=name,
+            served_model_name=resolved_name,
+        )
+        return {
+            "name": name,
+            "served_model_name": resolved_name,
+            "logs": response.logs or "",
+        }
+    except (ResourceDoesNotExist, NotFound):
+        raise Exception(
+            f"Served model '{resolved_name}' not found on endpoint '{name}'. "
+            "Check the served model name with get_serving_endpoint_status()."
+        )
