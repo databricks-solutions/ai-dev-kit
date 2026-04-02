@@ -42,7 +42,7 @@ Synthetic data should demonstrate how Databricks helps solve real business probl
 7. **Present plan for approval** — Show tables, distributions, assumptions before writing code
 8. **Master tables first** — Generate parent tables, write to Delta, then create children with valid FKs
 9. **Use Spark + Faker + Pandas UDFs** — Scalable, parallel. Polars only if user explicitly wants local + <30K rows
-10. **Serverless compute** — Unless user requests classic cluster
+10. **Use Databricks Connect Serverless by default to generate data** — Update databricks-connect on python 3.12 if required (avoid using execute_code unless instructed to not use Databricks Connect)
 11. **No `.cache()` or `.persist()`** — Not supported on serverless. Write to Delta, read back for joins
 12. **No Python loops or `.collect()`** — Use Spark parallelism. No driver-side iteration, avoid Pandas↔Spark conversions
 
@@ -121,7 +121,7 @@ Show a clear specification with **the business story and your assumptions surfac
 - [ ] Output location shown prominently in plan (easy to spot/change)
 - [ ] Table specification shown and approved
 - [ ] Assumptions about distributions confirmed
-- [ ] User confirmed compute preference (serverless recommended)
+- [ ] User confirmed compute preference (Databricks Connect on serverless recommended)
 - [ ] Data features selected
 
 **Do NOT proceed to code generation until user approves the plan, including the catalog.**
@@ -233,10 +233,10 @@ orders_with_fk = orders_df.join(customer_lookup, on="customer_idx")
 
 ## Setup
 
-Requires Python 3.12 for Databricks Connect. Prefer `uv`, fall back to `pip`:
+Requires Python 3.12 and databricks-connect>=16.4. Use `uv`:
 
 ```bash
-pip install "databricks-connect>=16.4,<17.4" faker numpy pandas holidays
+uv pip install "databricks-connect>=16.4,<17.4" faker numpy pandas holidays
 ```
 
 ## Related Skills
@@ -248,6 +248,8 @@ pip install "databricks-connect>=16.4,<17.4" faker numpy pandas holidays
 
 | Issue | Solution |
 |-------|----------|
+| `ImportError: cannot import name 'DatabricksEnv'` | Upgrade: `uv pip install "databricks-connect>=16.4"` |
+| Python 3.11 instead of 3.12 | Python 3.12 required. Use `uv` to create env with correct version |
 | `ModuleNotFoundError: faker` | Add to `withDependencies()`, import inside UDF |
 | Faker UDF is slow | Use `pandas_udf` for batch processing |
 | Out of memory | Increase `numPartitions` in `spark.range()` |
