@@ -72,15 +72,23 @@ if sys.platform == "win32":
     _patch_subprocess_stdin()
 
 
-def _patch_tool_decorator_for_windows():
-    """Wrap sync tool functions in asyncio.to_thread() on Windows.
+def _patch_tool_decorator_for_async():
+    """Wrap sync tool functions in asyncio.to_thread() on all platforms.
 
     FastMCP's FunctionTool.run() calls sync functions directly on the asyncio
-    event loop thread, which blocks the stdio transport's I/O tasks. On Windows
-    with ProactorEventLoop this causes a deadlock where all MCP tools hang.
+    event loop thread, which blocks the stdio transport's I/O tasks. This causes:
+
+    1. On Windows with ProactorEventLoop: deadlock where all MCP tools hang.
+
+    2. On ALL platforms: cancellation race conditions. When the MCP client
+       cancels a request (e.g., timeout), the event loop can't propagate the
+       CancelledError to blocking sync code. The sync function eventually
+       returns, but the MCP SDK has already responded to the cancellation,
+       causing "Request already responded to" assertion errors and crashes.
 
     This patch intercepts @mcp.tool registration to wrap sync functions so they
-    run in a thread pool, yielding control back to the event loop for I/O.
+    run in a thread pool, yielding control back to the event loop for I/O and
+    enabling proper cancellation handling via anyio's task cancellation.
     """
     original_tool = mcp.tool
 
@@ -132,11 +140,14 @@ if sys.platform == "win32":
 # Register middleware (see middleware.py for details on each)
 mcp.add_middleware(TimeoutHandlingMiddleware())
 
-# Apply async wrapper on Windows to prevent event loop deadlocks.
+# Apply async wrapper on ALL platforms to:
+# 1. Prevent event loop deadlocks (critical on Windows)
+# 2. Enable proper cancellation handling (critical on all platforms)
+# Without this, sync tools block the event loop, preventing CancelledError
+# propagation and causing "Request already responded to" crashes.
 # TODO: FastMCP 3.x automatically wraps sync functions in asyncio.to_thread().
-#       Test if this Windows-specific patch is still needed with FastMCP 3.x.
-if sys.platform == "win32":
-    _patch_tool_decorator_for_windows()
+#       Test if this patch is still needed with FastMCP 3.x.
+_patch_tool_decorator_for_async()
 
 # Import and register all tools (side-effect imports: each module registers @mcp.tool decorators)
 from .tools import (  # noqa: F401, E402
