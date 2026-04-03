@@ -134,7 +134,8 @@ def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
 
 @mcp.tool(timeout=30)
 def export_serving_endpoint_metrics(name: str) -> Dict[str, Any]:
-    """Export health metrics for a serving endpoint.
+    """
+    Export health metrics for a serving endpoint.
 
     Returns CPU, memory, request latency, error rates, and GPU utilization
     (if applicable), parsed from the Prometheus/OpenMetrics format into

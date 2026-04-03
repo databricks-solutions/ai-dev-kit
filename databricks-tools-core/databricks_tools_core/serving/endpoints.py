@@ -253,13 +253,19 @@ def list_serving_endpoints(limit: Optional[int] = 50) -> List[Dict[str, Any]]:
 
 
 def _parse_prometheus_metrics(text: str) -> List[Dict[str, Any]]:
-    """Parse Prometheus exposition format into structured dicts.
+    """
+    Parse Prometheus exposition format into structured dicts.
 
     Args:
         text: Raw Prometheus/OpenMetrics text.
 
     Returns:
-        List of metric dicts with name, labels, value, help, and type.
+        List of metric dicts, each with:
+        - name: Metric name
+        - labels: Dict of label key-value pairs
+        - value: Numeric metric value
+        - help: Metric description (from HELP comment)
+        - type: Prometheus type (gauge, histogram, counter)
     """
     metrics = []
     help_map: Dict[str, str] = {}
@@ -283,7 +289,7 @@ def _parse_prometheus_metrics(text: str) -> List[Dict[str, Any]]:
             continue
 
         # Parse: metric_name{label="val",...} value [timestamp]
-        match = re.match(r'^([a-zA-Z_:][a-zA-Z0-9_:]*)\{?(.*?)\}?\s+(.+)$', line)
+        match = re.match(r"^([a-zA-Z_:][a-zA-Z0-9_:]*)\{?(.*?)\}?\s+(.+)$", line)
         if not match:
             continue
 
@@ -302,19 +308,22 @@ def _parse_prometheus_metrics(text: str) -> List[Dict[str, Any]]:
         except ValueError:
             value = value_str
 
-        metrics.append({
-            "name": name,
-            "labels": labels,
-            "value": value,
-            "help": help_map.get(name),
-            "type": type_map.get(name),
-        })
+        metrics.append(
+            {
+                "name": name,
+                "labels": labels,
+                "value": value,
+                "help": help_map.get(name),
+                "type": type_map.get(name),
+            }
+        )
 
     return metrics
 
 
 def export_serving_endpoint_metrics(name: str) -> Dict[str, Any]:
-    """Export health metrics for a serving endpoint.
+    """
+    Export health metrics for a serving endpoint.
 
     Returns metrics in structured format, parsed from the Prometheus/OpenMetrics
     exposition format returned by the API. Includes CPU, memory, request latency,
