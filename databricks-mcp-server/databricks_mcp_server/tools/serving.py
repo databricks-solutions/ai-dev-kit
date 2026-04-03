@@ -135,7 +135,8 @@ def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
 
 @mcp.tool(timeout=30)
 def get_serving_endpoint_permissions(name: str) -> Dict[str, Any]:
-    """Get the access control list for a serving endpoint.
+    """
+    Get the access control list for a serving endpoint.
 
     Returns all permissions including inherited ones (e.g. admins group).
 
@@ -160,7 +161,8 @@ def update_serving_endpoint_permissions(
     name: str,
     access_control_list: List[Dict[str, str]],
 ) -> Dict[str, Any]:
-    """Update permissions for a serving endpoint (additive merge).
+    """
+    Update permissions for a serving endpoint (additive merge).
 
     Grants or modifies permissions. Existing permissions not in the list
     are left unchanged. Use CAN_VIEW, CAN_QUERY, or CAN_MANAGE.

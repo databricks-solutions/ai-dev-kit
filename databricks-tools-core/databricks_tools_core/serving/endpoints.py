@@ -252,7 +252,8 @@ def list_serving_endpoints(limit: Optional[int] = 50) -> List[Dict[str, Any]]:
 
 
 def _resolve_endpoint_id(client: Any, name: str) -> str:
-    """Resolve serving endpoint name to its ID.
+    """
+    Resolve serving endpoint name to its ID.
 
     Args:
         client: Workspace client.
@@ -272,7 +273,8 @@ def _resolve_endpoint_id(client: Any, name: str) -> str:
 
 
 def get_serving_endpoint_permissions(name: str) -> Dict[str, Any]:
-    """Get the access control list for a serving endpoint.
+    """
+    Get the access control list for a serving endpoint.
 
     Args:
         name: Name of the serving endpoint.
@@ -307,12 +309,14 @@ def get_serving_endpoint_permissions(name: str) -> Dict[str, Any]:
             if acl.all_permissions:
                 for perm in acl.all_permissions:
                     level = perm.permission_level.value if perm.permission_level else None
-                    result_perms.append({
-                        "principal": principal,
-                        "principal_type": principal_type,
-                        "permission_level": level,
-                        "inherited": perm.inherited or False,
-                    })
+                    result_perms.append(
+                        {
+                            "principal": principal,
+                            "principal_type": principal_type,
+                            "permission_level": level,
+                            "inherited": perm.inherited or False,
+                        }
+                    )
 
     return {
         "name": name,
@@ -324,7 +328,8 @@ def update_serving_endpoint_permissions(
     name: str,
     access_control_list: List[Dict[str, str]],
 ) -> Dict[str, Any]:
-    """Update permissions for a serving endpoint (additive merge).
+    """
+    Update permissions for a serving endpoint (additive merge).
 
     Grants or modifies permissions for users, groups, or service principals.
     Existing permissions not in the list are left unchanged.
