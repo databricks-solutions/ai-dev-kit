@@ -47,9 +47,7 @@ class TestGetServingEndpointBuildLogs:
         assert result["name"] == "test-ep"
         assert result["served_model_name"] == "model-1"
         assert "Building image" in result["logs"]
-        mock_client.serving_endpoints.build_logs.assert_called_once_with(
-            name="test-ep", served_model_name="model-1"
-        )
+        mock_client.serving_endpoints.build_logs.assert_called_once_with(name="test-ep", served_model_name="model-1")
 
     @mock.patch(_GET_CLIENT)
     def test_build_logs_auto_resolve_model_name(self, mock_get_client):
@@ -101,9 +99,7 @@ class TestGetServingEndpointServerLogs:
         assert result["name"] == "test-ep"
         assert result["served_model_name"] == "model-1"
         assert "Processing request" in result["logs"]
-        mock_client.serving_endpoints.logs.assert_called_once_with(
-            name="test-ep", served_model_name="model-1"
-        )
+        mock_client.serving_endpoints.logs.assert_called_once_with(name="test-ep", served_model_name="model-1")
 
     @mock.patch(_GET_CLIENT)
     def test_server_logs_auto_resolve_model_name(self, mock_get_client):

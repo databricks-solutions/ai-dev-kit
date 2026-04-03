@@ -252,7 +252,8 @@ def list_serving_endpoints(limit: Optional[int] = 50) -> List[Dict[str, Any]]:
 
 
 def _resolve_served_model_name(client: Any, name: str, served_model_name: Optional[str]) -> str:
-    """Resolve served_model_name from endpoint config if not provided.
+    """
+    Resolve served_model_name from endpoint config if not provided.
 
     Args:
         client: Workspace client.
@@ -278,16 +279,15 @@ def _resolve_served_model_name(client: Any, name: str, served_model_name: Option
         if resolved:
             return resolved
 
-    raise Exception(
-        f"Endpoint '{name}' has no served entities. Provide served_model_name explicitly."
-    )
+    raise Exception(f"Endpoint '{name}' has no served entities. Provide served_model_name explicitly.")
 
 
 def get_serving_endpoint_build_logs(
     name: str,
     served_model_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Get build logs for a served model in an endpoint.
+    """
+    Get build logs for a served model in an endpoint.
 
     Build logs contain container image creation output, dependency installation,
     and model download steps. Use this to debug failed or stuck deployments.
@@ -327,7 +327,8 @@ def get_serving_endpoint_server_logs(
     name: str,
     served_model_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Get runtime server logs for a served model in an endpoint.
+    """
+    Get runtime server logs for a served model in an endpoint.
 
     Server logs contain recent stdout/stderr from the model server, including
     inference request processing and application-level logging. Use this to

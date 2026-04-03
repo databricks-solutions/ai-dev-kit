@@ -138,7 +138,8 @@ def get_serving_endpoint_build_logs(
     name: str,
     served_model_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Get build logs for a served model in an endpoint.
+    """
+    Get build logs for a served model in an endpoint.
 
     Build logs show container image creation, dependency installation, and
     model download. Use this to debug failed or stuck deployments.
@@ -166,7 +167,8 @@ def get_serving_endpoint_server_logs(
     name: str,
     served_model_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Get runtime server logs for a served model in an endpoint.
+    """
+    Get runtime server logs for a served model in an endpoint.
 
     Server logs show recent stdout/stderr from the model server, including
     inference processing and errors. Use this to debug prediction failures.
