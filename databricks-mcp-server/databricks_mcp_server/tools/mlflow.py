@@ -7,6 +7,7 @@ from databricks_tools_core.mlflow import (
     list_experiments as _list_experiments,
     search_experiments as _search_experiments,
     create_experiment as _create_experiment,
+    set_experiment_tag as _set_experiment_tag,
     delete_experiment as _delete_experiment,
     get_run as _get_run,
     search_runs as _search_runs,
@@ -122,6 +123,7 @@ def search_mlflow_experiments(
 @mcp.tool(timeout=30)
 def create_mlflow_experiment(
     name: str,
+    experiment_kind: Optional[str] = None,
     artifact_location: Optional[str] = None,
     tags: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
@@ -133,6 +135,10 @@ def create_mlflow_experiment(
 
     Args:
         name: Experiment name/path (e.g. "/Users/user@example.com/my-experiment")
+        experiment_kind: Controls experiment type in the UI:
+            - "genai" — GenAI apps & agents (tracing, LLM evaluation)
+            - "ml" — Machine learning (traditional ML training)
+            - None — no kind set (default)
         artifact_location: Optional custom artifact storage location
         tags: Optional dict of tags (e.g. {"team": "ml-eng"})
 
@@ -143,10 +149,40 @@ def create_mlflow_experiment(
         - status: "created" or "ALREADY_EXISTS"
 
     Example:
-        >>> create_mlflow_experiment("/Users/me/new-experiment", tags={"team": "ml"})
-        {"experiment_id": "123", "name": "/Users/me/new-experiment", "status": "created"}
+        >>> create_mlflow_experiment("/Users/me/my-agent", experiment_kind="genai")
+        {"experiment_id": "123", "name": "/Users/me/my-agent", "status": "created"}
     """
-    return _create_experiment(name=name, artifact_location=artifact_location, tags=tags)
+    return _create_experiment(
+        name=name, experiment_kind=experiment_kind, artifact_location=artifact_location, tags=tags
+    )
+
+
+@mcp.tool(timeout=30)
+def set_mlflow_experiment_tag(
+    experiment_id: str,
+    key: str,
+    value: str,
+) -> Dict[str, Any]:
+    """
+    Set a tag on an MLflow experiment.
+
+    Use this to add metadata, change the experiment kind, or label
+    experiments for organization. Setting an existing key overwrites it.
+
+    Args:
+        experiment_id: Experiment ID (numeric string)
+        key: Tag key (e.g. "team", "mlflow.experimentKind")
+        value: Tag value
+
+    Returns:
+        Dictionary with:
+        - experiment_id, key, value, status: "set"
+
+    Example:
+        >>> set_mlflow_experiment_tag("123", "mlflow.experimentKind", "genai_development")
+        {"experiment_id": "123", "key": "mlflow.experimentKind", "value": "genai_development", "status": "set"}
+    """
+    return _set_experiment_tag(experiment_id=experiment_id, key=key, value=value)
 
 
 @mcp.tool(timeout=30)

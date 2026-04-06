@@ -32,7 +32,8 @@ Use this skill when:
 | `get_mlflow_experiment` | Get experiment by ID or name |
 | `list_mlflow_experiments` | List experiments (active, deleted, or all) |
 | `search_mlflow_experiments` | Search with filters (name, tags) |
-| `create_mlflow_experiment` | Create a new experiment |
+| `create_mlflow_experiment` | Create experiment with optional kind ("genai" or "ml") |
+| `set_mlflow_experiment_tag` | Set a tag on an experiment (metadata, kind, etc.) |
 | `delete_mlflow_experiment` | Soft-delete an experiment (can be restored) |
 
 ### Run Operations
@@ -90,11 +91,19 @@ list_mlflow_run_artifacts(run_id="abc123def456")
 ### 4. Create an Experiment
 
 ```python
+# GenAI agent experiment (shows as "GenAI apps & agents" in UI)
 create_mlflow_experiment(
-    name="/Users/user@example.com/my-project",
-    tags={"team": "ml-eng", "project": "churn-prediction"}
+    name="/Users/user@example.com/my-agent",
+    experiment_kind="genai",
+    tags={"team": "ml-eng"}
 )
-# {"experiment_id": "123", "status": "created"}
+
+# Traditional ML experiment (shows as "Machine learning" in UI)
+create_mlflow_experiment(
+    name="/Users/user@example.com/churn-model",
+    experiment_kind="ml",
+    tags={"project": "churn-prediction"}
+)
 ```
 
 ## Common Patterns

@@ -12,6 +12,7 @@ from databricks_tools_core.mlflow import (
     list_experiments,
     search_experiments,
     create_experiment,
+    set_experiment_tag,
     delete_experiment,
     get_run,
     search_runs,
@@ -205,6 +206,72 @@ class TestCreateExperiment:
         assert result["status"] == "created"
         call_kwargs = mock_client.return_value.experiments.create_experiment.call_args
         assert call_kwargs.kwargs["tags"] is not None
+
+
+class TestCreateExperimentKind:
+    @mock.patch("databricks_tools_core.mlflow.experiments.get_workspace_client")
+    def test_create_with_genai_kind(self, mock_client):
+        resp = MagicMock()
+        resp.experiment_id = "789"
+        mock_client.return_value.experiments.create_experiment.return_value = resp
+
+        result = create_experiment(name="/Users/me/agent", experiment_kind="genai")
+
+        assert result["status"] == "created"
+        call_kwargs = mock_client.return_value.experiments.create_experiment.call_args
+        tags = call_kwargs.kwargs["tags"]
+        tag_dict = {t.key: t.value for t in tags}
+        assert tag_dict["mlflow.experimentKind"] == "genai_development"
+
+    @mock.patch("databricks_tools_core.mlflow.experiments.get_workspace_client")
+    def test_create_with_ml_kind(self, mock_client):
+        resp = MagicMock()
+        resp.experiment_id = "790"
+        mock_client.return_value.experiments.create_experiment.return_value = resp
+
+        create_experiment(name="/Users/me/ml-exp", experiment_kind="ml")
+
+        call_kwargs = mock_client.return_value.experiments.create_experiment.call_args
+        tags = call_kwargs.kwargs["tags"]
+        tag_dict = {t.key: t.value for t in tags}
+        assert tag_dict["mlflow.experimentKind"] == "custom_model_development"
+
+    @mock.patch("databricks_tools_core.mlflow.experiments.get_workspace_client")
+    def test_create_with_kind_and_extra_tags(self, mock_client):
+        resp = MagicMock()
+        resp.experiment_id = "791"
+        mock_client.return_value.experiments.create_experiment.return_value = resp
+
+        create_experiment(name="/Users/me/exp", experiment_kind="genai", tags={"team": "ml"})
+
+        call_kwargs = mock_client.return_value.experiments.create_experiment.call_args
+        tags = call_kwargs.kwargs["tags"]
+        tag_dict = {t.key: t.value for t in tags}
+        assert tag_dict["mlflow.experimentKind"] == "genai_development"
+        assert tag_dict["team"] == "ml"
+
+
+class TestSetExperimentTag:
+    @mock.patch("databricks_tools_core.mlflow.experiments.get_workspace_client")
+    def test_set_tag_success(self, mock_client):
+        mock_client.return_value.experiments.set_experiment_tag.return_value = None
+
+        result = set_experiment_tag("123", "team", "ml-eng")
+
+        assert result["status"] == "set"
+        assert result["key"] == "team"
+        assert result["value"] == "ml-eng"
+        mock_client.return_value.experiments.set_experiment_tag.assert_called_once_with(
+            experiment_id="123", key="team", value="ml-eng"
+        )
+
+    @mock.patch("databricks_tools_core.mlflow.experiments.get_workspace_client")
+    def test_set_tag_not_found(self, mock_client):
+        mock_client.return_value.experiments.set_experiment_tag.side_effect = NotFound("not found")
+
+        result = set_experiment_tag("999", "key", "val")
+
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestDeleteExperiment:
