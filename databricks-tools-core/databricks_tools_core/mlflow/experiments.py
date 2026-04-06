@@ -200,6 +200,7 @@ def search_experiments(
 
 def create_experiment(
     name: str,
+    experiment_kind: Optional[str] = None,
     artifact_location: Optional[str] = None,
     tags: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
@@ -208,6 +209,10 @@ def create_experiment(
 
     Args:
         name: Experiment name (e.g. "/Users/user@example.com/my-experiment")
+        experiment_kind: Experiment type in the UI. One of:
+            - "genai" — shows as "GenAI apps & agents" (for agents, LLM apps)
+            - "ml" — shows as "Machine learning" (for traditional ML)
+            - None — no kind set (default)
         artifact_location: Optional custom artifact storage location
         tags: Optional dict of tags to set on the experiment
 
@@ -219,11 +224,19 @@ def create_experiment(
     """
     from databricks.sdk.service.ml import ExperimentTag
 
+    _KIND_MAP = {
+        "genai": "genai_development",
+        "ml": "custom_model_development",
+    }
+
     client = get_workspace_client()
 
-    tag_list = None
-    if tags:
-        tag_list = [ExperimentTag(key=k, value=v) for k, v in tags.items()]
+    all_tags = dict(tags or {})
+    if experiment_kind:
+        kind_value = _KIND_MAP.get(experiment_kind, experiment_kind)
+        all_tags["mlflow.experimentKind"] = kind_value
+
+    tag_list = [ExperimentTag(key=k, value=v) for k, v in all_tags.items()] if all_tags else None
 
     try:
         resp = client.experiments.create_experiment(
@@ -244,6 +257,49 @@ def create_experiment(
         "experiment_id": resp.experiment_id,
         "name": name,
         "status": "created",
+    }
+
+
+def set_experiment_tag(
+    experiment_id: str,
+    key: str,
+    value: str,
+) -> Dict[str, Any]:
+    """
+    Set a tag on an MLflow experiment.
+
+    Tags are key-value metadata. Setting an existing key overwrites the value.
+
+    Args:
+        experiment_id: Experiment ID
+        key: Tag key (e.g. "team", "mlflow.experimentKind")
+        value: Tag value
+
+    Returns:
+        Dictionary with:
+        - experiment_id: The experiment ID
+        - key: Tag key
+        - value: Tag value
+        - status: "set"
+    """
+    client = get_workspace_client()
+
+    try:
+        client.experiments.set_experiment_tag(
+            experiment_id=experiment_id,
+            key=key,
+            value=value,
+        )
+    except (ResourceDoesNotExist, NotFound):
+        return {"error": f"Experiment '{experiment_id}' not found", "status": "NOT_FOUND"}
+    except Exception as e:
+        raise Exception(f"Failed to set tag on experiment '{experiment_id}': {e}")
+
+    return {
+        "experiment_id": experiment_id,
+        "key": key,
+        "value": value,
+        "status": "set",
     }
 
 

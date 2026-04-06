@@ -12,6 +12,27 @@ MLflow experiments use workspace-style paths:
 
 Notebook experiments are created automatically with `mlflow.experimentType: NOTEBOOK` tag. Standalone experiments use `MLFLOW_EXPERIMENT`.
 
+## Experiment Kind (UI Type)
+
+The `mlflow.experimentKind` tag controls how the experiment appears in the Databricks UI:
+
+| `experiment_kind` param | `mlflow.experimentKind` value | UI Display |
+|------------------------|------------------------------|------------|
+| `"genai"` | `genai_development` | **GenAI apps & agents** (traces, LLM evaluation) |
+| `"ml"` | `custom_model_development` | **Machine learning** (training runs, metrics) |
+| None (default) | not set | Defaults to GenAI view |
+
+Set this when creating an experiment:
+```python
+create_mlflow_experiment("/Users/me/my-agent", experiment_kind="genai")
+create_mlflow_experiment("/Users/me/churn-model", experiment_kind="ml")
+```
+
+Or change it later:
+```python
+set_mlflow_experiment_tag("123", "mlflow.experimentKind", "custom_model_development")
+```
+
 ## Experiment Lifecycle
 
 | Stage | Description |
