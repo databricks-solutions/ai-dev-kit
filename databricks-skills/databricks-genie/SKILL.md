@@ -1,6 +1,6 @@
 ---
 name: databricks-genie
-description: "Create and query Databricks Genie Spaces for natural language SQL exploration. Use when building Genie Spaces, exporting and importing Genie Spaces, migrating Genie Spaces between workspaces or environments, or asking questions via the Genie Conversation API."
+description: "Create and query Databricks Genie Spaces for natural language SQL exploration. Use when building Genie Spaces, adding SQL instructions and benchmarks, exporting and importing Genie Spaces, migrating Genie Spaces between workspaces or environments, or asking questions via the Genie Conversation API."
 ---
 
 # Databricks Genie
@@ -35,6 +35,12 @@ Use this skill when:
 | `get_genie` |  Get space details (by ID and support `include_serialized_space` parameter) or list all spaces (no ID) |
 | `delete_genie` | Delete a Genie Space |
 | `migrate_genie` | Export (`type="export"`) or import (`type="import"`) a Genie Space for cloning / migration |
+
+### Instructions & Benchmarks
+
+| Tool | Purpose |
+|------|---------|
+| `manage_genie_instructions` | Add/list SQL instructions, text rules, UC functions, and benchmarks (`action` param) |
 
 ### Conversation API
 
@@ -116,6 +122,7 @@ migrate_genie(
 ## Reference Files
 
 - [spaces.md](spaces.md) - Creating and managing Genie Spaces
+- [instructions.md](instructions.md) - SQL instructions, text rules, UC functions, benchmarks, and batch operations
 - [conversation.md](conversation.md) - Asking questions via the Conversation API
 
 ## Prerequisites
