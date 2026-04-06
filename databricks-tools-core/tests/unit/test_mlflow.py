@@ -1,4 +1,4 @@
-"""Unit tests for MLflow experiment and run operations."""
+"""Unit tests for MLflow experiment, run, registry, and trace operations."""
 
 from unittest import mock
 from unittest.mock import MagicMock
@@ -26,6 +26,12 @@ from databricks_tools_core.mlflow import (
     get_model_version_by_alias,
     set_model_alias,
     delete_model_alias,
+    search_traces,
+    get_trace,
+    set_trace_tag,
+    delete_trace_tag,
+    log_assessment,
+    delete_assessment,
 )
 
 
@@ -629,5 +635,199 @@ class TestDeleteModelAlias:
         mock_client.return_value.registered_models.delete_alias.side_effect = NotFound("not found")
 
         result = delete_model_alias("cat.schema.model", alias="missing")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+# ---------------------------------------------------------------------------
+# Trace tests
+# ---------------------------------------------------------------------------
+
+
+class TestSearchTraces:
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_search_returns_traces(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {
+            "traces": [
+                {
+                    "request_id": "tr-abc",
+                    "experiment_id": "123",
+                    "timestamp_ms": 1700000000000,
+                    "execution_time_ms": 5000,
+                    "status": "OK",
+                    "tags": [{"key": "mlflow.traceName", "value": "predict"}],
+                    "request_metadata": [],
+                },
+                {
+                    "request_id": "tr-def",
+                    "experiment_id": "123",
+                    "timestamp_ms": 1700000010000,
+                    "execution_time_ms": 3000,
+                    "status": "ERROR",
+                    "tags": [],
+                    "request_metadata": [],
+                },
+            ]
+        }
+
+        result = search_traces(experiment_ids=["123"], max_results=10)
+
+        assert result["count"] == 2
+        assert result["traces"][0]["trace_id"] == "tr-abc"
+        assert result["traces"][0]["status"] == "OK"
+        assert result["traces"][1]["status"] == "ERROR"
+
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_search_with_filter(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {"traces": []}
+
+        result = search_traces(experiment_ids=["123"], filter_string="status = 'OK'")
+
+        assert result["count"] == 0
+        call_args = mock_client.return_value.api_client.do.call_args
+        assert call_args.kwargs["query"]["filter"] == "status = 'OK'"
+
+
+class TestGetTrace:
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_get_trace_detail(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {
+            "trace": {
+                "trace_info": {
+                    "trace_id": "tr-abc",
+                    "trace_location": {"type": "MLFLOW_EXPERIMENT", "mlflow_experiment": {"experiment_id": "123"}},
+                    "state": "OK",
+                    "request_time": "2026-01-01T00:00:00Z",
+                    "execution_duration": "5.0s",
+                    "request_preview": "Hello",
+                    "response_preview": "Hi there",
+                    "tags": {"mlflow.traceName": "predict"},
+                    "trace_metadata": {"mlflow.trace.sizeBytes": "1024"},
+                    "assessments": [],
+                },
+                "trace_data": {
+                    "spans": [
+                        {
+                            "span_id": "span-1",
+                            "name": "predict",
+                            "parent_id": None,
+                            "start_time_unix_nano": 1000,
+                            "end_time_unix_nano": 2000,
+                            "status": {"status_code": "OK"},
+                            "attributes": {},
+                        }
+                    ]
+                },
+            }
+        }
+
+        result = get_trace(trace_id="tr-abc")
+
+        assert result["trace_id"] == "tr-abc"
+        assert result["state"] == "OK"
+        assert result["span_count"] == 1
+        assert result["tags"]["mlflow.traceName"] == "predict"
+        assert result["metadata"]["mlflow.trace.sizeBytes"] == "1024"
+
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_get_trace_not_found(self, mock_client):
+        mock_client.return_value.api_client.do.side_effect = Exception("RESOURCE_DOES_NOT_EXIST")
+
+        result = get_trace(trace_id="tr-missing")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestSetTraceTag:
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_set_tag(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {}
+
+        result = set_trace_tag("tr-abc", "quality", "good")
+
+        assert result["status"] == "set"
+        assert result["key"] == "quality"
+
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_set_tag_not_found(self, mock_client):
+        mock_client.return_value.api_client.do.side_effect = Exception("RESOURCE_DOES_NOT_EXIST")
+
+        result = set_trace_tag("tr-missing", "key", "val")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestDeleteTraceTag:
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_delete_tag(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {}
+
+        result = delete_trace_tag("tr-abc", "old-tag")
+
+        assert result["status"] == "deleted"
+
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_delete_tag_not_found(self, mock_client):
+        mock_client.return_value.api_client.do.side_effect = Exception("not found")
+
+        result = delete_trace_tag("tr-missing", "key")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestLogAssessment:
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_log_feedback(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {
+            "assessment": {"assessment_id": "a-123", "assessment_name": "quality"}
+        }
+
+        result = log_assessment("tr-abc", "quality", "good")
+
+        assert result["status"] == "created"
+        assert result["assessment_id"] == "a-123"
+        call_body = mock_client.return_value.api_client.do.call_args.kwargs["body"]
+        assert call_body["assessment"]["assessment_name"] == "quality"
+        assert call_body["assessment"]["feedback"] == {"value": "good"}
+
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_log_expectation(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {
+            "assessment": {"assessment_id": "a-456", "assessment_name": "expected"}
+        }
+
+        result = log_assessment("tr-abc", "expected", "Should say hello", assessment_type="expectation")
+
+        call_body = mock_client.return_value.api_client.do.call_args.kwargs["body"]
+        assert call_body["assessment"]["expectation"] == {"value": "Should say hello"}
+        assert "feedback" not in call_body["assessment"]
+
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_log_with_rationale(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {
+            "assessment": {"assessment_id": "a-789", "assessment_name": "quality"}
+        }
+
+        log_assessment("tr-abc", "quality", "bad", rationale="Response was wrong")
+
+        call_body = mock_client.return_value.api_client.do.call_args.kwargs["body"]
+        assert call_body["assessment"]["rationale"] == "Response was wrong"
+
+
+class TestDeleteAssessment:
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_delete_assessment(self, mock_client):
+        mock_client.return_value.api_client.do.return_value = {}
+
+        result = delete_assessment("tr-abc", "a-123")
+
+        assert result["status"] == "deleted"
+        assert result["assessment_id"] == "a-123"
+
+    @mock.patch("databricks_tools_core.mlflow.traces.get_workspace_client")
+    def test_delete_assessment_not_found(self, mock_client):
+        mock_client.return_value.api_client.do.side_effect = Exception("RESOURCE_DOES_NOT_EXIST")
+
+        result = delete_assessment("tr-abc", "a-missing")
 
         assert result["status"] == "NOT_FOUND"
