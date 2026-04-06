@@ -109,7 +109,7 @@ def get_registered_model(
             include_aliases=include_aliases,
         )
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Model '{full_name}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Model '{full_name}' not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to get model '{full_name}': {e}")
 
@@ -263,7 +263,7 @@ def get_model_version(
             include_aliases=include_aliases,
         )
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Model version '{full_name}' v{version} not found", "status": "NOT_FOUND"}
+        return {"error": f"Model version '{full_name}' v{version} not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to get model version: {e}")
 
@@ -300,7 +300,7 @@ def list_model_versions(
             if len(versions) >= max_results:
                 break
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Model '{full_name}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Model '{full_name}' not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to list model versions: {e}")
 
@@ -329,7 +329,7 @@ def get_model_version_by_alias(
             alias=alias,
         )
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Alias '{alias}' not found for model '{full_name}'", "status": "NOT_FOUND"}
+        return {"error": f"Alias '{alias}' not found for model '{full_name}'", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to get model version by alias: {e}")
 
@@ -368,7 +368,7 @@ def set_model_alias(
             version_num=version_num,
         )
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Model '{full_name}' or version {version_num} not found", "status": "NOT_FOUND"}
+        return {"error": f"Model '{full_name}' or version {version_num} not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to set alias: {e}")
 
@@ -405,7 +405,7 @@ def delete_model_alias(
             alias=alias,
         )
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Alias '{alias}' not found for model '{full_name}'", "status": "NOT_FOUND"}
+        return {"error": f"Alias '{alias}' not found for model '{full_name}'", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to delete alias: {e}")
 

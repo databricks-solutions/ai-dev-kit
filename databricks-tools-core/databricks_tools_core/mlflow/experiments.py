@@ -111,13 +111,13 @@ def get_experiment(
             exp = resp.experiment
     except (ResourceDoesNotExist, NotFound):
         identifier = experiment_id or name
-        return {"error": f"Experiment '{identifier}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Experiment '{identifier}' not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to get experiment: {e}")
 
     if exp is None:
         identifier = experiment_id or name
-        return {"error": f"Experiment '{identifier}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Experiment '{identifier}' not found", "status": "not_found"}
 
     return _experiment_to_dict(exp)
 
@@ -249,7 +249,7 @@ def create_experiment(
         if "RESOURCE_ALREADY_EXISTS" in error_msg:
             return {
                 "error": f"Experiment '{name}' already exists",
-                "status": "ALREADY_EXISTS",
+                "status": "already_exists",
             }
         raise Exception(f"Failed to create experiment '{name}': {e}")
 
@@ -291,7 +291,7 @@ def set_experiment_tag(
             value=value,
         )
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Experiment '{experiment_id}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Experiment '{experiment_id}' not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to set tag on experiment '{experiment_id}': {e}")
 
@@ -368,7 +368,7 @@ def get_run(run_id: str) -> Dict[str, Any]:
     try:
         resp = client.experiments.get_run(run_id=run_id)
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Run '{run_id}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Run '{run_id}' not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to get run '{run_id}': {e}")
 
@@ -461,7 +461,7 @@ def get_run_metrics_history(
             if len(history) >= max_results:
                 break
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Run '{run_id}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Run '{run_id}' not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to get metric history: {e}")
 
@@ -509,7 +509,7 @@ def list_run_artifacts(
                 }
             )
     except (ResourceDoesNotExist, NotFound):
-        return {"error": f"Run '{run_id}' not found", "status": "NOT_FOUND"}
+        return {"error": f"Run '{run_id}' not found", "status": "not_found"}
     except Exception as e:
         raise Exception(f"Failed to list artifacts: {e}")
 
