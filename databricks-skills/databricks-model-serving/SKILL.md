@@ -191,7 +191,7 @@ Then deploy via UI or SDK. See [1-classical-ml.md](1-classical-ml.md).
 | `manage_job_runs` (action="run_now") | Kick off deployment (async) |
 | `manage_job_runs` (action="get") | Check deployment job status |
 
-### Querying
+### Querying & Status
 
 | Tool | Purpose |
 |------|---------|
@@ -199,9 +199,40 @@ Then deploy via UI or SDK. See [1-classical-ml.md](1-classical-ml.md).
 | `query_serving_endpoint` | Send requests to endpoint |
 | `list_serving_endpoints` | List all endpoints |
 
+### Endpoint Management
+
+| Tool | Action | Purpose |
+|------|--------|---------|
+| `manage_serving_endpoint` | `create` | Idempotent create (returns existing if present). Use `wait=False` for agents. |
+| `manage_serving_endpoint` | `update` | Deploy new model version, change workload size, modify traffic routing |
+| `manage_serving_endpoint` | `delete` | Delete endpoint (UC model is NOT deleted) |
+| `manage_serving_endpoint` | `get_build_logs` | Debug failed/stuck deployments (container build output) |
+| `manage_serving_endpoint` | `get_server_logs` | Debug prediction errors (runtime stdout/stderr) |
+| `manage_serving_endpoint` | `export_metrics` | CPU, memory, latency, GPU metrics (Prometheus format) |
+| `manage_serving_endpoint` | `get_permissions` | Get ACL (users, groups, service principals) |
+| `manage_serving_endpoint` | `update_permissions` | Grant CAN_VIEW/CAN_QUERY/CAN_MANAGE permissions |
+
 ---
 
 ## Common Workflows
+
+### Create an Endpoint
+
+```
+manage_serving_endpoint(
+    action="create",
+    name="my-model-endpoint",
+    served_entities=[{
+        "entity_name": "main.ml.my_model",
+        "entity_version": "1",
+        "workload_size": "Small",
+        "scale_to_zero_enabled": True
+    }],
+    wait=False
+)
+```
+
+Then poll with `get_serving_endpoint_status(name="my-model-endpoint")`.
 
 ### Check Endpoint Status After Deployment
 
@@ -237,6 +268,40 @@ query_serving_endpoint(
     name="sklearn-classifier",
     dataframe_records=[
         {"age": 25, "income": 50000, "credit_score": 720}
+    ]
+)
+```
+
+### Deploy a New Model Version
+
+```
+manage_serving_endpoint(
+    action="update",
+    name="my-model-endpoint",
+    served_entities=[{
+        "entity_name": "main.ml.my_model",
+        "entity_version": "2",
+        "workload_size": "Small"
+    }],
+    wait=False
+)
+```
+
+### Debug a Failed Deployment
+
+```
+manage_serving_endpoint(action="get_build_logs", name="my-endpoint")
+manage_serving_endpoint(action="get_server_logs", name="my-endpoint")
+```
+
+### Grant Query Access
+
+```
+manage_serving_endpoint(
+    action="update_permissions",
+    name="my-endpoint",
+    access_control_list=[
+        {"user_name": "analyst@company.com", "permission_level": "CAN_QUERY"}
     ]
 )
 ```
