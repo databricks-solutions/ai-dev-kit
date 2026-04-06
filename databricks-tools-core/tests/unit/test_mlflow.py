@@ -122,7 +122,7 @@ class TestGetExperiment:
 
         result = get_experiment(experiment_id="999")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
         assert "not found" in result["error"].lower()
 
     def test_no_args_raises(self):
@@ -137,7 +137,7 @@ class TestGetExperiment:
 
         result = get_experiment(experiment_id="123")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestListExperiments:
@@ -201,7 +201,7 @@ class TestCreateExperiment:
 
         result = create_experiment(name="/Users/me/existing")
 
-        assert result["status"] == "already_exists"
+        assert result["status"] == "ALREADY_EXISTS"
 
     @mock.patch("databricks_tools_core.mlflow.experiments.get_workspace_client")
     def test_create_with_tags(self, mock_client):
@@ -279,7 +279,7 @@ class TestSetExperimentTag:
 
         result = set_experiment_tag("999", "key", "val")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestDeleteExperiment:
@@ -298,7 +298,7 @@ class TestDeleteExperiment:
 
         result = delete_experiment(experiment_id="999")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 # ---------------------------------------------------------------------------
@@ -327,7 +327,7 @@ class TestGetRun:
 
         result = get_run(run_id="missing")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestSearchRuns:
@@ -388,7 +388,7 @@ class TestGetRunMetricsHistory:
 
         result = get_run_metrics_history(run_id="missing", metric_key="loss")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestListRunArtifacts:
@@ -416,7 +416,7 @@ class TestListRunArtifacts:
 
         result = list_run_artifacts(run_id="missing")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 # ---------------------------------------------------------------------------
@@ -485,7 +485,7 @@ class TestGetRegisteredModel:
 
         result = get_registered_model("cat.schema.missing")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestListRegisteredModels:
@@ -553,7 +553,7 @@ class TestGetModelVersion:
 
         result = get_model_version("cat.schema.model", version=999)
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestListModelVersions:
@@ -573,7 +573,7 @@ class TestListModelVersions:
 
         result = list_model_versions("cat.schema.missing")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestGetModelVersionByAlias:
@@ -592,7 +592,7 @@ class TestGetModelVersionByAlias:
 
         result = get_model_version_by_alias("cat.schema.model", alias="missing")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestSetModelAlias:
@@ -612,7 +612,7 @@ class TestSetModelAlias:
 
         result = set_model_alias("cat.schema.model", alias="x", version_num=999)
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
 
 
 class TestDeleteModelAlias:
@@ -630,4 +630,4 @@ class TestDeleteModelAlias:
 
         result = delete_model_alias("cat.schema.model", alias="missing")
 
-        assert result["status"] == "not_found"
+        assert result["status"] == "NOT_FOUND"
