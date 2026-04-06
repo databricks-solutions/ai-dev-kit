@@ -188,6 +188,44 @@ command:
   - "agent"
 ```
 
+### Troubleshooting: agent-server startup failures
+
+If `mlflow genai agent-server` fails to start on deployment (app status shows CRASHED despite successful deployment), use a plain FastAPI app as a fallback:
+
+**app.yaml**:
+```yaml
+command:
+  - "uvicorn"
+  - "app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "8000"
+```
+
+**app.py** -- Implement the same `/responses` endpoint that agent-server provides:
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Message(BaseModel):
+    role: str
+    content: str
+
+class AgentRequest(BaseModel):
+    messages: list[Message]
+
+@app.post("/responses")
+def responses(request: AgentRequest):
+    # Your agent logic here
+    last_msg = request.messages[-1].content if request.messages else ""
+    return {"output": [{"type": "message", "content": [{"type": "output_text", "text": last_msg}]}]}
+```
+
+This approach gives you full control over the server while maintaining compatibility with the Responses API format.
+
 ### Deploy with DABs
 
 ```bash
