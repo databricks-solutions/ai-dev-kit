@@ -191,28 +191,32 @@ def search_registered_models(
                 stage = v.current_stage
                 if stage and hasattr(stage, "value"):
                     stage = stage.value
-                latest_versions.append({
-                    "version": v.version,
-                    "current_stage": stage,
-                    "status": v.status.value if v.status and hasattr(v.status, "value") else v.status,
-                    "run_id": v.run_id,
-                    "source": v.source,
-                    "creation_timestamp": v.creation_timestamp,
-                })
+                latest_versions.append(
+                    {
+                        "version": v.version,
+                        "current_stage": stage,
+                        "status": v.status.value if v.status and hasattr(v.status, "value") else v.status,
+                        "run_id": v.run_id,
+                        "source": v.source,
+                        "creation_timestamp": v.creation_timestamp,
+                    }
+                )
 
             tags = {}
             for t in model.tags or []:
                 tags[t.key] = t.value
 
-            models.append({
-                "name": model.name,
-                "description": model.description,
-                "creation_timestamp": model.creation_timestamp,
-                "last_updated_timestamp": model.last_updated_timestamp,
-                "user_id": model.user_id,
-                "tags": tags,
-                "latest_versions": latest_versions,
-            })
+            models.append(
+                {
+                    "name": model.name,
+                    "description": model.description,
+                    "creation_timestamp": model.creation_timestamp,
+                    "last_updated_timestamp": model.last_updated_timestamp,
+                    "user_id": model.user_id,
+                    "tags": tags,
+                    "latest_versions": latest_versions,
+                }
+            )
             if len(models) >= max_results:
                 break
     except Exception as e:
