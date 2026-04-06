@@ -52,8 +52,11 @@ def _version_to_dict(version) -> Dict[str, Any]:
     for a in version.aliases or []:
         aliases.append({"alias_name": a.alias_name, "version_number": a.version_number})
 
+    # Build full_name from components (SDK doesn't provide it directly)
+    full_name = f"{version.catalog_name}.{version.schema_name}.{version.model_name}"
+
     return {
-        "full_name": version.full_name,
+        "full_name": full_name,
         "version": version.version,
         "model_name": version.model_name,
         "catalog_name": version.catalog_name,
