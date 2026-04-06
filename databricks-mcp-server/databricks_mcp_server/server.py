@@ -169,4 +169,5 @@ from .tools import (  # noqa: F401, E402
     apps,
     workspace,
     pdf,
+    mlflow,
 )
