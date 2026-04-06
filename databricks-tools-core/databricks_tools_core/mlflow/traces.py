@@ -62,27 +62,31 @@ def _extract_trace_detail(resp: Dict[str, Any]) -> Dict[str, Any]:
 
     assessments = []
     for a in info.get("assessments", []):
-        assessments.append({
-            "assessment_id": a.get("assessment_id"),
-            "assessment_name": a.get("assessment_name"),
-            "source": a.get("source"),
-            "feedback": a.get("feedback"),
-            "expectation": a.get("expectation"),
-            "rationale": a.get("rationale"),
-            "create_time": a.get("create_time"),
-        })
+        assessments.append(
+            {
+                "assessment_id": a.get("assessment_id"),
+                "assessment_name": a.get("assessment_name"),
+                "source": a.get("source"),
+                "feedback": a.get("feedback"),
+                "expectation": a.get("expectation"),
+                "rationale": a.get("rationale"),
+                "create_time": a.get("create_time"),
+            }
+        )
 
     spans = []
     for s in data.get("spans", []):
-        spans.append({
-            "span_id": s.get("span_id"),
-            "name": s.get("name"),
-            "parent_span_id": s.get("parent_id"),
-            "start_time_ns": s.get("start_time_unix_nano"),
-            "end_time_ns": s.get("end_time_unix_nano"),
-            "status": s.get("status"),
-            "attributes": s.get("attributes", {}),
-        })
+        spans.append(
+            {
+                "span_id": s.get("span_id"),
+                "name": s.get("name"),
+                "parent_span_id": s.get("parent_id"),
+                "start_time_ns": s.get("start_time_unix_nano"),
+                "end_time_ns": s.get("end_time_unix_nano"),
+                "status": s.get("status"),
+                "attributes": s.get("attributes", {}),
+            }
+        )
 
     return {
         "trace_id": info.get("trace_id"),

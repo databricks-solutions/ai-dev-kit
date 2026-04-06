@@ -796,7 +796,7 @@ class TestLogAssessment:
             "assessment": {"assessment_id": "a-456", "assessment_name": "expected"}
         }
 
-        result = log_assessment("tr-abc", "expected", "Should say hello", assessment_type="expectation")
+        log_assessment("tr-abc", "expected", "Should say hello", assessment_type="expectation")
 
         call_body = mock_client.return_value.api_client.do.call_args.kwargs["body"]
         assert call_body["assessment"]["expectation"] == {"value": "Should say hello"}
