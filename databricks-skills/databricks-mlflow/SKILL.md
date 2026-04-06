@@ -1,6 +1,6 @@
 ---
 name: databricks-mlflow
-description: "Manage MLflow experiments, runs, artifacts, and model registry on Databricks. Use when listing experiments, searching runs, inspecting model versions, managing aliases, or browsing artifacts."
+description: "Manage MLflow experiments, runs, traces, artifacts, and model registry on Databricks. Use when listing experiments, searching runs or traces, inspecting model versions, managing aliases, logging assessments, or browsing artifacts."
 ---
 
 # Databricks MLflow
@@ -24,6 +24,9 @@ Use this skill when:
 - Listing registered models in Unity Catalog
 - Inspecting model versions and their source runs
 - Managing model aliases (champion, challenger, etc.)
+- Searching and inspecting GenAI traces (LLM app observability)
+- Logging feedback or expectations on traces for evaluation
+- Tagging traces for dataset building
 - Cleaning up old or unused experiments
 
 ## MCP Tools
@@ -47,6 +50,17 @@ Use this skill when:
 | `search_mlflow_runs` | Search runs across experiments by metrics/params/status |
 | `get_mlflow_metric_history` | Get metric values over training steps |
 | `list_mlflow_run_artifacts` | List files logged to a run (models, plots, etc.) |
+
+### Traces & Assessments
+
+| Tool | Purpose |
+|------|---------|
+| `search_mlflow_traces` | Search traces across experiments by status/time |
+| `get_mlflow_trace` | Full trace detail with spans, tags, metadata, assessments |
+| `set_mlflow_trace_tag` | Tag a trace for filtering or labeling |
+| `delete_mlflow_trace_tag` | Remove a trace tag |
+| `log_mlflow_assessment` | Log feedback or expectation on a trace |
+| `delete_mlflow_assessment` | Remove an assessment |
 
 ### Model Registry (Unity Catalog)
 
@@ -212,11 +226,43 @@ set_mlflow_model_alias("main.ml.churn_model", alias="champion", version_num=5)
 delete_mlflow_model_alias("main.ml.churn_model", alias="challenger")
 ```
 
+### Search and Inspect Traces
+
+```python
+# Find traces in a GenAI experiment
+search_mlflow_traces(experiment_ids=["123"], filter_string="status = 'OK'", max_results=10)
+
+# Get full trace detail (spans, metadata, assessments)
+get_mlflow_trace("tr-abc123...")
+```
+
+### Tag Traces for Evaluation
+
+```python
+# Mark traces for inclusion in eval datasets
+set_mlflow_trace_tag("tr-abc123", "eval_dataset", "v1")
+set_mlflow_trace_tag("tr-abc123", "quality", "good")
+```
+
+### Log Feedback and Expectations
+
+```python
+# Human feedback on trace quality
+log_mlflow_assessment("tr-abc123", "quality", "good",
+    rationale="Response was accurate and complete")
+
+# Ground-truth expectation for evaluation
+log_mlflow_assessment("tr-abc123", "expected_response",
+    "The answer should mention product availability",
+    assessment_type="expectation")
+```
+
 ## Reference Files
 
 | Topic | File | Description |
 |-------|------|-------------|
 | Experiments & Runs | [experiments-and-runs.md](experiments-and-runs.md) | Experiment paths, run statuses, filter syntax, metric logging |
+| Traces & Assessments | [traces-and-assessments.md](traces-and-assessments.md) | Trace structure, assessment types, token usage metadata |
 | Model Registry | [model-registry.md](model-registry.md) | UC models, versions, aliases, legacy vs UC registry |
 
 ## Common Issues
