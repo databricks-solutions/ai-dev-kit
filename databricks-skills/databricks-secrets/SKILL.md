@@ -20,52 +20,52 @@ Use this skill when:
 - Listing secrets in a scope to audit what's configured
 - Cleaning up unused scopes or rotating secrets
 
-## MCP Tools
+## MCP Tool
 
-### Scope Management
+All secret operations use a single consolidated tool:
 
-| Tool | Purpose |
+| Tool | Actions |
 |------|---------|
-| `create_or_update_secret_scope` | Idempotent scope creation (returns existing if present) |
-| `list_secret_scopes` | List all scopes in the workspace |
-| `delete_secret_scope` | Delete a scope and ALL its secrets (irreversible) |
+| `manage_secrets(action=...)` | `create_scope`, `list_scopes`, `delete_scope`, `put`, `get`, `list`, `delete` |
 
-### Secret Management
+### Parameters
 
-| Tool | Purpose |
-|------|---------|
-| `put_secret` | Create or update a secret (upsert, string or bytes) |
-| `get_secret` | Check existence and byte length (value never exposed) |
-| `list_secrets` | List secret keys in a scope (metadata only) |
-| `delete_secret` | Delete a single secret from a scope |
+| Parameter | Used by | Description |
+|-----------|---------|-------------|
+| `action` | All | One of the 7 actions above |
+| `scope` | All except `list_scopes` | Secret scope name |
+| `key` | `put`, `get`, `delete` | Secret key name |
+| `value` | `put` | Secret value as string |
+| `string_value` | `put` | Alternative to `value` |
+| `bytes_value` | `put` | Base64-encoded bytes value |
 
 ## Quick Start
 
 ### 1. Create a Secret Scope
 
 ```python
-create_or_update_secret_scope("my-app-secrets")
+manage_secrets(action="create_scope", scope="my-app-secrets")
 # {"scope": "my-app-secrets", "status": "created", "created": true}
 ```
 
 ### 2. Store a Secret
 
 ```python
-put_secret("my-app-secrets", "api-key", string_value="sk-abc123...")
+manage_secrets(action="put", scope="my-app-secrets", key="api-key", value="sk-abc123...")
 # {"scope": "my-app-secrets", "key": "api-key", "status": "created"}
 ```
 
 ### 3. Verify the Secret Exists
 
 ```python
-get_secret("my-app-secrets", "api-key")
+manage_secrets(action="get", scope="my-app-secrets", key="api-key")
 # {"scope": "my-app-secrets", "key": "api-key", "exists": true, "value_length": 42}
 ```
 
 ### 4. List All Secrets in a Scope
 
 ```python
-list_secrets("my-app-secrets")
+manage_secrets(action="list", scope="my-app-secrets")
 # [{"key": "api-key", "last_updated_timestamp": 1700000000000}, ...]
 ```
 
@@ -77,13 +77,13 @@ Organize secrets by environment for clean separation:
 
 ```python
 # Create scopes per environment
-create_or_update_secret_scope("myapp-dev")
-create_or_update_secret_scope("myapp-staging")
-create_or_update_secret_scope("myapp-prod")
+manage_secrets(action="create_scope", scope="myapp-dev")
+manage_secrets(action="create_scope", scope="myapp-staging")
+manage_secrets(action="create_scope", scope="myapp-prod")
 
 # Store environment-specific credentials
-put_secret("myapp-dev", "db-password", string_value="dev-password")
-put_secret("myapp-prod", "db-password", string_value="prod-password")
+manage_secrets(action="put", scope="myapp-dev", key="db-password", value="dev-password")
+manage_secrets(action="put", scope="myapp-prod", key="db-password", value="prod-password")
 ```
 
 ### Secrets for Model Serving Endpoints
@@ -92,10 +92,10 @@ Store credentials that serving endpoints reference via `{{secrets/scope/key}}`:
 
 ```python
 # Create scope for serving secrets
-create_or_update_secret_scope("serving-credentials")
+manage_secrets(action="create_scope", scope="serving-credentials")
 
 # Store the API key
-put_secret("serving-credentials", "openai-key", string_value="sk-...")
+manage_secrets(action="put", scope="serving-credentials", key="openai-key", value="sk-...")
 
 # Reference in endpoint environment_vars:
 # {"OPENAI_API_KEY": "{{secrets/serving-credentials/openai-key}}"}
@@ -107,13 +107,13 @@ Check what's configured before making changes:
 
 ```python
 # List all scopes
-list_secret_scopes()
+manage_secrets(action="list_scopes")
 
 # List keys in a scope
-list_secrets("my-scope")
+manage_secrets(action="list", scope="my-scope")
 
 # Check a specific secret's size (helps verify it's set correctly)
-get_secret("my-scope", "api-key")
+manage_secrets(action="get", scope="my-scope", key="api-key")
 # value_length helps verify: 0 = empty, ~40 = typical API key
 ```
 
@@ -121,10 +121,10 @@ get_secret("my-scope", "api-key")
 
 ```python
 # Delete a single secret
-delete_secret("old-scope", "unused-key")
+manage_secrets(action="delete", scope="old-scope", key="unused-key")
 
 # Delete an entire scope (irreversible — deletes ALL secrets)
-delete_secret_scope("deprecated-scope")
+manage_secrets(action="delete_scope", scope="deprecated-scope")
 ```
 
 ## Reference Files
@@ -139,9 +139,9 @@ delete_secret_scope("deprecated-scope")
 |-------|----------|
 | **Scope name invalid** | Use alphanumeric, dashes, underscores, periods only (max 128 chars) |
 | **Permission denied on scope** | Only scope creator has MANAGE by default. Use `initial_manage_principal="users"` to grant all users access |
-| **Secret value not returned** | By design — `get_secret` returns metadata only. Use `dbutils.secrets.get()` in notebooks to read values |
-| **Scope already exists** | `create_or_update_secret_scope` is idempotent — returns the existing scope |
-| **Delete scope warning** | `delete_secret_scope` deletes ALL secrets in the scope. List secrets first to verify |
+| **Secret value not returned** | By design — `get` action returns metadata only. Use `dbutils.secrets.get()` in notebooks to read values |
+| **Scope already exists** | `create_scope` is idempotent — returns the existing scope |
+| **Delete scope warning** | `delete_scope` deletes ALL secrets in the scope. List secrets first to verify |
 
 ## Related Skills
 
