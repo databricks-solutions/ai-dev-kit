@@ -1,15 +1,15 @@
 ---
 name: databricks-mlflow
-description: "Manage MLflow experiments, runs, and artifacts on Databricks. Use when listing experiments, searching runs by metrics or parameters, inspecting run details, creating experiments, or browsing run artifacts."
+description: "Manage MLflow experiments, runs, artifacts, and model registry on Databricks. Use when listing experiments, searching runs, inspecting model versions, managing aliases, or browsing artifacts."
 ---
 
 # Databricks MLflow
 
-Manage MLflow experiments, runs, metrics, and artifacts in Databricks workspaces.
+Manage MLflow experiments, runs, artifacts, and the Unity Catalog model registry in Databricks workspaces.
 
 ## Overview
 
-MLflow on Databricks provides experiment tracking, model versioning, and artifact management. Experiments organize related runs, each run logs metrics, parameters, and artifacts during training or evaluation. This skill covers the core operations for browsing, searching, and managing these resources.
+MLflow on Databricks provides experiment tracking, model versioning, and artifact management. Experiments organize related runs, each run logs metrics, parameters, and artifacts during training or evaluation. The Unity Catalog model registry stores registered models and versions with aliases for deployment workflows.
 
 ## When to Use This Skill
 
@@ -21,6 +21,9 @@ Use this skill when:
 - Viewing a run's metrics, parameters, and tags
 - Tracking how a metric changed over training steps
 - Browsing artifacts (models, plots, configs) logged to a run
+- Listing registered models in Unity Catalog
+- Inspecting model versions and their source runs
+- Managing model aliases (champion, challenger, etc.)
 - Cleaning up old or unused experiments
 
 ## MCP Tools
@@ -43,6 +46,19 @@ Use this skill when:
 | `search_mlflow_runs` | Search runs across experiments by metrics/params/status |
 | `get_mlflow_metric_history` | Get metric values over training steps |
 | `list_mlflow_run_artifacts` | List files logged to a run (models, plots, etc.) |
+
+### Model Registry (Unity Catalog)
+
+| Tool | Purpose |
+|------|---------|
+| `get_mlflow_model` | Get registered model by full name (catalog.schema.model) |
+| `list_mlflow_models` | List models, optionally filtered by catalog/schema |
+| `search_mlflow_models` | Search legacy workspace registry by name/tags |
+| `get_mlflow_model_version` | Get a specific model version |
+| `list_mlflow_model_versions` | List all versions of a model |
+| `get_mlflow_model_version_by_alias` | Resolve alias to version (e.g. "champion") |
+| `set_mlflow_model_alias` | Point alias to a version |
+| `delete_mlflow_model_alias` | Remove an alias |
 
 ## Quick Start
 
@@ -154,11 +170,45 @@ delete_mlflow_experiment(experiment_id="123")
 list_mlflow_experiments(view_type="DELETED_ONLY")
 ```
 
+### Browse Models in Unity Catalog
+
+```python
+# List models in a specific catalog/schema
+list_mlflow_models(catalog_name="main", schema_name="ml")
+
+# Get model details with aliases
+get_mlflow_model("main.ml.churn_model")
+```
+
+### Inspect Model Versions
+
+```python
+# List all versions
+list_mlflow_model_versions("main.ml.churn_model")
+
+# Get specific version details (source run, status)
+get_mlflow_model_version("main.ml.churn_model", version=3)
+
+# Resolve which version "champion" points to
+get_mlflow_model_version_by_alias("main.ml.churn_model", "champion")
+```
+
+### Promote a Model Version
+
+```python
+# Set the "champion" alias to version 5
+set_mlflow_model_alias("main.ml.churn_model", alias="champion", version_num=5)
+
+# Remove old alias
+delete_mlflow_model_alias("main.ml.churn_model", alias="challenger")
+```
+
 ## Reference Files
 
 | Topic | File | Description |
 |-------|------|-------------|
 | Experiments & Runs | [experiments-and-runs.md](experiments-and-runs.md) | Experiment paths, run statuses, filter syntax, metric logging |
+| Model Registry | [model-registry.md](model-registry.md) | UC models, versions, aliases, legacy vs UC registry |
 
 ## Common Issues
 
@@ -169,6 +219,9 @@ list_mlflow_experiments(view_type="DELETED_ONLY")
 | **Filter syntax error** | Use MLflow filter syntax: `metrics.X > 0.9`, `params.X = 'val'`, `status = 'FINISHED'` |
 | **Metric history empty** | Metric may have been logged once (no steps). Use `get_mlflow_run` to see latest values |
 | **Cannot delete experiment** | Only the experiment creator or workspace admin can delete |
+| **Model not found (UC)** | Use three-level name: `catalog.schema.model`. Check catalog/schema access |
+| **Legacy vs UC models** | Use `list_mlflow_models` for UC, `search_mlflow_models` for legacy workspace registry |
+| **Alias not found** | Alias may not be set yet. Use `list_mlflow_model_versions` to see all versions |
 
 ## Related Skills
 
