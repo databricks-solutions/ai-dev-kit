@@ -1,4 +1,4 @@
-"""MLflow tools - Manage experiments, runs, metrics, artifacts, and model registry."""
+"""MLflow tools - Manage experiments, runs, traces, artifacts, and model registry."""
 
 from typing import Any, Dict, List, Optional
 
@@ -22,6 +22,12 @@ from databricks_tools_core.mlflow import (
     get_model_version_by_alias as _get_model_version_by_alias,
     set_model_alias as _set_model_alias,
     delete_model_alias as _delete_model_alias,
+    search_traces as _search_traces,
+    get_trace as _get_trace,
+    set_trace_tag as _set_trace_tag,
+    delete_trace_tag as _delete_trace_tag,
+    log_assessment as _log_assessment,
+    delete_assessment as _delete_assessment,
 )
 
 from ..manifest import register_deleter, track_resource, remove_resource
@@ -609,3 +615,191 @@ def delete_mlflow_model_alias(
         {"full_name": "...", "alias": "old-alias", "status": "deleted"}
     """
     return _delete_model_alias(full_name=full_name, alias=alias)
+
+
+# ---------------------------------------------------------------------------
+# Traces
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(timeout=30)
+def search_mlflow_traces(
+    experiment_ids: List[str],
+    filter_string: Optional[str] = None,
+    max_results: int = 50,
+    order_by: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Search MLflow traces across one or more experiments.
+
+    Use this to find traces by status, time range, or other filters.
+    Returns trace summaries (not full span details).
+
+    Args:
+        experiment_ids: List of experiment IDs to search within
+        filter_string: Filter expression (e.g. "status = 'OK'",
+            "timestamp_ms > 1700000000000")
+        max_results: Maximum traces to return (default: 50)
+        order_by: Sort fields (e.g. ["timestamp_ms DESC"])
+
+    Returns:
+        Dictionary with:
+        - traces: List of trace summaries with trace_id, status,
+          execution_time_ms, tags
+        - count: Number returned
+
+    Example:
+        >>> search_mlflow_traces(["123"], filter_string="status = 'OK'", max_results=10)
+        {"traces": [...], "count": 10}
+    """
+    return _search_traces(
+        experiment_ids=experiment_ids,
+        filter_string=filter_string,
+        max_results=max_results,
+        order_by=order_by,
+    )
+
+
+@mcp.tool(timeout=30)
+def get_mlflow_trace(trace_id: str) -> Dict[str, Any]:
+    """
+    Get full details for an MLflow trace including spans and assessments.
+
+    Use this to inspect a trace's request/response, view individual spans,
+    check token usage metadata, and see existing assessments.
+
+    Args:
+        trace_id: The trace ID (e.g. "tr-abc123...")
+
+    Returns:
+        Dictionary with:
+        - trace_id, state, request_time, execution_duration
+        - request_preview/response_preview: Truncated content
+        - tags: Dict of trace tags
+        - metadata: Dict (token usage, size, etc.)
+        - assessments: List of existing assessments
+        - spans: List of span dicts with name, status, timing
+        - span_count: Number of spans
+
+    Example:
+        >>> get_mlflow_trace("tr-abc123...")
+        {"trace_id": "...", "state": "OK", "span_count": 5, "assessments": [...]}
+    """
+    return _get_trace(trace_id=trace_id)
+
+
+@mcp.tool(timeout=30)
+def set_mlflow_trace_tag(
+    trace_id: str,
+    key: str,
+    value: str,
+) -> Dict[str, Any]:
+    """
+    Set a tag on an MLflow trace.
+
+    Use this to label traces for later filtering, mark them for
+    evaluation datasets, or add metadata.
+
+    Args:
+        trace_id: The trace ID
+        key: Tag key
+        value: Tag value
+
+    Returns:
+        Dictionary with:
+        - trace_id, key, value, status: "set"
+
+    Example:
+        >>> set_mlflow_trace_tag("tr-abc123", "quality", "good")
+        {"trace_id": "tr-abc123", "key": "quality", "value": "good", "status": "set"}
+    """
+    return _set_trace_tag(trace_id=trace_id, key=key, value=value)
+
+
+@mcp.tool(timeout=30)
+def delete_mlflow_trace_tag(
+    trace_id: str,
+    key: str,
+) -> Dict[str, Any]:
+    """
+    Delete a tag from an MLflow trace.
+
+    Args:
+        trace_id: The trace ID
+        key: Tag key to remove
+
+    Returns:
+        Dictionary with:
+        - trace_id, key, status: "deleted"
+
+    Example:
+        >>> delete_mlflow_trace_tag("tr-abc123", "old-tag")
+        {"trace_id": "tr-abc123", "key": "old-tag", "status": "deleted"}
+    """
+    return _delete_trace_tag(trace_id=trace_id, key=key)
+
+
+@mcp.tool(timeout=30)
+def log_mlflow_assessment(
+    trace_id: str,
+    assessment_name: str,
+    value: str,
+    assessment_type: str = "feedback",
+    source_type: str = "HUMAN",
+    rationale: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Log a feedback or expectation assessment on an MLflow trace.
+
+    Feedback records human or automated judgments about trace quality.
+    Expectations record ground-truth answers for evaluation datasets.
+
+    Args:
+        trace_id: The trace ID
+        assessment_name: Name (e.g. "quality", "correctness",
+            "expected_response")
+        value: Assessment value. For feedback: "yes", "no", "good", "bad".
+            For expectations: the expected answer.
+        assessment_type: "feedback" (default) or "expectation"
+        source_type: "HUMAN" (default) or "LLM_JUDGE"
+        rationale: Optional explanation for the assessment
+
+    Returns:
+        Dictionary with:
+        - assessment_id, trace_id, assessment_name, status: "created"
+
+    Example:
+        >>> log_mlflow_assessment("tr-abc123", "quality", "good", rationale="Response was accurate")
+        {"assessment_id": "a-...", "trace_id": "tr-abc123", "status": "created"}
+    """
+    return _log_assessment(
+        trace_id=trace_id,
+        assessment_name=assessment_name,
+        value=value,
+        assessment_type=assessment_type,
+        source_type=source_type,
+        rationale=rationale,
+    )
+
+
+@mcp.tool(timeout=30)
+def delete_mlflow_assessment(
+    trace_id: str,
+    assessment_id: str,
+) -> Dict[str, Any]:
+    """
+    Delete an assessment from an MLflow trace.
+
+    Args:
+        trace_id: The trace ID
+        assessment_id: The assessment ID to remove
+
+    Returns:
+        Dictionary with:
+        - trace_id, assessment_id, status: "deleted"
+
+    Example:
+        >>> delete_mlflow_assessment("tr-abc123", "a-xyz789")
+        {"trace_id": "tr-abc123", "assessment_id": "a-xyz789", "status": "deleted"}
+    """
+    return _delete_assessment(trace_id=trace_id, assessment_id=assessment_id)
