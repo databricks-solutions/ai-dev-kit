@@ -18,6 +18,15 @@ from .experiments import (
     list_run_artifacts,
 )
 
+from .traces import (
+    search_traces,
+    get_trace,
+    set_trace_tag,
+    delete_trace_tag,
+    log_assessment,
+    delete_assessment,
+)
+
 from .registry import (
     get_registered_model,
     list_registered_models,
@@ -42,6 +51,13 @@ __all__ = [
     "search_runs",
     "get_run_metrics_history",
     "list_run_artifacts",
+    # Traces
+    "search_traces",
+    "get_trace",
+    "set_trace_tag",
+    "delete_trace_tag",
+    "log_assessment",
+    "delete_assessment",
     # Registered Models
     "get_registered_model",
     "list_registered_models",
