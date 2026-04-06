@@ -74,6 +74,8 @@ Copy this checklist and verify each item:
 
 **MCP tools**: Use [6-mcp-approach.md](6-mcp-approach.md) for managing app lifecycle via MCP tools — covers creating, deploying, monitoring, and deleting apps programmatically. (Keywords: MCP, create app, deploy app, app logs)
 
+**Agent apps**: Use [7-agent-apps.md](7-agent-apps.md) when deploying AI agents as Databricks Apps — covers @invoke/@stream decorators, databricks.yml resource config, agent templates, tool integration, local development, and migration from Model Serving. (Keywords: agent, ResponsesAgent, AgentServer, @invoke, @stream, LangGraph, multi-agent, deploy agent)
+
 **Foundation Models**: See [examples/llm_config.py](examples/llm_config.py) for calling Databricks foundation model APIs — covers OAuth M2M auth, OpenAI-compatible client wiring, and token caching. (Keywords: foundation model, LLM, OpenAI client, chat completions)
 
 ---
@@ -88,6 +90,7 @@ Copy this checklist and verify each item:
    **Using Lakebase (PostgreSQL)?** → Read [5-lakebase.md](5-lakebase.md)
    **Deploying to Databricks?** → Read [4-deployment.md](4-deployment.md)
    **Using MCP tools?** → Read [6-mcp-approach.md](6-mcp-approach.md)
+   **Deploying an AI agent as an app?** → Read [7-agent-apps.md](7-agent-apps.md)
    **Calling foundation model/LLM APIs?** → See [examples/llm_config.py](examples/llm_config.py)
 
 2. Follow the instructions in the relevant guide
