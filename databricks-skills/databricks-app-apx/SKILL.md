@@ -5,7 +5,7 @@ description: "Build full-stack Databricks applications using APX framework (Fast
 
 # Databricks APX Application (FastAPI + React)
 
-Build full-stack Databricks applications with a FastAPI backend and React + TypeScript frontend. APX is the recommended framework when you need custom UI beyond dashboards, complex frontend interactions, or API-first architecture.
+Build full-stack Databricks applications with a FastAPI backend and React + TypeScript frontend. APX is the recommended framework when you need custom UI beyond dashboards, complex frontend interactions, or API-first architecture. For additional recipes and patterns, see the [Databricks Apps Cookbook](https://apps-cookbook.dev/).
 
 ---
 
@@ -15,7 +15,7 @@ Build full-stack Databricks applications with a FastAPI backend and React + Type
 - **MUST** include `response_model` on every FastAPI route (enables OpenAPI spec generation for the frontend)
 - **MUST** use shadcn/ui as the component library for the React frontend
 - **MUST** build the frontend (`npm run build`) before deploying
-- **MUST** deploy with `create_or_update_app` + `deploy_app` MCP tools (no APX-specific deploy tools exist)
+- **MUST** deploy with `create_or_update_app` (pass `source_code_path` to deploy source code) — no APX-specific deploy tools exist
 - **MUST** add `psycopg2-binary` to `requirements.txt` when using Lakebase (not pre-installed)
 
 ## Required Steps
