@@ -49,19 +49,28 @@ Before creating Agent Bricks, ensure you have the required data:
 ### Knowledge Assistant Tool
 
 **manage_ka** - Manage Knowledge Assistants (KA)
-- `action`: "create_or_update", "get", "find_by_name", or "delete"
+- `action`: "create_or_update", "get", "find_by_name", "delete", "sync_sources", "wait_for_ready", "list_examples", "add_example", or "delete_example"
 - `name`: Name for the KA (for create_or_update, find_by_name)
 - `volume_path`: Path to documents (e.g., `/Volumes/catalog/schema/volume/folder`) (for create_or_update)
 - `description`: (optional) What the KA does (for create_or_update)
 - `instructions`: (optional) How the KA should answer (for create_or_update)
-- `tile_id`: The KA tile ID (for get, delete, or update via create_or_update)
+- `tile_id`: The KA tile ID (for get, delete, sync_sources, wait_for_ready, list_examples, add_example, delete_example, or update via create_or_update)
 - `add_examples_from_volume`: (optional, default: true) Auto-add examples from JSON files (for create_or_update)
+- `question`: Example question text (for add_example)
+- `guidelines`: Expected answer guidelines (for add_example)
+- `example_id`: Example ID to delete (for delete_example)
+- `timeout_seconds`: (optional, default: 600) Max wait in seconds (for wait_for_ready)
 
 Actions:
 - **create_or_update**: Requires `name`, `volume_path`. Optionally pass `tile_id` to update.
 - **get**: Requires `tile_id`. Returns tile_id, name, description, endpoint_status, knowledge_sources, examples_count.
 - **find_by_name**: Requires `name` (exact match). Returns found, tile_id, name, endpoint_name, endpoint_status. Use this to look up an existing KA when you know the name but not the tile_id.
 - **delete**: Requires `tile_id`.
+- **sync_sources**: Requires `tile_id`. Triggers re-indexing of knowledge sources after volume changes.
+- **wait_for_ready**: Requires `tile_id`. Blocks until endpoint is ONLINE (default timeout: 600s).
+- **list_examples**: Requires `tile_id`. Returns all example questions.
+- **add_example**: Requires `tile_id`, `question`. Optionally pass `guidelines`.
+- **delete_example**: Requires `tile_id`, `example_id`.
 
 ### Genie Space Tools
 

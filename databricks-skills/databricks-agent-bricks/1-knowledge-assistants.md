@@ -104,6 +104,76 @@ To update the indexed documents:
 2. Call `manage_ka` with `action="create_or_update"`, the same name and `tile_id`
 3. The KA will re-index the updated content
 
+## Managing Knowledge Sources
+
+After updating documents in a UC Volume, trigger re-indexing:
+
+```python
+manage_ka(action="sync_sources", tile_id="01abc...")
+```
+
+**When to sync:**
+- After adding or removing documents from the volume
+- After updating existing documents with new content
+- After bulk uploads of new files
+
+Sync is asynchronous -- it may take several minutes depending on the volume size and number of documents. Use `get` to check status afterward.
+
+## Example Management
+
+Examples help with evaluation and user onboarding. Use these actions for iterative refinement.
+
+### List existing examples
+
+```python
+manage_ka(action="list_examples", tile_id="01abc...")
+# Returns: {"examples": [{"example_id": "ex-1", "question": "...", "guidelines": [...]}, ...]}
+```
+
+### Add an example interactively
+
+```python
+manage_ka(
+    action="add_example",
+    tile_id="01abc...",
+    question="What is the company's remote work policy?",
+    guidelines="Should mention the 3-day minimum in-office requirement"
+)
+```
+
+### Delete an example
+
+```python
+manage_ka(action="delete_example", tile_id="01abc...", example_id="ex-1")
+```
+
+**Note:** Auto-loading from volume JSON files (via `add_examples_from_volume=true` on create) handles the bulk case. Manual `add_example` / `delete_example` are for iterative refinement after observing KA behavior.
+
+## Waiting for Readiness
+
+After creating a KA, the endpoint needs time to provision. Block until it is online:
+
+```python
+manage_ka(action="wait_for_ready", tile_id="01abc...", timeout_seconds=600)
+```
+
+**Typical provisioning times:**
+- Simple KA with few documents: 5-10 minutes
+- KA with large document volumes: 10-15 minutes
+
+**Use in workflows:** Create the KA, then wait for readiness before adding examples or querying:
+
+```python
+# 1. Create
+result = manage_ka(action="create_or_update", name="HR Assistant", volume_path="/Volumes/cat/sch/vol/hr")
+
+# 2. Wait for ONLINE
+manage_ka(action="wait_for_ready", tile_id=result["tile_id"], timeout_seconds=600)
+
+# 3. Add examples
+manage_ka(action="add_example", tile_id=result["tile_id"], question="What is PTO policy?")
+```
+
 ## Example Workflow
 
 1. **Generate PDF documents** using `databricks-unstructured-pdf-generation` skill:
