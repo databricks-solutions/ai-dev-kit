@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
+from databricks_tools_core.identity import get_default_tags
 from databricks_tools_core.mlflow import (
     get_experiment as _get_experiment,
     list_experiments as _list_experiments,
@@ -23,7 +24,16 @@ from databricks_tools_core.mlflow import (
     delete_model_alias as _delete_model_alias,
 )
 
+from ..manifest import register_deleter, track_resource, remove_resource
 from ..server import mcp
+
+
+# Register deleter for experiment cleanup
+def _delete_experiment_resource(resource_id: str) -> None:
+    _delete_experiment(experiment_id=resource_id)
+
+
+register_deleter("mlflow_experiment", _delete_experiment_resource)
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +138,7 @@ def search_mlflow_experiments(
     )
 
 
-@mcp.tool(timeout=30)
+@mcp.tool(timeout=60)
 def create_mlflow_experiment(
     name: str,
     experiment_kind: Optional[str] = None,
@@ -154,15 +164,29 @@ def create_mlflow_experiment(
         Dictionary with:
         - experiment_id: ID of the created experiment
         - name: Experiment name
-        - status: "created" or "ALREADY_EXISTS"
+        - status: "created" or "already_exists"
 
     Example:
         >>> create_mlflow_experiment("/Users/me/my-agent", experiment_kind="genai")
         {"experiment_id": "123", "name": "/Users/me/my-agent", "status": "created"}
     """
-    return _create_experiment(
-        name=name, experiment_kind=experiment_kind, artifact_location=artifact_location, tags=tags
+    merged_tags = {**get_default_tags(), **(tags or {})}
+
+    result = _create_experiment(
+        name=name, experiment_kind=experiment_kind, artifact_location=artifact_location, tags=merged_tags
     )
+
+    if result.get("status") == "created":
+        try:
+            track_resource(
+                resource_type="mlflow_experiment",
+                name=name,
+                resource_id=result["experiment_id"],
+            )
+        except Exception:
+            pass
+
+    return result
 
 
 @mcp.tool(timeout=30)
@@ -213,7 +237,15 @@ def delete_mlflow_experiment(experiment_id: str) -> Dict[str, Any]:
         >>> delete_mlflow_experiment("123456789")
         {"experiment_id": "123456789", "status": "deleted"}
     """
-    return _delete_experiment(experiment_id=experiment_id)
+    result = _delete_experiment(experiment_id=experiment_id)
+
+    if result.get("status") == "deleted":
+        try:
+            remove_resource(resource_type="mlflow_experiment", resource_id=experiment_id)
+        except Exception:
+            pass
+
+    return result
 
 
 # ---------------------------------------------------------------------------
