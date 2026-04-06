@@ -2,7 +2,7 @@
 
 ## Supported Providers
 
-Databricks Repos supports these Git providers. Use the exact `provider` string when calling `create_or_update_repo`.
+Databricks Repos supports these Git providers. Use the exact `provider` string when calling `manage_repos(action="create", ...)`.
 
 | Provider | `provider` Value | URL Format |
 |----------|-----------------|------------|
@@ -61,7 +61,7 @@ git@github.com:my-org/my-repo.git
 
 ## Default Workspace Path
 
-When `path` is omitted from `create_or_update_repo`, the repo is cloned to:
+When `path` is omitted from the `create` action, the repo is cloned to:
 
 ```
 /Repos/{current_user}/{repo_name}
@@ -72,9 +72,9 @@ Where `{repo_name}` is extracted from the URL (last path segment, without `.git`
 ## Branch and Tag Behavior
 
 - **Default branch**: When cloning, the repo checks out the default branch (usually `main` or `master`)
-- **Switching branches**: `update_repo(repo_id, branch="...")` pulls latest and checks out the branch
-- **Tags**: `update_repo(repo_id, tag="v1.0")` checks out the tag (detached HEAD — `branch` returns `null`)
-- **One ref at a time**: Provide either `branch` or `tag` to `update_repo`, not both
+- **Switching branches**: `manage_repos(action="update", repo_id=..., branch="...")` pulls latest and checks out the branch
+- **Tags**: `manage_repos(action="update", repo_id=..., tag="v1.0")` checks out the tag (detached HEAD — `branch` returns `null`)
+- **One ref at a time**: Provide either `branch` or `tag` to the `update`/`sync` action, not both
 
 ## Limitations
 
