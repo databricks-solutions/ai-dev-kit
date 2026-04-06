@@ -3,7 +3,7 @@
 For Genie Space tools, see genie.py
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from databricks_tools_core.agent_bricks import (
     AgentBricksManager,
@@ -37,6 +37,18 @@ def _delete_mas_resource(resource_id: str) -> None:
 
 register_deleter("knowledge_assistant", _delete_ka_resource)
 register_deleter("multi_agent_supervisor", _delete_mas_resource)
+
+_VALID_KA_ACTIONS: Tuple[str, ...] = (
+    "create_or_update",
+    "get",
+    "find_by_name",
+    "delete",
+    "sync_sources",
+    "wait_for_ready",
+    "list_examples",
+    "add_example",
+    "delete_example",
+)
 
 
 # ============================================================================
@@ -469,8 +481,7 @@ def _mas_delete(tile_id: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-@mcp.tool(timeout=180)
-def manage_ka(
+def _manage_ka_impl(
     action: str,
     name: str = None,
     volume_path: str = None,
@@ -483,47 +494,11 @@ def manage_ka(
     example_id: str = None,
     timeout_seconds: int = None,
 ) -> Dict[str, Any]:
-    """
-    Manage Knowledge Assistants (KA) — document-based Q&A using RAG.
-
-    Actions:
-    - create_or_update: Create/update a KA (requires name, volume_path)
-    - get: Get KA details by tile_id
-    - find_by_name: Find a KA by exact name
-    - delete: Delete a KA by tile_id
-    - sync_sources: Trigger re-indexing of knowledge sources (requires tile_id)
-    - wait_for_ready: Wait for endpoint to come online (requires tile_id)
-    - list_examples: List example questions (requires tile_id)
-    - add_example: Add an example question (requires tile_id, question)
-    - delete_example: Delete an example (requires tile_id, example_id)
-
-    See databricks-agent-bricks skill for details.
-
-    Args:
-        action: One of the actions listed above
-        name: KA name (for create_or_update, find_by_name)
-        volume_path: Volume path to documents (for create_or_update)
-        description: What the KA does (for create_or_update)
-        instructions: How the KA should answer (for create_or_update)
-        tile_id: KA tile ID (for get, delete, sync_sources, wait_for_ready, list_examples,
-            add_example, delete_example, or update via create_or_update)
-        add_examples_from_volume: Auto-add examples from JSON files (default: true, for create_or_update)
-        question: Example question text (for add_example)
-        guidelines: Expected answer guidelines (for add_example)
-        example_id: Example ID to delete (for delete_example)
-        timeout_seconds: Max wait time in seconds (default: 600, for wait_for_ready)
-
-    Returns:
-        Dict with operation result varying by action.
-
-    Example:
-        >>> manage_ka(action="create_or_update", name="HR Assistant",
-        ...     volume_path="/Volumes/catalog/schema/vol/hr_docs")
-        >>> manage_ka(action="sync_sources", tile_id="01abc...")
-        >>> manage_ka(action="wait_for_ready", tile_id="01abc...", timeout_seconds=300)
-        >>> manage_ka(action="add_example", tile_id="01abc...", question="What is PTO policy?")
-    """
+    """Business logic for manage_ka, separated for testability."""
     action = action.lower()
+
+    if action not in _VALID_KA_ACTIONS:
+        return {"error": f"Invalid action '{action}'. Valid actions: {', '.join(_VALID_KA_ACTIONS)}"}
 
     if action == "create_or_update":
         return _ka_create_or_update(
@@ -571,12 +546,75 @@ def manage_ka(
         manager = _get_manager()
         manager.ka_delete_example(tile_id, example_id)
         return {"tile_id": tile_id, "example_id": example_id, "status": "deleted"}
-    else:
-        valid_actions = (
-            "create_or_update, get, find_by_name, delete, "
-            "sync_sources, wait_for_ready, list_examples, add_example, delete_example"
-        )
-        return {"error": f"Invalid action '{action}'. Must be one of: {valid_actions}"}
+
+
+@mcp.tool(timeout=180)
+def manage_ka(
+    action: str,
+    name: str = None,
+    volume_path: str = None,
+    description: str = None,
+    instructions: str = None,
+    tile_id: str = None,
+    add_examples_from_volume: bool = True,
+    question: str = None,
+    guidelines: str = None,
+    example_id: str = None,
+    timeout_seconds: int = None,
+) -> Dict[str, Any]:
+    """
+    Manage Knowledge Assistants (KA) — document-based Q&A using RAG.
+
+    Actions:
+    - create_or_update: Create/update a KA (requires name, volume_path)
+    - get: Get KA details by tile_id
+    - find_by_name: Find a KA by exact name
+    - delete: Delete a KA by tile_id
+    - sync_sources: Trigger re-indexing of knowledge sources (requires tile_id)
+    - wait_for_ready: Wait for endpoint to come online (requires tile_id)
+    - list_examples: List example questions (requires tile_id)
+    - add_example: Add an example question (requires tile_id, question)
+    - delete_example: Delete an example (requires tile_id, example_id)
+
+    See databricks-agent-bricks skill for details.
+
+    Args:
+        action: One of the actions listed above
+        name: KA name (for create_or_update, find_by_name)
+        volume_path: Volume path to documents (for create_or_update)
+        description: What the KA does (for create_or_update)
+        instructions: How the KA should answer (for create_or_update)
+        tile_id: KA tile ID (for get, delete, sync_sources, wait_for_ready, list_examples,
+            add_example, delete_example, or update via create_or_update)
+        add_examples_from_volume: Auto-add examples from JSON files (default: true, for create_or_update)
+        question: Example question text (for add_example)
+        guidelines: Single guideline string, wrapped to list internally (for add_example)
+        example_id: Example ID to delete (for delete_example)
+        timeout_seconds: Max wait time in seconds (default: 600, for wait_for_ready)
+
+    Returns:
+        Dict with operation result varying by action.
+
+    Example:
+        >>> manage_ka(action="create_or_update", name="HR Assistant",
+        ...     volume_path="/Volumes/catalog/schema/vol/hr_docs")
+        >>> manage_ka(action="sync_sources", tile_id="01abc...")
+        >>> manage_ka(action="wait_for_ready", tile_id="01abc...", timeout_seconds=300)
+        >>> manage_ka(action="add_example", tile_id="01abc...", question="What is PTO policy?")
+    """
+    return _manage_ka_impl(
+        action=action,
+        name=name,
+        volume_path=volume_path,
+        description=description,
+        instructions=instructions,
+        tile_id=tile_id,
+        add_examples_from_volume=add_examples_from_volume,
+        question=question,
+        guidelines=guidelines,
+        example_id=example_id,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 @mcp.tool(timeout=180)
