@@ -1,4 +1,4 @@
-"""MLflow tools - Manage experiments, runs, metrics, and artifacts."""
+"""MLflow tools - Manage experiments, runs, metrics, artifacts, and model registry."""
 
 from typing import Any, Dict, List, Optional
 
@@ -12,6 +12,14 @@ from databricks_tools_core.mlflow import (
     search_runs as _search_runs,
     get_run_metrics_history as _get_run_metrics_history,
     list_run_artifacts as _list_run_artifacts,
+    get_registered_model as _get_registered_model,
+    list_registered_models as _list_registered_models,
+    search_registered_models as _search_registered_models,
+    get_model_version as _get_model_version,
+    list_model_versions as _list_model_versions,
+    get_model_version_by_alias as _get_model_version_by_alias,
+    set_model_alias as _set_model_alias,
+    delete_model_alias as _delete_model_alias,
 )
 
 from ..server import mcp
@@ -305,3 +313,235 @@ def list_mlflow_run_artifacts(
         {"run_id": "abc123", "artifacts": [{"path": "model", "is_dir": true}, ...], "count": 5}
     """
     return _list_run_artifacts(run_id=run_id, path=path)
+
+
+# ---------------------------------------------------------------------------
+# Registered Models (Unity Catalog)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(timeout=30)
+def get_mlflow_model(
+    full_name: str,
+    include_aliases: bool = True,
+) -> Dict[str, Any]:
+    """
+    Get a registered model from Unity Catalog.
+
+    Use this to inspect model details, owner, aliases, and description.
+
+    Args:
+        full_name: Three-level name (catalog.schema.model)
+        include_aliases: Include alias information (default: True)
+
+    Returns:
+        Dictionary with model details:
+        - full_name: Three-level name
+        - name: Model name
+        - catalog_name/schema_name: Namespace
+        - comment: Description
+        - owner: Owner principal
+        - aliases: List of {alias_name, version_number}
+
+    Example:
+        >>> get_mlflow_model("main.ml.churn_model")
+        {"full_name": "main.ml.churn_model", "owner": "user@example.com", "aliases": [...]}
+    """
+    return _get_registered_model(full_name=full_name, include_aliases=include_aliases)
+
+
+@mcp.tool(timeout=30)
+def list_mlflow_models(
+    catalog_name: Optional[str] = None,
+    schema_name: Optional[str] = None,
+    max_results: int = 50,
+) -> Dict[str, Any]:
+    """
+    List registered models in Unity Catalog.
+
+    Use this to discover models, optionally filtered by catalog and schema.
+
+    Args:
+        catalog_name: Filter by catalog (optional)
+        schema_name: Filter by schema (requires catalog_name)
+        max_results: Maximum models to return (default: 50)
+
+    Returns:
+        Dictionary with:
+        - models: List of model dicts
+        - count: Number returned
+
+    Example:
+        >>> list_mlflow_models(catalog_name="main", schema_name="ml")
+        {"models": [...], "count": 5}
+    """
+    return _list_registered_models(
+        catalog_name=catalog_name, schema_name=schema_name, max_results=max_results
+    )
+
+
+@mcp.tool(timeout=30)
+def search_mlflow_models(
+    filter_string: Optional[str] = None,
+    max_results: int = 50,
+    order_by: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Search models in the legacy workspace model registry.
+
+    For Unity Catalog models, use list_mlflow_models with catalog/schema filters.
+    This searches the workspace-level (non-UC) registry.
+
+    Args:
+        filter_string: Filter expression (e.g. "name LIKE '%churn%'")
+        max_results: Maximum models to return (default: 50)
+        order_by: Sort fields (e.g. ["name ASC"])
+
+    Returns:
+        Dictionary with:
+        - models: List with name, description, tags, latest_versions
+        - count: Number returned
+
+    Example:
+        >>> search_mlflow_models(filter_string="name LIKE '%churn%'")
+        {"models": [...], "count": 2}
+    """
+    return _search_registered_models(
+        filter_string=filter_string, max_results=max_results, order_by=order_by
+    )
+
+
+# ---------------------------------------------------------------------------
+# Model Versions (Unity Catalog)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(timeout=30)
+def get_mlflow_model_version(
+    full_name: str,
+    version: int,
+) -> Dict[str, Any]:
+    """
+    Get a specific model version from Unity Catalog.
+
+    Use this to inspect a version's source, run_id, status, and aliases.
+
+    Args:
+        full_name: Three-level model name (catalog.schema.model)
+        version: Version number
+
+    Returns:
+        Dictionary with version details:
+        - full_name, version, status (READY, PENDING_REGISTRATION, etc.)
+        - source: Artifact location
+        - run_id: MLflow run that produced this version
+        - aliases: List of alias dicts
+
+    Example:
+        >>> get_mlflow_model_version("main.ml.churn_model", version=3)
+        {"full_name": "main.ml.churn_model", "version": 3, "status": "READY", ...}
+    """
+    return _get_model_version(full_name=full_name, version=version)
+
+
+@mcp.tool(timeout=30)
+def list_mlflow_model_versions(
+    full_name: str,
+    max_results: int = 50,
+) -> Dict[str, Any]:
+    """
+    List all versions of a registered model in Unity Catalog.
+
+    Use this to see version history, find the latest version, or
+    compare versions by their run_id.
+
+    Args:
+        full_name: Three-level model name (catalog.schema.model)
+        max_results: Maximum versions to return (default: 50)
+
+    Returns:
+        Dictionary with:
+        - full_name: The model name
+        - versions: List of version dicts
+        - count: Number returned
+
+    Example:
+        >>> list_mlflow_model_versions("main.ml.churn_model")
+        {"full_name": "...", "versions": [{"version": 3, "status": "READY"}, ...], "count": 3}
+    """
+    return _list_model_versions(full_name=full_name, max_results=max_results)
+
+
+@mcp.tool(timeout=30)
+def get_mlflow_model_version_by_alias(
+    full_name: str,
+    alias: str,
+) -> Dict[str, Any]:
+    """
+    Get a model version by its alias (e.g. "champion", "challenger").
+
+    Use this to resolve which version an alias points to.
+
+    Args:
+        full_name: Three-level model name (catalog.schema.model)
+        alias: Alias name (e.g. "champion", "production")
+
+    Returns:
+        Dictionary with version details (same as get_mlflow_model_version)
+
+    Example:
+        >>> get_mlflow_model_version_by_alias("main.ml.churn_model", "champion")
+        {"full_name": "...", "version": 5, "status": "READY", ...}
+    """
+    return _get_model_version_by_alias(full_name=full_name, alias=alias)
+
+
+@mcp.tool(timeout=30)
+def set_mlflow_model_alias(
+    full_name: str,
+    alias: str,
+    version_num: int,
+) -> Dict[str, Any]:
+    """
+    Set an alias on a model version (e.g. "champion", "challenger").
+
+    Aliases provide mutable references to specific versions. If the
+    alias already exists, it is reassigned to the new version.
+
+    Args:
+        full_name: Three-level model name (catalog.schema.model)
+        alias: Alias name to set
+        version_num: Version number to point the alias to
+
+    Returns:
+        Dictionary with:
+        - full_name, alias, version_num, status: "set"
+
+    Example:
+        >>> set_mlflow_model_alias("main.ml.churn_model", "champion", 5)
+        {"full_name": "...", "alias": "champion", "version_num": 5, "status": "set"}
+    """
+    return _set_model_alias(full_name=full_name, alias=alias, version_num=version_num)
+
+
+@mcp.tool(timeout=30)
+def delete_mlflow_model_alias(
+    full_name: str,
+    alias: str,
+) -> Dict[str, Any]:
+    """
+    Remove an alias from a registered model.
+
+    Args:
+        full_name: Three-level model name (catalog.schema.model)
+        alias: Alias name to remove
+
+    Returns:
+        Dictionary with:
+        - full_name, alias, status: "deleted" or "NOT_FOUND"
+
+    Example:
+        >>> delete_mlflow_model_alias("main.ml.churn_model", "old-alias")
+        {"full_name": "...", "alias": "old-alias", "status": "deleted"}
+    """
+    return _delete_model_alias(full_name=full_name, alias=alias)
