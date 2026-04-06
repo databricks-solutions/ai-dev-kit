@@ -395,11 +395,13 @@ def get_run_metrics_history(
         )
         history = []
         for m in metrics_iter:
-            history.append({
-                "value": m.value,
-                "timestamp": m.timestamp,
-                "step": m.step,
-            })
+            history.append(
+                {
+                    "value": m.value,
+                    "timestamp": m.timestamp,
+                    "step": m.step,
+                }
+            )
             if len(history) >= max_results:
                 break
     except (ResourceDoesNotExist, NotFound):
@@ -443,11 +445,13 @@ def list_run_artifacts(
         )
         artifacts = []
         for f in artifacts_iter:
-            artifacts.append({
-                "path": f.path,
-                "is_dir": f.is_dir,
-                "file_size": f.file_size,
-            })
+            artifacts.append(
+                {
+                    "path": f.path,
+                    "is_dir": f.is_dir,
+                    "file_size": f.file_size,
+                }
+            )
     except (ResourceDoesNotExist, NotFound):
         return {"error": f"Run '{run_id}' not found", "status": "NOT_FOUND"}
     except Exception as e:
