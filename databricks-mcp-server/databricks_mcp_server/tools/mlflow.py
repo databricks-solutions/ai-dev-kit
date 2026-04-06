@@ -156,7 +156,7 @@ def create_mlflow_experiment(
         Dictionary with:
         - experiment_id: ID of the created experiment
         - name: Experiment name
-        - status: "created" or "already_exists"
+        - status: "created" or "ALREADY_EXISTS"
 
     Example:
         >>> create_mlflow_experiment("/Users/me/my-agent", experiment_kind="genai")
@@ -223,7 +223,7 @@ def delete_mlflow_experiment(experiment_id: str) -> Dict[str, Any]:
     Returns:
         Dictionary with:
         - experiment_id: The deleted experiment ID
-        - status: "deleted" or "not_found"
+        - status: "deleted" or "NOT_FOUND"
 
     Example:
         >>> delete_mlflow_experiment("123456789")
