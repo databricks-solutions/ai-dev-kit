@@ -9,8 +9,15 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.service.ml import ViewType
 
 from ..auth import get_workspace_client
+
+_VIEW_TYPE_MAP = {
+    "ACTIVE_ONLY": ViewType.ACTIVE_ONLY,
+    "DELETED_ONLY": ViewType.DELETED_ONLY,
+    "ALL": ViewType.ALL,
+}
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +45,15 @@ def _run_to_dict(run) -> Dict[str, Any]:
     info = run.info or run
     data = run.data
 
+    status = getattr(info, "status", None)
+    if status is not None and hasattr(status, "value"):
+        status = status.value
+
     result: Dict[str, Any] = {
         "run_id": getattr(info, "run_id", None),
         "run_name": getattr(info, "run_name", None),
         "experiment_id": getattr(info, "experiment_id", None),
-        "status": getattr(info, "status", None),
+        "status": status,
         "start_time": getattr(info, "start_time", None),
         "end_time": getattr(info, "end_time", None),
         "artifact_uri": getattr(info, "artifact_uri", None),
@@ -133,7 +144,7 @@ def list_experiments(
     try:
         experiments_iter = client.experiments.list_experiments(
             max_results=max_results,
-            view_type=view_type,
+            view_type=_VIEW_TYPE_MAP.get(view_type, ViewType.ACTIVE_ONLY),
         )
         experiments = []
         for exp in experiments_iter:
@@ -174,7 +185,7 @@ def search_experiments(
             filter=filter_string,
             max_results=max_results,
             order_by=order_by,
-            view_type=view_type,
+            view_type=_VIEW_TYPE_MAP.get(view_type, ViewType.ACTIVE_ONLY),
         )
         experiments = []
         for exp in experiments_iter:
@@ -339,7 +350,7 @@ def search_runs(
             filter=filter_string,
             max_results=max_results,
             order_by=order_by,
-            run_view_type=view_type,
+            run_view_type=_VIEW_TYPE_MAP.get(view_type, ViewType.ACTIVE_ONLY),  # SDK expects ViewType enum
         )
         runs = []
         for run in runs_iter:
