@@ -10,6 +10,7 @@ from .experiments import (
     list_experiments,
     search_experiments,
     create_experiment,
+    set_experiment_tag,
     delete_experiment,
     get_run,
     search_runs,
@@ -34,6 +35,7 @@ __all__ = [
     "list_experiments",
     "search_experiments",
     "create_experiment",
+    "set_experiment_tag",
     "delete_experiment",
     # Runs
     "get_run",
