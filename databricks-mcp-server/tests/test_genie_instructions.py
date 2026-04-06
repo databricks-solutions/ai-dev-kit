@@ -142,9 +142,7 @@ def test_add_benchmark_dispatches_to_manager(mock_manager):
 def test_add_benchmark_missing_question(mock_manager):
     """action='add_benchmark' without question_text returns error."""
     with patch(_GET_MANAGER, return_value=mock_manager):
-        result = manage_genie_instructions(
-            action="add_benchmark", space_id="sp-1", answer_text="SELECT 1"
-        )
+        result = manage_genie_instructions(action="add_benchmark", space_id="sp-1", answer_text="SELECT 1")
 
     assert "error" in result
     assert "question_text" in result["error"]
@@ -153,9 +151,7 @@ def test_add_benchmark_missing_question(mock_manager):
 def test_add_benchmark_missing_answer(mock_manager):
     """action='add_benchmark' without answer_text returns error."""
     with patch(_GET_MANAGER, return_value=mock_manager):
-        result = manage_genie_instructions(
-            action="add_benchmark", space_id="sp-1", question_text="Total revenue?"
-        )
+        result = manage_genie_instructions(action="add_benchmark", space_id="sp-1", question_text="Total revenue?")
 
     assert "error" in result
     assert "answer_text" in result["error"]
@@ -185,9 +181,7 @@ def test_add_batch_functions(mock_manager):
     items = ["catalog.schema.func1", "catalog.schema.func2"]
     mock_manager.genie_add_sql_functions_batch.return_value = [{"id": "f1"}, {"id": "f2"}]
     with patch(_GET_MANAGER, return_value=mock_manager):
-        result = manage_genie_instructions(
-            action="add_batch", space_id="sp-1", batch_type="functions", items=items
-        )
+        result = manage_genie_instructions(action="add_batch", space_id="sp-1", batch_type="functions", items=items)
 
     mock_manager.genie_add_sql_functions_batch.assert_called_once_with("sp-1", items)
     assert result["success"] is True
@@ -199,9 +193,7 @@ def test_add_batch_benchmarks(mock_manager):
     items = [{"question_text": "Total?", "answer_text": "SELECT COUNT(*) FROM t"}]
     mock_manager.genie_add_benchmarks_batch.return_value = [{"id": "bm-10"}]
     with patch(_GET_MANAGER, return_value=mock_manager):
-        result = manage_genie_instructions(
-            action="add_batch", space_id="sp-1", batch_type="benchmarks", items=items
-        )
+        result = manage_genie_instructions(action="add_batch", space_id="sp-1", batch_type="benchmarks", items=items)
 
     mock_manager.genie_add_benchmarks_batch.assert_called_once_with("sp-1", items)
     assert result["success"] is True
@@ -210,9 +202,7 @@ def test_add_batch_benchmarks(mock_manager):
 def test_add_batch_missing_batch_type(mock_manager):
     """action='add_batch' without batch_type returns error."""
     with patch(_GET_MANAGER, return_value=mock_manager):
-        result = manage_genie_instructions(
-            action="add_batch", space_id="sp-1", items=[{"title": "x", "content": "y"}]
-        )
+        result = manage_genie_instructions(action="add_batch", space_id="sp-1", items=[{"title": "x", "content": "y"}])
 
     assert "error" in result
     assert "batch_type" in result["error"]
@@ -232,9 +222,7 @@ def test_add_batch_invalid_batch_type(mock_manager):
 def test_add_batch_missing_items(mock_manager):
     """action='add_batch' without items returns error."""
     with patch(_GET_MANAGER, return_value=mock_manager):
-        result = manage_genie_instructions(
-            action="add_batch", space_id="sp-1", batch_type="sql_instructions"
-        )
+        result = manage_genie_instructions(action="add_batch", space_id="sp-1", batch_type="sql_instructions")
 
     assert "error" in result
     assert "items" in result["error"].lower()
@@ -296,9 +284,7 @@ def test_add_sql_manager_error_returns_error_dict(mock_manager):
     """Manager exception is caught and returned as error dict."""
     mock_manager.genie_add_sql_instruction.side_effect = Exception("API error")
     with patch(_GET_MANAGER, return_value=mock_manager):
-        result = manage_genie_instructions(
-            action="add_sql", space_id="sp-1", title="T", content="C"
-        )
+        result = manage_genie_instructions(action="add_sql", space_id="sp-1", title="T", content="C")
 
     assert "error" in result
     assert "API error" in result["error"]
