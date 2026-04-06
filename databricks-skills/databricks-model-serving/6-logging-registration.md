@@ -93,6 +93,8 @@ resources = [
 ]
 ```
 
+**Note on Lakebase Autoscale:** `DatabricksLakebase` currently supports Lakebase Provisioned instances only. For Lakebase Autoscale, the agent must generate OAuth tokens at runtime via the Databricks SDK (`w.postgres.generate_database_credential()`). See the [Lakebase Autoscale skill](../databricks-lakebase-autoscale/SKILL.md) for connection patterns from agents and serving endpoints.
+
 ## pip_requirements
 
 ### Recommended Versions (Tested)
