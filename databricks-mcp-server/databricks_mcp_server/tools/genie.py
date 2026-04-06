@@ -28,6 +28,125 @@ def _delete_genie_resource(resource_id: str) -> None:
 
 register_deleter("genie_space", _delete_genie_resource)
 
+_VALID_INSTRUCTION_ACTIONS = ("add_sql", "add_text", "add_function", "add_benchmark", "add_batch", "list")
+_VALID_BATCH_TYPES = ("sql_instructions", "functions", "benchmarks")
+
+
+def _manage_genie_instructions_impl(
+    action: str,
+    space_id: str,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+    function_name: Optional[str] = None,
+    question_text: Optional[str] = None,
+    answer_text: Optional[str] = None,
+    batch_type: Optional[str] = None,
+    items: Optional[List[Dict[str, Any]]] = None,
+    question_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Business logic for manage_genie_instructions. Separated from the MCP
+    decorator so it can be imported and tested directly."""
+
+    if action not in _VALID_INSTRUCTION_ACTIONS:
+        return {"error": f"Invalid action '{action}'. Valid actions: {', '.join(_VALID_INSTRUCTION_ACTIONS)}"}
+
+    manager = _get_manager()
+
+    # -------------------------------------------------------------------------
+    # add_sql: Add a SQL query example instruction
+    # -------------------------------------------------------------------------
+    if action == "add_sql":
+        if not title or not content:
+            return {"error": "Both 'title' and 'content' are required for action='add_sql'."}
+        try:
+            result = manager.genie_add_sql_instruction(space_id, title, content)
+            return {"success": True, "action": "add_sql", "space_id": space_id, "instruction": result}
+        except Exception as e:
+            return {"error": f"Failed to add SQL instruction: {e}"}
+
+    # -------------------------------------------------------------------------
+    # add_text: Add a general text instruction
+    # -------------------------------------------------------------------------
+    if action == "add_text":
+        if not content:
+            return {"error": "'content' is required for action='add_text'."}
+        try:
+            result = manager.genie_add_text_instruction(space_id, content, title or "Notes")
+            return {"success": True, "action": "add_text", "space_id": space_id, "instruction": result}
+        except Exception as e:
+            return {"error": f"Failed to add text instruction: {e}"}
+
+    # -------------------------------------------------------------------------
+    # add_function: Add a UC SQL function as a certified answer
+    # -------------------------------------------------------------------------
+    if action == "add_function":
+        if not function_name:
+            return {"error": "'function_name' is required for action='add_function'."}
+        try:
+            result = manager.genie_add_sql_function(space_id, function_name)
+            return {"success": True, "action": "add_function", "space_id": space_id, "instruction": result}
+        except Exception as e:
+            return {"error": f"Failed to add SQL function: {e}"}
+
+    # -------------------------------------------------------------------------
+    # add_benchmark: Add a benchmark question with expected answer
+    # -------------------------------------------------------------------------
+    if action == "add_benchmark":
+        if not question_text or not answer_text:
+            return {"error": "Both 'question_text' and 'answer_text' are required for action='add_benchmark'."}
+        try:
+            result = manager.genie_add_benchmark(space_id, question_text, answer_text)
+            return {"success": True, "action": "add_benchmark", "space_id": space_id, "benchmark": result}
+        except Exception as e:
+            return {"error": f"Failed to add benchmark: {e}"}
+
+    # -------------------------------------------------------------------------
+    # add_batch: Bulk-add instructions, functions, or benchmarks
+    # -------------------------------------------------------------------------
+    if action == "add_batch":
+        if not batch_type:
+            valid = ", ".join(_VALID_BATCH_TYPES)
+            return {"error": f"'batch_type' is required for action='add_batch'. Valid types: {valid}"}
+        if batch_type not in _VALID_BATCH_TYPES:
+            return {"error": f"Invalid batch_type '{batch_type}'. Valid types: {', '.join(_VALID_BATCH_TYPES)}"}
+        if not items:
+            return {"error": "'items' list is required for action='add_batch'."}
+
+        try:
+            if batch_type == "sql_instructions":
+                results = manager.genie_add_sql_instructions_batch(space_id, items)
+            elif batch_type == "functions":
+                # items is a list of function name strings
+                function_names = [item if isinstance(item, str) else item.get("function_name", "") for item in items]
+                results = manager.genie_add_sql_functions_batch(space_id, function_names)
+            elif batch_type == "benchmarks":
+                results = manager.genie_add_benchmarks_batch(space_id, items)
+            return {
+                "success": True,
+                "action": "add_batch",
+                "batch_type": batch_type,
+                "space_id": space_id,
+                "count": len(results),
+                "results": results,
+            }
+        except Exception as e:
+            return {"error": f"Failed to add batch ({batch_type}): {e}"}
+
+    # -------------------------------------------------------------------------
+    # list: List instructions and curated questions
+    # -------------------------------------------------------------------------
+    if action == "list":
+        try:
+            instructions = manager.genie_list_instructions(space_id)
+            questions = manager.genie_list_questions(space_id, question_type=question_type or "SAMPLE_QUESTION")
+            return {
+                "space_id": space_id,
+                "instructions": instructions.get("instructions", []),
+                "curated_questions": questions.get("curated_questions", []),
+            }
+        except Exception as e:
+            return {"error": f"Failed to list instructions: {e}"}
+
 
 # ============================================================================
 # Genie Space Management Tools
@@ -428,6 +547,66 @@ def migrate_genie(
 
     else:
         return {"error": f"Invalid type '{type}'. Must be 'export' or 'import'."}
+
+
+# ============================================================================
+# Genie Instructions & Benchmarks
+# ============================================================================
+
+
+@mcp.tool(timeout=60)
+def manage_genie_instructions(
+    action: str,
+    space_id: str,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+    function_name: Optional[str] = None,
+    question_text: Optional[str] = None,
+    answer_text: Optional[str] = None,
+    batch_type: Optional[str] = None,
+    items: Optional[List[Dict[str, Any]]] = None,
+    question_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Manage instructions, SQL functions, and benchmarks for a Genie Space.
+
+    Actions: add_sql, add_text, add_function, add_benchmark, add_batch, list.
+    See databricks-genie skill for details.
+
+    Args:
+        action: One of "add_sql", "add_text", "add_function", "add_benchmark", "add_batch", "list".
+        space_id: The Genie Space ID.
+        title: Instruction title (add_sql, add_text).
+        content: SQL query or text body (add_sql, add_text).
+        function_name: UC function name e.g. "catalog.schema.func" (add_function).
+        question_text: Benchmark question (add_benchmark).
+        answer_text: Expected SQL answer for the benchmark (add_benchmark).
+        batch_type: One of "sql_instructions", "functions", "benchmarks" (add_batch).
+        items: List of dicts for batch operations (add_batch). Format depends on batch_type:
+            - sql_instructions: [{"title": "...", "content": "..."}]
+            - functions: ["catalog.schema.func1", ...] (list of strings)
+            - benchmarks: [{"question_text": "...", "answer_text": "..."}]
+        question_type: Filter for list action: "SAMPLE_QUESTION", "BENCHMARK", etc. (list).
+
+    Returns:
+        Dictionary with the operation result or error.
+
+    Example:
+        >>> manage_genie_instructions(action="add_sql", space_id="abc123",
+        ...     title="Monthly Revenue", content="SELECT SUM(amount) FROM sales WHERE month = :month")
+        >>> manage_genie_instructions(action="list", space_id="abc123")
+    """
+    return _manage_genie_instructions_impl(
+        action=action,
+        space_id=space_id,
+        title=title,
+        content=content,
+        function_name=function_name,
+        question_text=question_text,
+        answer_text=answer_text,
+        batch_type=batch_type,
+        items=items,
+        question_type=question_type,
+    )
 
 
 # ============================================================================
