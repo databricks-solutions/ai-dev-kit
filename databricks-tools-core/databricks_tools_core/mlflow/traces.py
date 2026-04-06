@@ -47,15 +47,18 @@ def _extract_trace_detail(resp: Dict[str, Any]) -> Dict[str, Any]:
     info = trace.get("trace_info", {})
     data = trace.get("trace_data", {})
 
-    tags = {}
-    for t in info.get("tags", []):
-        if isinstance(t, dict):
-            tags[t.get("key", "")] = t.get("value", "")
+    # Tags and metadata can be plain dicts or lists of {key, value}
+    raw_tags = info.get("tags", {})
+    if isinstance(raw_tags, dict):
+        tags = raw_tags
+    else:
+        tags = {t.get("key", ""): t.get("value", "") for t in raw_tags if isinstance(t, dict)}
 
-    metadata = {}
-    for m in info.get("trace_metadata", []):
-        if isinstance(m, dict):
-            metadata[m.get("key", "")] = m.get("value", "")
+    raw_metadata = info.get("trace_metadata", {})
+    if isinstance(raw_metadata, dict):
+        metadata = raw_metadata
+    else:
+        metadata = {m.get("key", ""): m.get("value", "") for m in raw_metadata if isinstance(m, dict)}
 
     assessments = []
     for a in info.get("assessments", []):
