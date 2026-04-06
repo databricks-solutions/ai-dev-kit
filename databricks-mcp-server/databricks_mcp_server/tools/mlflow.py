@@ -1,4 +1,9 @@
-"""MLflow tools - Manage experiments, runs, metrics, and artifacts."""
+"""MLflow tools - Manage experiments and runs.
+
+Consolidated into 2 tools:
+- manage_mlflow_experiment: create, get, list, search, set_tag, delete
+- manage_mlflow_run: get, search, get_metric_history, list_artifacts
+"""
 
 from typing import Any, Dict, List, Optional
 
@@ -28,348 +33,151 @@ def _delete_experiment_resource(resource_id: str) -> None:
 register_deleter("mlflow_experiment", _delete_experiment_resource)
 
 
-# ---------------------------------------------------------------------------
-# Experiments
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool(timeout=30)
-def get_mlflow_experiment(
-    experiment_id: Optional[str] = None,
-    name: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Get an MLflow experiment by ID or name.
-
-    Use this to inspect experiment details, check lifecycle stage,
-    or look up an experiment before searching its runs.
-
-    Args:
-        experiment_id: Experiment ID (numeric string, e.g. "123456789")
-        name: Full experiment path (e.g. "/Users/user@example.com/my-experiment").
-            Provide exactly one of experiment_id or name.
-
-    Returns:
-        Dictionary with experiment details:
-        - experiment_id: Unique ID
-        - name: Full experiment path
-        - lifecycle_stage: "active" or "deleted"
-        - tags: Dict of experiment tags
-        - creation_time: Creation timestamp (ms)
-
-    Example:
-        >>> get_mlflow_experiment(experiment_id="123456789")
-        {"experiment_id": "123456789", "name": "/Users/...", "lifecycle_stage": "active"}
-    """
-    return _get_experiment(experiment_id=experiment_id, name=name)
-
-
-@mcp.tool(timeout=30)
-def list_mlflow_experiments(
-    max_results: int = 50,
-    view_type: str = "ACTIVE_ONLY",
-) -> Dict[str, Any]:
-    """
-    List MLflow experiments in the workspace.
-
-    Use this to discover experiments, browse recent work, or find
-    experiments by lifecycle stage.
-
-    Args:
-        max_results: Maximum experiments to return (default: 50)
-        view_type: Filter by lifecycle. One of:
-            "ACTIVE_ONLY" (default), "DELETED_ONLY", "ALL"
-
-    Returns:
-        Dictionary with:
-        - experiments: List of experiment dicts
-        - count: Number returned
-
-    Example:
-        >>> list_mlflow_experiments(max_results=10)
-        {"experiments": [...], "count": 10}
-    """
-    return _list_experiments(max_results=max_results, view_type=view_type)
-
-
-@mcp.tool(timeout=30)
-def search_mlflow_experiments(
-    filter_string: Optional[str] = None,
-    max_results: int = 50,
-    order_by: Optional[List[str]] = None,
-    view_type: str = "ACTIVE_ONLY",
-) -> Dict[str, Any]:
-    """
-    Search MLflow experiments with filters.
-
-    Use this to find experiments by name pattern, tags, or other attributes.
-
-    Args:
-        filter_string: Filter expression. Examples:
-            - "name LIKE '%my-project%'"
-            - "tags.team = 'ml-eng'"
-            - "tags.`mlflow.experimentType` = 'MLFLOW_EXPERIMENT'"
-        max_results: Maximum experiments to return (default: 50)
-        order_by: Sort fields (e.g. ["last_update_time DESC"])
-        view_type: "ACTIVE_ONLY" (default), "DELETED_ONLY", or "ALL"
-
-    Returns:
-        Dictionary with:
-        - experiments: List of matching experiment dicts
-        - count: Number returned
-
-    Example:
-        >>> search_mlflow_experiments(filter_string="name LIKE '%churn%'")
-        {"experiments": [...], "count": 3}
-    """
-    return _search_experiments(
-        filter_string=filter_string,
-        max_results=max_results,
-        order_by=order_by,
-        view_type=view_type,
-    )
+# ============================================================================
+# Tool 1: manage_mlflow_experiment
+# ============================================================================
 
 
 @mcp.tool(timeout=60)
-def create_mlflow_experiment(
-    name: str,
+def manage_mlflow_experiment(
+    action: str,
+    # For get/set_tag/delete:
+    experiment_id: Optional[str] = None,
+    # For get/create:
+    name: Optional[str] = None,
+    # For create:
     experiment_kind: Optional[str] = None,
     artifact_location: Optional[str] = None,
     tags: Optional[Dict[str, str]] = None,
-) -> Dict[str, Any]:
-    """
-    Create a new MLflow experiment.
-
-    Use this to set up a new experiment for organizing runs.
-    Experiment names must be unique in the workspace.
-
-    Args:
-        name: Experiment name/path (e.g. "/Users/user@example.com/my-experiment")
-        experiment_kind: Controls experiment type in the UI:
-            - "genai" — GenAI apps & agents (tracing, LLM evaluation)
-            - "ml" — Machine learning (traditional ML training)
-            - None — no kind set (default)
-        artifact_location: Optional custom artifact storage location
-        tags: Optional dict of tags (e.g. {"team": "ml-eng"})
-
-    Returns:
-        Dictionary with:
-        - experiment_id: ID of the created experiment
-        - name: Experiment name
-        - status: "created" or "ALREADY_EXISTS"
-
-    Example:
-        >>> create_mlflow_experiment("/Users/me/my-agent", experiment_kind="genai")
-        {"experiment_id": "123", "name": "/Users/me/my-agent", "status": "created"}
-    """
-    merged_tags = {**get_default_tags(), **(tags or {})}
-
-    result = _create_experiment(
-        name=name, experiment_kind=experiment_kind, artifact_location=artifact_location, tags=merged_tags
-    )
-
-    if result.get("status") == "created":
-        try:
-            track_resource(
-                resource_type="mlflow_experiment",
-                name=name,
-                resource_id=result["experiment_id"],
-            )
-        except Exception:
-            pass
-
-    return result
-
-
-@mcp.tool(timeout=30)
-def set_mlflow_experiment_tag(
-    experiment_id: str,
-    key: str,
-    value: str,
-) -> Dict[str, Any]:
-    """
-    Set a tag on an MLflow experiment.
-
-    Use this to add metadata, change the experiment kind, or label
-    experiments for organization. Setting an existing key overwrites it.
-
-    Args:
-        experiment_id: Experiment ID (numeric string)
-        key: Tag key (e.g. "team", "mlflow.experimentKind")
-        value: Tag value
-
-    Returns:
-        Dictionary with:
-        - experiment_id, key, value, status: "set"
-
-    Example:
-        >>> set_mlflow_experiment_tag("123", "mlflow.experimentKind", "genai_development")
-        {"experiment_id": "123", "key": "mlflow.experimentKind", "value": "genai_development", "status": "set"}
-    """
-    return _set_experiment_tag(experiment_id=experiment_id, key=key, value=value)
-
-
-@mcp.tool(timeout=30)
-def delete_mlflow_experiment(experiment_id: str) -> Dict[str, Any]:
-    """
-    Delete (soft-delete) an MLflow experiment.
-
-    The experiment moves to "deleted" lifecycle stage. It can be restored
-    from the MLflow UI or API. All runs within it are also soft-deleted.
-
-    Args:
-        experiment_id: ID of the experiment to delete
-
-    Returns:
-        Dictionary with:
-        - experiment_id: The deleted experiment ID
-        - status: "deleted" or "NOT_FOUND"
-
-    Example:
-        >>> delete_mlflow_experiment("123456789")
-        {"experiment_id": "123456789", "status": "deleted"}
-    """
-    result = _delete_experiment(experiment_id=experiment_id)
-
-    if result.get("status") == "deleted":
-        try:
-            remove_resource(resource_type="mlflow_experiment", resource_id=experiment_id)
-        except Exception:
-            pass
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Runs
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool(timeout=30)
-def get_mlflow_run(run_id: str) -> Dict[str, Any]:
-    """
-    Get details for an MLflow run.
-
-    Use this to inspect a specific run's metrics, parameters, tags,
-    and status. Returns the latest value for each metric.
-
-    Args:
-        run_id: The run ID (UUID string)
-
-    Returns:
-        Dictionary with:
-        - run_id: Unique run ID
-        - run_name: Display name
-        - experiment_id: Parent experiment ID
-        - status: RUNNING, FINISHED, FAILED, KILLED
-        - metrics: Dict of latest metric values
-        - params: Dict of logged parameters
-        - tags: Dict of run tags
-
-    Example:
-        >>> get_mlflow_run("abc123def456")
-        {"run_id": "abc123...", "status": "FINISHED", "metrics": {"accuracy": 0.95}}
-    """
-    return _get_run(run_id=run_id)
-
-
-@mcp.tool(timeout=30)
-def search_mlflow_runs(
-    experiment_ids: List[str],
+    # For set_tag:
+    key: Optional[str] = None,
+    value: Optional[str] = None,
+    # For list/search:
     filter_string: Optional[str] = None,
     max_results: int = 50,
     order_by: Optional[List[str]] = None,
     view_type: str = "ACTIVE_ONLY",
 ) -> Dict[str, Any]:
-    """
-    Search MLflow runs across one or more experiments.
+    """Manage MLflow experiments: create, get, list, search, set_tag, delete.
 
-    Use this to find runs by metrics, parameters, status, or tags.
+    Actions:
+    - create: New experiment. Requires name. Optional: experiment_kind ("genai" or "ml"), tags.
+      experiment_kind controls UI type: "genai" = GenAI apps & agents, "ml" = Machine learning.
+      Returns: {experiment_id, name, status}.
+    - get: Get experiment. Requires experiment_id OR name. Returns: experiment details with tags.
+    - list: List experiments. Optional: max_results (default 50), view_type (ACTIVE_ONLY/DELETED_ONLY/ALL).
+    - search: Search experiments. Optional: filter_string (e.g. "name LIKE '%churn%'"), order_by, max_results.
+    - set_tag: Set tag on experiment. Requires experiment_id, key, value.
+    - delete: Soft-delete experiment (can be restored). Requires experiment_id.
 
-    Args:
-        experiment_ids: List of experiment IDs to search within
-        filter_string: Filter expression. Examples:
-            - "metrics.accuracy > 0.9"
-            - "params.model_type = 'xgboost'"
-            - "status = 'FINISHED'"
-            - "tags.mlflow.runName LIKE '%best%'"
-        max_results: Maximum runs to return (default: 50)
-        order_by: Sort fields (e.g. ["metrics.accuracy DESC", "start_time DESC"])
-        view_type: "ACTIVE_ONLY" (default), "DELETED_ONLY", or "ALL"
+    See databricks-mlflow skill for experiment paths, filter syntax, and patterns."""
+    act = action.lower()
 
-    Returns:
-        Dictionary with:
-        - runs: List of run dicts with metrics, params, tags
-        - count: Number returned
+    if act == "create":
+        if not name:
+            return {"error": "create requires: name"}
+        merged_tags = {**get_default_tags(), **(tags or {})}
+        result = _create_experiment(
+            name=name, experiment_kind=experiment_kind, artifact_location=artifact_location, tags=merged_tags
+        )
+        if result.get("status") == "created":
+            try:
+                track_resource(resource_type="mlflow_experiment", name=name, resource_id=result["experiment_id"])
+            except Exception:
+                pass
+        return result
 
-    Example:
-        >>> search_mlflow_runs(["123"], filter_string="metrics.accuracy > 0.9", order_by=["metrics.accuracy DESC"])
-        {"runs": [...], "count": 5}
-    """
-    return _search_runs(
-        experiment_ids=experiment_ids,
-        filter_string=filter_string,
-        max_results=max_results,
-        order_by=order_by,
-        view_type=view_type,
-    )
+    elif act == "get":
+        if not experiment_id and not name:
+            return {"error": "get requires: experiment_id or name"}
+        return _get_experiment(experiment_id=experiment_id, name=name)
+
+    elif act == "list":
+        return _list_experiments(max_results=max_results, view_type=view_type)
+
+    elif act == "search":
+        return _search_experiments(
+            filter_string=filter_string, max_results=max_results, order_by=order_by, view_type=view_type
+        )
+
+    elif act == "set_tag":
+        if not experiment_id or not key or not value:
+            return {"error": "set_tag requires: experiment_id, key, value"}
+        return _set_experiment_tag(experiment_id=experiment_id, key=key, value=value)
+
+    elif act == "delete":
+        if not experiment_id:
+            return {"error": "delete requires: experiment_id"}
+        result = _delete_experiment(experiment_id=experiment_id)
+        if result.get("status") == "deleted":
+            try:
+                remove_resource(resource_type="mlflow_experiment", resource_id=experiment_id)
+            except Exception:
+                pass
+        return result
+
+    else:
+        return {"error": f"Invalid action '{action}'. Valid: create, get, list, search, set_tag, delete"}
+
+
+# ============================================================================
+# Tool 2: manage_mlflow_run
+# ============================================================================
 
 
 @mcp.tool(timeout=30)
-def get_mlflow_metric_history(
-    run_id: str,
-    metric_key: str,
-    max_results: int = 100,
-) -> Dict[str, Any]:
-    """
-    Get the history of a specific metric for a run.
-
-    Use this to see how a metric changed over training steps — useful
-    for analyzing convergence, detecting overfitting, etc.
-
-    Args:
-        run_id: The run ID
-        metric_key: Name of the metric (e.g. "loss", "accuracy", "val_f1_score")
-        max_results: Maximum data points to return (default: 100)
-
-    Returns:
-        Dictionary with:
-        - run_id: The run ID
-        - metric_key: The metric name
-        - history: List of dicts with value, timestamp, step
-        - count: Number of data points
-
-    Example:
-        >>> get_mlflow_metric_history("abc123", "loss")
-        {"run_id": "abc123", "metric_key": "loss", "history": [{"value": 0.5, "step": 0}, ...]}
-    """
-    return _get_run_metrics_history(run_id=run_id, metric_key=metric_key, max_results=max_results)
-
-
-@mcp.tool(timeout=30)
-def list_mlflow_run_artifacts(
-    run_id: str,
+def manage_mlflow_run(
+    action: str,
+    # For get/get_metric_history/list_artifacts:
+    run_id: Optional[str] = None,
+    # For search:
+    experiment_ids: Optional[List[str]] = None,
+    filter_string: Optional[str] = None,
+    max_results: int = 50,
+    order_by: Optional[List[str]] = None,
+    view_type: str = "ACTIVE_ONLY",
+    # For get_metric_history:
+    metric_key: Optional[str] = None,
+    # For list_artifacts:
     path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    List artifacts stored for an MLflow run.
+    """Manage MLflow runs: get, search, get_metric_history, list_artifacts.
 
-    Use this to discover what files (models, plots, configs) were
-    logged during a run.
+    Actions:
+    - get: Get run details (metrics, params, tags, status). Requires run_id.
+    - search: Search runs. Requires experiment_ids. Optional: filter_string
+      (e.g. "metrics.accuracy > 0.9 AND status = 'FINISHED'"), order_by, max_results.
+    - get_metric_history: Get metric over training steps. Requires run_id, metric_key.
+    - list_artifacts: List run artifacts (models, plots). Requires run_id. Optional: path.
 
-    Args:
-        run_id: The run ID
-        path: Optional relative path within the artifact directory.
-            Omit to list root artifacts.
+    See databricks-mlflow skill for filter syntax and metric logging patterns."""
+    act = action.lower()
 
-    Returns:
-        Dictionary with:
-        - run_id: The run ID
-        - artifacts: List of dicts with path, is_dir, file_size
-        - count: Number of artifacts
+    if act == "get":
+        if not run_id:
+            return {"error": "get requires: run_id"}
+        return _get_run(run_id=run_id)
 
-    Example:
-        >>> list_mlflow_run_artifacts("abc123")
-        {"run_id": "abc123", "artifacts": [{"path": "model", "is_dir": true}, ...], "count": 5}
-    """
-    return _list_run_artifacts(run_id=run_id, path=path)
+    elif act == "search":
+        if not experiment_ids:
+            return {"error": "search requires: experiment_ids"}
+        return _search_runs(
+            experiment_ids=experiment_ids,
+            filter_string=filter_string,
+            max_results=max_results,
+            order_by=order_by,
+            view_type=view_type,
+        )
+
+    elif act == "get_metric_history":
+        if not run_id or not metric_key:
+            return {"error": "get_metric_history requires: run_id, metric_key"}
+        return _get_run_metrics_history(run_id=run_id, metric_key=metric_key, max_results=max_results)
+
+    elif act == "list_artifacts":
+        if not run_id:
+            return {"error": "list_artifacts requires: run_id"}
+        return _list_run_artifacts(run_id=run_id, path=path)
+
+    else:
+        return {"error": f"Invalid action '{action}'. Valid: get, search, get_metric_history, list_artifacts"}
