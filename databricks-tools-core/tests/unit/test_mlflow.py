@@ -17,6 +17,14 @@ from databricks_tools_core.mlflow import (
     search_runs,
     get_run_metrics_history,
     list_run_artifacts,
+    get_registered_model,
+    list_registered_models,
+    search_registered_models,
+    get_model_version,
+    list_model_versions,
+    get_model_version_by_alias,
+    set_model_alias,
+    delete_model_alias,
 )
 
 
@@ -340,5 +348,219 @@ class TestListRunArtifacts:
         mock_client.return_value.experiments.list_artifacts.side_effect = NotFound("not found")
 
         result = list_run_artifacts(run_id="missing")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+# ---------------------------------------------------------------------------
+# Registry helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_model(full_name="cat.schema.model"):
+    model = MagicMock()
+    parts = full_name.split(".")
+    model.full_name = full_name
+    model.name = parts[2] if len(parts) > 2 else full_name
+    model.catalog_name = parts[0] if len(parts) > 0 else None
+    model.schema_name = parts[1] if len(parts) > 1 else None
+    model.comment = "A test model"
+    model.owner = "user@example.com"
+    model.created_at = 1700000000000
+    model.created_by = "user@example.com"
+    model.updated_at = 1700000060000
+    model.updated_by = "user@example.com"
+    model.storage_location = "s3://bucket/path"
+    model.aliases = []
+    return model
+
+
+def _make_version(version=1, model_name="model", catalog="cat", schema="schema"):
+    v = MagicMock()
+    v.version = version
+    v.model_name = model_name
+    v.catalog_name = catalog
+    v.schema_name = schema
+    v.source = f"models:/m-{version}"
+    v.run_id = f"run-{version}"
+    status = MagicMock()
+    status.value = "READY"
+    v.status = status
+    v.comment = None
+    v.created_at = 1700000000000
+    v.created_by = "user@example.com"
+    v.updated_at = 1700000060000
+    v.updated_by = "user@example.com"
+    v.storage_location = "s3://bucket/versions"
+    v.aliases = []
+    return v
+
+
+# ---------------------------------------------------------------------------
+# Registered Model tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetRegisteredModel:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_get_success(self, mock_client):
+        model = _make_model("cat.schema.mymodel")
+        mock_client.return_value.registered_models.get.return_value = model
+
+        result = get_registered_model("cat.schema.mymodel")
+
+        assert result["full_name"] == "cat.schema.mymodel"
+        assert result["owner"] == "user@example.com"
+
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_not_found(self, mock_client):
+        mock_client.return_value.registered_models.get.side_effect = NotFound("not found")
+
+        result = get_registered_model("cat.schema.missing")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestListRegisteredModels:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_list_with_filters(self, mock_client):
+        models = [_make_model(f"cat.schema.model{i}") for i in range(3)]
+        mock_client.return_value.registered_models.list.return_value = iter(models)
+
+        result = list_registered_models(catalog_name="cat", schema_name="schema", max_results=10)
+
+        assert result["count"] == 3
+        call_kwargs = mock_client.return_value.registered_models.list.call_args.kwargs
+        assert call_kwargs["catalog_name"] == "cat"
+        assert call_kwargs["schema_name"] == "schema"
+
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_list_respects_max(self, mock_client):
+        models = [_make_model(f"cat.schema.model{i}") for i in range(10)]
+        mock_client.return_value.registered_models.list.return_value = iter(models)
+
+        result = list_registered_models(max_results=3)
+
+        assert result["count"] == 3
+
+
+class TestSearchRegisteredModels:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_search_legacy(self, mock_client):
+        model = MagicMock()
+        model.name = "legacy-model"
+        model.description = "A model"
+        model.creation_timestamp = 1700000000000
+        model.last_updated_timestamp = 1700000060000
+        model.user_id = "user"
+        model.tags = []
+        model.latest_versions = []
+        mock_client.return_value.model_registry.search_models.return_value = iter([model])
+
+        result = search_registered_models(filter_string="name LIKE '%legacy%'")
+
+        assert result["count"] == 1
+        assert result["models"][0]["name"] == "legacy-model"
+
+
+# ---------------------------------------------------------------------------
+# Model Version tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetModelVersion:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_get_version(self, mock_client):
+        v = _make_version(version=3)
+        mock_client.return_value.model_versions.get.return_value = v
+
+        result = get_model_version("cat.schema.model", version=3)
+
+        assert result["version"] == 3
+        assert result["status"] == "READY"
+        assert result["full_name"] == "cat.schema.model"
+
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_version_not_found(self, mock_client):
+        mock_client.return_value.model_versions.get.side_effect = ResourceDoesNotExist("not found")
+
+        result = get_model_version("cat.schema.model", version=999)
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestListModelVersions:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_list_versions(self, mock_client):
+        versions = [_make_version(i) for i in range(1, 4)]
+        mock_client.return_value.model_versions.list.return_value = iter(versions)
+
+        result = list_model_versions("cat.schema.model", max_results=10)
+
+        assert result["count"] == 3
+        assert result["full_name"] == "cat.schema.model"
+
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_list_model_not_found(self, mock_client):
+        mock_client.return_value.model_versions.list.side_effect = NotFound("not found")
+
+        result = list_model_versions("cat.schema.missing")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestGetModelVersionByAlias:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_get_by_alias(self, mock_client):
+        v = _make_version(version=5)
+        mock_client.return_value.model_versions.get_by_alias.return_value = v
+
+        result = get_model_version_by_alias("cat.schema.model", alias="champion")
+
+        assert result["version"] == 5
+
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_alias_not_found(self, mock_client):
+        mock_client.return_value.model_versions.get_by_alias.side_effect = NotFound("not found")
+
+        result = get_model_version_by_alias("cat.schema.model", alias="missing")
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestSetModelAlias:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_set_alias(self, mock_client):
+        mock_client.return_value.registered_models.set_alias.return_value = None
+
+        result = set_model_alias("cat.schema.model", alias="champion", version_num=5)
+
+        assert result["status"] == "set"
+        assert result["alias"] == "champion"
+        assert result["version_num"] == 5
+
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_set_alias_not_found(self, mock_client):
+        mock_client.return_value.registered_models.set_alias.side_effect = NotFound("not found")
+
+        result = set_model_alias("cat.schema.model", alias="x", version_num=999)
+
+        assert result["status"] == "NOT_FOUND"
+
+
+class TestDeleteModelAlias:
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_delete_alias(self, mock_client):
+        mock_client.return_value.registered_models.delete_alias.return_value = None
+
+        result = delete_model_alias("cat.schema.model", alias="old")
+
+        assert result["status"] == "deleted"
+
+    @mock.patch("databricks_tools_core.mlflow.registry.get_workspace_client")
+    def test_delete_alias_not_found(self, mock_client):
+        mock_client.return_value.registered_models.delete_alias.side_effect = NotFound("not found")
+
+        result = delete_model_alias("cat.schema.model", alias="missing")
 
         assert result["status"] == "NOT_FOUND"
