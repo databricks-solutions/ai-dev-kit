@@ -375,9 +375,7 @@ def list_mlflow_models(
         >>> list_mlflow_models(catalog_name="main", schema_name="ml")
         {"models": [...], "count": 5}
     """
-    return _list_registered_models(
-        catalog_name=catalog_name, schema_name=schema_name, max_results=max_results
-    )
+    return _list_registered_models(catalog_name=catalog_name, schema_name=schema_name, max_results=max_results)
 
 
 @mcp.tool(timeout=30)
@@ -406,9 +404,7 @@ def search_mlflow_models(
         >>> search_mlflow_models(filter_string="name LIKE '%churn%'")
         {"models": [...], "count": 2}
     """
-    return _search_registered_models(
-        filter_string=filter_string, max_results=max_results, order_by=order_by
-    )
+    return _search_registered_models(filter_string=filter_string, max_results=max_results, order_by=order_by)
 
 
 # ---------------------------------------------------------------------------
