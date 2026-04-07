@@ -1,5 +1,7 @@
 # Databricks Builder App
 
+> **Security Notice:** This application wraps Claude Code. Projects created within the app by different users are not strongly isolated from each other (this project doesn't implement solutions like Firecracker microVM or Docker to isolate Claude sessions from the app). Only grant access to users you trust.
+
 A web application that provides a Claude Code agent interface with integrated Databricks tools. Users interact with Claude through a chat interface, and the agent can execute SQL queries, manage pipelines, upload files, and more on their Databricks workspace.
 
 > **✅ Event Loop Fix Implemented**
