@@ -1,6 +1,5 @@
 {
   "name": "databricks-ai-dev-kit",
-  "version": "1.0.0",
   "description": "Databricks development toolkit with skills for data engineering, ML, and AI agents plus MCP tools for direct Databricks operations",
   "author": {
     "name": "Databricks Solutions"
