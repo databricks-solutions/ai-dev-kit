@@ -85,7 +85,7 @@ $script:Skills = @(
     "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-ai-functions",
     "databricks-python-sdk", "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
     "databricks-synthetic-data-gen", "databricks-unity-catalog", "databricks-unstructured-pdf-generation",
-    "databricks-vector-search", "databricks-zerobus-ingest", "skill-authoring", "spark-python-data-source"
+    "databricks-vector-search", "databricks-zerobus-ingest", "spark-python-data-source"
 )
 
 # MLflow skills (fetched from mlflow/skills repo)
@@ -101,7 +101,7 @@ $script:ApxSkills = @("databricks-app-apx")
 $ApxRawUrl = "https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # ─── Skill profiles ──────────────────────────────────────────
-$script:CoreSkills = @("databricks-config", "databricks-docs", "databricks-python-sdk", "databricks-unity-catalog", "skill-authoring")
+$script:CoreSkills = @("databricks-config", "databricks-docs", "databricks-python-sdk", "databricks-unity-catalog")
 
 $script:ProfileDataEngineer = @(
     "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
@@ -1100,7 +1100,7 @@ function Invoke-PromptCustomSkills {
 
     Write-Host ""
     Write-Host "  Select individual skills" -ForegroundColor White
-    Write-Host "  Core skills (config, docs, python-sdk, unity-catalog, skill-authoring) are always installed" -ForegroundColor DarkGray
+    Write-Host "  Core skills (config, docs, python-sdk, unity-catalog) are always installed" -ForegroundColor DarkGray
 
     $items = @(
         @{ Label = "Spark Pipelines";      Value = "databricks-spark-declarative-pipelines"; State = ($preselected -contains "databricks-spark-declarative-pipelines"); Hint = "SDP/LDP, CDC, SCD Type 2" }

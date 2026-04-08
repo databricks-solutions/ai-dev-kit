@@ -110,9 +110,6 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ### 📚 Reference
 - **databricks-docs** - Documentation index via llms.txt
 
-### 🛠️ Contributing
-- **skill-authoring** - Guided workflow for creating new Databricks skills for ai-dev-kit
-
 ## How It Works
 
 ```
@@ -158,7 +155,7 @@ For contributors creating new skills, ai-dev-kit provides a guided authoring wor
 
 ### Quick Start (Contributors)
 
-1. **Use the authoring skill** — Clone the repo and ask Claude: "Help me create a new skill for [feature]". The `skill-authoring` skill (in `databricks-skills/skill-authoring/`) will guide you through the full workflow: interview, draft, test, validate, register.
+1. **Use the authoring skill** — Clone the repo and ask Claude: "Help me create a new skill for [feature]". The `skill-authoring` skill (in `.claude/skills/skill-authoring/`) will guide you through the full workflow: interview, draft, test, validate, register.
 
 2. **Or start manually** — Copy the template and fill in the sections:
    ```bash

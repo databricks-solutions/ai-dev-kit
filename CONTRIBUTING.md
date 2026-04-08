@@ -92,7 +92,7 @@ Ensure your changes work with a live Databricks workspace.
 
 ### Recommended: Use the Authoring Skill
 
-The fastest way to create a high-quality skill is with the `skill-authoring` skill (available in `databricks-skills/skill-authoring/`). Ask Claude:
+The fastest way to create a high-quality skill is with the `skill-authoring` skill (available in `.claude/skills/skill-authoring/`). Ask Claude:
 
 > "Help me create a new skill for [Databricks feature]"
 
@@ -154,8 +154,8 @@ Before submitting a PR for a new skill, verify:
 ### Skill Format Reference
 
 For detailed format specifications, see:
-- `databricks-skills/skill-authoring/references/skill-format.md` — Frontmatter rules, progressive disclosure, section conventions
-- `databricks-skills/skill-authoring/references/test-format.md` — ground_truth.yaml and manifest.yaml schemas
+- `.claude/skills/skill-authoring/references/skill-format.md` — Frontmatter rules, progressive disclosure, section conventions
+- `.claude/skills/skill-authoring/references/test-format.md` — ground_truth.yaml and manifest.yaml schemas
 
 ### Evaluation & Optimization
 
