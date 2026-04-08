@@ -34,6 +34,8 @@ dependencies = [
   "fastmcp==3.1.1",
   # databricks-tools-core and databricks-mcp-server are bundled in packages/ directory
   "requests>=2.31.0",
+  # MLflow 3+ for Claude Code tracing (not mlflow[databricks] to avoid litellm)
+  "mlflow>=3.9.0",
   "sqlglot>=20.0.0",
   "sqlfluff>=3.0.0",
   "plutoprint==0.19.0",

@@ -1,0 +1,27 @@
+bundle:
+  name: databricks-builder-app
+
+variables:
+  lakebase_project_id:
+    description: "Lakebase project ID (lowercase, hyphens, 1-63 chars)"
+    default: "builder-app-db"
+
+resources:
+  postgres_projects:
+    builder_db:
+      project_id: ${var.lakebase_project_id}
+      display_name: "builder-app-db"
+      pg_version: 17
+      default_endpoint_settings:
+        autoscaling_limit_min_cu: 0.5
+        autoscaling_limit_max_cu: 2
+        suspend_timeout_duration: "300s"
+
+targets:
+  dev:
+    default: true
+    mode: development
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}

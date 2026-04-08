@@ -7,8 +7,8 @@ Databricks tools are loaded in-process from databricks-mcp-server using
 the SDK tool wrapper. Auth is handled via contextvars for multi-user support.
 
 MLflow Tracing:
-  This module integrates with MLflow for tracing Claude Code conversations.
-  Uses query() with a custom Stop hook for proper streaming + tracing.
+  Uses ClaudeSDKClient with mlflow.anthropic.autolog() for automatic tracing.
+  query() does NOT support tracing -- only ClaudeSDKClient does.
   See: https://mlflow.org/docs/latest/genai/tracing/integrations/listing/claude_code/
 
 NOTE: Fresh event loop workaround applied to fix claude-agent-sdk issue #462
@@ -29,7 +29,7 @@ from contextvars import copy_context
 from pathlib import Path
 from typing import AsyncIterator
 
-from claude_agent_sdk import ClaudeAgentOptions, query, HookMatcher
+from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, HookMatcher
 from claude_agent_sdk.types import (
   AssistantMessage,
   PermissionResultAllow,
@@ -122,92 +122,31 @@ def get_project_directory(project_id: str) -> Path:
   return _ensure_project_directory(project_id)
 
 
-def _get_mlflow_stop_hook(experiment_name: str | None = None):
-  """Get the MLflow Stop hook for tracing Claude Code conversations.
+def _setup_mlflow_autolog(experiment_name: str | None = None):
+  """Enable MLflow autolog for ClaudeSDKClient tracing.
 
-  This hook processes the transcript after the conversation ends and
-  creates an MLflow trace. Works with query() function unlike autolog
-  which only works with ClaudeSDKClient.
+  Must be called before creating a ClaudeSDKClient instance.
+  Only ClaudeSDKClient is supported -- query() cannot be traced.
 
   Args:
-      experiment_name: Optional MLflow experiment name
-
-  Returns:
-      The async hook function, or None if MLflow is not available
+      experiment_name: MLflow experiment name or numeric ID
   """
   try:
     import mlflow
-    from mlflow.claude_code.tracing import process_transcript, setup_mlflow
+    import mlflow.anthropic
 
-    # Set up MLflow tracking
     mlflow.set_tracking_uri('databricks')
     if experiment_name:
-      try:
-        # Support both experiment IDs (numeric) and experiment names (paths)
-        if experiment_name.isdigit():
-          mlflow.set_experiment(experiment_id=experiment_name)
-          logger.info(f'MLflow experiment set by ID: {experiment_name}')
-        else:
-          mlflow.set_experiment(experiment_name)
-          logger.info(f'MLflow experiment set to: {experiment_name}')
-      except Exception as e:
-        logger.warning(f'Could not set MLflow experiment: {e}')
-
-    async def mlflow_stop_hook(input_data: dict, tool_use_id: str | None, context) -> dict:
-      """Process transcript and create MLflow trace when conversation ends."""
-      try:
-        session_id = input_data.get('session_id')
-        transcript_path = input_data.get('transcript_path')
-
-        logger.info(f'MLflow Stop hook triggered: session={session_id}')
-
-        # Ensure MLflow is set up (tracking URI and experiment)
-        setup_mlflow()
-
-        # Process transcript and create trace
-        trace = process_transcript(transcript_path, session_id)
-
-        if trace:
-          logger.info(f'MLflow trace created: {trace.info.trace_id}')
-
-          # Add requested model name as trace tags
-          # The trace captures the response model (e.g., claude-opus-4-5-20251101)
-          # but we want to also record the Databricks endpoint name we requested
-          try:
-            client = mlflow.MlflowClient()
-            trace_id = trace.info.trace_id
-            requested_model = os.environ.get('ANTHROPIC_MODEL', 'databricks-claude-opus-4-5')
-            requested_model_mini = os.environ.get('ANTHROPIC_MODEL_MINI', 'databricks-claude-sonnet-4-5')
-            base_url = os.environ.get('ANTHROPIC_BASE_URL', '')
-
-            # Set tags to clarify the Databricks model endpoint used
-            client.set_trace_tag(trace_id, 'databricks.requested_model', requested_model)
-            client.set_trace_tag(trace_id, 'databricks.requested_model_mini', requested_model_mini)
-            if base_url:
-              client.set_trace_tag(trace_id, 'databricks.model_serving_endpoint', base_url)
-            client.set_trace_tag(trace_id, 'llm.provider', 'databricks-fmapi')
-
-            logger.info(f'Added Databricks model tags to trace {trace_id}: {requested_model}')
-          except Exception as tag_err:
-            logger.warning(f'Could not add model tags to trace: {tag_err}')
-        else:
-          logger.debug('MLflow trace creation returned None (possibly empty transcript)')
-
-        return {'continue': True}
-      except Exception as e:
-        logger.error(f'Error in MLflow Stop hook: {e}', exc_info=True)
-        # Return continue=True to not interrupt the conversation
-        return {'continue': True}
-
-    logger.info(f'MLflow tracing hook configured: {mlflow.get_tracking_uri()}')
-    return mlflow_stop_hook
-
-  except ImportError as e:
-    logger.debug(f'MLflow not available: {e}')
-    return None
+      if experiment_name.isdigit():
+        mlflow.set_experiment(experiment_id=experiment_name)
+      else:
+        mlflow.set_experiment(experiment_name)
+    mlflow.anthropic.autolog()
+    logger.info(f'MLflow autolog enabled for experiment: {experiment_name}')
+  except ImportError:
+    logger.debug('MLflow not available, tracing disabled')
   except Exception as e:
-    logger.warning(f'Failed to create MLflow stop hook: {e}')
-    return None
+    logger.warning(f'Could not enable MLflow autolog: {e}')
 
 
 def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancelled_fn, mlflow_experiment=None):
@@ -216,8 +155,7 @@ def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancell
   This function runs in a separate thread with a fresh event loop to avoid
   the subprocess transport issues in FastAPI/uvicorn contexts.
 
-  Uses query() for proper streaming, with a custom MLflow Stop hook for tracing.
-  The Stop hook processes the transcript after the conversation ends.
+  Uses ClaudeSDKClient for proper streaming with MLflow autolog tracing.
 
   Args:
       message: User message to send to the agent
@@ -234,50 +172,28 @@ def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancell
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # Add MLflow Stop hook for tracing if experiment is configured
+    # Enable MLflow autolog before creating the client
     exp_name = mlflow_experiment or os.environ.get('MLFLOW_EXPERIMENT_NAME')
     if exp_name:
-      mlflow_hook = _get_mlflow_stop_hook(exp_name)
-      if mlflow_hook:
-        # Add the hook to options
-        if options.hooks is None:
-          options.hooks = {}
-        if 'Stop' not in options.hooks:
-          options.hooks['Stop'] = []
-        options.hooks['Stop'].append(HookMatcher(hooks=[mlflow_hook]))
-        logger.info('MLflow Stop hook added to agent options')
+      _setup_mlflow_autolog(exp_name)
 
-    async def run_query():
-      """Run agent using query() for proper streaming."""
-      # Create prompt generator in the fresh event loop context
-      async def prompt_generator():
-        yield {'type': 'user', 'message': {'role': 'user', 'content': message}}
-
+    async def run_client():
+      """Run agent using ClaudeSDKClient for streaming + MLflow tracing."""
       try:
         msg_count = 0
-        async for msg in query(prompt=prompt_generator(), options=options):
-          msg_count += 1
-          msg_type = type(msg).__name__
-          logger.info(f"[AGENT DEBUG] Received message #{msg_count}: {msg_type}")
+        async with ClaudeSDKClient(options=options) as client:
+          await client.query(message)
+          async for msg in client.receive_response():
+            msg_count += 1
+            msg_type = type(msg).__name__
+            logger.info(f"[AGENT] Message #{msg_count}: {msg_type}")
 
-          # Log more details for specific message types
-          if hasattr(msg, 'content'):
-            content = msg.content
-            if isinstance(content, list):
-              block_types = [type(b).__name__ for b in content]
-              logger.info(f"[AGENT DEBUG]   Content blocks: {block_types}")
-          if hasattr(msg, 'is_error') and msg.is_error:
-            logger.error(f"[AGENT DEBUG]   is_error=True")
-          if hasattr(msg, 'session_id'):
-            logger.info(f"[AGENT DEBUG]   session_id={msg.session_id}")
-
-          # Check for cancellation before processing each message
-          if is_cancelled_fn():
-            logger.info("Agent cancelled by user request")
-            result_queue.put(('cancelled', None))
-            return
-          result_queue.put(('message', msg))
-        logger.info(f"[AGENT DEBUG] query() loop completed normally after {msg_count} messages")
+            if is_cancelled_fn():
+              logger.info("Agent cancelled by user request")
+              result_queue.put(('cancelled', None))
+              return
+            result_queue.put(('message', msg))
+        logger.info(f"[AGENT] Completed after {msg_count} messages")
       except asyncio.CancelledError:
         logger.warning("Agent query was cancelled (asyncio.CancelledError)")
         result_queue.put(('error', Exception("Agent query cancelled - likely due to stream timeout or connection issue")))
@@ -294,7 +210,7 @@ def _run_agent_in_fresh_loop(message, options, result_queue, context, is_cancell
         result_queue.put(('done', None))
 
     try:
-      loop.run_until_complete(run_query())
+      loop.run_until_complete(run_client())
     finally:
       loop.close()
 
@@ -355,7 +271,7 @@ async def stream_agent_response(
 ) -> AsyncIterator[dict]:
   """Stream Claude agent response with all event types.
 
-  Uses query() with custom MLflow Stop hook for tracing.
+  Uses ClaudeSDKClient with mlflow.anthropic.autolog() for tracing.
   Yields normalized event dicts for the frontend.
 
   Args:

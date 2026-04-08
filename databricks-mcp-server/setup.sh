@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PARENT_DIR=$(dirname ${SCRIPT_DIR})
+PARENT_DIR="$(dirname "${SCRIPT_DIR}")"
 TOOLS_CORE_DIR="${PARENT_DIR}/databricks-tools-core"
 echo AI Dev Kit directory: $PARENT_DIR
 echo MCP Server directory: $SCRIPT_DIR

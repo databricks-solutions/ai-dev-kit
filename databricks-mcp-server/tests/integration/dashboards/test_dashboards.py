@@ -7,9 +7,7 @@ Tests:
 
 import json
 import logging
-import tempfile
 import uuid
-from pathlib import Path
 
 import pytest
 
@@ -62,8 +60,8 @@ def clean_dashboards(current_user: str):
 
 
 @pytest.fixture(scope="module")
-def simple_dashboard_file(tmp_path_factory) -> str:
-    """Create a simple dashboard JSON file for testing."""
+def simple_dashboard_json() -> str:
+    """Create a simple dashboard JSON for testing."""
     dashboard = {
         "datasets": [
             {
@@ -106,11 +104,7 @@ def simple_dashboard_file(tmp_path_factory) -> str:
             }
         ]
     }
-    # Write to a temp file
-    tmp_dir = tmp_path_factory.mktemp("dashboards")
-    file_path = tmp_dir / "simple_dashboard.json"
-    file_path.write_text(json.dumps(dashboard))
-    return str(file_path)
+    return json.dumps(dashboard)
 
 
 @pytest.fixture(scope="module")
@@ -193,7 +187,7 @@ class TestDashboardLifecycle:
     def test_create_dashboard(
         self,
         current_user: str,
-        simple_dashboard_file: str,
+        simple_dashboard_json: str,
         warehouse_id: str,
         cleanup_dashboards,
     ):
@@ -205,7 +199,7 @@ class TestDashboardLifecycle:
             action="create_or_update",
             display_name=dashboard_name,
             parent_path=parent_path,
-            dashboard_file_path=simple_dashboard_file,
+            serialized_dashboard=simple_dashboard_json,
             warehouse_id=warehouse_id,
         )
 
@@ -240,7 +234,7 @@ class TestDashboardLifecycle:
     def test_create_and_delete_dashboard(
         self,
         current_user: str,
-        simple_dashboard_file: str,
+        simple_dashboard_json: str,
         warehouse_id: str,
     ):
         """Should create and delete a dashboard, verifying each step."""
@@ -252,7 +246,7 @@ class TestDashboardLifecycle:
             action="create_or_update",
             display_name=dashboard_name,
             parent_path=parent_path,
-            dashboard_file_path=simple_dashboard_file,
+            serialized_dashboard=simple_dashboard_json,
             warehouse_id=warehouse_id,
         )
 
@@ -286,11 +280,10 @@ class TestDashboardUpdate:
     def test_update_dashboard(
         self,
         current_user: str,
-        simple_dashboard_file: str,
+        simple_dashboard_json: str,
         warehouse_id: str,
         clean_dashboards,
         cleanup_dashboards,
-        tmp_path,
     ):
         """Should create a dashboard, update it, and verify changes."""
         parent_path = f"/Workspace/Users/{current_user}/ai_dev_kit_test/dashboards"
@@ -300,7 +293,7 @@ class TestDashboardUpdate:
             action="create_or_update",
             display_name=DASHBOARD_UPDATE,
             parent_path=parent_path,
-            dashboard_file_path=simple_dashboard_file,
+            serialized_dashboard=simple_dashboard_json,
             warehouse_id=warehouse_id,
         )
 
@@ -357,16 +350,12 @@ class TestDashboardUpdate:
             ]
         }
 
-        # Write updated dashboard to temp file
-        updated_file = tmp_path / "updated_dashboard.json"
-        updated_file.write_text(json.dumps(updated_dashboard))
-
         # Update the dashboard
         update_result = manage_dashboard(
             action="create_or_update",
             display_name=DASHBOARD_UPDATE,
             parent_path=parent_path,
-            dashboard_file_path=str(updated_file),
+            serialized_dashboard=json.dumps(updated_dashboard),
             warehouse_id=warehouse_id,
         )
 
@@ -397,7 +386,7 @@ class TestDashboardPublish:
     def test_publish_and_unpublish_dashboard(
         self,
         current_user: str,
-        simple_dashboard_file: str,
+        simple_dashboard_json: str,
         warehouse_id: str,
         clean_dashboards,
         cleanup_dashboards,
@@ -410,7 +399,7 @@ class TestDashboardPublish:
             action="create_or_update",
             display_name=DASHBOARD_PUBLISH,
             parent_path=parent_path,
-            dashboard_file_path=simple_dashboard_file,
+            serialized_dashboard=simple_dashboard_json,
             warehouse_id=warehouse_id,
         )
 

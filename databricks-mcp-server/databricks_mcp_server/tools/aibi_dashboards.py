@@ -8,8 +8,7 @@ Consolidated into 1 tool:
 """
 
 import json
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from databricks_tools_core.aibi_dashboards import (
     create_or_update_dashboard as _create_or_update_dashboard,
@@ -37,13 +36,10 @@ def manage_dashboard(
     # For create_or_update:
     display_name: Optional[str] = None,
     parent_path: Optional[str] = None,
-    dashboard_file_path: Optional[str] = None,
+    serialized_dashboard: Optional[Union[str, dict]] = None,
     warehouse_id: Optional[str] = None,
     # For create_or_update publish option:
     publish: bool = True,
-    genie_space_id: Optional[str] = None,
-    catalog: Optional[str] = None,
-    schema: Optional[str] = None,
     # For get/delete/publish/unpublish:
     dashboard_id: Optional[str] = None,
     # For publish:
@@ -52,19 +48,15 @@ def manage_dashboard(
     """Manage AI/BI dashboards: create, update, get, list, delete, publish.
 
     CRITICAL: Before calling this tool to create or edit a dashboard, you MUST:
-    0. Read the complete example at databricks-skills/databricks-aibi-dashboards/4-examples.md
-       to understand the exact JSON structure required. If you are not familiar with the
-       dashboard skill, first read the full skill (SKILL.md), then the widget specifications
-       (1-widget-specifications.md, 2-advanced-widget-specifications.md), and finally the
-       example. Sending valid JSON is critical - invalid structure will break the dashboard.
+    0. Review the databricks-aibi-dashboards skill to understand widget definitions.
+       You must EXACTLY follow the JSON structure detailed in the skill.
     1. Call get_table_stats_and_schema() to get table schemas for your queries.
     2. Call execute_sql() to TEST EVERY dataset query before using in dashboard.
     If you skip validation, widgets WILL show errors!
 
     Actions:
-    - create_or_update: Create/update dashboard from local JSON file.
-      Requires display_name, parent_path, dashboard_file_path, warehouse_id.
-      Optional: genie_space_id (link Genie), catalog/schema (defaults for unqualified tables).
+    - create_or_update: Create/update dashboard from JSON.
+      Requires display_name, parent_path, serialized_dashboard, warehouse_id.
       publish=True (default) auto-publishes after create.
       Returns: {success, dashboard_id, path, url, published, error}.
     - get: Get dashboard details. Requires dashboard_id.
@@ -79,42 +71,30 @@ def manage_dashboard(
     - unpublish: Unpublish dashboard. Requires dashboard_id.
       Returns: {status, dashboard_id}.
 
-Workflow for create_or_update:
-    1. Write dashboard JSON to a local file (e.g., ./my_dashboard.json)
-    2. Test all SQL queries via execute_sql()
-    3. Call manage_dashboard(action="create_or_update", dashboard_file_path="./my_dashboard.json", ...)
-    4. To update: edit the local file, then call manage_dashboard again
-
-    See databricks-aibi-dashboards skill for full widget structure reference."""
+    Widget structure rules (for create_or_update):
+    - queries is TOP-LEVEL SIBLING of spec (NOT inside spec, NOT named_queries)
+    - fields[].name MUST match encodings fieldName exactly
+    - Use datasetName (camelCase, not dataSetName)
+    - Versions: counter/table/filter=2, bar/line/pie=3
+    - Layout: 6-column grid
+    - Filter types: filter-multi-select, filter-single-select, filter-date-range-picker
+    - Text widget uses textbox_spec (no spec block)"""
     act = action.lower()
 
     if act == "create_or_update":
-        if not all([display_name, parent_path, dashboard_file_path, warehouse_id]):
-            return {"error": "create_or_update requires: display_name, parent_path, dashboard_file_path, warehouse_id"}
+        if not all([display_name, parent_path, serialized_dashboard, warehouse_id]):
+            return {"error": "create_or_update requires: display_name, parent_path, serialized_dashboard, warehouse_id"}
 
-        # Read dashboard JSON from local file
-        file_path = Path(dashboard_file_path)
-        if not file_path.exists():
-            return {"error": f"Dashboard file not found: {dashboard_file_path}"}
-
-        try:
-            dashboard_content = file_path.read_text(encoding="utf-8")
-            # Validate it's valid JSON
-            json.loads(dashboard_content)
-        except json.JSONDecodeError as e:
-            return {"error": f"Invalid JSON in dashboard file: {e}"}
-        except Exception as e:
-            return {"error": f"Failed to read dashboard file: {e}"}
+        # MCP deserializes JSON params, so serialized_dashboard may arrive as a dict
+        if isinstance(serialized_dashboard, dict):
+            serialized_dashboard = json.dumps(serialized_dashboard)
 
         result = _create_or_update_dashboard(
             display_name=display_name,
             parent_path=parent_path,
-            serialized_dashboard=dashboard_content,
+            serialized_dashboard=serialized_dashboard,
             warehouse_id=warehouse_id,
             publish=publish,
-            genie_space_id=genie_space_id,
-            catalog=catalog,
-            schema=schema,
         )
 
         # Track resource on successful create/update
