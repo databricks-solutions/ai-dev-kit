@@ -47,7 +47,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-bundles databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-execution-compute databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-bundles databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-execution-compute databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest skill-authoring spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -94,6 +94,7 @@ get_skill_description() {
         "databricks-unstructured-pdf-generation") echo "Generate synthetic PDFs for RAG" ;;
         "databricks-vector-search") echo "Vector Search - endpoints, indexes, and queries for RAG" ;;
         "databricks-zerobus-ingest") echo "Zerobus Ingest - gRPC data ingestion into Delta tables" ;;
+        "skill-authoring") echo "Guided workflow for creating new Databricks skills for ai-dev-kit" ;;
         # MLflow skills (from mlflow/skills repo)
         "agent-evaluation") echo "End-to-end agent evaluation workflow" ;;
         "analyze-mlflow-chat-session") echo "Debug multi-turn conversations" ;;
@@ -132,6 +133,7 @@ get_skill_extra_files() {
         "databricks-spark-structured-streaming") echo "checkpoint-best-practices.md kafka-streaming.md merge-operations.md multi-sink-writes.md stateful-operations.md stream-static-joins.md stream-stream-joins.md streaming-best-practices.md trigger-and-cost-optimization.md" ;;
         "databricks-vector-search") echo "index-types.md end-to-end-rag.md" ;;
         "databricks-zerobus-ingest") echo "1-setup-and-authentication.md 2-python-client.md 3-multilanguage-clients.md 4-protobuf-schema.md 5-operations-and-limits.md" ;;
+        "skill-authoring") echo "references/skill-format.md references/test-format.md" ;;
         *) echo "" ;;
     esac
 }
