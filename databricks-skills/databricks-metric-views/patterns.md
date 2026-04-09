@@ -14,8 +14,8 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Product sales metrics"
   source: catalog.schema.sales
+  comment: "Product sales metrics"
   dimensions:
     - name: Product Name
       expr: product_name
@@ -98,8 +98,8 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Efficiency and per-unit metrics"
   source: catalog.schema.transactions
+  comment: "Efficiency and per-unit metrics"
   dimensions:
     - name: Department
       expr: department_name
@@ -176,8 +176,8 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Sales analytics with customer and product dimensions"
   source: catalog.schema.fact_sales
+  comment: "Sales analytics with customer and product dimensions"
 
   joins:
     - name: customer
@@ -329,8 +329,8 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "TPC-H Orders KPIs - demo metric view"
   source: samples.tpch.orders
+  comment: "TPC-H Orders KPIs - demo metric view"
   filter: o_orderdate > '1990-01-01'
 
   dimensions:
