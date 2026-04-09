@@ -445,7 +445,7 @@ sqlglot==30.0.3
     # via databricks-builder-app (pyproject.toml)
 sqlparse==0.5.5
     # via mlflow-skinny
-sse-starlette==3.3.3
+sse-starlette==3.3.4
     # via mcp
 starlette==1.0.0
     # via
