@@ -88,6 +88,51 @@ dbutils.notebook.exit("success")
         logger.warning(f"Failed to cleanup test notebook: {e}")
 
 
+@pytest.fixture(scope="module")
+def failing_notebook_path() -> str:
+    """
+    Create a notebook that deliberately fails.
+
+    Used for testing repair_run functionality.
+    Returns the workspace path to the notebook.
+    """
+    w = get_workspace_client()
+    user = w.current_user.me()
+    notebook_path = f"/Users/{user.user_name}/test_jobs/test_failing_notebook"
+
+    notebook_content = """# Databricks notebook source
+# Test notebook that deliberately fails for repair_run tests
+raise Exception("Deliberate failure for repair_run test")
+"""
+
+    logger.info(f"Creating failing test notebook: {notebook_path}")
+
+    try:
+        parent_folder = "/".join(notebook_path.split("/")[:-1])
+        w.workspace.mkdirs(parent_folder)
+
+        content_b64 = base64.b64encode(notebook_content.encode("utf-8")).decode("utf-8")
+        w.workspace.import_(
+            path=notebook_path,
+            format=ImportFormat.SOURCE,
+            language=Language.PYTHON,
+            content=content_b64,
+            overwrite=True,
+        )
+        logger.info(f"Failing test notebook created: {notebook_path}")
+    except Exception as e:
+        logger.error(f"Failed to create failing test notebook: {e}")
+        raise
+
+    yield notebook_path
+
+    try:
+        logger.info(f"Cleaning up failing test notebook: {notebook_path}")
+        w.workspace.delete(notebook_path)
+    except Exception as e:
+        logger.warning(f"Failed to cleanup failing test notebook: {e}")
+
+
 @pytest.fixture(scope="function")
 def cleanup_job():
     """

@@ -121,6 +121,113 @@ def run_job_now(
         raise JobError(f"Failed to start run for job {job_id}: {str(e)}", job_id=job_id)
 
 
+def repair_run(
+    run_id: int,
+    rerun_all_failed_tasks: Optional[bool] = None,
+    rerun_dependent_tasks: Optional[bool] = None,
+    rerun_tasks: Optional[List[str]] = None,
+    latest_repair_id: Optional[int] = None,
+    jar_params: Optional[List[str]] = None,
+    notebook_params: Optional[Dict[str, str]] = None,
+    python_params: Optional[List[str]] = None,
+    spark_submit_params: Optional[List[str]] = None,
+    python_named_params: Optional[Dict[str, str]] = None,
+    pipeline_params: Optional[Dict[str, Any]] = None,
+    sql_params: Optional[Dict[str, str]] = None,
+    dbt_commands: Optional[List[str]] = None,
+) -> int:
+    """
+    Repair a failed job run by re-running only failed or specified tasks.
+
+    Tasks are re-run as part of the original job run using current job and
+    task settings. Use this instead of run_job_now to avoid re-running
+    tasks that already succeeded.
+
+    Args:
+        run_id: The job run ID to repair (must not be in progress)
+        rerun_all_failed_tasks: If True, rerun all tasks that failed
+        rerun_dependent_tasks: If True, also rerun tasks that depend on failed tasks
+        rerun_tasks: List of specific task keys to rerun
+        latest_repair_id: ID of the latest repair to ensure sequential repairs
+        jar_params: Parameters for JAR tasks
+        notebook_params: Parameters for notebook tasks
+        python_params: Parameters for Python tasks
+        spark_submit_params: Parameters for spark-submit tasks
+        python_named_params: Named parameters for Python tasks
+        pipeline_params: Parameters for pipeline tasks
+        sql_params: Parameters for SQL tasks
+        dbt_commands: Commands for dbt tasks
+
+    Returns:
+        Repair ID (integer) for tracking the repair
+
+    Raises:
+        JobError: If repair fails to start
+
+    Example:
+        >>> repair_id = repair_run(run_id=456, rerun_all_failed_tasks=True)
+        >>> print(f"Started repair {repair_id}")
+    """
+    w = get_workspace_client()
+
+    try:
+        # Build kwargs for SDK call
+        kwargs: Dict[str, Any] = {"run_id": run_id}
+
+        # Add repair-specific parameters
+        if rerun_all_failed_tasks is not None:
+            kwargs["rerun_all_failed_tasks"] = rerun_all_failed_tasks
+        if rerun_dependent_tasks is not None:
+            kwargs["rerun_dependent_tasks"] = rerun_dependent_tasks
+        if rerun_tasks:
+            kwargs["rerun_tasks"] = rerun_tasks
+        if latest_repair_id is not None:
+            kwargs["latest_repair_id"] = latest_repair_id
+
+        # Add optional task parameters
+        if jar_params:
+            kwargs["jar_params"] = jar_params
+        if notebook_params:
+            kwargs["notebook_params"] = notebook_params
+        if python_params:
+            kwargs["python_params"] = python_params
+        if spark_submit_params:
+            kwargs["spark_submit_params"] = spark_submit_params
+        if python_named_params:
+            kwargs["python_named_params"] = python_named_params
+        if pipeline_params:
+            kwargs["pipeline_params"] = pipeline_params
+        if sql_params:
+            kwargs["sql_params"] = sql_params
+        if dbt_commands:
+            kwargs["dbt_commands"] = dbt_commands
+
+        # Trigger repair - SDK returns Wait[Run] object
+        # Wait.response is a RepairRunResponse with repair_id field
+        response = w.jobs.repair_run(**kwargs)
+
+        # Extract repair_id from response
+        repair_id = None
+        if hasattr(response, "response") and hasattr(response.response, "repair_id"):
+            repair_id = response.response.repair_id
+        elif hasattr(response, "repair_id"):
+            repair_id = response.repair_id
+        else:
+            # Fallback: try to get it from as_dict()
+            response_dict = response.as_dict() if hasattr(response, "as_dict") else {}
+            repair_id = response_dict.get("repair_id")
+
+        if repair_id is None:
+            raise JobError(f"Failed to extract repair_id from response for run {run_id}", run_id=run_id)
+
+        return repair_id
+
+    except JobError:
+        raise
+    except Exception as e:
+        raise JobError(f"Failed to repair run {run_id}: {str(e)}", run_id=run_id)
+
+
 def get_run(run_id: int) -> Dict[str, Any]:
     """
     Get detailed run status and information.
