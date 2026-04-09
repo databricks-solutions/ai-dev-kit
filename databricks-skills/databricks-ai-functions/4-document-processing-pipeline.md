@@ -13,11 +13,11 @@ When processing documents with AI Functions, apply this order of preference for 
 | Stage | Preferred function | Use `ai_query` when... |
 |---|---|---|
 | Parse binary docs (PDF, DOCX, images) | `ai_parse_document` | Need image-level reasoning |
-| Extract flat fields from text | `ai_extract` | Schema has nested arrays |
-| Classify document type or status | `ai_classify` | More than 20 categories |
+| Extract structured fields (flat or nested) | `ai_extract` v2 (JSON schema) | >128 fields, >7 levels, or custom model needed |
+| Classify document type or status | `ai_classify` v2 (2–500 labels) | Need custom model control |
 | Score item similarity / matching | `ai_similarity` | Need cross-document reasoning |
 | Summarize long sections | `ai_summarize` | — |
-| Extract nested JSON (e.g. line items) | `ai_query` with `responseFormat` | (This is the intended use case) |
+| Extreme complexity / custom model / multimodal | `ai_query` with `responseFormat` | >128 fields, >7 nesting levels, custom endpoints, or image input |
 
 ---
 
@@ -79,8 +79,8 @@ Each logical step in your document workflow maps to a `@dlt.table` stage. Data f
 
 ```
 [Landing Volume]  →  Stage 1: ai_parse_document
-                  →  Stage 2: ai_classify (document type)
-                  →  Stage 3: ai_extract (flat fields) + ai_query (nested JSON)
+                  →  Stage 2: ai_classify v2 (document type)
+                  →  Stage 3: ai_extract v2 (flat + nested fields)
                   →  Stage 4: ai_similarity (item matching)
                   →  Stage 5: Final Delta output table
 ```
@@ -90,7 +90,7 @@ Each logical step in your document workflow maps to a `@dlt.table` stage. Data f
 ```python
 import dlt
 import yaml
-from pyspark.sql.functions import expr, col, from_json
+from pyspark.sql.functions import expr, col
 
 CFG      = yaml.safe_load(open("/Workspace/path/to/config.yml"))
 ENDPOINT = CFG["models"]["default"]
@@ -116,7 +116,7 @@ def raw_parsed():
 
 
 # ── Stage 2: Classify document type ──────────────────────────────────────────
-# Preferred: ai_classify — cheap, no endpoint selection
+# Preferred: ai_classify v2 — cheap, no endpoint selection, up to 500 labels
 
 @dlt.table(comment="Document type classification")
 def classified_docs():
@@ -124,13 +124,29 @@ def classified_docs():
         dlt.read("raw_parsed")
         .withColumn(
             "doc_type",
-            expr("ai_classify(text_blocks, array('invoice', 'purchase_order', 'receipt', 'contract', 'other'))")
+            expr("""
+                ai_classify(
+                    text_blocks,
+                    '["invoice", "purchase_order", "receipt", "contract", "other"]'
+                ):response[0]
+            """)
         )
     )
 
 
 # ── Stage 3a: Flat field extraction ──────────────────────────────────────────
-# Preferred: ai_extract for flat fields (vendor, date, total)
+# Preferred: ai_extract v2 — typed schema improves accuracy
+
+HEADER_SCHEMA = '''{
+    "type": "object",
+    "properties": {
+        "invoice_number": {"type": "string"},
+        "vendor_name": {"type": "string", "description": "Company or supplier name"},
+        "issue_date": {"type": "string", "description": "Date in dd/mm/yyyy format"},
+        "total_amount": {"type": "number"},
+        "tax_id": {"type": "string", "description": "Tax ID, digits only"}
+    }
+}'''
 
 @dlt.table(comment="Flat header fields extracted from documents")
 def extracted_flat():
@@ -139,40 +155,59 @@ def extracted_flat():
         .filter("doc_type = 'invoice'")
         .withColumn(
             "header",
-            expr("ai_extract(text_blocks, array('invoice_number', 'vendor_name', 'issue_date', 'total_amount', 'tax_id'))")
+            expr(f"ai_extract(text_blocks, '{HEADER_SCHEMA.strip()}')")
         )
         .select("path", "doc_type", "text_blocks", col("header"))
     )
 
 
-# ── Stage 3b: Nested JSON extraction (last resort: ai_query) ─────────────────
-# Use ai_query only because line_items is a nested array — ai_extract can't handle it
+# ── Stage 3b: Nested field extraction ────────────────────────────────────────
+# ai_extract v2 handles nested arrays (up to 7 levels, 128 fields)
 
-@dlt.table(comment="Nested line items extracted — ai_query used for array schema only")
+LINE_ITEMS_SCHEMA = '''{
+    "type": "object",
+    "properties": {
+        "line_items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "item_code": {"type": "string"},
+                    "description": {"type": "string"},
+                    "quantity": {"type": "number"},
+                    "unit_price": {"type": "number"},
+                    "total": {"type": "number"}
+                }
+            }
+        }
+    }
+}'''
+
+@dlt.table(comment="Nested line items extracted using ai_extract v2")
 def extracted_line_items():
     return (
         dlt.read("extracted_flat")
         .withColumn(
-            "ai_response",
-            expr(f"""
-                ai_query(
-                    '{ENDPOINT}',
-                    concat('{PROMPT.strip()}', '\\n\\nDocument text:\\n', LEFT(text_blocks, 6000)),
-                    responseFormat => '{{"type":"json_object"}}',
-                    failOnError     => false
-                )
-            """)
+            "line_items_raw",
+            expr(f"ai_extract(text_blocks, '{LINE_ITEMS_SCHEMA.strip()}')")
         )
-        .withColumn(
-            "line_items",
-            from_json(
-                col("ai_response.response"),
-                "STRUCT<line_items:ARRAY<STRUCT<item_code:STRING, description:STRING, "
-                "quantity:DOUBLE, unit_price:DOUBLE, total:DOUBLE>>>"
-            )
+        .select(
+            "path", "doc_type", "header",
+            expr("line_items_raw:response.line_items").alias("line_items"),
+            expr("line_items_raw:error_message").alias("extraction_error"),
         )
-        .select("path", "doc_type", "header", "line_items", col("ai_response.error").alias("extraction_error"))
     )
+
+# ── Alternative: ai_query (use when exceeding ai_extract v2 limits) ─────────
+# If the schema exceeds 128 fields or 7 nesting levels, or you need a custom
+# model endpoint or multimodal input, fall back to ai_query:
+#
+# .withColumn("ai_response", expr(f"""
+#     ai_query('{ENDPOINT}',
+#              concat('{PROMPT.strip()}', '\\n\\nDocument text:\\n', LEFT(text_blocks, 6000)),
+#              responseFormat => '{{"type":"json_object"}}',
+#              failOnError     => false)
+# """))
 
 
 # ── Stage 4: Similarity matching ─────────────────────────────────────────────
@@ -188,7 +223,7 @@ def vendor_matched():
         extracted.crossJoin(vendors)
         .withColumn(
             "name_similarity",
-            expr("ai_similarity(header.vendor_name, vendor_name)")
+            expr("ai_similarity(header:response.vendor_name, vendor_name)")
         )
         .filter("name_similarity > 0.80")
         .orderBy("name_similarity", ascending=False)
@@ -208,11 +243,11 @@ def processed_docs():
         .selectExpr(
             "path",
             "doc_type",
-            "header.invoice_number",
-            "header.vendor_name",
-            "header.issue_date",
-            "header.total_amount",
-            "line_items.line_items AS items",
+            "header:response.invoice_number",
+            "header:response.vendor_name",
+            "header:response.issue_date",
+            "header:response.total_amount",
+            "line_items AS items",
         )
     )
 
@@ -463,7 +498,7 @@ with mlflow.start_run():
 ## Tips
 
 1. **Parse first, enrich second** — always run `ai_parse_document` as the first stage. Feed its text output to task-specific functions; never pass raw binary to `ai_query`.
-2. **Flat fields → `ai_extract`; nested arrays → `ai_query`** — this is the clearest decision boundary.
+2. **Structured extraction (flat or nested) → `ai_extract` v2; extreme complexity → `ai_query`** — `ai_extract` v2 handles nested arrays (up to 7 levels, 128 fields). Fall back to `ai_query` only for custom models, multimodal input, or schemas exceeding these limits.
 3. **`failOnError => false` is mandatory in batch** — write errors to a sidecar `_errors` table rather than crashing the pipeline.
 4. **Truncate before sending to `ai_query`** — use `LEFT(text, 6000)` or chunk long documents to stay within context window limits.
 5. **Prompts belong in `config.yml`** — never hardcode prompt strings in pipeline code. A prompt change should be a config change, not a code change.

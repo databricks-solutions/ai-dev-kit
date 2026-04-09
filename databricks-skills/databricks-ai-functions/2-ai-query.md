@@ -6,7 +6,7 @@
 
 ## When to Use `ai_query`
 
-- Output schema has **nested arrays or deeply nested STRUCTs** (e.g., `itens: [{codigo, descricao, qtde}]`)
+- Output schema exceeds **128 fields or 7 nesting levels** (beyond `ai_extract` v2 limits). For most nested extraction including line-item arrays, prefer `ai_extract` v2 with a JSON schema — see [1-task-functions.md](1-task-functions.md#ai_extract)
 - Calling a **custom Model Serving endpoint** (your own fine-tuned model)
 - **Multimodal input** — passing binary image files via `files =>`
 - **Cross-document reasoning** — prompt includes content from multiple sources
