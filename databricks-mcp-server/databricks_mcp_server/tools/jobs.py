@@ -231,25 +231,22 @@ def manage_job_runs(
         return {"run_id": run_id_result}
 
     elif act == "repair":
-        try:
-            repair_id_result = _repair_run(
-                run_id=run_id,
-                rerun_all_failed_tasks=rerun_all_failed_tasks,
-                rerun_dependent_tasks=rerun_dependent_tasks,
-                rerun_tasks=rerun_tasks,
-                latest_repair_id=latest_repair_id,
-                jar_params=jar_params,
-                notebook_params=notebook_params,
-                python_params=python_params,
-                spark_submit_params=spark_submit_params,
-                python_named_params=python_named_params,
-                pipeline_params=pipeline_params,
-                sql_params=sql_params,
-                dbt_commands=dbt_commands,
-            )
-            return {"repair_id": repair_id_result, "run_id": run_id}
-        except Exception as e:
-            return {"error": f"Failed to repair run {run_id}: {e}", "run_id": run_id}
+        repair_id_result = _repair_run(
+            run_id=run_id,
+            rerun_all_failed_tasks=rerun_all_failed_tasks,
+            rerun_dependent_tasks=rerun_dependent_tasks,
+            rerun_tasks=rerun_tasks,
+            latest_repair_id=latest_repair_id,
+            jar_params=jar_params,
+            notebook_params=notebook_params,
+            python_params=python_params,
+            spark_submit_params=spark_submit_params,
+            python_named_params=python_named_params,
+            pipeline_params=pipeline_params,
+            sql_params=sql_params,
+            dbt_commands=dbt_commands,
+        )
+        return {"repair_id": repair_id_result, "run_id": run_id}
 
     elif act == "get":
         return _get_run(run_id=run_id)
