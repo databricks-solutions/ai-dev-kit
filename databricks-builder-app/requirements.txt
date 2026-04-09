@@ -312,7 +312,7 @@ psycopg2-binary==2.9.11
     # via databricks-builder-app (pyproject.toml)
 py-key-value-aio==0.4.4
     # via fastmcp
-pyarrow==18.1.0
+pyarrow==23.0.1
     # via
     #   databricks-builder-app (pyproject.toml)
     #   mlflow
