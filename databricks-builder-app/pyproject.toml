@@ -45,7 +45,7 @@ dependencies = [
   "websockets>=15.0.1",
   "pyarrow==18.1.0",
   "markupsafe==3.0.2",
-  "rich==14.0.0",
+  "rich==14.3.3",
   "protobuf>=3.12.0,<5",
   "pandas==2.3.0",
   "flask==3.1.0",
