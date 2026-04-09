@@ -44,10 +44,10 @@ def _build_yaml_block(
     """
     lines = [f"version: {version}"]
 
+    lines.append(f"source: {source}")
+
     if comment:
         lines.append(f'comment: "{comment}"')
-
-    lines.append(f"source: {source}")
 
     if filter_expr:
         lines.append(f"filter: {filter_expr}")
