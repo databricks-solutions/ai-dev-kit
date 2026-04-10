@@ -6,7 +6,6 @@ that each MCP request executes under the calling user's Databricks identity.
 
 import os
 
-from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -71,17 +70,11 @@ async def health(request: Request) -> JSONResponse:
 
 # Build the streamable-HTTP Starlette app from the MCP server.
 # All tools are already registered via side-effect imports in server.py.
+# The returned app already includes FastMCP's middleware and lifespan.
 mcp_app = mcp.http_app(path="/mcp", transport="streamable-http")
 
-# Combine MCP routes with our health check.
-app = Starlette(
-    routes=[
-        Route("/", health),
-        *mcp_app.routes,
-    ],
-    middleware=mcp_app.middleware,
-    lifespan=mcp_app.router.lifespan_context,
-)
+# Add our health check route to the existing MCP app.
+mcp_app.routes.insert(0, Route("/", health))
 
 # Wrap with auth middleware (outermost layer).
-app = OnBehalfOfUserMiddleware(app)
+app = OnBehalfOfUserMiddleware(mcp_app)
