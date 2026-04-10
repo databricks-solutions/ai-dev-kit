@@ -16,6 +16,7 @@ from databricks_tools_core.jobs import (
     update_job as _update_job,
     delete_job as _delete_job,
     run_job_now as _run_job_now,
+    repair_run as _repair_run,
     get_run as _get_run,
     get_run_output as _get_run_output,
     cancel_run as _cancel_run,
@@ -193,6 +194,10 @@ def manage_job_runs(
     sql_params: Dict[str, str] = None,
     dbt_commands: List[str] = None,
     queue: Dict[str, Any] = None,
+    rerun_all_failed_tasks: bool = None,
+    rerun_dependent_tasks: bool = None,
+    rerun_tasks: List[str] = None,
+    latest_repair_id: int = None,
     active_only: bool = False,
     completed_only: bool = False,
     limit: int = 25,
@@ -202,11 +207,11 @@ def manage_job_runs(
     timeout: int = 3600,
     poll_interval: int = 10,
 ) -> Dict[str, Any]:
-    """Manage job runs: run_now, get, get_output, cancel, list, wait.
+    """Manage job runs: run_now, repair, get, get_output, cancel, list, wait.
 
-    run_now: requires job_id, returns {run_id}. get/get_output/cancel/wait: require run_id.
-    list: filter by job_id/active_only/completed_only. wait: blocks until complete (timeout default 3600s).
-    Returns: run_now={run_id}, get=run details, get_output=logs+results, cancel={status}, list={items}, wait=full result."""
+    run_now: requires job_id, returns {run_id}. repair: requires run_id, reruns failed tasks (rerun_all_failed_tasks=True) or specific tasks (rerun_tasks=["task_key"]).
+    get/get_output/cancel/wait: require run_id. list: filter by job_id/active_only/completed_only. wait: blocks until complete (timeout default 3600s).
+    Returns: run_now={run_id}, repair={repair_id, run_id}, get=run details, get_output=logs+results, cancel={status}, list={items}, wait=full result."""
     act = action.lower()
 
     if act == "run_now":
@@ -224,6 +229,24 @@ def manage_job_runs(
             queue=queue,
         )
         return {"run_id": run_id_result}
+
+    elif act == "repair":
+        repair_id_result = _repair_run(
+            run_id=run_id,
+            rerun_all_failed_tasks=rerun_all_failed_tasks,
+            rerun_dependent_tasks=rerun_dependent_tasks,
+            rerun_tasks=rerun_tasks,
+            latest_repair_id=latest_repair_id,
+            jar_params=jar_params,
+            notebook_params=notebook_params,
+            python_params=python_params,
+            spark_submit_params=spark_submit_params,
+            python_named_params=python_named_params,
+            pipeline_params=pipeline_params,
+            sql_params=sql_params,
+            dbt_commands=dbt_commands,
+        )
+        return {"repair_id": repair_id_result, "run_id": run_id}
 
     elif act == "get":
         return _get_run(run_id=run_id)
@@ -252,4 +275,4 @@ def manage_job_runs(
         result = _wait_for_run(run_id=run_id, timeout=timeout, poll_interval=poll_interval)
         return result.to_dict()
 
-    raise ValueError(f"Invalid action: '{action}'. Valid: run_now, get, get_output, cancel, list, wait")
+    raise ValueError(f"Invalid action: '{action}'. Valid: run_now, repair, get, get_output, cancel, list, wait")
