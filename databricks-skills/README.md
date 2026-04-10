@@ -1,10 +1,12 @@
-# Databricks Skills for Claude Code
+# Databricks Skills for AI Coding Assistants
 
-Skills that teach Claude Code how to work effectively with Databricks - providing patterns, best practices, and code examples that work with Databricks MCP tools.
+Skills that teach AI coding assistants (Claude Code, Cursor, Kiro, etc.) how to work effectively with Databricks - providing patterns, best practices, and code examples that work with Databricks MCP tools.
 
 ## Installation
 
-Run from your **project root** (the directory where you want `.claude/skills` created).
+Run from your **project root** (the directory where you want skills created).
+
+> **Skill directories by tool:** `.claude/skills/` (Claude Code), `.cursor/skills/` (Cursor), `.kiro/skills/` (Kiro), `.github/skills/` (Copilot), `.gemini/skills/` (Gemini CLI), `.agents/skills/` (Codex). The unified installer (`install.sh` / `install.ps1`) handles this automatically.
 
 ### From this repository (local script)
 
@@ -57,16 +59,22 @@ curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie --profile prod
 ```
 
-`--install-to-genie` uploads the tree under `./.claude/skills` to the workspace (requires the `databricks` CLI).
+`--install-to-genie` uploads the tree under `./skills` to the workspace (requires the `databricks` CLI).
 
-This creates `.claude/skills/` and downloads all skills. Claude Code loads them automatically.
+This creates a skills directory and downloads all skills. Your AI coding assistant loads them automatically.
 - **Databricks skills** are downloaded from this repository
 - **MLflow skills** are fetched dynamically from [github.com/mlflow/skills](https://github.com/mlflow/skills)
 
-**Manual install:**
+**Manual install (example for Claude Code):**
 ```bash
 mkdir -p .claude/skills
 cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
+```
+
+**Manual install (example for Kiro):**
+```bash
+mkdir -p .kiro/skills
+cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .kiro/skills/
 ```
 
 ## Available Skills
@@ -113,18 +121,25 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ## How It Works
 
 ```
-┌────────────────────────────────────────────────┐
-│  .claude/skills/     +    .claude/mcp.json     │
-│  (Knowledge)               (Actions)           │
-│                                                │
-│  Skills teach HOW    +    MCP does it          │
-│  ↓                        ↓                    │
-│  Claude Code learns patterns and executes      │
-└────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  <tool>/skills/     +    MCP config                     │
+│  (Knowledge)              (Actions)                     │
+│                                                         │
+│  Skills teach HOW    +    MCP does it                   │
+│  ↓                        ↓                             │
+│  Your AI assistant learns patterns and executes         │
+│                                                         │
+│  Tool          Skills dir          MCP config           │
+│  Claude Code   .claude/skills/     .mcp.json            │
+│  Cursor        .cursor/skills/     .cursor/mcp.json     │
+│  Kiro          .kiro/skills/       .kiro/settings/mcp.json │
+│  Copilot       .github/skills/     .vscode/mcp.json     │
+│  Gemini CLI    .gemini/skills/     .gemini/settings.json │
+└─────────────────────────────────────────────────────────┘
 ```
 
 **Example:** User says "Create a sales dashboard"
-1. Claude loads `databricks-aibi-dashboards` skill → learns validation workflow
+1. The assistant loads `databricks-aibi-dashboards` skill → learns validation workflow
 2. Calls `get_table_stats_and_schema()` → gets schemas
 3. Calls `execute_sql()` → tests queries
 4. Calls `manage_dashboard(action="create_or_update")` → deploys
@@ -132,7 +147,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 
 ## Custom Skills
 
-Create your own in `.claude/skills/my-skill/SKILL.md`:
+Create your own in your tool's skills directory (e.g., `.claude/skills/my-skill/SKILL.md` or `.kiro/skills/my-skill/SKILL.md`):
 
 ```markdown
 ---
@@ -151,7 +166,7 @@ description: "What this teaches"
 
 ## Troubleshooting
 
-**Skills not loading?** Check `.claude/skills/` exists and each skill has `SKILL.md`
+**Skills not loading?** Check that your tool's skills directory exists and each skill has `SKILL.md`
 
 **Install fails?** Run `bash install_skills.sh` or check write permissions
 

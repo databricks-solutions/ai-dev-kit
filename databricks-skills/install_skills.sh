@@ -2,8 +2,8 @@
 #
 # Databricks Skills Installer
 #
-# Installs Databricks skills for Claude Code into your project.
-# These skills teach Claude how to work with Databricks using MCP tools.
+# Installs Databricks skills for AI coding assistants (Claude Code, Kiro, etc.) into your project.
+# These skills teach your assistant how to work with Databricks using MCP tools.
 #
 # Usage:
 #   # Install all skills (Databricks + MLflow + APX)
@@ -17,7 +17,9 @@
 #   ./install_skills.sh databricks-bundles agent-evaluation  # Install specific skills
 #   ./install_skills.sh --mlflow-version v1.0.0      # Pin MLflow skills version
 #   ./install_skills.sh --local                      # Install Databricks skills from local directory
-#   ./install_skills.sh --install-to-genie           # Install then upload ./.claude/skills to workspace (Genie Code / Assistant)
+#   ./install_skills.sh --tool kiro                   # Install to .kiro/skills/ for Kiro
+#   ./install_skills.sh --tool kiro --local           # Install from local for Kiro
+#   ./install_skills.sh --install-to-genie           # Install then upload skills to workspace (Genie Code / Assistant)
 #   ./install_skills.sh --install-to-genie --profile prod --local
 #   ./install_skills.sh --list                       # List available skills
 #   ./install_skills.sh --help                       # Show help
@@ -175,7 +177,7 @@ get_mlflow_skill_extra_files() {
 
 # Show usage
 show_help() {
-    echo -e "${BLUE}Databricks Skills Installer for Claude Code${NC}"
+    echo -e "${BLUE}Databricks Skills Installer for AI Coding Assistants${NC}"
     echo ""
     echo "Usage:"
     echo "  ./install_skills.sh [options] [skill1 skill2 ...]"
@@ -185,7 +187,9 @@ show_help() {
     echo "  --list, -l              List all available skills"
     echo "  --all, -a               Install all skills (default if no skills specified)"
     echo "  --local                 Install from local files instead of downloading"
-    echo "  --install-to-genie      After install, upload ./.claude/skills to workspace"
+    echo "  --tool <name>           Target tool: claude (default), kiro, cursor, copilot, codex, gemini"
+    echo "                          Sets the skills directory (e.g., --tool kiro → .kiro/skills)"
+    echo "  --install-to-genie      After install, upload skills to workspace"
     echo "                          /Users/<you>/.assistant/skills for Genie Code (uses cwd; requires databricks CLI)"
     echo "  --profile <name>        Databricks config profile for workspace upload (default: DEFAULT or \$DATABRICKS_CONFIG_PROFILE)"
     echo "  --mlflow-version <ref>  Pin MLflow skills to specific version/branch/tag (default: main)"
@@ -199,6 +203,8 @@ show_help() {
     echo "  ./install_skills.sh --mlflow-version v1.0.0  # Pin MLflow skills version"
     echo "  ./install_skills.sh --apx-version v1.0.0    # Pin APX skills version"
     echo "  ./install_skills.sh --local                  # Install all from local directory"
+    echo "  ./install_skills.sh --tool kiro               # Install to .kiro/skills/ for Kiro"
+    echo "  ./install_skills.sh --tool kiro --local       # Install from local for Kiro"
     echo "  ./install_skills.sh --install-to-genie       # Install all, then upload to workspace for Genie Code"
     echo "  ./install_skills.sh --install-to-genie --profile prod  # Same with explicit Databricks CLI profile"
     echo "  ./install_skills.sh --list                   # List available skills"
@@ -552,6 +558,22 @@ while [ $# -gt 0 ]; do
             INSTALL_FROM_LOCAL=true
             shift
             ;;
+        --tool)
+            if [ -z "$2" ] || [ "${2:0:1}" = "-" ]; then
+                echo -e "${RED}Error: --tool requires a tool name (claude, kiro, cursor, copilot, codex, gemini)${NC}"
+                exit 1
+            fi
+            case "$2" in
+                claude)  SKILLS_DIR=".claude/skills" ;;
+                kiro)    SKILLS_DIR=".kiro/skills" ;;
+                cursor)  SKILLS_DIR=".cursor/skills" ;;
+                copilot) SKILLS_DIR=".github/skills" ;;
+                codex)   SKILLS_DIR=".agents/skills" ;;
+                gemini)  SKILLS_DIR=".gemini/skills" ;;
+                *) echo -e "${RED}Unknown tool: $2. Use: claude, kiro, cursor, copilot, codex, gemini${NC}"; exit 1 ;;
+            esac
+            shift 2
+            ;;
         --install-to-genie|--deploy-to-assistant)
             INSTALL_TO_GENIE=true
             shift
@@ -612,7 +634,7 @@ fi
 
 # Header
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║        Databricks Skills Installer for Claude Code         ║${NC}"
+echo -e "${BLUE}║     Databricks Skills Installer for AI Coding Assistants   ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -627,7 +649,7 @@ if [ ! -d ".git" ] && [ ! -f "pyproject.toml" ] && [ ! -f "package.json" ] && [ 
     fi
 fi
 
-# Create .claude/skills directory if it doesn't exist
+# Create skills directory if it doesn't exist
 if [ ! -d "$SKILLS_DIR" ]; then
     echo -e "${GREEN}Creating $SKILLS_DIR directory...${NC}"
     mkdir -p "$SKILLS_DIR"
