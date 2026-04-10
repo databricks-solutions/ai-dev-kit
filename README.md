@@ -203,6 +203,10 @@ curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main
 
 Combine `--profile`, `--local`, specific skill names, `--mlflow-version`, etc. as needed; see `./databricks-skills/install_skills.sh --help` or [databricks-skills/README.md](databricks-skills/README.md).
 
+**From a Databricks notebook** (no local terminal needed):
+
+Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py) into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them to your workspace using the Databricks SDK. This works on any compute, including serverless.
+
 **Skill modification or Custom Skill**
 
 After the script successfully installs the skills to your workspace, you may find the skills under `/Workspace/Users/<your_user_name>/.assistant/skills`.
