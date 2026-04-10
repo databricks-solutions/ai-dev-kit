@@ -39,7 +39,7 @@ jobs:
           fi
 
           # Check if there's already an open PR for this
-          EXISTING_PR=$(gh pr list --base tilt/main --head main --state open --json number --jq '.[0].number')
+          EXISTING_PR=$(gh pr list --base tilt/main --head main --state open --json number --jq '.[0].number // empty')
           if [ -n "$EXISTING_PR" ]; then
             echo "PR #$EXISTING_PR already exists. Skipping."
             exit 0
