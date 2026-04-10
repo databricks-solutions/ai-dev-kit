@@ -1,0 +1,3 @@
+./databricks-tools-core
+./databricks-mcp-server
+uvicorn
