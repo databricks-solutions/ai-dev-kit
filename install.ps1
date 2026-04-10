@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, and Antigravity.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Kiro.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -569,6 +569,8 @@ function Invoke-DetectTools {
     $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
     $hasAntigravity = ($null -ne (Get-Command antigravity -ErrorAction SilentlyContinue)) -or
                       (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe")
+    $hasKiro = ($null -ne (Get-Command kiro -ErrorAction SilentlyContinue)) -or
+               (Test-Path "$env:LOCALAPPDATA\Programs\kiro\Kiro.exe")
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -576,9 +578,10 @@ function Invoke-DetectTools {
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
     $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
+    $kiroState = $hasKiro; $kiroHint = if ($hasKiro) { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasKiro) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -595,6 +598,7 @@ function Invoke-DetectTools {
         @{ Label = "OpenAI Codex";   Value = "codex";        State = $codexState;        Hint = $codexHint }
         @{ Label = "Gemini CLI";     Value = "gemini";       State = $geminiState;       Hint = $geminiHint }
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
+        @{ Label = "Kiro";           Value = "kiro";         State = $kiroState;         Hint = $kiroHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1164,6 +1168,13 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".agents\skills"
                 }
             }
+            "kiro" {
+                if ($script:Scope -eq "global") {
+                    $dirs += Join-Path $env:USERPROFILE ".kiro\skills"
+                } else {
+                    $dirs += Join-Path $BaseDir ".kiro\skills"
+                }
+            }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1588,6 +1599,14 @@ function Write-McpConfigs {
                 }
                 Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\antigravity\mcp_config.json")
                 Write-Ok "Antigravity MCP config"
+            }
+            "kiro" {
+                if ($script:Scope -eq "global") {
+                    Write-McpJson (Join-Path $env:USERPROFILE ".kiro\settings\mcp.json")
+                } else {
+                    Write-McpJson (Join-Path $BaseDir ".kiro\settings\mcp.json")
+                }
+                Write-Ok "Kiro MCP config"
             }
         }
     }

@@ -2,7 +2,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, and Antigravity.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Kiro.
 #
 # Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
@@ -503,6 +503,7 @@ detect_tools() {
     local has_copilot=false
     local has_gemini=false
     local has_antigravity=false
+    local has_kiro=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
@@ -510,19 +511,21 @@ detect_tools() {
     { [ -d "/Applications/Visual Studio Code.app" ] || command -v code >/dev/null 2>&1; } && has_copilot=true
     { command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/local/gemini" ]; } && has_gemini=true
     { [ -d "/Applications/Antigravity.app" ] || command -v antigravity >/dev/null 2>&1; } && has_antigravity=true
+    command -v kiro >/dev/null 2>&1 && has_kiro=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" kiro_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" kiro_hint="not found"
     [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
     [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
     [ "$has_codex" = true ]         && codex_state="on"         && codex_hint="detected"
     [ "$has_copilot" = true ]       && copilot_state="on"       && copilot_hint="detected"
     [ "$has_gemini" = true ]        && gemini_state="on"        && gemini_hint="detected"
     [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
+    [ "$has_kiro" = true ]          && kiro_state="on"          && kiro_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_kiro" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
@@ -539,6 +542,7 @@ detect_tools() {
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
             "Gemini CLI|gemini|${gemini_state}|${gemini_hint}" \
             "Antigravity|antigravity|${antigravity_state}|${antigravity_hint}" \
+            "Kiro|kiro|${kiro_state}|${kiro_hint}" \
         )
     else
         # Silent: use detected defaults
@@ -549,6 +553,7 @@ detect_tools() {
         [ "$has_codex" = true ]         && tools="${tools:+$tools }codex"
         [ "$has_gemini" = true ]        && tools="${tools:+$tools }gemini"
         [ "$has_antigravity" = true ]   && tools="${tools:+$tools }antigravity"
+        [ "$has_kiro" = true ]          && tools="${tools:+$tools }kiro"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -1096,6 +1101,13 @@ install_skills() {
                     dirs+=("$base_dir/.agents/skills")
                 fi
                 ;;
+            kiro)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.kiro/skills")
+                else
+                    dirs+=("$base_dir/.kiro/skills")
+                fi
+                ;;
         esac
     done
 
@@ -1485,6 +1497,14 @@ write_mcp_configs() {
                 fi
                 write_gemini_mcp_json "$HOME/.gemini/antigravity/mcp_config.json"
                 ok "Antigravity MCP config"
+                ;;
+            kiro)
+                if [ "$SCOPE" = "global" ]; then
+                    write_mcp_json "$HOME/.kiro/settings/mcp.json"
+                else
+                    write_mcp_json "$base_dir/.kiro/settings/mcp.json"
+                fi
+                ok "Kiro MCP config"
                 ;;
         esac
     done
