@@ -131,25 +131,30 @@ def _configure_tools() -> None:
     2. Annotate the remaining tools with ``readOnlyHint`` /
        ``destructiveHint`` so MCP clients can categorise them.
 
-    Accesses the FastMCP tool registry synchronously via
-    ``_local_provider._components`` so this works safely at module-load
-    time even when an event loop is already running.
+    Uses ``mcp.local_provider`` (public) to access the tool registry
+    synchronously so this works at module-load time even when an asyncio
+    event loop is already running.  ``_components`` is an internal dict
+    keyed by component key — the only sync path to enumerate tools in
+    FastMCP 3.1.  If a future FastMCP version exposes a sync listing
+    method, prefer that instead.
     """
     from fastmcp.tools.tool import Tool as FunctionTool
 
-    components = mcp._local_provider._components
+    provider = mcp.local_provider
 
     # --- Phase 1: restrict to allowlist ---
-    to_remove = [
-        v.name for v in components.values()
+    # De-duplicate names to avoid double-removal if multiple versions exist.
+    to_remove = {
+        v.name for v in provider._components.values()
         if isinstance(v, FunctionTool) and v.name not in _ALLOWED_TOOLS
-    ]
+    }
     for name in to_remove:
-        mcp._local_provider.remove_tool(name)
+        provider.remove_tool(name)
 
     # --- Phase 2: annotate remaining tools ---
     remaining = [
-        v for v in components.values() if isinstance(v, FunctionTool)
+        v for v in provider._components.values()
+        if isinstance(v, FunctionTool)
     ]
     n_read = n_destructive = n_write = 0
     for tool in remaining:
