@@ -503,6 +503,7 @@ detect_tools() {
     local has_copilot=false
     local has_gemini=false
     local has_antigravity=false
+	local has_opencode=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
@@ -510,19 +511,21 @@ detect_tools() {
     { [ -d "/Applications/Visual Studio Code.app" ] || command -v code >/dev/null 2>&1; } && has_copilot=true
     { command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/local/gemini" ]; } && has_gemini=true
     { [ -d "/Applications/Antigravity.app" ] || command -v antigravity >/dev/null 2>&1; } && has_antigravity=true
+	command -v opencode >/dev/null 2>&1 && has_opencode=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" opencode_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" opencode_hint="not found"
     [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
     [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
     [ "$has_codex" = true ]         && codex_state="on"         && codex_hint="detected"
     [ "$has_copilot" = true ]       && copilot_state="on"       && copilot_hint="detected"
     [ "$has_gemini" = true ]        && gemini_state="on"        && gemini_hint="detected"
     [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
+	[ "$has_opencode" = true ]      && opencode_state="on"      && opencode_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_opencode" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
@@ -539,6 +542,7 @@ detect_tools() {
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
             "Gemini CLI|gemini|${gemini_state}|${gemini_hint}" \
             "Antigravity|antigravity|${antigravity_state}|${antigravity_hint}" \
+			"Opencode|opencode|${opencode_state}|${opencode_hint}" \
         )
     else
         # Silent: use detected defaults
@@ -549,6 +553,7 @@ detect_tools() {
         [ "$has_codex" = true ]         && tools="${tools:+$tools }codex"
         [ "$has_gemini" = true ]        && tools="${tools:+$tools }gemini"
         [ "$has_antigravity" = true ]   && tools="${tools:+$tools }antigravity"
+		[ "$has_opencode" = true ]      && tools="${tools:+$tools }opencode"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -1096,6 +1101,13 @@ install_skills() {
                     dirs+=("$base_dir/.agents/skills")
                 fi
                 ;;
+			opencode)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.config/opencode/skills")
+                else
+                    dirs+=("$base_dir/.opencode/skills")
+                fi
+                ;;
         esac
     done
 
@@ -1274,6 +1286,42 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
       "command": "$VENV_PYTHON",
       "args": ["$MCP_ENTRY"],
       "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
+    }
+  }
+}
+EOF
+}
+
+write_opencode_mcp_json() {
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+
+    # Backup existing file before any modifications
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
+
+    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
+import json, sys
+try:
+    with open('$path') as f: cfg = json.load(f)
+except: cfg = {'\$schema' : 'https://opencode.ai/config.json'}
+cfg.setdefault('mcp', {})['databricks'] = {'type':'local', 'command': ['$VENV_PYTHON','$MCP_ENTRY'], 'enabled': True, 'environment': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
+    fi
+
+    cat > "$path" << EOF
+{
+  "\$schema" : "https://opencode.ai/config.json",
+  "mcp": {
+    "databricks": {
+      "type": "local",
+      "command": ["$VENV_PYTHON","$MCP_ENTRY"],
+      "enabled": true,
+      "environment": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
     }
   }
 }
@@ -1486,6 +1534,14 @@ write_mcp_configs() {
                 write_gemini_mcp_json "$HOME/.gemini/antigravity/mcp_config.json"
                 ok "Antigravity MCP config"
                 ;;
+			opencode)
+                if [ "$SCOPE" = "global" ]; then
+                    write_opencode_mcp_json "$HOME/.config/opencode/opencode.json"
+                else
+                    write_opencode_mcp_json "$base_dir/opencode.json"
+                fi
+                ok "Opencode CLI MCP config"
+                ;;
         esac
     done
 }
@@ -1531,6 +1587,10 @@ summary() {
         fi
         if echo "$TOOLS" | grep -q antigravity; then
             msg "${step}. Open your project in Antigravity to use Databricks skills and MCP tools"
+            step=$((step + 1))
+        fi
+		if echo "$TOOLS" | grep -q onpencode; then
+            msg "${step}. Open your project in Opencode to use Databricks skills and MCP tools"
             step=$((step + 1))
         fi
         msg "${step}. Open your project in your tool of choice"
