@@ -1714,6 +1714,10 @@ function Show-Summary {
         Write-Msg "$step. Open your project in Antigravity to use Databricks skills and MCP tools"
         $step++
     }
+	if ($script:Tools -match 'opencode') {
+        Write-Msg "$step. Open your project in Opencode to use Databricks skills and MCP tools"
+        $step++
+    }
     Write-Msg "$step. Open your project in your tool of choice"
     $step++
     Write-Msg "$step. Try: `"List my SQL warehouses`""
