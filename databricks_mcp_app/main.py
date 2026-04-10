@@ -100,25 +100,6 @@ _ALLOWED_TOOLS = {
 }
 
 
-def _restrict_tools() -> None:
-    """Remove every tool not in the allowlist."""
-    loop = asyncio.new_event_loop()
-    try:
-        tools = loop.run_until_complete(mcp.list_tools())
-        removed = []
-        for tool in tools:
-            if tool.name not in _ALLOWED_TOOLS:
-                loop.run_until_complete(mcp.remove_tool(tool.name))
-                removed.append(tool.name)
-    finally:
-        loop.close()
-    logger.info("Kept %d tools, removed %d: %s",
-                len(_ALLOWED_TOOLS), len(removed), ", ".join(sorted(removed)))
-
-
-_restrict_tools()
-
-
 # ---------------------------------------------------------------------------
 # MCP tool annotations — categorise tools for client UIs (Claude, etc.)
 # ---------------------------------------------------------------------------
@@ -144,49 +125,61 @@ _DESTRUCTIVE_TOOLS = {
 }
 
 
-def _annotate_tools() -> None:
-    """Set MCP tool annotations so client UIs can categorise tools.
+def _configure_tools() -> None:
+    """Restrict the tool surface to the allowlist and set annotations.
 
-    ``list_tools()`` returns ``FunctionTool`` objects whose ``annotations``
-    attribute is a mutable reference — changes persist in the FastMCP
-    registry and are reflected in subsequent ``tools/list`` responses.
+    1. Remove every tool not in ``_ALLOWED_TOOLS``.
+    2. Annotate the remaining tools with ``readOnlyHint`` /
+       ``destructiveHint`` so MCP clients can categorise them.
+
+    Uses ``asyncio.new_event_loop()`` because this runs at module-load
+    time before uvicorn starts the main event loop.
     """
     loop = asyncio.new_event_loop()
     try:
-        tools = loop.run_until_complete(mcp.list_tools())
-        for tool in tools:
+        # --- Phase 1: restrict to allowlist ---
+        all_tools = loop.run_until_complete(mcp.list_tools())
+        removed = []
+        for tool in all_tools:
+            if tool.name not in _ALLOWED_TOOLS:
+                loop.run_until_complete(mcp.remove_tool(tool.name))
+                removed.append(tool.name)
+
+        # --- Phase 2: annotate remaining tools ---
+        kept_tools = loop.run_until_complete(mcp.list_tools())
+        n_read = n_destructive = n_write = 0
+        for tool in kept_tools:
             if tool.name in _READ_ONLY_TOOLS:
                 tool.annotations = ToolAnnotations(
                     readOnlyHint=True,
                     destructiveHint=False,
                     openWorldHint=True,
                 )
+                n_read += 1
             elif tool.name in _DESTRUCTIVE_TOOLS:
                 tool.annotations = ToolAnnotations(
                     readOnlyHint=False,
                     destructiveHint=True,
                     openWorldHint=True,
                 )
+                n_destructive += 1
             else:
-                # Write tools that aren't destructive (create/update/execute)
                 tool.annotations = ToolAnnotations(
                     readOnlyHint=False,
                     destructiveHint=False,
                     openWorldHint=True,
                 )
+                n_write += 1
     finally:
         loop.close()
 
     logger.info(
-        "Annotated %d tools (%d read-only, %d destructive, %d write)",
-        len(tools),
-        len(_READ_ONLY_TOOLS),
-        len(_DESTRUCTIVE_TOOLS),
-        len(tools) - len(_READ_ONLY_TOOLS) - len(_DESTRUCTIVE_TOOLS),
+        "Kept %d tools (%d read-only, %d destructive, %d write), removed %d",
+        len(kept_tools), n_read, n_destructive, n_write, len(removed),
     )
 
 
-_annotate_tools()
+_configure_tools()
 
 
 # ---------------------------------------------------------------------------
