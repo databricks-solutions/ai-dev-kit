@@ -569,7 +569,7 @@ function Invoke-DetectTools {
     $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
     $hasAntigravity = ($null -ne (Get-Command antigravity -ErrorAction SilentlyContinue)) -or
                       (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe")
-	$hasOpencode  = $null -ne (Get-Command opencode -ErrorAction SilentlyContinue)
+    $hasOpencode  = $null -ne (Get-Command opencode -ErrorAction SilentlyContinue)
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -577,7 +577,7 @@ function Invoke-DetectTools {
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
     $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
-	$opencodeState  = $hasOpencode;  $opencodeHint  = if ($hasOpencode)  { "detected" } else { "not found" }
+    $opencodeState  = $hasOpencode;  $opencodeHint  = if ($hasOpencode)  { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
     if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasOpencode) {
@@ -597,7 +597,7 @@ function Invoke-DetectTools {
         @{ Label = "OpenAI Codex";   Value = "codex";        State = $codexState;        Hint = $codexHint }
         @{ Label = "Gemini CLI";     Value = "gemini";       State = $geminiState;       Hint = $geminiHint }
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
-		@{ Label = "OpenCode";    Value = "opencode";  State = $opencodeState;  Hint = $opencodeHint }
+        @{ Label = "OpenCode";    Value = "opencode";  State = $opencodeState;  Hint = $opencodeHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1167,7 +1167,7 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".agents\skills"
                 }
             }
-			"opencode"  { $dirs += Join-Path $BaseDir ".opencode\skills" }
+            "opencode"  { $dirs += Join-Path $BaseDir ".opencode\skills" }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1545,7 +1545,7 @@ function Write-OpenCodeMcpJson {
     }
 
     if ($existing) {
-		if (-not $existing.'$schema') {
+        if (-not $existing.'$schema') {
             $existing | Add-Member -NotePropertyName "$schema" -NotePropertyValue ([PSCustomObject]@{}) -Force
         }
         if (-not $existing.mcp) {
@@ -1553,28 +1553,28 @@ function Write-OpenCodeMcpJson {
         }
         $dbEntry = [PSCustomObject]@{
             type = "local"
-			command    = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
+            command    = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
             environment     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
-			enabled = $false
+            enabled = $false
         }
         $existing.mcp | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
         $existing  = $existing | ConvertTo-Json -Depth 10
-		$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
-		[System.IO.File]::WriteAllLines($Path, $existing, $Utf8NoBomEncoding)
+        $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+        [System.IO.File]::WriteAllLines($Path, $existing, $Utf8NoBomEncoding)
     } else {
-		$config = [PSCustomObject]@{
-			'$schema' = 'https://opencode.ai/config.json'
-			mcp = @{
-				databricks = @{
-					type    = 'local'
-					command = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
-					environment     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
-					enabled = $false
-				}
-			}
-		} | ConvertTo-Json -Depth 3
-		$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
-		[System.IO.File]::WriteAllLines($Path, $config, $Utf8NoBomEncoding)
+        $config = [PSCustomObject]@{
+            '$schema' = 'https://opencode.ai/config.json'
+            mcp = @{
+                databricks = @{
+                    type    = 'local'
+                    command = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
+                    environment     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
+                    enabled = $false
+                }
+            }
+        } | ConvertTo-Json -Depth 3
+        $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+        [System.IO.File]::WriteAllLines($Path, $config, $Utf8NoBomEncoding)
     }
 }
 
@@ -1650,15 +1650,15 @@ function Write-McpConfigs {
                 Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\antigravity\mcp_config.json")
                 Write-Ok "Antigravity MCP config"
             }
-			"opencode" {
+            "opencode" {
                 if ($script:Scope -eq "global") {
                     Write-OpenCodeMcpJson (Join-Path $env:USERPROFILE ".config\opencode\opencode.json")
                 } else {
                     Write-OpenCodeMcpJson (Join-Path $BaseDir "opencode.json")
-					
+                    
                 }
                 Write-Ok "OpenCode CLI MCP config"
-				Write-Warn "OpenCode: MCP servers are disabled by default."
+                Write-Warn "OpenCode: MCP servers are disabled by default."
                 Write-Msg "  Enable in: opencode -> /mcps -> Toggle 'databricks' by pressing spacebar"
             }
         }
