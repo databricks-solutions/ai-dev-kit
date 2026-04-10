@@ -74,7 +74,7 @@ async def health(request: Request) -> JSONResponse:
 mcp_app = mcp.http_app(path="/mcp", transport="streamable-http")
 
 # Add our health check route to the existing MCP app.
-mcp_app.routes.insert(0, Route("/", health))
+mcp_app.routes.insert(0, Route("/", health, methods=["GET"]))
 
 # Wrap with auth middleware (outermost layer).
 app = OnBehalfOfUserMiddleware(mcp_app)
