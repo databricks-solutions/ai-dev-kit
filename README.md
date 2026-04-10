@@ -58,11 +58,13 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
   - [Cursor](https://cursor.com)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
   - [Antigravity](https://antigravity.google)
+  - [Codex](https://openai.com/codex/)
+  - [Copilot](https://github.com/features/copilot/cli)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, or .agents_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github or .agents_
 
 #### Mac / Linux
 
