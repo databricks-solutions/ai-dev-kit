@@ -70,48 +70,53 @@ async def health(request: Request) -> JSONResponse:
 
 
 # ---------------------------------------------------------------------------
-# MCP tool visibility — hide tools whose scopes are unavailable
+# MCP tool allowlist — expose only the tools we need
 # ---------------------------------------------------------------------------
 
-# Tools to remove because the required Databricks Apps OAuth scopes don't
-# exist yet.  When Databricks adds a scope, move the tool out of this set.
-_HIDDEN_TOOLS: dict[str, str] = {
-    # scope: clusters
-    "list_compute":          "clusters",
-    "manage_cluster":        "clusters",
-    # scope: jobs
-    "manage_jobs":           "jobs",
-    "manage_job_runs":       "jobs",
-    # scope: pipelines
-    "manage_pipeline":       "pipelines",
-    "manage_pipeline_run":   "pipelines",
-    # scope: workspace
-    "manage_workspace":      "workspace",
-    "manage_workspace_files": "workspace",
-    # scope: apps
-    "manage_app":            "apps",
+# Only these tools are exposed to MCP clients.  Everything else registered
+# by the upstream databricks-mcp-server is removed at startup.
+_ALLOWED_TOOLS = {
+    # SQL
+    "execute_sql",
+    "execute_sql_multi",
+    "manage_warehouse",
+    "manage_sql_warehouse",
+    "get_table_stats_and_schema",
+    "get_volume_folder_details",
+    # Genie
+    "ask_genie",
+    "manage_genie",
+    # AI/BI Dashboards
+    "manage_dashboard",
+    # Vector Search
+    "manage_vs_endpoint",
+    "manage_vs_index",
+    "query_vs_index",
+    "manage_vs_data",
+    # Volume files
+    "manage_volume_files",
+    # User
+    "get_current_user",
 }
 
 
-def _hide_unsupported_tools() -> None:
-    """Remove tools that will always fail due to missing OAuth scopes."""
+def _restrict_tools() -> None:
+    """Remove every tool not in the allowlist."""
     loop = asyncio.new_event_loop()
     try:
+        tools = loop.run_until_complete(mcp.list_tools())
         removed = []
-        for name in _HIDDEN_TOOLS:
-            try:
-                loop.run_until_complete(mcp.remove_tool(name))
-                removed.append(name)
-            except Exception:
-                pass  # tool may not exist (upstream changes)
+        for tool in tools:
+            if tool.name not in _ALLOWED_TOOLS:
+                loop.run_until_complete(mcp.remove_tool(tool.name))
+                removed.append(tool.name)
     finally:
         loop.close()
-    if removed:
-        logger.info("Removed %d tools (missing scopes): %s",
-                     len(removed), ", ".join(sorted(removed)))
+    logger.info("Kept %d tools, removed %d: %s",
+                len(_ALLOWED_TOOLS), len(removed), ", ".join(sorted(removed)))
 
 
-_hide_unsupported_tools()
+_restrict_tools()
 
 
 # ---------------------------------------------------------------------------
@@ -124,26 +129,15 @@ _READ_ONLY_TOOLS = {
     "get_current_user",
     "get_table_stats_and_schema",
     "get_volume_folder_details",
-    "list_tracked_resources",
     "manage_warehouse",        # list / get_best only
     "query_vs_index",
 }
 
 # Tools that can permanently delete or irreversibly modify resources.
 _DESTRUCTIVE_TOOLS = {
-    "delete_tracked_resource",
     "manage_genie",            # has delete action
     "manage_dashboard",        # has delete action
-    "manage_ka",               # has delete action
-    "manage_lakebase_branch",  # has delete action
-    "manage_lakebase_database",# has delete action
-    "manage_lakebase_sync",    # has delete action
-    "manage_mas",              # has delete action
     "manage_sql_warehouse",    # has delete action
-    "manage_uc_connections",   # has delete action
-    "manage_uc_objects",       # has delete (catalog/schema/volume)
-    "manage_uc_sharing",       # has delete action
-    "manage_uc_storage",       # has delete action
     "manage_vs_endpoint",      # has delete action
     "manage_vs_index",         # has delete action
     "manage_vs_data",          # has delete action
