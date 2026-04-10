@@ -1,0 +1,10 @@
+[project]
+name = "databricks-mcp-app"
+version = "0.1.0"
+description = "Databricks MCP App — streamable HTTP wrapper with on-behalf-of-user OAuth"
+requires-python = ">=3.10"
+dependencies = [
+    "databricks-tools-core",
+    "databricks-mcp-server",
+    "uvicorn",
+]
