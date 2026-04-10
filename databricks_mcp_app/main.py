@@ -70,6 +70,51 @@ async def health(request: Request) -> JSONResponse:
 
 
 # ---------------------------------------------------------------------------
+# MCP tool visibility — hide tools whose scopes are unavailable
+# ---------------------------------------------------------------------------
+
+# Tools to remove because the required Databricks Apps OAuth scopes don't
+# exist yet.  When Databricks adds a scope, move the tool out of this set.
+_HIDDEN_TOOLS: dict[str, str] = {
+    # scope: clusters
+    "list_compute":          "clusters",
+    "manage_cluster":        "clusters",
+    # scope: jobs
+    "manage_jobs":           "jobs",
+    "manage_job_runs":       "jobs",
+    # scope: pipelines
+    "manage_pipeline":       "pipelines",
+    "manage_pipeline_run":   "pipelines",
+    # scope: workspace
+    "manage_workspace":      "workspace",
+    "manage_workspace_files": "workspace",
+    # scope: apps
+    "manage_app":            "apps",
+}
+
+
+def _hide_unsupported_tools() -> None:
+    """Remove tools that will always fail due to missing OAuth scopes."""
+    loop = asyncio.new_event_loop()
+    try:
+        removed = []
+        for name in _HIDDEN_TOOLS:
+            try:
+                loop.run_until_complete(mcp.remove_tool(name))
+                removed.append(name)
+            except Exception:
+                pass  # tool may not exist (upstream changes)
+    finally:
+        loop.close()
+    if removed:
+        logger.info("Removed %d tools (missing scopes): %s",
+                     len(removed), ", ".join(sorted(removed)))
+
+
+_hide_unsupported_tools()
+
+
+# ---------------------------------------------------------------------------
 # MCP tool annotations — categorise tools for client UIs (Claude, etc.)
 # ---------------------------------------------------------------------------
 
@@ -79,7 +124,6 @@ _READ_ONLY_TOOLS = {
     "get_current_user",
     "get_table_stats_and_schema",
     "get_volume_folder_details",
-    "list_compute",
     "list_tracked_resources",
     "manage_warehouse",        # list / get_best only
     "query_vs_index",
@@ -88,17 +132,13 @@ _READ_ONLY_TOOLS = {
 # Tools that can permanently delete or irreversibly modify resources.
 _DESTRUCTIVE_TOOLS = {
     "delete_tracked_resource",
-    "manage_cluster",          # has delete action
-    "manage_app",              # has delete action
     "manage_genie",            # has delete action
     "manage_dashboard",        # has delete action
-    "manage_jobs",             # has delete action
     "manage_ka",               # has delete action
     "manage_lakebase_branch",  # has delete action
     "manage_lakebase_database",# has delete action
     "manage_lakebase_sync",    # has delete action
     "manage_mas",              # has delete action
-    "manage_pipeline",         # has delete action
     "manage_sql_warehouse",    # has delete action
     "manage_uc_connections",   # has delete action
     "manage_uc_objects",       # has delete (catalog/schema/volume)
@@ -107,7 +147,6 @@ _DESTRUCTIVE_TOOLS = {
     "manage_vs_endpoint",      # has delete action
     "manage_vs_index",         # has delete action
     "manage_vs_data",          # has delete action
-    "manage_workspace_files",  # has delete action
 }
 
 
