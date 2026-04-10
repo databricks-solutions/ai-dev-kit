@@ -1555,7 +1555,7 @@ function Write-OpenCodeMcpJson {
             type = "local"
             command    = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
             environment     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
-            enabled = $false
+            enabled = $true 
         }
         $existing.mcp | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
         $existing  = $existing | ConvertTo-Json -Depth 10
@@ -1569,7 +1569,7 @@ function Write-OpenCodeMcpJson {
                     type    = 'local'
                     command = @($script:VenvPython -replace '\\', '/') + @($script:McpEntry -replace '\\', '/')
                     environment     = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
-                    enabled = $false
+                    enabled = $true 
                 }
             }
         } | ConvertTo-Json -Depth 3
@@ -1658,8 +1658,6 @@ function Write-McpConfigs {
                     
                 }
                 Write-Ok "OpenCode CLI MCP config"
-                Write-Warn "OpenCode: MCP servers are disabled by default."
-                Write-Msg "  Enable in: opencode -> /mcps -> Toggle 'databricks' by pressing spacebar"
             }
         }
     }
