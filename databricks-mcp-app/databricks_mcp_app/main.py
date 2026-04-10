@@ -4,7 +4,6 @@ Wraps the existing databricks-mcp-server with on-behalf-of-user OAuth so
 that each MCP request executes under the calling user's Databricks identity.
 """
 
-import asyncio
 import logging
 import os
 
@@ -132,50 +131,58 @@ def _configure_tools() -> None:
     2. Annotate the remaining tools with ``readOnlyHint`` /
        ``destructiveHint`` so MCP clients can categorise them.
 
-    Uses ``asyncio.new_event_loop()`` because this runs at module-load
-    time before uvicorn starts the main event loop.
+    Uses ``mcp.local_provider`` (public) to access the tool registry
+    synchronously so this works at module-load time even when an asyncio
+    event loop is already running.  ``_components`` is an internal dict
+    keyed by component key — the only sync path to enumerate tools in
+    FastMCP 3.1.  If a future FastMCP version exposes a sync listing
+    method, prefer that instead.
     """
-    loop = asyncio.new_event_loop()
-    try:
-        # --- Phase 1: restrict to allowlist ---
-        all_tools = loop.run_until_complete(mcp.list_tools())
-        removed = []
-        for tool in all_tools:
-            if tool.name not in _ALLOWED_TOOLS:
-                loop.run_until_complete(mcp.remove_tool(tool.name))
-                removed.append(tool.name)
+    from fastmcp.tools.tool import Tool as FunctionTool
 
-        # --- Phase 2: annotate remaining tools ---
-        kept_tools = loop.run_until_complete(mcp.list_tools())
-        n_read = n_destructive = n_write = 0
-        for tool in kept_tools:
-            if tool.name in _READ_ONLY_TOOLS:
-                tool.annotations = ToolAnnotations(
-                    readOnlyHint=True,
-                    destructiveHint=False,
-                    openWorldHint=True,
-                )
-                n_read += 1
-            elif tool.name in _DESTRUCTIVE_TOOLS:
-                tool.annotations = ToolAnnotations(
-                    readOnlyHint=False,
-                    destructiveHint=True,
-                    openWorldHint=True,
-                )
-                n_destructive += 1
-            else:
-                tool.annotations = ToolAnnotations(
-                    readOnlyHint=False,
-                    destructiveHint=False,
-                    openWorldHint=True,
-                )
-                n_write += 1
-    finally:
-        loop.close()
+    provider = mcp.local_provider
+
+    # --- Phase 1: restrict to allowlist ---
+    # De-duplicate names to avoid double-removal if multiple versions exist.
+    to_remove = {
+        v.name for v in provider._components.values()
+        if isinstance(v, FunctionTool) and v.name not in _ALLOWED_TOOLS
+    }
+    for name in to_remove:
+        provider.remove_tool(name)
+
+    # --- Phase 2: annotate remaining tools ---
+    remaining = [
+        v for v in provider._components.values()
+        if isinstance(v, FunctionTool)
+    ]
+    n_read = n_destructive = n_write = 0
+    for tool in remaining:
+        if tool.name in _READ_ONLY_TOOLS:
+            tool.annotations = ToolAnnotations(
+                readOnlyHint=True,
+                destructiveHint=False,
+                openWorldHint=True,
+            )
+            n_read += 1
+        elif tool.name in _DESTRUCTIVE_TOOLS:
+            tool.annotations = ToolAnnotations(
+                readOnlyHint=False,
+                destructiveHint=True,
+                openWorldHint=True,
+            )
+            n_destructive += 1
+        else:
+            tool.annotations = ToolAnnotations(
+                readOnlyHint=False,
+                destructiveHint=False,
+                openWorldHint=True,
+            )
+            n_write += 1
 
     logger.info(
         "Kept %d tools (%d read-only, %d destructive, %d write), removed %d",
-        len(kept_tools), n_read, n_destructive, n_write, len(removed),
+        len(remaining), n_read, n_destructive, n_write, len(to_remove),
     )
 
 
