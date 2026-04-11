@@ -1,11 +1,11 @@
 """Databricks MCP App — streamable HTTP wrapper for Databricks Apps deployment.
 
-Wraps the existing databricks-mcp-server with on-behalf-of-user OAuth so
-that each MCP request executes under the calling user's Databricks identity.
+Wraps the existing databricks-mcp-server as a streamable-HTTP endpoint.
+Authentication uses the app's service principal (OAuth M2M) credentials,
+which the Databricks SDK refreshes automatically.
 """
 
 import logging
-import os
 
 from mcp.types import ToolAnnotations
 from starlette.requests import Request
@@ -13,50 +13,8 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from databricks_mcp_server.server import mcp
-from databricks_tools_core.auth import clear_databricks_auth, set_databricks_auth
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# ASGI middleware — captures the per-user token from the Databricks Apps proxy
-# ---------------------------------------------------------------------------
-
-
-class OnBehalfOfUserMiddleware:
-    """Extract ``x-forwarded-access-token`` and set per-request auth context.
-
-    When running behind the Databricks Apps proxy, every request includes the
-    calling user's OAuth token in the ``x-forwarded-access-token`` header.
-    This middleware feeds it into :func:`set_databricks_auth` so that all
-    downstream ``get_workspace_client()`` calls return a client scoped to
-    that user.
-
-    ``force_token=True`` ensures the user token takes priority over the
-    service principal's OAuth M2M credentials injected by the Databricks
-    Apps runtime.
-
-    For local development (no header present), auth falls through to the
-    default SDK chain (env vars / config file).
-    """
-
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        headers = dict(scope.get("headers", []))
-        token = headers.get(b"x-forwarded-access-token", b"").decode()
-        if token:
-            host = os.environ.get("DATABRICKS_HOST", "")
-            set_databricks_auth(host, token, force_token=True)
-        try:
-            await self.app(scope, receive, send)
-        finally:
-            clear_databricks_auth()
 
 
 # ---------------------------------------------------------------------------
@@ -75,61 +33,20 @@ async def health(request: Request) -> JSONResponse:
 # Only these tools are exposed to MCP clients.  Everything else registered
 # by the upstream databricks-mcp-server is removed at startup.
 _ALLOWED_TOOLS = {
-    # SQL
-    "execute_sql",
-    "execute_sql_multi",
-    "manage_warehouse",
-    "manage_sql_warehouse",
-    "get_table_stats_and_schema",
-    "get_volume_folder_details",
-    # Genie
-    "ask_genie",
-    "manage_genie",
-    # AI/BI Dashboards
-    "manage_dashboard",
     # Vector Search
-    "manage_vs_endpoint",
-    "manage_vs_index",
     "query_vs_index",
     "manage_vs_data",
-    # Volume files
-    "manage_volume_files",
-    # User
-    "get_current_user",
-}
-
-
-# ---------------------------------------------------------------------------
-# MCP tool annotations — categorise tools for client UIs (Claude, etc.)
-# ---------------------------------------------------------------------------
-
-# Tools that only read data and never modify state.
-_READ_ONLY_TOOLS = {
-    "ask_genie",
-    "get_current_user",
-    "get_table_stats_and_schema",
-    "get_volume_folder_details",
-    "manage_warehouse",        # list / get_best only
-    "query_vs_index",
-}
-
-# Tools that can permanently delete or irreversibly modify resources.
-_DESTRUCTIVE_TOOLS = {
-    "manage_genie",            # has delete action
-    "manage_dashboard",        # has delete action
-    "manage_sql_warehouse",    # has delete action
-    "manage_vs_endpoint",      # has delete action
-    "manage_vs_index",         # has delete action
-    "manage_vs_data",          # has delete action
+    "manage_vs_index",
 }
 
 
 def _configure_tools() -> None:
-    """Restrict the tool surface to the allowlist and set annotations.
+    """Restrict the tool surface to the allowlist and mark all as read-only.
 
-    1. Remove every tool not in ``_ALLOWED_TOOLS``.
-    2. Annotate the remaining tools with ``readOnlyHint`` /
-       ``destructiveHint`` so MCP clients can categorise them.
+    The app's service principal is granted only "Can select" on specific
+    Vector Search indexes — the platform enforces read-only at the resource
+    level.  All tools are annotated ``readOnlyHint=True`` so MCP clients
+    don't add unnecessary confirmation prompts.
 
     Uses ``mcp.local_provider`` (public) to access the tool registry
     synchronously so this works at module-load time even when an asyncio
@@ -143,7 +60,6 @@ def _configure_tools() -> None:
     provider = mcp.local_provider
 
     # --- Phase 1: restrict to allowlist ---
-    # De-duplicate names to avoid double-removal if multiple versions exist.
     to_remove = {
         v.name for v in provider._components.values()
         if isinstance(v, FunctionTool) and v.name not in _ALLOWED_TOOLS
@@ -151,39 +67,19 @@ def _configure_tools() -> None:
     for name in to_remove:
         provider.remove_tool(name)
 
-    # --- Phase 2: annotate remaining tools ---
+    # --- Phase 2: annotate all remaining tools as read-only ---
     remaining = [
         v for v in provider._components.values()
         if isinstance(v, FunctionTool)
     ]
-    n_read = n_destructive = n_write = 0
     for tool in remaining:
-        if tool.name in _READ_ONLY_TOOLS:
-            tool.annotations = ToolAnnotations(
-                readOnlyHint=True,
-                destructiveHint=False,
-                openWorldHint=True,
-            )
-            n_read += 1
-        elif tool.name in _DESTRUCTIVE_TOOLS:
-            tool.annotations = ToolAnnotations(
-                readOnlyHint=False,
-                destructiveHint=True,
-                openWorldHint=True,
-            )
-            n_destructive += 1
-        else:
-            tool.annotations = ToolAnnotations(
-                readOnlyHint=False,
-                destructiveHint=False,
-                openWorldHint=True,
-            )
-            n_write += 1
+        tool.annotations = ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
 
-    logger.info(
-        "Kept %d tools (%d read-only, %d destructive, %d write), removed %d",
-        len(remaining), n_read, n_destructive, n_write, len(to_remove),
-    )
+    logger.info("Kept %d tools (all read-only), removed %d", len(remaining), len(to_remove))
 
 
 _configure_tools()
@@ -201,5 +97,4 @@ mcp_app = mcp.http_app(path="/mcp", transport="streamable-http")
 # Add our health check route to the existing MCP app.
 mcp_app.routes.insert(0, Route("/", health, methods=["GET"]))
 
-# Wrap with auth middleware (outermost layer).
-app = OnBehalfOfUserMiddleware(mcp_app)
+app = mcp_app
