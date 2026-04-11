@@ -40,28 +40,13 @@ _ALLOWED_TOOLS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# MCP tool annotations — categorise tools for client UIs (Claude, etc.)
-# ---------------------------------------------------------------------------
-
-# Tools that only read data and never modify state.
-_READ_ONLY_TOOLS = {
-    "query_vs_index",
-}
-
-# Tools that can permanently delete or irreversibly modify resources.
-_DESTRUCTIVE_TOOLS = {
-    "manage_vs_index",         # has delete action
-    "manage_vs_data",          # has delete action
-}
-
-
 def _configure_tools() -> None:
-    """Restrict the tool surface to the allowlist and set annotations.
+    """Restrict the tool surface to the allowlist and mark all as read-only.
 
-    1. Remove every tool not in ``_ALLOWED_TOOLS``.
-    2. Annotate the remaining tools with ``readOnlyHint`` /
-       ``destructiveHint`` so MCP clients can categorise them.
+    The app's service principal is granted only "Can select" on specific
+    Vector Search indexes — the platform enforces read-only at the resource
+    level.  All tools are annotated ``readOnlyHint=True`` so MCP clients
+    don't add unnecessary confirmation prompts.
 
     Uses ``mcp.local_provider`` (public) to access the tool registry
     synchronously so this works at module-load time even when an asyncio
@@ -75,7 +60,6 @@ def _configure_tools() -> None:
     provider = mcp.local_provider
 
     # --- Phase 1: restrict to allowlist ---
-    # De-duplicate names to avoid double-removal if multiple versions exist.
     to_remove = {
         v.name for v in provider._components.values()
         if isinstance(v, FunctionTool) and v.name not in _ALLOWED_TOOLS
@@ -83,39 +67,19 @@ def _configure_tools() -> None:
     for name in to_remove:
         provider.remove_tool(name)
 
-    # --- Phase 2: annotate remaining tools ---
+    # --- Phase 2: annotate all remaining tools as read-only ---
     remaining = [
         v for v in provider._components.values()
         if isinstance(v, FunctionTool)
     ]
-    n_read = n_destructive = n_write = 0
     for tool in remaining:
-        if tool.name in _READ_ONLY_TOOLS:
-            tool.annotations = ToolAnnotations(
-                readOnlyHint=True,
-                destructiveHint=False,
-                openWorldHint=True,
-            )
-            n_read += 1
-        elif tool.name in _DESTRUCTIVE_TOOLS:
-            tool.annotations = ToolAnnotations(
-                readOnlyHint=False,
-                destructiveHint=True,
-                openWorldHint=True,
-            )
-            n_destructive += 1
-        else:
-            tool.annotations = ToolAnnotations(
-                readOnlyHint=False,
-                destructiveHint=False,
-                openWorldHint=True,
-            )
-            n_write += 1
+        tool.annotations = ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
 
-    logger.info(
-        "Kept %d tools (%d read-only, %d destructive, %d write), removed %d",
-        len(remaining), n_read, n_destructive, n_write, len(to_remove),
-    )
+    logger.info("Kept %d tools (all read-only), removed %d", len(remaining), len(to_remove))
 
 
 _configure_tools()
