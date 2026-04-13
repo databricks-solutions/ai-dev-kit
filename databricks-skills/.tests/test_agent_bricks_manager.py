@@ -1,5 +1,5 @@
 """
-Integration tests for databricks-agent-bricks/manager.py
+Integration tests for databricks-agent-bricks/mas_manager.py
 
 Tests the Supervisor Agent (MAS) CLI interface functions.
 Requires databricks-tools-core.agent_bricks module.
@@ -15,13 +15,16 @@ import pytest
 SKILLS_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(SKILLS_DIR / "databricks-agent-bricks"))
 
-from manager import (
+from mas_manager import (
     create_mas,
     get_mas,
     find_mas,
     update_mas,
     delete_mas,
     list_mas,
+    add_examples,
+    add_examples_queued,
+    list_examples,
     _build_agent_list,
 )
 

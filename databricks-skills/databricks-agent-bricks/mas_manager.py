@@ -3,11 +3,15 @@
 Supervisor Agent (MAS) Manager - CLI interface for MAS operations.
 
 Usage:
-    python manager.py create_mas "Name" '{"agents": [...], "description": "...", "instructions": "..."}'
-    python manager.py get_mas TILE_ID
-    python manager.py find_mas "Name"
-    python manager.py delete_mas TILE_ID
-    python manager.py list_mas
+    python mas_manager.py create_mas "Name" '{"agents": [...], "description": "...", "instructions": "..."}'
+    python mas_manager.py get_mas TILE_ID
+    python mas_manager.py find_mas "Name"
+    python mas_manager.py update_mas TILE_ID '{"name": ..., "agents": [...], ...}'
+    python mas_manager.py delete_mas TILE_ID
+    python mas_manager.py list_mas
+    python mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]'
+    python mas_manager.py add_examples_queued TILE_ID '[{"question": "...", "guideline": "..."}]'
+    python mas_manager.py list_examples TILE_ID
 
 Requires: databricks-tools-core package
 """
@@ -16,7 +20,11 @@ import json
 import sys
 from typing import Any, Dict, List, Optional
 
-from databricks_tools_core.agent_bricks import AgentBricksManager, EndpointStatus
+from databricks_tools_core.agent_bricks import (
+    AgentBricksManager,
+    EndpointStatus,
+    get_tile_example_queue,
+)
 
 
 def _get_manager() -> AgentBricksManager:
@@ -274,6 +282,110 @@ def list_mas() -> List[Dict[str, Any]]:
     return results
 
 
+def add_examples(
+    tile_id: str,
+    examples: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Add example questions to a Supervisor Agent.
+
+    Args:
+        tile_id: The MAS tile ID
+        examples: List of example dicts with:
+            - question: The example question
+            - guideline: Optional routing guideline (e.g., "Should route to billing_agent")
+
+    Returns:
+        Dict with added_count and any errors
+    """
+    manager = _get_manager()
+
+    # Check if MAS is online
+    status = get_mas(tile_id)
+    if "error" in status:
+        return status
+
+    if status.get("endpoint_status") != "ONLINE":
+        return {
+            "error": f"MAS is not ONLINE (status: {status.get('endpoint_status')}). "
+            "Use add_examples_queued to queue examples for when it's ready.",
+            "tile_id": tile_id,
+        }
+
+    # Add examples directly
+    created = manager.mas_add_examples_batch(tile_id, examples)
+    return {
+        "tile_id": tile_id,
+        "added_count": len(created),
+        "total_requested": len(examples),
+    }
+
+
+def add_examples_queued(
+    tile_id: str,
+    examples: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Queue example questions to be added when MAS becomes ONLINE.
+
+    If the MAS is already ONLINE, examples are added immediately.
+    If not, they're queued and added automatically when the endpoint is ready.
+
+    Args:
+        tile_id: The MAS tile ID
+        examples: List of example dicts with:
+            - question: The example question
+            - guideline: Optional routing guideline
+
+    Returns:
+        Dict with status (queued or added) and count
+    """
+    manager = _get_manager()
+
+    # Check current status
+    status = get_mas(tile_id)
+    if "error" in status:
+        return status
+
+    if status.get("endpoint_status") == "ONLINE":
+        # Add immediately
+        created = manager.mas_add_examples_batch(tile_id, examples)
+        return {
+            "tile_id": tile_id,
+            "status": "added",
+            "added_count": len(created),
+            "total_requested": len(examples),
+        }
+    else:
+        # Queue for later
+        queue = get_tile_example_queue()
+        queue.start()
+        queue.enqueue(tile_id, manager, examples, tile_type="mas")
+        return {
+            "tile_id": tile_id,
+            "status": "queued",
+            "queued_count": len(examples),
+            "endpoint_status": status.get("endpoint_status"),
+            "message": "Examples will be added automatically when endpoint becomes ONLINE",
+        }
+
+
+def list_examples(tile_id: str) -> Dict[str, Any]:
+    """List all examples for a Supervisor Agent.
+
+    Args:
+        tile_id: The MAS tile ID
+
+    Returns:
+        Dict with examples list
+    """
+    manager = _get_manager()
+    result = manager.mas_list_examples(tile_id)
+    return {
+        "tile_id": tile_id,
+        "examples": result.get("examples", []),
+        "count": len(result.get("examples", [])),
+    }
+
+
 def _print_json(data: Any) -> None:
     """Print data as formatted JSON."""
     print(json.dumps(data, indent=2))
@@ -289,7 +401,7 @@ def main():
 
     if command == "create_mas":
         if len(sys.argv) < 4:
-            print("Usage: python manager.py create_mas NAME '{\"agents\": [...], ...}'")
+            print("Usage: python mas_manager.py create_mas NAME '{\"agents\": [...], ...}'")
             sys.exit(1)
         name = sys.argv[2]
         config = json.loads(sys.argv[3])
@@ -303,21 +415,21 @@ def main():
 
     elif command == "get_mas":
         if len(sys.argv) < 3:
-            print("Usage: python manager.py get_mas TILE_ID")
+            print("Usage: python mas_manager.py get_mas TILE_ID")
             sys.exit(1)
         result = get_mas(sys.argv[2])
         _print_json(result)
 
     elif command == "find_mas":
         if len(sys.argv) < 3:
-            print("Usage: python manager.py find_mas NAME")
+            print("Usage: python mas_manager.py find_mas NAME")
             sys.exit(1)
         result = find_mas(sys.argv[2])
         _print_json(result)
 
     elif command == "update_mas":
         if len(sys.argv) < 4:
-            print("Usage: python manager.py update_mas TILE_ID '{\"name\": ..., \"agents\": [...], ...}'")
+            print("Usage: python mas_manager.py update_mas TILE_ID '{\"name\": ..., \"agents\": [...], ...}'")
             sys.exit(1)
         tile_id = sys.argv[2]
         config = json.loads(sys.argv[3])
@@ -332,13 +444,38 @@ def main():
 
     elif command == "delete_mas":
         if len(sys.argv) < 3:
-            print("Usage: python manager.py delete_mas TILE_ID")
+            print("Usage: python mas_manager.py delete_mas TILE_ID")
             sys.exit(1)
         result = delete_mas(sys.argv[2])
         _print_json(result)
 
     elif command == "list_mas":
         result = list_mas()
+        _print_json(result)
+
+    elif command == "add_examples":
+        if len(sys.argv) < 4:
+            print("Usage: python mas_manager.py add_examples TILE_ID '[{\"question\": \"...\", \"guideline\": \"...\"}]'")
+            sys.exit(1)
+        tile_id = sys.argv[2]
+        examples = json.loads(sys.argv[3])
+        result = add_examples(tile_id, examples)
+        _print_json(result)
+
+    elif command == "add_examples_queued":
+        if len(sys.argv) < 4:
+            print("Usage: python mas_manager.py add_examples_queued TILE_ID '[{\"question\": \"...\", \"guideline\": \"...\"}]'")
+            sys.exit(1)
+        tile_id = sys.argv[2]
+        examples = json.loads(sys.argv[3])
+        result = add_examples_queued(tile_id, examples)
+        _print_json(result)
+
+    elif command == "list_examples":
+        if len(sys.argv) < 3:
+            print("Usage: python mas_manager.py list_examples TILE_ID")
+            sys.exit(1)
+        result = list_examples(sys.argv[2])
         _print_json(result)
 
     else:

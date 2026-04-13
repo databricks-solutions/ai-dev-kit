@@ -105,26 +105,35 @@ See `databricks-genie` skill for:
 
 ### Supervisor Agent (MAS)
 
-**NO CLI AVAILABLE** - Supervisor Agents are managed via the `manager.py` script in this skill folder:
+**NO CLI AVAILABLE** - Supervisor Agents are managed via the `mas_manager.py` script in this skill folder:
 
 ```bash
 # List all Supervisor Agents
-python manager.py list_mas
+python mas_manager.py list_mas
 
 # Create a Supervisor Agent
-python manager.py create_mas "My Supervisor" '{"agents": [...], "description": "...", "instructions": "..."}'
+python mas_manager.py create_mas "My Supervisor" '{"agents": [...], "description": "...", "instructions": "..."}'
 
 # Get a Supervisor Agent by tile ID
-python manager.py get_mas TILE_ID
+python mas_manager.py get_mas TILE_ID
 
 # Find a Supervisor Agent by name
-python manager.py find_mas "My Supervisor"
+python mas_manager.py find_mas "My Supervisor"
 
 # Update a Supervisor Agent
-python manager.py update_mas TILE_ID '{"name": "New Name", "agents": [...], ...}'
+python mas_manager.py update_mas TILE_ID '{"name": "New Name", "agents": [...], ...}'
 
 # Delete a Supervisor Agent
-python manager.py delete_mas TILE_ID
+python mas_manager.py delete_mas TILE_ID
+
+# Add examples (must be ONLINE)
+python mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]'
+
+# Add examples (queued - waits for ONLINE)
+python mas_manager.py add_examples_queued TILE_ID '[{"question": "...", "guideline": "..."}]'
+
+# List examples
+python mas_manager.py list_examples TILE_ID
 ```
 
 Agent configuration options (provide exactly one per agent):
@@ -177,10 +186,10 @@ For KA, if `add_examples_from_volume=true`, examples are automatically extracted
 
 ## Example: Multi-Modal Supervisor Agent
 
-Use `manager.py` to create a Supervisor Agent:
+Use `mas_manager.py` to create a Supervisor Agent:
 
 ```bash
-python manager.py create_mas "Enterprise Support Supervisor" '{
+python mas_manager.py create_mas "Enterprise Support Supervisor" '{
     "description": "Comprehensive enterprise support agent",
     "instructions": "Route queries as follows:\n1. Policy/procedure questions → knowledge_base\n2. Data analysis requests → analytics_engine\n3. Ticket classification → ml_classifier",
     "agents": [
