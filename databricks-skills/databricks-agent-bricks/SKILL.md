@@ -105,7 +105,7 @@ See `databricks-genie` skill for:
 
 ### Supervisor Agent (MAS)
 
-**NO CLI AVAILABLE** - Supervisor Agents are managed via the self-contained `mas_manager.py` script in this skill folder.
+**NO CLI AVAILABLE** - Supervisor Agents are managed via the self-contained `scripts/mas_manager.py` script in this skill folder.
 
 Install requirements first:
 ```bash
@@ -116,31 +116,31 @@ Usage:
 
 ```bash
 # List all Supervisor Agents
-python mas_manager.py list_mas
+python scripts/mas_manager.py list_mas
 
 # Create a Supervisor Agent
-python mas_manager.py create_mas "My Supervisor" '{"agents": [...], "description": "...", "instructions": "..."}'
+python scripts/mas_manager.py create_mas "My Supervisor" '{"agents": [...], "description": "...", "instructions": "..."}'
 
 # Get a Supervisor Agent by tile ID
-python mas_manager.py get_mas TILE_ID
+python scripts/mas_manager.py get_mas TILE_ID
 
 # Find a Supervisor Agent by name
-python mas_manager.py find_mas "My Supervisor"
+python scripts/mas_manager.py find_mas "My Supervisor"
 
 # Update a Supervisor Agent
-python mas_manager.py update_mas TILE_ID '{"name": "New Name", "agents": [...], ...}'
+python scripts/mas_manager.py update_mas TILE_ID '{"name": "New Name", "agents": [...], ...}'
 
 # Delete a Supervisor Agent
-python mas_manager.py delete_mas TILE_ID
+python scripts/mas_manager.py delete_mas TILE_ID
 
-# Add examples (must be ONLINE)
-python mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]'
+# Add examples (MAS must be ONLINE)
+python scripts/mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]'
 
-# Add examples (queued - waits for ONLINE)
-python mas_manager.py add_examples_queued TILE_ID '[{"question": "...", "guideline": "..."}]'
+# Add examples with wait (for jobs - waits up to 10 min for ONLINE)
+python scripts/mas_manager.py add_examples_wait TILE_ID '[{"question": "...", "guideline": "..."}]'
 
 # List examples
-python mas_manager.py list_examples TILE_ID
+python scripts/mas_manager.py list_examples TILE_ID
 ```
 
 Agent configuration options (provide exactly one per agent):
@@ -193,10 +193,10 @@ For KA, if `add_examples_from_volume=true`, examples are automatically extracted
 
 ## Example: Multi-Modal Supervisor Agent
 
-Use `mas_manager.py` to create a Supervisor Agent:
+Use `scripts/mas_manager.py` to create a Supervisor Agent:
 
 ```bash
-python mas_manager.py create_mas "Enterprise Support Supervisor" '{
+python scripts/mas_manager.py create_mas "Enterprise Support Supervisor" '{
     "description": "Comprehensive enterprise support agent",
     "instructions": "Route queries as follows:\n1. Policy/procedure questions → knowledge_base\n2. Data analysis requests → analytics_engine\n3. Ticket classification → ml_classifier",
     "agents": [

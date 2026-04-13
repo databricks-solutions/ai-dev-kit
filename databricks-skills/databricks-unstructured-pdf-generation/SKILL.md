@@ -9,7 +9,7 @@ Convert HTML content to PDF documents and upload them to Unity Catalog Volumes.
 
 ## Overview
 
-Generate PDFs from HTML using the self-contained `pdf_generator.py` script. You (the LLM) generate the HTML content, and the Python script handles conversion and upload using the Databricks CLI.
+Generate PDFs from HTML using the self-contained `scripts/pdf_generator.py` script. You (the LLM) generate the HTML content, and the Python script handles conversion and upload using the Databricks CLI.
 
 ## Installation
 
@@ -55,15 +55,15 @@ The script can also be run directly from command line:
 
 ```bash
 # Generate from inline HTML
-python pdf_generator.py generate --html '<html><body><h1>Hello</h1></body></html>' \
+python scripts/pdf_generator.py generate --html '<html><body><h1>Hello</h1></body></html>' \
     --filename hello.pdf --catalog my_catalog --schema my_schema
 
 # Generate from HTML file
-python pdf_generator.py generate --html-file input.html \
+python scripts/pdf_generator.py generate --html-file input.html \
     --filename report.pdf --catalog my_catalog --schema my_schema --folder reports
 
 # Get JSON output
-python pdf_generator.py generate --html '...' --filename test.pdf \
+python scripts/pdf_generator.py generate --html '...' --filename test.pdf \
     --catalog my_catalog --schema my_schema --json
 ```
 

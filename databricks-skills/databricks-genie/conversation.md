@@ -4,7 +4,7 @@ Use the Genie Conversation API to ask natural language questions to a curated Ge
 
 ## Overview
 
-The `conversation.py` script in this skill folder allows you to programmatically send questions to a Genie Space and receive SQL-generated answers. Instead of writing SQL directly, you delegate the query generation to Genie, which has been curated with business logic, instructions, and certified queries.
+The `scripts/conversation.py` script in this skill folder allows you to programmatically send questions to a Genie Space and receive SQL-generated answers. Instead of writing SQL directly, you delegate the query generation to Genie, which has been curated with business logic, instructions, and certified queries.
 
 ## When to Use the Conversation API
 
@@ -29,10 +29,10 @@ The `conversation.py` script in this skill folder allows you to programmatically
 
 ## CLI Usage
 
-Use the `conversation.py` script to ask questions:
+Use the `scripts/conversation.py` script to ask questions:
 
 ```bash
-python conversation.py ask SPACE_ID "Your question here"
+python scripts/conversation.py ask SPACE_ID "Your question here"
 ```
 
 ## Basic Usage
@@ -40,7 +40,7 @@ python conversation.py ask SPACE_ID "Your question here"
 ### Ask a Question
 
 ```bash
-python conversation.py ask 01abc123... "What were total sales last month?"
+python scripts/conversation.py ask 01abc123... "What were total sales last month?"
 ```
 
 **Response:**
@@ -63,11 +63,11 @@ Use the `conversation_id` from the first response to ask follow-up questions wit
 
 ```bash
 # First question - capture the conversation_id from output
-python conversation.py ask 01abc123... "What were total sales last month?"
+python scripts/conversation.py ask 01abc123... "What were total sales last month?"
 # Output includes: "conversation_id": "conv_xyz789"
 
 # Follow-up (uses context from first question)
-python conversation.py ask 01abc123... "Break that down by region" --conversation-id conv_xyz789
+python scripts/conversation.py ask 01abc123... "Break that down by region" --conversation-id conv_xyz789
 ```
 
 Genie remembers the context, so "that" refers to "total sales last month".
@@ -94,7 +94,7 @@ Genie remembers the context, so "that" refers to "total sales last month".
 The script returns JSON that can be parsed:
 
 ```bash
-python conversation.py ask SPACE_ID "Who are our top 10 customers?" | jq '.status'
+python scripts/conversation.py ask SPACE_ID "Who are our top 10 customers?" | jq '.status'
 # Output: "COMPLETED"
 ```
 
@@ -107,7 +107,7 @@ Response fields when status is `COMPLETED`:
 ### Failed Response
 
 ```bash
-python conversation.py ask SPACE_ID "What is the meaning of life?" | jq '.status, .error'
+python scripts/conversation.py ask SPACE_ID "What is the meaning of life?" | jq '.status, .error'
 # Output: "FAILED"
 # Output: "Could not generate SQL for this question"
 ```
@@ -117,7 +117,7 @@ Genie couldn't answer - may need to rephrase or use direct SQL.
 ### Timeout
 
 ```bash
-python conversation.py ask SPACE_ID "Complex query" --timeout 120 | jq '.status'
+python scripts/conversation.py ask SPACE_ID "Complex query" --timeout 120 | jq '.status'
 # If timeout occurs: "TIMEOUT"
 ```
 
@@ -132,7 +132,7 @@ User: "Ask my Sales Genie what the churn rate is"
 
 Claude:
 1. Identifies user wants to use Genie (explicit request)
-2. Runs: python conversation.py ask sales_genie_id "What is the churn rate?"
+2. Runs: python scripts/conversation.py ask sales_genie_id "What is the churn rate?"
 3. Returns: "Based on your Sales Genie, the churn rate is 4.2%.
    Genie used this SQL: SELECT ..."
 ```
@@ -145,8 +145,8 @@ User: "I just created a Genie Space for HR data. Can you test it?"
 Claude:
 1. Gets the space_id from the user or recent databricks genie create-space result
 2. Runs conversation.py with test questions:
-   - python conversation.py ask SPACE_ID "How many employees do we have?"
-   - python conversation.py ask SPACE_ID "What is the average salary by department?"
+   - python scripts/conversation.py ask SPACE_ID "How many employees do we have?"
+   - python scripts/conversation.py ask SPACE_ID "What is the average salary by department?"
 3. Reports results: "Your HR Genie is working. It correctly answered..."
 ```
 
@@ -156,12 +156,12 @@ Claude:
 User: "Use my analytics Genie to explore sales trends"
 
 Claude:
-1. python conversation.py ask SPACE_ID "What were total sales by month this year?"
+1. python scripts/conversation.py ask SPACE_ID "What were total sales by month this year?"
    # Returns conversation_id: conv_xyz
 2. User: "Which month had the highest growth?"
-3. python conversation.py ask SPACE_ID "Which month had the highest growth?" -c conv_xyz
+3. python scripts/conversation.py ask SPACE_ID "Which month had the highest growth?" -c conv_xyz
 4. User: "What products drove that growth?"
-5. python conversation.py ask SPACE_ID "What products drove that growth?" -c conv_xyz
+5. python scripts/conversation.py ask SPACE_ID "What products drove that growth?" -c conv_xyz
 ```
 
 ## Best Practices
@@ -172,13 +172,13 @@ Don't reuse conversations across unrelated questions:
 
 ```bash
 # Good: New conversation for new topic
-python conversation.py ask SPACE_ID "What were sales last month?"  # New conversation
-python conversation.py ask SPACE_ID "How many employees do we have?"  # New conversation
+python scripts/conversation.py ask SPACE_ID "What were sales last month?"  # New conversation
+python scripts/conversation.py ask SPACE_ID "How many employees do we have?"  # New conversation
 
 # Good: Follow-up for related question
-python conversation.py ask SPACE_ID "What were sales last month?"
+python scripts/conversation.py ask SPACE_ID "What were sales last month?"
 # Get conversation_id from output, then:
-python conversation.py ask SPACE_ID "Break that down by product" -c CONV_ID  # Related follow-up
+python scripts/conversation.py ask SPACE_ID "Break that down by product" -c CONV_ID  # Related follow-up
 ```
 
 ### Handle Clarification Requests
@@ -186,7 +186,7 @@ python conversation.py ask SPACE_ID "Break that down by product" -c CONV_ID  # R
 Genie may ask for clarification instead of returning results:
 
 ```bash
-python conversation.py ask SPACE_ID "Show me the data" | jq '.text_response'
+python scripts/conversation.py ask SPACE_ID "Show me the data" | jq '.text_response'
 # If Genie needs clarification, text_response will contain the question
 # Rephrase with more specifics
 ```
@@ -199,10 +199,10 @@ python conversation.py ask SPACE_ID "Show me the data" | jq '.text_response'
 
 ```bash
 # Quick question (default 60s)
-python conversation.py ask SPACE_ID "How many orders today?"
+python scripts/conversation.py ask SPACE_ID "How many orders today?"
 
 # Complex analysis with longer timeout
-python conversation.py ask SPACE_ID "Calculate customer lifetime value for all customers" --timeout 180
+python scripts/conversation.py ask SPACE_ID "Calculate customer lifetime value for all customers" --timeout 180
 ```
 
 ## Troubleshooting

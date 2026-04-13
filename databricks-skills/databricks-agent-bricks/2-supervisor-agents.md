@@ -135,10 +135,10 @@ Reference the UC Connection using the `connection_name` field:
 
 ### Complete Example: Multi-System Supervisor
 
-Example showing integration of Genie, KA, and external MCP using `mas_manager.py`:
+Example showing integration of Genie, KA, and external MCP using `scripts/mas_manager.py`:
 
 ```bash
-python mas_manager.py create_mas "AP_Invoice_Supervisor" '{
+python scripts/mas_manager.py create_mas "AP_Invoice_Supervisor" '{
     "description": "AP automation assistant with analytics, policy guidance, and operational actions",
     "instructions": "Route queries as follows:\n- Data questions (invoice counts, spend analysis, vendor metrics) → billing_analyst\n- Policy questions (thresholds, SLAs, compliance rules) → policy_expert\n- Actions (approve, reject, flag, search, workflows) → ap_operations\n\nWhen a user asks to approve, reject, or flag an invoice, ALWAYS use ap_operations.",
     "agents": [
@@ -181,10 +181,10 @@ SELECT http_request(
 
 ## Creating a Supervisor Agent
 
-**NO CLI AVAILABLE** - Use the `mas_manager.py` script in this skill folder:
+**NO CLI AVAILABLE** - Use the `scripts/mas_manager.py` script in this skill folder:
 
 ```bash
-python mas_manager.py create_mas "Customer Support MAS" '{
+python scripts/mas_manager.py create_mas "Customer Support MAS" '{
     "description": "Routes customer queries to specialized support agents",
     "instructions": "Analyze the user'\''s question and route to the most appropriate agent. If unclear, ask for clarification.",
     "agents": [
@@ -252,7 +252,7 @@ After creation, the Supervisor Agent endpoint needs to provision:
 | `ONLINE` | Ready to route queries | - |
 | `OFFLINE` | Not currently running | - |
 
-Use `python mas_manager.py get_mas TILE_ID` to check the status.
+Use `python scripts/mas_manager.py get_mas TILE_ID` to check the status.
 
 ## Adding Example Questions
 
@@ -261,23 +261,29 @@ Example questions help with evaluation and can guide routing optimization.
 ### Using the CLI
 
 ```bash
-# Add examples immediately (MAS must be ONLINE)
-python mas_manager.py add_examples TILE_ID '[
+# Add examples (MAS must be ONLINE)
+python scripts/mas_manager.py add_examples TILE_ID '[
     {"question": "I haven'\''t received my invoice for this month", "guideline": "Should be routed to billing_agent"},
     {"question": "The API is returning a 500 error", "guideline": "Should be routed to technical_agent"},
     {"question": "How many vacation days do I have?", "guideline": "Should be routed to hr_agent"}
 ]'
 
-# Add examples with queuing (waits for ONLINE if provisioning)
-python mas_manager.py add_examples_queued TILE_ID '[
-    {"question": "I haven'\''t received my invoice for this month", "guideline": "Should be routed to billing_agent"}
-]'
-
 # List existing examples
-python mas_manager.py list_examples TILE_ID
+python scripts/mas_manager.py list_examples TILE_ID
 ```
 
-If the Supervisor Agent is not yet `ONLINE`, use `add_examples_queued` - examples are queued and added automatically when the endpoint becomes ready.
+### Adding Examples in Jobs
+
+When creating a MAS in a Databricks job and immediately adding examples, use `add_examples_wait` to wait for the endpoint to become ONLINE:
+
+```bash
+# Waits up to 10 minutes for ONLINE, then adds examples
+python scripts/mas_manager.py add_examples_wait TILE_ID '[
+    {"question": "...", "guideline": "..."}
+]'
+```
+
+This is useful in automated pipelines where you create a MAS and need to add examples in the same job without manual intervention.
 
 ## Best Practices
 
@@ -332,14 +338,14 @@ Consider adding a general-purpose agent for queries that don't fit elsewhere:
 
 ## Updating a Supervisor Agent
 
-To update an existing Supervisor Agent, use `mas_manager.py`:
+To update an existing Supervisor Agent, use `scripts/mas_manager.py`:
 
 ```bash
 # Get current state
-python mas_manager.py get_mas TILE_ID
+python scripts/mas_manager.py get_mas TILE_ID
 
 # Update with new configuration
-python mas_manager.py update_mas TILE_ID '{"name": "New Name", "agents": [...], "instructions": "..."}'
+python scripts/mas_manager.py update_mas TILE_ID '{"name": "New Name", "agents": [...], "instructions": "..."}'
 ```
 
 1. **Add/remove agents**: Include updated `agents` list

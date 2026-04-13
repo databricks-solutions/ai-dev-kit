@@ -168,7 +168,7 @@ The endpoint name follows this pattern: `ka-{tile_id}-endpoint`
 databricks knowledge-assistants list-knowledge-assistants
 
 # Then use the tile_id to create a Supervisor Agent with mas_manager.py
-python mas_manager.py create_mas "Support_MAS" '{
+python scripts/mas_manager.py create_mas "Support_MAS" '{
     "agents": [
         {
             "name": "hr_agent",

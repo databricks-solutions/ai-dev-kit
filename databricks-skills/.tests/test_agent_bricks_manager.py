@@ -1,5 +1,5 @@
 """
-Integration tests for databricks-agent-bricks/mas_manager.py
+Integration tests for databricks-agent-bricks/scripts/mas_manager.py
 
 Tests the Supervisor Agent (MAS) CLI interface functions.
 The mas_manager.py is self-contained - requires only databricks-sdk and requests.

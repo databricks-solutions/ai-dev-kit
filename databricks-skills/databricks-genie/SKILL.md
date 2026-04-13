@@ -69,18 +69,18 @@ databricks genie import-space --json '{
 
 ### Conversation API (Query)
 
-Use the `conversation.py` script in this skill folder to ask questions:
+Use the `scripts/conversation.py` script in this skill folder to ask questions:
 
 ```bash
 # Ask a question to a Genie Space
-python conversation.py ask SPACE_ID "What were total sales last month?"
+python scripts/conversation.py ask SPACE_ID "What were total sales last month?"
 # Returns: {question, conversation_id, message_id, status, sql, columns, data, row_count}
 
 # Follow-up question in same conversation
-python conversation.py ask SPACE_ID "Break that down by region" --conversation-id CONV_ID
+python scripts/conversation.py ask SPACE_ID "Break that down by region" --conversation-id CONV_ID
 
 # With custom timeout (default: 60 seconds)
-python conversation.py ask SPACE_ID "Complex analysis query" --timeout 120
+python scripts/conversation.py ask SPACE_ID "Complex analysis query" --timeout 120
 ```
 
 ### Table Inspection
@@ -124,7 +124,7 @@ databricks genie create-space --json '{
 ### 3. Ask Questions (Conversation API)
 
 ```bash
-python conversation.py ask YOUR_SPACE_ID "What were total sales last month?"
+python scripts/conversation.py ask YOUR_SPACE_ID "What were total sales last month?"
 # Returns: SQL, columns, data, row_count
 ```
 

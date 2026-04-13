@@ -1,5 +1,5 @@
 """
-Integration tests for databricks-genie/conversation.py
+Integration tests for databricks-genie/scripts/conversation.py
 
 Tests the Genie Conversation API CLI interface.
 Requires databricks.sdk for Genie Space operations.
