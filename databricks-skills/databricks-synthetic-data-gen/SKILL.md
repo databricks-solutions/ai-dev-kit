@@ -126,12 +126,17 @@ Show a clear specification with **the business story and your assumptions surfac
 
 **Do NOT proceed to code generation until user approves the plan, including the catalog.**
 
-### Post-Generation Checklist
+### Post-Generation Validation
 
-After generating data, use `get_volume_folder_details` to validate the output matches requirements:
-- Row counts match the plan
-- Schema matches expected columns and types
-- Data distributions look reasonable (check column stats)
+Use `databricks sql execute` to validate generated data (row counts, distributions, referential integrity). Query parquet files directly:
+
+```bash
+databricks sql execute --warehouse-id $WAREHOUSE_ID --query "
+SELECT COUNT(*) FROM parquet.\`/Volumes/CATALOG/SCHEMA/raw_data/customers\`
+"
+```
+
+See [references/2-troubleshooting.md](references/2-troubleshooting.md) for full validation examples.
 
 ## Use Databricks Connect Spark + Faker Pattern
 

@@ -178,10 +178,6 @@ customers_df = (
 customers_df.write.mode(WRITE_MODE).parquet(f"{VOLUME_PATH}/customers")
 print(f"  Saved customers to {VOLUME_PATH}/customers")
 
-# Show tier distribution
-print("\n  Tier distribution:")
-customers_df.groupBy("tier").count().orderBy("tier").show()
-
 # =============================================================================
 # GENERATE ORDERS (Child Table with Referential Integrity)
 # =============================================================================
@@ -283,10 +279,6 @@ orders_final = orders_with_fk.drop("tier")
 # Save orders
 orders_final.write.mode(WRITE_MODE).parquet(f"{VOLUME_PATH}/orders")
 print(f"  Saved orders to {VOLUME_PATH}/orders")
-
-# Show status distribution
-print("\n  Status distribution:")
-orders_final.groupBy("status").count().orderBy("status").show()
 
 # =============================================================================
 # CLEANUP AND SUMMARY
