@@ -96,3 +96,51 @@ print(w.current_user.me().user_name)
 ```
 
 > **Note:** Profile changes via environment variables or CLI flags are session-scoped. For permanent profile setup, use `databricks auth login -p <profile>` and update `~/.databrickscfg` with `cluster_id` or `serverless_compute_id = auto`.
+
+## CLI Syntax Patterns
+
+**IMPORTANT**: Use `--json` for creating Unity Catalog objects. This is the most reliable syntax.
+
+```bash
+# ✅ CORRECT - use --json for create operations
+databricks catalogs create --json '{"name": "my_catalog"}'
+databricks schemas create --json '{"name": "my_schema", "catalog_name": "my_catalog"}'
+databricks volumes create --json '{"name": "my_volume", "catalog_name": "my_catalog", "schema_name": "my_schema", "volume_type": "MANAGED"}'
+```
+
+### Common CLI Patterns
+
+```bash
+# Get help for any command
+databricks <command> --help
+databricks schemas create --help
+
+# List operations
+databricks catalogs list
+databricks schemas list CATALOG_NAME
+databricks volumes list CATALOG_NAME.SCHEMA_NAME
+databricks clusters list
+databricks warehouses list
+
+# Create operations (use --json)
+databricks catalogs create --json '{"name": "my_catalog"}'
+databricks schemas create --json '{"name": "my_schema", "catalog_name": "my_catalog"}'
+databricks volumes create --json '{"name": "my_volume", "catalog_name": "my_catalog", "schema_name": "my_schema", "volume_type": "MANAGED"}'
+
+# Delete operations (use full name)
+databricks catalogs delete CATALOG_NAME
+databricks schemas delete CATALOG_NAME.SCHEMA_NAME
+databricks volumes delete CATALOG_NAME.SCHEMA_NAME.VOLUME_NAME
+```
+
+### SQL Execution via CLI
+
+```bash
+# Run SQL query
+databricks sql execute --warehouse-id WAREHOUSE_ID --query "SELECT * FROM catalog.schema.table LIMIT 10"
+
+# Create objects via SQL (alternative approach)
+databricks sql execute --warehouse-id WAREHOUSE_ID --query "CREATE CATALOG my_catalog"
+databricks sql execute --warehouse-id WAREHOUSE_ID --query "CREATE SCHEMA my_catalog.my_schema"
+databricks sql execute --warehouse-id WAREHOUSE_ID --query "CREATE VOLUME my_catalog.my_schema.my_volume"
+```

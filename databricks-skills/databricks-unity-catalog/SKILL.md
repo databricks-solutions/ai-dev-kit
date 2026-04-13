@@ -29,6 +29,29 @@ Use this skill when:
 
 ## Quick Start
 
+### Create Unity Catalog Objects (CLI)
+
+**IMPORTANT**: Use `--json` for creating UC objects. Positional args vary by command and version.
+
+```bash
+# Create a catalog
+databricks catalogs create --json '{"name": "my_catalog"}'
+
+# Create a schema
+databricks schemas create --json '{"name": "my_schema", "catalog_name": "my_catalog"}'
+
+# Create a managed volume
+databricks volumes create --json '{"name": "my_volume", "catalog_name": "my_catalog", "schema_name": "my_schema", "volume_type": "MANAGED"}'
+
+# Create an external volume
+databricks volumes create --json '{"name": "my_volume", "catalog_name": "my_catalog", "schema_name": "my_schema", "volume_type": "EXTERNAL", "storage_location": "s3://bucket/path"}'
+
+# List catalogs, schemas, volumes
+databricks catalogs list
+databricks schemas list my_catalog
+databricks volumes list my_catalog.my_schema
+```
+
 ### Volume File Operations (CLI)
 
 ```bash

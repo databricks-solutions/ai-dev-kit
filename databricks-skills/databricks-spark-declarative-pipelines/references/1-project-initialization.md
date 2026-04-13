@@ -429,7 +429,7 @@ pip install --upgrade databricks-cli
 databricks catalogs list
 
 # Create catalog if needed
-databricks catalogs create --name my_catalog
+databricks catalogs create --json '{"name": "my_catalog"}'
 ```
 
 ### "Language option not recognized"
