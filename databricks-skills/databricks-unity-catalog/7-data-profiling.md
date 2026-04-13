@@ -36,55 +36,42 @@ Supported `AggregationGranularity` values: `AGGREGATION_GRANULARITY_5_MINUTES`, 
 
 ---
 
-## MCP Tools
+## CLI & SQL Commands
 
-Use the `manage_uc_monitors` tool for all monitor operations:
+### Create a Monitor (SQL)
 
-| Action | Description |
-|--------|-------------|
-| `create` | Create a quality monitor on a table |
-| `get` | Get monitor details and status |
-| `run_refresh` | Trigger a metric refresh |
-| `list_refreshes` | List refresh history |
-| `delete` | Delete the monitor (assets are not deleted) |
-
-### Create a Monitor
-
-> **Note:** The MCP tool currently only creates **snapshot** monitors. For TimeSeries or InferenceLog monitors, use the Python SDK directly (see below).
-
-```python
-manage_uc_monitors(
-    action="create",
-    table_name="catalog.schema.my_table",
-    output_schema_name="catalog.schema",
-)
+```sql
+CREATE OR REPLACE QUALITY MONITOR catalog.schema.my_table
+OPTIONS (
+  OUTPUT_SCHEMA 'catalog.schema'
+);
 ```
 
-### Get Monitor Status
+### Get Monitor Status (SQL)
 
-```python
-manage_uc_monitors(
-    action="get",
-    table_name="catalog.schema.my_table",
-)
+```sql
+DESCRIBE QUALITY MONITOR catalog.schema.my_table;
 ```
 
-### Trigger a Refresh
+### Trigger a Refresh (SQL)
 
-```python
-manage_uc_monitors(
-    action="run_refresh",
-    table_name="catalog.schema.my_table",
-)
+```sql
+REFRESH QUALITY MONITOR catalog.schema.my_table;
 ```
 
-### Delete a Monitor
+### Delete a Monitor (SQL)
 
-```python
-manage_uc_monitors(
-    action="delete",
-    table_name="catalog.schema.my_table",
-)
+```sql
+DROP QUALITY MONITOR catalog.schema.my_table;
+```
+
+### Execute via CLI
+
+```bash
+databricks sql execute --warehouse-id WAREHOUSE_ID --query "
+CREATE OR REPLACE QUALITY MONITOR catalog.schema.my_table
+OPTIONS (OUTPUT_SCHEMA 'catalog.schema')
+"
 ```
 
 ---
@@ -300,7 +287,7 @@ LIMIT 100;
 ---
 
 > **Note:** Data profiling was formerly known as Lakehouse Monitoring. The legacy SDK accessor
-> `w.lakehouse_monitors` and the MCP tool `manage_uc_monitors` still use the previous API.
+> `w.lakehouse_monitors` still uses the previous API. Use `w.data_quality` for the new API.
 
 ## Resources
 

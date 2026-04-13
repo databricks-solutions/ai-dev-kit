@@ -37,18 +37,16 @@ All volume operations use the path format:
 
 ---
 
-## MCP Tools
+## CLI Commands
 
-| Tool | Usage |
-|------|-------|
-| `list_volume_files` | `list_volume_files(volume_path="/Volumes/catalog/schema/volume/path/")` |
-| `get_volume_folder_details` | `get_volume_folder_details(volume_path="catalog/schema/volume/path", format="parquet")` - schema, row counts, stats |
-| `upload_to_volume` | `upload_to_volume(local_path="/tmp/data/*", volume_path="/Volumes/.../dest")` - supports files, folders, globs |
-| `download_from_volume` | `download_from_volume(volume_path="/Volumes/.../file.csv", local_path="/tmp/file.csv")` |
-| `create_volume_directory` | `create_volume_directory(volume_path="/Volumes/.../new_folder")` - creates parents like `mkdir -p` |
-| `delete_volume_file` | `delete_volume_file(volume_path="/Volumes/.../file.csv")` |
-| `delete_volume_directory` | `delete_volume_directory(volume_path="/Volumes/.../folder")` - directory must be empty |
-| `get_volume_file_info` | `get_volume_file_info(volume_path="/Volumes/.../file.csv")` - returns size, modified date |
+| Command | Description |
+|---------|-------------|
+| `databricks fs ls /Volumes/catalog/schema/volume/path/` | List files in a volume |
+| `databricks fs cp /tmp/data/* /Volumes/.../dest --recursive` | Upload files/folders to volume |
+| `databricks fs cp /Volumes/.../file.csv /tmp/file.csv` | Download files from volume |
+| `databricks fs mkdirs /Volumes/.../new_folder` | Create directory (like `mkdir -p`) |
+| `databricks fs rm /Volumes/.../file.csv` | Delete file |
+| `databricks fs rm /Volumes/.../folder --recursive` | Delete directory recursively |
 
 ---
 

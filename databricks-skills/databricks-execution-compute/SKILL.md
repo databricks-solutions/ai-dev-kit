@@ -42,7 +42,7 @@ Scala/R? → Interactive Cluster (list and ask which one to use)
 
 **Read the reference file for your chosen mode before proceeding.**
 
-### Databricks Connect (no MCP tool, run locally) → [reference](references/1-databricks-connect.md)
+### Databricks Connect (run locally) → [reference](references/1-databricks-connect.md)
 
 ```bash
 python my_spark_script.py
@@ -50,30 +50,48 @@ python my_spark_script.py
 
 ### Serverless Job → [reference](references/2-serverless-job.md)
 
-```python
-execute_code(file_path="/path/to/script.py")
+```bash
+# Create and run a job with serverless compute
+databricks jobs create --json '{
+  "name": "my-script-job",
+  "tasks": [{
+    "task_key": "main",
+    "spark_python_task": {"python_file": "/Workspace/Users/me/script.py"},
+    "environment_key": "default"
+  }],
+  "environments": [{"environment_key": "default", "spec": {"client": "4"}}]
+}'
+
+# Run the job
+databricks jobs run-now --job-id JOB_ID
 ```
 
 ### Interactive Cluster → [reference](references/3-interactive-cluster.md)
 
-```python
-# Check for running clusters first (or use the one instructed)
-list_compute(resource="clusters")
-# Ask the customer which one to use
+```bash
+# List running clusters
+databricks clusters list --output json | jq '.[] | select(.state == "RUNNING")'
 
-# Run code, reuse context_id for follow-up MCP call
-result = execute_code(code="...", compute_type="cluster", cluster_id="...")
-execute_code(code="...", context_id=result["context_id"], cluster_id=result["cluster_id"])
+# Run a notebook or script on a cluster
+databricks workspace import /Workspace/Users/me/script.py --file ./script.py
+databricks jobs create --json '{
+  "name": "cluster-job",
+  "tasks": [{
+    "task_key": "main",
+    "existing_cluster_id": "CLUSTER_ID",
+    "spark_python_task": {"python_file": "/Workspace/Users/me/script.py"}
+  }]
+}'
 ```
 
-## MCP Tools
+## CLI Commands
 
-| Tool | For | Purpose |
-|------|-----|---------|
-| `execute_code` | Serverless, Interactive | Run code remotely |
-| `list_compute` | Interactive | List clusters, check status, auto-select running cluster |
-| `manage_cluster` | Interactive | Create, start, terminate, delete. **COSTLY:** `start` takes 3-8 min—ask user |
-| `manage_sql_warehouse` | SQL | Create, modify, delete SQL warehouses |
+| Command | For | Purpose |
+|---------|-----|---------|
+| `databricks jobs create/run-now` | Serverless, Cluster | Run code remotely |
+| `databricks clusters list` | Interactive | List clusters, check status |
+| `databricks clusters create/start/delete` | Interactive | Manage clusters. **COSTLY:** `start` takes 3-8 min |
+| `databricks sql warehouses create/list` | SQL | Manage SQL warehouses |
 
 ## Related Skills
 

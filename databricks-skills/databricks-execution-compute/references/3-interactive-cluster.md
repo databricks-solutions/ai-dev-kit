@@ -1,6 +1,6 @@
 # Interactive Cluster Execution
 
-**Use when:** You have an existing running cluster and need to preserve state across multiple MCP tool calls, or need Scala/R support.
+**Use when:** You have an existing running cluster and need to preserve state across multiple tool calls, or need Scala/R support.
 
 ## When to Choose Interactive Cluster
 

@@ -68,5 +68,5 @@ Switch to **[Serverless Job](2-serverless-job.md)** when:
 - Non-Spark Python code (pure sklearn, pytorch, etc.)
 
 Switch to **[Interactive Cluster](3-interactive-cluster.md)** when:
-- Need state across multiple separate MCP tool calls
+- Need state across multiple separate tool calls
 - Need Scala or R support
