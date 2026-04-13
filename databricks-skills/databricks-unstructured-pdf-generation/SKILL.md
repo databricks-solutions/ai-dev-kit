@@ -11,6 +11,18 @@ Convert HTML content to PDF documents and upload them to Unity Catalog Volumes.
 
 Generate PDFs from HTML using the `databricks-tools-core` library. You (the LLM) generate the HTML content, and the Python script handles conversion and upload.
 
+## Installation
+
+Install the `databricks-tools-core` library before using PDF generation:
+
+```bash
+# Preferred: use uv for faster installation
+uv pip install databricks-tools-core
+
+# Fallback: use pip if uv is not available
+pip install databricks-tools-core
+```
+
 ## Python Script Pattern
 
 ```python
