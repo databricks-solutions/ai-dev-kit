@@ -40,11 +40,8 @@ databricks catalogs create --json '{"name": "my_catalog"}'
 # Create a schema
 databricks schemas create --json '{"name": "my_schema", "catalog_name": "my_catalog"}'
 
-# Create a managed volume
+# Create a volume
 databricks volumes create --json '{"name": "my_volume", "catalog_name": "my_catalog", "schema_name": "my_schema", "volume_type": "MANAGED"}'
-
-# Create an external volume
-databricks volumes create --json '{"name": "my_volume", "catalog_name": "my_catalog", "schema_name": "my_schema", "volume_type": "EXTERNAL", "storage_location": "s3://bucket/path"}'
 
 # List catalogs, schemas, volumes
 databricks catalogs list
