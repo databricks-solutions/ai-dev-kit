@@ -12,12 +12,13 @@ A Genie Space connects to Unity Catalog tables and translates natural language q
 
 **Before creating a Genie Space, you MUST inspect the table schemas** to understand what data is available:
 
-```python
-get_table_stats_and_schema(
-    catalog="my_catalog",
-    schema="sales",
-    table_stat_level="SIMPLE"
-)
+```bash
+# Get table details
+databricks unity-catalog tables get my_catalog.sales.customers
+databricks unity-catalog tables get my_catalog.sales.orders
+
+# Or use discover-schema for multiple tables with statistics
+databricks experimental aitools tools discover-schema my_catalog.sales.customers my_catalog.sales.orders
 ```
 
 This returns:
@@ -39,31 +40,25 @@ Based on the schema information:
 
 Create the space with content tailored to the actual data:
 
-```python
-manage_genie(
-    action="create_or_update",
-    display_name="Sales Analytics",
-    table_identifiers=[
-        "my_catalog.sales.customers",
-        "my_catalog.sales.orders",
-        "my_catalog.sales.products"
-    ],
-    description="""Explore retail sales data with three related tables:
-- customers: Customer demographics including region, segment, and signup date
-- orders: Transaction history with order_date, total_amount, and status
-- products: Product catalog with category, price, and inventory
-
-Tables join on customer_id and product_id.""",
-    sample_questions=[
-        "What were total sales last month?",
-        "Who are our top 10 customers by total_amount?",
-        "How many orders were placed in Q4 by region?",
-        "What's the average order value by customer segment?",
-        "Which product categories have the highest revenue?",
-        "Show me customers who haven't ordered in 90 days"
-    ]
-)
+```bash
+databricks genie create-space --json '{
+  "display_name": "Sales Analytics",
+  "description": "Explore retail sales data with three related tables:\n- customers: Customer demographics including region, segment, and signup date\n- orders: Transaction history with order_date, total_amount, and status\n- products: Product catalog with category, price, and inventory\n\nTables join on customer_id and product_id.",
+  "table_identifiers": [
+    "my_catalog.sales.customers",
+    "my_catalog.sales.orders",
+    "my_catalog.sales.products"
+  ]
+}'
 ```
+
+Sample questions can be added via the Databricks UI after creation:
+- "What were total sales last month?"
+- "Who are our top 10 customers by total_amount?"
+- "How many orders were placed in Q4 by region?"
+- "What's the average order value by customer segment?"
+- "Which product categories have the highest revenue?"
+- "Show me customers who haven't ordered in 90 days"
 
 ## Why This Workflow Matters
 
@@ -149,55 +144,40 @@ Write sample questions that:
 
 ## Updating a Genie Space
 
-`manage_genie(action="create_or_update")` handles both create and update automatically. There are two ways it locates an existing space to update:
+Use `databricks genie update-space` to update an existing space by ID.
 
-- **By `space_id`** (explicit, preferred): pass `space_id=` to target a specific space.
-- **By `display_name`** (implicit fallback): if `space_id` is omitted, the tool searches for a space with a matching name and updates it if found; otherwise it creates a new one.
+### Simple field updates
 
-### Simple field updates (tables, questions, warehouse)
-
-To update metadata without a serialized config:
-
-```python
-manage_genie(
-    action="create_or_update",
-    display_name="Sales Analytics",
-    space_id="01abc123...",           # omit to match by name instead
-    table_identifiers=[               # updated table list
-        "my_catalog.sales.customers",
-        "my_catalog.sales.orders",
-        "my_catalog.sales.products",
-    ],
-    sample_questions=[                # updated sample questions
-        "What were total sales last month?",
-        "Who are our top 10 customers by revenue?",
-    ],
-    warehouse_id="abc123def456",      # omit to keep current / auto-detect
-    description="Updated description.",
-)
+```bash
+# Update display name and description
+databricks genie update-space SPACE_ID --json '{
+  "display_name": "Sales Analytics",
+  "description": "Updated description.",
+  "table_identifiers": [
+    "my_catalog.sales.customers",
+    "my_catalog.sales.orders",
+    "my_catalog.sales.products"
+  ]
+}'
 ```
 
-### Full config update via `serialized_space`
+### Full config update via serialized_space
 
-To push a complete serialized configuration to an existing space (the dict contains all regular table metadata, plus it preserves all instructions, SQL examples, join specs, etc.):
+To push a complete serialized configuration to an existing space (preserves all instructions, SQL examples, join specs, etc.):
 
-```python
-manage_genie(
-    action="create_or_update",
-    display_name="Sales Analytics",   # overrides title embedded in serialized_space
-    table_identifiers=[],             # ignored when serialized_space is provided
-    space_id="01abc123...",           # target space to overwrite
-    warehouse_id="abc123def456",      # overrides warehouse embedded in serialized_space
-    description="Updated description.",  # overrides description embedded in serialized_space; omit to keep the one in the payload
-    serialized_space=remapped_config, # JSON string from manage_genie(action="export") (after catalog remap if needed)
-)
+```bash
+# First export the current config
+databricks genie export-space SOURCE_SPACE_ID > config.json
+
+# Modify the serialized_space as needed, then update
+databricks genie update-space TARGET_SPACE_ID --json @updated_config.json
 ```
 
-> **Note:** When `serialized_space` is provided, `table_identifiers` and `sample_questions` are ignored — the full config comes from the serialized payload. However, `display_name`, `warehouse_id`, and `description` are still applied as top-level overrides on top of the serialized payload. Omit any of them to keep the values embedded in `serialized_space`.
+> **Note:** When using serialized_space, the full config comes from the serialized payload. Top-level overrides (display_name, warehouse_id, description) can still be applied.
 
 ## Export, Import & Migration
 
-`manage_genie(action="export")` returns a dictionary with four top-level keys:
+`databricks genie export-space SPACE_ID` returns a JSON object with these top-level keys:
 
 | Key | Description |
 |-----|-------------|
@@ -207,7 +187,7 @@ manage_genie(
 | `warehouse_id` | SQL warehouse associated with the space (workspace-specific — do **not** reuse across workspaces) |
 | `serialized_space` | JSON-encoded string with the full space configuration (see below) |
 
-This envelope enables cloning, backup, and cross-workspace migration. Use `manage_genie(action="export")` and `manage_genie(action="import")` for all export/import operations — no direct REST calls needed.
+This envelope enables cloning, backup, and cross-workspace migration.
 
 ### What is `serialized_space`?
 
@@ -230,10 +210,10 @@ Minimum structure:
 
 ### Exporting a Space
 
-Use `manage_genie(action="export")` to export the full configuration (requires CAN EDIT permission):
+Use `databricks genie export-space` to export the full configuration (requires CAN EDIT permission):
 
-```python
-exported = manage_genie(action="export", space_id="01abc123...")
+```bash
+databricks genie export-space 01abc123... > exported_space.json
 # Returns:
 # {
 #   "space_id": "01abc123...",
@@ -244,90 +224,72 @@ exported = manage_genie(action="export", space_id="01abc123...")
 # }
 ```
 
-You can also get `serialized_space` inline via `manage_genie(action="get")`:
-
-```python
-details = manage_genie(action="get", space_id="01abc123...", include_serialized_space=True)
-serialized = details["serialized_space"]
-```
-
 ### Cloning a Space (Same Workspace)
 
-```python
+```bash
 # Step 1: Export the source space
-source = manage_genie(action="export", space_id="01abc123...")
+databricks genie export-space 01abc123... > source.json
 
-# Step 2: Import as a new space
-manage_genie(
-    action="import",
-    warehouse_id=source["warehouse_id"],
-    serialized_space=source["serialized_space"],
-    title=source["title"],  # override title; omit to keep original
-    description=source["description"],
-)
-# Returns: {"space_id": "01def456...", "title": "Sales Analytics (Dev Copy)", "operation": "imported"}
+# Step 2: Import as a new space (modify title in JSON if needed)
+databricks genie import-space --json @source.json
+# Returns: {"space_id": "01def456...", "title": "Sales Analytics", "operation": "imported"}
 ```
 
 ### Migrating Across Workspaces with Catalog Remapping
 
 When migrating between environments (e.g. prod → dev), Unity Catalog names are often different. The `serialized_space` string contains the source catalog name **everywhere** — in table identifiers, SQL queries, join specs, and filter snippets. You must remap it before importing.
 
-**Agent workflow (3 steps):**
+**Workflow (3 steps):**
 
 **Step 1 — Export from source workspace:**
-```python
-exported = manage_genie(action="export", space_id="01f106e1239d14b28d6ab46f9c15e540")
-# exported keys: warehouse_id, title, description, serialized_space
-# exported["serialized_space"] contains all references to source catalog
+```bash
+# Use source workspace profile
+DATABRICKS_CONFIG_PROFILE=source databricks genie export-space 01f106e1239d14b28d6ab46f9c15e540 > exported.json
 ```
 
 **Step 2 — Remap catalog name in `serialized_space`:**
 
-The agent does this as an inline string substitution between the two MCP calls:
-```python
-modified_serialized = exported["serialized_space"].replace(
-    "source_catalog_name",     # e.g. "healthverity_claims_sample_patient_dataset"
-    "target_catalog_name"      # e.g. "healthverity_claims_sample_patient_dataset_dev"
-)
+Use sed or a script to replace catalog names:
+```bash
+# Replace source catalog with target catalog in the serialized_space
+sed -i '' 's/source_catalog_name/target_catalog_name/g' exported.json
 ```
 This replaces all occurrences — table identifiers, SQL FROM clauses, join specs, and filter snippets.
 
 **Step 3 — Import to target workspace:**
-```python
-manage_genie(
-    action="import",
-    warehouse_id="<target_warehouse_id>",   # from manage_warehouse(action="list") on target
-    serialized_space=modified_serialized,
-    title=exported["title"],
-    description=exported["description"]
-)
+```bash
+# Use target workspace profile
+DATABRICKS_CONFIG_PROFILE=target databricks genie import-space --json @exported.json
 ```
 
 ### Batch Migration of Multiple Spaces
 
-To migrate several spaces at once, loop through space IDs. The agent exports, remaps the catalog, then imports each:
+To migrate several spaces at once, use a shell loop:
 
-```
-For each space_id in [id1, id2, id3]:
-  1. exported = manage_genie(action="export", space_id=space_id)
-  2. modified  = exported["serialized_space"].replace(src_catalog, tgt_catalog)
-  3. result    = manage_genie(action="import", warehouse_id=wh_id, serialized_space=modified, title=exported["title"], description=exported["description"])
-  4. record result["space_id"] for updating databricks.yml
+```bash
+for space_id in id1 id2 id3; do
+  # Export
+  DATABRICKS_CONFIG_PROFILE=source databricks genie export-space $space_id > ${space_id}.json
+  # Remap catalog
+  sed -i '' 's/src_catalog/tgt_catalog/g' ${space_id}.json
+  # Import
+  DATABRICKS_CONFIG_PROFILE=target databricks genie import-space --json @${space_id}.json
+done
 ```
 
 After migration, update `databricks.yml` with the new dev `space_id` values under the `dev` target's `genie_space_ids` variable.
 
 ### Updating an Existing Space with New Config
 
-To push a serialized config to an already-existing space (rather than creating a new one), use `manage_genie(action="create_or_update")` with `space_id=` and `serialized_space=`. The export → remap → push pattern is identical to the migration steps above; just replace `manage_genie(action="import")` with `manage_genie(action="create_or_update", space_id=TARGET_SPACE_ID, ...)` as the final call.
+To push a serialized config to an already-existing space (rather than creating a new one), use `databricks genie update-space` with the serialized config. The export → remap → push pattern is identical to the migration steps above; just replace `import-space` with `update-space TARGET_SPACE_ID` as the final call.
 
 ### Permissions Required
 
 | Operation | Required Permission |
 |-----------|-------------------|
-| `manage_genie(action="export")` / `manage_genie(action="get", include_serialized_space=True)` | CAN EDIT on source space |
-| `manage_genie(action="import")` | Can create items in target workspace folder |
-| `manage_genie(action="create_or_update")` with `serialized_space` (update) | CAN EDIT on target space |
+| `databricks genie export-space` | CAN EDIT on source space |
+| `databricks genie import-space` | Can create items in target workspace folder |
+| `databricks genie update-space` with serialized_space | CAN EDIT on target space |
 
 ## Example End-to-End Workflow
 
@@ -338,17 +300,21 @@ To push a serialized config to an already-existing space (rather than creating a
    - Creates `catalog.schema.bronze_*` → `catalog.schema.silver_*` → `catalog.schema.gold_*`
 
 3. **Inspect the tables**:
-   ```python
-   get_table_stats_and_schema(catalog="catalog", schema="schema")
+   ```bash
+   databricks experimental aitools tools discover-schema catalog.schema.silver_customers catalog.schema.silver_orders
    ```
 
 4. **Create the Genie Space**:
-   - `display_name`: "My Data Explorer"
-   - `table_identifiers`: `["catalog.schema.silver_customers", "catalog.schema.silver_orders"]`
+   ```bash
+   databricks genie create-space --json '{
+     "display_name": "My Data Explorer",
+     "table_identifiers": ["catalog.schema.silver_customers", "catalog.schema.silver_orders"]
+   }'
+   ```
 
-5. **Add sample questions** based on actual column names
+5. **Add sample questions** via the Databricks UI based on actual column names
 
-6. **Test** in the Databricks UI
+6. **Test** using conversation.py or the Databricks UI
 
 ## Troubleshooting
 
@@ -370,26 +336,25 @@ To push a serialized config to an already-existing space (rather than creating a
 - Include sample questions that demonstrate the vocabulary
 - Add instructions via the Databricks Genie UI
 
-### `manage_genie(action="export")` returns empty `serialized_space`
+### `databricks genie export-space` returns empty `serialized_space`
 
 Requires at least **CAN EDIT** permission on the space.
 
-### `manage_genie(action="import")` fails with permission error
+### `databricks genie import-space` fails with permission error
 
 Ensure you have CREATE privileges in the target workspace folder.
 
 ### Tables not found after migration
 
-Catalog name was not remapped — replace the source catalog name in `serialized_space` before calling `manage_genie(action="import")`. The catalog appears in table identifiers, SQL FROM clauses, join specs, and filter snippets; a single `.replace(src_catalog, tgt_catalog)` on the whole string covers all occurrences.
+Catalog name was not remapped — replace the source catalog name in `serialized_space` before calling `databricks genie import-space`. The catalog appears in table identifiers, SQL FROM clauses, join specs, and filter snippets; a single `sed 's/src_catalog/tgt_catalog/g'` on the whole JSON covers all occurrences.
 
-### `manage_genie` lands in the wrong workspace
+### CLI targets the wrong workspace
 
-Each MCP server is workspace-scoped. Set up two named MCP server entries (one per profile) in your IDE's MCP config instead of switching a single server's profile mid-session.
+Use `DATABRICKS_CONFIG_PROFILE=profile_name` to specify which workspace profile to use:
+```bash
+DATABRICKS_CONFIG_PROFILE=dev databricks genie list-spaces
+```
 
-### MCP server doesn't pick up profile change
-
-The MCP process reads `DATABRICKS_CONFIG_PROFILE` once at startup — editing the config file requires an IDE reload to take effect.
-
-### `manage_genie(action="import")` fails with JSON parse error
+### `databricks genie import-space` fails with JSON parse error
 
 The `serialized_space` string may contain multi-line SQL arrays with `\n` escape sequences. Flatten SQL arrays to single-line strings before passing to avoid double-escaping issues.

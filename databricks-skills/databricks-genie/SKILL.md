@@ -25,80 +25,72 @@ Use this skill when:
     - Not supported for schema and/or table names that differ across environments
     - Not including migration of tables between environments (only migration of Genie Spaces)
 
-## MCP Tools
+## CLI Commands
 
-| Tool | Purpose |
-|------|---------|
-| `manage_genie` | Create, get, list, delete, export, and import Genie Spaces |
-| `ask_genie` | Ask natural language questions to a Genie Space |
-| `get_table_stats_and_schema` | Inspect table schemas before creating a space |
-| `execute_sql` | Test SQL queries directly |
+### Space Management
 
-### manage_genie - Space Management
+```bash
+# List all Genie Spaces
+databricks genie list-spaces
 
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `create_or_update` | Idempotent create/update a space | display_name, table_identifiers (or serialized_space) |
-| `get` | Get space details | space_id |
-| `list` | List all spaces | (none) |
-| `delete` | Delete a space | space_id |
-| `export` | Export space config for migration/backup | space_id |
-| `import` | Import space from serialized config | warehouse_id, serialized_space |
+# Create a Genie Space
+databricks genie create-space --json '{
+  "display_name": "Sales Analytics",
+  "description": "Explore sales data with natural language",
+  "table_identifiers": ["catalog.schema.customers", "catalog.schema.orders"]
+}'
 
-**Example tool calls:**
-```
-# MCP Tool: manage_genie
-# Create a new space
-manage_genie(
-    action="create_or_update",
-    display_name="Sales Analytics",
-    table_identifiers=["catalog.schema.customers", "catalog.schema.orders"],
-    description="Explore sales data with natural language",
-    sample_questions=["What were total sales last month?"]
-)
+# Get space details
+databricks genie get-space SPACE_ID
 
-# MCP Tool: manage_genie
-# Get space details with full config
-manage_genie(action="get", space_id="space_123", include_serialized_space=True)
+# Update a Genie Space
+databricks genie update-space SPACE_ID --json '{
+  "display_name": "Updated Name",
+  "description": "Updated description"
+}'
 
-# MCP Tool: manage_genie
-# List all spaces
-manage_genie(action="list")
-
-# MCP Tool: manage_genie
-# Export for migration
-exported = manage_genie(action="export", space_id="space_123")
-
-# MCP Tool: manage_genie
-# Import to new workspace
-manage_genie(
-    action="import",
-    warehouse_id="warehouse_456",
-    serialized_space=exported["serialized_space"],
-    title="Sales Analytics (Prod)"
-)
+# Delete (trash) a Genie Space
+databricks genie trash-space SPACE_ID
 ```
 
-### ask_genie - Conversation API (Query)
+### Export & Import (Migration)
 
-Ask natural language questions to a Genie Space. Pass `conversation_id` for follow-up questions.
+```bash
+# Export space configuration (returns JSON with serialized_space)
+databricks genie export-space SPACE_ID
 
+# Import space from exported config
+databricks genie import-space --json '{
+  "warehouse_id": "WAREHOUSE_ID",
+  "serialized_space": "...",
+  "title": "Sales Analytics (Prod)"
+}'
 ```
-# MCP Tool: ask_genie
-# Start a new conversation
-result = ask_genie(
-    space_id="space_123",
-    question="What were total sales last month?"
-)
+
+### Conversation API (Query)
+
+Use the `conversation.py` script in this skill folder to ask questions:
+
+```bash
+# Ask a question to a Genie Space
+python conversation.py ask SPACE_ID "What were total sales last month?"
 # Returns: {question, conversation_id, message_id, status, sql, columns, data, row_count}
 
-# MCP Tool: ask_genie
 # Follow-up question in same conversation
-result = ask_genie(
-    space_id="space_123",
-    question="Break that down by region",
-    conversation_id=result["conversation_id"]
-)
+python conversation.py ask SPACE_ID "Break that down by region" --conversation-id CONV_ID
+
+# With custom timeout (default: 60 seconds)
+python conversation.py ask SPACE_ID "Complex analysis query" --timeout 120
+```
+
+### Table Inspection
+
+```bash
+# Inspect table schemas before creating a space
+databricks unity-catalog tables get CATALOG.SCHEMA.TABLE
+
+# Or use the discover-schema tool for multiple tables
+databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2
 ```
 
 ## Quick Start
@@ -107,42 +99,32 @@ result = ask_genie(
 
 Before creating a Genie Space, understand your data:
 
-```
-# MCP Tool: get_table_stats_and_schema
-get_table_stats_and_schema(
-    catalog="my_catalog",
-    schema="sales",
-    table_stat_level="SIMPLE"
-)
+```bash
+# Get table details
+databricks unity-catalog tables get my_catalog.sales.customers
+databricks unity-catalog tables get my_catalog.sales.orders
+
+# Or use discover-schema for multiple tables
+databricks experimental aitools tools discover-schema my_catalog.sales.customers my_catalog.sales.orders
 ```
 
 ### 2. Create the Genie Space
 
-```
-# MCP Tool: manage_genie
-manage_genie(
-    action="create_or_update",
-    display_name="Sales Analytics",
-    table_identifiers=[
-        "my_catalog.sales.customers",
-        "my_catalog.sales.orders"
-    ],
-    description="Explore sales data with natural language",
-    sample_questions=[
-        "What were total sales last month?",
-        "Who are our top 10 customers?"
-    ]
-)
+```bash
+databricks genie create-space --json '{
+  "display_name": "Sales Analytics",
+  "description": "Explore sales data with natural language",
+  "table_identifiers": [
+    "my_catalog.sales.customers",
+    "my_catalog.sales.orders"
+  ]
+}'
 ```
 
 ### 3. Ask Questions (Conversation API)
 
-```
-# MCP Tool: ask_genie
-ask_genie(
-    space_id="your_space_id",
-    question="What were total sales last month?"
-)
+```bash
+python conversation.py ask YOUR_SPACE_ID "What were total sales last month?"
 # Returns: SQL, columns, data, row_count
 ```
 
@@ -150,26 +132,23 @@ ask_genie(
 
 Export a space (preserves all tables, instructions, SQL examples, and layout):
 
-```
-# MCP Tool: manage_genie
-exported = manage_genie(action="export", space_id="your_space_id")
-# exported["serialized_space"] contains the full config
+```bash
+databricks genie export-space YOUR_SPACE_ID > exported_space.json
+# exported_space.json contains serialized_space with full config
 ```
 
 Clone to a new space (same catalog):
 
-```
-# MCP Tool: manage_genie
-manage_genie(
-    action="import",
-    warehouse_id=exported["warehouse_id"],
-    serialized_space=exported["serialized_space"],
-    title=exported["title"],  # override title; omit to keep original
-    description=exported["description"],
-)
+```bash
+# Extract and import
+databricks genie import-space --json '{
+  "warehouse_id": "WAREHOUSE_ID",
+  "serialized_space": "...",
+  "title": "Sales Analytics (Clone)"
+}'
 ```
 
-> **Cross-workspace migration:** Each MCP server is workspace-scoped. Configure one server entry per workspace profile in your IDE's MCP config, then `manage_genie(action="export")` from the source server and `manage_genie(action="import")` via the target server. See [spaces.md §Migration](spaces.md#migrating-across-workspaces-with-catalog-remapping) for the full workflow.
+> **Cross-workspace migration:** Use different Databricks CLI profiles for source and target workspaces. Export from source profile, remap catalog names in `serialized_space`, then import via target profile. See [spaces.md §Migration](spaces.md#migrating-across-workspaces-with-catalog-remapping) for the full workflow.
 
 ## Reference Files
 
