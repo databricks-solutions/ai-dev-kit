@@ -2,6 +2,8 @@
 
 A web application that provides a Claude Code agent interface with integrated Databricks tools. Users interact with Claude through a chat interface, and the agent can execute SQL queries, manage pipelines, upload files, and more on their Databricks workspace.
 
+Optionally, the app can also serve as an **MCP server** for [Genie Code](https://docs.databricks.com/en/genie/genie-code.html) and other MCP clients, exposing all 75+ Databricks tools via the MCP protocol at `/mcp`.
+
 > **✅ Event Loop Fix Implemented**
 >
 > We've implemented a workaround for `claude-agent-sdk` [issue #462](https://github.com/anthropics/claude-agent-sdk-python/issues/462) that was preventing the agent from executing Databricks tools in FastAPI contexts.
@@ -432,6 +434,7 @@ databricks-builder-app/
 │   │   ├── agent.py       # /api/agent/* (invoke, etc.)
 │   │   ├── projects.py    # /api/projects/*
 │   │   └── conversations.py
+│   ├── mcp_gateway.py     # MCP Gateway for Genie Code (optional, via ENABLE_MCP_GATEWAY)
 │   └── services/          # Business logic
 │       ├── agent.py       # Claude Code session management
 │       ├── databricks_tools.py  # MCP tool loading from SDK
@@ -480,6 +483,12 @@ databricks-builder-app/
 | `/api/clusters` | GET | List available Databricks clusters |
 | `/api/warehouses` | GET | List available SQL warehouses |
 | `/api/mlflow/status` | GET | Get MLflow tracing status |
+| **MCP Gateway** (when `ENABLE_MCP_GATEWAY=true`) | | |
+| `/mcp` | POST | MCP protocol endpoint (Streamable HTTP) |
+| `/mcp/health` | GET | MCP gateway health check |
+| `/mcp/tools` | GET | List all registered MCP tools |
+| `/mcp/skills` | GET | List all available skills |
+| `/mcp/info` | GET | HTML info page with tools and skills |
 
 ## Deploying to Databricks Apps
 
@@ -519,6 +528,9 @@ That's it. The script handles everything:
 ```bash
 # Full deploy from scratch
 ./scripts/deploy.sh my-builder-app --profile dbx_shared_demo
+
+# Deploy with MCP Gateway for Genie Code (name MUST start with mcp-)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --profile dbx_shared_demo
 
 # Quick redeploy (skip Lakebase + frontend build + skills download)
 ./scripts/deploy.sh my-builder-app --profile dbx_shared_demo --skip-lakebase --skip-build --skip-skills
@@ -583,6 +595,86 @@ databricks bundle destroy --profile <profile>
 
 # Quick redeploy (server code changes only)
 ./scripts/deploy.sh my-builder-app --profile <profile> --skip-lakebase --skip-build --skip-skills
+```
+
+### MCP Gateway for Genie Code
+
+The Builder App can optionally serve as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. This turns the app into a dual-purpose deployment: **visual builder UI** at `/` and **MCP server** at `/mcp`.
+
+#### How It Works
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Builder App (single Databricks App deployment)     │
+│                                                     │
+│  /              → React Builder UI                  │
+│  /api/*         → REST API (projects, agent, etc.)  │
+│                                                     │
+│  /mcp           → MCP Protocol (Streamable HTTP)    │
+│  /mcp/health    → Health check (JSON)               │
+│  /mcp/tools     → Tool listing (JSON)               │
+│  /mcp/skills    → Skill listing (JSON)              │
+│  /mcp/info      → Info page (HTML)                  │
+└─────────────────────────────────────────────────────┘
+```
+
+The MCP gateway reuses the same FastMCP server and tool registrations that the in-process Claude agent uses — no duplicate tool loading, no separate deployment.
+
+#### Deploying with MCP Gateway
+
+> **Genie Code requires app names to start with `mcp-`** to appear in the MCP server picker. The deploy script will warn you if the name doesn't match.
+
+```bash
+# Deploy with MCP Gateway enabled (Genie Code compatible name)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --profile <your-profile>
+
+# Quick redeploy (code changes only)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --skip-lakebase --skip-build --skip-skills --profile <profile>
+```
+
+The `--enable-mcp` flag sets `ENABLE_MCP_GATEWAY=true` and `FASTMCP_STATELESS_HTTP=true` in the generated `app.yaml`. Without this flag, the MCP gateway is completely disabled and the app behaves identically to a standard deployment.
+
+#### Registering with Genie Code
+
+After deploying with `--enable-mcp` and an `mcp-` prefixed name:
+
+1. Open a **Genie Space** in the Databricks UI
+2. Click the **gear icon** (Settings) > **MCP Servers**
+3. Select your app (e.g., `mcp-builder-app`) from the list
+4. Genie Code now has access to all Databricks tools via MCP
+
+You can also install skills to the Genie Space for additional context:
+
+```bash
+# From the repo root — installs skills to your workspace for Genie Code
+./databricks-skills/install_skills_to_genie_code.sh
+```
+
+#### Using with Other MCP Clients
+
+The MCP endpoint works with any MCP client that supports Streamable HTTP transport:
+
+```
+MCP URL: https://<app-url>/mcp
+```
+
+| Client | Configuration |
+|--------|---------------|
+| **Genie Code** | Settings > MCP Servers > Select app |
+| **AI Playground** | Add MCP server URL |
+| **Claude Desktop** | `mcpServers` config with HTTP transport |
+| **Cursor / VS Code** | MCP server config with HTTP transport |
+
+#### Local Development
+
+The MCP gateway does **not** activate during local development unless you explicitly set the environment variable:
+
+```bash
+# Normal local dev (no MCP gateway)
+./scripts/start_dev.sh
+
+# Local dev with MCP gateway (for testing)
+ENABLE_MCP_GATEWAY=true uvicorn server.app:app --reload --port 8000 --reload-dir server
 ```
 
 ### Destroying Everything
