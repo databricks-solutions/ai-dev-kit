@@ -232,8 +232,8 @@ databricks bundle run customer_pipeline_etl
 # Run specific target
 databricks bundle run customer_pipeline_etl --target prod
 
-# Or use Pipeline API directly
-databricks pipelines start-update --pipeline-id <id>
+# Or use Pipeline API directly (pipeline_id is positional)
+databricks pipelines start-update <pipeline_id>
 ```
 
 ---

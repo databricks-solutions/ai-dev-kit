@@ -21,18 +21,25 @@ databricks workspace import-dir ./my_pipeline /Workspace/Users/user@example.com/
 
 ```bash
 # Create pipeline with JSON config
+# Use "file" - can point to a single .sql/.py file OR a directory (includes all files)
 databricks pipelines create --json '{
   "name": "my_orders_pipeline",
   "catalog": "my_catalog",
   "schema": "my_schema",
   "serverless": true,
   "libraries": [
-    {"notebook": {"path": "/Workspace/Users/user@example.com/my_pipeline/bronze/ingest_orders.sql"}},
-    {"notebook": {"path": "/Workspace/Users/user@example.com/my_pipeline/silver/clean_orders.sql"}},
-    {"notebook": {"path": "/Workspace/Users/user@example.com/my_pipeline/gold/daily_summary.sql"}}
+    {"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}
   ],
   "development": true
 }'
+
+# Or specify individual files:
+# "libraries": [
+#   {"file": {"path": "/Workspace/.../bronze/ingest_orders.sql"}},
+#   {"file": {"path": "/Workspace/.../silver/clean_orders.sql"}}
+# ]
+#
+# Legacy (avoid): {"notebook": {"path": "..."}} - use "file" instead
 ```
 
 Save the returned `pipeline_id` for subsequent operations.
@@ -40,11 +47,11 @@ Save the returned `pipeline_id` for subsequent operations.
 ### Step 4: Run Pipeline
 
 ```bash
-# Start a full refresh run
-databricks pipelines start-update --pipeline-id <pipeline_id> --full-refresh
+# Start a full refresh run (pipeline_id is a positional argument)
+databricks pipelines start-update <pipeline_id> --full-refresh
 
 # Check run status
-databricks pipelines get --pipeline-id <pipeline_id>
+databricks pipelines get <pipeline_id>
 ```
 
 ### Step 5: Validate Results
@@ -52,15 +59,14 @@ databricks pipelines get --pipeline-id <pipeline_id>
 **On Success** - Verify tables were created with correct data:
 
 ```bash
-# Check table schemas and row counts
-databricks sql execute --warehouse-id WAREHOUSE_ID --query "
-DESCRIBE TABLE EXTENDED my_catalog.my_schema.bronze_orders;
-"
-
-databricks sql execute --warehouse-id WAREHOUSE_ID --query "
-SELECT COUNT(*) as row_count FROM my_catalog.my_schema.bronze_orders;
-"
+# Check schema, row counts, sample data, and null counts for all tables
+databricks experimental aitools tools discover-schema \
+  my_catalog.my_schema.bronze_orders \
+  my_catalog.my_schema.silver_orders \
+  my_catalog.my_schema.gold_summary
 ```
+
+This returns per table: columns/types, 5 sample rows, total_rows count, and null counts.
 
 Or use Python for detailed stats:
 ```python
@@ -77,11 +83,11 @@ print(f"Created: {table.created_at}")
 **On Failure** - Get pipeline events and errors:
 
 ```bash
-# Get pipeline details with recent events
-databricks pipelines get --pipeline-id <pipeline_id>
+# Get pipeline details with recent events (pipeline_id is positional)
+databricks pipelines get <pipeline_id>
 
 # Get specific run events
-databricks pipelines list-pipeline-events --pipeline-id <pipeline_id>
+databricks pipelines list-pipeline-events <pipeline_id>
 ```
 
 ### Step 6: Iterate Until Working
@@ -89,7 +95,7 @@ databricks pipelines list-pipeline-events --pipeline-id <pipeline_id>
 1. Review errors from pipeline status or events
 2. Fix issues in local files
 3. Re-upload: `databricks workspace import-dir ./my_pipeline /Workspace/Users/user@example.com/my_pipeline --overwrite`
-4. Update and run: `databricks pipelines update --pipeline-id <pipeline_id> --json '...'` then `databricks pipelines start-update --pipeline-id <pipeline_id>`
+4. Update and run: `databricks pipelines update <pipeline_id> --json '...'` then `databricks pipelines start-update <pipeline_id>`
 5. Repeat until pipeline completes successfully
 
 ---
@@ -101,28 +107,29 @@ databricks pipelines list-pipeline-events --pipeline-id <pipeline_id>
 | Command | Description |
 |---------|-------------|
 | `databricks pipelines create --json '{...}'` | Create new pipeline |
-| `databricks pipelines get --pipeline-id ID` | Get pipeline details and status |
-| `databricks pipelines update --pipeline-id ID --json '{...}'` | Update pipeline config |
-| `databricks pipelines delete --pipeline-id ID` | Delete a pipeline |
-| `databricks pipelines list` | List all pipelines |
+| `databricks pipelines get PIPELINE_ID` | Get pipeline details and status |
+| `databricks pipelines update PIPELINE_ID --json '{...}'` | Update pipeline config |
+| `databricks pipelines delete PIPELINE_ID` | Delete a pipeline |
+| `databricks pipelines list-pipelines` | List all pipelines |
 
 ### Run Management
 
 | Command | Description |
 |---------|-------------|
-| `databricks pipelines start-update --pipeline-id ID` | Start pipeline update |
-| `databricks pipelines start-update --pipeline-id ID --full-refresh` | Start with full refresh |
-| `databricks pipelines stop --pipeline-id ID` | Stop running pipeline |
-| `databricks pipelines list-pipeline-events --pipeline-id ID` | Get events/logs |
-| `databricks pipelines list-updates --pipeline-id ID` | List recent runs |
+| `databricks pipelines start-update PIPELINE_ID` | Start pipeline update |
+| `databricks pipelines start-update PIPELINE_ID --full-refresh` | Start with full refresh |
+| `databricks pipelines stop PIPELINE_ID` | Stop running pipeline |
+| `databricks pipelines list-pipeline-events PIPELINE_ID` | Get events/logs |
+| `databricks pipelines list-updates PIPELINE_ID` | List recent runs |
 
 ### Supporting Commands
 
 | Command | Description |
 |---------|-------------|
 | `databricks workspace import-dir` | Upload files/folders to workspace |
-| `databricks workspace ls` | List workspace files |
-| `databricks sql execute` | Run ad-hoc SQL to inspect data |
+| `databricks workspace list` | List workspace files |
+| `databricks experimental aitools tools discover-schema` | Get schema, row counts, sample data, null counts |
+| `databricks experimental aitools tools query` | Run ad-hoc SQL queries |
 
 ---
 
@@ -135,14 +142,14 @@ from databricks.sdk import WorkspaceClient
 
 w = WorkspaceClient()
 
-# Create pipeline
+# Create pipeline - use "file" to include all .sql/.py files in a directory
 pipeline = w.pipelines.create(
     name="my_orders_pipeline",
     catalog="my_catalog",
     schema="my_schema",
     serverless=True,
     libraries=[
-        {"notebook": {"path": "/Workspace/Users/user@example.com/my_pipeline/bronze/ingest_orders.sql"}}
+        {"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}
     ],
     development=True
 )
