@@ -1,11 +1,26 @@
 ---
 name: databricks-aibi-dashboards
-description: "Create Databricks AI/BI dashboards. Use when creating, updating, or deploying Lakeview dashboards. CRITICAL: You MUST test ALL SQL queries via CLI BEFORE deploying. Follow guidelines strictly."
+description: "Create Databricks AI/BI dashboards. Must use when creating, updating, or deploying Lakeview dashboards as Databricks Dashboard have a unique json structure. CRITICAL: You MUST test ALL SQL queries via CLI BEFORE deploying. Follow guidelines strictly."
 ---
 
 # AI/BI Dashboard Skill
 
-Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow these guidelines strictly.**
+Create Databricks AI/BI dashboards (formerly Lakeview dashboards).
+A dashboard should be showing something relevant for a human, typically some KPI on the top, and based on the story, some graph (often temporal), and we see "something happens".
+**Follow these guidelines strictly.**
+
+## CRITICAL: Widget Version Requirements
+
+> **Wrong version = broken widget!** This is the #1 cause of dashboard errors.
+
+| Widget Type | Version | Notes |
+|-------------|---------|-------|
+| `counter` | **2** | KPI cards |
+| `table` | **2** | Data tables |
+| `bar`, `line`, `area`, `pie` | **3** | Charts |
+| `filter-*` | **2** | All filter types |
+
+---
 
 ## CRITICAL: MANDATORY VALIDATION WORKFLOW
 
@@ -22,7 +37,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 │          - Verify column names match what widgets will reference   │
 │          - Verify data types are correct (dates, numbers, strings) │
 ├─────────────────────────────────────────────────────────────────────┤
-│  STEP 4: Build dashboard JSON using ONLY verified queries          │
+│  STEP 4: Build dashboard JSON (serialized_dashboard content)       │
 ├─────────────────────────────────────────────────────────────────────┤
 │  STEP 5: Deploy via databricks lakeview create                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -36,7 +51,21 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 
 ```bash
 # Get table schemas for designing queries
+# IMPORTANT: Use CATALOG.SCHEMA.TABLE format (full 3-part name required)
 databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2
+
+# Example:
+databricks experimental aitools tools discover-schema samples.nyctaxi.trips main.default.customers
+
+# Explore data patterns if needed (to understand what to visualize):
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SELECT DISTINCT status FROM catalog.schema.orders"
+```
+
+### Step 2: Get Warehouse ID
+
+```bash
+# List warehouses to find one for SQL execution
+databricks warehouses list
 ```
 
 ### Step 3: Test SQL Queries
@@ -44,19 +73,52 @@ databricks experimental aitools tools discover-schema catalog.schema.table1 cata
 ```bash
 # Test SQL queries - MANDATORY before deployment!
 databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SELECT COUNT(*) FROM catalog.schema.table"
+
+# Test aggregations that will be used in widgets:
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SELECT region, SUM(revenue) FROM catalog.schema.sales GROUP BY region"
 ```
+
+### Step 4: Verify Data Matches Story
+
+Before finalizing, run validation queries to confirm the data tells the intended story:
+```bash
+# Example: Verify a spike/trend is visible in the data
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "
+SELECT
+  CASE WHEN date < '2025-02-17' THEN 'Before' ELSE 'After' END as period,
+  AVG(metric) as avg_value
+FROM catalog.schema.table
+GROUP BY 1"
+# Should show significant difference between periods if that's the story
+```
+
+If values don't match expectations, fix the data or adjust the story before creating the dashboard.
 
 ### Step 5: Dashboard Lifecycle
 
 ```bash
+# Create a dashboard
+# IMPORTANT: Use --display-name, --warehouse-id, and --serialized-dashboard (NOT --json @file.json with displayName in it)
+databricks lakeview create \
+  --display-name "My Dashboard" \
+  --warehouse-id "abc123def456" \
+  --serialized-dashboard "$(cat dashboard.json)"
+
+# Alternative: Use --json with the correct structure
+databricks lakeview create --json '{
+  "display_name": "My Dashboard",
+  "warehouse_id": "abc123def456",
+  "serialized_dashboard": "{\"datasets\":[...],\"pages\":[...]}"
+}'
+
 # List all dashboards
 databricks lakeview list
 
-# Create a dashboard from JSON file
-databricks lakeview create --json @dashboard.json
-
 # Get dashboard details
 databricks lakeview get DASHBOARD_ID
+
+# Update a dashboard
+databricks lakeview update DASHBOARD_ID --serialized-dashboard "$(cat dashboard.json)"
 
 # Publish a dashboard
 databricks lakeview publish DASHBOARD_ID --warehouse-id WAREHOUSE_ID
@@ -68,21 +130,80 @@ databricks lakeview unpublish DASHBOARD_ID
 databricks lakeview trash DASHBOARD_ID
 ```
 
-### Get Available Warehouse
+---
 
-```bash
-# List warehouses to find one for SQL execution
-databricks warehouses list
+## JSON Structure (Required Skeleton)
+
+Every dashboard's `serialized_dashboard` content must follow this exact structure:
+
+```json
+{
+  "datasets": [
+    {
+      "name": "ds_x",
+      "displayName": "Dataset X",
+      "queryLines": ["SELECT col1, col2 ", "FROM catalog.schema.table"]
+    }
+  ],
+  "pages": [
+    {
+      "name": "main",
+      "displayName": "Main",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {"widget": {/* INLINE widget definition */}, "position": {"x":0,"y":0,"width":2,"height":3}}
+      ]
+    }
+  ]
+}
 ```
+
+**Structural rules (violations cause "failed to parse serialized dashboard"):**
+- `queryLines`: Array of strings, NOT `"query": "string"`
+- Widgets: INLINE in `layout[].widget`, NOT a separate `"widgets"` array
+- `pageType`: Required on every page (`PAGE_TYPE_CANVAS` or `PAGE_TYPE_GLOBAL_FILTERS`)
+- Query binding: `query.fields[].name` must exactly match `encodings.*.fieldName`
+
+### Linking a Genie Space (Optional)
+
+To add an "Ask Genie" button to the dashboard, add `uiSettings.genieSpace` to the JSON:
+
+```json
+{
+  "datasets": [...],
+  "pages": [...],
+  "uiSettings": {
+    "genieSpace": {
+      "isEnabled": true,
+      "overrideId": "your-genie-space-id-here",
+      "enablementMode": "ENABLED"
+    }
+  }
+}
+```
+
+> **Genie is NOT a widget.** Link via `uiSettings.genieSpace` only. There is no `"widgetType": "assistant"`.
+
+---
+
+## Design Best Practices
+
+Apply unless user specifies otherwise:
+
+- **Global date filter**: When data has temporal columns, add a date range filter. Most dashboards need time-based filtering.
+- **KPI time bounds**: Use time-bounded metrics that enable period comparison (MoM, YoY). Unbounded "all-time" totals are less actionable.
+- **Value formatting**: Format values based on their meaning — currency with symbol, percentages with %, large numbers compacted (K/M/B).
+- **Chart selection**: Match cardinality to chart type. Few distinct values → pie/bar with color grouping; many values → table.
 
 ## Reference Files
 
 | What are you building? | Reference |
 |------------------------|-----------|
 | Any widget (text, counter, table, chart) | [1-widget-specifications.md](1-widget-specifications.md) |
-| Dashboard with filters (global or page-level) | [2-filters.md](2-filters.md) |
-| Need a complete working template to adapt | [3-examples.md](3-examples.md) |
-| Debugging a broken dashboard | [4-troubleshooting.md](4-troubleshooting.md) |
+| Advanced charts (area, scatter, combo, map) | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| Dashboard with filters (global or page-level) | [3-filters.md](3-filters.md) |
+| Need a complete working template to adapt | [4-examples.md](4-examples.md) |
+| Debugging a broken dashboard | [5-troubleshooting.md](5-troubleshooting.md) |
 
 ---
 
@@ -90,12 +211,16 @@ databricks warehouses list
 
 ### 1) DATASET ARCHITECTURE
 
-- **One dataset per domain** (e.g., orders, customers, products)
+- **One dataset per domain** (e.g., orders, customers, products). Datasets shared across widgets benefit from the same filters.
 - **Exactly ONE valid SQL query per dataset** (no multiple queries separated by `;`)
 - Always use **fully-qualified table names**: `catalog.schema.table_name`
 - SELECT must include all dimensions needed by widgets and all derived columns via `AS` aliases
 - Put ALL business logic (CASE/WHEN, COALESCE, ratios) into the dataset SELECT with explicit aliases
 - **Contract rule**: Every widget `fieldName` must exactly match a dataset column or alias
+- **Add ORDER BY** when visualization depends on data order:
+  - Time series: `ORDER BY date` for chronological display
+  - Rankings/Top-N: `ORDER BY metric DESC LIMIT 10` for "Top 10" charts
+  - Categorical charts: `ORDER BY metric DESC` to show largest values first
 
 ### 2) WIDGET FIELD EXPRESSIONS
 
@@ -159,13 +284,20 @@ Each widget has a position: `{"x": 0, "y": 0, "width": 2, "height": 4}`
 
 **CRITICAL**: Each row must fill width=6 exactly. No gaps allowed.
 
+```
+CORRECT:                          WRONG:
+y=0: [w=6]                        y=0: [w=4]____  ← gap!
+y=1: [w=2][w=2][w=2]  ← fills 6   y=1: [w=1][w=1][w=1][w=1]__  ← gap!
+y=4: [w=3][w=3]       ← fills 6
+```
+
 **Recommended widget sizes:**
 
 | Widget Type | Width | Height | Notes |
 |-------------|-------|--------|-------|
 | Text header | 6 | 1 | Full width; use SEPARATE widgets for title and subtitle |
 | Counter/KPI | 2 | **3-4** | **NEVER height=2** - too cramped! |
-| Line/Bar chart | 3 | **5-6** | Pair side-by-side to fill row |
+| Line/Bar/Area chart | 3 | **5-6** | Pair side-by-side to fill row |
 | Pie chart | 3 | **5-6** | Needs space for legend |
 | Full-width chart | 6 | 5-7 | For detailed time series |
 | Table | 6 | 5-8 | Full width for readability |
@@ -188,11 +320,11 @@ y=12: Table (w=6, h=6) - Detailed data
 | Dimension Type | Max Values | Examples |
 |----------------|------------|----------|
 | Chart color/groups | **3-8** | 4 regions, 5 product lines, 3 tiers |
-| Filters | 4-10 | 8 countries, 5 channels |
+| Filters | 4-15 | 8 countries, 5 channels |
 | High cardinality | **Table only** | customer_id, order_id, SKU |
 
 **Before creating any chart with color/grouping:**
-1. Check column cardinality (use `databricks experimental aitools tools discover-schema` to see distinct values)
+1. Check column cardinality via discover-schema or a COUNT DISTINCT query
 2. If >10 distinct values, aggregate to higher level OR use TOP-N + "Other" bucket
 3. For high-cardinality dimensions, use a table widget instead of a chart
 
@@ -202,7 +334,7 @@ Before deploying, verify:
 1. All widget names use only alphanumeric + hyphens + underscores
 2. All rows sum to width=6 with no gaps
 3. KPIs use height 3-4, charts use height 5-6
-4. Chart dimensions have ≤8 distinct values
+4. Chart dimensions have reasonable cardinality (≤8 for colors/groups)
 5. All widget fieldNames match dataset columns exactly
 6. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
 7. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
