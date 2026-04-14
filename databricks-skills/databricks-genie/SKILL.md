@@ -33,19 +33,20 @@ Use this skill when:
 # List all Genie Spaces
 databricks genie list-spaces
 
-# Create a Genie Space
+# Create a Genie Space (requires warehouse_id and serialized_space)
 databricks genie create-space --json '{
-  "display_name": "Sales Analytics",
+  "warehouse_id": "WAREHOUSE_ID",
+  "title": "Sales Analytics",
   "description": "Explore sales data with natural language",
-  "table_identifiers": ["catalog.schema.customers", "catalog.schema.orders"]
+  "serialized_space": "{\"version\": 2, \"data_sources\": {\"tables\": [{\"identifier\": \"catalog.schema.customers\"}, {\"identifier\": \"catalog.schema.orders\"}]}}"
 }'
 
-# Get space details
-databricks genie get-space SPACE_ID
+# Get space details (with serialized config)
+databricks genie get-space SPACE_ID --include-serialized-space
 
 # Update a Genie Space
 databricks genie update-space SPACE_ID --json '{
-  "display_name": "Updated Name",
+  "title": "Updated Name",
   "description": "Updated description"
 }'
 
@@ -112,12 +113,10 @@ databricks experimental aitools tools discover-schema my_catalog.sales.customers
 
 ```bash
 databricks genie create-space --json '{
-  "display_name": "Sales Analytics",
+  "warehouse_id": "YOUR_WAREHOUSE_ID",
+  "title": "Sales Analytics",
   "description": "Explore sales data with natural language",
-  "table_identifiers": [
-    "my_catalog.sales.customers",
-    "my_catalog.sales.orders"
-  ]
+  "serialized_space": "{\"version\": 2, \"data_sources\": {\"tables\": [{\"identifier\": \"my_catalog.sales.customers\"}, {\"identifier\": \"my_catalog.sales.orders\"}]}}"
 }'
 ```
 

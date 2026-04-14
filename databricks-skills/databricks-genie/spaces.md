@@ -38,38 +38,34 @@ Based on the schema information:
 
 ### Step 3: Create the Genie Space
 
-Create the space with content tailored to the actual data:
+Create the space using `warehouse_id` and `serialized_space`:
 
 ```bash
 databricks genie create-space --json '{
-  "display_name": "Sales Analytics",
-  "description": "Explore retail sales data with three related tables:\n- customers: Customer demographics including region, segment, and signup date\n- orders: Transaction history with order_date, total_amount, and status\n- products: Product catalog with category, price, and inventory\n\nTables join on customer_id and product_id.",
-  "table_identifiers": [
-    "my_catalog.sales.customers",
-    "my_catalog.sales.orders",
-    "my_catalog.sales.products"
-  ]
+  "warehouse_id": "YOUR_WAREHOUSE_ID",
+  "title": "Sales Analytics",
+  "description": "Explore retail sales data",
+  "parent_path": "/Workspace/Users/your.email@company.com/genie_spaces",
+  "serialized_space": "{\"version\": 2, \"data_sources\": {\"tables\": [{\"identifier\": \"my_catalog.sales.customers\"}, {\"identifier\": \"my_catalog.sales.orders\"}, {\"identifier\": \"my_catalog.sales.products\"}]}}"
 }'
 ```
 
-Sample questions can be added via the Databricks UI after creation:
-- "What were total sales last month?"
-- "Who are our top 10 customers by total_amount?"
-- "How many orders were placed in Q4 by region?"
-- "What's the average order value by customer segment?"
-- "Which product categories have the highest revenue?"
-- "Show me customers who haven't ordered in 90 days"
+**Required parameters:**
+- `warehouse_id` — SQL warehouse to use
+- `serialized_space` — JSON string with version 2 format (see Field Format Requirements below)
+
+**Optional parameters:**
+- `title` — Display name
+- `description` — Space description
+- `parent_path` — Workspace folder path
+
+Sample questions can be added via the Databricks UI after creation, or included in `serialized_space`. Questions should reference actual column names and reflect realistic business queries for the data (e.g., "What were total sales last month?" for a sales table with `order_date` and `amount` columns).
 
 ## Why This Workflow Matters
 
-**Sample questions that reference actual column names** help Genie:
-- Learn the vocabulary of your data
-- Generate more accurate SQL queries
-- Provide better autocomplete suggestions
+**Sample questions that reference actual column names** help Genie learn the vocabulary of your data and generate more accurate SQL.
 
-**A description that explains table relationships** helps Genie:
-- Understand how to join tables correctly
-- Know which table contains which information
+**A description that explains table relationships** helps Genie understand how to join tables correctly.
 - Provide more relevant answers
 
 ## Auto-Detection of Warehouse
@@ -142,6 +138,16 @@ Write sample questions that:
 - Demonstrate the data's capabilities
 - Use natural language (not SQL terms)
 
+## Deleting a Genie Space
+
+Use `databricks genie trash-space` to delete a space:
+
+```bash
+databricks genie trash-space SPACE_ID
+```
+
+> **Note:** The command is `trash-space`, not `delete-space`.
+
 ## Updating a Genie Space
 
 Use `databricks genie update-space` to update an existing space by ID.
@@ -149,15 +155,10 @@ Use `databricks genie update-space` to update an existing space by ID.
 ### Simple field updates
 
 ```bash
-# Update display name and description
+# Update title and description
 databricks genie update-space SPACE_ID --json '{
-  "display_name": "Sales Analytics",
-  "description": "Updated description.",
-  "table_identifiers": [
-    "my_catalog.sales.customers",
-    "my_catalog.sales.orders",
-    "my_catalog.sales.products"
-  ]
+  "title": "Sales Analytics",
+  "description": "Updated description."
 }'
 ```
 
@@ -173,7 +174,7 @@ databricks genie export-space SOURCE_SPACE_ID > config.json
 databricks genie update-space TARGET_SPACE_ID --json @updated_config.json
 ```
 
-> **Note:** When using serialized_space, the full config comes from the serialized payload. Top-level overrides (display_name, warehouse_id, description) can still be applied.
+> **Note:** When using serialized_space, the full config comes from the serialized payload. Top-level overrides (title, warehouse_id, description) can still be applied.
 
 ## Export, Import & Migration
 
@@ -206,6 +207,50 @@ Catalog names appear **everywhere** inside `serialized_space` — in `data_sourc
 Minimum structure:
 ```json
 {"version": 2, "data_sources": {"tables": [{"identifier": "catalog.schema.table"}]}}
+```
+
+### Field Format Requirements
+
+**IMPORTANT:** All items in `sample_questions`, `example_question_sqls`, and `text_instructions` require a unique `id` field.
+
+| Field | ID Required | Format |
+|-------|-------------|--------|
+| `config.sample_questions[]` | **YES** | `{"id": "32hexchars", "question": ["..."]}` |
+| `instructions.example_question_sqls[]` | **YES** | `{"id": "32hexchars", "question": ["..."], "sql": ["..."]}` |
+| `instructions.text_instructions[]` | **YES** | `{"id": "32hexchars", "content": ["..."]}` |
+
+**ID format:** 32-character lowercase hex UUID without hyphens. Generate with `uuid.uuid4().hex` in Python.
+
+**Text fields are arrays:** `question`, `sql`, and `content` are arrays of strings, not plain strings. Multi-line content is split into array elements.
+
+Example:
+```json
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {"id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", "question": ["What were total sales last month?"]}
+    ]
+  },
+  "data_sources": {
+    "tables": [{"identifier": "catalog.schema.customers"}]
+  },
+  "instructions": {
+    "example_question_sqls": [
+      {
+        "id": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+        "question": ["Show top customers"],
+        "sql": ["SELECT customer_name, SUM(amount) AS total\n", "FROM catalog.schema.orders\n", "GROUP BY 1 ORDER BY 2 DESC"]
+      }
+    ],
+    "text_instructions": [
+      {
+        "id": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+        "content": ["Use gold tables for KPI queries.\n", "Use silver tables for detailed drill-downs."]
+      }
+    ]
+  }
+}
 ```
 
 ### Exporting a Space
@@ -307,8 +352,9 @@ To push a serialized config to an already-existing space (rather than creating a
 4. **Create the Genie Space**:
    ```bash
    databricks genie create-space --json '{
-     "display_name": "My Data Explorer",
-     "table_identifiers": ["catalog.schema.silver_customers", "catalog.schema.silver_orders"]
+     "warehouse_id": "YOUR_WAREHOUSE_ID",
+     "title": "My Data Explorer",
+     "serialized_space": "{\"version\": 2, \"data_sources\": {\"tables\": [{\"identifier\": \"catalog.schema.silver_customers\"}, {\"identifier\": \"catalog.schema.silver_orders\"}]}}"
    }'
    ```
 
