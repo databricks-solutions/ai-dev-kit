@@ -55,12 +55,28 @@ databricks genie get-space SPACE_ID
 
 ### Supervisor Agent
 
-**No CLI** - use `scripts/mas_manager.py`:
+**No CLI** - use `scripts/mas_manager.py` (run from skill folder):
 
 ```bash
+# List existing MAS
 python scripts/mas_manager.py list_mas
-python scripts/mas_manager.py create_mas "Name" '{"description": "...", "agents": [...]}'
+
+# Create MAS with KA and Genie agents
+python scripts/mas_manager.py create_mas "My Supervisor" '{
+    "description": "Routes queries to specialized agents",
+    "instructions": "Route data questions to analyst. Route document questions to docs_agent.",
+    "agents": [
+        {"name": "analyst", "genie_space_id": "01abc...", "description": "SQL analytics on data"},
+        {"name": "docs_agent", "ka_tile_id": "dab408a2-...", "description": "Answers from documents"}
+    ]
+}'
+
+# Check status (wait for ONLINE)
 python scripts/mas_manager.py get_mas TILE_ID
+
+# Find IDs
+databricks knowledge-assistants list-knowledge-assistants --output json | jq '.[].id'
+databricks genie list-spaces --output json | jq '.[].space_id'
 ```
 
 ---

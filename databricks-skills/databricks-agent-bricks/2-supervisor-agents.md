@@ -248,7 +248,7 @@ After creation, the Supervisor Agent endpoint needs to provision:
 
 | Status | Meaning | Duration |
 |--------|---------|----------|
-| `PROVISIONING` | Creating the supervisor | 2-5 minutes |
+| `NOT_READY` | Creating the supervisor | 2-5 minutes |
 | `ONLINE` | Ready to route queries | - |
 | `OFFLINE` | Not currently running | - |
 
