@@ -148,6 +148,26 @@ description: "What this teaches"
 ...
 ```
 
+## Testing
+
+Run tests for skill scripts (requires `pytest`):
+
+```bash
+cd databricks-skills/.tests
+
+# Run all tests (unit tests are mocked, no Databricks connection needed)
+python run_tests.py
+
+# Run only unit tests
+python run_tests.py --unit
+
+# Run integration tests (requires Databricks connection)
+python run_tests.py --integration
+
+# Verbose output
+python run_tests.py -v
+```
+
 ## Troubleshooting
 
 **Skills not loading?** Check `.claude/skills/` exists and each skill has `SKILL.md`
