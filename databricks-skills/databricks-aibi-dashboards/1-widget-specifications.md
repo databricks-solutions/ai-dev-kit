@@ -297,7 +297,7 @@ Add `format` to any encoding to display values appropriately:
 
 ## Dataset Parameters
 
-Use `:param` syntax in SQL for dynamic filtering:
+Use `:param` syntax in SQL for dynamic filtering. Parameters can be bound to filter widgets (see [3-filters.md](3-filters.md)):
 
 ```json
 {
@@ -323,19 +323,9 @@ Use `:param` syntax in SQL for dynamic filtering:
 Allowed in `query.fields` (no CAST or complex SQL):
 
 ```json
-// Aggregations
-{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}
-{"name": "avg(price)", "expression": "AVG(`price`)"}
-{"name": "count(id)", "expression": "COUNT(`id`)"}
-{"name": "countdistinct(id)", "expression": "COUNT(DISTINCT `id`)"}
-
-// Date truncation
-{"name": "daily(date)", "expression": "DATE_TRUNC(\"DAY\", `date`)"}
-{"name": "weekly(date)", "expression": "DATE_TRUNC(\"WEEK\", `date`)"}
-{"name": "monthly(date)", "expression": "DATE_TRUNC(\"MONTH\", `date`)"}
-
-// Simple reference
-{"name": "category", "expression": "`category`"}
+{"name": "[sum|avg|count|countdistinct|min|max](col)", "expression": "[SUM|AVG|COUNT|COUNT(DISTINCT)|MIN|MAX](`col`)"}
+{"name": "[daily|weekly|monthly](date)", "expression": "DATE_TRUNC(\"[DAY|WEEK|MONTH]\", `date`)"}
+{"name": "field", "expression": "`field`"}
 ```
 
 For conditional logic, compute in dataset SQL instead.

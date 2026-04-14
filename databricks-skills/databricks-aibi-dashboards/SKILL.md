@@ -9,6 +9,21 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards).
 A dashboard should be showing something relevant for a human, typically some KPI on the top, and based on the story, some graph (often temporal), and we see "something happens".
 **Follow these guidelines strictly.**
 
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| List warehouses | `databricks warehouses list` |
+| List tables | `databricks experimental aitools tools query --warehouse WH "SHOW TABLES IN catalog.schema"` |
+| Get schema | `databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2` |
+| Test query | `databricks experimental aitools tools query --warehouse WH "SELECT..."` |
+| Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "Y" --serialized-dashboard "$(cat file.json)"` |
+| Update dashboard | `databricks lakeview update DASHBOARD_ID --serialized-dashboard "$(cat file.json)"` |
+| Publish | `databricks lakeview publish DASHBOARD_ID --warehouse-id WH` |
+| Delete | `databricks lakeview trash DASHBOARD_ID` |
+
+---
+
 ## CRITICAL: Widget Version Requirements
 
 > **Wrong version = broken widget!** This is the #1 cause of dashboard errors.
@@ -17,85 +32,69 @@ A dashboard should be showing something relevant for a human, typically some KPI
 |-------------|---------|-------|
 | `counter` | **2** | KPI cards |
 | `table` | **2** | Data tables |
-| `bar`, `line`, `area`, `pie` | **3** | Charts |
+| `bar`, `line`, `area`, `pie`, `scatter` | **3** | Charts |
+| `combo`, `choropleth-map` | **1** | Advanced charts |
 | `filter-*` | **2** | All filter types |
 
 ---
 
-## CRITICAL: MANDATORY VALIDATION WORKFLOW
+## NEW DASHBOARD CREATION WORKFLOW
 
-**You MUST follow this workflow exactly. Skipping validation causes broken dashboards.**
+**You MUST test ALL SQL queries via CLI BEFORE deploying. Follow the overall logic in these steps for new dashboard - Skipping validation causes broken dashboards.**
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 1: Get table schemas via discover-schema                      │
-├─────────────────────────────────────────────────────────────────────┤
-│  STEP 2: Write SQL queries for each dataset                        │
-├─────────────────────────────────────────────────────────────────────┤
-│  STEP 3: TEST EVERY QUERY via CLI ← DO NOT SKIP!                   │
-│          - If query fails, FIX IT before proceeding                │
-│          - Verify column names match what widgets will reference   │
-│          - Verify data types are correct (dates, numbers, strings) │
-├─────────────────────────────────────────────────────────────────────┤
-│  STEP 4: Build dashboard JSON (serialized_dashboard content)       │
-├─────────────────────────────────────────────────────────────────────┤
-│  STEP 5: Deploy via databricks lakeview create                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**WARNING: If you deploy without testing queries, widgets WILL show "Invalid widget definition" errors!**
-
-## CLI Commands
-
-### Step 1: Discover Table Schemas
-
-```bash
-# Get table schemas for designing queries
-# IMPORTANT: Use CATALOG.SCHEMA.TABLE format (full 3-part name required)
-databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2
-
-# Example:
-databricks experimental aitools tools discover-schema samples.nyctaxi.trips main.default.customers
-
-# Explore data patterns if needed (to understand what to visualize):
-databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SELECT DISTINCT status FROM catalog.schema.orders"
-```
-
-### Step 2: Get Warehouse ID
+### Step 1: Get Warehouse ID if not already known
 
 ```bash
 # List warehouses to find one for SQL execution
 databricks warehouses list
 ```
 
-### Step 3: Test SQL Queries
+### Step 2: Discover Table Schemas and existing data pattern
 
 ```bash
-# Test SQL queries - MANDATORY before deployment!
-databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SELECT COUNT(*) FROM catalog.schema.table"
+# Get table schemas for designing queries
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SHOW TABLES IN catalog.schema" 2>&1
+# IMPORTANT: Use CATALOG.SCHEMA.TABLE format (full 3-part name required)
+databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2
 
-# Test aggregations that will be used in widgets:
-databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SELECT region, SUM(revenue) FROM catalog.schema.sales GROUP BY region"
+# Example:
+databricks experimental aitools tools discover-schema samples.nyctaxi.trips main.default.customers
+
+# Explore data patterns if needed to confirm the data tells the intended story (to understand what/how to visualize):
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "<YOUR DATA EXPLORATION QUERY>"
 ```
 
-### Step 4: Verify Data Matches Story
 
-Before finalizing, run validation queries to confirm the data tells the intended story:
-```bash
-# Example: Verify a spike/trend is visible in the data
-databricks experimental aitools tools query --warehouse WAREHOUSE_ID "
-SELECT
-  CASE WHEN date < '2025-02-17' THEN 'Before' ELSE 'After' END as period,
-  AVG(metric) as avg_value
-FROM catalog.schema.table
-GROUP BY 1"
-# Should show significant difference between periods if that's the story
-```
+### Step 3: Verify Data Matches Story
+The datasets.querylines in the dashboard json (see example below) must be tested to ensure 
 
-If values don't match expectations, fix the data or adjust the story before creating the dashboard.
+Before finalizing, run the SQL Queries you intend to add in each dataset to confirm that they run properly and that the result are valid.
+This is crucial, as the widget defined in the json will use the query field output to render the visualization. The value should also make sense at a business level.
+Remember that for the filter to work, the query should have the field available (so typically group by the filter field)
+
+If values don't match expectations, ensure the query is correct, fix the data if you can, or adjust the story before creating the dashboard.
+
+### Step 4: Plan Dashboard Structure
+
+Before writing JSON, plan your dashboard:
+
+1. You must know the expected specific JSON structure. For this, **Read reference files**: [1-widget-specifications.md](1-widget-specifications.md), [3-filters.md](3-filters.md), [4-examples.md](4-examples.md)
+
+2. Think: **What widgets?** Map each visualization to a dataset:
+   | Widget | Type | Dataset | Has filter field? |
+   |--------|------|---------|-------------------|
+   | Revenue KPI | counter | ds_sales | ✓ date, region |
+   | Trend Chart | line | ds_sales | ✓ date, region |
+   | Top Products | table | ds_products | ✗ no date | 
+   ...
+
+3. **What filters?** For each filter, verify ALL datasets you want filtered contain the filter field.
+   > **Filters only affect datasets that have the filter field.** A pre-aggregated table without dates WON'T be date-filtered.
+
+4. **Write JSON locally** as a file.
 
 ### Step 5: Dashboard Lifecycle
-
+Once created, you can edit the file as following:
 ```bash
 # Create a dashboard
 # IMPORTANT: Use --display-name, --warehouse-id, and --serialized-dashboard (NOT --json @file.json with displayName in it)
@@ -166,7 +165,7 @@ Every dashboard's `serialized_dashboard` content must follow this exact structur
 
 ### Linking a Genie Space (Optional)
 
-To add an "Ask Genie" button to the dashboard, add `uiSettings.genieSpace` to the JSON:
+To add an "Ask Genie" button to the dashboard, or to link a genie space/room with an ID, add `uiSettings.genieSpace` to the JSON:
 
 ```json
 {
@@ -189,7 +188,6 @@ To add an "Ask Genie" button to the dashboard, add `uiSettings.genieSpace` to th
 ## Design Best Practices
 
 Apply unless user specifies otherwise:
-
 - **Global date filter**: When data has temporal columns, add a date range filter. Most dashboards need time-based filtering.
 - **KPI time bounds**: Use time-bounded metrics that enable period comparison (MoM, YoY). Unbounded "all-time" totals are less actionable.
 - **Value formatting**: Format values based on their meaning — currency with symbol, percentages with %, large numbers compacted (K/M/B).
@@ -200,7 +198,7 @@ Apply unless user specifies otherwise:
 | What are you building? | Reference |
 |------------------------|-----------|
 | Any widget (text, counter, table, chart) | [1-widget-specifications.md](1-widget-specifications.md) |
-| Advanced charts (area, scatter, combo, map) | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| Advanced charts (area, scatter/Bubble, combo (Line+Bar), Choropleth map) | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
 | Dashboard with filters (global or page-level) | [3-filters.md](3-filters.md) |
 | Need a complete working template to adapt | [4-examples.md](4-examples.md) |
 | Debugging a broken dashboard | [5-troubleshooting.md](5-troubleshooting.md) |
@@ -248,26 +246,10 @@ Apply unless user specifies otherwise:
 
 Allowed expressions in widget queries (you CANNOT use CAST or other SQL in expressions):
 
-**For numbers:**
 ```json
-{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}
-{"name": "avg(price)", "expression": "AVG(`price`)"}
-{"name": "count(orders)", "expression": "COUNT(`order_id`)"}
-{"name": "countdistinct(customers)", "expression": "COUNT(DISTINCT `customer_id`)"}
-{"name": "min(date)", "expression": "MIN(`order_date`)"}
-{"name": "max(date)", "expression": "MAX(`order_date`)"}
-```
-
-**For dates** (use daily for timeseries, weekly/monthly for grouped comparisons):
-```json
-{"name": "daily(date)", "expression": "DATE_TRUNC(\"DAY\", `date`)"}
-{"name": "weekly(date)", "expression": "DATE_TRUNC(\"WEEK\", `date`)"}
-{"name": "monthly(date)", "expression": "DATE_TRUNC(\"MONTH\", `date`)"}
-```
-
-**Simple field reference** (for pre-aggregated data):
-```json
-{"name": "category", "expression": "`category`"}
+{"name": "[sum|avg|count|countdistinct|min|max](col)", "expression": "[SUM|AVG|COUNT|COUNT(DISTINCT)|MIN|MAX](`col`)"}
+{"name": "[daily|weekly|monthly](date)", "expression": "DATE_TRUNC(\"[DAY|WEEK|MONTH]\", `date`)"}
+{"name": "field", "expression": "`field`"}
 ```
 
 If you need conditional logic or multi-field formulas, compute a derived column in the dataset SQL first.
@@ -338,9 +320,25 @@ Before deploying, verify:
 5. All widget fieldNames match dataset columns exactly
 6. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
 7. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
-8. Percent values are 0-1 (not 0-100)
+8. **Percent values must be 0-1 for `number-percent` format** (0.865 displays as "86.5%", don't forget to set the format). If data is 0-100, either divide by 100 in SQL or use `number` format instead.
 9. SQL uses Spark syntax (date_sub, not INTERVAL)
 10. **All SQL queries tested via CLI and return expected data**
+11. **Every dataset you want filtered MUST contain the filter field** — filters only affect datasets with that column in their query
+
+---
+
+## Data Variance Considerations
+
+Before creating trend charts, check if the metric has enough variance to visualize meaningfully:
+
+```sql
+SELECT MIN(metric), MAX(metric), MAX(metric) - MIN(metric) as range FROM dataset
+```
+
+If the range is very small relative to the scale (e.g., 83-89% on a 0-100 scale), the chart will appear nearly flat. Consider:
+- Showing as KPI with delta/comparison instead of chart
+- Using a table to display exact values
+- Adjusting the visualization to focus on the variance
 
 ---
 
