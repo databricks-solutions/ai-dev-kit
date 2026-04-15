@@ -1,0 +1,237 @@
+name: Release
+
+# Triggers when VERSION file is updated on main (typically via a version bump PR)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'VERSION'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  SYNC_PR_BRANCH: sync-main-to-experimental
+  EXPERIMENTAL_BRANCH: experimental
+
+jobs:
+  sync-experimental:
+    name: Sync Experimental Branch
+    runs-on: ubuntu-latest
+    outputs:
+      synced: ${{ steps.check-sync.outputs.synced }}
+      pr_number: ${{ steps.find-or-create-pr.outputs.pr_number }}
+      pr_url: ${{ steps.find-or-create-pr.outputs.pr_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check if experimental branch exists
+        id: check-experimental
+        run: |
+          if git ls-remote --heads origin ${{ env.EXPERIMENTAL_BRANCH }} | grep -q ${{ env.EXPERIMENTAL_BRANCH }}; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::notice::Experimental branch does not exist yet. It will be created from main."
+          fi
+
+      - name: Create experimental branch if missing
+        if: steps.check-experimental.outputs.exists == 'false'
+        run: |
+          git checkout -b ${{ env.EXPERIMENTAL_BRANCH }}
+          git push origin ${{ env.EXPERIMENTAL_BRANCH }}
+          echo "::notice::Created '${{ env.EXPERIMENTAL_BRANCH }}' branch from main"
+
+      - name: Check if experimental is in sync with main
+        id: check-sync
+        if: steps.check-experimental.outputs.exists == 'true'
+        run: |
+          git fetch origin ${{ env.EXPERIMENTAL_BRANCH }}
+
+          # Check if main is ahead of experimental
+          BEHIND_COUNT=$(git rev-list --count origin/${{ env.EXPERIMENTAL_BRANCH }}..origin/main)
+
+          if [ "$BEHIND_COUNT" -eq 0 ]; then
+            echo "synced=true" >> $GITHUB_OUTPUT
+            echo "::notice::✅ Experimental branch is in sync with main"
+          else
+            echo "synced=false" >> $GITHUB_OUTPUT
+            echo "behind_count=$BEHIND_COUNT" >> $GITHUB_OUTPUT
+            echo "::warning::Experimental branch is $BEHIND_COUNT commit(s) behind main"
+          fi
+
+      - name: Find or create sync PR
+        id: find-or-create-pr
+        if: steps.check-sync.outputs.synced == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check for existing open PR
+          EXISTING_PR=$(gh pr list --head main --base ${{ env.EXPERIMENTAL_BRANCH }} --state open --json number,url --jq '.[0]')
+
+          if [ -n "$EXISTING_PR" ]; then
+            PR_NUMBER=$(echo "$EXISTING_PR" | jq -r '.number')
+            PR_URL=$(echo "$EXISTING_PR" | jq -r '.url')
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+            echo "pr_existed=true" >> $GITHUB_OUTPUT
+            echo "::notice::Found existing sync PR #$PR_NUMBER"
+          else
+            # Create new PR
+            PR_URL=$(gh pr create \
+              --title "🔄 Sync: merge main into experimental" \
+              --body "## Auto-generated sync PR
+
+This PR keeps the \`experimental\` branch up to date with \`main\`.
+
+### Why is this needed?
+The experimental branch allows users to opt-in to early access features. It must stay in sync with main to ensure experimental users get all stable fixes and features.
+
+### What to do?
+- **If this PR has no conflicts**: It will be auto-merged by the release workflow
+- **If this PR has conflicts**: Please resolve them manually, then the next release attempt will succeed
+
+---
+*This PR was automatically created by the release workflow.*" \
+              --head main \
+              --base ${{ env.EXPERIMENTAL_BRANCH }})
+
+            PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+            echo "pr_existed=false" >> $GITHUB_OUTPUT
+            echo "::notice::Created sync PR #$PR_NUMBER: $PR_URL"
+          fi
+
+      - name: Check PR mergeability
+        id: check-mergeable
+        if: steps.check-sync.outputs.synced == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ steps.find-or-create-pr.outputs.pr_number }}"
+
+          # Wait a moment for GitHub to compute mergeability
+          sleep 5
+
+          # Get PR mergeable state
+          MERGEABLE=$(gh pr view "$PR_NUMBER" --json mergeable --jq '.mergeable')
+
+          echo "mergeable=$MERGEABLE" >> $GITHUB_OUTPUT
+
+          if [ "$MERGEABLE" = "MERGEABLE" ]; then
+            echo "::notice::✅ Sync PR #$PR_NUMBER is mergeable (no conflicts)"
+          elif [ "$MERGEABLE" = "CONFLICTING" ]; then
+            echo "::error::❌ Sync PR #$PR_NUMBER has merge conflicts that must be resolved manually"
+          else
+            echo "::warning::⏳ Sync PR #$PR_NUMBER mergeability is unknown (state: $MERGEABLE)"
+          fi
+
+      - name: Auto-merge sync PR
+        id: auto-merge
+        if: steps.check-sync.outputs.synced == 'false' && steps.check-mergeable.outputs.mergeable == 'MERGEABLE'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ steps.find-or-create-pr.outputs.pr_number }}"
+
+          echo "Auto-merging sync PR #$PR_NUMBER..."
+          gh pr merge "$PR_NUMBER" --merge --admin -t "Sync main into experimental (auto-merge)"
+
+          echo "merged=true" >> $GITHUB_OUTPUT
+          echo "::notice::✅ Successfully merged sync PR #$PR_NUMBER"
+
+      - name: Fail if conflicts exist
+        if: steps.check-sync.outputs.synced == 'false' && steps.check-mergeable.outputs.mergeable == 'CONFLICTING'
+        run: |
+          PR_URL="${{ steps.find-or-create-pr.outputs.pr_url }}"
+          PR_NUMBER="${{ steps.find-or-create-pr.outputs.pr_number }}"
+
+          echo ""
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║                    ❌ RELEASE BLOCKED                            ║"
+          echo "╠══════════════════════════════════════════════════════════════════╣"
+          echo "║                                                                  ║"
+          echo "║  The experimental branch has merge conflicts with main.          ║"
+          echo "║                                                                  ║"
+          echo "║  Before releasing, you must:                                     ║"
+          echo "║                                                                  ║"
+          echo "║  1. Resolve conflicts in PR #$PR_NUMBER"
+          echo "║     $PR_URL"
+          echo "║                                                                  ║"
+          echo "║  2. Merge the PR                                                 ║"
+          echo "║                                                                  ║"
+          echo "║  3. Re-trigger this workflow (push to VERSION or re-run)         ║"
+          echo "║                                                                  ║"
+          echo "╚══════════════════════════════════════════════════════════════════╝"
+          echo ""
+
+          exit 1
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: sync-experimental
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::notice::Releasing version $VERSION"
+
+      - name: Check if tag already exists
+        id: check-tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "::warning::Tag v$VERSION already exists, skipping release creation"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: steps.check-tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+          echo "::notice::Created tag v$VERSION"
+
+      - name: Create GitHub Release
+        if: steps.check-tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            --latest
+
+          echo ""
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║                    ✅ RELEASE SUCCESSFUL                         ║"
+          echo "╠══════════════════════════════════════════════════════════════════╣"
+          echo "║                                                                  ║"
+          echo "║  Version: v$VERSION"
+          echo "║                                                                  ║"
+          echo "║  • GitHub Release created                                        ║"
+          echo "║  • Experimental branch is in sync                                ║"
+          echo "║                                                                  ║"
+          echo "╚══════════════════════════════════════════════════════════════════╝"
