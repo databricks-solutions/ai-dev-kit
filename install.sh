@@ -83,6 +83,13 @@ INSTALL_SKILLS=true
 INSTALL_MCP="${DEVKIT_INSTALL_MCP:-false}"
 MCP_INSTALL_PATH="${DEVKIT_MCP_PATH:-$HOME/.ai-dev-kit}"
 
+# Required config fields - if any new field is added here, saved configs become stale
+# (hash is computed automatically, no manual version bump needed)
+REQUIRED_CONFIG_FIELDS="SAVED_TOOLS SAVED_PROFILE SAVED_SCOPE SAVED_SKILLS_PROFILE SAVED_INSTALL_MCP"
+
+# Flag to track if we're using previous config
+USE_PREVIOUS_CONFIG=false
+
 # Minimum required versions
 MIN_CLI_VERSION="0.278.0"
 MIN_SDK_VERSION="0.85.0"
@@ -494,6 +501,167 @@ radio_select() {
     trap - EXIT
 
     echo "${values[$selected]}"
+}
+
+# ─── Configuration persistence ───────────────────────────────────
+# Saves all user choices to allow quick reinstalls
+
+# Compute hash of required fields list (auto-detects schema changes)
+get_config_schema_hash() {
+    # Use md5/md5sum depending on platform, truncate for readability
+    if command -v md5 >/dev/null 2>&1; then
+        echo "$REQUIRED_CONFIG_FIELDS" | md5 | cut -c1-8
+    elif command -v md5sum >/dev/null 2>&1; then
+        echo "$REQUIRED_CONFIG_FIELDS" | md5sum | cut -c1-8
+    else
+        # Fallback: simple checksum
+        echo "$REQUIRED_CONFIG_FIELDS" | cksum | cut -d' ' -f1
+    fi
+}
+
+# Get config file path (scope-aware)
+get_config_file() {
+    local state_dir
+    if [ "$SCOPE" = "global" ]; then
+        state_dir="$INSTALL_DIR"
+    else
+        state_dir="$(pwd)/.ai-dev-kit"
+    fi
+    echo "$state_dir/.install-config"
+}
+
+# Save current configuration to file
+save_config() {
+    local config_file
+    config_file=$(get_config_file)
+    mkdir -p "$(dirname "$config_file")"
+
+    local schema_hash
+    schema_hash=$(get_config_schema_hash)
+
+    cat > "$config_file" << EOF
+# AI Dev Kit installation configuration
+# Generated on $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+CONFIG_SCHEMA_HASH=$schema_hash
+SAVED_TOOLS=$TOOLS
+SAVED_PROFILE=$PROFILE
+SAVED_SCOPE=$SCOPE
+SAVED_SKILLS_PROFILE=${SKILLS_PROFILE:-all}
+SAVED_USER_SKILLS=$USER_SKILLS
+SAVED_INSTALL_MCP=$INSTALL_MCP
+SAVED_MCP_INSTALL_PATH=$MCP_INSTALL_PATH
+EOF
+}
+
+# Load and validate previous configuration
+# Returns 0 if valid config exists, 1 otherwise
+# Sets SAVED_* variables if successful
+load_previous_config() {
+    # Determine where to look for config
+    # For project scope, check current directory
+    # For global scope (or auto-detect), check both
+    local config_file=""
+
+    # First try project-local config
+    if [ -f "$(pwd)/.ai-dev-kit/.install-config" ]; then
+        config_file="$(pwd)/.ai-dev-kit/.install-config"
+    # Then try global config
+    elif [ -f "$INSTALL_DIR/.install-config" ]; then
+        config_file="$INSTALL_DIR/.install-config"
+    fi
+
+    [ -z "$config_file" ] && return 1
+
+    # Source the config file
+    # shellcheck disable=SC1090
+    source "$config_file" 2>/dev/null || return 1
+
+    # Validate schema hash matches (if new fields added, hash changes, config is stale)
+    local expected_hash
+    expected_hash=$(get_config_schema_hash)
+    if [ "${CONFIG_SCHEMA_HASH:-}" != "$expected_hash" ]; then
+        return 1
+    fi
+
+    # Validate all required fields are present and non-empty
+    local field
+    for field in $REQUIRED_CONFIG_FIELDS; do
+        eval "local value=\${$field:-}"
+        [ -z "$value" ] && return 1
+    done
+
+    return 0
+}
+
+# Apply loaded config to current session variables
+apply_previous_config() {
+    TOOLS="$SAVED_TOOLS"
+    PROFILE="$SAVED_PROFILE"
+    SCOPE="$SAVED_SCOPE"
+    SCOPE_EXPLICIT=true
+
+    if [ "$SAVED_SKILLS_PROFILE" = "custom" ] || [[ "$SAVED_USER_SKILLS" == *","* ]] || [[ "$SAVED_USER_SKILLS" == *" "* ]]; then
+        USER_SKILLS="$SAVED_USER_SKILLS"
+    else
+        SKILLS_PROFILE="$SAVED_SKILLS_PROFILE"
+    fi
+
+    INSTALL_MCP="$SAVED_INSTALL_MCP"
+    MCP_INSTALL_PATH="${SAVED_MCP_INSTALL_PATH:-$HOME/.ai-dev-kit}"
+
+    USE_PREVIOUS_CONFIG=true
+}
+
+# Display previous config and ask if user wants to use it
+prompt_use_previous_config() {
+    if ! load_previous_config; then
+        return 1  # No valid config, proceed with prompts
+    fi
+
+    echo ""
+    echo -e "  ${B}Previous installation detected${N}"
+    echo -e "  ────────────────────────────────────"
+    echo -e "  Tools:         ${G}$(echo "$SAVED_TOOLS" | tr ' ' ', ')${N}"
+    echo -e "  Profile:       ${G}$SAVED_PROFILE${N}"
+    echo -e "  Scope:         ${G}$SAVED_SCOPE${N}"
+
+    if [ -n "$SAVED_USER_SKILLS" ]; then
+        echo -e "  Skills:        ${G}custom selection${N}"
+    else
+        echo -e "  Skills:        ${G}${SAVED_SKILLS_PROFILE:-all}${N}"
+    fi
+
+    if [ "$SAVED_INSTALL_MCP" = "true" ]; then
+        echo -e "  MCP server:    ${Y}Yes${N} → $SAVED_MCP_INSTALL_PATH"
+    else
+        echo -e "  MCP server:    ${G}No${N}"
+    fi
+    echo ""
+
+    if [ "$SILENT" = true ]; then
+        apply_previous_config
+        return 0
+    fi
+
+    if [ ! -e /dev/tty ]; then
+        apply_previous_config
+        return 0
+    fi
+
+    # Use radio selector for clear UX
+    local choice
+    choice=$(radio_select \
+        "Use previous configuration|use|Quick reinstall with same settings" \
+        "Reconfigure|new|Change tools, profile, or skills")
+
+    if [ "$choice" = "use" ]; then
+        apply_previous_config
+        ok "Using previous configuration"
+        return 0
+    else
+        msg "Starting fresh configuration..."
+        return 1
+    fi
 }
 
 # ─── Tool detection & selection ─────────────────────────────────
@@ -1902,51 +2070,77 @@ main() {
     step "Checking prerequisites"
     check_deps
 
-    # ── Step 2: Interactive tool selection ──
-    step "Selecting tools"
-    detect_tools
-    ok "Selected: $(echo "$TOOLS" | tr ' ' ', ')"
+    # ── Step 2: Check for previous configuration ──
+    # Only prompt if running interactively and no explicit flags were provided
+    if [ "$SILENT" = false ] && [ -z "$USER_TOOLS" ] && [ "$SCOPE_EXPLICIT" = false ]; then
+        if prompt_use_previous_config; then
+            # Config loaded and user chose to use it - skip to skill resolution
+            # Set state directory based on loaded scope
+            if [ "$SCOPE" = "global" ]; then
+                STATE_DIR="$INSTALL_DIR"
+            else
+                STATE_DIR="$(pwd)/.ai-dev-kit"
+            fi
+            # Resolve skills from loaded config
+            if [ "$INSTALL_SKILLS" = true ]; then
+                resolve_skills
+            fi
+            # Skip to confirmation (USE_PREVIOUS_CONFIG is true)
+        fi
+    fi
 
-    # ── Step 3: Interactive profile selection ──
-    step "Databricks profile"
-    prompt_profile
-    ok "Profile: $PROFILE"
+    # ── Interactive configuration (skip if using previous config) ──
+    if [ "$USE_PREVIOUS_CONFIG" = false ]; then
+        # ── Step 2: Interactive tool selection ──
+        step "Selecting tools"
+        detect_tools
+        ok "Selected: $(echo "$TOOLS" | tr ' ' ', ')"
 
-    # ── Step 3.5: Interactive scope selection ──
-    if [ "$SCOPE_EXPLICIT" = false ]; then
-        prompt_scope
-        ok "Scope: $SCOPE"
+        # ── Step 3: Interactive profile selection ──
+        step "Databricks profile"
+        prompt_profile
+        ok "Profile: $PROFILE"
+
+        # ── Step 3.5: Interactive scope selection ──
+        if [ "$SCOPE_EXPLICIT" = false ]; then
+            prompt_scope
+            ok "Scope: $SCOPE"
+        fi
     fi
 
     # Set state directory based on scope (for profile/manifest storage)
+    # (Also set when using previous config, but doesn't hurt to ensure it's set)
     if [ "$SCOPE" = "global" ]; then
         STATE_DIR="$INSTALL_DIR"
     else
         STATE_DIR="$(pwd)/.ai-dev-kit"
     fi
 
-    # ── Step 4: Skill profile selection ──
-    if [ "$INSTALL_SKILLS" = true ]; then
-        step "Skill profiles"
-        prompt_skills_profile
-        resolve_skills
-        # Count for display
-        local sk_count=0
-        for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_count=$((sk_count + 1)); done
-        if [ -n "$USER_SKILLS" ]; then
-            ok "Custom selection ($sk_count skills)"
-        else
-            ok "Profile: ${SKILLS_PROFILE:-all} ($sk_count skills)"
+    # ── Continue interactive configuration (skip if using previous config) ──
+    if [ "$USE_PREVIOUS_CONFIG" = false ]; then
+        # ── Step 4: Skill profile selection ──
+        if [ "$INSTALL_SKILLS" = true ]; then
+            step "Skill profiles"
+            prompt_skills_profile
+            resolve_skills
+            # Count for display
+            local sk_count=0
+            for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_count=$((sk_count + 1)); done
+            if [ -n "$USER_SKILLS" ]; then
+                ok "Custom selection ($sk_count skills)"
+            else
+                ok "Profile: ${SKILLS_PROFILE:-all} ($sk_count skills)"
+            fi
         fi
-    fi
 
-    # ── Step 4.5: MCP server installation prompt ──
-    step "MCP server (deprecated)"
-    prompt_mcp_install
-    if [ "$INSTALL_MCP" = true ]; then
-        ok "Will install MCP server to: $MCP_INSTALL_PATH"
-    else
-        ok "Skipping MCP server (recommended)"
+        # ── Step 4.5: MCP server installation prompt ──
+        step "MCP server (deprecated)"
+        prompt_mcp_install
+        if [ "$INSTALL_MCP" = true ]; then
+            ok "Will install MCP server to: $MCP_INSTALL_PATH"
+        else
+            ok "Skipping MCP server (recommended)"
+        fi
     fi
 
     # ── Step 5: Confirm before proceeding ──
@@ -2023,10 +2217,13 @@ main() {
     
     # Save version
     save_version
-    
+
+    # Save configuration for quick reinstalls
+    save_config
+
     # Prompt to run auth
     prompt_auth
-    
+
     # Done
     summary
 }
