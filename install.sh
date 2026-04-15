@@ -543,53 +543,53 @@ save_config() {
     cat > "$config_file" << EOF
 # AI Dev Kit installation configuration
 # Generated on $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-CONFIG_SCHEMA_HASH=$schema_hash
-SAVED_TOOLS=$TOOLS
-SAVED_PROFILE=$PROFILE
-SAVED_SCOPE=$SCOPE
-SAVED_SKILLS_PROFILE=${SKILLS_PROFILE:-all}
-SAVED_USER_SKILLS=$USER_SKILLS
-SAVED_INSTALL_MCP=$INSTALL_MCP
-SAVED_MCP_INSTALL_PATH=$MCP_INSTALL_PATH
+CONFIG_SCHEMA_HASH="$schema_hash"
+SAVED_TOOLS="$TOOLS"
+SAVED_PROFILE="$PROFILE"
+SAVED_SCOPE="$SCOPE"
+SAVED_SKILLS_PROFILE="${SKILLS_PROFILE:-all}"
+SAVED_USER_SKILLS="$USER_SKILLS"
+SAVED_INSTALL_MCP="$INSTALL_MCP"
+SAVED_MCP_INSTALL_PATH="$MCP_INSTALL_PATH"
 EOF
 }
 
 # Load and validate previous configuration
 # Returns 0 if valid config exists, 1 otherwise
 # Sets SAVED_* variables if successful
+# Robust: any error silently falls back to fresh install
 load_previous_config() {
-    # Determine where to look for config
-    # For project scope, check current directory
-    # For global scope (or auto-detect), check both
     local config_file=""
 
-    # First try project-local config
+    # First try project-local config, then global
     if [ -f "$(pwd)/.ai-dev-kit/.ai-dev-kit-install-config" ]; then
         config_file="$(pwd)/.ai-dev-kit/.ai-dev-kit-install-config"
-    # Then try global config
     elif [ -f "$INSTALL_DIR/.ai-dev-kit-install-config" ]; then
         config_file="$INSTALL_DIR/.ai-dev-kit-install-config"
     fi
-
     [ -z "$config_file" ] && return 1
 
-    # Source the config file
-    # shellcheck disable=SC1090
-    source "$config_file" 2>/dev/null || return 1
+    # Safely read config using grep instead of source (avoids code execution)
+    CONFIG_SCHEMA_HASH=$(grep -E '^CONFIG_SCHEMA_HASH=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_TOOLS=$(grep -E '^SAVED_TOOLS=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_PROFILE=$(grep -E '^SAVED_PROFILE=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_SCOPE=$(grep -E '^SAVED_SCOPE=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_SKILLS_PROFILE=$(grep -E '^SAVED_SKILLS_PROFILE=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_INSTALL_MCP=$(grep -E '^SAVED_INSTALL_MCP=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_USER_SKILLS=$(grep -E '^SAVED_USER_SKILLS=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || true
+    SAVED_MCP_INSTALL_PATH=$(grep -E '^SAVED_MCP_INSTALL_PATH=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || true
 
-    # Validate schema hash matches (if new fields added, hash changes, config is stale)
+    # Validate schema hash matches
     local expected_hash
     expected_hash=$(get_config_schema_hash)
-    if [ "${CONFIG_SCHEMA_HASH:-}" != "$expected_hash" ]; then
-        return 1
-    fi
+    [ "${CONFIG_SCHEMA_HASH:-}" != "$expected_hash" ] && return 1
 
-    # Validate all required fields are present and non-empty
-    local field
-    for field in $REQUIRED_CONFIG_FIELDS; do
-        eval "local value=\${$field:-}"
-        [ -z "$value" ] && return 1
-    done
+    # Validate required fields are present
+    [ -z "$SAVED_TOOLS" ] && return 1
+    [ -z "$SAVED_PROFILE" ] && return 1
+    [ -z "$SAVED_SCOPE" ] && return 1
+    [ -z "$SAVED_SKILLS_PROFILE" ] && return 1
+    [ -z "$SAVED_INSTALL_MCP" ] && return 1
 
     return 0
 }
