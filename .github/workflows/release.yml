@@ -157,23 +157,91 @@ The experimental branch allows users to opt-in to early access features. It must
           PR_NUMBER="${{ steps.find-or-create-pr.outputs.pr_number }}"
 
           echo ""
-          echo "╔══════════════════════════════════════════════════════════════════╗"
-          echo "║                    ❌ RELEASE BLOCKED                            ║"
-          echo "╠══════════════════════════════════════════════════════════════════╣"
-          echo "║                                                                  ║"
-          echo "║  The experimental branch has merge conflicts with main.          ║"
-          echo "║                                                                  ║"
-          echo "║  Before releasing, you must:                                     ║"
-          echo "║                                                                  ║"
-          echo "║  1. Resolve conflicts in PR #$PR_NUMBER"
-          echo "║     $PR_URL"
-          echo "║                                                                  ║"
-          echo "║  2. Merge the PR                                                 ║"
-          echo "║                                                                  ║"
-          echo "║  3. Re-trigger this workflow (push to VERSION or re-run)         ║"
-          echo "║                                                                  ║"
-          echo "╚══════════════════════════════════════════════════════════════════╝"
+          echo "❌ RELEASE BLOCKED - Merge conflicts detected"
           echo ""
+          echo "📋 Sync PR: $PR_URL"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "                         HOW TO FIX"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Open Claude Code in the ai-dev-kit repo and paste this prompt:"
+          echo ""
+          cat << 'PROMPT'
+━━━━━━━━━━━━━━━━━━━━━ COPY BELOW THIS LINE ━━━━━━━━━━━━━━━━━━━━━
+
+Merge main into experimental and resolve any conflicts.
+
+## Step 1: Start the merge
+
+Run:
+  git checkout experimental
+  git pull
+  git merge origin/main
+
+## Step 2: Understand what's in experimental (IMPORTANT - do this BEFORE resolving)
+
+I need you to fully understand the experimental branch before touching any conflicts.
+
+1. List commits only in experimental:
+   git log main..experimental --oneline
+
+2. For each commit, read the actual changes (not just the message):
+   git show <commit-hash> --stat
+   Then read the key files if needed.
+
+3. Give me a detailed summary:
+   - What experimental features exist (describe each one)
+   - What files are experimental-only vs modified from main
+   - The intent/purpose of these experimental changes
+
+Do NOT proceed to conflict resolution until you've given me this summary.
+
+## Step 3: Analyze each conflict
+
+Run: git diff --name-only --diff-filter=U
+
+For each conflicted file:
+1. Show me the conflict markers (the <<<<<<< ======= >>>>>>> sections)
+2. Explain what MAIN is changing (likely: bugfix, stable feature, refactor)
+3. Explain what EXPERIMENTAL is changing (likely: early-access feature)
+4. Explain if these changes are independent or overlapping
+
+## Step 4: Resolve conflicts
+
+Apply these rules:
+- **Independent changes** (different parts of file): Keep BOTH - main's updates AND experimental's features
+- **Compatible changes** (e.g., main fixed a bug in code experimental also modified): Apply main's fix within experimental's version
+- **Conflicting intent**: STOP and ask me. Based on your analysis from Step 2, explain the tradeoff and give me clear options to choose from.
+
+## Step 5: Complete the merge
+
+After ALL conflicts are resolved, commit with a detailed message:
+
+  git add .
+  git commit -m "Merge main into experimental
+
+  Kept from main:
+  - [list bugfixes and features from main]
+
+  Preserved from experimental:
+  - [list experimental features preserved]
+
+  Resolutions:
+  - [list any non-trivial merge decisions]
+  "
+  git push origin experimental
+
+## Step 6: Confirm
+
+Tell me when the merge is pushed so I can re-run the release workflow.
+
+━━━━━━━━━━━━━━━━━━━━━ COPY ABOVE THIS LINE ━━━━━━━━━━━━━━━━━━━━━
+PROMPT
+          echo ""
+          echo "After the merge is pushed, re-run this workflow."
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
           exit 1
 
