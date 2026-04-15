@@ -1343,7 +1343,7 @@ check_deps() {
     # Print inline
     if [ "$SILENT" = false ] && [ ${#PREREQS[@]} -gt 0 ]; then
         local prereq_list
-        prereq_list=$(IFS=', '; echo "${PREREQS[*]}")
+        prereq_list=$(printf '%s, ' "${PREREQS[@]}" | sed 's/, $//')
         echo -e "${G}✓${N} ${prereq_list}"
     fi
 
