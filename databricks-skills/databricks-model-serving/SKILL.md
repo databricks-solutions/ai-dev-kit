@@ -310,6 +310,7 @@ Available helper methods:
 - **[databricks-genie](../databricks-genie/SKILL.md)** - Genie Spaces can serve as agents in multi-agent setups
 - **[databricks-mlflow-evaluation](../databricks-mlflow-evaluation/SKILL.md)** - Evaluate model and agent quality before deployment
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - Job-based async deployment used for agent endpoints
+- **[databricks-ai-gateway](../databricks-ai-gateway/SKILL.md)** - Add guardrails, rate limits, and observability to serving endpoints
 
 ## Resources
 
