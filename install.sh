@@ -80,6 +80,8 @@ fi
 # Installation mode defaults
 INSTALL_MCP=true
 INSTALL_SKILLS=true
+INSTALL_MCP="${DEVKIT_INSTALL_MCP:-false}"
+MCP_INSTALL_PATH="${DEVKIT_MCP_PATH:-$HOME/.ai-dev-kit}"
 
 # Minimum required versions
 MIN_CLI_VERSION="0.278.0"
@@ -135,6 +137,8 @@ while [ $# -gt 0 ]; do
         --skills)         USER_SKILLS="$2"; shift 2 ;;
         --list-skills)    LIST_SKILLS=true; shift ;;
         --silent)         SILENT=true; shift ;;
+        --mcp)            INSTALL_MCP=true; shift ;;
+        --mcp-path)       MCP_INSTALL_PATH="$2"; INSTALL_MCP=true; shift 2 ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --experimental)   CHANNEL="experimental"; shift ;;
         -f|--force)       FORCE=true; shift ;;
@@ -156,6 +160,8 @@ while [ $# -gt 0 ]; do
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
             echo "  --experimental        Install from experimental branch (early access features)"
+            echo "  --mcp                 Install deprecated MCP server (default: no)"
+            echo "  --mcp-path PATH       MCP server install path (default: ~/.ai-dev-kit)"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             echo ""
@@ -170,6 +176,8 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
             echo "  DEVKIT_CHANNEL        'stable' (default) or 'experimental'"
+            echo "  DEVKIT_INSTALL_MCP    Set to 'true' to install MCP server"
+            echo "  DEVKIT_MCP_PATH       MCP server install path"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             echo ""
             echo "Examples:"
@@ -940,6 +948,157 @@ prompt_custom_skills() {
 
     # Use explicit skills list — set USER_SKILLS so resolve_skills handles it
     USER_SKILLS=$(echo "$selected" | tr ' ' ',')
+}
+
+# ─── MCP Server installation prompt ────────────────────────────
+prompt_mcp_install() {
+    # Skip if already set via env var or flag
+    if [ "$INSTALL_MCP" = true ]; then
+        return
+    fi
+
+    # Skip in silent mode or non-interactive
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Deprecated MCP Server${N}"
+    echo -e "  ${D}Skills now work via CLI for better performance. MCP server is optional for backwards compatibility.${N}"
+
+    local -a labels=("Do not install" "Install MCP server")
+    local -a values=("no" "yes")
+    local -a hints=("Recommended - skills work without MCP" "Legacy - requires Python venv setup")
+    local count=2
+    local selected=0
+    local cursor=0
+
+    _mcp_draw() {
+        for i in 0 1; do
+            local dot="○"
+            local dot_color="\033[2m"
+            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
+            local arrow="  "
+            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
+            local hint_style="\033[2m"
+            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
+            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
+        done
+    }
+
+    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
+    printf "\033[?25l" > /dev/tty
+    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+
+    _mcp_draw
+
+    while true; do
+        printf "\033[%dA" "$count" > /dev/tty
+        _mcp_draw
+
+        local key=""
+        IFS= read -rsn1 key < /dev/tty 2>/dev/null
+
+        if [ "$key" = $'\x1b' ]; then
+            local s1="" s2=""
+            read -rsn1 s1 < /dev/tty 2>/dev/null
+            read -rsn1 s2 < /dev/tty 2>/dev/null
+            if [ "$s1" = "[" ]; then
+                case "$s2" in
+                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
+                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
+                esac
+            fi
+        elif [ "$key" = "" ]; then
+            selected=$cursor
+            printf "\033[%dA" "$count" > /dev/tty
+            _mcp_draw
+            break
+        elif [ "$key" = " " ]; then
+            selected=$cursor
+        fi
+    done
+
+    printf "\033[?25h" > /dev/tty
+    trap - EXIT
+
+    if [ "${values[$selected]}" = "yes" ]; then
+        INSTALL_MCP=true
+        # Prompt for install path
+        echo ""
+        MCP_INSTALL_PATH=$(prompt "MCP server install path" "$MCP_INSTALL_PATH")
+    fi
+}
+
+# Install MCP server (venv + packages)
+install_mcp_server() {
+    step "Installing MCP server"
+
+    # Check for uv
+    if ! command -v uv &> /dev/null; then
+        warn "'uv' is not installed. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        die "MCP server installation requires 'uv'"
+    fi
+    ok "uv is installed"
+
+    local mcp_dir="$MCP_INSTALL_PATH"
+    local tools_core_dir="$REPO_DIR/databricks-tools-core"
+    local mcp_server_dir="$REPO_DIR/databricks-mcp-server"
+
+    # Verify source directories exist
+    if [ ! -d "$tools_core_dir" ]; then
+        die "databricks-tools-core not found at $tools_core_dir"
+    fi
+    if [ ! -d "$mcp_server_dir" ]; then
+        die "databricks-mcp-server not found at $mcp_server_dir"
+    fi
+
+    # Create install directory
+    mkdir -p "$mcp_dir"
+
+    # Copy source files
+    msg "Copying MCP server source files..."
+    cp -r "$tools_core_dir" "$mcp_dir/"
+    cp -r "$mcp_server_dir" "$mcp_dir/"
+    ok "Source files copied to $mcp_dir"
+
+    # Create virtual environment
+    msg "Creating virtual environment..."
+    cd "$mcp_dir"
+    uv venv --python 3.11 -q
+    ok "Virtual environment created"
+
+    # Install packages
+    msg "Installing databricks-tools-core..."
+    uv pip install --python .venv/bin/python -e "$mcp_dir/databricks-tools-core" --quiet
+    ok "databricks-tools-core installed"
+
+    msg "Installing databricks-mcp-server..."
+    uv pip install --python .venv/bin/python -e "$mcp_dir/databricks-mcp-server" --quiet
+    ok "databricks-mcp-server installed"
+
+    # Verify installation
+    if .venv/bin/python -c "import databricks_mcp_server" 2>/dev/null; then
+        ok "MCP server verified"
+    else
+        warn "MCP server import verification failed"
+    fi
+
+    # Save MCP config for later reference
+    echo "$mcp_dir" > "$mcp_dir/.mcp-install-path"
+
+    cd - > /dev/null
+
+    msg ""
+    msg "${B}MCP server installed at:${N} $mcp_dir"
+    msg ""
+    msg "To configure Claude Code, add to your project's .mcp.json:"
+    msg "  {\"mcpServers\": {\"databricks\": {"
+    msg "    \"command\": \"$mcp_dir/.venv/bin/python\","
+    msg "    \"args\": [\"$mcp_dir/databricks-mcp-server/run_server.py\"]"
+    msg "  }}}"
+    msg ""
+    msg "Or use: ${B}claude mcp add-json databricks '{\"command\":\"$mcp_dir/.venv/bin/python\",\"args\":[\"$mcp_dir/databricks-mcp-server/run_server.py\"]}'${N}"
 }
 
 # Compare semantic versions (returns 0 if $1 >= $2)
@@ -1781,13 +1940,16 @@ main() {
         fi
     fi
 
-    # ── Step 5: Interactive MCP path ──
+    # ── Step 4.5: MCP server installation prompt ──
+    step "MCP server (deprecated)"
+    prompt_mcp_install
     if [ "$INSTALL_MCP" = true ]; then
-        prompt_mcp_path
-        ok "MCP path: $INSTALL_DIR"
+        ok "Will install MCP server to: $MCP_INSTALL_PATH"
+    else
+        ok "Skipping MCP server (recommended)"
     fi
 
-    # ── Step 6: Confirm before proceeding ──
+    # ── Step 5: Confirm before proceeding ──
     if [ "$SILENT" = false ]; then
         echo ""
         echo -e "  ${B}Summary${N}"
@@ -1806,7 +1968,11 @@ main() {
                 echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N}"
             fi
         fi
-        [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
+        if [ "$INSTALL_MCP" = true ]; then
+            echo -e "  MCP server:  ${Y}Yes${N} (legacy) → $MCP_INSTALL_PATH"
+        else
+            echo -e "  MCP server:  ${G}No${N} (recommended)"
+        fi
         echo ""
     fi
 
@@ -1839,6 +2005,9 @@ main() {
     
     # Install skills
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
+
+    # Install MCP server if requested
+    [ "$INSTALL_MCP" = true ] && install_mcp_server
 
     # Write GEMINI.md if gemini is selected
     if echo "$TOOLS" | grep -q gemini; then
