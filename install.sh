@@ -935,14 +935,17 @@ prompt_skills_profile() {
     local -a p_values=("all" "data-engineer" "analyst" "ai-ml-engineer" "app-developer" "custom")
     local -a p_hints=("Install everything (34 skills)" "Pipelines, Spark, Jobs, Streaming (14 skills)" "Dashboards, SQL, Genie, Metrics (8 skills)" "Agents, RAG, Vector Search, MLflow (17 skills)" "Apps, Lakebase, Deployment (10 skills)" "Pick individual skills")
 
-    # Pre-select based on previous config if available
+    # Pre-select based on previous config if available and add "previous" hint
     local -a p_states=(0 0 0 0 0 0)
     if [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_SKILLS_PROFILE" ]; then
-        # Parse comma-separated profiles and set states
+        # Parse comma-separated profiles and set states + hints
         IFS=',' read -ra prev_profiles <<< "$SAVED_SKILLS_PROFILE"
         for prev in "${prev_profiles[@]}"; do
             for i in "${!p_values[@]}"; do
-                [ "${p_values[$i]}" = "$prev" ] && p_states[$i]=1
+                if [ "${p_values[$i]}" = "$prev" ]; then
+                    p_states[$i]=1
+                    p_hints[$i]="previous"
+                fi
             done
         done
     else
@@ -1135,9 +1138,12 @@ prompt_mcp_install() {
     local -a hints=("Recommended - skills work without MCP" "Legacy - requires Python venv setup")
     local count=2
 
-    # Pre-select based on previous config
+    # Pre-select based on previous config and add "previous" hint
     local selected=0
-    [ "$HAS_PREVIOUS_CONFIG" = true ] && [ "$SAVED_INSTALL_MCP" = "true" ] && selected=1
+    if [ "$HAS_PREVIOUS_CONFIG" = true ]; then
+        [ "$SAVED_INSTALL_MCP" = "true" ] && selected=1
+        hints[$selected]="previous"
+    fi
     local cursor=$selected
 
     _mcp_draw() {
@@ -1345,28 +1351,6 @@ check_deps() {
     for w in "${PREREQ_WARNINGS[@]}"; do
         warn "$w"
     done
-}
-
-# Check if update needed
-check_version() {
-    local ver_file="$INSTALL_DIR/version"
-    [ "$SCOPE" = "project" ] && ver_file=".ai-dev-kit/version"
-
-    [ ! -f "$ver_file" ] && return
-    [ "$FORCE" = true ] && return
-
-    local local_ver=$(cat "$ver_file")
-    # Use -f to fail on HTTP errors (like 404)
-    local remote_ver=$(curl -fsSL "$RAW_URL/VERSION" 2>/dev/null || echo "")
-
-    # Validate remote version format (should not contain "404" or other error text)
-    if [ -n "$remote_ver" ] && [[ ! "$remote_ver" =~ (404|Not Found|error) ]]; then
-        if [ "$local_ver" = "$remote_ver" ]; then
-            ok "Already up to date (v${local_ver})"
-            msg "${D}Use --force to reinstall${N}"
-            exit 0
-        fi
-    fi
 }
 
 # Setup MCP server
@@ -1890,9 +1874,12 @@ prompt_scope() {
     local -a hints=("Install in current directory (.cursor/, .claude/, .gemini/)" "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
     local count=2
 
-    # Pre-select based on previous config
+    # Pre-select based on previous config and add "previous" hint
     local selected=0
-    [ "$HAS_PREVIOUS_CONFIG" = true ] && [ "$SAVED_SCOPE" = "global" ] && selected=1
+    if [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_SCOPE" ]; then
+        [ "$SAVED_SCOPE" = "global" ] && selected=1
+        hints[$selected]="previous"
+    fi
     local cursor=$selected
     
     _scope_draw() {
@@ -1985,7 +1972,6 @@ prompt_channel() {
         echo -e "  Discussions:   ${BL}https://github.com/databricks-solutions/ai-dev-kit/discussions${N}"
         echo ""
         echo -e "  ${D}Downloading installer from experimental branch...${N}"
-        echo ""
 
         # Build the command with all current flags preserved
         local args="--experimental"
@@ -2172,9 +2158,6 @@ main() {
         fi
     fi
 
-    # ── Step 7: Version check (may exit early if up to date) ──
-    check_version
-    
     # Determine base directory
     local base_dir
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
