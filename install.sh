@@ -760,7 +760,8 @@ prompt_profile() {
     fi
 
     echo ""
-    echo -e "  ${B}Select Databricks profile${N}"
+    echo -e "  ${B}Which Databricks profile for this project?${N}"
+    echo -e "  ${D}This will be set in .claude/settings.json for Claude Code to use.${N}"
 
     if [ ${#profiles[@]} -gt 0 ] && [ -e /dev/tty ]; then
         # Determine which profile to pre-select
@@ -808,32 +809,6 @@ prompt_profile() {
         selected=$(prompt "Profile name" "DEFAULT")
         PROFILE="$selected"
     fi
-}
-
-# ─── MCP path selection ────────────────────────────────────────
-prompt_mcp_path() {
-    # If provided via --mcp-path flag, skip prompt
-    if [ -n "$USER_MCP_PATH" ]; then
-        INSTALL_DIR="$USER_MCP_PATH"
-    elif [ "$SILENT" = false ] && [ -e /dev/tty ]; then
-        [ "$SILENT" = false ] && echo ""
-        [ "$SILENT" = false ] && echo -e "  ${B}MCP server location${N}"
-        [ "$SILENT" = false ] && echo -e "  ${D}The MCP server runtime (Python venv + source) will be installed here.${N}"
-        [ "$SILENT" = false ] && echo -e "  ${D}Shared across all your projects — only the config files are per-project.${N}"
-        [ "$SILENT" = false ] && echo ""
-
-        local selected
-        selected=$(prompt "Install path" "$INSTALL_DIR")
-
-        # Expand ~ to $HOME
-        INSTALL_DIR="${selected/#\~/$HOME}"
-    fi
-
-    # Update derived paths
-    REPO_DIR="$INSTALL_DIR/repo"
-    VENV_DIR="$INSTALL_DIR/.venv"
-    VENV_PYTHON="$VENV_DIR/bin/python"
-    MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 }
 
 # ─── Skill profile selection ──────────────────────────────────
@@ -1131,145 +1106,32 @@ prompt_mcp_install() {
     echo -e "  ${B}Deprecated MCP Server${N}"
     echo -e "  ${D}Skills now work via CLI for better performance. MCP server is optional for backwards compatibility.${N}"
 
-    local -a labels=("Do not install" "Install MCP server")
-    local -a values=("no" "yes")
-    local -a hints=("Recommended - skills work without MCP" "Legacy - requires Python venv setup")
-    local count=2
+    # Build radio items with previous config pre-selection
+    local skip_state="on" skip_hint="Recommended - skills work without MCP"
+    local install_state="off" install_hint="Legacy - requires Python venv setup"
 
-    # Pre-select based on previous config and add "previous" hint
-    local selected=0
     if [ "$HAS_PREVIOUS_CONFIG" = true ]; then
-        [ "$SAVED_INSTALL_MCP" = "true" ] && selected=1
-        hints[$selected]="previous"
-    fi
-    local cursor=$selected
-
-    _mcp_draw() {
-        for i in 0 1; do
-            local dot="○"
-            local dot_color="\033[2m"
-            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
-            local arrow="  "
-            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
-            local hint_style="\033[2m"
-            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
-            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
-        done
-    }
-
-    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
-    printf "\033[?25l" > /dev/tty
-    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
-
-    _mcp_draw
-
-    while true; do
-        printf "\033[%dA" "$count" > /dev/tty
-        _mcp_draw
-
-        local key=""
-        IFS= read -rsn1 key < /dev/tty 2>/dev/null
-
-        if [ "$key" = $'\x1b' ]; then
-            local s1="" s2=""
-            read -rsn1 s1 < /dev/tty 2>/dev/null
-            read -rsn1 s2 < /dev/tty 2>/dev/null
-            if [ "$s1" = "[" ]; then
-                case "$s2" in
-                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
-                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
-                esac
-            fi
-        elif [ "$key" = "" ]; then
-            selected=$cursor
-            printf "\033[%dA" "$count" > /dev/tty
-            _mcp_draw
-            break
-        elif [ "$key" = " " ]; then
-            selected=$cursor
+        if [ "$SAVED_INSTALL_MCP" = "true" ]; then
+            skip_state="off"
+            install_state="on"
+            install_hint="previous"
+        else
+            skip_hint="previous"
         fi
-    done
+    fi
 
-    printf "\033[?25h" > /dev/tty
-    trap - EXIT
+    local selected
+    selected=$(radio_select \
+        "Do not install|no|${skip_state}|${skip_hint}" \
+        "Install MCP server|yes|${install_state}|${install_hint}" \
+    )
 
-    if [ "${values[$selected]}" = "yes" ]; then
+    if [ "$selected" = "yes" ]; then
         INSTALL_MCP=true
         # Prompt for install path
         echo ""
         MCP_INSTALL_PATH=$(prompt "MCP server install path" "$MCP_INSTALL_PATH")
     fi
-}
-
-# Install MCP server (venv + packages)
-install_mcp_server() {
-    step "Installing MCP server"
-
-    # Check for uv
-    if ! command -v uv &> /dev/null; then
-        warn "'uv' is not installed. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
-        die "MCP server installation requires 'uv'"
-    fi
-    ok "uv is installed"
-
-    local mcp_dir="$MCP_INSTALL_PATH"
-    local tools_core_dir="$REPO_DIR/databricks-tools-core"
-    local mcp_server_dir="$REPO_DIR/databricks-mcp-server"
-
-    # Verify source directories exist
-    if [ ! -d "$tools_core_dir" ]; then
-        die "databricks-tools-core not found at $tools_core_dir"
-    fi
-    if [ ! -d "$mcp_server_dir" ]; then
-        die "databricks-mcp-server not found at $mcp_server_dir"
-    fi
-
-    # Create install directory
-    mkdir -p "$mcp_dir"
-
-    # Copy source files
-    msg "Copying MCP server source files..."
-    cp -r "$tools_core_dir" "$mcp_dir/"
-    cp -r "$mcp_server_dir" "$mcp_dir/"
-    ok "Source files copied to $mcp_dir"
-
-    # Create virtual environment
-    msg "Creating virtual environment..."
-    cd "$mcp_dir"
-    uv venv --python 3.12 --allow-existing -q 2>/dev/null || uv venv --allow-existing -q
-    ok "Virtual environment created"
-
-    # Install packages
-    msg "Installing databricks-tools-core..."
-    uv pip install --python .venv/bin/python -e "$mcp_dir/databricks-tools-core" --quiet
-    ok "databricks-tools-core installed"
-
-    msg "Installing databricks-mcp-server..."
-    uv pip install --python .venv/bin/python -e "$mcp_dir/databricks-mcp-server" --quiet
-    ok "databricks-mcp-server installed"
-
-    # Verify installation
-    if .venv/bin/python -c "import databricks_mcp_server" 2>/dev/null; then
-        ok "MCP server verified"
-    else
-        warn "MCP server import verification failed"
-    fi
-
-    # Save MCP config for later reference
-    echo "$mcp_dir" > "$mcp_dir/.mcp-install-path"
-
-    cd - > /dev/null
-
-    msg ""
-    msg "${B}MCP server installed at:${N} $mcp_dir"
-    msg ""
-    msg "To configure Claude Code, add to your project's .mcp.json:"
-    msg "  {\"mcpServers\": {\"databricks\": {"
-    msg "    \"command\": \"$mcp_dir/.venv/bin/python\","
-    msg "    \"args\": [\"$mcp_dir/databricks-mcp-server/run_server.py\"]"
-    msg "  }}}"
-    msg ""
-    msg "Or use: ${B}claude mcp add-json databricks '{\"command\":\"$mcp_dir/.venv/bin/python\",\"args\":[\"$mcp_dir/databricks-mcp-server/run_server.py\"]}'${N}"
 }
 
 # Compare semantic versions (returns 0 if $1 >= $2)
@@ -1293,24 +1155,6 @@ check_cli_version() {
     else
         PREREQ_WARNINGS+=("Databricks CLI v${cli_version} outdated (min: v${MIN_CLI_VERSION}). Upgrade: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh")
         return 1
-    fi
-}
-
-# Check Databricks SDK version in the MCP venv
-check_sdk_version() {
-    local sdk_version
-    sdk_version=$("$VENV_PYTHON" -c "from databricks.sdk.version import __version__; print(__version__)" 2>/dev/null)
-
-    if [ -z "$sdk_version" ]; then
-        warn "Could not determine Databricks SDK version"
-        return
-    fi
-
-    if version_gte "$sdk_version" "$MIN_SDK_VERSION"; then
-        ok "Databricks SDK v${sdk_version}"
-    else
-        warn "Databricks SDK v${sdk_version} is outdated (minimum: v${MIN_SDK_VERSION})"
-        msg "  ${B}Upgrade:${N} $VENV_PYTHON -m pip install --upgrade databricks-sdk"
     fi
 }
 
@@ -1672,6 +1516,57 @@ GEMINIEOF
     ok "GEMINI.md"
 }
 
+# Write DATABRICKS_CONFIG_PROFILE to Claude settings.json env section
+# Safely merges with existing settings using Python or jq
+write_claude_env() {
+    local path=$1
+    local profile=$2
+    mkdir -p "$(dirname "$path")"
+
+    # Try Python first (most reliable for JSON manipulation)
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c "
+import json
+path = '$path'
+profile = '$profile'
+try:
+    with open(path) as f: cfg = json.load(f)
+except: cfg = {}
+env = cfg.setdefault('env', {})
+env['DATABRICKS_CONFIG_PROFILE'] = profile
+with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return 0
+    fi
+
+    # Fallback: jq if available
+    if command -v jq >/dev/null 2>&1; then
+        if [ -f "$path" ]; then
+            local tmp="${path}.tmp"
+            jq --arg p "$profile" '.env = (.env // {}) | .env.DATABRICKS_CONFIG_PROFILE = $p' "$path" > "$tmp" && mv "$tmp" "$path"
+        else
+            echo "{\"env\":{\"DATABRICKS_CONFIG_PROFILE\":\"$profile\"}}" | jq '.' > "$path"
+        fi
+        return 0
+    fi
+
+    # Last resort: create new file only if it doesn't exist
+    if [ ! -f "$path" ]; then
+        cat > "$path" << EOF
+{
+  "env": {
+    "DATABRICKS_CONFIG_PROFILE": "$profile"
+  }
+}
+EOF
+        return 0
+    fi
+
+    # Can't safely merge without Python or jq
+    warn "Cannot update $path without python3 or jq. Add manually:"
+    msg "  \"env\": {\"DATABRICKS_CONFIG_PROFILE\": \"$profile\"}"
+    return 1
+}
+
 write_claude_hook() {
     local path=$1
     local script=$2
@@ -1866,70 +1761,24 @@ prompt_scope() {
     echo ""
     echo -e "  ${B}Select installation scope${N}"
 
-    # Simple radio selector without Confirm button
-    local -a labels=("Project" "Global")
-    local -a values=("project" "global")
-    local -a hints=("Install in current directory (.cursor/, .claude/, .gemini/)" "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
-    local count=2
+    # Build radio items with previous config pre-selection
+    local project_state="on" project_hint="Install in current directory"
+    local global_state="off" global_hint="Install in home directory"
 
-    # Pre-select based on previous config and add "previous" hint
-    local selected=0
     if [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_SCOPE" ]; then
-        [ "$SAVED_SCOPE" = "global" ] && selected=1
-        hints[$selected]="previous"
-    fi
-    local cursor=$selected
-    
-    _scope_draw() {
-        for i in 0 1; do
-            local dot="○"
-            local dot_color="\033[2m"
-            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
-            local arrow="  "
-            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
-            local hint_style="\033[2m"
-            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
-            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
-        done
-    }
-    
-    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
-    printf "\033[?25l" > /dev/tty
-    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
-    
-    _scope_draw
-    
-    while true; do
-        printf "\033[%dA" "$count" > /dev/tty
-        _scope_draw
-        
-        local key=""
-        IFS= read -rsn1 key < /dev/tty 2>/dev/null
-        
-        if [ "$key" = $'\x1b' ]; then
-            local s1="" s2=""
-            read -rsn1 s1 < /dev/tty 2>/dev/null
-            read -rsn1 s2 < /dev/tty 2>/dev/null
-            if [ "$s1" = "[" ]; then
-                case "$s2" in
-                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
-                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
-                esac
-            fi
-        elif [ "$key" = "" ]; then
-            selected=$cursor
-            printf "\033[%dA" "$count" > /dev/tty
-            _scope_draw
-            break
-        elif [ "$key" = " " ]; then
-            selected=$cursor
+        if [ "$SAVED_SCOPE" = "global" ]; then
+            project_state="off"
+            global_state="on"
+            global_hint="previous"
+        else
+            project_hint="previous"
         fi
-    done
-    
-    printf "\033[?25h" > /dev/tty
-    trap - EXIT
-    
-    SCOPE="${values[$selected]}"
+    fi
+
+    SCOPE=$(radio_select \
+        "Project|project|${project_state}|${project_hint}" \
+        "Global|global|${global_state}|${global_hint}" \
+    )
 }
 
 # Prompt for release channel (stable vs experimental)
@@ -1989,8 +1838,13 @@ prompt_channel() {
     fi
 }
 
-# Prompt to run auth
+# Prompt to run auth (only for Claude + project scope)
 prompt_auth() {
+    # Skip if not Claude or if global scope
+    if ! echo "$TOOLS" | grep -qw "claude" || [ "$SCOPE" = "global" ]; then
+        return
+    fi
+
     if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
         return
     fi
@@ -2072,15 +1926,19 @@ main() {
         detect_tools
         ok "Selected: $(echo "$TOOLS" | tr ' ' ', ')"
 
-        # ── Step 3: Interactive profile selection ──
-        step "Databricks profile"
-        prompt_profile
-        ok "Profile: $PROFILE"
-
-        # ── Step 3.5: Interactive scope selection ──
+        # ── Step 3: Interactive scope selection ──
         if [ "$SCOPE_EXPLICIT" = false ]; then
             prompt_scope
             ok "Scope: $SCOPE"
+        fi
+
+        # ── Step 4: Interactive profile selection (only if Claude + project scope) ──
+        # Profile is set in .claude/settings.json env, so only for project-scoped installs
+        # to avoid messing with global settings that affect all projects
+        if echo "$TOOLS" | grep -qw "claude" && [ "$SCOPE" != "global" ]; then
+            step "Databricks profile for this project"
+            prompt_profile
+            ok "Profile: $PROFILE"
         fi
     fi
 
@@ -2126,8 +1984,9 @@ main() {
         echo -e "  ────────────────────────────────────"
         [ "$CHANNEL" = "experimental" ] && echo -e "  Channel:     ${Y}experimental 🧪${N}"
         echo -e "  Tools:       ${G}$(echo "$TOOLS" | tr ' ' ', ')${N}"
-        echo -e "  Profile:     ${G}${PROFILE}${N}"
         echo -e "  Scope:       ${G}${SCOPE}${N}"
+        # Only show profile for Claude + project scope (where it's actually used)
+        echo "$TOOLS" | grep -qw "claude" && [ "$SCOPE" != "global" ] && echo -e "  Profile:     ${G}${PROFILE}${N}"
         if [ "$INSTALL_SKILLS" = true ]; then
             if [ -n "$USER_SKILLS" ]; then
                 echo -e "  Skills:      ${G}custom selection${N}"
@@ -2171,6 +2030,14 @@ main() {
     
     # Install skills
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
+
+    # Write Databricks profile to Claude settings.json (project scope only)
+    if echo "$TOOLS" | grep -qw "claude" && [ "$SCOPE" != "global" ]; then
+        local claude_settings="$base_dir/.claude/settings.json"
+        if write_claude_env "$claude_settings" "$PROFILE"; then
+            ok "Claude env: DATABRICKS_CONFIG_PROFILE=$PROFILE"
+        fi
+    fi
 
     # Write GEMINI.md if gemini is selected
     if echo "$TOOLS" | grep -q gemini; then
