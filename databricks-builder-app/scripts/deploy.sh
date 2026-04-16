@@ -142,11 +142,16 @@ echo -e "${YELLOW}[2/${TOTAL_STEPS}] Deploying Lakebase...${NC}"
 if [ "$SKIP_LAKEBASE" = true ]; then
   echo -e "  ${GREEN}✓${NC} Skipped (--skip-lakebase)"
 else
-  cd "$PROJECT_DIR"
-  BUNDLE_ARGS=""
-  if [ -n "$PROFILE" ]; then BUNDLE_ARGS="--profile $PROFILE"; fi
-  databricks bundle deploy $BUNDLE_ARGS --var "lakebase_project_id=${LAKEBASE_PROJECT_ID}" 2>&1
-  echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' deployed"
+  # Check if the Lakebase project already exists before deploying
+  if databricks postgres get-project "projects/${LAKEBASE_PROJECT_ID}" $CLI_ARGS &>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' already exists, skipping bundle deploy"
+  else
+    cd "$PROJECT_DIR"
+    BUNDLE_ARGS=""
+    if [ -n "$PROFILE" ]; then BUNDLE_ARGS="--profile $PROFILE"; fi
+    databricks bundle deploy $BUNDLE_ARGS --var "lakebase_project_id=${LAKEBASE_PROJECT_ID}" 2>&1
+    echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' deployed"
+  fi
 fi
 echo ""
 
