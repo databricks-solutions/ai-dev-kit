@@ -352,9 +352,7 @@ pyjwt==2.12.1
     # via mcp
 pyparsing==3.3.2
     # via matplotlib
-pyperclip==1.11.0 \
-    --hash=sha256:244035963e4428530d9e3a6101a1ef97209c6825edab1567beac148ccc1db1b6 \
-    --hash=sha256:299403e9ff44581cb9ba2ffeed69c7aa96a008622ad0c46cb575ca75b5b84273
+pyperclip==1.11.0
     # via fastmcp
 pytest==9.0.2
     # via sqlfluff

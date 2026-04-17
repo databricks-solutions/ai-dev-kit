@@ -41,6 +41,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 |----------------------------------|----------|------------|
 | :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | [Quick Start (install)](#install-in-existing-project)
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
+| [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
 | [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
 | [**Genie Code Skills**](databricks-skills/install_skills.sh) | Install skills into your workspace for Genie Code (`--install-to-genie`) | [Genie Code skills (install)](#genie-code-skills) |
@@ -150,7 +151,12 @@ cd ai-dev-kit/databricks-builder-app
 
 # Deploy everything (Lakebase + app + permissions)
 ./scripts/deploy.sh my-builder-app --profile <your-profile>
+
+# Deploy with MCP Gateway for Genie Code (name must start with mcp-)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --profile <your-profile>
 ```
+
+With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
 
 For local development:
 
