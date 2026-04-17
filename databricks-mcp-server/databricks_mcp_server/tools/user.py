@@ -9,18 +9,9 @@ from ..server import mcp
 
 @mcp.tool(timeout=30)
 def get_current_user() -> Dict[str, Any]:
-    """
-    Get the current authenticated Databricks user's identity.
+    """Get current Databricks user identity.
 
-    Returns the username (email) and the user's home path in the workspace.
-    Useful for determining where to create files, notebooks, and other
-    user-specific resources.
-
-    Returns:
-        Dictionary with:
-        - username: The user's email address (or None if unavailable)
-        - home_path: The user's workspace home directory (e.g. /Workspace/Users/user@example.com/)
-    """
+    Returns: {username (email), home_path (/Workspace/Users/user@example.com/)}."""
     username = get_current_username()
     home_path = f"/Workspace/Users/{username}/" if username else None
     return {

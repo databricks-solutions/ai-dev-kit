@@ -111,7 +111,8 @@ Create `agent.py` locally with `ResponsesAgent` pattern (see [3-genai-agents.md]
 ### Step 3: Upload to Workspace
 
 ```
-upload_to_workspace(
+manage_workspace_files(
+    action="upload",
     local_path="./my_agent",
     workspace_path="/Workspace/Users/you@company.com/my_agent"
 )
@@ -142,7 +143,8 @@ See [7-deployment.md](7-deployment.md) for job-based deployment that doesn't tim
 ### Step 7: Query Endpoint
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="my-agent-endpoint",
     messages=[{"role": "user", "content": "Hello!"}]
 )
@@ -180,7 +182,7 @@ Then deploy via UI or SDK. See [1-classical-ml.md](1-classical-ml.md).
 
 | Tool | Purpose |
 |------|---------|
-| `upload_to_workspace` | Upload agent files to workspace |
+| `manage_workspace_files` (action="upload") | Upload agent files to workspace |
 | `execute_code` | Install packages, test agent, log model |
 
 ### Deployment
@@ -191,13 +193,37 @@ Then deploy via UI or SDK. See [1-classical-ml.md](1-classical-ml.md).
 | `manage_job_runs` (action="run_now") | Kick off deployment (async) |
 | `manage_job_runs` (action="get") | Check deployment job status |
 
-### Querying
+### manage_serving_endpoint - Querying
 
-| Tool | Purpose |
-|------|---------|
-| `get_serving_endpoint_status` | Check if endpoint is READY |
-| `query_serving_endpoint` | Send requests to endpoint |
-| `list_serving_endpoints` | List all endpoints |
+| Action | Description | Required Params |
+|--------|-------------|-----------------|
+| `get` | Check endpoint status (READY/NOT_READY/NOT_FOUND) | name |
+| `list` | List all endpoints | (none, optional limit) |
+| `query` | Send requests to endpoint | name + one of: messages, inputs, dataframe_records |
+
+**Example usage:**
+```python
+# Check endpoint status
+manage_serving_endpoint(action="get", name="my-agent-endpoint")
+
+# List all endpoints
+manage_serving_endpoint(action="list")
+
+# Query a chat/agent endpoint
+manage_serving_endpoint(
+    action="query",
+    name="my-agent-endpoint",
+    messages=[{"role": "user", "content": "Hello!"}],
+    max_tokens=500
+)
+
+# Query a traditional ML endpoint
+manage_serving_endpoint(
+    action="query",
+    name="sklearn-classifier",
+    dataframe_records=[{"age": 25, "income": 50000, "credit_score": 720}]
+)
+```
 
 ---
 
@@ -206,7 +232,7 @@ Then deploy via UI or SDK. See [1-classical-ml.md](1-classical-ml.md).
 ### Check Endpoint Status After Deployment
 
 ```
-get_serving_endpoint_status(name="my-agent-endpoint")
+manage_serving_endpoint(action="get", name="my-agent-endpoint")
 ```
 
 Returns:
@@ -221,7 +247,8 @@ Returns:
 ### Query a Chat/Agent Endpoint
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="my-agent-endpoint",
     messages=[
         {"role": "user", "content": "What is Databricks?"}
@@ -233,7 +260,8 @@ query_serving_endpoint(
 ### Query a Traditional ML Endpoint
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="sklearn-classifier",
     dataframe_records=[
         {"age": 25, "income": 50000, "credit_score": 720}
@@ -248,7 +276,7 @@ query_serving_endpoint(
 | Issue | Solution |
 |-------|----------|
 | **Invalid output format** | Use `self.create_text_output_item(text, id)` - NOT raw dicts! |
-| **Endpoint NOT_READY** | Deployment takes ~15 min. Use `get_serving_endpoint_status` to poll. |
+| **Endpoint NOT_READY** | Deployment takes ~15 min. Use `manage_serving_endpoint(action="get")` to poll. |
 | **Package not found** | Specify exact versions in `pip_requirements` when logging model |
 | **Tool timeout** | Use job-based deployment, not synchronous calls |
 | **Auth error on endpoint** | Ensure `resources` specified in `log_model` for auto passthrough |

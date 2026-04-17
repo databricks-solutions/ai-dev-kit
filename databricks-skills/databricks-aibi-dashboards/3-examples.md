@@ -196,11 +196,12 @@ dashboard = {
 }
 
 # Step 4: Deploy
-result = create_or_update_dashboard(
+result = manage_dashboard(
+    action="create_or_update",
     display_name="NYC Taxi Dashboard",
     parent_path="/Workspace/Users/me/dashboards",
     serialized_dashboard=json.dumps(dashboard),
-    warehouse_id=get_best_warehouse(),
+    warehouse_id=manage_warehouse(action="get_best"),
 )
 print(result["url"])
 ```
@@ -293,11 +294,12 @@ dashboard_with_filters = {
 }
 
 # Deploy with filters
-result = create_or_update_dashboard(
+result = manage_dashboard(
+    action="create_or_update",
     display_name="Sales Dashboard with Filters",
     parent_path="/Workspace/Users/me/dashboards",
     serialized_dashboard=json.dumps(dashboard_with_filters),
-    warehouse_id=get_best_warehouse(),
+    warehouse_id=manage_warehouse(action="get_best"),
 )
 print(result["url"])
 ```

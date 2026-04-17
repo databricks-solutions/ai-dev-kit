@@ -5,7 +5,6 @@ Note: AI/BI dashboards were previously known as Lakeview dashboards.
 The SDK/API still uses the 'lakeview' name internally.
 """
 
-import asyncio
 import json
 import logging
 from typing import Any, Dict, Optional, Union
@@ -49,13 +48,13 @@ def get_dashboard(dashboard_id: str) -> Dict[str, Any]:
 
 
 def list_dashboards(
-    page_size: int = 25,
+    page_size: int = 100,
     page_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """List AI/BI dashboards in the workspace.
 
     Args:
-        page_size: Number of dashboards per page (default: 25)
+        page_size: Number of dashboards per page (default: 100)
         page_token: Token for pagination
 
     Returns:
@@ -102,6 +101,27 @@ def find_dashboard_by_path(dashboard_path: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"Error checking dashboard path {dashboard_path}: {e}")
         return None
+
+
+def get_dashboard_by_name(parent_path: str, display_name: str) -> Optional[Dict[str, Any]]:
+    """Get dashboard details by parent path and display name.
+
+    The dashboard file path is constructed as: {parent_path}/{display_name}.lvdash.json
+    This matches the naming convention used by create_dashboard and deploy_dashboard.
+
+    Args:
+        parent_path: Workspace folder path (e.g., /Workspace/Users/me/dashboards)
+        display_name: Dashboard display name (used as filename without .lvdash.json)
+
+    Returns:
+        Dictionary with dashboard details if found, None otherwise
+    """
+    dashboard_path = f"{parent_path}/{display_name}.lvdash.json"
+    dashboard_id = find_dashboard_by_path(dashboard_path)
+
+    if dashboard_id:
+        return get_dashboard(dashboard_id)
+    return None
 
 
 def create_dashboard(
@@ -260,110 +280,49 @@ def unpublish_dashboard(dashboard_id: str) -> Dict[str, str]:
     }
 
 
-async def deploy_dashboard(
-    dashboard_content: str,
-    install_path: str,
-    dashboard_name: str,
-    warehouse_id: str,
-) -> DashboardDeploymentResult:
-    """Deploy a dashboard to Databricks workspace using Lakeview API.
-
-    This is a high-level function that handles create-or-update logic:
-    - Checks if a dashboard exists at the path
-    - Creates new or updates existing dashboard
-    - Publishes the dashboard
+def _inject_genie_space(
+    dashboard_content: Union[str, dict],
+    genie_space_id: Optional[str],
+) -> str:
+    """Inject Genie space configuration into dashboard JSON.
 
     Args:
-        dashboard_content: Dashboard JSON content as string
-        install_path: Workspace folder path (e.g., /Workspace/Users/me/dashboards)
-        dashboard_name: Display name for the dashboard
-        warehouse_id: SQL warehouse ID
+        dashboard_content: Dashboard JSON content as string or dict
+        genie_space_id: Optional Genie space ID to link
 
     Returns:
-        DashboardDeploymentResult with deployment status and details
+        Dashboard JSON string with Genie space configuration
     """
-    from databricks.sdk.errors.platform import ResourceDoesNotExist
+    if isinstance(dashboard_content, str):
+        dashboard_dict = json.loads(dashboard_content)
+    else:
+        dashboard_dict = dashboard_content
 
-    w = get_workspace_client()
-    dashboard_path = f"{install_path}/{dashboard_name}.lvdash.json"
+    if genie_space_id:
+        # Ensure uiSettings exists
+        if "uiSettings" not in dashboard_dict:
+            dashboard_dict["uiSettings"] = {}
 
-    try:
-        # Ensure the parent directory exists
-        try:
-            await asyncio.to_thread(w.workspace.mkdirs, install_path)
-        except Exception as e:
-            logger.debug(f"Directory creation check: {install_path} - {e}")
+        # Add Genie space configuration
+        dashboard_dict["uiSettings"]["genieSpace"] = {
+            "isEnabled": True,
+            "overrideId": genie_space_id,
+            "enablementMode": "ENABLED",
+        }
 
-        # Check if dashboard already exists at path
-        existing_dashboard_id = None
-        try:
-            existing = await asyncio.to_thread(w.workspace.get_status, path=dashboard_path)
-            existing_dashboard_id = existing.resource_id
-        except ResourceDoesNotExist:
-            pass
-
-        dashboard = Dashboard(
-            display_name=dashboard_name,
-            warehouse_id=warehouse_id,
-            parent_path=install_path,
-            serialized_dashboard=dashboard_content,
-        )
-
-        # Update or create
-        if existing_dashboard_id:
-            try:
-                logger.info(f"Updating existing dashboard: {dashboard_name}")
-                updated = w.lakeview.update(dashboard_id=existing_dashboard_id, dashboard=dashboard)
-                dashboard_id = updated.dashboard_id
-                status = "updated"
-            except Exception as e:
-                logger.warning(f"Failed to update dashboard {existing_dashboard_id}: {e}. Creating new.")
-                created = w.lakeview.create(dashboard=dashboard)
-                dashboard_id = created.dashboard_id
-                status = "created"
-        else:
-            logger.info(f"Creating new dashboard: {dashboard_name}")
-            created = w.lakeview.create(dashboard=dashboard)
-            dashboard_id = created.dashboard_id
-            status = "created"
-
-        dashboard_url = f"{w.config.host}/sql/dashboardsv3/{dashboard_id}"
-
-        # Publish (best-effort)
-        try:
-            w.lakeview.publish(
-                dashboard_id=dashboard_id,
-                warehouse_id=warehouse_id,
-                embed_credentials=True,
-            )
-            logger.info(f"Dashboard {dashboard_id} published successfully")
-        except Exception as e:
-            logger.warning(f"Failed to publish dashboard {dashboard_id}: {e}")
-
-        return DashboardDeploymentResult(
-            success=True,
-            status=status,
-            dashboard_id=dashboard_id,
-            path=dashboard_path,
-            url=dashboard_url,
-        )
-
-    except Exception as e:
-        logger.error(f"Dashboard deployment failed: {e}", exc_info=True)
-        return DashboardDeploymentResult(
-            success=False,
-            error=str(e),
-            path=dashboard_path,
-        )
+    return json.dumps(dashboard_dict)
 
 
-def deploy_dashboard_sync(
+def deploy_dashboard(
     dashboard_content: Union[str, dict],
     install_path: str,
     dashboard_name: str,
     warehouse_id: str,
+    genie_space_id: Optional[str] = None,
+    dataset_catalog: Optional[str] = None,
+    dataset_schema: Optional[str] = None,
 ) -> DashboardDeploymentResult:
-    """Deploy a dashboard to Databricks workspace (synchronous version).
+    """Deploy a dashboard to Databricks workspace.
 
     This is a high-level function that handles create-or-update logic:
     - Checks if a dashboard exists at the path
@@ -375,15 +334,17 @@ def deploy_dashboard_sync(
         install_path: Workspace folder path (e.g., /Workspace/Users/me/dashboards)
         dashboard_name: Display name for the dashboard
         warehouse_id: SQL warehouse ID
+        genie_space_id: Optional Genie space ID to link to dashboard
+        dataset_catalog: Default catalog for datasets (doesn't affect fully qualified names)
+        dataset_schema: Default schema for datasets (doesn't affect fully qualified names)
 
     Returns:
         DashboardDeploymentResult with deployment status and details
     """
     from databricks.sdk.errors.platform import ResourceDoesNotExist
 
-    # Ensure dashboard_content is a JSON string — MCP may deserialize it to a dict
-    if isinstance(dashboard_content, dict):
-        dashboard_content = json.dumps(dashboard_content)
+    # Inject Genie space if provided, and ensure content is JSON string
+    dashboard_content = _inject_genie_space(dashboard_content, genie_space_id)
 
     w = get_workspace_client()
     dashboard_path = f"{install_path}/{dashboard_name}.lvdash.json"
@@ -414,17 +375,30 @@ def deploy_dashboard_sync(
         if existing_dashboard_id:
             try:
                 logger.info(f"Updating existing dashboard: {dashboard_name}")
-                updated = w.lakeview.update(dashboard_id=existing_dashboard_id, dashboard=dashboard)
+                updated = w.lakeview.update(
+                    dashboard_id=existing_dashboard_id,
+                    dashboard=dashboard,
+                    dataset_catalog=dataset_catalog,
+                    dataset_schema=dataset_schema,
+                )
                 dashboard_id = updated.dashboard_id
                 status = "updated"
             except Exception as e:
                 logger.warning(f"Failed to update dashboard {existing_dashboard_id}: {e}. Creating new.")
-                created = w.lakeview.create(dashboard=dashboard)
+                created = w.lakeview.create(
+                    dashboard=dashboard,
+                    dataset_catalog=dataset_catalog,
+                    dataset_schema=dataset_schema,
+                )
                 dashboard_id = created.dashboard_id
                 status = "created"
         else:
             logger.info(f"Creating new dashboard: {dashboard_name}")
-            created = w.lakeview.create(dashboard=dashboard)
+            created = w.lakeview.create(
+                dashboard=dashboard,
+                dataset_catalog=dataset_catalog,
+                dataset_schema=dataset_schema,
+            )
             dashboard_id = created.dashboard_id
             status = "created"
 
@@ -464,8 +438,11 @@ def create_or_update_dashboard(
     serialized_dashboard: Union[str, dict],
     warehouse_id: str,
     publish: bool = True,
+    genie_space_id: Optional[str] = None,
+    catalog: Optional[str] = None,
+    schema: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create or update a dashboard (synchronous version).
+    """Create or update a dashboard.
 
     This is a convenience function that:
     1. Checks if a dashboard exists at the path
@@ -478,6 +455,12 @@ def create_or_update_dashboard(
         serialized_dashboard: Dashboard JSON content
         warehouse_id: SQL warehouse ID
         publish: Whether to publish after create/update (default: True)
+        genie_space_id: Optional Genie space ID to link to dashboard.
+            When provided, enables the "Ask Genie" button on the dashboard.
+        catalog: Default catalog for datasets. Doesn't affect fully qualified
+            table references (e.g., catalog.schema.table).
+        schema: Default schema for datasets. Doesn't affect fully qualified
+            table references (e.g., schema.table).
 
     Returns:
         Dictionary with:
@@ -487,11 +470,14 @@ def create_or_update_dashboard(
         - url: Dashboard URL
         - published: Whether dashboard was published
     """
-    result = deploy_dashboard_sync(
+    result = deploy_dashboard(
         dashboard_content=serialized_dashboard,
         install_path=parent_path,
         dashboard_name=display_name,
         warehouse_id=warehouse_id,
+        genie_space_id=genie_space_id,
+        dataset_catalog=catalog,
+        dataset_schema=schema,
     )
 
     return {

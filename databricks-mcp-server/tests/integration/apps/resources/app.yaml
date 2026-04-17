@@ -1,0 +1,8 @@
+# Databricks App configuration for MCP Integration Tests
+command:
+  - python
+  - app.py
+
+env:
+  - name: GRADIO_SERVER_NAME
+    value: "0.0.0.0"

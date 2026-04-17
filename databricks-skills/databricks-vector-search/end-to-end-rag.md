@@ -7,10 +7,10 @@ Build a complete Retrieval-Augmented Generation pipeline: prepare documents, cre
 | Tool | Step |
 |------|------|
 | `execute_sql` | Create source table, insert documents |
-| `create_vs_endpoint` | Create compute endpoint |
-| `create_vs_index` | Create Delta Sync index with managed embeddings |
-| `sync_vs_index` | Trigger index sync |
-| `get_vs_index` | Check index status |
+| `manage_vs_endpoint(action="create")` | Create compute endpoint |
+| `manage_vs_index(action="create")` | Create Delta Sync index with managed embeddings |
+| `manage_vs_index(action="sync")` | Trigger index sync |
+| `manage_vs_index(action="get")` | Check index status |
 | `query_vs_index` | Test similarity search |
 
 ---
@@ -51,7 +51,8 @@ execute_sql(sql_query="""
 ## Step 2: Create Vector Search Endpoint
 
 ```python
-create_vs_endpoint(
+manage_vs_endpoint(
+    action="create",
     name="my-rag-endpoint",
     endpoint_type="STORAGE_OPTIMIZED"
 )
@@ -60,14 +61,15 @@ create_vs_endpoint(
 Endpoint creation is asynchronous. Check status:
 
 ```python
-get_vs_endpoint(name="my-rag-endpoint")
+manage_vs_endpoint(action="get", name="my-rag-endpoint")
 # Wait for state: "ONLINE"
 ```
 
 ## Step 3: Create Delta Sync Index
 
 ```python
-create_vs_index(
+manage_vs_index(
+    action="create",
     name="catalog.schema.knowledge_base_index",
     endpoint_name="my-rag-endpoint",
     primary_key="doc_id",
@@ -95,10 +97,10 @@ Key decisions:
 
 ```python
 # Trigger initial sync
-sync_vs_index(index_name="catalog.schema.knowledge_base_index")
+manage_vs_index(action="sync", index_name="catalog.schema.knowledge_base_index")
 
 # Check status
-get_vs_index(index_name="catalog.schema.knowledge_base_index")
+manage_vs_index(action="get", index_name="catalog.schema.knowledge_base_index")
 # Wait for state: "ONLINE"
 ```
 
@@ -214,7 +216,7 @@ INSERT INTO catalog.schema.knowledge_base VALUES
 Then sync:
 
 ```python
-sync_vs_index(index_name="catalog.schema.knowledge_base_index")
+manage_vs_index(action="sync", index_name="catalog.schema.knowledge_base_index")
 ```
 
 ### Delete Documents
@@ -231,9 +233,9 @@ Then sync — the index automatically handles deletions via Delta change data fe
 
 | Issue | Solution |
 |-------|----------|
-| **Index stuck in PROVISIONING** | Endpoint may still be creating. Check `get_vs_endpoint` first |
-| **Query returns no results** | Index may not be synced yet. Run `sync_vs_index` and wait for ONLINE state |
+| **Index stuck in PROVISIONING** | Endpoint may still be creating. Check `manage_vs_endpoint(action="get")` first |
+| **Query returns no results** | Index may not be synced yet. Run `manage_vs_index(action="sync")` and wait for ONLINE state |
 | **"Column not found in index"** | Column must be in `columns_to_sync`. Recreate index with the column included |
 | **Embeddings not computed** | Ensure `embedding_model_endpoint_name` is a valid serving endpoint |
-| **Stale results after table update** | For TRIGGERED pipelines, you must call `sync_vs_index` manually |
+| **Stale results after table update** | For TRIGGERED pipelines, you must call `manage_vs_index(action="sync")` manually |
 | **Filter not working** | Standard endpoints use dict-format filters (`filters_json`), Storage-Optimized use SQL-like string filters (`filters`) |

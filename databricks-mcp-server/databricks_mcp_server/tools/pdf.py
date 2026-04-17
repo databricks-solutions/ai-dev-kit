@@ -16,43 +16,9 @@ def generate_and_upload_pdf(
     volume: str = "raw_data",
     folder: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Convert HTML to PDF and upload to a Unity Catalog volume.
+    """Convert complete HTML (with styles) to PDF and upload to Unity Catalog volume.
 
-    Takes complete HTML content (including styles) and converts it to a PDF document,
-    then uploads it to the specified Unity Catalog volume.
-
-    Args:
-        html_content: Complete HTML document including <!DOCTYPE html>, <html>, <head>,
-            <style>, and <body> tags. Use modern CSS3 for styling.
-        filename: Name for the PDF file (e.g., "report.pdf" or "report" - .pdf added if missing)
-        catalog: Unity Catalog name
-        schema: Schema name
-        volume: Volume name (must already exist). Default: "raw_data"
-        folder: Optional folder within volume (e.g., "documents")
-
-    Returns:
-        Dictionary with:
-        - success: True if PDF generated and uploaded successfully
-        - volume_path: Full path to the PDF in the volume (if successful)
-        - error: Error message (if failed)
-
-    Example:
-        >>> generate_and_upload_pdf(
-        ...     html_content='''<!DOCTYPE html>
-        ...     <html>
-        ...     <head><style>body { font-family: Arial; } h1 { color: #333; }</style></head>
-        ...     <body><h1>My Report</h1><p>Content here...</p></body>
-        ...     </html>''',
-        ...     filename="my_report.pdf",
-        ...     catalog="my_catalog",
-        ...     schema="my_schema",
-        ... )
-        {
-            "success": True,
-            "volume_path": "/Volumes/my_catalog/my_schema/raw_data/my_report.pdf",
-            "error": None
-        }
-    """
+    Returns: {success, volume_path, error}."""
     result = _generate_and_upload_pdf(
         html_content=html_content,
         filename=filename,

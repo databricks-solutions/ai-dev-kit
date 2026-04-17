@@ -13,7 +13,7 @@ MCP-based workflow for developing and testing agents on Databricks.
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Step 2: Upload to workspace                                 │
-│   → upload_to_workspace MCP tool                            │
+│   → manage_workspace_files MCP tool                         │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -85,10 +85,11 @@ print("Response:", result.model_dump(exclude_none=True))
 
 ## Step 2: Upload to Workspace
 
-Use the `upload_to_workspace` MCP tool:
+Use the `manage_workspace_files` MCP tool:
 
 ```
-upload_to_workspace(
+manage_workspace_files(
+    action="upload",
     local_path="./my_agent",
     workspace_path="/Workspace/Users/you@company.com/my_agent"
 )
@@ -134,7 +135,7 @@ execute_code(
 
 1. Read the error from the output
 2. Fix the local file (`agent.py` or `test_agent.py`)
-3. Re-upload: `upload_to_workspace(...)`
+3. Re-upload: `manage_workspace_files(action="upload", ...)`
 4. Re-run: `execute_code(file_path=...)`
 
 ### Iteration Tips
@@ -189,7 +190,7 @@ print(response.content)
 
 | Step | MCP Tool | Purpose |
 |------|----------|---------|
-| Upload files | `upload_to_workspace` | Sync local files to workspace |
+| Upload files | `manage_workspace_files` (action="upload") | Sync local files to workspace |
 | Install packages | `execute_code` | Set up dependencies |
 | Restart Python | `execute_code` | Apply package changes |
 | Test agent | `execute_code` (with `file_path`) | Run test script |

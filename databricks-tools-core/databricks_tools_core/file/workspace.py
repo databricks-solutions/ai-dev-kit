@@ -15,7 +15,9 @@ from pathlib import Path
 from typing import List, Optional
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ImportFormat
+import base64
+
+from databricks.sdk.service.workspace import ImportFormat, Language
 
 from ..auth import get_workspace_client
 
@@ -60,9 +62,45 @@ class DeleteResult:
     error: Optional[str] = None
 
 
+# Notebook markers for each language
+_NOTEBOOK_MARKERS = {
+    Language.PYTHON: b"# Databricks notebook source",
+    Language.SQL: b"-- Databricks notebook source",
+    Language.SCALA: b"// Databricks notebook source",
+    Language.R: b"# Databricks notebook source",
+}
+
+
+def _detect_notebook_language(local_path: str, content: bytes) -> Optional[Language]:
+    """
+    Detect if a file is a Databricks notebook and return its language.
+
+    Notebooks are identified by their marker comment at the start of the file.
+    This is required because workspace.upload() creates FILE objects, but
+    jobs/pipelines require NOTEBOOK objects.
+
+    Args:
+        local_path: Path to the file (used for extension-based language hint)
+        content: File content as bytes
+
+    Returns:
+        Language enum if file is a notebook, None otherwise
+    """
+    # Check for notebook markers in content
+    for lang, marker in _NOTEBOOK_MARKERS.items():
+        if content.startswith(marker):
+            return lang
+
+    return None
+
+
 def _upload_single_file(w: WorkspaceClient, local_path: str, remote_path: str, overwrite: bool = True) -> UploadResult:
     """
     Upload a single file to Databricks workspace.
+
+    Notebooks (files with Databricks notebook markers) are imported using
+    workspace.import_() with SOURCE format to create NOTEBOOK objects.
+    Regular files use workspace.upload() with AUTO format.
 
     Args:
         w: WorkspaceClient instance
@@ -77,14 +115,27 @@ def _upload_single_file(w: WorkspaceClient, local_path: str, remote_path: str, o
         with open(local_path, "rb") as f:
             content = f.read()
 
-        # Use workspace.upload with AUTO format to handle all file types
-        # AUTO will detect notebooks vs regular files based on extension/content
-        w.workspace.upload(
-            path=remote_path,
-            content=io.BytesIO(content),
-            format=ImportFormat.AUTO,
-            overwrite=overwrite,
-        )
+        # Check if this is a Databricks notebook
+        notebook_language = _detect_notebook_language(local_path, content)
+
+        if notebook_language:
+            # Use import_() with SOURCE format for notebooks
+            # This creates NOTEBOOK objects that jobs/pipelines can run
+            w.workspace.import_(
+                path=remote_path,
+                content=base64.b64encode(content).decode("utf-8"),
+                format=ImportFormat.SOURCE,
+                language=notebook_language,
+                overwrite=overwrite,
+            )
+        else:
+            # Use upload() with AUTO format for regular files
+            w.workspace.upload(
+                path=remote_path,
+                content=io.BytesIO(content),
+                format=ImportFormat.AUTO,
+                overwrite=overwrite,
+            )
 
         return UploadResult(local_path=local_path, remote_path=remote_path, success=True)
 
@@ -95,12 +146,23 @@ def _upload_single_file(w: WorkspaceClient, local_path: str, remote_path: str, o
         if overwrite and "type mismatch" in error_msg:
             try:
                 w.workspace.delete(remote_path)
-                w.workspace.upload(
-                    path=remote_path,
-                    content=io.BytesIO(content),
-                    format=ImportFormat.AUTO,
-                    overwrite=False,
-                )
+                # Retry with same logic
+                notebook_language = _detect_notebook_language(local_path, content)
+                if notebook_language:
+                    w.workspace.import_(
+                        path=remote_path,
+                        content=base64.b64encode(content).decode("utf-8"),
+                        format=ImportFormat.SOURCE,
+                        language=notebook_language,
+                        overwrite=False,
+                    )
+                else:
+                    w.workspace.upload(
+                        path=remote_path,
+                        content=io.BytesIO(content),
+                        format=ImportFormat.AUTO,
+                        overwrite=False,
+                    )
                 return UploadResult(local_path=local_path, remote_path=remote_path, success=True)
             except Exception as retry_error:
                 return UploadResult(

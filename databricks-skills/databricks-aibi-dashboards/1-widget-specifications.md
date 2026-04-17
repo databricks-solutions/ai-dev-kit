@@ -1,33 +1,38 @@
 # Widget Specifications
 
-Detailed JSON patterns for each AI/BI dashboard widget type.
+Core widget types for AI/BI dashboards. For advanced visualizations (area, scatter, choropleth map, combo), see [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
 
-## Widget Naming Convention (CRITICAL)
+## Widget Naming and Display
 
-- `widget.name`: alphanumeric + hyphens + underscores ONLY (no spaces, parentheses, colons)
-- `frame.title`: human-readable name (any characters allowed)
-- `widget.queries[0].name`: always use `"main_query"`
+- `widget.name`: alphanumeric + hyphens + underscores ONLY (max 60 characters)
+- `frame.title`: human-readable title (any characters allowed)
+- `frame.showTitle`: always set to `true` so users understand the widget
+- `displayName`: use in encodings to label axes/values clearly (e.g., "Revenue ($)", "Growth Rate (%)")
+- `widget.queries[].name`: use `"main_query"` for chart/counter/table widgets. Filter widgets with multiple queries can use descriptive names (see [3-filters.md](3-filters.md))
+
+**Always format values appropriately** - use `format` for currency, percentages, and large numbers (see [Axis Formatting](#axis-formatting)).
 
 ## Version Requirements
 
-| Widget Type | Version |
-|-------------|---------|
-| counter | 2 |
-| table | 2 |
-| filter-multi-select | 2 |
-| filter-single-select | 2 |
-| filter-date-range-picker | 2 |
-| bar | 3 |
-| line | 3 |
-| pie | 3 |
-| text | N/A (no spec block) |
+| Widget Type | Version | File |
+|-------------|---------|------|
+| text | N/A | this file |
+| counter | 2 | this file |
+| table | 2 | this file |
+| bar | 3 | this file |
+| line | 3 | this file |
+| pie | 3 | this file |
+| area | 3 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| scatter | 3 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| combo | 1 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| choropleth-map | 1 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| filter-* | 2 | [3-filters.md](3-filters.md) |
 
 ---
 
 ## Text (Headers/Descriptions)
 
-- **CRITICAL: Text widgets do NOT use a spec block!**
-- Use `multilineTextboxSpec` directly on the widget
+- **CRITICAL: Text widgets do NOT use a spec block** - use `multilineTextboxSpec` directly
 - Supports markdown: `#`, `##`, `###`, `**bold**`, `*italic*`
 - **CRITICAL: Multiple items in the `lines` array are concatenated on a single line, NOT displayed as separate lines!**
 - For title + subtitle, use **separate text widgets** at different y positions
@@ -37,18 +42,14 @@ Detailed JSON patterns for each AI/BI dashboard widget type.
 {
   "widget": {
     "name": "title",
-    "multilineTextboxSpec": {
-      "lines": ["## Dashboard Title"]
-    }
+    "multilineTextboxSpec": {"lines": ["## Dashboard Title"]}
   },
   "position": {"x": 0, "y": 0, "width": 6, "height": 1}
 },
 {
   "widget": {
     "name": "subtitle",
-    "multilineTextboxSpec": {
-      "lines": ["Description text here"]
-    }
+    "multilineTextboxSpec": {"lines": ["Description text here"]}
   },
   "position": {"x": 0, "y": 1, "width": 6, "height": 1}
 }
@@ -71,15 +72,30 @@ Detailed JSON patterns for each AI/BI dashboard widget type.
 
 - `version`: **2** (NOT 3!)
 - `widgetType`: "counter"
-- **Percent values must be 0-1** in the data (not 0-100)
+- Percent values must be 0-1 in the data (not 0-100)
 
-**Two patterns for counters:**
+### Number Formatting
 
-**Pattern 1: Pre-aggregated dataset (1 row, no filters)**
-- Dataset returns exactly 1 row
-- Use `"disaggregated": true` and simple field reference
-- Field `name` matches dataset column directly
+```json
+"encodings": {
+  "value": {
+    "fieldName": "revenue",
+    "displayName": "Total Revenue",
+    "format": {
+      "type": "number-currency",
+      "currencyCode": "USD",
+      "abbreviation": "compact",
+      "decimalPlaces": {"type": "max", "places": 2}
+    }
+  }
+}
+```
 
+Format types: `number`, `number-currency`, `number-percent`
+
+### Counter Patterns
+
+**Pre-aggregated dataset (1 row)** - use `disaggregated: true`:
 ```json
 {
   "widget": {
@@ -105,7 +121,7 @@ Detailed JSON patterns for each AI/BI dashboard widget type.
 }
 ```
 
-**Pattern 2: Aggregating widget (multi-row dataset, supports filters)**
+**Multi-row dataset with aggregation (supports filters)** - use `disaggregated: false`:
 - Dataset returns multiple rows (e.g., grouped by a filter dimension)
 - Use `"disaggregated": false` and aggregation expression
 - **CRITICAL**: Field `name` MUST match `fieldName` exactly (e.g., `"sum(spend)"`)
@@ -141,8 +157,9 @@ Detailed JSON patterns for each AI/BI dashboard widget type.
 
 - `version`: **2** (NOT 1 or 3!)
 - `widgetType`: "table"
-- **Columns only need `fieldName` and `displayName`** - no other properties!
+- **Columns only need `fieldName` and `displayName`** - no other properties required
 - Use `"disaggregated": true` for raw rows
+- Default sort: use `ORDER BY` in dataset SQL
 
 ```json
 {
@@ -185,9 +202,9 @@ Detailed JSON patterns for each AI/BI dashboard widget type.
 - `scale.type`: `"temporal"` (dates), `"quantitative"` (numbers), `"categorical"` (strings)
 - Use `"disaggregated": true` with pre-aggregated dataset data
 
-**Multiple Lines - Two Approaches:**
+**Multiple series - two approaches:**
 
-1. **Multi-Y Fields** (different metrics on same chart):
+1. **Multi-Y Fields** (different metrics):
 ```json
 "y": {
   "scale": {"type": "quantitative"},
@@ -201,17 +218,124 @@ Detailed JSON patterns for each AI/BI dashboard widget type.
 2. **Color Grouping** (same metric split by dimension):
 ```json
 "y": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}},
-"color": {"fieldName": "region", "scale": {"type": "categorical"}, "displayName": "Region"}
+"color": {"fieldName": "region", "scale": {"type": "categorical"}}
 ```
 
-**Bar Chart Modes:**
-- **Stacked** (default): No `mark` field - bars stack on top of each other
-- **Grouped**: Add `"mark": {"layout": "group"}` - bars side-by-side for comparison
+### Bar Chart Modes
+
+| Mode | Configuration |
+|------|---------------|
+| Stacked (default) | No `mark` field |
+| Grouped | `"mark": {"layout": "group"}` |
+
+### Horizontal Bar Chart
+
+Swap `x` and `y` - put quantitative on `x`, categorical/temporal on `y`:
+```json
+"encodings": {
+  "x": {"scale": {"type": "quantitative"}, "fields": [...]},
+  "y": {"fieldName": "category", "scale": {"type": "categorical"}}
+}
+```
+
+### Color Scale
+
+> **CRITICAL**: For bar/line/pie, color scale ONLY supports `type` and `sort`.
+> Do NOT use `scheme`, `colorRamp`, or `mappings` (only for choropleth-map).
+
+---
 
 ## Pie Chart
 
 - `version`: **3**
 - `widgetType`: "pie"
-- `angle`: quantitative aggregate
+- `angle`: quantitative field
 - `color`: categorical dimension
-- Limit to 3-8 categories for readability
+- **Limit to 3-8 categories for readability**
+
+```json
+"spec": {
+  "version": 3,
+  "widgetType": "pie",
+  "encodings": {
+    "angle": {"fieldName": "revenue", "scale": {"type": "quantitative"}},
+    "color": {"fieldName": "category", "scale": {"type": "categorical"}}
+  }
+}
+```
+
+---
+
+## Axis Formatting
+
+Add `format` to any encoding to display values appropriately:
+
+| Data Type | Format Type | Example |
+|-----------|-------------|---------|
+| Currency | `number-currency` | $1.2M |
+| Percentage | `number-percent` | 45.2% (data must be 0-1, not 0-100) |
+| Large numbers | `number` with `abbreviation` | 1.5K, 2.3M |
+
+```json
+"value": {
+  "fieldName": "revenue",
+  "displayName": "Revenue",
+  "format": {
+    "type": "number-currency",
+    "currencyCode": "USD",
+    "abbreviation": "compact",
+    "decimalPlaces": {"type": "max", "places": 2}
+  }
+}
+```
+
+**Options:**
+- `abbreviation`: `"compact"` (K/M/B) or omit for full numbers
+- `decimalPlaces`: `{"type": "max", "places": N}` or `{"type": "fixed", "places": N}`
+
+---
+
+## Dataset Parameters
+
+Use `:param` syntax in SQL for dynamic filtering:
+
+```json
+{
+  "name": "revenue_by_category",
+  "queryLines": ["SELECT ... WHERE returns_usd > :threshold GROUP BY category"],
+  "parameters": [{
+    "keyword": "threshold",
+    "dataType": "INTEGER",
+    "defaultSelection": {}
+  }]
+}
+```
+
+**Parameter types:**
+- Single value: `"dataType": "INTEGER"` / `"DECIMAL"` / `"STRING"`
+- Multi-select: Add `"complexType": "MULTI"`
+- Range: `"dataType": "DATE", "complexType": "RANGE"` - use `:param.min` / `:param.max`
+
+---
+
+## Widget Field Expressions
+
+Allowed in `query.fields` (no CAST or complex SQL):
+
+```json
+// Aggregations
+{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}
+{"name": "avg(price)", "expression": "AVG(`price`)"}
+{"name": "count(id)", "expression": "COUNT(`id`)"}
+{"name": "countdistinct(id)", "expression": "COUNT(DISTINCT `id`)"}
+
+// Date truncation
+{"name": "daily(date)", "expression": "DATE_TRUNC(\"DAY\", `date`)"}
+{"name": "weekly(date)", "expression": "DATE_TRUNC(\"WEEK\", `date`)"}
+{"name": "monthly(date)", "expression": "DATE_TRUNC(\"MONTH\", `date`)"}
+
+// Simple reference
+{"name": "category", "expression": "`category`"}
+```
+
+For conditional logic, compute in dataset SQL instead.

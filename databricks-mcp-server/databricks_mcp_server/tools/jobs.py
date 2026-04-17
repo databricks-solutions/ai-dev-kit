@@ -16,6 +16,7 @@ from databricks_tools_core.jobs import (
     update_job as _update_job,
     delete_job as _delete_job,
     run_job_now as _run_job_now,
+    repair_run as _repair_run,
     get_run as _get_run,
     get_run_output as _get_run_output,
     cancel_run as _cancel_run,
@@ -63,58 +64,15 @@ def manage_jobs(
     limit: int = 25,
     expand_tasks: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Manage Databricks jobs: create, get, list, find by name, update, and delete.
+    """Manage Databricks jobs: create, get, list, find_by_name, update, delete.
 
-    Actions:
-    - create: Create a new job (requires name, tasks). Uses serverless compute by default.
-        Idempotent: if a job with the same name exists, returns it instead of creating a duplicate.
-        Auto-merges default tags; user-provided tags take precedence.
-    - get: Get detailed job configuration (requires job_id).
-    - list: List jobs with optional name filter.
-    - find_by_name: Find a job by exact name and return its ID.
-    - update: Update an existing job's configuration (requires job_id).
-    - delete: Delete a job permanently (requires job_id).
-
-    Args:
-        action: "create", "get", "list", "find_by_name", "update", or "delete"
-        job_id: Job ID (for get, update, delete)
-        name: Job name (for create, find_by_name, or list filter)
-        tasks: List of task definitions (for create/update). Each task should have:
-            - task_key: Unique identifier
-            - description: Optional task description
-            - depends_on: Optional list of task dependencies
-            - [task_type]: One of spark_python_task, notebook_task, python_wheel_task,
-                          spark_jar_task, spark_submit_task, pipeline_task, sql_task, dbt_task, run_job_task
-            - [compute]: One of new_cluster, existing_cluster_id, job_cluster_key, compute_key
-        job_clusters: Job cluster definitions (for create/update, non-serverless tasks)
-        environments: Environment definitions for serverless tasks with custom dependencies (for create/update).
-            Each dict: environment_key, spec (with client and dependencies list)
-        tags: Tags dict for organization (for create/update)
-        timeout_seconds: Job-level timeout in seconds (for create/update)
-        max_concurrent_runs: Maximum concurrent runs (for create/update)
-        email_notifications: Email notification settings (for create/update)
-        webhook_notifications: Webhook notification settings (for create/update)
-        notification_settings: Notification settings for run lifecycle events (for create/update)
-        schedule: Schedule configuration (for create/update)
-        queue: Queue settings (for create/update)
-        run_as: Run-as user/service principal (for create/update)
-        git_source: Git source configuration (for create/update)
-        parameters: Job parameters (for create/update)
-        health: Health monitoring rules (for create/update)
-        deployment: Deployment configuration (for create/update)
-        limit: Maximum number of jobs to return for list (default: 25)
-        expand_tasks: If True, include full task definitions in list results (default: False)
-
-    Returns:
-        Dict with operation result:
-        - create: {"job_id": int, ...} or {"job_id": int, "already_exists": True, ...}
-        - get: Full job configuration dict
-        - list: {"items": [...]}
-        - find_by_name: {"job_id": int | None}
-        - update: {"status": "updated", "job_id": int}
-        - delete: {"status": "deleted", "job_id": int}
-    """
+    create: requires name+tasks, serverless default, idempotent (returns existing if same name).
+    get/update/delete: require job_id. find_by_name: returns job_id.
+    tasks: [{task_key, notebook_task|spark_python_task|..., job_cluster_key or environment_key}].
+    job_clusters: Shared cluster definitions tasks can reference. environments: Serverless env configs.
+    schedule: {quartz_cron_expression, timezone_id}. git_source: {git_url, git_provider, git_branch}.
+    See databricks-jobs skill for task configuration details.
+    Returns: create={job_id}, get=full config, list={items}, find_by_name={job_id}, update/delete={status, job_id}."""
     act = action.lower()
 
     if act == "create":
@@ -236,6 +194,10 @@ def manage_job_runs(
     sql_params: Dict[str, str] = None,
     dbt_commands: List[str] = None,
     queue: Dict[str, Any] = None,
+    rerun_all_failed_tasks: bool = None,
+    rerun_dependent_tasks: bool = None,
+    rerun_tasks: List[str] = None,
+    latest_repair_id: int = None,
     active_only: bool = False,
     completed_only: bool = False,
     limit: int = 25,
@@ -245,50 +207,11 @@ def manage_job_runs(
     timeout: int = 3600,
     poll_interval: int = 10,
 ) -> Dict[str, Any]:
-    """
-    Manage Databricks job runs: trigger, monitor, and control.
+    """Manage job runs: run_now, repair, get, get_output, cancel, list, wait.
 
-    Actions:
-    - run_now: Trigger a job run immediately (requires job_id).
-    - get: Get detailed run status and information (requires run_id).
-    - get_output: Get run output including logs and results (requires run_id).
-    - cancel: Cancel a running job (requires run_id).
-    - list: List job runs with optional filters.
-    - wait: Wait for a job run to complete and return detailed results (requires run_id).
-
-    Args:
-        action: "run_now", "get", "get_output", "cancel", "list", or "wait"
-        job_id: Job ID (for run_now, or list filter)
-        run_id: Run ID (for get, get_output, cancel, wait)
-        idempotency_token: Token to ensure idempotent job runs (for run_now)
-        jar_params: Parameters for JAR tasks (for run_now)
-        notebook_params: Parameters for notebook tasks (for run_now)
-        python_params: Parameters for Python tasks (for run_now)
-        spark_submit_params: Parameters for spark-submit tasks (for run_now)
-        python_named_params: Named parameters for Python tasks (for run_now)
-        pipeline_params: Parameters for pipeline tasks (for run_now)
-        sql_params: Parameters for SQL tasks (for run_now)
-        dbt_commands: Commands for dbt tasks (for run_now)
-        queue: Queue settings for this run (for run_now)
-        active_only: If True, only return active runs (for list)
-        completed_only: If True, only return completed runs (for list)
-        limit: Maximum number of runs to return (for list, default: 25)
-        offset: Offset for pagination (for list)
-        start_time_from: Filter by start time in epoch milliseconds (for list)
-        start_time_to: Filter by start time in epoch milliseconds (for list)
-        timeout: Maximum wait time in seconds (for wait, default: 3600)
-        poll_interval: Time between status checks in seconds (for wait, default: 10)
-
-    Returns:
-        Dict with operation result:
-        - run_now: {"run_id": int}
-        - get: Run details dict with state, start_time, end_time, tasks, etc.
-        - get_output: Run output dict with logs, error messages, and task outputs
-        - cancel: {"status": "cancelled", "run_id": int}
-        - list: {"items": [...]}
-        - wait: Detailed run result dict with success, lifecycle_state, result_state,
-                duration_seconds, error_message, run_page_url
-    """
+    run_now: requires job_id, returns {run_id}. repair: requires run_id, reruns failed tasks (rerun_all_failed_tasks=True) or specific tasks (rerun_tasks=["task_key"]).
+    get/get_output/cancel/wait: require run_id. list: filter by job_id/active_only/completed_only. wait: blocks until complete (timeout default 3600s).
+    Returns: run_now={run_id}, repair={repair_id, run_id}, get=run details, get_output=logs+results, cancel={status}, list={items}, wait=full result."""
     act = action.lower()
 
     if act == "run_now":
@@ -306,6 +229,24 @@ def manage_job_runs(
             queue=queue,
         )
         return {"run_id": run_id_result}
+
+    elif act == "repair":
+        repair_id_result = _repair_run(
+            run_id=run_id,
+            rerun_all_failed_tasks=rerun_all_failed_tasks,
+            rerun_dependent_tasks=rerun_dependent_tasks,
+            rerun_tasks=rerun_tasks,
+            latest_repair_id=latest_repair_id,
+            jar_params=jar_params,
+            notebook_params=notebook_params,
+            python_params=python_params,
+            spark_submit_params=spark_submit_params,
+            python_named_params=python_named_params,
+            pipeline_params=pipeline_params,
+            sql_params=sql_params,
+            dbt_commands=dbt_commands,
+        )
+        return {"repair_id": repair_id_result, "run_id": run_id}
 
     elif act == "get":
         return _get_run(run_id=run_id)
@@ -334,4 +275,4 @@ def manage_job_runs(
         result = _wait_for_run(run_id=run_id, timeout=timeout, poll_interval=poll_interval)
         return result.to_dict()
 
-    raise ValueError(f"Invalid action: '{action}'. Valid: run_now, get, get_output, cancel, list, wait")
+    raise ValueError(f"Invalid action: '{action}'. Valid: run_now, repair, get, get_output, cancel, list, wait")

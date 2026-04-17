@@ -25,8 +25,8 @@ There are three categories:
 | Task | Use this | Fall back to `ai_query` when... |
 |---|---|---|
 | Sentiment scoring | `ai_analyze_sentiment` | Never |
-| Fixed-label routing | `ai_classify` (2–20 labels) | Never |
-| Flat entity extraction | `ai_extract` | Output schema has nested arrays |
+| Fixed-label routing | `ai_classify` (2–500 labels; add descriptions for accuracy) | Never |
+| Entity / field extraction | `ai_extract` | Never |
 | Summarization | `ai_summarize` | Never — use `max_words=0` for uncapped |
 | Grammar correction | `ai_fix_grammar` | Never |
 | Translation | `ai_translate` | Target language not in the supported list |

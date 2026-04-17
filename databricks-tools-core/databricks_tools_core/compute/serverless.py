@@ -203,6 +203,7 @@ def run_code_on_serverless(
     run_name: Optional[str] = None,
     cleanup: bool = True,
     workspace_path: Optional[str] = None,
+    job_extra_params: Optional[Dict[str, Any]] = None,
 ) -> ServerlessRunResult:
     """Execute code on serverless compute via Jobs API runs/submit.
 
@@ -236,6 +237,9 @@ def run_code_on_serverless(
             (e.g. "/Workspace/Users/user@company.com/my-project/train").
             If provided, the notebook is persisted at this path. If omitted,
             a temporary path is used and cleaned up after execution.
+        job_extra_params: Optional dict of extra parameters to pass to jobs.submit().
+            Use for custom environments with dependencies, e.g.:
+            {"environments": [{"environment_key": "my_env", "spec": {"client": "4", "dependencies": ["pandas"]}}]}
 
     Returns:
         ServerlessRunResult with output, error, run_id, run_url, and timing info.
@@ -291,22 +295,39 @@ def run_code_on_serverless(
     try:
         # --- Step 2: Submit serverless run ---
         try:
-            wait = w.jobs.submit(
-                run_name=run_name,
-                tasks=[
+            # Build submit kwargs, allowing job_extra_params to override defaults
+            extra = job_extra_params or {}
+
+            # Determine environment_key for the task
+            env_key = "Default"
+            if "environments" in extra and extra["environments"]:
+                # Use the first environment's key from extra params
+                env_key = extra["environments"][0].get("environment_key", "Default")
+
+            submit_kwargs = {
+                "run_name": run_name,
+                "tasks": [
                     SubmitTask(
                         task_key="main",
                         notebook_task=NotebookTask(notebook_path=notebook_path),
-                        environment_key="Default",
+                        environment_key=env_key,
                     )
                 ],
-                environments=[
+            }
+
+            # Use custom environments if provided, otherwise use default
+            if "environments" not in extra:
+                submit_kwargs["environments"] = [
                     JobEnvironment(
                         environment_key="Default",
                         spec=Environment(client="1"),
                     )
-                ],
-            )
+                ]
+
+            # Merge any extra params (environments, timeout_seconds, etc.)
+            submit_kwargs.update(extra)
+
+            wait = w.jobs.submit(**submit_kwargs)
             # Extract run_id from the Wait object
             run_id = getattr(wait, "run_id", None)
             if run_id is None and hasattr(wait, "response"):

@@ -90,7 +90,7 @@ manage_job_runs(action="get", run_id="<run_id>")
 Or check endpoint directly:
 
 ```
-get_serving_endpoint_status(name="<endpoint_name>")
+manage_serving_endpoint(action="get", name="<endpoint_name>")
 ```
 
 ## Classical ML Deployment
@@ -172,7 +172,7 @@ deployment = agents.deploy(
 Endpoints created via `agents.deploy()` appear under **Serving** in the Databricks UI. If you don't see your endpoint:
 
 1. **Check the filter** - The Serving page defaults to "Owned by me". If the deployment ran as a service principal (e.g., via a job), switch to "All" to see it.
-2. **Verify via API** - Use `list_serving_endpoints()` or `get_serving_endpoint_status(name="...")` to confirm the endpoint exists and check its state.
+2. **Verify via API** - Use `manage_serving_endpoint(action="list")` or `manage_serving_endpoint(action="get", name="...")` to confirm the endpoint exists and check its state.
 3. **Check the name** - The auto-generated name may not be what you expect. Print `deployment.endpoint_name` in the deploy script or check the job run output.
 
 ### Deployment Script with Explicit Naming
@@ -263,16 +263,16 @@ client.update_endpoint(
 
 | Step | MCP Tool | Waits? |
 |------|----------|--------|
-| Upload deploy script | `upload_to_workspace` | Yes |
+| Upload deploy script | `manage_workspace_files` (action="upload") | Yes |
 | Create job (one-time) | `manage_jobs` (action="create") | Yes |
 | Run deployment | `manage_job_runs` (action="run_now") | **No** - returns immediately |
 | Check job status | `manage_job_runs` (action="get") | Yes |
-| Check endpoint status | `get_serving_endpoint_status` | Yes |
+| Check endpoint status | `manage_serving_endpoint` (action="get") | Yes |
 
 ## After Deployment
 
 Once endpoint is READY:
 
-1. **Test with MCP**: `query_serving_endpoint(name="...", messages=[...])`
+1. **Test with MCP**: `manage_serving_endpoint(action="query", name="...", messages=[...])`
 2. **Share with team**: Endpoint URL in Databricks UI
 3. **Integrate in apps**: Use REST API or SDK

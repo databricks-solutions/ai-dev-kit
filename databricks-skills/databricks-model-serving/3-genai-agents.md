@@ -275,7 +275,8 @@ agents.deploy(
 ## Query Deployed Agent
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="my-agent-endpoint",
     messages=[{"role": "user", "content": "What is Databricks?"}],
     max_tokens=500

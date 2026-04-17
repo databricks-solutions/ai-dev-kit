@@ -147,7 +147,7 @@ Claude:
 User: "I just created a Genie Space for HR data. Can you test it?"
 
 Claude:
-1. Gets the space_id from the user or recent create_or_update_genie result
+1. Gets the space_id from the user or recent manage_genie(action="create_or_update") result
 2. Calls ask_genie with test questions:
    - "How many employees do we have?"
    - "What is the average salary by department?"
@@ -218,7 +218,7 @@ ask_genie(space_id, "Calculate customer lifetime value for all customers",
 
 - Verify the `space_id` is correct
 - Check you have access to the space
-- Use `get_genie(space_id)` to verify it exists
+- Use `manage_genie(action="get", space_id=...)` to verify it exists
 
 ### "Query timed out"
 

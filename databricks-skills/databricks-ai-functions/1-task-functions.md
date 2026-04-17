@@ -27,15 +27,34 @@ df.withColumn("sentiment", expr("ai_analyze_sentiment(review_text)")).display()
 
 **Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_classify
 
-**Syntax:** `ai_classify(content, labels)`
-- `content`: STRING — text to classify
-- `labels`: ARRAY\<STRING\> — 2 to 20 mutually exclusive categories
+**Syntax:** `ai_classify(content, labels [, options])`
+- `content`: VARIANT | STRING — raw text, or VARIANT from `ai_parse_document` / `ai_extract`
+- `labels`: STRING — JSON labels definition:
+  - Simple array: `'["urgent", "not_urgent", "spam"]'`
+  - With descriptions: `'{"billing_error": "Payment, invoice, or refund issues", "product_defect": "Any malfunction or bug"}'` (descriptions up to 1000 chars each)
+  - 2–500 labels, each 1–100 characters
+- `options`: optional MAP\<STRING, STRING\>:
+  - `instructions`: task context to improve accuracy (max 20,000 chars)
+  - `multilabel`: `"true"` to return multiple matching labels (default `"false"`)
 
-Returns the matching label or `NULL`.
+Returns VARIANT. Returns `NULL` if content is `NULL`.
 
 ```sql
+-- simple labels
 SELECT ticket_text,
-       ai_classify(ticket_text, ARRAY('urgent', 'not urgent', 'spam')) AS priority
+       ai_classify(ticket_text, '["urgent", "not urgent", "spam"]') AS priority
+FROM support_tickets;
+-- {"response": ["urgent"], "error_message": null}
+
+-- labels with descriptions
+SELECT ticket_text,
+       ai_classify(
+           ticket_text,
+           '{"billing_error": "Payment, invoice, or refund issues",
+             "product_defect": "Any malfunction, bug, or breakage",
+             "account_issue": "Login failures, password resets"}',
+           MAP('instructions', 'Customer support tickets for a SaaS product')
+       ) AS category
 FROM support_tickets;
 ```
 
@@ -44,14 +63,14 @@ from pyspark.sql.functions import expr
 df = spark.table("support_tickets")
 df.withColumn(
     "priority",
-    expr("ai_classify(ticket_text, array('urgent', 'not urgent', 'spam'))")
+    expr("ai_classify(ticket_text, '[\"urgent\", \"not urgent\", \"spam\"]')")
 ).display()
 ```
 
 **Tips:**
-- Fewer labels = more consistent results (2–5 is optimal)
-- Labels should be mutually exclusive and clearly distinguishable
-- Not suitable for multi-label classification — run multiple calls if needed
+- Use label descriptions for ambiguous categories — they significantly improve accuracy
+- `multilabel: "true"` enables multi-label classification without running multiple calls
+- Up to 500 labels supported
 
 ---
 
@@ -59,25 +78,45 @@ df.withColumn(
 
 **Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_extract
 
-**Syntax:** `ai_extract(content, labels)`
-- `content`: STRING — source text
-- `labels`: ARRAY\<STRING\> — entity types to extract
+**Syntax:** `ai_extract(content, schema [, options])`
+- `content`: VARIANT | STRING — raw text, or VARIANT from `ai_parse_document`
+- `schema`: STRING — JSON schema definition:
+  - Simple (field names only): `'["invoice_id", "vendor_name", "total_amount"]'`
+  - Advanced (with types and descriptions):
+    ```json
+    {
+      "invoice_id": {"type": "string"},
+      "total_amount": {"type": "number"},
+      "currency": {"type": "enum", "labels": ["USD", "EUR", "GBP"]},
+      "line_items": {"type": "array", "items": {"type": "object", "properties": {...}}}
+    }
+    ```
+  - Supported types: `string`, `integer`, `number`, `boolean`, `enum`
+  - Max 128 fields, 7 nesting levels, 500 enum values
+- `options`: optional MAP\<STRING, STRING\>:
+  - `instructions`: task context to improve extraction quality (max 20,000 chars)
 
-Returns a STRUCT where each field name matches a label. Fields are `NULL` if not found.
+Returns VARIANT `{"response": {...}, "error_message": null}`. Returns `NULL` if content is `NULL`.
 
 ```sql
--- Extract and access fields directly
-SELECT
-    entities.person,
-    entities.location,
-    entities.date
-FROM (
-    SELECT ai_extract(
-        'John Doe called from New York on 2024-01-15.',
-        ARRAY('person', 'location', 'date')
-    ) AS entities
-    FROM messages
-);
+-- simple schema
+SELECT ai_extract(
+    'Invoice #12345 from Acme Corp for $1,250.00',
+    '["invoice_id", "vendor_name", "total_amount"]'
+) AS extracted;
+-- {"response": {"invoice_id": "12345", "vendor_name": "Acme Corp", ...}, "error_message": null}
+
+-- composable with ai_parse_document
+WITH parsed AS (
+  SELECT ai_parse_document(content, MAP('version', '2.0')) AS parsed
+  FROM READ_FILES('/Volumes/finance/invoices/', format => 'binaryFile')
+)
+SELECT ai_extract(
+    parsed,
+    '["invoice_id", "vendor_name", "total_amount"]',
+    MAP('instructions', 'These are vendor invoices.')
+) AS invoice_data
+FROM parsed;
 ```
 
 ```python
@@ -85,12 +124,10 @@ from pyspark.sql.functions import expr
 df = spark.table("messages")
 df = df.withColumn(
     "entities",
-    expr("ai_extract(message, array('person', 'location', 'date'))")
+    expr("ai_extract(message, '[\"person\", \"location\", \"date\"]')")
 )
-df.select("entities.person", "entities.location", "entities.date").display()
+df.display()
 ```
-
-**Use `ai_query` instead when:** the output has nested arrays or more than ~5 levels of hierarchy.
 
 ---
 

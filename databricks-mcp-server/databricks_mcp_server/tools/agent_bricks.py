@@ -81,17 +81,15 @@ def _ka_create_or_update(
         tile_id=tile_id,
     )
 
-    # Extract tile info
-    ka_data = result.get("knowledge_assistant", {})
-    tile_data = ka_data.get("tile", {})
-    status_data = ka_data.get("status", {})
-
-    response_tile_id = tile_data.get("tile_id", "")
-    endpoint_status = status_data.get("endpoint_status", "UNKNOWN")
+    # Extract info from new flat format
+    response_tile_id = result.get("tile_id", "")
+    # Map SDK state to endpoint status for backward compatibility
+    state = result.get("state", "UNKNOWN")
+    endpoint_status = "ONLINE" if state == "ACTIVE" else ("PROVISIONING" if state == "CREATING" else state)
 
     response = {
         "tile_id": response_tile_id,
-        "name": tile_data.get("name", name),
+        "name": result.get("name", name),
         "operation": result.get("operation", "created"),
         "endpoint_status": endpoint_status,
         "examples_queued": 0,
@@ -101,8 +99,8 @@ def _ka_create_or_update(
     if add_examples_from_volume and response_tile_id:
         examples = manager.scan_volume_for_examples(volume_path)
         if examples:
-            # If endpoint is ONLINE, add examples directly
-            if endpoint_status == EndpointStatus.ONLINE.value:
+            # If endpoint is ACTIVE, add examples directly
+            if state == "ACTIVE":
                 created = manager.ka_add_examples_batch(response_tile_id, examples)
                 response["examples_added"] = len(created)
             else:
@@ -138,22 +136,26 @@ def _ka_get(tile_id: str) -> Dict[str, Any]:
     if not result:
         return {"error": f"Knowledge Assistant {tile_id} not found"}
 
-    ka_data = result.get("knowledge_assistant", {})
-    tile_data = ka_data.get("tile", {})
-    status_data = ka_data.get("status", {})
+    # Get examples count (handle failures gracefully)
+    try:
+        examples_response = manager.ka_list_examples(tile_id)
+        examples_count = len(examples_response.get("examples", []))
+    except Exception:
+        examples_count = 0
 
-    # Get examples count
-    examples_response = manager.ka_list_examples(tile_id)
-    examples_count = len(examples_response.get("examples", []))
+    # Map SDK state to endpoint status for backward compatibility
+    state = result.get("state", "UNKNOWN")
+    endpoint_status = "ONLINE" if state == "ACTIVE" else ("PROVISIONING" if state == "CREATING" else state)
 
     return {
-        "tile_id": tile_data.get("tile_id", tile_id),
-        "name": tile_data.get("name", ""),
-        "description": tile_data.get("description", ""),
-        "endpoint_status": status_data.get("endpoint_status", "UNKNOWN"),
-        "knowledge_sources": ka_data.get("knowledge_sources", []),
+        "tile_id": result.get("tile_id", tile_id),
+        "name": result.get("name", ""),
+        "description": result.get("description", ""),
+        "endpoint_status": endpoint_status,
+        "endpoint_name": result.get("endpoint_name", ""),
+        "knowledge_sources": result.get("sources", []),
         "examples_count": examples_count,
-        "instructions": ka_data.get("instructions", ""),
+        "instructions": result.get("instructions", ""),
     }
 
 
@@ -168,21 +170,20 @@ def _ka_find_by_name(name: str) -> Dict[str, Any]:
     if result is None:
         return {"found": False, "name": name}
 
-    # Fetch full details to get endpoint status
+    # Fetch full details to get endpoint status and name
     full_details = manager.ka_get(result.tile_id)
     endpoint_status = "UNKNOWN"
+    endpoint_name = ""
     if full_details:
-        endpoint_status = (
-            full_details.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status", "UNKNOWN")
-        )
+        state = full_details.get("state", "UNKNOWN")
+        endpoint_status = "ONLINE" if state == "ACTIVE" else ("PROVISIONING" if state == "CREATING" else state)
+        endpoint_name = full_details.get("endpoint_name", "")
 
-    # Endpoint name uses only the first segment of the tile_id (before the first hyphen)
-    tile_id_prefix = result.tile_id.split("-")[0]
     return {
         "found": True,
         "tile_id": result.tile_id,
         "name": result.name,
-        "endpoint_name": f"ka-{tile_id_prefix}-endpoint",
+        "endpoint_name": endpoint_name,
         "endpoint_status": endpoint_status,
     }
 
@@ -397,9 +398,12 @@ def _mas_get(tile_id: str) -> Dict[str, Any]:
     tile_data = mas_data.get("tile", {})
     status_data = mas_data.get("status", {})
 
-    # Get examples count
-    examples_response = manager.mas_list_examples(tile_id)
-    examples_count = len(examples_response.get("examples", []))
+    # Get examples count (handle failures gracefully)
+    try:
+        examples_response = manager.mas_list_examples(tile_id)
+        examples_count = len(examples_response.get("examples", []))
+    except Exception:
+        examples_count = 0
 
     return {
         "tile_id": tile_data.get("tile_id", tile_id),
@@ -479,52 +483,15 @@ def manage_ka(
     tile_id: str = None,
     add_examples_from_volume: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Create or update a Knowledge Assistant (KA) with document knowledge sources.
+    """Manage Knowledge Assistant (KA) - RAG-based document Q&A.
 
-    A Knowledge Assistant is a document-based Q&A system that uses RAG to answer
-    questions from indexed documents (PDFs, text files, etc.).
-
-    Actions:
-    - create_or_update: Create or update a KA (requires name, volume_path)
-    - get: Get KA details by tile_id
-    - find_by_name: Find a KA by exact name
-    - delete: Delete a KA by tile_id
-
-    Args:
-        action: "create_or_update", "get", "find_by_name", or "delete"
-        name: Name for the KA (for create_or_update, find_by_name)
-        volume_path: Path to the volume folder containing documents
-            (e.g., "/Volumes/catalog/schema/volume/folder") (for create_or_update)
-        description: Optional description of what the KA does (for create_or_update)
-        instructions: Optional instructions for how the KA should answer (for create_or_update)
-        tile_id: The KA tile ID (for get, delete, or update via create_or_update)
-        add_examples_from_volume: If True, scan the volume for JSON files
-            containing question/guideline pairs and add them as examples (for create_or_update)
-
-    Returns:
-        Dict with operation result. Varies by action:
-        - create_or_update: tile_id, name, operation, endpoint_status, examples_queued
-        - get: tile_id, name, description, endpoint_status, knowledge_sources, examples_count
-        - find_by_name: found, tile_id, name, endpoint_name, endpoint_status
-        - delete: success, tile_id
-
-    Example:
-        >>> manage_ka(
-        ...     action="create_or_update",
-        ...     name="HR Policy Assistant",
-        ...     volume_path="/Volumes/my_catalog/my_schema/raw_data/hr_docs",
-        ...     description="Answers questions about HR policies",
-        ...     instructions="Be helpful and cite specific policies when answering"
-        ... )
-        {
-            "tile_id": "01abc...",
-            "name": "HR_Policy_Assistant",
-            "operation": "created",
-            "endpoint_status": "PROVISIONING",
-            "examples_queued": 5
-        }
-    """
+    Actions: create_or_update (name+volume_path), get (tile_id), find_by_name (name), delete (tile_id).
+    volume_path: UC Volume path with documents (e.g., /Volumes/catalog/schema/vol/docs).
+    description: What this KA does (shown to users). instructions: How KA should answer queries.
+    add_examples_from_volume: scan volume for JSON example files with question/guideline pairs.
+    See agent-bricks skill for full details.
+    Returns: create_or_update={tile_id, operation, endpoint_status}, get={tile_id, knowledge_sources, examples_count},
+    find_by_name={found, tile_id, endpoint_name}, delete={success}."""
     action = action.lower()
 
     if action == "create_or_update":
@@ -556,73 +523,15 @@ def manage_mas(
     tile_id: str = None,
     examples: List[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Create or update a Supervisor Agent (formerly Multi-Agent Supervisor, MAS).
+    """Manage Supervisor Agent (MAS) - orchestrates multiple agents for query routing.
 
-    A Supervisor Agent orchestrates multiple agents, routing user queries to the appropriate
-    specialized agent based on the query content. Supports model serving endpoints,
-    Genie spaces, Knowledge Assistants, UC functions, and external MCP servers as agents.
-
-    Actions:
-    - create_or_update: Create or update a Supervisor Agent (requires name, agents)
-    - get: Get Supervisor Agent details by tile_id
-    - find_by_name: Find a Supervisor Agent by exact name
-    - delete: Delete a Supervisor Agent by tile_id
-
-    Args:
-        action: "create_or_update", "get", "find_by_name", or "delete"
-        name: Name for the Supervisor Agent (for create_or_update, find_by_name)
-        agents: List of agent configurations (for create_or_update). Each agent requires:
-            - name: Agent identifier (used internally for routing)
-            - description: What this agent handles (critical for routing decisions)
-            - endpoint_name: Model serving endpoint name (for custom agents)
-            - genie_space_id: Genie space ID (for SQL-based data agents)
-            - ka_tile_id: Knowledge Assistant tile ID (for document Q&A agents)
-            - uc_function_name: Unity Catalog function name in format 'catalog.schema.function_name'
-            - connection_name: Unity Catalog connection name (for external MCP servers)
-            Note: Provide exactly one of: endpoint_name, genie_space_id,
-                ka_tile_id, uc_function_name, or connection_name.
-        description: Optional description of what the MAS does (for create_or_update)
-        instructions: Optional routing instructions for the supervisor (for create_or_update)
-        tile_id: The Supervisor Agent tile ID (for get, delete, or update via create_or_update)
-        examples: Optional list of example questions (for create_or_update), each with:
-            - question: The example question
-            - guideline: Expected routing behavior or answer guidelines
-
-    Returns:
-        Dict with operation result. Varies by action:
-        - create_or_update: tile_id, name, operation, endpoint_status, agents_count
-        - get: tile_id, name, description, endpoint_status, agents, examples_count
-        - find_by_name: found, tile_id, name, endpoint_status, agents_count
-        - delete: success, tile_id
-
-    Example:
-        >>> manage_mas(
-        ...     action="create_or_update",
-        ...     name="Customer Support MAS",
-        ...     agents=[
-        ...         {
-        ...             "name": "policy_agent",
-        ...             "ka_tile_id": "f32c5f73-466b-...",
-        ...             "description": "Answers questions about company policies and procedures"
-        ...         },
-        ...         {
-        ...             "name": "analytics_agent",
-        ...             "genie_space_id": "01abc123...",
-        ...             "description": "Answers data questions about usage and metrics"
-        ...         }
-        ...     ],
-        ...     description="Routes customer queries to specialized agents",
-        ...     instructions="Route policy questions to policy_agent, data questions to analytics_agent."
-        ... )
-        {
-            "tile_id": "01xyz...",
-            "name": "Customer_Support_MAS",
-            "operation": "created",
-            "endpoint_status": "PROVISIONING",
-            "agents_count": 2
-        }
-    """
+    Actions: create_or_update (name+agents), get (tile_id), find_by_name (name), delete (tile_id).
+    agents: [{name, description (critical for routing), ONE OF: endpoint_name|genie_space_id|ka_tile_id|uc_function_name|connection_name}].
+    description: What this MAS does. instructions: Routing rules for the supervisor.
+    examples: [{question, guideline}] to train routing behavior.
+    See agent-bricks skill for full agent configuration details.
+    Returns: create_or_update={tile_id, operation, endpoint_status, agents_count}, get={tile_id, agents, examples_count},
+    find_by_name={found, tile_id, agents_count}, delete={success}."""
     action = action.lower()
 
     if action == "create_or_update":

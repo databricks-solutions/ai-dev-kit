@@ -58,54 +58,26 @@ def execute_code(
     destroy_context_on_completion: bool = False,
     workspace_path: str = None,
     run_name: str = None,
+    job_extra_params: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
-    """
-    Execute code on Databricks — serverless or cluster compute.
+    """Execute code on Databricks via serverless or cluster compute.
 
-    This is the single entry point for all code execution on Databricks.
+    Modes:
+    - auto (default): Serverless unless cluster_id/context_id given or language is scala/r
+    - serverless: No cluster needed, ~30s cold start, best for batch/one-off tasks
+    - cluster: State persists via context_id, best for interactive work (but slow ~2min one-off cluster startup)
 
-    Modes (determined by compute_type):
-    - "serverless": Run on serverless compute via Jobs API (no cluster needed).
-      Best for one-off Python/SQL, batch scripts, model training. Up to 30 min timeout.
-    - "cluster": Run on a classic cluster. Best for interactive iteration with
-      state preservation (variables, imports persist across calls via context_id).
-    - "auto" (default): Uses serverless if no cluster_id/context_id is provided
-      and language is python/sql. Falls back to cluster if cluster_id or
-      context_id is provided, or if language is scala/r.
+    - Cluster mode returns context_id. REUSE IT for subsequent calls to skip context creation (Variables/imports persist across calls).
+    - Serverless has no context reuse (~30s cold start each time).
 
-    File execution: Set file_path to a local file (.py, .scala, .sql, .r) instead
-    of code. Language is auto-detected from extension. Requires cluster compute
-    (or serverless for .py/.sql).
+    file_path: Run local file (.py/.scala/.sql/.r), auto-detects language.
+    workspace_path: Save as notebook in workspace (omit for ephemeral).
+    .ipynb: Pass raw JSON with serverless, auto-detected.
+    job_extra_params: Extra job params (serverless only). For dependencies:
+        {"environments": [{"environment_key": "env", "spec": {"client": "4", "dependencies": ["pandas", "sklearn"]}}]}
 
-    Persistence: Set workspace_path to save the code as a notebook in the
-    Databricks workspace (visible in UI, re-runnable, versionable). If omitted,
-    execution is ephemeral.
-
-    Jupyter notebooks (.ipynb): Pass raw .ipynb JSON as code with compute_type="serverless".
-    Auto-detected and uploaded natively.
-
-    Args:
-        code: Code to execute. Required unless file_path is provided.
-        file_path: Local file path to execute instead of code. Language auto-detected
-            from extension (.py, .scala, .sql, .r).
-        compute_type: "serverless", "cluster", or "auto" (default).
-        cluster_id: Cluster ID for cluster compute. Auto-selects if omitted.
-        context_id: Reuse an existing execution context (cluster compute only).
-            Enables state preservation across calls.
-        language: "python" (default), "scala", "sql", or "r".
-            Ignored when file_path is set (auto-detected) or for .ipynb content.
-        timeout: Max wait in seconds. Defaults: serverless=1800, cluster=120, file=600.
-        destroy_context_on_completion: Destroy cluster execution context after run.
-            Default False (keeps context for reuse).
-        workspace_path: Save code as a notebook at this workspace path
-            (e.g. "/Workspace/Users/user@company.com/project/train").
-            If omitted, execution is ephemeral.
-        run_name: Human-readable name for the run (serverless only).
-
-    Returns:
-        Dictionary with success, output, error, and compute-specific metadata
-        (cluster_id, context_id for cluster; run_id, run_url for serverless).
-    """
+    Timeouts: serverless=1800s, cluster=120s, file=600s.
+    Returns: {success, output, error, cluster_id, context_id} or {run_id, run_url}."""
     # Normalize empty strings to None
     code = _none_if_empty(code)
     file_path = _none_if_empty(file_path)
@@ -168,6 +140,7 @@ def execute_code(
             run_name=run_name,
             cleanup=workspace_path is None,
             workspace_path=workspace_path,
+            job_extra_params=job_extra_params,
         )
         return result.to_dict()
 
@@ -223,36 +196,18 @@ def manage_cluster(
     autoscale_min_workers: int = None,
     autoscale_max_workers: int = None,
 ) -> Dict[str, Any]:
-    """
-    Create, modify, start, terminate, or delete a Databricks cluster.
+    """Create, modify, start, terminate, or delete a cluster.
 
     Actions:
-    - "create": Create a new cluster. Requires name. Auto-picks latest LTS DBR,
-      reasonable node type, SINGLE_USER mode, and 120-min auto-termination.
-    - "modify": Update an existing cluster. Requires cluster_id. Only specified
-      parameters change; others stay as-is. Running clusters restart to apply.
-    - "start": Start a terminated cluster. Requires cluster_id.
-      IMPORTANT: Always ask the user before starting (consumes cloud resources, 3-8 min).
-    - "terminate": Stop a running cluster (reversible). Requires cluster_id.
-    - "delete": PERMANENTLY delete a cluster (irreversible). Requires cluster_id.
-      IMPORTANT: Always confirm with user before deleting.
+    - create: Requires name. Auto-picks DBR, node type, SINGLE_USER, 120min auto-stop.
+    - modify: Requires cluster_id. Only specified params change. Running clusters restart.
+    - start: Requires cluster_id. ASK USER FIRST (costs money, 3-8min startup).
+    - terminate: Reversible stop. Requires cluster_id.
+    - get: returns cluster details. Requires cluster_id.
+    - delete: PERMANENT. CONFIRM WITH USER. Requires cluster_id.
 
-    Args:
-        action: One of "create", "modify", "start", "terminate", "delete".
-        cluster_id: Required for modify, start, terminate, delete.
-        name: Cluster name. Required for create, optional for modify.
-        num_workers: Fixed worker count (ignored if autoscale is set). Default 1 for create.
-        spark_version: DBR version key (e.g. "15.4.x-scala2.12"). Auto-picks if omitted.
-        node_type_id: Worker node type (e.g. "i3.xlarge"). Auto-picked if omitted.
-        autotermination_minutes: Minutes of inactivity before auto-stop. Default 120.
-        data_security_mode: "SINGLE_USER", "USER_ISOLATION", etc. Default SINGLE_USER.
-        spark_conf: JSON string of Spark config overrides.
-        autoscale_min_workers: Min workers for autoscaling (set with max to enable).
-        autoscale_max_workers: Max workers for autoscaling.
-
-    Returns:
-        Dictionary with cluster_id, cluster_name, state, and message.
-    """
+    num_workers default 1, ignored if autoscale set. spark_conf: JSON string.
+    Returns: {cluster_id, cluster_name, state, message}."""
     action = action.lower().strip()
 
     # Normalize empty strings
@@ -331,10 +286,21 @@ def manage_cluster(
             return {"success": False, "error": "cluster_id is required for delete action."}
         return _delete_cluster(cluster_id)
 
+    elif action == "get":
+        if not cluster_id:
+            return {"success": False, "error": "cluster_id is required for get action."}
+        try:
+            return _get_cluster_status(cluster_id)
+        except Exception as e:
+            # Handle case where cluster doesn't exist (e.g., after deletion)
+            if "does not exist" in str(e).lower():
+                return {"success": True, "cluster_id": cluster_id, "state": "DELETED", "exists": False}
+            return {"success": False, "error": str(e)}
+
     else:
         return {
             "success": False,
-            "error": f"Unknown action: {action!r}. Must be one of: create, modify, start, terminate, delete.",
+            "error": f"Unknown action: {action!r}. Must be one of: create, modify, start, terminate, delete, get.",
         }
 
 
@@ -355,33 +321,15 @@ def manage_sql_warehouse(
     warehouse_type: str = None,
     enable_serverless: bool = None,
 ) -> Dict[str, Any]:
-    """
-    Create, modify, or delete a Databricks SQL warehouse.
+    """Create, modify, or delete a SQL warehouse.
 
     Actions:
-    - "create": Create a new warehouse. Requires name. Defaults to serverless
-      Pro, Small size, 120-min auto-stop.
-    - "modify": Update an existing warehouse. Requires warehouse_id. Only
-      specified parameters change.
-    - "delete": PERMANENTLY delete a warehouse (irreversible). Requires warehouse_id.
-      IMPORTANT: Always confirm with user before deleting.
+    - create: Requires name. Defaults: serverless PRO, Small, 120min auto-stop.
+    - modify: Requires warehouse_id. Only specified params change.
+    - delete: PERMANENT. CONFIRM WITH USER. Requires warehouse_id.
 
-    For listing warehouses, use the list_warehouses tool (in SQL tools).
-
-    Args:
-        action: One of "create", "modify", "delete".
-        warehouse_id: Required for modify and delete.
-        name: Warehouse name. Required for create.
-        size: T-shirt size ("2X-Small" through "4X-Large"). Default "Small".
-        min_num_clusters: Minimum cluster count. Default 1.
-        max_num_clusters: Maximum cluster count for scaling. Default 1.
-        auto_stop_mins: Minutes of inactivity before auto-stop. Default 120.
-        warehouse_type: "PRO" or "CLASSIC". Default "PRO".
-        enable_serverless: Enable serverless compute. Default True.
-
-    Returns:
-        Dictionary with warehouse_id, name, state, and message.
-    """
+    size: "2X-Small" to "4X-Large". Use list_warehouses to list existing.
+    Returns: {warehouse_id, name, state, message}."""
     action = action.lower().strip()
 
     warehouse_id = _none_if_empty(warehouse_id)
@@ -444,22 +392,11 @@ def list_compute(
     cluster_id: str = None,
     auto_select: bool = False,
 ) -> Dict[str, Any]:
-    """
-    List and inspect compute resources: clusters, node types, or spark versions.
+    """List compute resources: clusters, node types, or spark versions.
 
-    Args:
-        resource: What to list. One of:
-            - "clusters" (default): List all user-created clusters with state info.
-            - "node_types": List available VM types for cluster creation.
-            - "spark_versions": List available Databricks Runtime versions.
-        cluster_id: (clusters only) If provided, returns detailed status for this
-            specific cluster. Use after starting a cluster to poll until RUNNING.
-        auto_select: (clusters only) If True, returns the best running cluster
-            (prefers "shared" > "demo" in name). Useful for auto-picking a cluster.
-
-    Returns:
-        Dictionary with the requested resource data.
-    """
+    resource: "clusters" (default), "node_types", or "spark_versions".
+    cluster_id: Get specific cluster status (use to poll after starting).
+    auto_select: Return best running cluster (prefers "shared" > "demo" in name)."""
     resource = resource.lower().strip()
     cluster_id = _none_if_empty(cluster_id)
 

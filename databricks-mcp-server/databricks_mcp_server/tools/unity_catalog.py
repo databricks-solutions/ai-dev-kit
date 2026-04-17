@@ -178,36 +178,23 @@ def manage_uc_objects(
     isolation_mode: str = None,
     force: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Manage Unity Catalog namespace objects: catalogs, schemas, volumes, functions.
+    """Manage UC namespace objects: catalog/schema/volume/function.
 
-    Actions per object_type:
-    - catalog: create, get, list, update, delete
-    - schema: create, get, list, update, delete
-    - volume: create, get, list, update, delete
-    - function: get, list, delete (create functions via manage_uc_security_policies or execute_sql)
+    object_type: "catalog", "schema", "volume", or "function".
+    action: "create", "get", "list", "update", "delete" (function: no create, use SQL).
 
-    Args:
-        object_type: "catalog", "schema", "volume", or "function"
-        action: "create", "get", "list", "update", or "delete"
-        name: Object name (for create)
-        full_name: Full qualified name (for get/update/delete).
-                   Format: "catalog" or "catalog.schema" or "catalog.schema.object".
-        catalog_name: Parent catalog (for list schemas/volumes/functions, or create schema)
-        schema_name: Parent schema (for list volumes/functions, or create volume)
-        comment: Description (for create/update)
-        owner: Owner (for create/update)
-        storage_root: Managed storage location (for catalog/schema create)
-        volume_type: "MANAGED" or "EXTERNAL" (for volume create, default: MANAGED)
-        storage_location: Cloud storage URL (for external volumes)
-        new_name: New name (for update/rename)
-        properties: Key-value properties (for catalog create)
-        isolation_mode: "OPEN" or "ISOLATED" (for catalog update)
-        force: Force deletion (default: False)
+    Parameters by object_type:
+    - catalog: create(name, comment?, storage_root?, properties?), get/update/delete(full_name or name).
+      update supports: new_name, comment, owner, isolation_mode (OPEN/ISOLATED).
+    - schema: create(catalog_name, name, comment?), get/update/delete(full_name).
+      list(catalog_name). update supports: new_name, comment, owner.
+    - volume: create(catalog_name, schema_name, name, volume_type?, comment?, storage_location?).
+      volume_type: MANAGED (default) or EXTERNAL. storage_location required for EXTERNAL.
+      list(catalog_name, schema_name). get/update/delete(full_name).
+    - function: get/delete(full_name), list(catalog_name, schema_name). force=True for delete.
 
-    Returns:
-        Dict with operation result. For list: {"items": [...]}. For get/create/update: object details.
-    """
+    full_name format: "catalog" or "catalog.schema" or "catalog.schema.object".
+    Returns: list={items}, get/create/update=object details, delete={status}."""
     otype = object_type.lower()
 
     if otype == "catalog":
@@ -365,29 +352,19 @@ def manage_uc_grants(
     principal: str = None,
     privileges: List[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Manage permissions on Unity Catalog securables.
+    """Manage UC permissions: grant/revoke/get/get_effective.
 
-    Actions:
-    - grant: Grant privileges to a principal.
-    - revoke: Revoke privileges from a principal.
-    - get: Get current grants on an object.
-    - get_effective: Get effective (inherited + direct) grants.
-
-    Args:
-        action: "grant", "revoke", "get", or "get_effective"
-        securable_type: Object type: "catalog", "schema", "table", "volume", "function",
-            "storage_credential", "external_location", "connection", "share", "metastore"
-        full_name: Full name of the securable object
-        principal: User, group, or service principal (required for grant/revoke)
-        privileges: List of privileges (required for grant/revoke).
-            Common values: "SELECT", "MODIFY", "CREATE_TABLE", "CREATE_SCHEMA",
-            "USE_CATALOG", "USE_SCHEMA", "ALL_PRIVILEGES", "EXECUTE",
-            "READ_VOLUME", "WRITE_VOLUME", "CREATE_VOLUME", "CREATE_FUNCTION"
-
-    Returns:
-        Dict with grant/revoke result or current permissions
-    """
+    action: "grant", "revoke", "get", "get_effective".
+    securable_type: catalog/schema/table/volume/function/storage_credential/external_location/connection/share.
+    full_name: Full UC name (e.g., "catalog.schema.table").
+    principal: User, group, or service principal (e.g., "user@example.com", "group_name").
+    privileges: List of privileges to grant/revoke. Common values:
+      - catalog: USE_CATALOG, CREATE_SCHEMA, ALL_PRIVILEGES
+      - schema: USE_SCHEMA, CREATE_TABLE, CREATE_FUNCTION, ALL_PRIVILEGES
+      - table: SELECT, MODIFY, ALL_PRIVILEGES
+      - volume: READ_VOLUME, WRITE_VOLUME, ALL_PRIVILEGES
+      - function: EXECUTE, ALL_PRIVILEGES
+    Returns: get/get_effective={privilege_assignments: [...]}, grant/revoke={status}."""
     act = action.lower()
 
     if act == "grant":
@@ -432,30 +409,24 @@ def manage_uc_storage(
     new_name: str = None,
     force: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Manage storage credentials and external locations.
+    """Manage storage credentials and external locations.
 
-    resource_type + action combinations:
-    - credential: create, get, list, update, delete, validate
-    - external_location: create, get, list, update, delete
+    resource_type: "credential" or "external_location".
 
-    Args:
-        resource_type: "credential" or "external_location"
-        action: "create", "get", "list", "update", "delete", "validate"
-        name: Resource name (for all actions except list)
-        aws_iam_role_arn: AWS IAM Role ARN (for credential create/update on AWS)
-        azure_access_connector_id: Azure Access Connector ID (for credential create/update on Azure)
-        url: Cloud storage URL (for external_location create/update, or credential validate)
-        credential_name: Storage credential name (for external_location create/update)
-        read_only: Whether resource is read-only (default: False)
-        comment: Description
-        owner: Owner
-        new_name: New name for update/rename
-        force: Force deletion (default: False)
+    credential actions:
+    - create: name + (aws_iam_role_arn OR azure_access_connector_id), comment?, read_only?.
+    - get/delete: name. delete supports force=True.
+    - update: name, new_name?, comment?, owner?, aws_iam_role_arn?, azure_access_connector_id?.
+    - validate: name, url (cloud path to validate access).
+    - list: no params.
 
-    Returns:
-        Dict with operation result
-    """
+    external_location actions:
+    - create: name, url (cloud path), credential_name, comment?, read_only?.
+    - get/delete: name. delete supports force=True.
+    - update: name, new_name?, url?, credential_name?, comment?, owner?, read_only?.
+    - list: no params.
+
+    Returns: get/create/update=resource details, list={items}, delete={status}, validate={results}."""
     rtype = resource_type.lower().replace(" ", "_").replace("-", "_")
 
     if rtype == "credential":
@@ -543,33 +514,23 @@ def manage_uc_connections(
     catalog_options: Dict[str, str] = None,
     warehouse_id: str = None,
 ) -> Dict[str, Any]:
-    """
-    Manage Lakehouse Federation foreign connections.
+    """Manage Lakehouse Federation foreign connections.
 
-    Actions:
-    - create: Create a foreign connection.
-    - get: Get connection details.
-    - list: List all connections.
-    - update: Update a connection.
-    - delete: Delete a connection.
-    - create_foreign_catalog: Create a foreign catalog using a connection.
+    action: "create", "get", "list", "update", "delete", "create_foreign_catalog".
+    connection_type: SNOWFLAKE, POSTGRESQL, MYSQL, SQLSERVER, BIGQUERY, REDSHIFT, SQLDW (Azure Synapse).
 
-    Args:
-        action: "create", "get", "list", "update", "delete", "create_foreign_catalog"
-        name: Connection name (for CRUD operations)
-        connection_type: "SNOWFLAKE", "POSTGRESQL", "MYSQL", "SQLSERVER", "BIGQUERY" (for create)
-        options: Connection options dict with keys like "host", "port", "user", "password", "database"
-        comment: Description
-        owner: Owner
-        new_name: New name for rename
-        connection_name: Connection to use (for create_foreign_catalog)
-        catalog_name: Name for the foreign catalog (for create_foreign_catalog)
-        catalog_options: Options for foreign catalog (e.g., {"database": "mydb"})
-        warehouse_id: SQL warehouse ID (for create_foreign_catalog)
+    Parameters by action:
+    - create: name, connection_type, options (dict with connection details), comment?.
+      options format varies by type. Example for POSTGRESQL:
+        {"host": "...", "port": "5432", "user": "...", "password": "..."}.
+    - get/delete: name.
+    - update: name, options?, new_name?, owner?.
+    - list: no params.
+    - create_foreign_catalog: Creates UC catalog from external connection.
+      Requires: catalog_name (new UC catalog name), connection_name (existing connection).
+      Optional: catalog_options (dict, e.g., {"database": "mydb"}), comment, warehouse_id.
 
-    Returns:
-        Dict with operation result
-    """
+    Returns: get/create/update=connection details, list={items}, delete={status}."""
     act = action.lower()
 
     if act == "create":
@@ -623,34 +584,20 @@ def manage_uc_tags(
     limit: int = 100,
     warehouse_id: str = None,
 ) -> Dict[str, Any]:
-    """
-    Manage tags and comments on Unity Catalog objects.
+    """Manage UC tags and comments.
 
-    Actions:
-    - set_tags: Set tags on an object or column.
-    - unset_tags: Remove tags from an object or column.
-    - set_comment: Set a comment on an object or column.
-    - query_table_tags: Query tags from system.information_schema.table_tags.
-    - query_column_tags: Query tags from system.information_schema.column_tags.
+    action: "set_tags", "unset_tags", "set_comment", "query_table_tags", "query_column_tags".
 
-    Args:
-        action: "set_tags", "unset_tags", "set_comment", "query_table_tags", "query_column_tags"
-        object_type: "catalog", "schema", "table", or "column" (for set/unset/comment)
-        full_name: Full object name (for set/unset/comment)
-        column_name: Column name when object_type is "column"
-        tags: Tag key-value pairs for set_tags (e.g., {"pii": "true", "classification": "confidential"})
-        tag_names: Tag keys to remove for unset_tags
-        comment_text: Comment text for set_comment
-        catalog_filter: Filter by catalog name (for query actions)
-        tag_name_filter: Filter by tag name (for query actions)
-        tag_value_filter: Filter by tag value (for query actions)
-        table_name_filter: Filter by table name (for query_column_tags)
-        limit: Max rows for query (default: 100)
-        warehouse_id: SQL warehouse ID (auto-selected if not provided)
+    Parameters by action:
+    - set_tags: object_type (catalog/schema/table/column), full_name, tags (dict of key-value pairs).
+      For columns: also set column_name. warehouse_id? for SQL-based tagging.
+    - unset_tags: object_type, full_name, tag_names (list of keys to remove).
+      For columns: also set column_name. warehouse_id?.
+    - set_comment: object_type, full_name, comment_text. For columns: column_name. warehouse_id?.
+    - query_table_tags: Search tables by tags. catalog_filter?, tag_name_filter?, tag_value_filter?, limit? (default 100).
+    - query_column_tags: Search columns by tags. catalog_filter?, table_name_filter?, tag_name_filter?, tag_value_filter?, limit?.
 
-    Returns:
-        Dict with operation result or query results
-    """
+    Returns: set/unset={status}, query={data: [...]}."""
     act = action.lower()
 
     if act == "set_tags":
@@ -723,34 +670,23 @@ def manage_uc_security_policies(
     function_comment: str = None,
     warehouse_id: str = None,
 ) -> Dict[str, Any]:
-    """
-    Manage row-level security and column masking policies.
+    """Manage row-level security and column masking.
 
-    Actions:
-    - set_row_filter: Apply a row filter function to a table.
-    - drop_row_filter: Remove the row filter from a table.
-    - set_column_mask: Apply a column mask function.
-    - drop_column_mask: Remove a column mask.
-    - create_security_function: Create a SQL function for row filters or column masks.
+    action: "set_row_filter", "drop_row_filter", "set_column_mask", "drop_column_mask", "create_security_function".
 
-    Args:
-        action: "set_row_filter", "drop_row_filter", "set_column_mask", "drop_column_mask", "create_security_function"
-        table_name: Full table name (for row filter/column mask operations)
-        column_name: Column name (for column mask operations)
-        filter_function: Full function name for row filter
-        filter_columns: Columns passed to the filter function
-        mask_function: Full function name for column mask
-        function_name: Full function name to create (catalog.schema.function)
-        function_body: SQL function body (e.g., "RETURN IF(IS_ACCOUNT_GROUP_MEMBER('admins'), val, '***')")
-        parameter_name: Function input parameter name
-        parameter_type: Function input parameter type (e.g., "STRING")
-        return_type: Function return type ("BOOLEAN" for filters, data type for masks)
-        function_comment: Function description
-        warehouse_id: SQL warehouse ID (auto-selected if not provided)
+    Parameters by action:
+    - set_row_filter: table_name (full name), filter_function (UDF name), filter_columns (list of columns to pass).
+      Example: filter_function="main.default.row_filter_fn", filter_columns=["user_id"].
+    - drop_row_filter: table_name.
+    - set_column_mask: table_name, column_name, mask_function (UDF that returns masked value).
+    - drop_column_mask: table_name, column_name.
+    - create_security_function: Creates a UDF for row filtering or column masking.
+      Requires: function_name (full name), parameter_name, parameter_type, return_type, function_body.
+      Example: function_name="main.default.my_filter", parameter_name="user_id", parameter_type="STRING",
+               return_type="BOOLEAN", function_body="return user_id = current_user()".
 
-    Returns:
-        Dict with operation result and executed SQL
-    """
+    All actions accept optional warehouse_id for SQL execution.
+    Returns: {status, message} or function details for create."""
     act = action.lower()
 
     if act == "set_row_filter":
@@ -799,27 +735,21 @@ def manage_uc_monitors(
     schedule_timezone: str = "UTC",
     assets_dir: str = None,
 ) -> Dict[str, Any]:
-    """
-    Manage Lakehouse quality monitors on tables.
+    """Manage Lakehouse quality monitors for data quality tracking.
 
-    Actions:
-    - create: Create a quality monitor on a table.
-    - get: Get monitor details.
-    - run_refresh: Trigger a monitor refresh.
-    - list_refreshes: List refresh history.
-    - delete: Delete the monitor.
+    action: "create", "get", "run_refresh", "list_refreshes", "delete".
+    table_name: Full table name (required for all actions).
 
-    Args:
-        action: "create", "get", "run_refresh", "list_refreshes", "delete"
-        table_name: Full table name being monitored (catalog.schema.table)
-        output_schema_name: Schema for output tables (for create, e.g., "catalog.schema")
-        schedule_cron: Quartz cron expression (for create, e.g., "0 0 12 * * ?")
-        schedule_timezone: Timezone (default: "UTC")
-        assets_dir: Workspace path for assets (for create)
+    Parameters by action:
+    - create: table_name, output_schema_name (where metrics tables are stored).
+      Optional: assets_dir (for dashboard assets), schedule_cron (e.g., "0 0 * * *"),
+      schedule_timezone (default "UTC").
+    - get: table_name. Returns monitor config and status.
+    - run_refresh: table_name. Triggers a new monitor refresh.
+    - list_refreshes: table_name. Returns {refreshes: [...]}.
+    - delete: table_name. Removes the monitor.
 
-    Returns:
-        Dict with monitor details or operation result
-    """
+    Returns: create/get=monitor details, run_refresh={status}, list_refreshes={refreshes}, delete={status}."""
     act = action.lower()
 
     if act == "create":
@@ -864,32 +794,30 @@ def manage_uc_sharing(
     recipient_name: str = None,
     include_shared_data: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Manage Delta Sharing: shares, recipients, and providers.
+    """Manage Delta Sharing: shares, recipients, and providers.
 
-    resource_type + action combinations:
-    - share: create, get, list, delete, add_table, remove_table, grant_to_recipient, revoke_from_recipient
-    - recipient: create, get, list, delete, rotate_token
-    - provider: get, list, list_shares
+    resource_type: "share", "recipient", or "provider".
 
-    Args:
-        resource_type: "share", "recipient", or "provider"
-        action: Operation to perform (see combinations above)
-        name: Resource name (share/recipient/provider name)
-        comment: Description (for create)
-        table_name: Full table name for add_table/remove_table
-        shared_as: Alias for shared table (hides internal naming)
-        partition_spec: Partition filter for shared table
-        authentication_type: "TOKEN" or "DATABRICKS" (for recipient create)
-        sharing_id: Sharing identifier for D2D sharing (for recipient create)
-        ip_access_list: Allowed IP addresses (for recipient create)
-        share_name: Share name (for grant/revoke operations)
-        recipient_name: Recipient name (for grant/revoke operations)
-        include_shared_data: Include shared objects in get (default: True)
+    SHARE actions (for data providers to share tables):
+    - create: name, comment?. Creates an empty share.
+    - get: name, include_shared_data? (default True).
+    - list: no params. Returns {items: [...]}.
+    - delete: name.
+    - add_table: name (or share_name), table_name (full UC name), shared_as? (alias), partition_spec?.
+    - remove_table: name (or share_name), table_name.
+    - grant_to_recipient: name (or share_name), recipient_name.
+    - revoke_from_recipient: name (or share_name), recipient_name.
 
-    Returns:
-        Dict with operation result
-    """
+    RECIPIENT actions (for data providers to manage share consumers):
+    - create: name, authentication_type? (TOKEN/DATABRICKS), sharing_id?, comment?, ip_access_list?.
+    - get: name. list: no params. delete: name.
+    - rotate_token: name. Generates new access token for TOKEN-based recipients.
+
+    PROVIDER actions (for data consumers to view available shares):
+    - get: name. list: no params.
+    - list_shares: name (provider name). Lists shares available from this provider.
+
+    Returns: create/get=details, list={items}, delete={status}."""
     rtype = resource_type.lower()
     act = action.lower()
 
@@ -974,53 +902,25 @@ def manage_metric_views(
     privileges: List[str] = None,
     warehouse_id: str = None,
 ) -> Dict[str, Any]:
-    """
-    Manage Unity Catalog metric views: create, alter, describe, query, drop, and grant.
+    """Manage UC metric views (reusable business metrics). Requires DBR 17.2+.
 
-    Metric views define reusable, governed business metrics in YAML. They separate
-    measure definitions from dimension groupings, allowing flexible querying across
-    any dimension at runtime. Requires Databricks Runtime 17.2+ and a SQL warehouse.
+    action: "create", "alter", "describe", "query", "drop", "grant".
+    full_name: Full metric view name (catalog.schema.metric_view).
 
-    Actions:
-    - create: Create a metric view with dimensions and measures.
-    - alter: Update a metric view's YAML definition.
-    - describe: Get the full definition and metadata of a metric view.
-    - query: Query measures grouped by dimensions using MEASURE() syntax.
-    - drop: Drop a metric view.
-    - grant: Grant privileges (e.g., SELECT) on a metric view.
+    Parameters by action:
+    - create: full_name, source (table/view name), dimensions, measures.
+      dimensions: List of dicts [{name: "dim_name", expr: "column_or_expr"}, ...].
+      measures: List of dicts [{name: "measure_name", expr: "SUM(amount)"}, ...] (aggregate functions).
+      Optional: version (default "1.1"), comment, filter_expr, joins, materialization, or_replace.
+    - alter: Same params as create except or_replace. Updates existing metric view.
+    - describe: full_name. Returns metric view definition and metadata.
+    - query: full_name, query_measures (list of measure names to retrieve).
+      Optional: query_dimensions (list of dimension names), where, order_by, limit.
+    - drop: full_name. Deletes the metric view.
+    - grant: full_name, principal, privileges (list, e.g., ["SELECT"]).
 
-    Args:
-        action: "create", "alter", "describe", "query", "drop", or "grant"
-        full_name: Three-level name (catalog.schema.metric_view_name)
-        source: Source table/view (for create/alter, e.g., "catalog.schema.orders")
-        dimensions: List of dimension dicts for create/alter. Each has:
-            - name: Display name (e.g., "Order Month")
-            - expr: SQL expression (e.g., "DATE_TRUNC('MONTH', order_date)")
-            - comment: (optional) Description
-        measures: List of measure dicts for create/alter. Each has:
-            - name: Display name (e.g., "Total Revenue")
-            - expr: Aggregate expression (e.g., "SUM(total_price)")
-            - comment: (optional) Description
-        version: YAML spec version (default: "1.1" for DBR 17.2+)
-        comment: Description of the metric view (for create/alter)
-        filter_expr: SQL boolean filter applied to all queries (for create/alter)
-        joins: Star/snowflake schema joins (for create/alter).
-            Each dict: name, source, on (or using), joins (nested for snowflake)
-        materialization: Materialization config (experimental, for create/alter).
-            Keys: schedule, mode ("relaxed"), materialized_views (list)
-        or_replace: If True, uses CREATE OR REPLACE (for create, default: False)
-        query_measures: Measure names to query (for query action)
-        query_dimensions: Dimension names to group by (for query action)
-        where: WHERE clause filter (for query action)
-        order_by: ORDER BY clause, use "ALL" for ORDER BY ALL (for query action)
-        limit: Row limit (for query action)
-        principal: User/group to grant to (for grant action)
-        privileges: Privileges to grant, default ["SELECT"] (for grant action)
-        warehouse_id: SQL warehouse ID (auto-selected if not provided)
-
-    Returns:
-        Dict with operation result. For query: list of row dicts.
-    """
+    All actions accept optional warehouse_id for SQL execution.
+    Returns: create/alter/describe/grant=details, query={data: [...]}, drop={status}."""
     act = action.lower()
 
     if act == "create":

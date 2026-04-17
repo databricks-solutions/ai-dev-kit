@@ -202,6 +202,17 @@ After choosing your workflow (see [Choose Your Workflow](#choose-your-workflow))
 | **Silver** | `stream(bronze)` → streaming table | Clean/validate, type casting, quality filters. Prefer `DECIMAL(p,s)` for money. Dedup can happen here or gold. |
 | **Gold** | `AUTO CDC INTO` or materialized view | Aggregated, denormalized. SCD/dedup often via `AUTO CDC`. Star schema typically uses `dim_*`/`fact_*`. |
 
+#### Gold Layer: Preserve Key Dimensions
+
+When aggregating data in gold tables, **keep the main business dimensions** to enable flexible analysis. Over-aggregating loses information that analysts may need later.
+
+**Guidance based on context:**
+- **If a dashboard is mentioned**: Include all dimensions that appear as filters. Dashboard filters only work if the underlying data has those columns.
+- **If analysis by dimension is mentioned** (e.g., "analyze by store", "breakdown by department"): Include those dimensions in the aggregation.
+- **If no specific instructions**: Default to keeping key business dimensions (location, department, product line, customer segment, time period) rather than aggregating them away. This preserves flexibility for future analysis.
+
+**Rule of thumb**: If users might want to slice the data by a dimension, include it in the gold table. It's easier to aggregate further in queries than to recover lost dimensions.
+
 **For medallion architecture** (bronze/silver/gold), two approaches work:
 - **Flat with naming** (template default): `bronze_*.sql`, `silver_*.sql`, `gold_*.sql`
 - **Subdirectories**: `bronze/orders.sql`, `silver/cleaned.sql`, `gold/summary.sql`
@@ -271,13 +282,13 @@ After running a pipeline (via DAB or MCP), you **MUST** validate both the execut
 
 ### Step 1: Check Pipeline Execution Status
 
-**From MCP (`run_pipeline` or `create_or_update_pipeline`):**
+**From MCP (`manage_pipeline(action="run")` or `manage_pipeline(action="create_or_update")`):**
 - Check `result["success"]` and `result["state"]`
 - If failed, check `result["message"]` and `result["errors"]` for details
 
 **From DAB (`databricks bundle run`):**
 - Check the command output for success/failure
-- Use `get_pipeline(pipeline_id=...)` to get detailed status and recent events
+- Use `manage_pipeline(action="get", pipeline_id=...)` to get detailed status and recent events
 
 ### Step 2: Validate Output Data
 
@@ -325,13 +336,13 @@ If validation reveals problems, trace upstream to find the root cause:
 | **Pipeline stuck INITIALIZING** | Normal for serverless, wait a few minutes |
 | **"Column not found"** | Check `schemaHints` match actual data |
 | **Streaming reads fail** | For file ingestion in a streaming table, you must use the `STREAM` keyword with `read_files`: `FROM STREAM read_files(...)`. For table streams use `FROM stream(table)`. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
-| **Timeout during run** | Increase `timeout`, or use `wait_for_completion=False` and check status with `get_pipeline` |
+| **Timeout during run** | Increase `timeout`, or use `wait_for_completion=False` and check status with `manage_pipeline(action="get")` |
 | **MV doesn't refresh** | Enable row tracking on source tables |
 | **SCD2: query column not found** | Lakeflow uses `__START_AT` and `__END_AT` (double underscore), not `START_AT`/`END_AT`. Use `WHERE __END_AT IS NULL` for current rows. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
 | **AUTO CDC parse error at APPLY/SEQUENCE** | Put `APPLY AS DELETE WHEN` **before** `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source (omit `_rescued_data` unless bronze uses rescue data). Omit `TRACK HISTORY ON *` if it causes "end of input" errors; default is equivalent. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
 | **"Cannot create streaming table from batch query"** | In a streaming table query, use `FROM STREAM read_files(...)` so `read_files` leverages Auto Loader; `FROM read_files(...)` alone is batch. See [sql/2-ingestion.md](references/sql/2-ingestion.md) and [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
 
-**For detailed errors**, the `result["message"]` from `create_or_update_pipeline` includes suggested next steps. Use `get_pipeline(pipeline_id=...)` which includes recent events and error details.
+**For detailed errors**, the `result["message"]` from `manage_pipeline(action="create_or_update")` includes suggested next steps. Use `manage_pipeline(action="get", pipeline_id=...)` which includes recent events and error details.
 
 ---
 

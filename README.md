@@ -5,6 +5,10 @@
 </p>
 
 ---
+> 🔒 Proactive Dependency Security  
+> As part of our commitment to supply chain integrity, we continually monitor our dependency tree against known vulnerabilities and industry advisories. In response to a recently disclosed supply chain incident affecting litellm versions 1.82.7–1.82.8, we have audited our packages and removed the litellm dependency for most usage. It is solely used in the test directory for skills evaluation and optimization, and has been pinned to a safe version.  
+> For full third-party attribution, see NOTICE.txt.
+---
 
 ## Overview
 
@@ -40,7 +44,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 | [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
 | [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
-| [**Genie Code Skills**](databricks-skills/install_skills_to_genie_code.sh) | Install Databricks skills for Genie Code to reference | [Genie Code skills (install)](#genie-code-skills) |
+| [**Genie Code Skills**](databricks-skills/install_skills.sh) | Install skills into your workspace for Genie Code (`--install-to-genie`) | [Genie Code skills (install)](#genie-code-skills) |
 | [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
 ---
 
@@ -55,11 +59,13 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
   - [Cursor](https://cursor.com)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
   - [Antigravity](https://antigravity.google)
+  - [Codex](https://openai.com/codex/)
+  - [Copilot](https://github.com/features/copilot/cli)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, or .agents_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github or .agents_
 
 #### Mac / Linux
 
@@ -177,22 +183,35 @@ Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databrick
 
 ---
 ## Genie Code Skills
-  
-  Will install and deploy all available skills to your personal skills directory for all Genie Code sessions to reference while planning/building anything directly in the UI. No post-install steps as workspace is automatically configured during install process for Genie Code to use the skills.
 
-  **Basic installation** (uses DEFAULT profile)
+Install skills into `./.claude/skills` (relative to the directory where you run the script), then upload them to your workspace at `/Workspace/Users/<you>/.assistant/skills` so Genie Code can use them in the UI. Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for your workspace.
 
-```bash
-#Execute from root folder (/ai-dev-kit)
-./databricks-skills/install_skills_to_genie_code.sh
-```
+**Always run from the project directory** where you want `.claude/skills` created (for example your repo root or `ai-dev-kit`).
 
-**Advance installation** (uses provided profile)
+**From this repo (recommended if you have a clone):**
 
 ```bash
-#Execute from root folder (/ai-dev-kit)
-./databricks-skills/install_skills_to_genie_code <profile_name>
+# Databricks skills from this checkout + upload (DEFAULT CLI profile)
+./databricks-skills/install_skills.sh --local --install-to-genie
+
+# Download all skills from GitHub, then upload
+./databricks-skills/install_skills.sh --install-to-genie
+
+# Explicit Databricks CLI profile
+./databricks-skills/install_skills.sh --install-to-genie --profile YOUR_PROFILE
 ```
+
+**Without cloning** (run from the directory that should contain `.claude/skills`):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie
+```
+
+Combine `--profile`, `--local`, specific skill names, `--mlflow-version`, etc. as needed; see `./databricks-skills/install_skills.sh --help` or [databricks-skills/README.md](databricks-skills/README.md).
+
+**From a Databricks notebook** (no local terminal needed):
+
+Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py) into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them to your workspace using the Databricks SDK. This works on any compute, including serverless.
 
 **Skill modification or Custom Skill**
 

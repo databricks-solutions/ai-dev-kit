@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned SHAs up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Keep Python dependencies up to date
+  - package-ecosystem: "pip"
+    directory: "/databricks-builder-app"
+    schedule:
+      interval: "weekly"
+
+  # Keep npm dependencies up to date
+  - package-ecosystem: "npm"
+    directory: "/databricks-builder-app/client"
+    schedule:
+      interval: "weekly"

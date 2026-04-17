@@ -30,24 +30,9 @@ def _delete_from_databricks(resource_type: str, resource_id: str) -> Optional[st
 
 @mcp.tool(timeout=30)
 def list_tracked_resources(type: Optional[str] = None) -> Dict[str, Any]:
-    """
-    List resources tracked in the project manifest.
+    """List resources tracked in project manifest (dashboards, jobs, pipelines, genie_space, etc.).
 
-    The manifest records every resource created through the MCP server
-    (dashboards, jobs, pipelines, Genie spaces, KAs, MAS, schemas, volumes, etc.).
-    Use this to see what was created across sessions.
-
-    Args:
-        type: Optional filter by resource type. One of: "dashboard", "job",
-            "pipeline", "genie_space", "knowledge_assistant",
-            "multi_agent_supervisor", "catalog", "schema", "volume".
-            If not provided, returns all tracked resources.
-
-    Returns:
-        Dictionary with:
-        - resources: List of tracked resources (type, name, id, url, timestamps)
-        - count: Number of resources returned
-    """
+    type: Filter by resource type (optional). Returns: {resources: [...], count}."""
     resources = list_resources(resource_type=type)
     return {
         "resources": resources,
@@ -61,25 +46,10 @@ def delete_tracked_resource(
     resource_id: str,
     delete_from_databricks: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Delete a resource from the project manifest, and optionally from Databricks.
+    """Delete resource from manifest, optionally from Databricks too.
 
-    Use this to clean up resources that were created during development/testing.
-
-    Args:
-        type: Resource type (e.g., "dashboard", "job", "pipeline", "genie_space",
-            "knowledge_assistant", "multi_agent_supervisor", "catalog", "schema", "volume")
-        resource_id: The resource ID (as shown in list_tracked_resources)
-        delete_from_databricks: If True, also delete the resource from Databricks
-            before removing it from the manifest. Default: False (manifest-only).
-
-    Returns:
-        Dictionary with:
-        - success: Whether the operation succeeded
-        - removed_from_manifest: Whether the resource was found and removed
-        - deleted_from_databricks: Whether the resource was deleted from Databricks
-        - error: Error message if deletion failed
-    """
+    delete_from_databricks: If True, deletes from Databricks first (default: False, manifest-only).
+    Returns: {success, removed_from_manifest, deleted_from_databricks, error}."""
     result: Dict[str, Any] = {
         "success": True,
         "removed_from_manifest": False,

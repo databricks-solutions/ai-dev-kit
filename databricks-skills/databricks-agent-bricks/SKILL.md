@@ -67,18 +67,19 @@ Actions:
 
 **For comprehensive Genie guidance, use the `databricks-genie` skill.**
 
-Basic tools available:
-
-- `create_or_update_genie` - Create or update a Genie Space
-- `get_genie` - Get Genie Space details
-- `delete_genie` - Delete a Genie Space
+Use `manage_genie` with actions:
+- `create_or_update` - Create or update a Genie Space
+- `get` - Get Genie Space details
+- `list` - List all Genie Spaces
+- `delete` - Delete a Genie Space
+- `export` / `import` - For migration
 
 See `databricks-genie` skill for:
 - Table inspection workflow
 - Sample question best practices
 - Curation (instructions, certified queries)
 
-**IMPORTANT**: There is NO system table for Genie spaces (e.g., `system.ai.genie_spaces` does not exist). To find a Genie space by name, use the `find_genie_by_name` tool.
+**IMPORTANT**: There is NO system table for Genie spaces (e.g., `system.ai.genie_spaces` does not exist). Use `manage_genie(action="list")` to find spaces.
 
 ### Supervisor Agent Tool
 

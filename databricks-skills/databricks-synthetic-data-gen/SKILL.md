@@ -9,42 +9,42 @@ description: "Generate realistic synthetic data using Spark + Faker (strongly re
 
 Generate realistic, story-driven synthetic data for Databricks using **Spark + Faker + Pandas UDFs** (strongly recommended).
 
-## Quick Reference
+## Data Must Tell a Business Story
 
-| Topic | Guide | When to Use |
-|-------|-------|-------------|
-| **Setup & Execution** | [references/1-setup-and-execution.md](references/1-setup-and-execution.md) | Setting up environment, choosing compute, installing dependencies |
-| **Generation Approaches** | [references/2-generation-approaches.md](references/2-generation-approaches.md) | Choosing Spark UDFs vs Polars local, writing generation code |
-| **Data Patterns** | [references/3-data-patterns.md](references/3-data-patterns.md) | Creating realistic distributions, referential integrity, time patterns |
-| **Domain Guidance** | [references/4-domain-guidance.md](references/4-domain-guidance.md) | E-commerce, IoT, financial, support/CRM domain patterns |
-| **Output Formats** | [references/5-output-formats.md](references/5-output-formats.md) | Choosing output format, saving to volumes/tables |
-| **Troubleshooting** | [references/6-troubleshooting.md](references/6-troubleshooting.md) | Fixing errors, debugging issues |
-| **Example Script** | [scripts/generate_synthetic_data.py](scripts/generate_synthetic_data.py) | Complete Spark + Pandas UDF example |
+Synthetic data should demonstrate how Databricks helps solve real business problems.
 
-## Package Manager
+**The pattern:** Something goes wrong → business impact ($) → analyze root cause → identify affected customers → fix and prevent.
 
-Prefer `uv` for all Python operations. Fall back to `pip` only if `uv` is not available.
+**Key principles:**
+- **Problem → Impact → Analysis → Solution** — Include an incident, anomaly, or issue that causes measurable business impact. The data lets you find the root cause and act on it.
+- **Industry-relevant but simple** — Use domain terms (e.g., "SLA breach", "churn", "stockout") but keep the schema easy to understand. A few tables, clear relationships.
+- **Business metrics with $ impact** — Revenue, MRR, cost, conversion rate. Every story needs a dollar sign to show why it matters.
+- **Tables explain each other** — Ticket spike? Incident table shows the outage. Revenue drop? Churn table shows who left and why. All data connects.
+- **Actionable insights** — Data should answer: What happened? Who's affected? How much did it cost? How do we prevent it?
 
-```bash
-# Preferred
-uv pip install "databricks-connect>=16.4,<17.4" faker numpy pandas holidays
-uv run python generate_data.py
+**Why no flat distributions:** Uniform data has no story — no spikes, no anomalies, no cohort, no 20/80, no skew, nothing to investigate. It can't show Databricks' value for root cause analysis.
 
-# Fallback if uv not available
-pip install "databricks-connect>=16.4,<17.4" faker numpy pandas holidays
-python generate_data.py
-```
+## References
+
+| When | Guide |
+|------|-------|
+| User mentions **ML model training** or complex time patterns | [references/1-data-patterns.md](references/1-data-patterns.md) — ML-ready data, time multipliers, row coherence |
+| Errors during generation | [references/2-troubleshooting.md](references/2-troubleshooting.md) — Fixing common issues |
 
 ## Critical Rules
 
-1. **Strongly prefer to use Spark + Faker + Pandas UDFs** for data generation (scalable, parallel)
-2. **If user specifies local** then use Polars locally instead of Spark, but suggest Spark if > 30,000 rows.
-3. **Present a plan for user approval** before generating any code
-4. **Ask for catalog/schema** - do not default
-5. **Use serverless compute** unless user explicitly requests classic cluster
-6. **Generate raw data only** - no pre-aggregated fields (unless user requests)
-7. **Create master tables first** - then generate related tables with valid FKs
-8. **NEVER use `.cache()` or `.persist()` with serverless compute** - these operations are NOT supported and will fail with `AnalysisException: PERSIST TABLE is not supported on serverless compute`. Instead, write master tables to Delta first, then read them back for FK joins.
+1. **Data tells a story** — Something goes wrong, impacts $, can be analyzed and fixed. Show Databricks value.
+2. **All data serves the story** — Every table and column must be coherent and usable in dashboards or ML models. No orphan data, no random noise — if it doesn't help explain or plot a futur dashboard or predict, don't generate it.
+3. **Industry terms, simple schema** — Use domain-specific vocabulary but keep it easy to understand (few tables, clear relationships)
+4. **Never uniform distributions** — Skewed categories, log-normal amounts, 80/20 patterns. Flat = no story = useless
+5. **Enough data for trends** — ~100K+ rows for main tables so patterns survive aggregation
+6. **Ask for catalog/schema** — Never default, always confirm before generating
+7. **Present plan for approval** — Show tables, distributions, assumptions before writing code
+8. **Master tables first** — Generate parent tables, write to Delta, then create children with valid FKs
+9. **Use Spark + Faker + Pandas UDFs** — Scalable, parallel. Polars only if user explicitly wants local + <30K rows
+10. **Use Databricks Connect Serverless by default to generate data** — Update databricks-connect on python 3.12 if required (avoid using execute_code unless instructed to not use Databricks Connect)
+11. **No `.cache()` or `.persist()`** — Not supported on serverless. Write to Delta, read back for joins
+12. **No Python loops or `.collect()`** — Use Spark parallelism. No driver-side iteration, avoid Pandas↔Spark conversions
 
 ## Generation Planning Workflow
 
@@ -68,40 +68,44 @@ This makes it easy for the user to spot and correct if needed.
 ### Step 1: Gather Requirements
 
 Ask the user about:
-- **Catalog/Schema** - Which catalog to use?
-- What domain/scenario? (e-commerce, support tickets, IoT sensors, etc.)
-- How many tables? What relationships between them?
-- Approximate row counts per table?
-- Output format preference? (Delta table is default)
+- **Catalog/Schema** — Which catalog to use?
+- **Domain** — E-commerce, support tickets, IoT, financial? (Use industry terms)
 
-### Step 2: Present Table Specification
+**If user doesn't specify a story:** Propose one. Don't generate bland data — suggest an incident, anomaly, or trend that shows Databricks value (e.g., "I'll include a system outage that causes ticket spike and churn — this lets you demo root cause analysis").
 
-Show a clear specification with **YOUR ASSUMPTIONS surfaced**. Always start with the output location:
+### Step 2: Present Plan with Story
+
+Show a clear specification with **the business story and your assumptions surfaced**:
 
 ```
-📍 Output Location: {user_catalog}.ecommerce_demo
-   Volume: /Volumes/{user_catalog}/ecommerce_demo/raw_data/
+📍 Output Location: {user_catalog}.support_demo
+   Volume: /Volumes/{user_catalog}/support_demo/raw_data/
+
+📖 Story: A payment system outage causes support ticket spike. Resolution times
+   degrade, enterprise customers churn, revenue drops $2.3M. With Databricks we
+   identify the root cause, affected customers, and prevent future impact.
 ```
 
-| Table | Columns | Description | Rows | Key Assumptions |
-|-------|---------|-------------|------|-----------------|
-| customers | customer_id, name, email, tier, region | Synthetic customer profiles | 5,000 | Tier: Free 60%, Pro 30%, Enterprise 10% |
-| orders | order_id, customer_id (FK), amount, status | Customer purchase transactions | 15,000 | Enterprise customers generate 5x more orders |
+| Table | Description | Rows | Key Assumptions |
+|-------|-------------|------|-----------------|
+| customers | Customer profiles with tier, MRR | 10,000 | Enterprise 10% but 60% of revenue |
+| tickets | Support tickets with priority, resolution_time | 80,000 | Spike during outage, SLA breaches |
+| incidents | System events (outages, deployments) | 50 | Payment outage mid-month |
+| churn_events | Customer cancellations with reason | 500 | Spike after poor support experience |
 
-Include column-level descriptions in the plan (these become column comments in Unity Catalog):
+**Business metrics:**
+- `customers.mrr` — Revenue at risk ($)
+- `tickets.resolution_hours` — SLA performance
+- `churn_events.lost_mrr` — Churn impact ($)
 
-| Table | Column | Comment |
-|-------|--------|---------|
-| customers | customer_id | Unique customer identifier (CUST-XXXXX) |
-| customers | tier | Customer tier: Free, Pro, Enterprise |
-| orders | customer_id | FK to customers.customer_id |
-| orders | amount | Order total in USD |
+**The story this data tells:**
+- Incident table shows payment outage on March 15
+- Tickets spike 5x during outage, resolution time degrades from 4h → 18h
+- Enterprise customers with SLA breaches churn 3 weeks later
+- Total impact: $2.3M lost MRR, traceable to one incident
+- **Databricks value:** Root cause analysis, identify at-risk customers, build alerting
 
-**Assumptions I'm making:**
-- Amount distribution: log-normal by tier (Enterprise ~$1800, Pro ~$245, Free ~$55)
-- Status: 65% delivered, 15% shipped, 10% processing, 5% pending, 5% cancelled
-
-**Ask user**: "Does this look correct? Any adjustments to the catalog, tables, or distributions?"
+**Ask user**: "Does this story work? Any adjustments?"
 
 ### Step 3: Ask About Data Features
 
@@ -109,7 +113,7 @@ Include column-level descriptions in the plan (these become column comments in U
 - [x] Joins (referential integrity) - **Enabled by default**
 - [ ] Bad data injection (for data quality testing)
 - [ ] Multi-language text
-- [ ] Incremental mode (append vs overwrite)
+- [ ] Incremental mode (append instead of overwrite)
 
 ### Pre-Generation Checklist
 
@@ -117,7 +121,7 @@ Include column-level descriptions in the plan (these become column comments in U
 - [ ] Output location shown prominently in plan (easy to spot/change)
 - [ ] Table specification shown and approved
 - [ ] Assumptions about distributions confirmed
-- [ ] User confirmed compute preference (serverless recommended)
+- [ ] User confirmed compute preference (Databricks Connect on serverless recommended)
 - [ ] Data features selected
 
 **Do NOT proceed to code generation until user approves the plan, including the catalog.**
@@ -129,144 +133,124 @@ After generating data, use `get_volume_folder_details` to validate the output ma
 - Schema matches expected columns and types
 - Data distributions look reasonable (check column stats)
 
-## Quick Start: Spark + Faker + Pandas UDFs
+## Use Databricks Connect Spark + Faker Pattern 
 
 ```python
 from databricks.connect import DatabricksSession, DatabricksEnv
 from pyspark.sql import functions as F
-from pyspark.sql.types import StringType, DoubleType
+from pyspark.sql.types import StringType
 import pandas as pd
-import numpy as np
 
-# Setup serverless session with dependencies installed on the cluster
-# IMPORTANT: Any library used inside Pandas UDFs (faker, holidays, etc.) must be listed here
-env = DatabricksEnv().withDependencies("faker")
+# Setup serverless with dependencies (MUST list all libs used in UDFs)
+env = DatabricksEnv().withDependencies("faker", "holidays")
 spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
 
-# Define Pandas UDFs
+# Pandas UDF pattern - import lib INSIDE the function
 @F.pandas_udf(StringType())
 def fake_name(ids: pd.Series) -> pd.Series:
-    from faker import Faker
+    from faker import Faker  # Import inside UDF
     fake = Faker()
     return pd.Series([fake.name() for _ in range(len(ids))])
 
-@F.pandas_udf(DoubleType())
-def generate_amount(tiers: pd.Series) -> pd.Series:
-    amounts = []
-    for tier in tiers:
-        if tier == "Enterprise":
-            amounts.append(float(np.random.lognormal(7.5, 0.8)))
-        elif tier == "Pro":
-            amounts.append(float(np.random.lognormal(5.5, 0.7)))
-        else:
-            amounts.append(float(np.random.lognormal(4.0, 0.6)))
-    return pd.Series(amounts)
-
-# Generate customers
-customers_df = (
-    spark.range(0, 10000, numPartitions=16)
-    .select(
-        F.concat(F.lit("CUST-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("customer_id"),
-        fake_name(F.col("id")).alias("name"),
-        F.when(F.rand() < 0.6, "Free")
-         .when(F.rand() < 0.9, "Pro")
-         .otherwise("Enterprise").alias("tier"),
-    )
-    .withColumn("arr", generate_amount(F.col("tier")))
+# Generate with spark.range, apply UDFs
+customers_df = spark.range(0, 10000, numPartitions=16).select(
+    F.concat(F.lit("CUST-"), F.lpad(F.col("id").cast("string"), 5, "0")).alias("customer_id"),
+    fake_name(F.col("id")).alias("name"),
 )
 
-# Save to Unity Catalog
+# Write to Volume as Parquet (default for raw data)
+# Path is a folder with table name: /Volumes/catalog/schema/raw_data/customers/
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
 customers_df.write.mode("overwrite").parquet(f"/Volumes/{CATALOG}/{SCHEMA}/raw_data/customers")
 ```
 
+**Partitions by scale:** `spark.range(N, numPartitions=P)`
+- <100K rows: 8 partitions
+- 100K-500K: 16 partitions
+- 500K-1M: 32 partitions
+- 1M+: 64+ partitions
+
+**Output formats:**
+- **Parquet to Volume** (default): `df.write.parquet("/Volumes/.../raw_data/table")` — raw data for pipelines
+- **Delta Table**: `df.write.saveAsTable("catalog.schema.table")` — if user wants queryable tables
+- **JSON/CSV**: small dimension tables, replicate legacy systems
+
+## Performance Rules
+
+Generated scripts must be highly performant. **Never** do these:
+
+| Anti-Pattern | Why It's Slow | Do This Instead |
+|--------------|---------------|-----------------|
+| Python loops on driver | Single-threaded, no parallelism | Use `spark.range()` + Spark operations |
+| `.collect()` then iterate | Brings all data to driver memory | Keep data in Spark, use DataFrame ops |
+| Pandas → Spark → Pandas | Serialization overhead, defeats distribution | Stay in Spark, use `pandas_udf` only for UDFs |
+| Read/write temp files | Unnecessary I/O | Chain DataFrame transformations |
+| Scalar UDFs | Row-by-row processing | Use `pandas_udf` for batch processing |
+
+**Good pattern:** `spark.range()` → Spark transforms → `pandas_udf` for Faker → write directly
+
 ## Common Patterns
 
-### Weighted Tier Distribution
+### Weighted Categories (never uniform)
 ```python
-F.when(F.rand() < 0.6, "Free")
- .when(F.rand() < 0.9, "Pro")
- .otherwise("Enterprise").alias("tier")
+F.when(F.rand() < 0.6, "Free").when(F.rand() < 0.9, "Pro").otherwise("Enterprise")
 ```
 
-### Log-Normal Amounts (Realistic Pricing)
-```python
-@F.pandas_udf(DoubleType())
-def generate_amount(tiers: pd.Series) -> pd.Series:
-    return pd.Series([
-        float(np.random.lognormal({"Enterprise": 7.5, "Pro": 5.5, "Free": 4.0}[t], 0.7))
-        for t in tiers
-    ])
-```
+### Log-Normal Amounts (in a pandas UDF)
+Use `np.random.lognormal(mean, sigma)` — always positive, long tail:
+- Enterprise: `lognormal(7.5, 0.8)` → ~$1800 median
+- Pro: `lognormal(5.5, 0.7)` → ~$245 median
+- Free: `lognormal(4.0, 0.6)` → ~$55 median
 
 ### Date Range (Last 6 Months)
 ```python
-from datetime import datetime, timedelta
 END_DATE = datetime.now()
 START_DATE = END_DATE - timedelta(days=180)
-
-F.date_add(F.lit(START_DATE.date()), (F.rand() * 180).cast("int")).alias("order_date")
 ```
 
-### Infrastructure Creation
+### Infrastructure (always create in script)
 ```python
-# Always in script - assume catalog exists
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.raw_data")
 ```
 
-## Execution Modes
+### Referential Integrity (FK pattern)
+Write master table to Delta first, then read back for FK joins (no `.cache()` on serverless):
+```python
+# 1. Write master table
+customers_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.customers")
 
-| Mode | Best For | Setup |
-|------|----------|-------|
-| **DB Connect 16.4+ Serverless** | Local dev, Python 3.12+ | `DatabricksEnv().withDependencies(...)` |
-| **Serverless Job** | Production, scheduled | Job with `environments` parameter |
-| **Classic Cluster** | Fallback only | Use Databricks CLI to install libraries. `databricks libraries install --json '{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}'` |
+# 2. Read back for FK lookup
+customer_lookup = spark.table(f"{CATALOG}.{SCHEMA}.customers").select("customer_idx", "customer_id")
 
-See [references/1-setup-and-execution.md](references/1-setup-and-execution.md) for detailed setup instructions.
+# 3. Generate child table with valid FKs via join
+orders_df = spark.range(N_ORDERS).select(
+    (F.abs(F.hash(F.col("id"))) % N_CUSTOMERS).alias("customer_idx")
+)
+orders_with_fk = orders_df.join(customer_lookup, on="customer_idx")
+```
 
-## Output Formats
+## Setup
 
-| Format | Use Case | Code |
-|--------|----------|------|
-| **Parquet** (default) | SDP pipeline input | `df.write.parquet(path)` |
-| **JSON** | Log-style ingestion | `df.write.json(path)` |
-| **CSV** | Legacy systems | `df.write.option("header", "true").csv(path)` |
-| **Delta Table** | Direct analytics | `df.write.saveAsTable("catalog.schema.table")` |
+Requires Python 3.12 and databricks-connect>=16.4. Use `uv`:
 
-See [references/5-output-formats.md](references/5-output-formats.md) for detailed options.
-
-## Best Practices Summary
-
-### Execution
-- Use serverless (instant start, no cluster wait)
-- Ask for catalog/schema
-- Present plan before generating
-
-### Data Generation
-- **Spark + Faker + Pandas UDFs** for all cases
-- Master tables first, then related tables with valid FKs
-- Non-linear distributions (log-normal, Pareto, exponential)
-- Time patterns (weekday/weekend, holidays, seasonality)
-- Row coherence (correlated attributes)
-
-### Output
-- Create infrastructure in script (`CREATE SCHEMA/VOLUME IF NOT EXISTS`)
-- Do NOT create catalogs - assume they exist
-- Delta tables as default
-- Add table and column comments for discoverability in Unity Catalog (see [references/5-output-formats.md](references/5-output-formats.md))
+```bash
+uv pip install "databricks-connect>=16.4,<17.4" faker numpy pandas holidays
+```
 
 ## Related Skills
 
-- **databricks-unity-catalog** - Managing catalogs, schemas, and volumes
-- **databricks-bundles** - DABs for production deployment
+- **databricks-unity-catalog** — Managing catalogs, schemas, and volumes
+- **databricks-bundles** — DABs for production deployment
 
 ## Common Issues
 
 | Issue | Solution |
 |-------|----------|
-| `ModuleNotFoundError: faker` | See [references/1-setup-and-execution.md](references/1-setup-and-execution.md) |
+| `ImportError: cannot import name 'DatabricksEnv'` | Upgrade: `uv pip install "databricks-connect>=16.4"` |
+| Python 3.11 instead of 3.12 | Python 3.12 required. Use `uv` to create env with correct version |
+| `ModuleNotFoundError: faker` | Add to `withDependencies()`, import inside UDF |
 | Faker UDF is slow | Use `pandas_udf` for batch processing |
 | Out of memory | Increase `numPartitions` in `spark.range()` |
 | Referential integrity errors | Write master table to Delta first, read back for FK joins |
@@ -274,4 +258,4 @@ See [references/5-output-formats.md](references/5-output-formats.md) for detaile
 | `F.window` vs `Window` confusion | Use `from pyspark.sql.window import Window` for `row_number()`, `rank()`, etc. `F.window` is for streaming only. |
 | Broadcast variables not supported | **NEVER use `spark.sparkContext.broadcast()` with serverless** |
 
-See [references/6-troubleshooting.md](references/6-troubleshooting.md) for full troubleshooting guide.
+See [references/2-troubleshooting.md](references/2-troubleshooting.md) for full troubleshooting guide.

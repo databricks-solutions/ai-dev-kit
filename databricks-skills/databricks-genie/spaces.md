@@ -40,7 +40,8 @@ Based on the schema information:
 Create the space with content tailored to the actual data:
 
 ```python
-create_or_update_genie(
+manage_genie(
+    action="create_or_update",
     display_name="Sales Analytics",
     table_identifiers=[
         "my_catalog.sales.customers",
@@ -148,7 +149,7 @@ Write sample questions that:
 
 ## Updating a Genie Space
 
-`create_or_update_genie` handles both create and update automatically. There are two ways it locates an existing space to update:
+`manage_genie(action="create_or_update")` handles both create and update automatically. There are two ways it locates an existing space to update:
 
 - **By `space_id`** (explicit, preferred): pass `space_id=` to target a specific space.
 - **By `display_name`** (implicit fallback): if `space_id` is omitted, the tool searches for a space with a matching name and updates it if found; otherwise it creates a new one.
@@ -158,7 +159,8 @@ Write sample questions that:
 To update metadata without a serialized config:
 
 ```python
-create_or_update_genie(
+manage_genie(
+    action="create_or_update",
     display_name="Sales Analytics",
     space_id="01abc123...",           # omit to match by name instead
     table_identifiers=[               # updated table list
@@ -180,13 +182,14 @@ create_or_update_genie(
 To push a complete serialized configuration to an existing space (the dict contains all regular table metadata, plus it preserves all instructions, SQL examples, join specs, etc.):
 
 ```python
-create_or_update_genie(
+manage_genie(
+    action="create_or_update",
     display_name="Sales Analytics",   # overrides title embedded in serialized_space
     table_identifiers=[],             # ignored when serialized_space is provided
     space_id="01abc123...",           # target space to overwrite
     warehouse_id="abc123def456",      # overrides warehouse embedded in serialized_space
     description="Updated description.",  # overrides description embedded in serialized_space; omit to keep the one in the payload
-    serialized_space=remapped_config, # JSON string from migrate_genie(type="export") (after catalog remap if needed)
+    serialized_space=remapped_config, # JSON string from manage_genie(action="export") (after catalog remap if needed)
 )
 ```
 
@@ -194,7 +197,7 @@ create_or_update_genie(
 
 ## Export, Import & Migration
 
-`migrate_genie(type="export")` returns a dictionary with four top-level keys:
+`manage_genie(action="export")` returns a dictionary with four top-level keys:
 
 | Key | Description |
 |-----|-------------|
@@ -204,7 +207,7 @@ create_or_update_genie(
 | `warehouse_id` | SQL warehouse associated with the space (workspace-specific — do **not** reuse across workspaces) |
 | `serialized_space` | JSON-encoded string with the full space configuration (see below) |
 
-This envelope enables cloning, backup, and cross-workspace migration. Use `migrate_genie(type="export")` and `migrate_genie(type="import")` for all export/import operations — no direct REST calls needed.
+This envelope enables cloning, backup, and cross-workspace migration. Use `manage_genie(action="export")` and `manage_genie(action="import")` for all export/import operations — no direct REST calls needed.
 
 ### What is `serialized_space`?
 
@@ -227,10 +230,10 @@ Minimum structure:
 
 ### Exporting a Space
 
-Use `migrate_genie(type="export")` to export the full configuration (requires CAN EDIT permission):
+Use `manage_genie(action="export")` to export the full configuration (requires CAN EDIT permission):
 
 ```python
-exported = migrate_genie(type="export", space_id="01abc123...")
+exported = manage_genie(action="export", space_id="01abc123...")
 # Returns:
 # {
 #   "space_id": "01abc123...",
@@ -241,10 +244,10 @@ exported = migrate_genie(type="export", space_id="01abc123...")
 # }
 ```
 
-You can also get `serialized_space` inline via `get_genie`:
+You can also get `serialized_space` inline via `manage_genie(action="get")`:
 
 ```python
-details = get_genie(space_id="01abc123...", include_serialized_space=True)
+details = manage_genie(action="get", space_id="01abc123...", include_serialized_space=True)
 serialized = details["serialized_space"]
 ```
 
@@ -252,11 +255,11 @@ serialized = details["serialized_space"]
 
 ```python
 # Step 1: Export the source space
-source = migrate_genie(type="export", space_id="01abc123...")
+source = manage_genie(action="export", space_id="01abc123...")
 
 # Step 2: Import as a new space
-migrate_genie(
-    type="import",
+manage_genie(
+    action="import",
     warehouse_id=source["warehouse_id"],
     serialized_space=source["serialized_space"],
     title=source["title"],  # override title; omit to keep original
@@ -273,7 +276,7 @@ When migrating between environments (e.g. prod → dev), Unity Catalog names are
 
 **Step 1 — Export from source workspace:**
 ```python
-exported = migrate_genie(type="export", space_id="01f106e1239d14b28d6ab46f9c15e540")
+exported = manage_genie(action="export", space_id="01f106e1239d14b28d6ab46f9c15e540")
 # exported keys: warehouse_id, title, description, serialized_space
 # exported["serialized_space"] contains all references to source catalog
 ```
@@ -291,9 +294,9 @@ This replaces all occurrences — table identifiers, SQL FROM clauses, join spec
 
 **Step 3 — Import to target workspace:**
 ```python
-migrate_genie(
-    type="import",
-    warehouse_id="<target_warehouse_id>",   # from list_warehouses() on target
+manage_genie(
+    action="import",
+    warehouse_id="<target_warehouse_id>",   # from manage_warehouse(action="list") on target
     serialized_space=modified_serialized,
     title=exported["title"],
     description=exported["description"]
@@ -306,9 +309,9 @@ To migrate several spaces at once, loop through space IDs. The agent exports, re
 
 ```
 For each space_id in [id1, id2, id3]:
-  1. exported = migrate_genie(type="export", space_id=space_id)
+  1. exported = manage_genie(action="export", space_id=space_id)
   2. modified  = exported["serialized_space"].replace(src_catalog, tgt_catalog)
-  3. result    = migrate_genie(type="import", warehouse_id=wh_id, serialized_space=modified, title=exported["title"], description=exported["description"])
+  3. result    = manage_genie(action="import", warehouse_id=wh_id, serialized_space=modified, title=exported["title"], description=exported["description"])
   4. record result["space_id"] for updating databricks.yml
 ```
 
@@ -316,15 +319,15 @@ After migration, update `databricks.yml` with the new dev `space_id` values unde
 
 ### Updating an Existing Space with New Config
 
-To push a serialized config to an already-existing space (rather than creating a new one), use `create_or_update_genie` with `space_id=` and `serialized_space=`. The export → remap → push pattern is identical to the migration steps above; just replace `migrate_genie(type="import")` with `create_or_update_genie(space_id=TARGET_SPACE_ID, ...)` as the final call.
+To push a serialized config to an already-existing space (rather than creating a new one), use `manage_genie(action="create_or_update")` with `space_id=` and `serialized_space=`. The export → remap → push pattern is identical to the migration steps above; just replace `manage_genie(action="import")` with `manage_genie(action="create_or_update", space_id=TARGET_SPACE_ID, ...)` as the final call.
 
 ### Permissions Required
 
 | Operation | Required Permission |
 |-----------|-------------------|
-| `migrate_genie(type="export")` / `get_genie(include_serialized_space=True)` | CAN EDIT on source space |
-| `migrate_genie(type="import")` | Can create items in target workspace folder |
-| `create_or_update_genie` with `serialized_space` (update) | CAN EDIT on target space |
+| `manage_genie(action="export")` / `manage_genie(action="get", include_serialized_space=True)` | CAN EDIT on source space |
+| `manage_genie(action="import")` | Can create items in target workspace folder |
+| `manage_genie(action="create_or_update")` with `serialized_space` (update) | CAN EDIT on target space |
 
 ## Example End-to-End Workflow
 
@@ -367,19 +370,19 @@ To push a serialized config to an already-existing space (rather than creating a
 - Include sample questions that demonstrate the vocabulary
 - Add instructions via the Databricks Genie UI
 
-### `migrate_genie(type="export")` returns empty `serialized_space`
+### `manage_genie(action="export")` returns empty `serialized_space`
 
 Requires at least **CAN EDIT** permission on the space.
 
-### `migrate_genie(type="import")` fails with permission error
+### `manage_genie(action="import")` fails with permission error
 
 Ensure you have CREATE privileges in the target workspace folder.
 
 ### Tables not found after migration
 
-Catalog name was not remapped — replace the source catalog name in `serialized_space` before calling `migrate_genie(type="import")`. The catalog appears in table identifiers, SQL FROM clauses, join specs, and filter snippets; a single `.replace(src_catalog, tgt_catalog)` on the whole string covers all occurrences.
+Catalog name was not remapped — replace the source catalog name in `serialized_space` before calling `manage_genie(action="import")`. The catalog appears in table identifiers, SQL FROM clauses, join specs, and filter snippets; a single `.replace(src_catalog, tgt_catalog)` on the whole string covers all occurrences.
 
-### `migrate_genie` lands in the wrong workspace
+### `manage_genie` lands in the wrong workspace
 
 Each MCP server is workspace-scoped. Set up two named MCP server entries (one per profile) in your IDE's MCP config instead of switching a single server's profile mid-session.
 
@@ -387,6 +390,6 @@ Each MCP server is workspace-scoped. Set up two named MCP server entries (one pe
 
 The MCP process reads `DATABRICKS_CONFIG_PROFILE` once at startup — editing the config file requires an IDE reload to take effect.
 
-### `migrate_genie(type="import")` fails with JSON parse error
+### `manage_genie(action="import")` fails with JSON parse error
 
 The `serialized_space` string may contain multi-line SQL arrays with `\n` escape sequences. Flatten SQL arrays to single-line strings before passing to avoid double-escaping issues.

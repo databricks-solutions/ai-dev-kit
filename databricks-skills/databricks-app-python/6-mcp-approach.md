@@ -4,6 +4,17 @@ Use MCP tools to create, deploy, and manage Databricks Apps programmatically. Th
 
 ---
 
+## manage_app - App Lifecycle Management
+
+| Action | Description | Required Params |
+|--------|-------------|-----------------|
+| `create_or_update` | Idempotent create, deploys if source_code_path provided | name |
+| `get` | Get app details (with optional logs) | name |
+| `list` | List all apps | (none, optional name_contains filter) |
+| `delete` | Delete an app | name |
+
+---
+
 ## Workflow
 
 ### Step 1: Write App Files Locally
@@ -22,8 +33,9 @@ my_app/
 ### Step 2: Upload to Workspace
 
 ```python
-# MCP Tool: upload_to_workspace
-upload_to_workspace(
+# MCP Tool: manage_workspace_files
+manage_workspace_files(
+    action="upload",
     local_path="/path/to/my_app",
     workspace_path="/Workspace/Users/user@example.com/my_app"
 )
@@ -32,8 +44,9 @@ upload_to_workspace(
 ### Step 3: Create and Deploy App
 
 ```python
-# MCP Tool: create_or_update_app (creates if needed + deploys)
-result = create_or_update_app(
+# MCP Tool: manage_app (creates if needed + deploys)
+result = manage_app(
+    action="create_or_update",
     name="my-dashboard",
     description="Customer analytics dashboard",
     source_code_path="/Workspace/Users/user@example.com/my_app"
@@ -44,29 +57,18 @@ result = create_or_update_app(
 ### Step 4: Verify
 
 ```python
-# MCP Tool: get_app (with logs)
-app = get_app(name="my-dashboard", include_logs=True)
+# MCP Tool: manage_app (get with logs)
+app = manage_app(action="get", name="my-dashboard", include_logs=True)
 # Returns: {"name": "...", "url": "...", "status": "RUNNING", "logs": "...", ...}
 ```
 
 ### Step 5: Iterate
 
 1. Fix issues in local files
-2. Re-upload with `upload_to_workspace`
-3. Re-deploy with `create_or_update_app` (will update existing + deploy)
-4. Check `get_app(name=..., include_logs=True)` for errors
+2. Re-upload with `manage_workspace_files(action="upload", ...)`
+3. Re-deploy with `manage_app(action="create_or_update", ...)` (will update existing + deploy)
+4. Check `manage_app(action="get", name=..., include_logs=True)` for errors
 5. Repeat until app is healthy
-
----
-
-## Quick Reference: MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| **`create_or_update_app`** | Create app if it doesn't exist, optionally deploy (pass `source_code_path`) |
-| **`get_app`** | Get app details by name (with `include_logs=True` for logs), or list all apps |
-| **`delete_app`** | Delete an app |
-| **`upload_to_workspace`** | Upload files/folders to workspace (shared tool) |
 
 ---
 

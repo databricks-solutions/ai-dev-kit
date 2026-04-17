@@ -1,10 +1,10 @@
 """Vector Search tools - Manage endpoints, indexes, and query vector data.
 
-Provides 8 workflow-oriented tools following the Lakebase pattern:
-- create_or_update for idempotent resource management
-- get doubling as list when no name/id provided
-- explicit delete
-- query as hot-path, manage_vs_data for maintenance ops (upsert/delete/scan/sync)
+Consolidated into 4 tools:
+- manage_vs_endpoint: create_or_update, get, list, delete
+- manage_vs_index: create_or_update, get, list, delete
+- query_vs_index: query vectors (hot path - kept separate)
+- manage_vs_data: upsert, delete, scan, sync
 """
 
 import json
@@ -60,278 +60,176 @@ def _find_index_by_name(index_name: str) -> Optional[Dict[str, Any]]:
 
 
 # ============================================================================
-# Tool 1: create_or_update_vs_endpoint
+# Tool 1: manage_vs_endpoint
 # ============================================================================
 
 
 @mcp.tool(timeout=120)
-def create_or_update_vs_endpoint(
-    name: str,
+def manage_vs_endpoint(
+    action: str,
+    name: Optional[str] = None,
     endpoint_type: str = "STANDARD",
 ) -> Dict[str, Any]:
-    """
-    Idempotent create for Vector Search endpoints. Returns existing if one
-    with the same name already exists (endpoints are immutable after creation).
+    """Manage Vector Search endpoints: create, get, list, delete.
 
-    Endpoints are compute resources that host vector search indexes.
-    Creation is asynchronous -- use get_vs_endpoint() to check status.
+    Actions:
+    - create_or_update: Idempotent create. Returns existing if found. Requires name.
+      endpoint_type: "STANDARD" (<100ms latency) or "STORAGE_OPTIMIZED" (~250ms, 1B+ vectors).
+      Async creation - poll with action="get" until state=ONLINE.
+      Returns: {name, endpoint_type, state, created: bool}.
+    - get: Get endpoint details. Requires name.
+      Returns: {name, state, num_indexes, ...}.
+    - list: List all endpoints.
+      Returns: {endpoints: [{name, state, ...}, ...]}.
+    - delete: Delete endpoint. All indexes must be deleted first. Requires name.
+      Returns: {name, status}.
 
-    Args:
-        name: Endpoint name (unique within workspace)
-        endpoint_type: "STANDARD" (low-latency, <100ms) or
-            "STORAGE_OPTIMIZED" (cost-effective, ~250ms, supports 1B+ vectors)
+    See databricks-vector-search skill for endpoint configuration."""
+    act = action.lower()
 
-    Returns:
-        Dictionary with endpoint details and whether it was created or already existed.
+    if act == "create_or_update":
+        if not name:
+            return {"error": "create_or_update requires: name"}
 
-    Example:
-        >>> create_or_update_vs_endpoint("my-endpoint", "STORAGE_OPTIMIZED")
-        {"name": "my-endpoint", "endpoint_type": "STORAGE_OPTIMIZED", "created": True}
-    """
-    existing = _find_endpoint_by_name(name)
-    if existing:
-        return {**existing, "created": False}
+        existing = _find_endpoint_by_name(name)
+        if existing:
+            return {**existing, "created": False}
 
-    result = _create_vs_endpoint(name=name, endpoint_type=endpoint_type)
+        result = _create_vs_endpoint(name=name, endpoint_type=endpoint_type)
 
-    try:
-        from ..manifest import track_resource
+        try:
+            from ..manifest import track_resource
+            track_resource(resource_type="vs_endpoint", name=name, resource_id=name)
+        except Exception:
+            pass
 
-        track_resource(
-            resource_type="vs_endpoint",
-            name=name,
-            resource_id=name,
-        )
-    except Exception:
-        pass  # best-effort tracking
+        return {**result, "created": True}
 
-    return {**result, "created": True}
-
-
-@mcp.tool(timeout=30)
-def get_vs_endpoint(
-    name: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Get Vector Search endpoint details, or list all endpoints.
-
-    Pass a name to get one endpoint's details. Omit name to list all endpoints.
-
-    Args:
-        name: Endpoint name. If omitted, lists all endpoints.
-
-    Returns:
-        Single endpoint dict (if name provided) or {"endpoints": [...]}.
-
-    Example:
-        >>> get_vs_endpoint("my-endpoint")
-        {"name": "my-endpoint", "state": "ONLINE", "num_indexes": 3}
-        >>> get_vs_endpoint()
-        {"endpoints": [{"name": "my-endpoint", "state": "ONLINE", ...}]}
-    """
-    if name:
+    elif act == "get":
+        if not name:
+            return {"error": "get requires: name"}
         return _get_vs_endpoint(name=name)
 
-    return {"endpoints": _list_vs_endpoints()}
+    elif act == "list":
+        return {"endpoints": _list_vs_endpoints()}
+
+    elif act == "delete":
+        if not name:
+            return {"error": "delete requires: name"}
+        return _delete_vs_endpoint(name=name)
+
+    else:
+        return {"error": f"Invalid action '{action}'. Valid actions: create_or_update, get, list, delete"}
 
 
 # ============================================================================
-# Tool 3: delete_vs_endpoint
-# ============================================================================
-
-
-@mcp.tool(timeout=60)
-def delete_vs_endpoint(name: str) -> Dict[str, Any]:
-    """
-    Delete a Vector Search endpoint.
-
-    All indexes on the endpoint must be deleted first.
-
-    Args:
-        name: Endpoint name to delete
-
-    Returns:
-        Dictionary with name and status ("deleted" or error info)
-
-    Example:
-        >>> delete_vs_endpoint("my-endpoint")
-        {"name": "my-endpoint", "status": "deleted"}
-    """
-    return _delete_vs_endpoint(name=name)
-
-
-# ============================================================================
-# Tool 4: create_or_update_vs_index
+# Tool 2: manage_vs_index
 # ============================================================================
 
 
 @mcp.tool(timeout=120)
-def create_or_update_vs_index(
-    name: str,
-    endpoint_name: str,
-    primary_key: str,
+def manage_vs_index(
+    action: str,
+    # For create_or_update:
+    name: Optional[str] = None,
+    endpoint_name: Optional[str] = None,
+    primary_key: Optional[str] = None,
     index_type: str = "DELTA_SYNC",
     delta_sync_index_spec: Optional[Dict[str, Any]] = None,
     direct_access_index_spec: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Idempotent create for Vector Search indexes. Returns existing if one
-    with the same name already exists. Triggers an initial sync after
-    creating a new DELTA_SYNC index.
+    """Manage Vector Search indexes: create, get, list, delete.
 
-    For DELTA_SYNC indexes (auto-sync from Delta table):
-      - Managed embeddings: provide embedding_source_columns with model endpoint
-      - Self-managed: provide embedding_vector_columns with pre-computed vectors
+    Actions:
+    - create_or_update: Idempotent create. Returns existing if found. Auto-triggers initial sync for DELTA_SYNC.
+      Requires name, endpoint_name, primary_key.
+      index_type: "DELTA_SYNC" (auto-sync from Delta table) or "DIRECT_ACCESS" (manual CRUD via manage_vs_data).
+      delta_sync_index_spec: {source_table, embedding_source_columns OR embedding_vector_columns, pipeline_type}.
+        - embedding_source_columns: List of text columns for managed embeddings (Databricks generates vectors).
+        - embedding_vector_columns: List of {name, dimension} for self-managed embeddings (you provide vectors).
+        - pipeline_type: "TRIGGERED" (manual sync) or "CONTINUOUS" (auto-sync on changes).
+      direct_access_index_spec: {embedding_vector_columns: [{name, dimension}], schema_json}.
+      Returns: {name, created: bool, sync_triggered}.
+    - get: Get index details. Requires name (format: catalog.schema.index_name).
+      Returns: {name, state, index_type, ...}.
+    - list: List indexes. Optional endpoint_name to filter. Omit for all indexes across all endpoints.
+      Returns: {indexes: [...]}.
+    - delete: Delete index. Requires name.
+      Returns: {name, status}.
 
-    For DIRECT_ACCESS indexes (manual CRUD):
-      - Provide embedding_vector_columns and schema_json
+    See databricks-vector-search skill for full spec details and examples."""
+    act = action.lower()
 
-    Args:
-        name: Fully qualified index name (catalog.schema.index_name)
-        endpoint_name: Vector Search endpoint to host this index
-        primary_key: Column name for the primary key
-        index_type: "DELTA_SYNC" or "DIRECT_ACCESS"
-        delta_sync_index_spec: Config for Delta Sync index:
-            - source_table: Fully qualified source table
-            - embedding_source_columns: For managed embeddings
-              [{"name": "content", "embedding_model_endpoint_name": "databricks-gte-large-en"}]
-            - embedding_vector_columns: For self-managed embeddings
-              [{"name": "embedding", "embedding_dimension": 768}]
-            - pipeline_type: "TRIGGERED" or "CONTINUOUS"
-            - columns_to_sync: Optional list of columns to include
-        direct_access_index_spec: Config for Direct Access index:
-            - embedding_vector_columns: [{"name": "embedding", "embedding_dimension": 768}]
-            - schema_json: JSON schema string
+    if act == "create_or_update":
+        if not all([name, endpoint_name, primary_key]):
+            return {"error": "create_or_update requires: name, endpoint_name, primary_key"}
 
-    Returns:
-        Dictionary with index details and whether it was created or already existed.
+        existing = _find_index_by_name(name)
+        if existing:
+            return {**existing, "created": False}
 
-    Example:
-        >>> create_or_update_vs_index(
-        ...     name="catalog.schema.docs_index",
-        ...     endpoint_name="my-endpoint",
-        ...     primary_key="id",
-        ...     delta_sync_index_spec={
-        ...         "source_table": "catalog.schema.documents",
-        ...         "embedding_source_columns": [
-        ...             {"name": "content", "embedding_model_endpoint_name": "databricks-gte-large-en"}
-        ...         ],
-        ...         "pipeline_type": "TRIGGERED"
-        ...     }
-        ... )
-    """
-    existing = _find_index_by_name(name)
-    if existing:
-        return {**existing, "created": False}
-
-    result = _create_vs_index(
-        name=name,
-        endpoint_name=endpoint_name,
-        primary_key=primary_key,
-        index_type=index_type,
-        delta_sync_index_spec=delta_sync_index_spec,
-        direct_access_index_spec=direct_access_index_spec,
-    )
-
-    # Trigger initial sync for DELTA_SYNC indexes
-    if index_type == "DELTA_SYNC" and result.get("status") != "ALREADY_EXISTS":
-        try:
-            _sync_vs_index(index_name=name)
-            result["sync_triggered"] = True
-        except Exception as e:
-            logger.warning("Failed to trigger initial sync for index '%s': %s", name, e)
-            result["sync_triggered"] = False
-
-    try:
-        from ..manifest import track_resource
-
-        track_resource(
-            resource_type="vs_index",
+        result = _create_vs_index(
             name=name,
-            resource_id=name,
+            endpoint_name=endpoint_name,
+            primary_key=primary_key,
+            index_type=index_type,
+            delta_sync_index_spec=delta_sync_index_spec,
+            direct_access_index_spec=direct_access_index_spec,
         )
-    except Exception:
-        pass  # best-effort tracking
 
-    return {**result, "created": True}
+        # Trigger initial sync for DELTA_SYNC indexes
+        if index_type == "DELTA_SYNC" and result.get("status") != "ALREADY_EXISTS":
+            try:
+                _sync_vs_index(index_name=name)
+                result["sync_triggered"] = True
+            except Exception as e:
+                logger.warning("Failed to trigger initial sync for index '%s': %s", name, e)
+                result["sync_triggered"] = False
 
-
-@mcp.tool(timeout=30)
-def get_vs_index(
-    index_name: Optional[str] = None,
-    endpoint_name: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Get Vector Search index details, or list indexes.
-
-    Pass index_name to get one index's details. Pass endpoint_name to list
-    all indexes on that endpoint. Omit both to list all indexes across
-    all endpoints in the workspace.
-
-    Args:
-        index_name: Fully qualified index name (catalog.schema.index_name).
-            If provided, returns detailed index info.
-        endpoint_name: Endpoint name. Lists all indexes on this endpoint.
-
-    Returns:
-        Single index dict (if index_name) or {"indexes": [...]}.
-
-    Example:
-        >>> get_vs_index(index_name="catalog.schema.docs_index")
-        {"name": "catalog.schema.docs_index", "state": "ONLINE", ...}
-        >>> get_vs_index(endpoint_name="my-endpoint")
-        {"indexes": [{"name": "catalog.schema.docs_index", ...}]}
-        >>> get_vs_index()
-        {"indexes": [{"name": "catalog.schema.docs_index", "endpoint_name": "my-endpoint", ...}]}
-    """
-    if index_name:
-        return _get_vs_index(index_name=index_name)
-
-    if endpoint_name:
-        return {"indexes": _list_vs_indexes(endpoint_name=endpoint_name)}
-
-    # List all indexes across all endpoints
-    all_indexes = []
-    endpoints = _list_vs_endpoints()
-    for ep in endpoints:
-        ep_name = ep.get("name")
-        if not ep_name:
-            continue
         try:
-            indexes = _list_vs_indexes(endpoint_name=ep_name)
-            for idx in indexes:
-                idx["endpoint_name"] = ep_name
-            all_indexes.extend(indexes)
+            from ..manifest import track_resource
+            track_resource(resource_type="vs_index", name=name, resource_id=name)
         except Exception:
-            logger.warning("Failed to list indexes on endpoint '%s'", ep_name)
-    return {"indexes": all_indexes}
+            pass
+
+        return {**result, "created": True}
+
+    elif act == "get":
+        if not name:
+            return {"error": "get requires: name"}
+        return _get_vs_index(index_name=name)
+
+    elif act == "list":
+        if endpoint_name:
+            return {"indexes": _list_vs_indexes(endpoint_name=endpoint_name)}
+
+        # List all indexes across all endpoints
+        all_indexes = []
+        endpoints = _list_vs_endpoints()
+        for ep in endpoints:
+            ep_name = ep.get("name")
+            if not ep_name:
+                continue
+            try:
+                indexes = _list_vs_indexes(endpoint_name=ep_name)
+                for idx in indexes:
+                    idx["endpoint_name"] = ep_name
+                all_indexes.extend(indexes)
+            except Exception:
+                logger.warning("Failed to list indexes on endpoint '%s'", ep_name)
+        return {"indexes": all_indexes}
+
+    elif act == "delete":
+        if not name:
+            return {"error": "delete requires: name"}
+        return _delete_vs_index(index_name=name)
+
+    else:
+        return {"error": f"Invalid action '{action}'. Valid actions: create_or_update, get, list, delete"}
 
 
 # ============================================================================
-# Tool 6: delete_vs_index
-# ============================================================================
-
-
-@mcp.tool(timeout=60)
-def delete_vs_index(index_name: str) -> Dict[str, Any]:
-    """
-    Delete a Vector Search index.
-
-    Args:
-        index_name: Fully qualified index name (catalog.schema.index_name)
-
-    Returns:
-        Dictionary with name and status ("deleted" or error info)
-
-    Example:
-        >>> delete_vs_index("catalog.schema.docs_index")
-        {"name": "catalog.schema.docs_index", "status": "deleted"}
-    """
-    return _delete_vs_index(index_name=index_name)
-
-
-# ============================================================================
-# Tool 7: query_vs_index
+# Tool 3: query_vs_index (HOT PATH - kept separate for performance)
 # ============================================================================
 
 
@@ -346,41 +244,20 @@ def query_vs_index(
     filter_string: Optional[str] = None,
     query_type: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Query a Vector Search index for similar documents.
+    """Query a Vector Search index for similar documents.
 
-    Provide either query_text (for indexes with embedding models) or
-    query_vector (pre-computed embedding).
+    Use ONE OF:
+    - query_text: For managed embeddings (Databricks generates vector from text).
+    - query_vector: For self-managed embeddings (you provide the vector).
 
-    For filters:
-    - Standard endpoints: filters_json (dict format) e.g. '{"category": "ai"}'
-    - Storage-Optimized endpoints: filter_string (SQL syntax) e.g. "category = 'ai'"
+    columns: List of columns to return in results.
+    num_results: Number of results to return (default 5).
+    Filters (use one based on endpoint type):
+    - filters_json: For STANDARD endpoints. Dict like {"field": "value"} or {"field NOT": "value"}.
+    - filter_string: For STORAGE_OPTIMIZED endpoints. SQL WHERE clause like "field = 'value'".
+    query_type: "ANN" (default, approximate) or "HYBRID" (combines vector + keyword search).
 
-    Args:
-        index_name: Fully qualified index name (catalog.schema.index_name)
-        columns: Column names to return in results
-        query_text: Text query (for managed/attached embeddings)
-        query_vector: Pre-computed query embedding vector
-        num_results: Number of results to return (default: 5)
-        filters_json: JSON string filters for Standard endpoints
-        filter_string: SQL-like filter for Storage-Optimized endpoints
-        query_type: "ANN" (default) or "HYBRID" (vector + keyword search)
-
-    Returns:
-        Dictionary with:
-        - columns: Column names in results
-        - data: List of result rows (similarity score appended as last column)
-        - num_results: Number of results returned
-
-    Example:
-        >>> query_vs_index(
-        ...     index_name="catalog.schema.docs_index",
-        ...     columns=["id", "content"],
-        ...     query_text="What is machine learning?",
-        ...     num_results=5
-        ... )
-        {"columns": ["id", "content", "score"], "data": [...], "num_results": 5}
-    """
+    Returns: {columns, data (with similarity score appended), num_results}."""
     # MCP deserializes JSON params, so filters_json may arrive as a dict
     if isinstance(filters_json, dict):
         filters_json = json.dumps(filters_json)
@@ -398,70 +275,59 @@ def query_vs_index(
 
 
 # ============================================================================
-# Tool 8: manage_vs_data
+# Tool 4: manage_vs_data
 # ============================================================================
 
 
 @mcp.tool(timeout=120)
 def manage_vs_data(
+    action: str,
     index_name: str,
-    operation: str,
+    # For upsert:
     inputs_json: Optional[Union[str, list]] = None,
+    # For delete:
     primary_keys: Optional[List[str]] = None,
+    # For scan:
     num_results: int = 100,
 ) -> Dict[str, Any]:
-    """
-    Manage data in a Vector Search index: upsert, delete, scan, or sync.
+    """Manage Vector Search index data: upsert, delete, scan, sync.
 
-    Required parameters per operation:
-    - "upsert": inputs_json (JSON string of records with primary key + embedding columns)
-    - "delete": primary_keys (list of primary key values to remove)
-    - "scan": num_results (optional, defaults to 100)
-    - "sync": no extra params (triggers re-sync for TRIGGERED pipeline DELTA_SYNC indexes)
+    Actions:
+    - upsert: Insert or update records. Requires inputs_json.
+      inputs_json: List of records, each with primary key + embedding vector.
+      Example: [{"id": "doc1", "text": "...", "embedding": [0.1, 0.2, ...]}]
+      Returns: {status, upserted_count}.
+    - delete: Delete records by primary key. Requires primary_keys.
+      primary_keys: List of primary key values to delete.
+      Returns: {status, deleted_count}.
+    - scan: Scan index contents. Optional num_results (default 100).
+      Returns: {columns, data, num_results}.
+    - sync: Trigger re-sync for TRIGGERED DELTA_SYNC indexes.
+      Returns: {index_name, status: "sync_triggered"}.
 
-    Args:
-        index_name: Fully qualified index name (catalog.schema.index_name)
-        operation: One of "upsert", "delete", "scan", or "sync"
-        inputs_json: Records to upsert. REQUIRED for "upsert", ignored otherwise.
-            Example: '[{"id": "1", "text": "hello", "embedding": [0.1, 0.2, ...]}]'
-        primary_keys: Primary key values to delete. REQUIRED for "delete", ignored otherwise.
-        num_results: Maximum entries to return for "scan" (default: 100)
+    For DIRECT_ACCESS indexes, use upsert/delete to manage data.
+    For DELTA_SYNC indexes, use sync to trigger refresh from source table."""
+    act = action.lower()
 
-    Returns:
-        Dictionary with operation results.
-
-    Example:
-        >>> manage_vs_data("catalog.schema.idx", "upsert",
-        ...     inputs_json='[{"id": "1", "text": "hello", "embedding": [0.1]}]')
-        {"name": "catalog.schema.idx", "status": "SUCCESS", "num_records": 1}
-        >>> manage_vs_data("catalog.schema.idx", "delete", primary_keys=["1", "2"])
-        {"name": "catalog.schema.idx", "status": "SUCCESS", "num_deleted": 2}
-        >>> manage_vs_data("catalog.schema.idx", "scan", num_results=10)
-        {"columns": [...], "data": [...], "num_results": 10}
-        >>> manage_vs_data("catalog.schema.idx", "sync")
-        {"index_name": "catalog.schema.idx", "status": "sync_triggered"}
-    """
-    op = operation.lower()
-
-    if op == "upsert":
+    if act == "upsert":
         if inputs_json is None:
-            return {"error": "inputs_json is required for upsert operation."}
+            return {"error": "upsert requires: inputs_json"}
         # MCP deserializes JSON params, so inputs_json may arrive as a list
         if isinstance(inputs_json, (dict, list)):
             inputs_json = json.dumps(inputs_json)
         return _upsert_vs_data(index_name=index_name, inputs_json=inputs_json)
 
-    elif op == "delete":
+    elif act == "delete":
         if primary_keys is None:
-            return {"error": "primary_keys is required for delete operation."}
+            return {"error": "delete requires: primary_keys"}
         return _delete_vs_data(index_name=index_name, primary_keys=primary_keys)
 
-    elif op == "scan":
+    elif act == "scan":
         return _scan_vs_index(index_name=index_name, num_results=num_results)
 
-    elif op == "sync":
+    elif act == "sync":
         _sync_vs_index(index_name=index_name)
         return {"index_name": index_name, "status": "sync_triggered"}
 
     else:
-        return {"error": f"Invalid operation '{operation}'. Use 'upsert', 'delete', 'scan', or 'sync'."}
+        return {"error": f"Invalid action '{action}'. Valid actions: upsert, delete, scan, sync"}

@@ -4,21 +4,60 @@ Skills that teach Claude Code how to work effectively with Databricks - providin
 
 ## Installation
 
-Run in your project root:
+Run from your **project root** (the directory where you want `.claude/skills` created).
+
+### From this repository (local script)
+
+If you already have the repo (fork or clone), use the script on disk:
 
 ```bash
-# Install all skills (Databricks + MLflow)
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
+# Install all skills (Databricks + MLflow + APX) — downloads from GitHub by default
+./databricks-skills/install_skills.sh
+
+# Install Databricks skills only from this checkout (no network for those skills)
+./databricks-skills/install_skills.sh --local
 
 # Install specific skills
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-bundles agent-evaluation
+./databricks-skills/install_skills.sh databricks-bundles agent-evaluation
 
-# Pin MLflow skills to a specific version
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --mlflow-version v1.0.0
+# Pin MLflow / APX versions
+./databricks-skills/install_skills.sh --mlflow-version v1.0.0
 
 # List available skills
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --list
+./databricks-skills/install_skills.sh --list
+
+# Install + upload to workspace for Genie Code (/Workspace/Users/<you>/.assistant/skills)
+./databricks-skills/install_skills.sh --install-to-genie
+
+./databricks-skills/install_skills.sh --install-to-genie --profile prod
+
+# Local Databricks skills + Genie upload
+./databricks-skills/install_skills.sh --local --install-to-genie
 ```
+
+Paths assume you are at the **ai-dev-kit** repo root. From another project, copy or symlink the script, or use the `curl` flow below.
+
+### Without cloning (curl)
+
+Use this when you only want the installer and not the full repo:
+
+```bash
+# Install all skills
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
+
+# Install specific skills (pass args after bash -s --)
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-bundles agent-evaluation
+
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --mlflow-version v1.0.0
+
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --list
+
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie
+
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie --profile prod
+```
+
+`--install-to-genie` uploads the tree under `./.claude/skills` to the workspace (requires the `databricks` CLI).
 
 This creates `.claude/skills/` and downloads all skills. Claude Code loads them automatically.
 - **Databricks skills** are downloaded from this repository
@@ -88,7 +127,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 1. Claude loads `databricks-aibi-dashboards` skill → learns validation workflow
 2. Calls `get_table_stats_and_schema()` → gets schemas
 3. Calls `execute_sql()` → tests queries
-4. Calls `create_or_update_dashboard()` → deploys
+4. Calls `manage_dashboard(action="create_or_update")` → deploys
 5. Returns working dashboard URL
 
 ## Custom Skills

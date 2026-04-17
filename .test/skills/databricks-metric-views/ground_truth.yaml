@@ -10,7 +10,7 @@ test_cases:
   outputs:
     response: "Here's a metric view for order analytics:\n\n```sql\nCREATE OR REPLACE\
       \ VIEW catalog.schema.orders_metrics\nWITH METRICS\nLANGUAGE YAML\nAS $$\n \
-      \ version: 1.1\n  comment: \"Orders KPIs for sales analysis\"\n  source: catalog.schema.orders\n\
+      \ version: 1.1\n  source: catalog.schema.orders\n  comment: \"Orders KPIs for sales analysis\"\n\
       \  filter: order_date > '2020-01-01'\n  dimensions:\n    - name: Order Month\n\
       \      expr: DATE_TRUNC('MONTH', order_date)\n      comment: \"Month of order\"\
       \n    - name: Order Status\n      expr: CASE\n        WHEN status = 'O' THEN\
@@ -179,8 +179,8 @@ test_cases:
     prompt: Show me the full YAML specification for a metric view definition
   outputs:
     response: "```yaml\nversion: 1.1                    # Required: \"1.1\" for DBR\
-      \ 17.2+\ncomment: \"Description\"          # Optional\nsource: catalog.schema.table\
-      \    # Required: source table/view\nfilter: column > value          # Optional:\
+      \ 17.2+\nsource: catalog.schema.table    # Required: source table/view\ncomment:\
+      \ \"Description\"          # Optional: metric view description\nfilter: column > value          # Optional:\
       \ global WHERE filter\n\ndimensions:                     # Required: at least\
       \ one\n  - name: Display Name\n    expr: sql_expression\n    comment: \"Description\"\
       \n\nmeasures:                       # Required: at least one\n  - name: Display\
@@ -825,8 +825,8 @@ test_cases:
       LANGUAGE YAML
       AS $$
         version: 1.1
-        comment: "Customer support ticket KPIs"
         source: catalog.schema.support_tickets
+        comment: "Customer support ticket KPIs"
         filter: created_at >= '2024-01-01'
 
         dimensions:
@@ -1058,8 +1058,8 @@ test_cases:
       LANGUAGE YAML
       AS $$
         version: 1.1
-        comment: "Transaction metrics - migrated from standard view"
         source: catalog.schema.transactions
+        comment: "Transaction metrics - migrated from standard view"
 
         dimensions:
           - name: Region
@@ -1226,8 +1226,8 @@ test_cases:
       LANGUAGE YAML
       AS $$
         version: 1.1
-        comment: "Product usage KPIs: DAU and feature adoption"
         source: catalog.schema.product_usage
+        comment: "Product usage KPIs: DAU and feature adoption"
 
         dimensions:
           - name: Date

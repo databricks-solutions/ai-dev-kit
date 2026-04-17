@@ -1,4 +1,8 @@
-"""Model Serving tools - Query and manage serving endpoints."""
+"""Model Serving tools - Query and manage serving endpoints.
+
+Consolidated into 1 tool:
+- manage_serving_endpoint: get, list, query
+"""
 
 from typing import Any, Dict, List, Optional
 
@@ -11,121 +15,61 @@ from databricks_tools_core.serving import (
 from ..server import mcp
 
 
-@mcp.tool(timeout=30)
-def get_serving_endpoint_status(name: str) -> Dict[str, Any]:
-    """
-    Get the status of a Model Serving endpoint.
-
-    Use this to check if an endpoint is ready after deployment, or to
-    debug issues with a serving endpoint.
-
-    Args:
-        name: The name of the serving endpoint
-
-    Returns:
-        Dictionary with endpoint status:
-        - name: Endpoint name
-        - state: Current state (READY, NOT_READY, NOT_FOUND)
-        - config_update: Config update state if updating (IN_PROGRESS, etc.)
-        - served_entities: List of served models with their deployment states
-        - error: Error message if endpoint is in error state
-
-    Example:
-        >>> get_serving_endpoint_status("my-agent-endpoint")
-        {
-            "name": "my-agent-endpoint",
-            "state": "READY",
-            "config_update": null,
-            "served_entities": [
-                {"name": "my-agent-1", "entity_name": "main.agents.my_agent", ...}
-            ]
-        }
-    """
-    return _get_serving_endpoint_status(name=name)
-
-
 @mcp.tool(timeout=120)
-def query_serving_endpoint(
-    name: str,
+def manage_serving_endpoint(
+    action: str,
+    # For get/query:
+    name: Optional[str] = None,
+    # For query (use one input format):
     messages: Optional[List[Dict[str, str]]] = None,
     inputs: Optional[Dict[str, Any]] = None,
     dataframe_records: Optional[List[Dict[str, Any]]] = None,
+    # For query options:
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
+    # For list:
+    limit: int = 50,
 ) -> Dict[str, Any]:
-    """
-    Query a Model Serving endpoint.
+    """Manage Model Serving endpoints: get status, list, query.
 
-    Supports multiple input formats depending on endpoint type:
-    - messages: For chat/agent endpoints (OpenAI-compatible format)
-    - inputs: For custom pyfunc models
-    - dataframe_records: For traditional ML models (pandas DataFrame format)
+    Actions:
+    - get: Get endpoint status. Requires name.
+      Returns: {name, state (READY/NOT_READY/NOT_FOUND), config_update, served_entities, error}.
+    - list: List all endpoints. Optional limit (default 50).
+      Returns: {endpoints: [{name, state, creation_timestamp, creator, served_entities_count}, ...]}.
+    - query: Query an endpoint. Requires name + one input format.
+      Input formats (use one):
+      - messages: Chat/agent endpoints. Format: [{"role": "user", "content": "..."}]
+      - inputs: Custom pyfunc models (dict matching model signature)
+      - dataframe_records: ML models. Format: [{"feature1": 1.0, ...}]
+      max_tokens, temperature: Optional for chat endpoints.
+      Returns: {choices: [...]} for chat or {predictions: [...]} for ML.
 
-    Args:
-        name: The name of the serving endpoint
-        messages: List of chat messages for chat/agent endpoints.
-            Format: [{"role": "user", "content": "Hello"}]
-        inputs: Dictionary of inputs for custom pyfunc models.
-            Format depends on model signature.
-        dataframe_records: List of records for ML models.
-            Format: [{"feature1": 1.0, "feature2": 2.0}, ...]
-        max_tokens: Maximum tokens for chat/completion endpoints
-        temperature: Temperature for chat/completion endpoints (0.0-2.0)
+    See databricks-model-serving skill for endpoint configuration."""
+    act = action.lower()
 
-    Returns:
-        Dictionary with query response:
-        - For chat endpoints: Contains 'choices' with assistant response
-        - For ML endpoints: Contains 'predictions'
+    if act == "get":
+        if not name:
+            return {"error": "get requires: name"}
+        return _get_serving_endpoint_status(name=name)
 
-    Example (chat/agent endpoint):
-        >>> query_serving_endpoint(
-        ...     name="my-agent-endpoint",
-        ...     messages=[{"role": "user", "content": "What is Databricks?"}]
-        ... )
-        {
-            "choices": [
-                {"message": {"role": "assistant", "content": "Databricks is..."}}
-            ]
-        }
+    elif act == "list":
+        endpoints = _list_serving_endpoints(limit=limit)
+        return {"endpoints": endpoints}
 
-    Example (ML model):
-        >>> query_serving_endpoint(
-        ...     name="sklearn-model",
-        ...     dataframe_records=[{"age": 25, "income": 50000}]
-        ... )
-        {"predictions": [0.85]}
-    """
-    return _query_serving_endpoint(
-        name=name,
-        messages=messages,
-        inputs=inputs,
-        dataframe_records=dataframe_records,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
+    elif act == "query":
+        if not name:
+            return {"error": "query requires: name"}
+        if not any([messages, inputs, dataframe_records]):
+            return {"error": "query requires one of: messages, inputs, dataframe_records"}
+        return _query_serving_endpoint(
+            name=name,
+            messages=messages,
+            inputs=inputs,
+            dataframe_records=dataframe_records,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
 
-
-@mcp.tool(timeout=30)
-def list_serving_endpoints(limit: int = 50) -> List[Dict[str, Any]]:
-    """
-    List Model Serving endpoints in the workspace.
-
-    Args:
-        limit: Maximum number of endpoints to return (default: 50)
-
-    Returns:
-        List of endpoint dictionaries with:
-        - name: Endpoint name
-        - state: Current state (READY, NOT_READY)
-        - creation_timestamp: When created
-        - creator: Who created it
-        - served_entities_count: Number of served models
-
-    Example:
-        >>> list_serving_endpoints(limit=10)
-        [
-            {"name": "my-agent", "state": "READY", ...},
-            {"name": "ml-model", "state": "READY", ...}
-        ]
-    """
-    return _list_serving_endpoints(limit=limit)
+    else:
+        return {"error": f"Invalid action '{action}'. Valid actions: get, list, query"}

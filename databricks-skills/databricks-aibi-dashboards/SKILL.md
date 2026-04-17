@@ -24,7 +24,7 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 ├─────────────────────────────────────────────────────────────────────┤
 │  STEP 4: Build dashboard JSON using ONLY verified queries          │
 ├─────────────────────────────────────────────────────────────────────┤
-│  STEP 5: Deploy via create_or_update_dashboard()                   │
+│  STEP 5: Deploy via manage_dashboard(action="create_or_update")    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -36,11 +36,38 @@ Create Databricks AI/BI dashboards (formerly Lakeview dashboards). **Follow thes
 |------|-------------|
 | `get_table_stats_and_schema` | **STEP 1**: Get table schemas for designing queries |
 | `execute_sql` | **STEP 3**: Test SQL queries - MANDATORY before deployment! |
-| `get_best_warehouse` | Get available warehouse ID |
-| `create_or_update_dashboard` | **STEP 5**: Deploy dashboard JSON (only after validation!) |
-| `get_dashboard` | Get dashboard details by ID, or list all dashboards (omit dashboard_id) |
-| `delete_dashboard` | Move dashboard to trash |
-| `publish_dashboard` | Publish (`publish=True`) or unpublish (`publish=False`) a dashboard |
+| `manage_warehouse` (action="get_best") | Get available warehouse ID |
+| `manage_dashboard` | **STEP 5**: Dashboard lifecycle management (see actions below) |
+
+### manage_dashboard Actions
+
+| Action | Description | Required Params |
+|--------|-------------|-----------------|
+| `create_or_update` | Deploy dashboard JSON (only after validation!) | display_name, parent_path, serialized_dashboard, warehouse_id |
+| `get` | Get dashboard details by ID | dashboard_id |
+| `list` | List all dashboards | (none) |
+| `delete` | Move dashboard to trash | dashboard_id |
+| `publish` | Publish a dashboard | dashboard_id, warehouse_id |
+| `unpublish` | Unpublish a dashboard | dashboard_id |
+
+**Example usage:**
+```python
+# Create/update dashboard
+manage_dashboard(
+    action="create_or_update",
+    display_name="Sales Dashboard",
+    parent_path="/Workspace/Users/me/dashboards",
+    serialized_dashboard=dashboard_json,
+    warehouse_id="abc123",
+    publish=True  # auto-publish after create
+)
+
+# Get dashboard details
+manage_dashboard(action="get", dashboard_id="dashboard_123")
+
+# List all dashboards
+manage_dashboard(action="list")
+```
 
 ## Reference Files
 

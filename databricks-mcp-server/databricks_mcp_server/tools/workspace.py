@@ -233,36 +233,8 @@ def manage_workspace(
     profile: Optional[str] = None,
     host: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Manage the active Databricks workspace connection.
+    """Manage active Databricks workspace connection (session-scoped).
 
-    Allows switching between workspaces at runtime without restarting the
-    MCP server. The switch is session-scoped and resets on server restart.
-
-    Actions:
-    - status: Return current workspace info (host, profile, username).
-    - list: List all configured profiles from ~/.databrickscfg.
-    - switch: Switch to an existing profile or workspace URL.
-    - login: Run OAuth login for a new workspace via the Databricks CLI,
-             then switch to it.
-
-    Args:
-        action: One of "status", "list", "switch", or "login".
-        profile: Profile name from ~/.databrickscfg (for switch).
-        host: Workspace URL, e.g. https://adb-123.azuredatabricks.net
-              (for switch or login).
-
-    Returns:
-        Dictionary with operation result. For status/switch/login: host,
-        profile, and username. For list: list of profiles with host URLs.
-
-    Example:
-        >>> manage_workspace(action="status")
-        {"host": "https://adb-123.net", "profile": "DEFAULT", "username": "user@company.com"}
-        >>> manage_workspace(action="list")
-        {"profiles": [{"profile": "DEFAULT", "host": "...", "active": true}, ...]}
-        >>> manage_workspace(action="switch", profile="prod")
-        {"host": "...", "profile": "prod", "username": "user@company.com"}
-        >>> manage_workspace(action="login", host="https://adb-999.azuredatabricks.net")
-        {"host": "...", "profile": "adb-999", "username": "user@company.com"}
-    """
+    Actions: status (current workspace), list (profiles from ~/.databrickscfg), switch (profile or host), login (OAuth via CLI).
+    Returns: {host, profile, username} or {profiles: [...]}."""
     return _manage_workspace_impl(action=action, profile=profile, host=host)

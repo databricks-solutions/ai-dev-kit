@@ -225,21 +225,65 @@ mlflow.langchain.log_model(
 
 The following MCP tools are available for managing Lakebase infrastructure. Use `type="provisioned"` for Lakebase Provisioned.
 
-### Database Management
+### manage_lakebase_database - Database Management
 
-| Tool | Description |
-|------|-------------|
-| `create_or_update_lakebase_database` | Create or update a database. Finds by name, creates if new, updates if existing. Use `type="provisioned"`, `capacity` (CU_1-CU_8), `stopped` params. |
-| `get_lakebase_database` | Get database details or list all. Pass `name` to get one, omit to list all. Use `type="provisioned"` to filter. |
-| `delete_lakebase_database` | Delete a database and its resources. Use `type="provisioned"`, `force=True` to cascade. |
-| `generate_lakebase_credential` | Generate OAuth token for PostgreSQL connections (1-hour expiry). Pass `instance_names` for provisioned. |
+| Action | Description | Required Params |
+|--------|-------------|-----------------|
+| `create_or_update` | Create or update a database | name |
+| `get` | Get database details | name |
+| `list` | List all databases | (none, optional type filter) |
+| `delete` | Delete database and resources | name |
 
-### Reverse ETL (Catalog + Synced Tables)
+**Example usage:**
+```python
+# Create a provisioned database
+manage_lakebase_database(
+    action="create_or_update",
+    name="my-lakebase-instance",
+    type="provisioned",
+    capacity="CU_1"
+)
 
-| Tool | Description |
-|------|-------------|
-| `create_or_update_lakebase_sync` | Set up reverse ETL: ensures UC catalog registration exists, then creates a synced table from Delta to Lakebase. Params: `instance_name`, `source_table_name`, `target_table_name`, `scheduling_policy` ("TRIGGERED"/"SNAPSHOT"/"CONTINUOUS"). |
-| `delete_lakebase_sync` | Remove a synced table and optionally its UC catalog registration. |
+# Get database details
+manage_lakebase_database(action="get", name="my-lakebase-instance", type="provisioned")
+
+# List all databases
+manage_lakebase_database(action="list")
+
+# Delete with cascade
+manage_lakebase_database(action="delete", name="my-lakebase-instance", type="provisioned", force=True)
+```
+
+### manage_lakebase_sync - Reverse ETL
+
+| Action | Description | Required Params |
+|--------|-------------|-----------------|
+| `create_or_update` | Set up reverse ETL from Delta to Lakebase | instance_name, source_table_name, target_table_name |
+| `delete` | Remove synced table (and optionally catalog) | table_name |
+
+**Example usage:**
+```python
+# Set up reverse ETL
+manage_lakebase_sync(
+    action="create_or_update",
+    instance_name="my-lakebase-instance",
+    source_table_name="catalog.schema.delta_table",
+    target_table_name="lakebase_catalog.schema.postgres_table",
+    scheduling_policy="TRIGGERED"  # or SNAPSHOT, CONTINUOUS
+)
+
+# Delete synced table
+manage_lakebase_sync(action="delete", table_name="lakebase_catalog.schema.postgres_table")
+```
+
+### generate_lakebase_credential - OAuth Tokens
+
+Generate OAuth token (~1hr) for PostgreSQL connections. Use as password with `sslmode=require`.
+
+```python
+# For provisioned instances
+generate_lakebase_credential(instance_names=["my-lakebase-instance"])
+```
 
 ## Reference Files
 

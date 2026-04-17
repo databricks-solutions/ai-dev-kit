@@ -4,7 +4,7 @@ Operational guidance for monitoring, cost optimization, capacity planning, and m
 
 ## Monitoring Endpoint Status
 
-Use `get_vs_endpoint` (MCP tool) or `w.vector_search_endpoints.get_endpoint()` (SDK) to check endpoint health.
+Use `manage_vs_endpoint(action="get")` (MCP tool) or `w.vector_search_endpoints.get_endpoint()` (SDK) to check endpoint health.
 
 ### Endpoint fields
 
@@ -34,7 +34,7 @@ print(f"Indexes: {endpoint.num_indexes}")
 
 ## Monitoring Index Status
 
-Use `get_vs_index` (MCP tool) or `w.vector_search_indexes.get_index()` (SDK) to check index health.
+Use `manage_vs_index(action="get")` (MCP tool) or `w.vector_search_indexes.get_index()` (SDK) to check index health.
 
 ### Index fields
 
@@ -63,7 +63,7 @@ Delta Sync indexes use a DLT pipeline to sync data from the source Delta table. 
 
 | Pipeline Type | Behavior | Cost | Best for |
 |---------------|----------|------|----------|
-| **TRIGGERED** | Manual sync via `sync_vs_index()` | Lower — runs only when triggered | Batch updates, periodic refreshes, cost-sensitive workloads |
+| **TRIGGERED** | Manual sync via `manage_vs_index(action="sync")` | Lower — runs only when triggered | Batch updates, periodic refreshes, cost-sensitive workloads |
 | **CONTINUOUS** | Auto-syncs on source table changes | Higher — always running | Real-time freshness, applications needing up-to-date results |
 
 ### Triggering a sync
@@ -165,12 +165,12 @@ w.vector_search_endpoints.delete_endpoint(endpoint_name="my-endpoint")
 
 | Issue | Likely Cause | Solution |
 |-------|-------------|----------|
-| **Index stuck in NOT_READY** | Sync pipeline failed or source table issue | Check `message` field via `get_vs_index()`. Inspect the DLT pipeline using `pipeline_id`. |
+| **Index stuck in NOT_READY** | Sync pipeline failed or source table issue | Check `message` field via `manage_vs_index(action="get")`. Inspect the DLT pipeline using `pipeline_id`. |
 | **Embedding dimension mismatch** | Query vector dimensions ≠ index dimensions | Ensure your embedding model output matches the `embedding_dimension` in the index spec. |
 | **Permission errors on create** | Missing Unity Catalog privileges | User needs `CREATE TABLE` on the schema and `USE CATALOG`/`USE SCHEMA` privileges. |
 | **Index returns NOT_FOUND** | Wrong name format or index deleted | Index names must be fully qualified: `catalog.schema.index_name`. |
-| **Sync not running (TRIGGERED)** | Sync not triggered after source update | Call `sync_vs_index()` or `w.vector_search_indexes.sync_index()` after updating source data. |
-| **Endpoint NOT_FOUND** | Endpoint name typo or deleted | List all endpoints with `get_vs_endpoint()` (no name) to verify available endpoints. |
+| **Sync not running (TRIGGERED)** | Sync not triggered after source update | Call `manage_vs_index(action="sync")` or `w.vector_search_indexes.sync_index()` after updating source data. |
+| **Endpoint NOT_FOUND** | Endpoint name typo or deleted | List all endpoints with `manage_vs_endpoint(action="list")` to verify available endpoints. |
 | **Query returns empty results** | Index not yet synced, or filters too restrictive | Check index state is ONLINE. Verify `columns_to_sync` includes queried columns. Test without filters first. |
 | **filters_json has no effect** | Using wrong filter syntax for endpoint type | Standard endpoints use dict-format filters (`filters_json` in SDK, `filters` as dict in `databricks-vectorsearch`). Storage-Optimized endpoints use SQL-like string filters (`filters` as str in `databricks-vectorsearch`). |
 | **Quota or capacity errors** | Too many indexes or vectors | Check `num_indexes` on endpoint. Consider Storage-Optimized for higher capacity. |

@@ -1,5 +1,7 @@
 # Databricks Builder App
 
+> **Security Notice:** This application wraps Claude Code. Projects created within the app by different users are not strongly isolated from each other (this project doesn't implement solutions like Firecracker microVM or Docker to isolate Claude sessions from the app). Only grant access to users you trust.
+
 A web application that provides a Claude Code agent interface with integrated Databricks tools. Users interact with Claude through a chat interface, and the agent can execute SQL queries, manage pipelines, upload files, and more on their Databricks workspace.
 
 Optionally, the app can also serve as an **MCP server** for [Genie Code](https://docs.databricks.com/en/genie/genie-code.html) and other MCP clients, exposing all 75+ Databricks tools via the MCP protocol at `/mcp`.
@@ -215,88 +217,56 @@ projects/
   - Unity Catalog enabled (recommended)
 - PostgreSQL database (Lakebase) for project persistence — autoscale or provisioned
 
-### Quick Start
+### Quick Start (Local Development)
 
-#### 1. Run the Setup Script
-
-From the repository root:
+One command provisions Lakebase, installs all dependencies, and starts the app:
 
 ```bash
 cd databricks-builder-app
-./scripts/setup.sh
+./scripts/start_local.sh --profile <your-profile>
 ```
 
 This will:
+- Check prerequisites (uv, Node.js, npm, Databricks CLI v0.287.0+)
+- Get credentials from your Databricks CLI profile
+- Provision a Lakebase Autoscale database via DAB (if needed)
+- Generate `.env.local` with your workspace settings
+- Install backend and frontend dependencies
+- Install all Databricks skills (local + external)
+- Test the Lakebase connection
+- Start backend (http://localhost:8000) and frontend (http://localhost:3000)
 
-- Verify prerequisites (uv, Node.js, npm)
-- Create a `.env.local` file from `.env.example` (if one doesn't already exist)
-- Install backend Python dependencies via `uv sync`
-- Install sibling packages (`databricks-tools-core`, `databricks-mcp-server`)
-- Install frontend Node.js dependencies
-
-#### 2. Configure Your `.env.local` File
-
-> **You must do this before running the app.** The setup script creates a `.env.local` file from `.env.example`, but all values are placeholders. Open `.env.local` and fill in your actual values.
-
-The `.env.local` file is gitignored and will never be committed. At a minimum, you need to set these:
+#### Options
 
 ```bash
-# Required: Your Databricks workspace
-DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
-DATABRICKS_TOKEN=dapi...
+# First time — everything from scratch
+./scripts/start_local.sh --profile dbx_shared_demo
 
-# Required: Database for project persistence (pick ONE option)
+# Subsequent runs — fast (deps cached, Lakebase exists)
+./scripts/start_local.sh --profile dbx_shared_demo
 
-# Option A — Autoscale Lakebase (recommended, scales to zero):
-LAKEBASE_ENDPOINT=projects/<project-name>/branches/production/endpoints/primary
-LAKEBASE_DATABASE_NAME=databricks_postgres
+# Skip Lakebase provisioning
+./scripts/start_local.sh --profile dbx_shared_demo --skip-lakebase
 
-# Option B — Provisioned Lakebase (fixed capacity):
-# LAKEBASE_INSTANCE_NAME=your-lakebase-instance
-# LAKEBASE_DATABASE_NAME=databricks_postgres
+# Force reinstall all dependencies
+./scripts/start_local.sh --profile dbx_shared_demo --force-install
 
-# Option C — Static connection URL (any type, simplest for local dev):
-# LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
+# Regenerate .env.local
+./scripts/start_local.sh --profile dbx_shared_demo --force-env
+
+# Custom Lakebase project name
+./scripts/start_local.sh --profile dbx_shared_demo --lakebase-id my-custom-db
 ```
 
-The app auto-detects the mode based on which variable is set:
-- `LAKEBASE_ENDPOINT` → autoscale mode (`client.postgres` API, host looked up automatically)
-- `LAKEBASE_INSTANCE_NAME` → provisioned mode (`client.database` API)
-- `LAKEBASE_PG_URL` → static URL mode (no OAuth token refresh)
-
-See `.env.example` for the full list of available settings including LLM provider, skills configuration, and MLflow tracing. The app loads `.env.local` (not `.env`) at startup.
-
-**Getting your Databricks token:**
-1. Go to your Databricks workspace
-2. Click your username → User Settings
-3. Go to Developer → Access Tokens → Generate New Token
-4. Copy the token value
-
-#### 3. Start the Development Servers
-
-```bash
-./scripts/start_dev.sh
-```
-
-This starts both the backend and frontend in one terminal.
-
-You can also start them separately if you prefer:
-
-```bash
-# Terminal 1 — Backend
-uvicorn server.app:app --reload --port 8000 --reload-dir server
-
-# Terminal 2 — Frontend
-cd client && npm run dev
-```
-
-#### 4. Access the App
+#### Access the App
 
 - **Frontend**: <http://localhost:3000>
 - **Backend API**: <http://localhost:8000>
 - **API Docs**: <http://localhost:8000/docs>
 
-#### 5. (Optional) Configure Claude via Databricks Model Serving
+Press `Ctrl+C` to stop both servers.
+
+#### (Optional) Configure Claude via Databricks Model Serving
 
 If you're routing Claude API calls through Databricks Model Serving instead of directly to Anthropic, create `.claude/settings.json` in the **repository root** (not in the app directory):
 
@@ -449,7 +419,8 @@ databricks-builder-app/
 │   └── package.json
 ├── alembic/               # Database migrations
 ├── scripts/               # Utility scripts
-│   └── start_dev.sh       # Development startup
+│   ├── start_local.sh     # Local development (one command)
+│   └── _legacy/            # Old setup.sh and start_dev.sh
 ├── skills/                # Cached skills (gitignored)
 ├── projects/              # Project working directories (gitignored)
 ├── pyproject.toml         # Python dependencies

@@ -18,6 +18,7 @@ import time
 from databricks_tools_core.jobs import (
     create_job,
     run_job_now,
+    repair_run,
     get_run,
     cancel_run,
     list_runs,
@@ -410,3 +411,68 @@ class TestWaitForRun:
         assert "lifecycle_state" in result_dict
 
         logger.info(f"JobRunResult.to_dict(): {result_dict}")
+
+
+@pytest.mark.integration
+class TestRepairRun:
+    """Tests for repairing failed job runs."""
+
+    def test_repair_run_rerun_all_failed(
+        self,
+        failing_notebook_path: str,
+        test_notebook_path: str,
+        cleanup_job,
+    ):
+        """Should repair a failed run by rerunning all failed tasks."""
+        from databricks_tools_core.auth import get_workspace_client
+        import base64
+        from databricks.sdk.service.workspace import ImportFormat, Language
+
+        w = get_workspace_client()
+
+        # Create job with the failing notebook
+        tasks = [
+            {
+                "task_key": "repairable_task",
+                "notebook_task": {
+                    "notebook_path": failing_notebook_path,
+                    "source": "WORKSPACE",
+                },
+            }
+        ]
+        job = create_job(name="test_repair_run", tasks=tasks)
+        cleanup_job(job["job_id"])
+
+        # Run the job (it will fail)
+        run_id = run_job_now(job_id=job["job_id"])
+        logger.info(f"Started run {run_id}, waiting for failure...")
+
+        result = wait_for_run(run_id=run_id, timeout=300, poll_interval=10)
+        assert not result.success, "Run should have failed"
+        logger.info(f"Run failed as expected: {result.result_state}")
+
+        # Replace the failing notebook with a passing one
+        passing_content = (
+            "# Databricks notebook source\n"
+            "print('Repaired successfully')\n"
+            "dbutils.notebook.exit('success')\n"
+        )
+        content_b64 = base64.b64encode(passing_content.encode("utf-8")).decode("utf-8")
+        w.workspace.import_(
+            path=failing_notebook_path,
+            format=ImportFormat.SOURCE,
+            language=Language.PYTHON,
+            content=content_b64,
+            overwrite=True,
+        )
+
+        # Repair the run
+        repair_id = repair_run(run_id=run_id, rerun_all_failed_tasks=True)
+        assert repair_id is not None, "Should return a repair_id"
+        assert isinstance(repair_id, int), "repair_id should be an integer"
+        logger.info(f"Repair started with repair_id={repair_id}")
+
+        # Wait for the repair to complete
+        repaired_result = wait_for_run(run_id=run_id, timeout=300, poll_interval=10)
+        assert repaired_result.success, "Repaired run should succeed"
+        logger.info(f"Repair completed successfully: {repaired_result.result_state}")
