@@ -53,6 +53,7 @@ USER_TOOLS=""
 USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
+CHANNEL="${DEVKIT_CHANNEL:-stable}"  # stable or experimental
 
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
@@ -135,6 +136,7 @@ while [ $# -gt 0 ]; do
         --list-skills)    LIST_SKILLS=true; shift ;;
         --silent)         SILENT=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
+        --experimental)   CHANNEL="experimental"; shift ;;
         -f|--force)       FORCE=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
@@ -153,6 +155,7 @@ while [ $# -gt 0 ]; do
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
+            echo "  --experimental        Install from experimental branch (early access features)"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             echo ""
@@ -166,6 +169,7 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SKILLS_PROFILE Comma-separated skill profiles"
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
+            echo "  DEVKIT_CHANNEL        'stable' (default) or 'experimental'"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             echo ""
             echo "Examples:"
@@ -1509,6 +1513,7 @@ summary() {
         echo ""
         echo -e "${G}${B}Installation complete!${N}"
         echo "────────────────────────────────"
+        [ "$CHANNEL" = "experimental" ] && msg "Channel:  ${Y}experimental 🧪${N}"
         msg "Location: $INSTALL_DIR"
         msg "Scope:    $SCOPE"
         msg "Tools:    $(echo "$TOOLS" | tr ' ' ', ')"
@@ -1537,6 +1542,15 @@ summary() {
         step=$((step + 1))
         msg "${step}. Try: \"List my SQL warehouses\""
         echo ""
+        if [ "$CHANNEL" = "experimental" ]; then
+            echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+            echo -e "  ${B}🧪 You're using the experimental channel${N}"
+            echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+            echo ""
+            msg "Thank you for testing early features! Your feedback helps us improve."
+            msg "Report issues: ${BL}https://github.com/databricks-solutions/ai-dev-kit/issues${N}"
+            echo ""
+        fi
     fi
 }
 
@@ -1609,6 +1623,64 @@ prompt_scope() {
     SCOPE="${values[$selected]}"
 }
 
+# Prompt for release channel (stable vs experimental)
+prompt_channel() {
+    # Skip if already set via --experimental flag or env var
+    if [ "$CHANNEL" = "experimental" ]; then
+        return
+    fi
+
+    # Skip in silent mode or non-interactive
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Select release channel${N}"
+
+    local selected
+    selected=$(radio_select \
+        "Stable|stable|on|Latest stable release (recommended)" \
+        "Experimental|experimental|off|Early access to new features — help us test!" \
+    )
+
+    CHANNEL="$selected"
+
+    # If experimental was selected, re-download and re-exec from experimental branch
+    if [ "$CHANNEL" = "experimental" ]; then
+        echo ""
+        echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+        echo -e "  ${B}🧪 Experimental Channel${N}"
+        echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+        echo ""
+        echo -e "  You're about to install the ${B}experimental${N} version of AI Dev Kit."
+        echo -e "  This includes early access features that may change or break."
+        echo ""
+        echo -e "  ${B}We'd love your feedback!${N}"
+        echo -e "  Report issues: ${BL}https://github.com/databricks-solutions/ai-dev-kit/issues${N}"
+        echo -e "  Discussions:   ${BL}https://github.com/databricks-solutions/ai-dev-kit/discussions${N}"
+        echo ""
+        echo -e "  ${D}Downloading installer from experimental branch...${N}"
+        echo ""
+
+        # Build the command with all current flags preserved
+        local args="--experimental"
+        [ "$FORCE" = true ] && args="$args --force"
+        [ "$SILENT" = true ] && args="$args --silent"
+        [ -n "$USER_TOOLS" ] && args="$args --tools $USER_TOOLS"
+        [ -n "$USER_MCP_PATH" ] && args="$args --mcp-path $USER_MCP_PATH"
+        [ -n "$SKILLS_PROFILE" ] && args="$args --skills-profile $SKILLS_PROFILE"
+        [ -n "$USER_SKILLS" ] && args="$args --skills $USER_SKILLS"
+        [ "$SCOPE_EXPLICIT" = true ] && [ "$SCOPE" = "global" ] && args="$args --global"
+        [ "$PROFILE" != "DEFAULT" ] && args="$args --profile $PROFILE"
+        [ "$INSTALL_MCP" = false ] && args="$args --skills-only"
+        [ "$INSTALL_SKILLS" = false ] && args="$args --mcp-only"
+
+        # Download and execute the experimental installer
+        exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") $args
+    fi
+}
+
 # Prompt to run auth
 prompt_auth() {
     if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
@@ -1664,6 +1736,9 @@ main() {
         echo "────────────────────────────────"
     fi
     
+    # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
+    prompt_channel
+
     # Check dependencies
     step "Checking prerequisites"
     check_deps
@@ -1717,17 +1792,18 @@ main() {
         echo ""
         echo -e "  ${B}Summary${N}"
         echo -e "  ────────────────────────────────────"
+        [ "$CHANNEL" = "experimental" ] && echo -e "  Channel:     ${Y}experimental 🧪${N}"
         echo -e "  Tools:       ${G}$(echo "$TOOLS" | tr ' ' ', ')${N}"
         echo -e "  Profile:     ${G}${PROFILE}${N}"
         echo -e "  Scope:       ${G}${SCOPE}${N}"
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${G}${INSTALL_DIR}${N}"
         if [ "$INSTALL_SKILLS" = true ]; then
             if [ -n "$USER_SKILLS" ]; then
-                echo -e "  Skills:      ${G}custom selection${N}"
+                echo -e "  Skills:      ${G}custom selection${N} ${Y}(will be overwritten, backup your changes first)${N}"
             else
                 local sk_total=0
                 for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_total=$((sk_total + 1)); done
-                echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N}"
+                echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N} ${Y}(will be overwritten, backup your changes first)${N}"
             fi
         fi
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
