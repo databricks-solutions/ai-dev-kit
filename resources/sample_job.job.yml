@@ -1,0 +1,34 @@
+resources:
+  jobs:
+    table_filter_refresh:
+      name: mcp_table_filter_refresh
+
+      trigger:
+        periodic:
+          interval: 1
+          unit: DAYS
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+
+      tasks:
+        - task_key: refresh_filter_cache
+          python_wheel_task:
+            package_name: mcp_databricks_filtering
+            entry_point: mcp-table-filter
+            parameters:
+              - "--tag-name"
+              - "mcp-ready"
+              - "--tag-value"
+              - "yes"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ../dist/*.whl
