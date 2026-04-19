@@ -1,19 +1,12 @@
-# A sample job for mcp_databricks_filtering.
-
 resources:
   jobs:
-    sample_job:
-      name: sample_job
+    table_filter_refresh:
+      name: mcp_table_filter_refresh
 
       trigger:
-        # Run this job every day, exactly one day from the last run; see https://docs.databricks.com/api/workspace/jobs/create#trigger
         periodic:
           interval: 1
           unit: DAYS
-
-      #email_notifications:
-      #  on_failure:
-      #    - your_email@example.com
 
       parameters:
         - name: catalog
@@ -22,20 +15,15 @@ resources:
           default: ${var.schema}
 
       tasks:
-        - task_key: notebook_task
-          notebook_task:
-            notebook_path: ../src/sample_notebook.ipynb
-        - task_key: python_wheel_task
-          depends_on:
-            - task_key: notebook_task
+        - task_key: refresh_filter_cache
           python_wheel_task:
             package_name: mcp_databricks_filtering
-            entry_point: main
+            entry_point: mcp-table-filter
             parameters:
-              - "--catalog"
-              - "${var.catalog}"
-              - "--schema"
-              - "${var.schema}"
+              - "--tag-name"
+              - "mcp-ready"
+              - "--tag-value"
+              - "yes"
           environment_key: default
 
       environments:
@@ -43,7 +31,4 @@ resources:
           spec:
             environment_version: "4"
             dependencies:
-              # By default we just include the .whl file generated for the mcp_databricks_filtering package.
-              # See https://docs.databricks.com/dev-tools/bundles/library-dependencies.html
-              # for more information on how to add other libraries.
               - ../dist/*.whl

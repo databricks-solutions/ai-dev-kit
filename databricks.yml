@@ -1,8 +1,7 @@
-# This is a Databricks asset bundle definition for mcp_databricks_filtering.
+# Databricks asset bundle definition for mcp_databricks_filtering.
 # See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
 bundle:
   name: mcp_databricks_filtering
-  uuid: 017caa2d-6bde-46c3-8bef-87b40d581fd7
 
 include:
   - resources/*.yml
@@ -13,7 +12,6 @@ artifacts:
     type: whl
     build: uv build --wheel
 
-# Variable declarations. These variables are assigned in the dev/prod targets below.
 variables:
   catalog:
     description: The catalog to use
@@ -22,26 +20,18 @@ variables:
 
 targets:
   dev:
-    # The default target uses 'mode: development' to create a development copy.
-    # - Deployed resources get prefixed with '[dev my_user_name]'
-    # - Any job schedules and triggers are paused by default.
-    # See also https://docs.databricks.com/dev-tools/bundles/deployment-modes.html.
     mode: development
     default: true
     workspace:
-      host: https://adb-5142916747090026.6.azuredatabricks.net
+      host: ${var.workspace_host}
     variables:
       catalog: main
       schema: ${workspace.current_user.short_name}
   prod:
     mode: production
     workspace:
-      host: https://adb-5142916747090026.6.azuredatabricks.net
-      # We explicitly deploy to /Workspace/Users/eliezerze@etoro.com to make sure we only have a single copy.
-      root_path: /Workspace/Users/eliezerze@etoro.com/.bundle/${bundle.name}/${bundle.target}
+      host: ${var.workspace_host}
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
     variables:
       catalog: main
       schema: prod
-    permissions:
-      - user_name: eliezerze@etoro.com
-        level: CAN_MANAGE

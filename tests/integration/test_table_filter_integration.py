@@ -3,38 +3,30 @@ Integration tests for the MCP tag-based table filter.
 
 Two test categories:
   - "offline" tests: validate filtering logic without Databricks connection
-  - "online" tests: connect to real Databricks workspace (stg-bi) to verify
+  - "online" tests: connect to real Databricks workspace to verify
     the full flow against actual tagged tables
 
 Run offline tests only (no auth needed):
-    PYTHONPATH=... python -m pytest tests/integration/ -v -k "not online"
+    uv run pytest tests/integration/ -v -k "not online"
 
-Run all tests (requires valid stg-bi auth):
-    databricks auth login --profile stg-bi
-    PYTHONPATH=... python -m pytest tests/integration/ -v
+Run all tests (requires valid Databricks auth):
+    uv run pytest tests/integration/ -v
 """
 
 import os
-import sys
 import time
 
 import pytest
 
-MCP_SERVER_ROOT = os.path.expanduser("~/.ai-dev-kit/repo/databricks-mcp-server")
-TOOLS_CORE_ROOT = os.path.expanduser("~/.ai-dev-kit/repo/databricks-tools-core")
-sys.path.insert(0, MCP_SERVER_ROOT)
-sys.path.insert(0, TOOLS_CORE_ROOT)
+from mcp_databricks_filtering.table_filter import TableTagFilter
 
-os.environ.setdefault("DATABRICKS_CONFIG_PROFILE", "stg-bi")
-os.environ["MCP_TABLE_FILTER_TAG_NAME"] = "mcp-ready"
-os.environ["MCP_TABLE_FILTER_TAG_VALUE"] = "yes"
-os.environ["MCP_TABLE_FILTER_CACHE_TTL"] = "60"
+os.environ.setdefault("MCP_TABLE_FILTER_TAG_NAME", "mcp-ready")
+os.environ.setdefault("MCP_TABLE_FILTER_TAG_VALUE", "yes")
+os.environ.setdefault("MCP_TABLE_FILTER_CACHE_TTL", "60")
 
-from databricks_mcp_server.table_filter import TableTagFilter  # noqa: E402
-
-KNOWN_TAGGED_CATALOG = "main"
-KNOWN_TAGGED_SCHEMA = "eod"
-KNOWN_TAGGED_TABLE = "delta_bronze_analystratings"
+KNOWN_TAGGED_CATALOG = os.environ.get("TEST_TAGGED_CATALOG", "main")
+KNOWN_TAGGED_SCHEMA = os.environ.get("TEST_TAGGED_SCHEMA", "eod")
+KNOWN_TAGGED_TABLE = os.environ.get("TEST_TAGGED_TABLE", "delta_bronze_analystratings")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -229,7 +221,7 @@ class TestCacheBehaviorOffline:
 
     def test_cache_expiry(self):
         f = _make_filter_with_fake_cache([("main", "eod", "t1")])
-        f.cache_ttl = 0  # expire immediately
+        f.cache_ttl = 0
         f._cache_ts = time.time() - 1
         assert not f._is_cache_valid()
 
