@@ -1,6 +1,6 @@
 # GOTCHAS — Classic ML on MLflow + Unity Catalog
 
-Twelve mistakes that silently waste hours. Read before writing any code.
+Fourteen mistakes that silently waste hours. Read before writing any code.
 
 ---
 
@@ -236,7 +236,43 @@ def gold_forecast():
 
 ---
 
-## 12. Custom preprocessing not captured in the logged model
+## 12. `mlflow[databricks]` extras missing when running outside Databricks
+
+**Symptom:** training + logging works; `register_model` fails with `MlflowException: Unable to import necessary dependencies to access model version files in Unity Catalog` — root cause `ModuleNotFoundError: No module named 'azure'` (for Azure-hosted workspaces) or `'boto3'` (AWS) / `'google.cloud'` (GCP).
+
+**Fix:** install the `databricks` extras, which pull cloud-storage SDKs MLflow needs to stage artifacts into the UC-managed location.
+
+```bash
+pip install 'mlflow[databricks]'
+# or, for a lighter install:
+pip install 'mlflow-skinny[databricks]'
+```
+
+**Why it bites:** plain `pip install mlflow` leaves out the cloud-provider SDKs because they're large and most local workflows don't need them. UC registration REQUIRES them because the registry stages artifacts into cloud-managed storage (Azure ADLS / S3 / GCS), and MLflow uses the provider's SDK for the upload. Local `log_model` works fine (artifacts go to the tracking server); registration doesn't.
+
+**When it most commonly hits:** running training scripts from a laptop, CI runner, or non-Databricks compute — anywhere that isn't a Databricks cluster (which ships the extras pre-installed).
+
+---
+
+## 13. `artifact_path=` parameter is deprecated; new name is `name=`
+
+**Symptom:** warning in logs: `WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.` Still works today; may break in a future MLflow major version.
+
+**Fix:** use `name=` instead of `artifact_path=` in `log_model` calls.
+
+```python
+# OLD (still works, warns)
+mlflow.sklearn.log_model(sk_model=model, artifact_path="model", ...)
+
+# NEW (preferred, no warning)
+mlflow.sklearn.log_model(sk_model=model, name="model", ...)
+```
+
+**Why it bites:** most online tutorials and training courses still use `artifact_path`. The rename shipped in MLflow 2.16. `name=` semantics are identical — still the within-run artifact folder. Aliases this to the preferred parameter, not a rename of what the parameter represents.
+
+---
+
+## 14. Custom preprocessing not captured in the logged model
 
 **Symptom:** in the training notebook, predictions are accurate. After `pyfunc.load_model(...)`, predictions are garbage. The pipeline works in training because you're calling `scaler.transform()` manually; at inference time, nobody calls the scaler.
 
