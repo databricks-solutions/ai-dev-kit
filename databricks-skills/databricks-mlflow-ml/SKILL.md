@@ -123,3 +123,7 @@ If you're training a forecasting / classification / regression model, registerin
 - [`patterns-uc-registration.md`](references/patterns-uc-registration.md) — register + alias + verify + A/B promotion
 - [`patterns-batch-inference.md`](references/patterns-batch-inference.md) — notebook (`pyfunc.load_model`) + Lakeflow (`spark_udf`) + champion-vs-challenger
 - [`user-journeys.md`](references/user-journeys.md) — end-to-end workflows with decision points
+
+## Runtime compatibility
+
+Patterns verified against **MLflow 3.11** on **Lakeflow SDP serverless compute version 5** (default at time of writing). All APIs used (`set_registry_uri`, `log_model`, `register_model`, `set_registered_model_alias`, `pyfunc.load_model`, `pyfunc.spark_udf`) are compatible with MLflow 2.16+ as well, so the patterns work on older classic Databricks Runtimes that still ship 2.x. Where 3.x behaviour diverges (e.g., `artifact_path` deprecation → use `name=`), GOTCHAS.md calls it out.
