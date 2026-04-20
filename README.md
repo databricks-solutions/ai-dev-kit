@@ -61,11 +61,12 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
   - [Antigravity](https://antigravity.google)
   - [Codex](https://openai.com/codex/)
   - [Copilot](https://github.com/features/copilot/cli)
+  - [Windsurf](https://windsurf.com)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github or .agents_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, or .codeium_
 
 #### Mac / Linux
 
@@ -93,7 +94,7 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 **Install for specific tools only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity,windsurf
 ```
 
 </details>
