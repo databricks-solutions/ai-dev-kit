@@ -17,7 +17,7 @@ A dashboard should be showing something relevant for a human, typically some KPI
 | List tables | `databricks experimental aitools tools query --warehouse WH "SHOW TABLES IN catalog.schema"` |
 | Get schema | `databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2` |
 | Test query | `databricks experimental aitools tools query --warehouse WH "SELECT..."` |
-| Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "Y" --dataset-catalog "catalog" --dataset-schema "schema" --serialized-dashboard "$(cat file.json)"` |
+| Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "Y" --dataset-catalog "catalog" --dataset-schema "schema" --serialized-dashboard "$(cat file.json)"` (always set `--dataset-catalog` and `--dataset-schema` — queries MUST use bare table names only) |
 | Update dashboard | `databricks lakeview update DASHBOARD_ID --serialized-dashboard "$(cat file.json)"` |
 | Publish | `databricks lakeview publish DASHBOARD_ID --warehouse-id WH` |
 | Delete | `databricks lakeview trash DASHBOARD_ID` |
@@ -64,7 +64,14 @@ databricks experimental aitools tools discover-schema samples.nyctaxi.trips main
 databricks experimental aitools tools query --warehouse WAREHOUSE_ID "<YOUR DATA EXPLORATION QUERY>"
 ```
 
-> **Note**: The `discover-schema` command requires full `catalog.schema.table` paths, but **dashboard queries should use `schema.table` format** with catalog set via `--dataset-catalog` at dashboard creation.
+> **Note**: The `discover-schema` command needs the full `catalog.schema.table` path (it's a separate exploration tool).
+>
+> **Dashboard queries are different** — inside the dashboard JSON, the `FROM` clause must reference ONLY the table name, with no catalog or schema prefix:
+> - ✅ Correct: `FROM trips`
+> - ❌ Wrong: `FROM nyctaxi.trips`
+> - ❌ Wrong: `FROM samples.nyctaxi.trips`
+>
+> The catalog and schema are supplied separately via the `--dataset-catalog` and `--dataset-schema` flags when you run `databricks lakeview create`. These flags do NOT rewrite the query — they only fill in the catalog/schema when the query omits them. If you hardcode a catalog or schema in the `FROM` clause, the flags are ignored for that query and the dashboard won't be portable across environments.
 
 
 ### Step 3: Verify Data Matches Story
@@ -99,8 +106,10 @@ Before writing JSON, plan your dashboard:
 Once created, you can edit the file as following:
 ```bash
 # Create a dashboard
-# IMPORTANT: Use --dataset-catalog and --dataset-schema to set defaults for all queries
-# This way, queries can use schema.table format instead of catalog.schema.table
+# IMPORTANT: Use --dataset-catalog and --dataset-schema to set the catalog/schema for all queries
+# Queries in the JSON MUST use bare table names only (e.g., "FROM trips"),
+# NOT "FROM schema.trips" and NOT "FROM catalog.schema.trips".
+# The CLI flags only provide a default — they do NOT override hardcoded catalog/schema in queries.
 databricks lakeview create \
   --display-name "My Dashboard" \
   --warehouse-id "abc123def456" \
@@ -143,7 +152,7 @@ Every dashboard's `serialized_dashboard` content must follow this exact structur
     {
       "name": "ds_x",
       "displayName": "Dataset X",
-      "queryLines": ["SELECT col1, col2 ", "FROM schema.table"]
+      "queryLines": ["SELECT col1, col2 ", "FROM my_table"]
     }
   ],
   "pages": [
@@ -213,7 +222,7 @@ Apply unless user specifies otherwise:
 
 - **One dataset per domain** (e.g., orders, customers, products). Datasets shared across widgets benefit from the same filters.
 - **Exactly ONE valid SQL query per dataset** (no multiple queries separated by `;`)
-- **NEVER specify catalog in queries** - use `schema.table` format (e.g., `gold.daily_sales`). Set the default catalog and schema via CLI options `--dataset-catalog` and `--dataset-schema` when creating the dashboard
+- **Queries must use bare table names only** — no catalog, no schema prefix. Example: `FROM orders`, never `FROM gold.orders` or `FROM main.gold.orders`. The catalog and schema come from the `--dataset-catalog` and `--dataset-schema` flags at creation time. These flags only fill in missing parts — they do NOT override any catalog/schema written in the query.
 - SELECT must include all dimensions needed by widgets and all derived columns via `AS` aliases
 - Put ALL business logic (CASE/WHEN, COALESCE, ratios) into the dataset SELECT with explicit aliases
 - **Contract rule**: Every widget `fieldName` must exactly match a dataset column or alias

@@ -151,7 +151,7 @@ Place filter widget directly on a `PAGE_TYPE_CANVAS` page (same widget structure
 {
   "name": "revenue_by_category",
   "queryLines": [
-    "SELECT category, SUM(revenue) as revenue FROM sales.orders ",
+    "SELECT category, SUM(revenue) as revenue FROM orders ",
     "WHERE order_date BETWEEN :date_range.min AND :date_range.max ",
     "GROUP BY category"
   ],

@@ -59,7 +59,7 @@ This example shows a complete dashboard with:
 - Data table for detailed records
 - Global filters (date range, region, category)
 
-> **Note**: Queries use `schema.table` format (no catalog). Set the catalog via `--dataset-catalog "my_catalog"` when creating the dashboard.
+> **Note**: Queries reference bare table names only (no catalog, no schema). Catalog and schema are set via `--dataset-catalog "my_catalog" --dataset-schema "gold"` when creating the dashboard. These flags only apply when the query omits catalog/schema — they will NOT override anything you hardcode in the `FROM` clause.
 
 ```json
 {
@@ -69,7 +69,7 @@ This example shows a complete dashboard with:
       "displayName": "Daily Sales",
       "queryLines": [
         "SELECT sale_date, region, department, total_orders, total_units, total_revenue, total_cost, profit_margin ",
-        "FROM gold.daily_sales ",
+        "FROM daily_sales ",
         "ORDER BY sale_date"
       ]
     },
@@ -78,7 +78,7 @@ This example shows a complete dashboard with:
       "displayName": "Product Performance",
       "queryLines": [
         "SELECT product_id, product_name, department, region, units_sold, revenue, cost, profit ",
-        "FROM gold.product_performance"
+        "FROM product_performance"
       ]
     }
   ],
