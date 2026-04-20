@@ -72,7 +72,7 @@ Copy this checklist and verify each item:
 
 **Lakebase**: Use [5-lakebase.md](5-lakebase.md) when using Lakebase (PostgreSQL) as your app's data layer — covers auto-injected env vars, psycopg2/asyncpg patterns, and when to choose Lakebase vs SQL warehouse. (Keywords: Lakebase, PostgreSQL, psycopg2, asyncpg, transactional, PGHOST)
 
-**MCP tools**: Use [6-mcp-approach.md](6-mcp-approach.md) for managing app lifecycle via MCP tools — covers creating, deploying, monitoring, and deleting apps programmatically. (Keywords: MCP, create app, deploy app, app logs)
+**CLI commands**: Use [6-cli-approach.md](6-cli-approach.md) for managing app lifecycle via CLI — covers creating, deploying, monitoring, and deleting apps. (Keywords: CLI, create app, deploy app, app logs)
 
 **Foundation Models**: See [examples/llm_config.py](examples/llm_config.py) for calling Databricks foundation model APIs — covers OAuth M2M auth, OpenAI-compatible client wiring, and token caching. (Keywords: foundation model, LLM, OpenAI client, chat completions)
 
@@ -87,7 +87,7 @@ Copy this checklist and verify each item:
    **Connecting to data/resources?** → Read [2-app-resources.md](2-app-resources.md)
    **Using Lakebase (PostgreSQL)?** → Read [5-lakebase.md](5-lakebase.md)
    **Deploying to Databricks?** → Read [4-deployment.md](4-deployment.md)
-   **Using MCP tools?** → Read [6-mcp-approach.md](6-mcp-approach.md)
+   **Using CLI for app lifecycle?** → Read [6-cli-approach.md](6-cli-approach.md)
    **Calling foundation model/LLM APIs?** → See [examples/llm_config.py](examples/llm_config.py)
 
 2. Follow the instructions in the relevant guide

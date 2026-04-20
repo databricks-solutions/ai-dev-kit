@@ -95,72 +95,88 @@ ORDER BY ALL
 | YAML Syntax | [yaml-reference.md](yaml-reference.md) | Complete YAML spec: dimensions, measures, joins, materialization |
 | Patterns & Examples | [patterns.md](patterns.md) | Common patterns: star schema, snowflake, filtered measures, window measures, ratios |
 
-## MCP Tools
+## SQL Operations
 
-Use the `manage_metric_views` tool for all metric view operations:
+### Create Metric View
 
-| Action | Description |
-|--------|-------------|
-| `create` | Create a metric view with dimensions and measures |
-| `alter` | Update a metric view's YAML definition |
-| `describe` | Get the full definition and metadata |
-| `query` | Query measures grouped by dimensions |
-| `drop` | Drop a metric view |
-| `grant` | Grant SELECT privileges to users/groups |
-
-### Create via MCP
-
-```python
-manage_metric_views(
-    action="create",
-    full_name="catalog.schema.orders_metrics",
-    source="catalog.schema.orders",
-    or_replace=True,
-    comment="Orders KPIs for sales analysis",
-    filter_expr="order_date > '2020-01-01'",
-    dimensions=[
-        {"name": "Order Month", "expr": "DATE_TRUNC('MONTH', order_date)", "comment": "Month of order"},
-        {"name": "Order Status", "expr": "status"},
-    ],
-    measures=[
-        {"name": "Order Count", "expr": "COUNT(1)"},
-        {"name": "Total Revenue", "expr": "SUM(total_price)", "comment": "Sum of total price"},
-    ],
-)
+```sql
+CREATE OR REPLACE VIEW catalog.schema.orders_metrics
+WITH METRICS
+LANGUAGE YAML
+AS $$
+  version: 1.1
+  comment: "Orders KPIs for sales analysis"
+  source: catalog.schema.orders
+  filter: order_date > '2020-01-01'
+  dimensions:
+    - name: Order Month
+      expr: DATE_TRUNC('MONTH', order_date)
+      comment: "Month of order"
+    - name: Order Status
+      expr: status
+  measures:
+    - name: Order Count
+      expr: COUNT(1)
+    - name: Total Revenue
+      expr: SUM(total_price)
+      comment: "Sum of total price"
+$$;
 ```
 
-### Query via MCP
+### Query Metric View
 
-```python
-manage_metric_views(
-    action="query",
-    full_name="catalog.schema.orders_metrics",
-    query_measures=["Total Revenue", "Order Count"],
-    query_dimensions=["Order Month"],
-    where="extract(year FROM `Order Month`) = 2024",
-    order_by="ALL",
-    limit=100,
-)
+```sql
+SELECT
+  `Order Month`,
+  MEASURE(`Total Revenue`) AS total_revenue,
+  MEASURE(`Order Count`) AS order_count
+FROM catalog.schema.orders_metrics
+WHERE extract(year FROM `Order Month`) = 2024
+GROUP BY ALL
+ORDER BY ALL
+LIMIT 100;
 ```
 
-### Describe via MCP
+### Describe Metric View
 
-```python
-manage_metric_views(
-    action="describe",
-    full_name="catalog.schema.orders_metrics",
-)
+```sql
+DESCRIBE TABLE EXTENDED catalog.schema.orders_metrics;
+
+-- Or get YAML definition
+SHOW CREATE TABLE catalog.schema.orders_metrics;
 ```
 
 ### Grant Access
 
-```python
-manage_metric_views(
-    action="grant",
-    full_name="catalog.schema.orders_metrics",
-    principal="data-consumers",
-    privileges=["SELECT"],
-)
+```sql
+GRANT SELECT ON VIEW catalog.schema.orders_metrics TO `data-consumers`;
+```
+
+### Drop Metric View
+
+```sql
+DROP VIEW IF EXISTS catalog.schema.orders_metrics;
+```
+
+### CLI Execution
+
+```bash
+# Execute SQL via CLI
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "
+CREATE OR REPLACE VIEW catalog.schema.orders_metrics
+WITH METRICS
+LANGUAGE YAML
+AS \$\$
+  version: 1.1
+  source: catalog.schema.orders
+  dimensions:
+    - name: Order Month
+      expr: DATE_TRUNC('MONTH', order_date)
+  measures:
+    - name: Total Revenue
+      expr: SUM(total_price)
+\$\$
+"
 ```
 
 ## YAML Spec Quick Reference

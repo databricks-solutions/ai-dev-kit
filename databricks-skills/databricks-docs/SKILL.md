@@ -5,7 +5,7 @@ description: "Databricks documentation reference via llms.txt index. Use when ot
 
 # Databricks Documentation Reference
 
-This skill provides access to the complete Databricks documentation index via llms.txt - use it as a **reference resource** to supplement other skills and inform your use of MCP tools.
+This skill provides access to the complete Databricks documentation index via llms.txt - use it as a **reference resource** to supplement other skills.
 
 ## Role of This Skill
 
@@ -13,10 +13,10 @@ This is a **reference skill**, not an action skill. Use it to:
 
 - Look up documentation when other skills don't cover a topic
 - Get authoritative guidance on Databricks concepts and APIs
-- Find detailed information to inform how you use MCP tools
+- Find detailed information to inform CLI commands and SDK usage
 - Discover features and capabilities you may not know about
 
-**Always prefer using MCP tools for actions** (execute_sql, manage_pipeline, etc.) and **load specific skills for workflows** (databricks-python-sdk, databricks-spark-declarative-pipelines, etc.). Use this skill when you need reference documentation.
+**Always prefer using CLI/SDK for actions** and **load specific skills for workflows** (databricks-python-sdk, databricks-spark-declarative-pipelines, etc.). Use this skill when you need reference documentation.
 
 ## How to Use
 
@@ -28,7 +28,7 @@ Use WebFetch to retrieve this index, then:
 
 1. Search for relevant sections/links
 2. Fetch specific documentation pages for detailed guidance
-3. Apply what you learn using the appropriate MCP tools
+3. Apply what you learn using the appropriate CLI commands or SDK
 
 ## Documentation Structure
 
@@ -47,7 +47,7 @@ The llms.txt file is organized by category:
 
 1. Load `databricks-spark-declarative-pipelines` skill for workflow patterns
 2. Use this skill to fetch docs if you need clarification on specific DLT features
-3. Use `manage_pipeline(action="create_or_update")` MCP tool to actually create the pipeline
+3. Use `databricks pipelines create` CLI command to create the pipeline
 
 **Scenario:** User asks about an unfamiliar Databricks feature
 

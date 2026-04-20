@@ -12,31 +12,16 @@ Common issues and solutions for synthetic data generation.
 
 | Mode | Solution |
 |------|----------|
-| **DB Connect 16.4+** | Use `DatabricksEnv().withDependencies("faker", "pandas", ...)` |
-| **Older DB Connect with Serverless** | Create job with `environments` parameter |
-| **Databricks Runtime** | Use Databricks CLI to  install `faker holidays` |
+| **DB Connect with Serverless** | Install libs locally (`uv pip install faker`), use `DatabricksSession.builder.serverless(True)` |
+| **Databricks Runtime** | Use Databricks CLI to install `faker holidays` |
 | **Classic cluster** | Use Databricks CLI to install libraries. `databricks libraries install --json '{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}'` |
 
 ```python
-# For DB Connect 16.4+
-from databricks.connect import DatabricksSession, DatabricksEnv
+# For DB Connect with serverless
+from databricks.connect import DatabricksSession
 
-env = DatabricksEnv().withDependencies("faker", "pandas", "numpy", "holidays")
-spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
-```
-
-### DatabricksEnv not found
-
-**Problem:** Using older databricks-connect version.
-
-**Solution:** Upgrade to 16.4+ or use job-based approach:
-
-```bash
-# Upgrade (prefer uv, fall back to pip)
-uv pip install "databricks-connect>=16.4,<17.4"
-# or: pip install "databricks-connect>=16.4,<17.4"
-
-# Or use job with environments parameter instead
+# Install dependencies locally first: uv pip install faker pandas numpy holidays
+spark = DatabricksSession.builder.serverless(True).getOrCreate()
 ```
 
 ### serverless_compute_id error
@@ -300,25 +285,57 @@ resolution_hours = np.random.exponential(scale=resolution_scale[priority])
 
 ## Validation Steps
 
-After generation, verify your data:
+After generation, validate using SQL queries via Databricks CLI:
 
-```python
+```bash
+# Set your warehouse ID
+WAREHOUSE_ID="your-warehouse-id"
+VOLUME_PATH="/Volumes/CATALOG/SCHEMA/raw_data"
+
 # 1. Check row counts
-print(f"Customers: {customers_df.count():,}")
-print(f"Orders: {orders_df.count():,}")
+databricks experimental aitools tools query --warehouse $WAREHOUSE_ID "
+SELECT 'customers' as table_name, COUNT(*) as row_count FROM parquet.\`${VOLUME_PATH}/customers\`
+UNION ALL
+SELECT 'orders', COUNT(*) FROM parquet.\`${VOLUME_PATH}/orders\`
+"
 
-# 2. Verify distributions
-customers_df.groupBy("tier").count().show()
-orders_df.describe("amount").show()
+# 2. Preview schema and sample data
+databricks experimental aitools tools query --warehouse $WAREHOUSE_ID "
+DESCRIBE SELECT * FROM parquet.\`${VOLUME_PATH}/customers\`
+"
 
-# 3. Check referential integrity
-orphans = orders_df.join(
-    customers_df,
-    orders_df.customer_id == customers_df.customer_id,
-    "left_anti"
-)
-print(f"Orphan orders: {orphans.count()}")
+databricks experimental aitools tools query --warehouse $WAREHOUSE_ID "
+SELECT * FROM parquet.\`${VOLUME_PATH}/customers\` LIMIT 5
+"
 
-# 4. Verify date range
-orders_df.select(F.min("order_date"), F.max("order_date")).show()
+# 3. Verify distributions
+databricks experimental aitools tools query --warehouse $WAREHOUSE_ID "
+SELECT tier, COUNT(*) as count, ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as pct
+FROM parquet.\`${VOLUME_PATH}/customers\`
+GROUP BY tier ORDER BY tier
+"
+
+# 4. Check amount statistics
+databricks experimental aitools tools query --warehouse $WAREHOUSE_ID "
+SELECT
+  MIN(amount) as min_amount,
+  MAX(amount) as max_amount,
+  ROUND(AVG(amount), 2) as avg_amount,
+  ROUND(STDDEV(amount), 2) as stddev_amount
+FROM parquet.\`${VOLUME_PATH}/orders\`
+"
+
+# 5. Check referential integrity
+databricks experimental aitools tools query --warehouse $WAREHOUSE_ID "
+SELECT COUNT(*) as orphan_orders
+FROM parquet.\`${VOLUME_PATH}/orders\` o
+LEFT JOIN parquet.\`${VOLUME_PATH}/customers\` c ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL
+"
+
+# 6. Verify date range
+databricks experimental aitools tools query --warehouse $WAREHOUSE_ID "
+SELECT MIN(order_date) as min_date, MAX(order_date) as max_date
+FROM parquet.\`${VOLUME_PATH}/orders\`
+"
 ```

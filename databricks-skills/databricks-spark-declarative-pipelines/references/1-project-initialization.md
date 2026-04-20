@@ -232,8 +232,8 @@ databricks bundle run customer_pipeline_etl
 # Run specific target
 databricks bundle run customer_pipeline_etl --target prod
 
-# Or use Pipeline API directly
-databricks pipelines start-update --pipeline-id <id>
+# Or use Pipeline API directly (pipeline_id is positional)
+databricks pipelines start-update <pipeline_id>
 ```
 
 ---
@@ -429,7 +429,7 @@ pip install --upgrade databricks-cli
 databricks catalogs list
 
 # Create catalog if needed
-databricks catalogs create --name my_catalog
+databricks catalogs create --json '{"name": "my_catalog"}'
 ```
 
 ### "Language option not recognized"
@@ -576,7 +576,7 @@ For technical best practices (Liquid Clustering, serverless, etc.), see **[SKILL
 
 ## References
 
-- **[SKILL.md](../SKILL.md)** - Main development workflow and MCP tools
+- **[SKILL.md](../SKILL.md)** - Main development workflow and CLI commands
 - **[Declarative Automation Bundles (DABs) Documentation](https://docs.databricks.com/dev-tools/bundles/)** - Official bundle reference
 - **[Pipeline Configuration Reference](https://docs.databricks.com/aws/en/ldp/configure-pipeline)** - Pipeline settings
 - **[Databricks CLI Reference](https://docs.databricks.com/dev-tools/cli/)** - CLI commands and options

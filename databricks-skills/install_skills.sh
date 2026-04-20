@@ -3,7 +3,7 @@
 # Databricks Skills Installer
 #
 # Installs Databricks skills for Claude Code into your project.
-# These skills teach Claude how to work with Databricks using MCP tools.
+# These skills teach Claude how to work with Databricks using CLI, SDK, and REST APIs.
 #
 # Usage:
 #   # Install all skills (Databricks + MLflow + APX)
@@ -119,7 +119,7 @@ get_skill_extra_files() {
         "databricks-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
-        "databricks-app-python") echo "1-authorization.md 2-app-resources.md 3-frameworks.md 4-deployment.md 5-lakebase.md 6-mcp-approach.md examples/llm_config.py examples/fm-minimal-chat.py examples/fm-parallel-calls.py examples/fm-structured-outputs.py" ;;
+        "databricks-app-python") echo "1-authorization.md 2-app-resources.md 3-frameworks.md 4-deployment.md 5-lakebase.md 6-cli-approach.md examples/llm_config.py examples/fm-minimal-chat.py examples/fm-parallel-calls.py examples/fm-structured-outputs.py" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
         "databricks-unity-catalog") echo "5-system-tables.md" ;;

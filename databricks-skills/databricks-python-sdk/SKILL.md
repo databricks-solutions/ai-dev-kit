@@ -91,7 +91,7 @@ databricks --profile MY_PROFILE clusters list
 # Common commands
 databricks clusters list
 databricks jobs list
-databricks workspace ls /Users/me
+databricks workspace list /Users/me
 ```
 
 ---

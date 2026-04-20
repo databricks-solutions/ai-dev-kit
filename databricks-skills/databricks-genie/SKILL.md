@@ -5,196 +5,215 @@ description: "Create and query Databricks Genie Spaces for natural language SQL 
 
 # Databricks Genie
 
-Create, manage, and query Databricks Genie Spaces - natural language interfaces for SQL-based data exploration.
+Create, manage, and query Genie Spaces - natural language interfaces for SQL-based data exploration.
 
 ## Overview
 
 Genie Spaces allow users to ask natural language questions about structured data in Unity Catalog. The system translates questions into SQL queries, executes them on a SQL warehouse, and presents results conversationally.
 
-## When to Use This Skill
+## Creating a Genie Space
 
-Use this skill when:
-- Creating a new Genie Space for data exploration
-- Adding sample questions to guide users
-- Connecting Unity Catalog tables to a conversational interface
-- Asking questions to a Genie Space programmatically (Conversation API)
-- Exporting a Genie Space configuration (serialized_space) for backup or migration
-- Importing / cloning a Genie Space from a serialized payload
-- Migrating a Genie Space between workspaces or environments (dev → staging → prod)
-    - Only supports catalog remapping where catalog names differ across environments
-    - Not supported for schema and/or table names that differ across environments
-    - Not including migration of tables between environments (only migration of Genie Spaces)
+### Step 1: Understand the Data
 
-## MCP Tools
+Before creating a Genie Space, explore the available tables to:
+- **Select relevant tables** — typically gold layer (aggregated KPIs) and sometimes silver layer (cleaned facts) or metric views
+- **Understand the story** — what business questions can this data answer? What insights can users discover?
+- **Design meaningful sample questions** — questions should reflect real use cases and lead to actionable insights in the data
 
-| Tool | Purpose |
-|------|---------|
-| `manage_genie` | Create, get, list, delete, export, and import Genie Spaces |
-| `ask_genie` | Ask natural language questions to a Genie Space |
-| `get_table_stats_and_schema` | Inspect table schemas before creating a space |
-| `execute_sql` | Test SQL queries directly |
+```bash
+# Discover table schemas, columns, and sample values
+databricks experimental aitools tools discover-schema catalog.schema.gold_sales catalog.schema.gold_customers
 
-### manage_genie - Space Management
-
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `create_or_update` | Idempotent create/update a space | display_name, table_identifiers (or serialized_space) |
-| `get` | Get space details | space_id |
-| `list` | List all spaces | (none) |
-| `delete` | Delete a space | space_id |
-| `export` | Export space config for migration/backup | space_id |
-| `import` | Import space from serialized config | warehouse_id, serialized_space |
-
-**Example tool calls:**
-```
-# MCP Tool: manage_genie
-# Create a new space
-manage_genie(
-    action="create_or_update",
-    display_name="Sales Analytics",
-    table_identifiers=["catalog.schema.customers", "catalog.schema.orders"],
-    description="Explore sales data with natural language",
-    sample_questions=["What were total sales last month?"]
-)
-
-# MCP Tool: manage_genie
-# Get space details with full config
-manage_genie(action="get", space_id="space_123", include_serialized_space=True)
-
-# MCP Tool: manage_genie
-# List all spaces
-manage_genie(action="list")
-
-# MCP Tool: manage_genie
-# Export for migration
-exported = manage_genie(action="export", space_id="space_123")
-
-# MCP Tool: manage_genie
-# Import to new workspace
-manage_genie(
-    action="import",
-    warehouse_id="warehouse_456",
-    serialized_space=exported["serialized_space"],
-    title="Sales Analytics (Prod)"
-)
+# Run SQL queries to explore the data and understand relationships
+databricks sql exec "SELECT * FROM catalog.schema.gold_sales LIMIT 10"
+databricks sql exec "DESCRIBE TABLE catalog.schema.gold_sales"
 ```
 
-### ask_genie - Conversation API (Query)
+### Step 2: Create the Space
 
-Ask natural language questions to a Genie Space. Pass `conversation_id` for follow-up questions.
+Define your space in a local JSON file (e.g., `genie_space.json`) for version control and easy iteration. See "serialized_space Format" below for the full structure.
 
-```
-# MCP Tool: ask_genie
-# Start a new conversation
-result = ask_genie(
-    space_id="space_123",
-    question="What were total sales last month?"
-)
-# Returns: {question, conversation_id, message_id, status, sql, columns, data, row_count}
+```bash
+# List all Genie Spaces
+databricks genie list-spaces
 
-# MCP Tool: ask_genie
-# Follow-up question in same conversation
-result = ask_genie(
-    space_id="space_123",
-    question="Break that down by region",
-    conversation_id=result["conversation_id"]
-)
-```
+# Create a Genie Space from a local file
+# IMPORTANT: sample_questions require a 32-char hex "id" and "question" must be an array
+databricks genie create-space --json "{
+  \"warehouse_id\": \"WAREHOUSE_ID\",
+  \"title\": \"Sales Analytics\",
+  \"description\": \"Explore sales data\",
+  \"parent_path\": \"/Workspace/Users/you@company.com/genie_spaces\",
+  \"serialized_space\": $(cat genie_space.json | jq -c '.' | jq -Rs '.')
+}"
 
-## Quick Start
+# Get space details (with full config)
+databricks genie get-space SPACE_ID --include-serialized-space
 
-### 1. Inspect Your Tables
+# By default, after creation, tag the Genie Space to track resources created with this skill
+databricks workspace-entity-tag-assignments create-tag-assignment \
+  geniespaces SPACE_ID aidevkit_project --tag-value ai-dev-kit
 
-Before creating a Genie Space, understand your data:
-
-```
-# MCP Tool: get_table_stats_and_schema
-get_table_stats_and_schema(
-    catalog="my_catalog",
-    schema="sales",
-    table_stat_level="SIMPLE"
-)
+# Delete a Genie Space
+databricks genie trash-space SPACE_ID
 ```
 
-### 2. Create the Genie Space
+### Step 3: Test and Iterate
 
+Use `scripts/conversation.py` (see Conversation API section below) to test questions and verify answers are accurate.
+
+If answers are inaccurate or incomplete, improve the space — see "Improving a Genie Space" below.
+
+### Export & Import
+
+```bash
+# Export space configuration (extract serialized_space from get-space output)
+databricks genie get-space SPACE_ID --include-serialized-space -o json | jq '.serialized_space' > genie_space.json
+
+# Import: Create a new space with the exported serialized_space
+databricks genie create-space --json "{
+  \"warehouse_id\": \"WAREHOUSE_ID\",
+  \"title\": \"Sales Analytics\",
+  \"description\": \"Migrated space\",
+  \"parent_path\": \"/Workspace/Users/you@company.com/genie_spaces\",
+  \"serialized_space\": $(cat genie_space.json)
+}"
 ```
-# MCP Tool: manage_genie
-manage_genie(
-    action="create_or_update",
-    display_name="Sales Analytics",
-    table_identifiers=[
-        "my_catalog.sales.customers",
-        "my_catalog.sales.orders"
-    ],
-    description="Explore sales data with natural language",
-    sample_questions=[
-        "What were total sales last month?",
-        "Who are our top 10 customers?"
+
+### Improving a Genie Space
+
+When Genie answers are inaccurate or incomplete, improve the space by updating questions, SQL examples, or instructions:
+
+```bash
+# 1. Edit your local genie_space.json (add questions, fix SQL examples, improve instructions)
+
+# 2. Push updates back to the space
+databricks genie update-space SPACE_ID --json "{\"serialized_space\": $(cat genie_space.json | jq -c '.' | jq -Rs '.')}"
+```
+
+## serialized_space Format
+
+The `serialized_space` field is a JSON string containing the full space configuration.
+
+### Structure
+
+```json
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [...]
+  },
+  "data_sources": {
+    "tables": [{"identifier": "catalog.schema.table"}]
+  },
+  "instructions": {
+    "example_question_sqls": [...],
+    "text_instructions": [...]
+  }
+}
+```
+
+### Field Format Requirements
+
+**IMPORTANT:** All items in `sample_questions`, `example_question_sqls`, and `text_instructions` require a unique `id` field.
+
+| Field | Format |
+|-------|--------|
+| `config.sample_questions[]` | `{"id": "32hexchars", "question": ["..."]}` |
+| `instructions.example_question_sqls[]` | `{"id": "32hexchars", "question": ["..."], "sql": ["..."]}` |
+| `instructions.text_instructions[]` | `{"id": "32hexchars", "content": ["..."]}` |
+
+- **ID format:** 32-character lowercase hex UUID without hyphens.
+- **Text fields are arrays:** `question`, `sql`, and `content` are arrays of strings, not plain strings.
+
+### Text Instructions
+
+`text_instructions` make the Genie Space more reliable by explaining:
+- **Where to find information** — which tables contain which metrics
+- **How to answer specific questions** — when a user asks X, use table Y with filter Z
+- **Business context** — definitions, thresholds, and domain knowledge
+
+Well-crafted instructions significantly improve answer accuracy.
+
+### Complete Example
+
+This example shows a properly formatted `serialized_space` with sample questions, SQL examples, and text instructions. Note that every item has a unique 32-char hex `id` and all text fields are arrays:
+
+```json
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {"id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", "question": ["What is our current on-time performance?"]},...
     ]
-)
+  },
+  "data_sources": {
+    "tables": [
+      {"identifier": "catalog.ops.gold_otp_summary"},...
+    ]
+  },
+  "instructions": {
+    "example_question_sqls": [
+      {
+        "id": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+        "question": ["What is our on-time performance?"],
+        "sql": ["SELECT flight_date, ROUND(SUM(on_time_count) * 100.0 / SUM(total_flights), 1) AS otp_pct\n", "FROM catalog.ops.gold_otp_summary\n", "WHERE flight_date >= date_sub(current_date(), 7)\n", "GROUP BY flight_date ORDER BY flight_date"]
+      }
+    ],
+    "text_instructions": [
+      {
+        "id": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+        "content": [
+          "On-time performance (OTP) questions: Use gold_otp_summary table. OTP target is 85%.\n",
+          "Delay analysis questions: Use gold_delay_analysis table. Filter by delay_code for specific delay types.\n",
+          "When asked about 'this week' or 'recent': Use flight_date >= date_sub(current_date(), 7).\n",
+          "When comparing aircraft: Join with gold_aircraft_reliability on tail_number."
+        ]
+      }
+    ]
+  }
+}
 ```
 
-### 3. Ask Questions (Conversation API)
 
-```
-# MCP Tool: ask_genie
-ask_genie(
-    space_id="your_space_id",
-    question="What were total sales last month?"
-)
-# Returns: SQL, columns, data, row_count
+## Cross-Workspace Migration
+
+When migrating between workspaces, catalog names often differ. Export the space, remap with `sed`, then import:
+
+```bash
+sed -i '' 's/source_catalog/target_catalog/g' genie_space.json
 ```
 
-### 4. Export & Import (Clone / Migrate)
+Use `DATABRICKS_CONFIG_PROFILE=profile_name` to target different workspaces.
 
-Export a space (preserves all tables, instructions, SQL examples, and layout):
+## Conversation API
 
-```
-# MCP Tool: manage_genie
-exported = manage_genie(action="export", space_id="your_space_id")
-# exported["serialized_space"] contains the full config
-```
+Use `scripts/conversation.py` to ask questions programmatically:
 
-Clone to a new space (same catalog):
+```bash
+# Ask a question
+python scripts/conversation.py ask SPACE_ID "What were total sales last month?"
 
-```
-# MCP Tool: manage_genie
-manage_genie(
-    action="import",
-    warehouse_id=exported["warehouse_id"],
-    serialized_space=exported["serialized_space"],
-    title=exported["title"],  # override title; omit to keep original
-    description=exported["description"],
-)
+# Follow-up in same conversation (Genie remembers context)
+python scripts/conversation.py ask SPACE_ID "Break down by region" --conversation-id CONV_ID
+
+# With timeout for complex queries
+python scripts/conversation.py ask SPACE_ID "Complex query" --timeout 120
 ```
 
-> **Cross-workspace migration:** Each MCP server is workspace-scoped. Configure one server entry per workspace profile in your IDE's MCP config, then `manage_genie(action="export")` from the source server and `manage_genie(action="import")` via the target server. See [spaces.md §Migration](spaces.md#migrating-across-workspaces-with-catalog-remapping) for the full workflow.
+Start a new conversation for unrelated topics. Use `--conversation-id` only for follow-ups on the same topic.
 
-## Reference Files
+## Troubleshooting
 
-- [spaces.md](spaces.md) - Creating and managing Genie Spaces
-- [conversation.md](conversation.md) - Asking questions via the Conversation API
+| Issue | Solution |
+|-------|----------|
+| `sample_question.id must be provided` | Add 32-char hex UUID `id` to each sample question |
+| `Expected an array for question` | Use `"question": ["text"]` not `"question": "text"` |
+| No warehouse available | Create a SQL warehouse or provide `warehouse_id` |
+| Empty `serialized_space` on export | Requires CAN EDIT permission on the space |
+| Tables not found after migration | Remap catalog name in `serialized_space` before import |
 
-## Prerequisites
-
-Before creating a Genie Space:
-
-1. **Tables in Unity Catalog** - Bronze/silver/gold tables with the data
-2. **SQL Warehouse** - A warehouse to execute queries (auto-detected if not specified)
-
-### Creating Tables
-
-Use these skills in sequence:
-1. `databricks-synthetic-data-gen` - Generate raw parquet files
-2. `databricks-spark-declarative-pipelines` - Create bronze/silver/gold tables
-
-## Common Issues
-
-See [spaces.md §Troubleshooting](spaces.md#troubleshooting) for a full list of issues and solutions.
 ## Related Skills
 
-- **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Use Genie Spaces as agents inside Supervisor Agents
-- **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - Generate raw parquet data to populate tables for Genie
-- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
-- **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs, schemas, and tables Genie queries
+- **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - Generate data for Genie tables
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables

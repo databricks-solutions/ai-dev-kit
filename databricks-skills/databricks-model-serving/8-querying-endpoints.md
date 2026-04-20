@@ -2,87 +2,41 @@
 
 Send requests to deployed Model Serving endpoints.
 
-> **If MCP tools are not available**, use the Python SDK or REST API examples below.
-
-## MCP Tools
+## CLI Commands
 
 ### Check Endpoint Status
 
 Before querying, verify the endpoint is ready:
 
-```
-manage_serving_endpoint(action="get", name="my-agent-endpoint")
-```
-
-Response:
-```json
-{
-    "name": "my-agent-endpoint",
-    "state": "READY",
-    "served_entities": [
-        {"name": "my_agent-1", "entity_name": "main.agents.my_agent", "deployment_state": "READY"}
-    ]
-}
+```bash
+databricks serving-endpoints get my-agent-endpoint
 ```
 
 ### Query Chat/Agent Endpoint
 
-```
-manage_serving_endpoint(
-    action="query",
-    name="my-agent-endpoint",
-    messages=[
-        {"role": "user", "content": "What is Databricks?"}
-    ],
-    max_tokens=500,
-    temperature=0.7
-)
-```
-
-Response:
-```json
-{
-    "choices": [
-        {
-            "message": {
-                "role": "assistant",
-                "content": "Databricks is a unified data intelligence platform..."
-            },
-            "finish_reason": "stop"
-        }
-    ],
-    "usage": {
-        "prompt_tokens": 10,
-        "completion_tokens": 150,
-        "total_tokens": 160
-    }
-}
+```bash
+databricks serving-endpoints query my-agent-endpoint --json '{
+  "messages": [{"role": "user", "content": "What is Databricks?"}],
+  "max_tokens": 500,
+  "temperature": 0.7
+}'
 ```
 
 ### Query ML Model Endpoint
 
-```
-manage_serving_endpoint(
-    action="query",
-    name="sklearn-classifier",
-    dataframe_records=[
-        {"age": 25, "income": 50000, "credit_score": 720},
-        {"age": 35, "income": 75000, "credit_score": 680}
-    ]
-)
-```
-
-Response:
-```json
-{
-    "predictions": [0.85, 0.72]
-}
+```bash
+databricks serving-endpoints query sklearn-classifier --json '{
+  "dataframe_records": [
+    {"age": 25, "income": 50000, "credit_score": 720},
+    {"age": 35, "income": 75000, "credit_score": 680}
+  ]
+}'
 ```
 
 ### List All Endpoints
 
-```
-manage_serving_endpoint(action="list", limit=20)
+```bash
+databricks serving-endpoints list
 ```
 
 ## Python SDK

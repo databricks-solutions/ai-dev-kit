@@ -431,8 +431,8 @@ run_result = w.jobs.run_now_and_wait(job_id=12345)
 # Run job
 databricks jobs run-now 12345
 
-# Run with parameters
-databricks jobs run-now 12345 --job-params '{"env": "prod"}'
+# Run with parameters (must use --json with job_id inside)
+databricks jobs run-now --json '{"job_id": 12345, "job_parameters": {"env": "prod"}}'
 ```
 
 **DABs:**

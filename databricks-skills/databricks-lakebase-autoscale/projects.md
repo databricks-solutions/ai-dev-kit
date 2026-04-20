@@ -64,8 +64,7 @@ print(f"Postgres version: {result.status.pg_version}")
 ### CLI
 
 ```bash
-databricks postgres create-project \
-    --project-id my-app \
+databricks postgres create-project my-app \
     --json '{
         "spec": {
             "display_name": "My Application",

@@ -4,7 +4,7 @@ Operational guidance for monitoring, cost optimization, capacity planning, and m
 
 ## Monitoring Endpoint Status
 
-Use `manage_vs_endpoint(action="get")` (MCP tool) or `w.vector_search_endpoints.get_endpoint()` (SDK) to check endpoint health.
+Use `databricks vector-search-endpoints get-endpoint ENDPOINT_NAME` (CLI) or `w.vector_search_endpoints.get_endpoint()` (SDK) to check endpoint health.
 
 ### Endpoint fields
 
@@ -34,7 +34,7 @@ print(f"Indexes: {endpoint.num_indexes}")
 
 ## Monitoring Index Status
 
-Use `manage_vs_index(action="get")` (MCP tool) or `w.vector_search_indexes.get_index()` (SDK) to check index health.
+Use `databricks vector-search-indexes get-index INDEX_NAME` (CLI) or `w.vector_search_indexes.get_index()` (SDK) to check index health.
 
 ### Index fields
 

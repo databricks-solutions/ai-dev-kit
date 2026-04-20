@@ -72,5 +72,5 @@ Switch to **[Databricks Connect](1-databricks-connect.md)** when:
 - Need local debugging with breakpoints
 
 Switch to **[Interactive Cluster](3-interactive-cluster.md)** when:
-- Need state across multiple MCP tool calls
+- Need state across multiple tool calls
 - Need Scala or R support

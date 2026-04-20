@@ -221,99 +221,59 @@ mlflow.langchain.log_model(
 )
 ```
 
-## MCP Tools
-
-The following MCP tools are available for managing Lakebase infrastructure. Use `type="provisioned"` for Lakebase Provisioned.
-
-### manage_lakebase_database - Database Management
-
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `create_or_update` | Create or update a database | name |
-| `get` | Get database details | name |
-| `list` | List all databases | (none, optional type filter) |
-| `delete` | Delete database and resources | name |
-
-**Example usage:**
-```python
-# Create a provisioned database
-manage_lakebase_database(
-    action="create_or_update",
-    name="my-lakebase-instance",
-    type="provisioned",
-    capacity="CU_1"
-)
-
-# Get database details
-manage_lakebase_database(action="get", name="my-lakebase-instance", type="provisioned")
-
-# List all databases
-manage_lakebase_database(action="list")
-
-# Delete with cascade
-manage_lakebase_database(action="delete", name="my-lakebase-instance", type="provisioned", force=True)
-```
-
-### manage_lakebase_sync - Reverse ETL
-
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `create_or_update` | Set up reverse ETL from Delta to Lakebase | instance_name, source_table_name, target_table_name |
-| `delete` | Remove synced table (and optionally catalog) | table_name |
-
-**Example usage:**
-```python
-# Set up reverse ETL
-manage_lakebase_sync(
-    action="create_or_update",
-    instance_name="my-lakebase-instance",
-    source_table_name="catalog.schema.delta_table",
-    target_table_name="lakebase_catalog.schema.postgres_table",
-    scheduling_policy="TRIGGERED"  # or SNAPSHOT, CONTINUOUS
-)
-
-# Delete synced table
-manage_lakebase_sync(action="delete", table_name="lakebase_catalog.schema.postgres_table")
-```
-
-### generate_lakebase_credential - OAuth Tokens
-
-Generate OAuth token (~1hr) for PostgreSQL connections. Use as password with `sslmode=require`.
-
-```python
-# For provisioned instances
-generate_lakebase_credential(instance_names=["my-lakebase-instance"])
-```
-
 ## Reference Files
 
 - [connection-patterns.md](connection-patterns.md) - Detailed connection patterns for different use cases
 - [reverse-etl.md](reverse-etl.md) - Syncing data from Delta Lake to Lakebase
 
-## CLI Quick Reference
+## CLI Commands
+
+### Instance Management
 
 ```bash
-# Create instance
-databricks database create-database-instance \
-    --name my-lakebase-instance \
-    --capacity CU_1
+# Create instance (NAME is positional)
+databricks database create-database-instance my-lakebase-instance --capacity CU_1
 
 # Get instance details
-databricks database get-database-instance --name my-lakebase-instance
-
-# Generate credentials
-databricks database generate-database-credential \
-    --request-id $(uuidgen) \
-    --json '{"instance_names": ["my-lakebase-instance"]}'
+databricks database get-database-instance my-lakebase-instance
 
 # List instances
 databricks database list-database-instances
 
 # Stop instance (saves cost)
-databricks database stop-database-instance --name my-lakebase-instance
+databricks database stop-database-instance my-lakebase-instance
 
 # Start instance
-databricks database start-database-instance --name my-lakebase-instance
+databricks database start-database-instance my-lakebase-instance
+
+# Delete instance
+databricks database delete-database-instance my-lakebase-instance
+```
+
+### OAuth Credentials
+
+```bash
+# Generate credentials for connection
+databricks database generate-database-credential \
+    --request-id $(uuidgen) \
+    --json '{"instance_names": ["my-lakebase-instance"]}'
+```
+
+### Reverse ETL (Synced Tables)
+
+Synced tables are managed via Unity Catalog SQL commands:
+
+```sql
+-- Create synced table from Delta to Lakebase
+CREATE TABLE lakebase_catalog.schema.target_table
+SYNC FROM catalog.schema.source_delta_table
+SCHEDULE TRIGGERED;
+
+-- List synced tables
+SHOW TABLES IN lakebase_catalog.schema;
+
+-- Drop synced table
+DROP TABLE lakebase_catalog.schema.target_table;
 ```
 
 ## Common Issues

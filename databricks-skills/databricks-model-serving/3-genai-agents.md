@@ -221,10 +221,12 @@ for event in AGENT.predict_stream(request):
     print(event)
 ```
 
-Run via MCP:
+Run via CLI:
 
-```
-execute_code(file_path="./my_agent/test_agent.py")
+```bash
+# Upload and run on Databricks
+databricks workspace import-dir ./my_agent /Workspace/Users/<user>/my_agent
+databricks jobs run-now JOB_ID  # JOB_ID is positional; job runs test_agent.py
 ```
 
 ## Logging the Agent
@@ -267,18 +269,16 @@ from databricks import agents
 agents.deploy(
     "main.agents.my_agent", 
     version="1",
-    tags={"source": "mcp"}
+    tags={"source": "cli"}
 )
 # Takes ~15 minutes
 ```
 
 ## Query Deployed Agent
 
-```
-manage_serving_endpoint(
-    action="query",
-    name="my-agent-endpoint",
-    messages=[{"role": "user", "content": "What is Databricks?"}],
-    max_tokens=500
-)
+```bash
+databricks serving-endpoints query my-agent-endpoint --json '{
+  "messages": [{"role": "user", "content": "What is Databricks?"}],
+  "max_tokens": 500
+}'
 ```

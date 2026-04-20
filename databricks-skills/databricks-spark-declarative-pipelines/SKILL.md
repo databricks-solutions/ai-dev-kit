@@ -39,10 +39,10 @@ description: "Creates, configures, and updates Databricks Lakeflow Spark Declara
 - When the user provides table schema and asks for code, respond directly with the code. Don't ask clarifying questions if the request is clear.
 
 ## Tools
-- List files in volume: `databricks fs ls dbfs:/Volumes/{catalog}/{schema}/{volume}/{path} --profile {PROFILE}`
-- Query data: `databricks experimental aitools tools query --profile {PROFILE} --warehouse abc123 "SELECT 1 FROM catalog.schema.table"`
-- Discover schema: `databricks experimental aitools tools discover-schema --profile {PROFILE} catalog.schema.table1 catalog.schema.table2`
-- Pipelines CLI: `databricks pipelines init|deploy|run|logs|stop` or use `databricks pipelines --help` for more options
+- List files in volume: `databricks fs ls /Volumes/{catalog}/{schema}/{volume}/{path}`
+- Query data: `databricks experimental aitools tools query --warehouse abc123 "SELECT 1 FROM catalog.schema.table"`
+- Discover schema: `databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2`
+- Pipelines CLI: `databricks pipelines create|get|delete|start-update|list-pipelines` or use `databricks pipelines --help` for more options
 
 ## Choose Your Workflow
 
@@ -83,15 +83,14 @@ Use this when the pipeline is **part of an existing DAB project**:
 
 → See [1-project-initialization.md](references/1-project-initialization.md) for adding pipelines to existing bundles
 
-### Option C: Rapid Iteration with MCP Tools (no bundle management)
+### Option C: Rapid Iteration with CLI (no bundle management, or you'll create the DAB at the end)
 
 Use this when you need to **quickly create, test, and iterate** on a pipeline without managing bundle files:
 - User wants to "just run a pipeline and see if it works"
 - Part of a larger demo where bundle is managed separately, or the DAB bundle will be created at the end as you want to quickly test the project first
 - Prototyping or experimenting with pipeline logic
-- User explicitly asks to use MCP tools
 
-→ See [2-mcp-approach.md](references/2-mcp-approach.md) for MCP-based workflow
+→ See [2-cli-approach.md](references/2-cli-approach.md) for CLI-based workflow
 
 ---
 
@@ -101,7 +100,7 @@ Before writing pipeline code, make sure you have:
 ```
 - [ ] Language selected: Python or SQL
 - [ ] Read the syntax basics: **SQL**: Always Read [sql/1-syntax-basics.md](references/sql/1-syntax-basics.md), **Python**: Always Read [python/1-syntax-basics.md](references/python/1-syntax-basics.md)
-- [ ] Workflow chosen: Standalone DAB / Existing DAB / MCP iteration
+- [ ] Workflow chosen: Standalone DAB / Existing DAB / CLI iteration
 - [ ] Compute type: serverless (default) or classic
 - [ ] Schema strategy: single schema with prefixes vs. multi-schema
 - [ ] Consider [Multi-Schema Patterns](#multi-schema-patterns) and [Modern Defaults](#modern-defaults)
@@ -179,7 +178,7 @@ After choosing your workflow (see [Choose Your Workflow](#choose-your-workflow))
 | Task | Guide |
 |------|-------|
 | **Setting up standalone pipeline project** | [1-project-initialization.md](references/1-project-initialization.md) |
-| **Rapid iteration with MCP tools** | [2-mcp-approach.md](references/2-mcp-approach.md) |
+| **Rapid iteration with CLI** | [2-cli-approach.md](references/2-cli-approach.md) |
 | **Advanced configuration** | [3-advanced-configuration.md](references/3-advanced-configuration.md) |
 | **Migrating from DLT** | [4-dlt-migration.md](references/4-dlt-migration.md) |
 
@@ -248,7 +247,7 @@ For detailed syntax, see [sql/1-syntax-basics.md](references/sql/1-syntax-basics
 ### Project Structure
 - **Standalone pipeline projects**: Use `databricks pipelines init` for Asset Bundle with multi-environment support
 - **Pipeline in existing bundle**: Add to `resources/*.pipeline.yml`
-- **Rapid iteration/prototyping**: Use MCP tools, formalize in bundle later
+- **Rapid iteration/prototyping**: Use CLI/SDK, formalize in bundle later
 - See **[1-project-initialization.md](references/1-project-initialization.md)** for project setup details
 
 ### Minimal pipeline config pointers
@@ -278,30 +277,35 @@ For detailed examples, see **[3-advanced-configuration.md](references/3-advanced
 
 ## Post-Run Validation (Required)
 
-After running a pipeline (via DAB or MCP), you **MUST** validate both the execution status AND the actual data.
+After running a pipeline (via DAB or CLI), you **MUST** validate both the execution status AND the actual data.
 
 ### Step 1: Check Pipeline Execution Status
 
-**From MCP (`manage_pipeline(action="run")` or `manage_pipeline(action="create_or_update")`):**
-- Check `result["success"]` and `result["state"]`
-- If failed, check `result["message"]` and `result["errors"]` for details
+```bash
+# Get pipeline status and details (pipeline_id is positional)
+databricks pipelines get <pipeline_id>
+
+# Get recent events/logs
+databricks pipelines list-pipeline-events <pipeline_id>
+```
 
 **From DAB (`databricks bundle run`):**
 - Check the command output for success/failure
-- Use `manage_pipeline(action="get", pipeline_id=...)` to get detailed status and recent events
+- Use `databricks pipelines get <pipeline_id>` to get detailed status and recent events
 
 ### Step 2: Validate Output Data
 
 Even if the pipeline reports SUCCESS, you **MUST** verify the data is correct:
 
+```bash
+# Check schema, row counts, sample data, and null counts for all tables
+databricks experimental aitools tools discover-schema \
+  my_catalog.my_schema.bronze_orders \
+  my_catalog.my_schema.silver_orders \
+  my_catalog.my_schema.gold_summary
 ```
-# MCP Tool: get_table_stats_and_schema - validates schema, row counts, and stats
-get_table_stats_and_schema(
-    catalog="my_catalog",
-    schema="my_schema",
-    table_names=["bronze_*", "silver_*", "gold_*"]  # Use glob patterns
-)
-```
+
+This returns per table: columns/types, 5 sample rows, total_rows count, and null counts per column.
 
 **Check for:**
 - Empty tables (row_count = 0) - indicates ingestion or filtering issues
@@ -314,7 +318,7 @@ get_table_stats_and_schema(
 If validation reveals problems, trace upstream to find the root cause:
 
 1. **Start from the problematic table** - identify what's wrong (empty, wrong counts, bad data)
-2. **Check its source table** - use `get_table_stats_and_schema` on the upstream table
+2. **Check its source table** - run `DESCRIBE` and `COUNT(*)` on the upstream table
 3. **Trace back to bronze** - continue until you find where the issue originates
 4. **Common causes:**
    - Bronze empty → source files missing or path incorrect
@@ -324,7 +328,7 @@ If validation reveals problems, trace upstream to find the root cause:
 
 5. **Fix the SQL/Python code**, re-upload, and re-run the pipeline
 
-**Do NOT use `execute_sql` with COUNT queries for validation** - `get_table_stats_and_schema` is faster and returns more information in a single call.
+**Use `discover-schema` for validation** - it returns schema, row counts, sample data, and null counts in a single call.
 
 ---
 
@@ -332,17 +336,18 @@ If validation reveals problems, trace upstream to find the root cause:
 
 | Issue | Solution |
 |-------|----------|
-| **Empty output tables** | Use `get_table_stats_and_schema` to check upstream sources. Verify source files exist and paths are correct. |
+| **"Only SQL, Scala and Python notebooks are supported"** | Use `{"file": {"path": "..."}}` instead of `{"notebook": {"path": "..."}}` for raw SQL files. `notebook` is for Databricks notebook format only. |
+| **Empty output tables** | Use `discover-schema` to check upstream tables. Verify source files exist and paths are correct. |
 | **Pipeline stuck INITIALIZING** | Normal for serverless, wait a few minutes |
 | **"Column not found"** | Check `schemaHints` match actual data |
 | **Streaming reads fail** | For file ingestion in a streaming table, you must use the `STREAM` keyword with `read_files`: `FROM STREAM read_files(...)`. For table streams use `FROM stream(table)`. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
-| **Timeout during run** | Increase `timeout`, or use `wait_for_completion=False` and check status with `manage_pipeline(action="get")` |
+| **Timeout during run** | Use `databricks pipelines get <pipeline_id>` to check status |
 | **MV doesn't refresh** | Enable row tracking on source tables |
 | **SCD2: query column not found** | Lakeflow uses `__START_AT` and `__END_AT` (double underscore), not `START_AT`/`END_AT`. Use `WHERE __END_AT IS NULL` for current rows. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
 | **AUTO CDC parse error at APPLY/SEQUENCE** | Put `APPLY AS DELETE WHEN` **before** `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source (omit `_rescued_data` unless bronze uses rescue data). Omit `TRACK HISTORY ON *` if it causes "end of input" errors; default is equivalent. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
 | **"Cannot create streaming table from batch query"** | In a streaming table query, use `FROM STREAM read_files(...)` so `read_files` leverages Auto Loader; `FROM read_files(...)` alone is batch. See [sql/2-ingestion.md](references/sql/2-ingestion.md) and [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
 
-**For detailed errors**, the `result["message"]` from `manage_pipeline(action="create_or_update")` includes suggested next steps. Use `manage_pipeline(action="get", pipeline_id=...)` which includes recent events and error details.
+**For detailed errors**, use `databricks pipelines get <pipeline_id>` which includes recent events, or `databricks pipelines list-pipeline-events <pipeline_id>` for full event history.
 
 ---
 

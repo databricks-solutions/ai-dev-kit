@@ -1,6 +1,6 @@
 # Deploying Databricks Apps
 
-Three deployment options: Databricks CLI (simplest), Asset Bundles (multi-environment), or MCP tools (programmatic).
+Three deployment options: Databricks CLI (simplest), Asset Bundles (multi-environment), or CLI commands (programmatic).
 
 **Cookbook deployment guide**: https://apps-cookbook.dev/docs/deploy
 
@@ -107,9 +107,9 @@ For complete DABs guidance, use the **databricks-bundles** skill.
 
 ---
 
-## Option 3: MCP Tools
+## Option 3: CLI Commands
 
-For programmatic app lifecycle management, see [6-mcp-approach.md](6-mcp-approach.md).
+For CLI-based app lifecycle management, see [6-cli-approach.md](6-cli-approach.md).
 
 ---
 

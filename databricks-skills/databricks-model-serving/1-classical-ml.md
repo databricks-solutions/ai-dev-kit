@@ -140,16 +140,14 @@ endpoint = w.serving_endpoints.create_and_wait(
 
 ## Query the Endpoint
 
-### Via MCP Tool
+### Via CLI
 
-```
-manage_serving_endpoint(
-    action="query",
-    name="diabetes-predictor",
-    dataframe_records=[
-        {"age": 45, "bmi": 25.3, "bp": 120, "s1": 200}
-    ]
-)
+```bash
+databricks serving-endpoints query diabetes-predictor --json '{
+  "dataframe_records": [
+    {"age": 45, "bmi": 25.3, "bp": 120, "s1": 200}
+  ]
+}'
 ```
 
 ### Via Python SDK

@@ -196,7 +196,7 @@ Create a storage credential for the cloud storage where Snowflake stores its Ice
 ```bash
 # In Databricks CLI (AWS example)
 databricks storage-credentials create snowflake_storage_cred \
-  --aws-iam-role-arn "arn:aws:iam::123456789012:role/snowflake-data-access"
+  --json '{"aws_iam_role": {"role_arn": "arn:aws:iam::123456789012:role/snowflake-data-access"}}'
 ```
 
 ### Step 3: Create an External Location

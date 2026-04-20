@@ -60,10 +60,12 @@ uc_model_info = mlflow.register_model(
 print(f"Registered: {uc_model_info.name} version {uc_model_info.version}")
 ```
 
-Run via MCP:
+Run via CLI:
 
-```
-execute_code(file_path="./my_agent/log_model.py")
+```bash
+# Upload and run on Databricks
+databricks workspace import-dir ./my_agent /Workspace/Users/<user>/my_agent
+databricks jobs run-now JOB_ID  # JOB_ID is positional; job runs log_model.py
 ```
 
 ## Resources for Auto Authentication
@@ -141,7 +143,7 @@ mlflow.models.predict(
 )
 ```
 
-Run via MCP (in log_model.py or separate file):
+Run validation (in log_model.py or separate file):
 
 ```python
 # validate_model.py

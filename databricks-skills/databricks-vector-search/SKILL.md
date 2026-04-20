@@ -268,28 +268,22 @@ scan_result = w.vector_search_indexes.scan_index(
 
 ```bash
 # List endpoints
-databricks vector-search endpoints list
+databricks vector-search-endpoints list-endpoints
 
-# Create endpoint
-databricks vector-search endpoints create \
-    --name my-endpoint \
-    --endpoint-type STANDARD
+# Create endpoint (positional args: NAME ENDPOINT_TYPE)
+databricks vector-search-endpoints create-endpoint my-endpoint STANDARD
 
-# List indexes on endpoint
-databricks vector-search indexes list-indexes \
-    --endpoint-name my-endpoint
+# List indexes on endpoint (positional arg: ENDPOINT_NAME)
+databricks vector-search-indexes list-indexes my-endpoint
 
-# Get index status
-databricks vector-search indexes get-index \
-    --index-name catalog.schema.my_index
+# Get index status (positional arg: INDEX_NAME)
+databricks vector-search-indexes get-index catalog.schema.my_index
 
-# Sync index (for TRIGGERED)
-databricks vector-search indexes sync-index \
-    --index-name catalog.schema.my_index
+# Sync index (positional arg: INDEX_NAME)
+databricks vector-search-indexes sync-index catalog.schema.my_index
 
-# Delete index
-databricks vector-search indexes delete-index \
-    --index-name catalog.schema.my_index
+# Delete index (positional arg: INDEX_NAME)
+databricks vector-search-indexes delete-index catalog.schema.my_index
 ```
 
 ## Common Issues
@@ -302,7 +296,7 @@ databricks vector-search indexes delete-index \
 | **Embedding dimension mismatch** | Ensure query and index dimensions match |
 | **Index not updating** | Check pipeline_type; use sync_index() for TRIGGERED |
 | **Out of capacity** | Upgrade to Storage-Optimized (1B+ vectors) |
-| **`query_vector` truncated by MCP tool** | MCP tool calls serialize arrays as JSON and can truncate large vectors (e.g. 1024-dim). Use `query_text` instead (for managed embedding indexes), or use the Databricks SDK/CLI to pass raw vectors |
+| **`query_vector` truncated** | Large vectors (e.g. 1024-dim) can be truncated when serialized as JSON. Use `query_text` instead (for managed embedding indexes), or use the Databricks SDK to pass raw vectors |
 
 ## Embedding Models
 
@@ -323,112 +317,6 @@ embedding_source_columns=[
 ]
 ```
 
-## MCP Tools
-
-The following MCP tools are available for managing Vector Search infrastructure. For a full end-to-end walkthrough, see [end-to-end-rag.md](end-to-end-rag.md).
-
-### manage_vs_endpoint - Endpoint Management
-
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `create_or_update` | Create endpoint (STANDARD or STORAGE_OPTIMIZED). Idempotent | name |
-| `get` | Get endpoint details | name |
-| `list` | List all endpoints | (none) |
-| `delete` | Delete endpoint (indexes must be deleted first) | name |
-
-```python
-# Create or update an endpoint
-result = manage_vs_endpoint(action="create_or_update", name="my-vs-endpoint", endpoint_type="STANDARD")
-# Returns {"name": "my-vs-endpoint", "endpoint_type": "STANDARD", "created": True}
-
-# List all endpoints
-endpoints = manage_vs_endpoint(action="list")
-
-# Get specific endpoint
-endpoint = manage_vs_endpoint(action="get", name="my-vs-endpoint")
-```
-
-### manage_vs_index - Index Management
-
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `create_or_update` | Create index. Idempotent, auto-triggers sync for DELTA_SYNC | name, endpoint_name, primary_key |
-| `get` | Get index details | name |
-| `list` | List indexes. Optional endpoint_name filter | (none) |
-| `delete` | Delete index | name |
-
-```python
-# Create a Delta Sync index with managed embeddings
-result = manage_vs_index(
-    action="create_or_update",
-    name="catalog.schema.my_index",
-    endpoint_name="my-vs-endpoint",
-    primary_key="id",
-    index_type="DELTA_SYNC",
-    delta_sync_index_spec={
-        "source_table": "catalog.schema.docs",
-        "embedding_source_columns": [{"name": "content", "embedding_model_endpoint_name": "databricks-gte-large-en"}],
-        "pipeline_type": "TRIGGERED"
-    }
-)
-
-# Get a specific index
-index = manage_vs_index(action="get", name="catalog.schema.my_index")
-
-# List all indexes on an endpoint
-indexes = manage_vs_index(action="list", endpoint_name="my-vs-endpoint")
-
-# List all indexes across all endpoints
-all_indexes = manage_vs_index(action="list")
-```
-
-### query_vs_index - Query (Hot Path)
-
-Query index with `query_text`, `query_vector`, or hybrid (`query_type="HYBRID"`). Prefer `query_text` over `query_vector` — MCP tool calls can truncate large embedding arrays (1024-dim).
-
-```python
-# Query an index
-results = query_vs_index(
-    index_name="catalog.schema.my_index",
-    columns=["id", "content"],
-    query_text="machine learning best practices",
-    num_results=5
-)
-
-# Hybrid search (combines vector + keyword)
-results = query_vs_index(
-    index_name="catalog.schema.my_index",
-    columns=["id", "content"],
-    query_text="SPARK-12345 memory error",
-    query_type="HYBRID",
-    num_results=10
-)
-```
-
-### manage_vs_data - Data Operations
-
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `upsert` | Insert/update records | index_name, inputs_json |
-| `delete` | Delete by primary key | index_name, primary_keys |
-| `scan` | Scan index contents | index_name |
-| `sync` | Trigger sync for TRIGGERED indexes | index_name |
-
-```python
-# Upsert data into a Direct Access index
-manage_vs_data(
-    action="upsert",
-    index_name="catalog.schema.my_index",
-    inputs_json=[{"id": "doc1", "content": "...", "embedding": [0.1, 0.2, ...]}]
-)
-
-# Trigger manual sync for a TRIGGERED pipeline index
-manage_vs_data(action="sync", index_name="catalog.schema.my_index")
-
-# Scan index contents
-manage_vs_data(action="scan", index_name="catalog.schema.my_index", num_results=100)
-```
-
 ## Notes
 
 - **Storage-Optimized is newer** — better for most use cases unless you need <100ms latency
@@ -436,7 +324,7 @@ manage_vs_data(action="scan", index_name="catalog.schema.my_index", num_results=
 - **Hybrid search** — available for both Delta Sync and Direct Access indexes
 - **`columns_to_sync` matters** — only synced columns are available in query results; include all columns you need
 - **Filter syntax differs by endpoint** — Standard uses dict-format filters, Storage-Optimized uses SQL-like string filters. Use the `databricks-vectorsearch` package's `filters` parameter which accepts both formats
-- **Management vs runtime** — MCP tools above handle lifecycle management; for agent tool-calling at runtime, use `VectorSearchRetrieverTool` or the Databricks managed Vector Search MCP server
+- **Management vs runtime** — CLI and SDK handle lifecycle management; for agent tool-calling at runtime, use `VectorSearchRetrieverTool`
 
 ## Related Skills
 

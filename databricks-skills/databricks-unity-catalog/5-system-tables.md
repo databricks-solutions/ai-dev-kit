@@ -48,12 +48,11 @@ w.system_schemas.enable(
 
 **CLI:**
 ```bash
-# List system schemas
-databricks system-schemas list --metastore-id your-metastore-id
+# List system schemas (METASTORE_ID is positional)
+databricks system-schemas list your-metastore-id
 
-# Enable system schema
-databricks system-schemas enable --metastore-id your-metastore-id \
-    --schema-name access
+# Enable system schema (METASTORE_ID and SCHEMA_NAME are positional)
+databricks system-schemas enable your-metastore-id access
 ```
 
 ---
