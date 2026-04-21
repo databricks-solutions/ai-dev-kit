@@ -253,6 +253,16 @@ MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 # ─── Interactive helpers ────────────────────────────────────────
 # Reads from /dev/tty so prompts work even when piped via curl | bash
 
+# True if we have an interactive tty we can read from.
+# `[ -e /dev/tty ]` is not safe here — on macOS the device node always exists
+# even when the process has no controlling terminal, so existence does not
+# imply we can open it. We check stdin first (normal interactive runs) and
+# fall back to attempting to open /dev/tty (needed for `curl … | bash` where
+# stdin is piped but a controlling terminal is still available).
+is_interactive() {
+    [ -t 0 ] || ( : < /dev/tty ) 2>/dev/null
+}
+
 # Simple text prompt with default value
 prompt() {
     local prompt_text=$1
@@ -264,7 +274,7 @@ prompt() {
         return
     fi
 
-    if [ -e /dev/tty ]; then
+    if ( : < /dev/tty ) 2>/dev/null; then
         printf "  %b [%s]: " "$prompt_text" "$default_value" > /dev/tty
         read -r result < /dev/tty
     elif [ -t 0 ]; then
@@ -528,7 +538,7 @@ detect_tools() {
     fi
 
     # Interactive or fallback
-    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+    if [ "$SILENT" = false ] && is_interactive; then
         [ "$SILENT" = false ] && echo ""
         [ "$SILENT" = false ] && echo -e "  ${B}Select tools to install for:${N}"
 
@@ -568,7 +578,7 @@ prompt_profile() {
     fi
 
     # Skip in silent mode or non-interactive
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
 
@@ -588,7 +598,7 @@ prompt_profile() {
     echo ""
     echo -e "  ${B}Select Databricks profile${N}"
 
-    if [ ${#profiles[@]} -gt 0 ] && [ -e /dev/tty ]; then
+    if [ ${#profiles[@]} -gt 0 ] && is_interactive; then
         # Build radio items: "Label|value|on_or_off|hint"
         local -a items=()
         for p in "${profiles[@]}"; do
@@ -636,7 +646,7 @@ prompt_mcp_path() {
     # If provided via --mcp-path flag, skip prompt
     if [ -n "$USER_MCP_PATH" ]; then
         INSTALL_DIR="$USER_MCP_PATH"
-    elif [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+    elif [ "$SILENT" = false ] && is_interactive; then
         [ "$SILENT" = false ] && echo ""
         [ "$SILENT" = false ] && echo -e "  ${B}MCP server location${N}"
         [ "$SILENT" = false ] && echo -e "  ${D}The MCP server runtime (Python venv + source) will be installed here.${N}"
@@ -741,7 +751,7 @@ prompt_skills_profile() {
     fi
 
     # Skip in silent mode or non-interactive
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         SKILLS_PROFILE="all"
         return
     fi
@@ -1542,7 +1552,7 @@ summary() {
 
 # Prompt for installation scope
 prompt_scope() {
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
 
@@ -1611,7 +1621,7 @@ prompt_scope() {
 
 # Prompt to run auth
 prompt_auth() {
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
 
@@ -1734,7 +1744,7 @@ main() {
         echo ""
     fi
 
-    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+    if [ "$SILENT" = false ] && is_interactive; then
         local confirm
         confirm=$(prompt "Proceed with installation? ${D}(y/n)${N}" "y")
         if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && [ "$confirm" != "yes" ]; then
