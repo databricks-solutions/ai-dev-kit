@@ -107,10 +107,16 @@ def raw_parsed():
     return (
         spark.read.format("binaryFile").load(VOL_IN)
         .withColumn("parsed", expr("ai_parse_document(content)"))
+        .withColumn("text_blocks", expr("""
+            concat_ws('\n', transform(
+                parsed:document:elements,
+                e -> e:content::STRING
+            ))
+        """))
         .selectExpr(
             "path",
-            "parsed:pages[*].elements[*].content AS text_blocks",
-            "parsed:error AS parse_error",
+            "text_blocks",
+            "parsed:error_status AS parse_error",
         )
         .filter("parse_error IS NULL")
     )
@@ -138,6 +144,7 @@ def extracted_flat():
     return (
         dlt.read("classified_docs")
         .filter("doc_type = 'invoice'")
+        .filter("text_blocks IS NOT NULL")
         .withColumn(
             "result",
             expr("""
