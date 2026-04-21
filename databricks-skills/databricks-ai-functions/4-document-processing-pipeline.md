@@ -13,8 +13,8 @@ When processing documents with AI Functions, apply this order of preference for 
 | Stage | Preferred function | Use `ai_query` when... |
 |---|---|---|
 | Parse binary docs (PDF, DOCX, images) | `ai_parse_document` | Need image-level reasoning |
-| Extract flat/typed fields | `ai_extract` v2 | Schema exceeds 128 fields or 7 nesting levels |
-| Extract arrays of objects (e.g. line items) | `ai_extract` v2 | Deeply nested arrays exceeding 7-level limit |
+| Extract flat/typed fields | `ai_extract` | Schema exceeds 128 fields or 7 nesting levels |
+| Extract arrays of objects (e.g. line items) | `ai_extract` | Deeply nested arrays exceeding 7-level limit |
 | Classify document type or status | `ai_classify` | More than 20 categories |
 | Score item similarity / matching | `ai_similarity` | Need cross-document reasoning |
 | Summarize long sections | `ai_summarize` | — |
