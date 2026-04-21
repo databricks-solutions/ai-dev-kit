@@ -130,7 +130,13 @@ def classified_docs():
         dlt.read("raw_parsed")
         .withColumn(
             "doc_type",
-            expr("ai_classify(text_blocks, array('invoice', 'purchase_order', 'receipt', 'contract', 'other'))")
+            expr("""
+                ai_classify(
+                    text_blocks,
+                    '["invoice", "purchase_order", "receipt", "contract", "other"]',
+                    MAP('version', '2.0')
+                ):response[0]::STRING
+            """)
         )
     )
 
