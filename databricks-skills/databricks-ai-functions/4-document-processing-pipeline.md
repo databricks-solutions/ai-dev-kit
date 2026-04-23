@@ -105,7 +105,7 @@ PROMPT   = CFG["prompts"]["extract_invoice"]
 def raw_parsed():
     return (
         spark.read.format("binaryFile").load(VOL_IN)
-        .withColumn("parsed", expr("ai_parse_document(content)"))
+        .withColumn("parsed", expr("ai_parse_document(content, MAP('version', '2.0'))"))
         .withColumn("text_blocks", expr("""
             concat_ws('\n', transform(
                 parsed:document:elements,
@@ -155,7 +155,13 @@ def extracted_flat():
             expr("""
                 ai_extract(
                     text_blocks,
-                    '["invoice_number", "vendor_name", "issue_date", "total_amount", "tax_id"]',
+                    '{
+                        "invoice_number": {"type": "string"},
+                        "vendor_name":    {"type": "string"},
+                        "issue_date":     {"type": "string", "description": "dd/mm/yyyy"},
+                        "total_amount":   {"type": "number"},
+                        "tax_id":         {"type": "string"}
+                     }',
                     MAP('version', '2.0')
                 )
             """)
