@@ -1,8 +1,20 @@
-# Lakebase Autoscaling Connection Patterns
+# Lakebase Autoscaling — Connection Patterns (deep dive)
 
-## Overview
+Deep dive for the application-runtime connection layer. Basic credential generation and a minimal Python snippet are in [SKILL.md](SKILL.md#credentials--connecting).
 
-This document covers different connection patterns for Lakebase Autoscaling, from simple scripts to production applications with token refresh.
+**Why this file uses the SDK and the others don't.** OAuth tokens are 1-hour TTL and must be refreshed from inside the running process — shelling out to the CLI per refresh is slow, fragile, and awkward to embed in a pool. All admin operations (project, branch, endpoint, synced-table lifecycle) stay on the CLI; only runtime token rotation and connection pooling live here.
+
+This document covers connection patterns from simple scripts to production applications with token refresh.
+
+## Requirements
+
+```python
+%pip install -U "databricks-sdk>=0.81.0" "psycopg[binary]>=3.0" sqlalchemy
+```
+
+- `databricks-sdk >= 0.81.0` — required for the `w.postgres` module
+- `psycopg 3.x` — supports the `hostaddr` parameter for the macOS DNS workaround
+- `sqlalchemy 2.x` with the `postgresql+psycopg` driver
 
 ## Authentication Methods
 

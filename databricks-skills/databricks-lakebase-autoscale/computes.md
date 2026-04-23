@@ -1,208 +1,143 @@
-# Lakebase Autoscaling Computes
+# Lakebase Autoscaling — Computes (deep dive)
 
-## Overview
+Deep dive for Endpoints (computes). Basic CLI is in [SKILL.md](SKILL.md).
 
-A compute is a virtualized service that runs Postgres for a branch. Each branch has one primary read-write compute and can have optional read replicas. Computes support autoscaling, scale-to-zero, and granular sizing from 0.5 to 112 CU.
+## What an Endpoint Is
 
-## Compute Sizing
+An endpoint is a Postgres server instance attached to one branch. Each branch has exactly one R/W endpoint (conventionally `ep-primary`) and may have additional read-only replicas. The endpoint owns the hostname clients connect to and the CU budget that determines concurrency and RAM.
 
-Each Compute Unit (CU) allocates approximately 2 GB of RAM.
+## Compute Units
 
-### Available Sizes
+1 CU ≈ 2 GB RAM (vs ~16 GB/CU on Lakebase Provisioned — the autoscaling tier trades per-unit RAM for finer scaling granularity).
 
-| Category | Range | Notes |
-|----------|-------|-------|
-| **Autoscale computes** | 0.5-32 CU | Dynamic scaling within range (max-min <= 8 CU) |
-| **Large fixed-size** | 36-112 CU | Fixed size, no autoscaling |
+| CU | RAM | Max connections |
+|----|-----|-----------------|
+| 0.5 | ~1 GB | 104 |
+| 1 | ~2 GB | 209 |
+| 4 | ~8 GB | 839 |
+| 8 | ~16 GB | 1,678 |
+| 16 | ~32 GB | 3,357 |
+| 32 | ~64 GB | 4,000 |
+| 64 | ~128 GB | 4,000 |
+| 112 | ~224 GB | 4,000 |
 
-### Representative Sizes
+Max connections flattens at 4,000 above 32 CU — scale up past 32 CU for memory/CPU, not for connection headroom.
 
-| Compute Units | RAM | Max Connections |
-|--------------|-----|-----------------|
-| 0.5 CU | ~1 GB | 104 |
-| 1 CU | ~2 GB | 209 |
-| 4 CU | ~8 GB | 839 |
-| 8 CU | ~16 GB | 1,678 |
-| 16 CU | ~32 GB | 3,357 |
-| 32 CU | ~64 GB | 4,000 |
-| 64 CU | ~128 GB | 4,000 |
-| 112 CU | ~224 GB | 4,000 |
+## Sizing Categories
 
-**Note:** Lakebase Provisioned used ~16 GB per CU. Autoscaling uses ~2 GB per CU for more granular scaling.
+| Category | Range | Behavior |
+|----------|-------|----------|
+| Autoscale | 0.5-32 CU | Dynamic scaling; `max − min ≤ 8 CU` |
+| Large fixed | 36-112 CU | Fixed size, no autoscaling |
 
-## Creating a Compute
+**Autoscaling window constraint.** The spread between `autoscaling_limit_min_cu` and `autoscaling_limit_max_cu` cannot exceed 8 CU:
+- Valid: 4-8, 8-16, 16-24
+- Invalid: 0.5-32 (31.5 CU spread), 0.5-16 (15.5 CU spread)
 
-```python
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.postgres import Endpoint, EndpointSpec, EndpointType
-
-w = WorkspaceClient()
-
-# Create a read-write compute endpoint
-result = w.postgres.create_endpoint(
-    parent="projects/my-app/branches/production",
-    endpoint=Endpoint(
-        spec=EndpointSpec(
-            endpoint_type=EndpointType.ENDPOINT_TYPE_READ_WRITE,
-            autoscaling_limit_min_cu=0.5,
-            autoscaling_limit_max_cu=4.0
-        )
-    ),
-    endpoint_id="my-compute"
-).wait()
-
-print(f"Endpoint created: {result.name}")
-print(f"Host: {result.status.hosts.host}")
-```
-
-### CLI
-
-```bash
-databricks postgres create-endpoint \
-    projects/my-app/branches/production my-compute \
-    --json '{
-        "spec": {
-            "endpoint_type": "ENDPOINT_TYPE_READ_WRITE",
-            "autoscaling_limit_min_cu": 0.5,
-            "autoscaling_limit_max_cu": 4.0
-        }
-    }'
-```
-
-**Important:** Each branch can have only one read-write compute.
-
-## Getting Compute Details
-
-```python
-endpoint = w.postgres.get_endpoint(
-    name="projects/my-app/branches/production/endpoints/my-compute"
-)
-
-print(f"Endpoint: {endpoint.name}")
-print(f"Type: {endpoint.status.endpoint_type}")
-print(f"State: {endpoint.status.current_state}")
-print(f"Host: {endpoint.status.hosts.host}")
-print(f"Min CU: {endpoint.status.autoscaling_limit_min_cu}")
-print(f"Max CU: {endpoint.status.autoscaling_limit_max_cu}")
-```
-
-## Listing Computes
-
-```python
-endpoints = list(w.postgres.list_endpoints(
-    parent="projects/my-app/branches/production"
-))
-
-for ep in endpoints:
-    print(f"Endpoint: {ep.name}")
-    print(f"  Type: {ep.status.endpoint_type}")
-    print(f"  CU Range: {ep.status.autoscaling_limit_min_cu}-{ep.status.autoscaling_limit_max_cu}")
-```
-
-## Resizing a Compute
-
-Use `update_mask` to specify which fields to update:
-
-```python
-from databricks.sdk.service.postgres import Endpoint, EndpointSpec, FieldMask
-
-# Update min and max CU
-w.postgres.update_endpoint(
-    name="projects/my-app/branches/production/endpoints/my-compute",
-    endpoint=Endpoint(
-        name="projects/my-app/branches/production/endpoints/my-compute",
-        spec=EndpointSpec(
-            autoscaling_limit_min_cu=2.0,
-            autoscaling_limit_max_cu=8.0
-        )
-    ),
-    update_mask=FieldMask(field_mask=[
-        "spec.autoscaling_limit_min_cu",
-        "spec.autoscaling_limit_max_cu"
-    ])
-).wait()
-```
-
-### CLI
-
-```bash
-# Update single field
-databricks postgres update-endpoint \
-    projects/my-app/branches/production/endpoints/my-compute \
-    spec.autoscaling_limit_max_cu \
-    --json '{"spec": {"autoscaling_limit_max_cu": 8.0}}'
-
-# Update multiple fields
-databricks postgres update-endpoint \
-    projects/my-app/branches/production/endpoints/my-compute \
-    "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu" \
-    --json '{"spec": {"autoscaling_limit_min_cu": 2.0, "autoscaling_limit_max_cu": 8.0}}'
-```
-
-## Deleting a Compute
-
-```python
-w.postgres.delete_endpoint(
-    name="projects/my-app/branches/production/endpoints/my-compute"
-).wait()
-```
-
-## Autoscaling
-
-Autoscaling dynamically adjusts compute resources based on workload demand.
-
-### Configuration
-
-- **Range:** 0.5-32 CU
-- **Constraint:** Max - Min cannot exceed 8 CU
-- **Valid examples:** 4-8 CU, 8-16 CU, 16-24 CU
-- **Invalid example:** 0.5-32 CU (range of 31.5 CU)
-
-### Best Practices
-
-- Set minimum CU large enough to cache your working set in memory
-- Performance may be degraded until compute scales up and caches data
-- Connection limits are based on the maximum CU in the range
+Set the minimum high enough to keep your working set in memory — traffic that lands after a scale-up pays a cache-warm penalty until hot pages are faulted back in.
 
 ## Scale-to-Zero
 
-Automatically suspends compute after a period of inactivity.
+When enabled, an endpoint suspends after an inactivity window (min 60 s, default 5 min). Default state per branch:
 
-| Setting | Description |
-|---------|-------------|
-| **Enabled** | Compute suspends after inactivity timeout (saves cost) |
-| **Disabled** | Always-active compute (eliminates wake-up latency) |
+| Branch | Default |
+|--------|---------|
+| `production` | Scale-to-zero **off** (always active) |
+| Others | Scale-to-zero configurable |
 
-**Default behavior:**
-- `production` branch: Scale-to-zero **disabled** (always active)
-- Other branches: Scale-to-zero can be configured
+### Wake-up
 
-**Default inactivity timeout:** 5 minutes
-**Minimum inactivity timeout:** 60 seconds
+Incoming connections to a suspended endpoint trigger reactivation. Expected latency is a few hundred ms, but:
+- First connection may see a timeout — applications must retry.
+- Endpoint resumes at the **minimum** of its autoscaling range; expect cache-cold performance until load ramps up.
+- All session-scoped state is lost: in-memory stats, temp tables, prepared statements, session GUCs, active transactions.
 
-### Wake-up Behavior
+If your app keeps session state server-side (e.g., Postgres advisory locks, prepared statements you don't re-prepare), disable scale-to-zero.
 
-When a connection arrives on a suspended compute:
-1. Compute starts automatically (reactivation takes a few hundred milliseconds)
-2. The connection request is handled transparently once active
-3. Compute restarts at minimum autoscaling size (if autoscaling enabled)
-4. Applications should implement connection retry logic for the brief reactivation period
+## Advanced CLI
 
-### Session Context After Reactivation
+Create a read replica:
 
-When a compute suspends and reactivates, session context is **reset**:
-- In-memory statistics and cache contents are cleared
-- Temporary tables and prepared statements are lost
-- Session-specific configuration settings reset
-- Connection pools and active transactions are terminated
+```bash
+databricks postgres create-endpoint \
+    projects/my-app/branches/production ep-readonly-1 \
+    --json '{"spec": {"endpoint_type": "ENDPOINT_TYPE_READ_ONLY",
+                      "autoscaling_limit_min_cu": 1.0,
+                      "autoscaling_limit_max_cu": 4.0}}'
+```
 
-If your application requires persistent session data, consider disabling scale-to-zero.
+Change scale-to-zero timeout (durations are strings ending in `s`):
+
+```bash
+databricks postgres update-endpoint \
+    projects/my-app/branches/development/endpoints/primary \
+    spec.suspend_timeout_duration \
+    --json '{"spec": {"suspend_timeout_duration": "1800s"}}'  # 30 min
+```
+
+Disable scale-to-zero on a non-default branch (`"0s"` = off):
+
+```bash
+databricks postgres update-endpoint \
+    projects/my-app/branches/staging/endpoints/primary \
+    spec.suspend_timeout_duration \
+    --json '{"spec": {"suspend_timeout_duration": "0s"}}'
+```
+
+Convert from autoscale to a large fixed size (e.g., 64 CU):
+
+```bash
+databricks postgres update-endpoint \
+    projects/my-app/branches/production/endpoints/primary \
+    "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu" \
+    --json '{"spec": {"autoscaling_limit_min_cu": 64.0, "autoscaling_limit_max_cu": 64.0}}'
+```
 
 ## Sizing Guidance
 
 | Factor | Recommendation |
-|--------|---------------|
+|--------|----------------|
 | Query complexity | Complex analytical queries benefit from larger computes |
-| Concurrent connections | More connections need more CPU and memory |
-| Data volume | Larger datasets may need more memory for performance |
-| Response time | Critical apps may require larger computes |
+| Concurrent connections | Scale up until 32 CU; past that you're buying CPU/RAM, not connections |
+| Working-set size | Min CU should hold your hot data in RAM |
+| Latency-sensitive apps | Disable scale-to-zero or accept wake-up retries |
+
+## SDK Equivalents
+
+```python
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.postgres import (
+    Endpoint, EndpointSpec, EndpointType, FieldMask,
+)
+
+w = WorkspaceClient()
+
+# Create R/W endpoint
+w.postgres.create_endpoint(
+    parent="projects/my-app/branches/production",
+    endpoint=Endpoint(spec=EndpointSpec(
+        endpoint_type=EndpointType.ENDPOINT_TYPE_READ_WRITE,
+        autoscaling_limit_min_cu=0.5,
+        autoscaling_limit_max_cu=4.0,
+    )),
+    endpoint_id="my-compute",
+).wait()
+
+# Resize
+w.postgres.update_endpoint(
+    name="projects/my-app/branches/production/endpoints/my-compute",
+    endpoint=Endpoint(
+        name="projects/my-app/branches/production/endpoints/my-compute",
+        spec=EndpointSpec(autoscaling_limit_min_cu=2.0, autoscaling_limit_max_cu=8.0),
+    ),
+    update_mask=FieldMask(field_mask=[
+        "spec.autoscaling_limit_min_cu",
+        "spec.autoscaling_limit_max_cu",
+    ]),
+).wait()
+
+# Delete
+w.postgres.delete_endpoint(
+    name="projects/my-app/branches/production/endpoints/my-compute"
+).wait()
+```
