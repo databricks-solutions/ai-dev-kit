@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, and Antigravity.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Windsurf.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -233,7 +233,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
@@ -569,6 +569,8 @@ function Invoke-DetectTools {
     $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
     $hasAntigravity = ($null -ne (Get-Command antigravity -ErrorAction SilentlyContinue)) -or
                       (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe")
+    $hasWindsurf = ($null -ne (Get-Command windsurf -ErrorAction SilentlyContinue)) -or
+                   (Test-Path "$env:LOCALAPPDATA\Programs\Windsurf\Windsurf.exe")
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -576,9 +578,10 @@ function Invoke-DetectTools {
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
     $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
+    $windsurfState = $hasWindsurf; $windsurfHint = if ($hasWindsurf) { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasWindsurf) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -595,6 +598,7 @@ function Invoke-DetectTools {
         @{ Label = "OpenAI Codex";   Value = "codex";        State = $codexState;        Hint = $codexHint }
         @{ Label = "Gemini CLI";     Value = "gemini";       State = $geminiState;       Hint = $geminiHint }
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
+        @{ Label = "Windsurf";       Value = "windsurf";     State = $windsurfState;     Hint = $windsurfHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1164,6 +1168,13 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".agents\skills"
                 }
             }
+            "windsurf" {
+                if ($script:Scope -eq "global") {
+                    $dirs += Join-Path $env:USERPROFILE ".codeium\windsurf\skills"
+                } else {
+                    $dirs += Join-Path $BaseDir ".windsurf\skills"
+                }
+            }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1589,6 +1600,14 @@ function Write-McpConfigs {
                 Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\antigravity\mcp_config.json")
                 Write-Ok "Antigravity MCP config"
             }
+            "windsurf" {
+                if ($script:Scope -eq "project") {
+                    Write-Warn "Windsurf only supports global MCP configuration."
+                    Write-Msg "  Config written to ~/.codeium/windsurf/mcp_config.json"
+                }
+                Write-McpJson (Join-Path $env:USERPROFILE ".codeium\windsurf\mcp_config.json")
+                Write-Ok "Windsurf MCP config"
+            }
         }
     }
 }
@@ -1642,6 +1661,10 @@ function Show-Summary {
     }
     if ($script:Tools -match 'antigravity') {
         Write-Msg "$step. Open your project in Antigravity to use Databricks skills and MCP tools"
+        $step++
+    }
+    if ($script:Tools -match 'windsurf') {
+        Write-Msg "$step. Restart Windsurf to pick up the databricks MCP server (Windsurf -> Settings -> Windsurf Settings -> MCP)"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"

@@ -1103,9 +1103,9 @@ install_skills() {
                 ;;
             windsurf)
                 if [ "$SCOPE" = "global" ]; then
-                    dirs+=("$HOME/.windsurf/rules")
+                    dirs+=("$HOME/.codeium/windsurf/skills")
                 else
-                    dirs+=("$base_dir/.windsurf/rules")
+                    dirs+=("$base_dir/.windsurf/skills")
                 fi
                 ;;
         esac
@@ -1499,11 +1499,11 @@ write_mcp_configs() {
                 ok "Antigravity MCP config"
                 ;;
             windsurf)
-                if [ "$SCOPE" = "global" ]; then
-                    write_mcp_json "$HOME/.codeium/windsurf/mcp_config.json"
-                else
-                    write_mcp_json "$base_dir/.codeium/windsurf/mcp_config.json"
+                if [ "$SCOPE" = "project" ]; then
+                    warn "Windsurf only supports global MCP configuration."
+                    msg "  Config written to ${B}~/.codeium/windsurf/mcp_config.json${N}"
                 fi
+                write_mcp_json "$HOME/.codeium/windsurf/mcp_config.json"
                 ok "Windsurf MCP config"
                 ;;
         esac
