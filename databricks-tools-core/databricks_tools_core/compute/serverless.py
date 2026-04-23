@@ -295,14 +295,40 @@ def run_code_on_serverless(
     try:
         # --- Step 2: Submit serverless run ---
         try:
-            # Build submit kwargs, allowing job_extra_params to override defaults
-            extra = job_extra_params or {}
+            # Build submit kwargs, allowing job_extra_params to override defaults.
+            # Callers may pass environments as dicts (documented shape) or typed
+            # JobEnvironment objects. Normalize to typed before use, because:
+            #   - the SDK's jobs.submit serializes each element via .as_dict()
+            #   - we read environment_key off the first element here
+            extra = dict(job_extra_params or {})
 
-            # Determine environment_key for the task
-            env_key = "Default"
-            if "environments" in extra and extra["environments"]:
-                # Use the first environment's key from extra params
-                env_key = extra["environments"][0].get("environment_key", "Default")
+            if extra.get("environments"):
+                normalized = []
+                for e in extra["environments"]:
+                    if isinstance(e, JobEnvironment):
+                        normalized.append(e)
+                    elif isinstance(e, dict):
+                        spec = e.get("spec", {})
+                        if isinstance(spec, dict):
+                            spec = Environment(**spec)
+                        elif not isinstance(spec, Environment):
+                            raise TypeError(
+                                f"environments[].spec must be a dict or Environment, got {type(spec).__name__}"
+                            )
+                        normalized.append(
+                            JobEnvironment(
+                                environment_key=e.get("environment_key", "Default"),
+                                spec=spec,
+                            )
+                        )
+                    else:
+                        raise TypeError(
+                            f"environments[] entries must be dict or JobEnvironment, got {type(e).__name__}"
+                        )
+                extra["environments"] = normalized
+                env_key = normalized[0].environment_key or "Default"
+            else:
+                env_key = "Default"
 
             submit_kwargs = {
                 "run_name": run_name,

@@ -224,3 +224,75 @@ class TestServerlessPersistentMode:
         assert result.success, f"Execution failed: {result.error}"
         d = result.to_dict()
         assert d["workspace_path"] == ws_path
+
+
+@pytest.mark.integration
+class TestServerlessJobExtraParams:
+    """Tests for job_extra_params, especially the environments list normalization.
+
+    Regression coverage for the bug where passing environments as dicts (the
+    documented shape in the docstring) crashed with
+    "'dict' object has no attribute 'as_dict'", and passing typed JobEnvironment
+    crashed with "'JobEnvironment' object has no attribute 'get'".
+    """
+
+    def test_environments_as_dicts(self):
+        """Documented shape: environments as plain dicts with 'spec' nested dict."""
+        result = run_code_on_serverless(
+            code='dbutils.notebook.exit("dict env ok")',
+            run_name="test-env-dict",
+            job_extra_params={
+                "environments": [
+                    {
+                        "environment_key": "dict_env",
+                        "spec": {"client": "1"},
+                    }
+                ]
+            },
+        )
+        logger.info(f"dict-env result: success={result.success}, error={result.error}")
+        assert result.success, f"Execution failed: {result.error}"
+        assert "dict env ok" in result.output
+
+    def test_environments_as_typed_objects(self):
+        """Typed shape: environments as JobEnvironment + Environment instances."""
+        from databricks.sdk.service.compute import Environment
+        from databricks.sdk.service.jobs import JobEnvironment
+
+        result = run_code_on_serverless(
+            code='dbutils.notebook.exit("typed env ok")',
+            run_name="test-env-typed",
+            job_extra_params={
+                "environments": [
+                    JobEnvironment(
+                        environment_key="typed_env",
+                        spec=Environment(client="1"),
+                    )
+                ]
+            },
+        )
+        logger.info(f"typed-env result: success={result.success}, error={result.error}")
+        assert result.success, f"Execution failed: {result.error}"
+        assert "typed env ok" in result.output
+
+    def test_no_job_extra_params_uses_default_env(self):
+        """Regression: omitting job_extra_params still submits with the default env."""
+        result = run_code_on_serverless(
+            code='dbutils.notebook.exit("default env ok")',
+            run_name="test-env-default",
+        )
+        logger.info(f"default-env result: success={result.success}, error={result.error}")
+        assert result.success, f"Execution failed: {result.error}"
+        assert "default env ok" in result.output
+
+    def test_malformed_environment_entry_raises_type_error(self):
+        """Non-dict, non-typed entries should fail fast with a TypeError (no submit)."""
+        result = run_code_on_serverless(
+            code="print('never runs')",
+            run_name="test-env-malformed",
+            job_extra_params={"environments": ["not-a-dict-or-typed"]},
+        )
+        # The function catches the TypeError and returns a failure result.
+        assert not result.success
+        assert result.error is not None
+        assert "JobEnvironment" in result.error or "type" in result.error.lower()
