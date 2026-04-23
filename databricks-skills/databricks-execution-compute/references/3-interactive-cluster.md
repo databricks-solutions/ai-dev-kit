@@ -125,6 +125,8 @@ python scripts/compute.py execute-code \
 
 ## Managing Clusters
 
+Two equivalent paths: the standalone script (convenience wrapper) or the raw `databricks` CLI (more fields exposed). Prefer the script for the common operations listed here.
+
 ```bash
 # List all clusters
 python scripts/compute.py list-compute --resource clusters
@@ -140,6 +142,30 @@ python scripts/compute.py manage-cluster --action terminate --cluster-id "1234-5
 
 # Create a new cluster
 python scripts/compute.py manage-cluster --action create --name "my-cluster" --num-workers 2
+```
+
+### Filter running interactive clusters only (raw CLI)
+
+Useful before asking the user which cluster to reuse. `--cluster-sources UI,API` excludes job clusters (which would otherwise dominate the list on busy workspaces):
+
+```bash
+databricks clusters list --cluster-sources UI,API --output json \
+  | jq '.[] | select(.state == "RUNNING")'
+```
+
+### Create with a full spec (raw CLI)
+
+The script's `manage-cluster --action create` is fine for quick defaults; for full control (DBR version, instance type, tags) use the raw CLI:
+
+```bash
+# SPARK_VERSION is positional; custom_tags recommended for resource tracking
+databricks clusters create 15.4.x-scala2.12 --json '{
+  "cluster_name": "my-cluster",
+  "node_type_id": "i3.xlarge",
+  "num_workers": 2,
+  "autotermination_minutes": 60,
+  "custom_tags": {"aidevkit_project": "ai-dev-kit"}
+}'
 ```
 
 ## Common Issues

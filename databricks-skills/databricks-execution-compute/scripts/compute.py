@@ -292,8 +292,22 @@ def run_code_on_serverless(
     code: str,
     language: str = "python",
     timeout: int = 1800,
+    environments: Optional[List[Any]] = None,
 ) -> ServerlessRunResult:
-    """Run code on serverless compute using Jobs API runs/submit."""
+    """Run code on serverless compute using Jobs API runs/submit.
+
+    Args:
+        code: Source to execute.
+        language: "python" or "sql".
+        timeout: Max wait time in seconds.
+        environments: Optional list of environments to install dependencies.
+            Each entry may be a dict (documented shape) or a typed
+            ``JobEnvironment``. Dict shape:
+                {"environment_key": "my_env",
+                 "spec": {"client": "4", "dependencies": ["pandas", "mlflow"]}}
+            ``client`` must be ``"4"`` (or higher) for dependencies to install;
+            ``"1"`` is the default but does NOT install ``dependencies``.
+    """
     w = get_workspace_client()
 
     # Create temp notebook
@@ -326,6 +340,39 @@ def run_code_on_serverless(
         overwrite=True,
     )
 
+    # Normalize environments (accept dicts or typed JobEnvironment).
+    # The SDK serializes each list item via .as_dict(), so raw dicts fail there;
+    # typed objects also lack .get(), so we need to canonicalize before reading
+    # environment_key for the task binding.
+    if environments:
+        normalized = []
+        for e in environments:
+            if isinstance(e, JobEnvironment):
+                normalized.append(e)
+            elif isinstance(e, dict):
+                spec = e.get("spec", {})
+                if isinstance(spec, dict):
+                    spec = Environment(**spec)
+                elif not isinstance(spec, Environment):
+                    raise TypeError(
+                        f"environments[].spec must be a dict or Environment, got {type(spec).__name__}"
+                    )
+                normalized.append(
+                    JobEnvironment(
+                        environment_key=e.get("environment_key", "default"),
+                        spec=spec,
+                    )
+                )
+            else:
+                raise TypeError(
+                    f"environments[] entries must be dict or JobEnvironment, got {type(e).__name__}"
+                )
+        job_envs = normalized
+        env_key = job_envs[0].environment_key or "default"
+    else:
+        job_envs = [JobEnvironment(environment_key="default", spec=Environment(client="1"))]
+        env_key = "default"
+
     try:
         # Submit run
         run = w.jobs.submit(
@@ -337,15 +384,10 @@ def run_code_on_serverless(
                         notebook_path=notebook_path,
                         source=Source.WORKSPACE,
                     ),
-                    environment_key="default",
+                    environment_key=env_key,
                 )
             ],
-            environments=[
-                JobEnvironment(
-                    environment_key="default",
-                    spec=Environment(client="1"),
-                )
-            ],
+            environments=job_envs,
         ).result(timeout=timedelta(seconds=timeout))
 
         # Get run output
@@ -499,6 +541,22 @@ def cmd_execute_code(args):
     timeout = args.timeout
     destroy_context = args.destroy_context
 
+    # Parse --environments (JSON string or @path/to/file.json) for serverless
+    environments = None
+    env_arg = _none_if_empty(getattr(args, "environments", None))
+    if env_arg:
+        try:
+            if env_arg.startswith("@"):
+                with open(env_arg[1:], "r", encoding="utf-8") as fh:
+                    environments = json.load(fh)
+            else:
+                environments = json.loads(env_arg)
+        except (OSError, json.JSONDecodeError) as e:
+            return {"success": False, "error": f"Invalid --environments: {e}"}
+        if not isinstance(environments, list):
+            return {"success": False,
+                    "error": "--environments must be a JSON array of environment objects"}
+
     if not code and not file_path:
         return {"success": False, "error": "Either --code or --file must be provided."}
 
@@ -522,12 +580,20 @@ def cmd_execute_code(args):
     # Serverless execution
     if compute_type == "serverless":
         default_timeout = timeout if timeout else 1800
-        result = run_code_on_serverless(
-            code=code,
-            language=language,
-            timeout=default_timeout,
-        )
+        try:
+            result = run_code_on_serverless(
+                code=code,
+                language=language,
+                timeout=default_timeout,
+                environments=environments,
+            )
+        except TypeError as e:
+            return {"success": False, "error": str(e)}
         return result.to_dict()
+
+    if environments:
+        return {"success": False,
+                "error": "--environments is only supported with --compute-type serverless"}
 
     # Cluster execution
     default_timeout = timeout if timeout else 120
@@ -639,6 +705,15 @@ def main():
                             help="Language (default: python)")
     exec_parser.add_argument("--timeout", type=int, help="Timeout in seconds")
     exec_parser.add_argument("--destroy-context", action="store_true", help="Destroy context after execution")
+    exec_parser.add_argument(
+        "--environments",
+        help=(
+            "Serverless only. JSON array of environments (or @path/to/file.json). "
+            'Example: \'[{"environment_key":"ml_env","spec":{"client":"4",'
+            '"dependencies":["mlflow","scikit-learn"]}}]\'. '
+            'IMPORTANT: "client":"4" installs dependencies; "1" does not.'
+        ),
+    )
     exec_parser.set_defaults(func=cmd_execute_code)
 
     # list-compute
