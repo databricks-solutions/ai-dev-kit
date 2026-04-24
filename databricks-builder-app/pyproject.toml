@@ -42,7 +42,7 @@ dependencies = [
   "plutoprint==0.19.0",
   # Conflict resolution pins for Databricks Apps pre-installed packages
   "tenacity==9.0.0",
-  "pillow==11.1.0",
+  "pillow==12.2.0",
   "websockets>=15.0.1",
   "pyarrow==18.1.0",
   "markupsafe==3.0.2",
