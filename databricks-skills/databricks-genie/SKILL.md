@@ -57,23 +57,24 @@ databricks genie trash-space SPACE_ID
 
 ### Step 3: Test and Iterate
 
-Use `scripts/conversation.py` (see Conversation API section below) to test questions and verify answers are accurate.
-
-If answers are inaccurate or incomplete, improve the space — see "Improving a Genie Space" below.
+Use the Conversation API (section below) to ask questions and verify answers. If answers are inaccurate or incomplete, improve the space — see "Improving a Genie Space" below.
 
 ### Export & Import
 
-```bash
-# Export space configuration (extract serialized_space from get-space output)
-databricks genie get-space SPACE_ID --include-serialized-space -o json | jq '.serialized_space' > genie_space.json
+**Convention:** `genie_space.json` always holds the **parsed** space object (not a JSON-string-encoded blob), so it's readable and editable. At each use site we stringify it with `jq -c '.' | jq -Rs '.'` — same pattern as Step 2 Create and "Improving a Genie Space" below. `jq -r '.serialized_space | fromjson'` on export strips the outer quoting so the file is already a parsed object.
 
-# Import: Create a new space with the exported serialized_space (then don't forge to tag)
+```bash
+# Export: extract serialized_space AND unwrap it to a parsed object on disk
+databricks genie get-space SPACE_ID --include-serialized-space -o json \
+  | jq '.serialized_space | fromjson' > genie_space.json
+
+# Import: same stringify pattern as Step 2 (Create)
 databricks genie create-space --json "{
   \"warehouse_id\": \"WAREHOUSE_ID\",
   \"title\": \"Sales Analytics\",
   \"description\": \"Migrated space\",
   \"parent_path\": \"/Workspace/Users/you@company.com/genie_spaces\",
-  \"serialized_space\": $(cat genie_space.json)
+  \"serialized_space\": $(cat genie_space.json | jq -c '.' | jq -Rs '.')
 }"
 ```
 
@@ -91,24 +92,6 @@ databricks genie update-space SPACE_ID --json "{\"serialized_space\": $(cat geni
 ## serialized_space Format
 
 The `serialized_space` field is a JSON string containing the full space configuration.
-
-### Structure
-
-```json
-{
-  "version": 2,
-  "config": {
-    "sample_questions": [...]
-  },
-  "data_sources": {
-    "tables": [{"identifier": "catalog.schema.table"}]
-  },
-  "instructions": {
-    "example_question_sqls": [...],
-    "text_instructions": [...]
-  }
-}
-```
 
 ### Field Format Requirements
 
@@ -132,9 +115,9 @@ The `serialized_space` field is a JSON string containing the full space configur
 
 Well-crafted instructions significantly improve answer accuracy.
 
-### Complete Example
+### Example
 
-This example shows a properly formatted `serialized_space` with sample questions, SQL examples, and text instructions. Note that every item has a unique 32-char hex `id` and all text fields are arrays:
+Top-level keys are `version`, `config`, `data_sources`, `instructions`. Every item in `sample_questions`, `example_question_sqls`, and `text_instructions` needs a unique 32-char hex `id` and all text fields are arrays:
 
 ```json
 {
@@ -185,20 +168,32 @@ Use `DATABRICKS_CONFIG_PROFILE=profile_name` to target different workspaces.
 
 ## Conversation API
 
-Use `scripts/conversation.py` to ask questions programmatically:
+Ask questions via three CLI primitives: `start-conversation`, `create-message` (follow-ups), and `get-message` (state + SQL + text). `--no-wait` on `start-conversation` / `create-message` returns immediately with `{conversation_id, message_id}`; poll `get-message` until `.status` is `COMPLETED`, `FAILED`, or `CANCELLED`. Intermediate states you'll see: `SUBMITTED`, `FILTERING_CONTEXT`, `ASKING_AI`, `EXECUTING_QUERY`.
 
 ```bash
-# Ask a question
-python scripts/conversation.py ask SPACE_ID "What were total sales last month?"
+# Start a new conversation (async — get IDs back immediately)
+databricks genie start-conversation --no-wait SPACE_ID "What were total sales last month?"
+# → {"conversation_id": "...", "message_id": "..."}
 
-# Follow-up in same conversation (Genie remembers context)
-python scripts/conversation.py ask SPACE_ID "Break down by region" --conversation-id CONV_ID
+# Poll state
+databricks genie get-message SPACE_ID CONV_ID MSG_ID | jq '{status, error}'
 
-# With timeout for complex queries
-python scripts/conversation.py ask SPACE_ID "Complex query" --timeout 120
+# When COMPLETED, pull the generated SQL and any text reply
+databricks genie get-message SPACE_ID CONV_ID MSG_ID \
+  | jq '.attachments[] | {sql: .query.query, description: .query.description, text: .text.content}'
+
+# Fetch the query result rows (columns + data_array)
+databricks genie get-message-attachment-query-result SPACE_ID CONV_ID MSG_ID ATTACHMENT_ID \
+  | jq '{columns: .statement_response.manifest.schema.columns | map({name, type: .type_name}),
+         rows: .statement_response.result.data_array}'
+
+# Follow-up in the same conversation (Genie remembers context)
+databricks genie create-message --no-wait SPACE_ID CONV_ID "Break that down by region"
 ```
 
-Start a new conversation for unrelated topics. Use `--conversation-id` only for follow-ups on the same topic.
+Start a new conversation for unrelated topics. Use `create-message` (same `CONV_ID`) only for follow-ups on the same topic.
+
+On `FAILED`, `get-message` populates `.error.error` with the underlying error string (e.g. `[INSUFFICIENT_PERMISSIONS] ...`) and `.error.type` (e.g. `SQL_EXECUTION_EXCEPTION`). Attachments may still include `suggested_questions` even when the primary query failed.
 
 ## Troubleshooting
 
@@ -209,6 +204,8 @@ Start a new conversation for unrelated topics. Use `--conversation-id` only for 
 | No warehouse available | Create a SQL warehouse or provide `warehouse_id` |
 | Empty `serialized_space` on export | Requires CAN EDIT permission on the space |
 | Tables not found after migration | Remap catalog name in `serialized_space` before import |
+| Slow answers / query timeouts | Size up the warehouse attached to the space; simplify or pre-aggregate tall source tables |
+| Wrong or empty answers | Add `example_question_sqls` and `text_instructions` — see "Improving a Genie Space" |
 
 ## Related Skills
 
