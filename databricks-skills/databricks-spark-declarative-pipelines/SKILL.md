@@ -256,7 +256,7 @@ For detailed syntax, see [sql/1-syntax-basics.md](references/sql/1-syntax-basics
 
 ### Modern Defaults
 - **Always use raw `.sql`/`.py` files for the transformations files** - NO notebooks in your pipeline. Pipeline code must be plain files.
-- **Databricks notebook source for explorations** - Use `# Databricks notebook source` format with `# COMMAND ----------` separators for ad-hoc queries. See [examples/exploration_notebook.py](scripts/exploration_notebook.py).
+- **Databricks notebook source for explorations** - Use `# Databricks notebook source` format with `# COMMAND ----------` separators for ad-hoc queries. See [scripts/exploration_notebook.py](scripts/exploration_notebook.py).
 - **Serverless compute** - Do not use classic clusters unless explicitly required (R, RDD APIs, JAR libraries)
 - **Unity Catalog** (required for serverless)
 - **CLUSTER BY** (Liquid Clustering), not PARTITION BY with ZORDER - see [sql/5-performance.md](references/sql/5-performance.md) or [python/5-performance.md](references/python/5-performance.md)

@@ -10,9 +10,11 @@ Convert HTML content to PDF documents and upload them to Unity Catalog Volumes.
 ## Workflow
 
 1. Write HTML files to `./raw_data/html/` (write multiple files in parallel for speed)
-2. Convert HTML → PDF using `scripts/pdf_generator.py` (parallel conversion)
+2. Convert HTML → PDF using `<SKILL_ROOT>/scripts/pdf_generator.py` (parallel conversion)
 3. Upload PDFs to Unity Catalog volume using `databricks fs cp`
 4. Generate `doc_questions.json` with test questions for each document
+
+> **Path convention:** `<SKILL_ROOT>` below = the directory containing this SKILL.md. Resolve to the absolute install path (e.g. `~/.claude/skills/databricks-unstructured-pdf-generation`). `./raw_data/...` paths are relative to your own project cwd.
 
 ## Dependencies
 
@@ -32,7 +34,7 @@ Write HTML documents to `./raw_data/html/filename.html`. Use subdirectories to o
 
 ```bash
 # Convert entire folder (parallel, 4 workers)
-python scripts/pdf_generator.py convert --input ./raw_data/html --output ./raw_data/pdf
+python <SKILL_ROOT>/scripts/pdf_generator.py convert --input ./raw_data/html --output ./raw_data/pdf
 ```
 
 Skips files where PDF exists and is newer than HTML. Use `--force` to reconvert all.
@@ -86,7 +88,7 @@ When generating documents for Knowledge Assistant testing or demos:
 ## CLI Reference
 
 ```
-python scripts/pdf_generator.py convert [OPTIONS]
+python <SKILL_ROOT>/scripts/pdf_generator.py convert [OPTIONS]
 
   --input, -i     Input HTML file or folder (required)
   --output, -o    Output folder for PDFs (required)

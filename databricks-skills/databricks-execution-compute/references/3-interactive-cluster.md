@@ -2,6 +2,8 @@
 
 **Use when:** You have an existing running cluster and need to preserve state across multiple tool calls, or need Scala/R support.
 
+> `<SKILL_ROOT>` in examples = the directory containing the parent SKILL.md — substitute the absolute install path (e.g. `~/.claude/skills/databricks-execution-compute`).
+
 ## When to Choose Interactive Cluster
 
 - Multiple sequential commands where variables must persist
@@ -21,7 +23,7 @@
 **Starting a cluster takes 3-8 minutes and costs money.** Always check first:
 
 ```bash
-python scripts/compute.py list-compute --resource clusters
+python <SKILL_ROOT>/scripts/compute.py list-compute --resource clusters
 ```
 
 If no cluster is running, ask the user:
@@ -35,7 +37,7 @@ If no cluster is running, ask the user:
 ### First Command: Creates Context
 
 ```bash
-python scripts/compute.py execute-code \
+python <SKILL_ROOT>/scripts/compute.py execute-code \
     --code "import pandas as pd; df = pd.DataFrame({'a': [1, 2, 3]}); print(df)" \
     --compute-type cluster \
     --cluster-id "1234-567890-abcdef"
@@ -55,7 +57,7 @@ Response includes `context_id` for reuse:
 
 ```bash
 # Variables from first command still available
-python scripts/compute.py execute-code \
+python <SKILL_ROOT>/scripts/compute.py execute-code \
     --code "print(df.shape)" \
     --compute-type cluster \
     --cluster-id "1234-567890-abcdef" \
@@ -66,11 +68,11 @@ python scripts/compute.py execute-code \
 
 ```bash
 # Get best running cluster
-python scripts/compute.py list-compute --auto-select
+python <SKILL_ROOT>/scripts/compute.py list-compute --auto-select
 # Returns: {"cluster_id": "1234-567890-abcdef"}
 
 # Then execute on it
-python scripts/compute.py execute-code \
+python <SKILL_ROOT>/scripts/compute.py execute-code \
     --code "spark.range(100).show()" \
     --compute-type cluster \
     --cluster-id "1234-567890-abcdef"
@@ -80,13 +82,13 @@ python scripts/compute.py execute-code \
 
 ```bash
 # Scala
-python scripts/compute.py execute-code --code 'println("Hello")' --compute-type cluster --language scala --cluster-id ...
+python <SKILL_ROOT>/scripts/compute.py execute-code --code 'println("Hello")' --compute-type cluster --language scala --cluster-id ...
                    
 # SQL
-python scripts/compute.py execute-code --code "SELECT * FROM table LIMIT 10" --compute-type cluster --language sql --cluster-id ...
+python <SKILL_ROOT>/scripts/compute.py execute-code --code "SELECT * FROM table LIMIT 10" --compute-type cluster --language sql --cluster-id ...
 
 # R
-python scripts/compute.py execute-code --code 'print("Hello")' --compute-type cluster --language r --cluster-id ...
+python <SKILL_ROOT>/scripts/compute.py execute-code --code 'print("Hello")' --compute-type cluster --language r --cluster-id ...
 ```
 
 ## Installing Libraries
@@ -94,7 +96,7 @@ python scripts/compute.py execute-code --code 'print("Hello")' --compute-type cl
 Install pip packages directly in the execution context:
 
 ```bash
-python scripts/compute.py execute-code \
+python <SKILL_ROOT>/scripts/compute.py execute-code \
     --code "%pip install faker" \
     --compute-type cluster \
     --cluster-id "..." \
@@ -103,7 +105,7 @@ python scripts/compute.py execute-code \
 
 If needed, restart Python to pick up new packages:
 ```bash
-python scripts/compute.py execute-code \
+python <SKILL_ROOT>/scripts/compute.py execute-code \
     --code "dbutils.library.restartPython()" \
     --compute-type cluster \
     --cluster-id "..." \
@@ -116,7 +118,7 @@ python scripts/compute.py execute-code \
 
 **Destroy when done:**
 ```bash
-python scripts/compute.py execute-code \
+python <SKILL_ROOT>/scripts/compute.py execute-code \
     --code "print('Done!')" \
     --compute-type cluster \
     --cluster-id "..." \
@@ -129,19 +131,19 @@ Two equivalent paths: the standalone script (convenience wrapper) or the raw `da
 
 ```bash
 # List all clusters
-python scripts/compute.py list-compute --resource clusters
+python <SKILL_ROOT>/scripts/compute.py list-compute --resource clusters
 
 # Get specific cluster status
-python scripts/compute.py list-compute --cluster-id "1234-567890-abcdef"
+python <SKILL_ROOT>/scripts/compute.py list-compute --cluster-id "1234-567890-abcdef"
 
 # Start a cluster (WITH USER APPROVAL ONLY - costs money, 3-8min startup)
-python scripts/compute.py manage-cluster --action start --cluster-id "1234-567890-abcdef"
+python <SKILL_ROOT>/scripts/compute.py manage-cluster --action start --cluster-id "1234-567890-abcdef"
 
 # Terminate a cluster (reversible)
-python scripts/compute.py manage-cluster --action terminate --cluster-id "1234-567890-abcdef"
+python <SKILL_ROOT>/scripts/compute.py manage-cluster --action terminate --cluster-id "1234-567890-abcdef"
 
 # Create a new cluster
-python scripts/compute.py manage-cluster --action create --name "my-cluster" --num-workers 2
+python <SKILL_ROOT>/scripts/compute.py manage-cluster --action create --name "my-cluster" --num-workers 2
 ```
 
 ### Filter running interactive clusters only (raw CLI)

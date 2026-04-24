@@ -2,6 +2,8 @@
 
 **Use when:** Running intensive Python code remotely (ML training, heavy processing) that doesn't need Spark, or when code shouldn't depend on the local machine staying connected.
 
+> `<SKILL_ROOT>` in examples = the directory containing the parent SKILL.md — substitute the absolute install path (e.g. `~/.claude/skills/databricks-execution-compute`).
+
 ## When to Choose Serverless Job
 
 - ML model training (runs independently of local machine)
@@ -89,15 +91,15 @@ Max output size is 5 MB. Larger results should be written to a Volume/object sto
 
 Minimal:
 
-`python scripts/compute.py execute-code --file train.py --compute-type serverless`
+`python <SKILL_ROOT>/scripts/compute.py execute-code --file train.py --compute-type serverless`
 
 With dependencies:
 
-`python scripts/compute.py execute-code --file /path/to/train.py --compute-type serverless --timeout 1500 --environments '[{"environment_key":"ml_env","spec":{"client":"4","dependencies":["scikit-learn==1.5.2","mlflow==2.22.0","xgboost==2.1.3"]}}]'`
+`python <SKILL_ROOT>/scripts/compute.py execute-code --file /path/to/train.py --compute-type serverless --timeout 1500 --environments '[{"environment_key":"ml_env","spec":{"client":"4","dependencies":["scikit-learn==1.5.2","mlflow==2.22.0","xgboost==2.1.3"]}}]'`
 
 Long dependency list from a file:
 
-`python scripts/compute.py execute-code --file /path/to/train.py --compute-type serverless --environments @env.json`
+`python <SKILL_ROOT>/scripts/compute.py execute-code --file /path/to/train.py --compute-type serverless --environments @env.json`
 
 ## Common Issues
 

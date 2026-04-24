@@ -15,6 +15,8 @@ description: >-
 
 Run code on Databricks. Three execution modes—choose based on workload.
 
+> **Path convention:** `<SKILL_ROOT>` in examples below = the directory containing this SKILL.md. Resolve it to the absolute path in your install (e.g. `~/.claude/skills/databricks-execution-compute`). Commands like `python <SKILL_ROOT>/scripts/compute.py ...` work from any cwd.
+
 ## Execution Mode Decision Matrix
 
 | Aspect | [Databricks Connect](references/1-databricks-connect.md) ⭐ | [Serverless Job](references/2-serverless-job.md) | [Interactive Cluster](references/3-interactive-cluster.md) |
@@ -93,7 +95,7 @@ Always use `dbutils.notebook.exit(<string>)` in the notebook — `print()` is no
 
 **Convenience wrapper.** `scripts/compute.py execute-code` does upload + submit + wait + cleanup in one command and returns a single tidy JSON:
 
-`python scripts/compute.py execute-code --file /local/path/to/train.py --compute-type serverless --timeout 1500 --environments '[{"environment_key":"ml_env","spec":{"client":"4","dependencies":["scikit-learn==1.5.2","mlflow==2.22.0"]}}]' | jq '{success, state, output, error, run_id, run_page_url, execution_duration_ms}'`
+`python <SKILL_ROOT>/scripts/compute.py execute-code --file /local/path/to/train.py --compute-type serverless --timeout 1500 --environments '[{"environment_key":"ml_env","spec":{"client":"4","dependencies":["scikit-learn==1.5.2","mlflow==2.22.0"]}}]' | jq '{success, state, output, error, run_id, run_page_url, execution_duration_ms}'`
 
 ### Interactive Cluster → [reference](references/3-interactive-cluster.md)
 
@@ -108,9 +110,9 @@ Interactive clusters are **slow to start (3-8 min)** and cost money while runnin
 
 | Command | Purpose |
 |---------|---------|
-| `python scripts/compute.py execute-code` | Run code on serverless or an existing cluster |
-| `python scripts/compute.py list-compute` | List clusters, node types, Spark versions |
-| `python scripts/compute.py manage-cluster` | Create/start/terminate/delete clusters (see [3-interactive-cluster.md](references/3-interactive-cluster.md)) |
+| `python <SKILL_ROOT>/scripts/compute.py execute-code` | Run code on serverless or an existing cluster |
+| `python <SKILL_ROOT>/scripts/compute.py list-compute` | List clusters, node types, Spark versions |
+| `python <SKILL_ROOT>/scripts/compute.py manage-cluster` | Create/start/terminate/delete clusters (see [3-interactive-cluster.md](references/3-interactive-cluster.md)) |
 | `databricks warehouses create/list` | Manage SQL warehouses |
 
 ### SQL Warehouses
