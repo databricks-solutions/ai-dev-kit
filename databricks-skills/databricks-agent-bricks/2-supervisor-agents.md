@@ -1,6 +1,6 @@
 # Supervisor Agents - Details
 
-For commands, see [SKILL.md](SKILL.md).
+For commands, see [SKILL.md](SKILL.md). `<SKILL_ROOT>` in examples = the directory containing SKILL.md.
 
 ## Unity Catalog Functions
 
@@ -61,20 +61,20 @@ The `description` field drives routing. Be specific:
 
 ## Adding Examples
 
-Examples help evaluation and routing optimization. MAS must be ONLINE.
+Examples help evaluation and routing optimization. **The MAS endpoint must be ONLINE.** Right after `create_mas` (or a big `update_mas`), the endpoint is `NOT_READY` and takes **up to ~10 minutes** to come ONLINE. Pass `--wait` to block until then:
 
 ```bash
-python scripts/mas_manager.py add_examples TILE_ID '[
+# Fails fast if endpoint isn't ONLINE yet
+python <SKILL_ROOT>/scripts/mas_manager.py add_examples TILE_ID '[
     {"question": "I need my invoice for March", "guideline": "Route to billing_agent"},
     {"question": "API returns 500 error", "guideline": "Route to tech_agent"}
 ]'
 
-python scripts/mas_manager.py list_examples TILE_ID
-```
+# --wait blocks until endpoint is ONLINE (default timeout 15 min) then adds.
+# The process must stay alive for the whole wait — there is no background queue.
+python <SKILL_ROOT>/scripts/mas_manager.py add_examples TILE_ID '[...]' --wait
 
-**In automated jobs** (waits for ONLINE):
-```bash
-python scripts/mas_manager.py add_examples_wait TILE_ID '[...]'
+python <SKILL_ROOT>/scripts/mas_manager.py list_examples TILE_ID
 ```
 
 ## Troubleshooting

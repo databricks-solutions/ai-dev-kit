@@ -9,9 +9,11 @@ Usage:
     python mas_manager.py update_mas TILE_ID '{"name": ..., "agents": [...], ...}'
     python mas_manager.py delete_mas TILE_ID
     python mas_manager.py list_mas
-    python mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]'
-    python mas_manager.py add_examples_queued TILE_ID '[{"question": "...", "guideline": "..."}]'
+    python mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]' [--wait]
     python mas_manager.py list_examples TILE_ID
+
+    --wait on add_examples blocks until the MAS endpoint reaches ONLINE state
+    (up to ~10 min after a create/update) before adding the examples.
 
 Requires: databricks-sdk, requests
     pip install databricks-sdk requests
@@ -21,12 +23,11 @@ import json
 import logging
 import re
 import sys
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import requests
 from databricks.sdk import WorkspaceClient
@@ -288,98 +289,6 @@ class MASManager:
 
 
 # ============================================================================
-# Example Queue (for adding examples when MAS becomes ONLINE)
-# ============================================================================
-
-
-class TileExampleQueue:
-    """Background queue for adding examples to tiles that aren't ready yet."""
-
-    def __init__(self, poll_interval: float = 30.0, max_attempts: int = 120):
-        self.queue: Dict[str, Tuple[MASManager, List[Dict[str, Any]], float, int]] = {}
-        self.lock = threading.Lock()
-        self.running = False
-        self.thread: Optional[threading.Thread] = None
-        self.poll_interval = poll_interval
-        self.max_attempts = max_attempts
-
-    def enqueue(self, tile_id: str, manager: MASManager, questions: List[Dict[str, Any]]) -> None:
-        """Add a tile and its questions to the processing queue."""
-        with self.lock:
-            self.queue[tile_id] = (manager, questions, time.time(), 0)
-            logger.info(f"Enqueued {len(questions)} examples for MAS {tile_id}")
-
-        if not self.running:
-            self.start()
-
-    def start(self) -> None:
-        """Start the background processing thread."""
-        if not self.running:
-            self.running = True
-            self.thread = threading.Thread(target=self._process_loop, daemon=True)
-            self.thread.start()
-
-    def stop(self) -> None:
-        """Stop the background processing thread."""
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=5)
-
-    def _process_loop(self) -> None:
-        """Background loop that checks tile status and adds examples when ready."""
-        while self.running:
-            try:
-                with self.lock:
-                    items_to_process = list(self.queue.items())
-
-                for tile_id, (manager, questions, enqueue_time, attempt_count) in items_to_process:
-                    try:
-                        if attempt_count >= self.max_attempts:
-                            logger.error(f"MAS {tile_id} exceeded max attempts. Removing from queue.")
-                            with self.lock:
-                                self.queue.pop(tile_id, None)
-                            continue
-
-                        with self.lock:
-                            if tile_id in self.queue:
-                                self.queue[tile_id] = (manager, questions, enqueue_time, attempt_count + 1)
-
-                        status = manager.get_endpoint_status(tile_id)
-
-                        if status == EndpointStatus.ONLINE.value:
-                            logger.info(f"MAS {tile_id} is ONLINE, adding {len(questions)} examples...")
-                            created = manager.add_examples_batch(tile_id, questions)
-                            logger.info(f"Added {len(created)} examples to MAS {tile_id}")
-                            with self.lock:
-                                self.queue.pop(tile_id, None)
-
-                    except Exception as e:
-                        logger.error(f"Error processing MAS {tile_id}: {e}")
-                        with self.lock:
-                            self.queue.pop(tile_id, None)
-
-            except Exception as e:
-                logger.error(f"Error in queue processor: {e}")
-
-            time.sleep(self.poll_interval)
-
-
-# Global singleton queue instance
-_tile_example_queue: Optional[TileExampleQueue] = None
-_queue_lock = threading.Lock()
-
-
-def get_tile_example_queue() -> TileExampleQueue:
-    """Get or create the global tile example queue instance."""
-    global _tile_example_queue
-    if _tile_example_queue is None:
-        with _queue_lock:
-            if _tile_example_queue is None:
-                _tile_example_queue = TileExampleQueue()
-    return _tile_example_queue
-
-
-# ============================================================================
 # CLI Functions
 # ============================================================================
 
@@ -478,7 +387,8 @@ def get_mas(tile_id: str) -> Dict[str, Any]:
         "description": tile_data.get("description", ""),
         "endpoint_status": status_data.get("endpoint_status", "UNKNOWN"),
         "agents": mas_data.get("agents", []),
-        "instructions": mas_data.get("instructions", ""),
+        # instructions live on the tile, not on the mas_data root
+        "instructions": tile_data.get("instructions", ""),
     }
 
 
@@ -528,7 +438,8 @@ def update_mas(
 
     final_name = name or tile_data.get("name", "")
     final_description = description or tile_data.get("description", "")
-    final_instructions = instructions or mas_data.get("instructions", "")
+    # instructions live on the tile in GET responses, not on the mas_data root
+    final_instructions = instructions or tile_data.get("instructions", "")
 
     if agents:
         agent_list = _build_agent_list(agents)
@@ -587,56 +498,68 @@ def list_mas() -> List[Dict[str, Any]]:
     return results
 
 
-def add_examples(tile_id: str, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Add example questions to a Supervisor Agent."""
+def add_examples(
+    tile_id: str,
+    examples: List[Dict[str, Any]],
+    wait_for_online: bool = False,
+    wait_timeout_seconds: int = 900,
+    poll_interval_seconds: float = 30.0,
+) -> Dict[str, Any]:
+    """Add example questions to a Supervisor Agent.
+
+    Examples can only be added once the MAS endpoint is ONLINE. Right after
+    create_mas or a big update_mas the endpoint is NOT_READY and takes up to
+    ~10 min to come ONLINE.
+
+    If wait_for_online=True, this call BLOCKS synchronously until the endpoint
+    reaches ONLINE (polling every `poll_interval_seconds`, up to
+    `wait_timeout_seconds`). Default timeout 15 min covers the ~10 min
+    provisioning with some headroom. The caller's process MUST stay alive for
+    the whole duration — there is no background queue.
+
+    If wait_for_online=False (default) and the endpoint is not ONLINE, returns
+    an error immediately without adding anything. Retry later once ONLINE.
+    """
     manager = _get_manager()
 
     status = get_mas(tile_id)
     if "error" in status:
         return status
 
-    if status.get("endpoint_status") != "ONLINE":
-        return {
-            "error": f"MAS is not ONLINE (status: {status.get('endpoint_status')}). "
-            "Use add_examples_queued to queue examples for when it's ready.",
-            "tile_id": tile_id,
-        }
+    current = status.get("endpoint_status")
+
+    if current != "ONLINE":
+        if not wait_for_online:
+            return {
+                "error": f"MAS is not ONLINE (status: {current}). "
+                "Retry once it's ONLINE, or pass wait_for_online=True "
+                "(--wait on the CLI) to block until it comes up.",
+                "tile_id": tile_id,
+                "endpoint_status": current,
+            }
+
+        # Block-and-poll until ONLINE or timeout.
+        deadline = time.monotonic() + wait_timeout_seconds
+        while time.monotonic() < deadline:
+            current = manager.get_endpoint_status(tile_id)
+            if current == "ONLINE":
+                break
+            time.sleep(poll_interval_seconds)
+        else:
+            return {
+                "error": f"Timed out after {wait_timeout_seconds}s waiting for MAS "
+                f"to reach ONLINE (last status: {current}).",
+                "tile_id": tile_id,
+                "endpoint_status": current,
+            }
 
     created = manager.add_examples_batch(tile_id, examples)
     return {
         "tile_id": tile_id,
         "added_count": len(created),
         "total_requested": len(examples),
+        "endpoint_status": current,
     }
-
-
-def add_examples_queued(tile_id: str, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Queue example questions to be added when MAS becomes ONLINE."""
-    manager = _get_manager()
-
-    status = get_mas(tile_id)
-    if "error" in status:
-        return status
-
-    if status.get("endpoint_status") == "ONLINE":
-        created = manager.add_examples_batch(tile_id, examples)
-        return {
-            "tile_id": tile_id,
-            "status": "added",
-            "added_count": len(created),
-            "total_requested": len(examples),
-        }
-    else:
-        queue = get_tile_example_queue()
-        queue.start()
-        queue.enqueue(tile_id, manager, examples)
-        return {
-            "tile_id": tile_id,
-            "status": "queued",
-            "queued_count": len(examples),
-            "endpoint_status": status.get("endpoint_status"),
-            "message": "Examples will be added automatically when endpoint becomes ONLINE",
-        }
 
 
 def list_examples(tile_id: str) -> Dict[str, Any]:
@@ -719,20 +642,12 @@ def main():
 
     elif command == "add_examples":
         if len(sys.argv) < 4:
-            print("Usage: python mas_manager.py add_examples TILE_ID '[{\"question\": \"...\", \"guideline\": \"...\"}]'")
+            print("Usage: python mas_manager.py add_examples TILE_ID '[{\"question\": \"...\", \"guideline\": \"...\"}]' [--wait]")
             sys.exit(1)
         tile_id = sys.argv[2]
         examples = json.loads(sys.argv[3])
-        result = add_examples(tile_id, examples)
-        _print_json(result)
-
-    elif command == "add_examples_queued":
-        if len(sys.argv) < 4:
-            print("Usage: python mas_manager.py add_examples_queued TILE_ID '[{\"question\": \"...\", \"guideline\": \"...\"}]'")
-            sys.exit(1)
-        tile_id = sys.argv[2]
-        examples = json.loads(sys.argv[3])
-        result = add_examples_queued(tile_id, examples)
+        wait = "--wait" in sys.argv[4:]
+        result = add_examples(tile_id, examples, wait_for_online=wait)
         _print_json(result)
 
     elif command == "list_examples":

@@ -25,10 +25,17 @@ databricks experimental aitools tools query --warehouse WH "LIST '/Volumes/catal
 # Create KA
 databricks knowledge-assistants create-knowledge-assistant "Name" "Description"
 
-# Add knowledge source (4 positional args: PARENT DISPLAY_NAME DESCRIPTION SOURCE_TYPE)
+# Add knowledge source. With --json, pass ONLY the PARENT as a positional arg
+# and put display_name / description / source_type / the source body (files|index|file_table)
+# inside the JSON. Mixing positional DISPLAY_NAME/DESCRIPTION/SOURCE_TYPE with --json errors.
 databricks knowledge-assistants create-knowledge-source \
-  "knowledge-assistants/{ka_id}" "Docs" "Documentation files" "files" \
-  --json '{"files": {"path": "/Volumes/catalog/schema/volume/"}}'
+  "knowledge-assistants/{ka_id}" \
+  --json '{
+    "display_name": "Docs",
+    "description": "Documentation files",
+    "source_type": "files",
+    "files": {"path": "/Volumes/catalog/schema/volume/"}
+  }'
 
 # Sync and check status
 databricks knowledge-assistants sync-knowledge-sources "knowledge-assistants/{ka_id}"
@@ -47,11 +54,11 @@ databricks knowledge-assistants delete-knowledge-assistant "knowledge-assistants
 
 ## Supervisor Agent
 
-**No CLI** - use `scripts/mas_manager.py` (run from skill folder):
+**No CLI** — use `mas_manager.py` from this skill's `scripts/` folder. All `<SKILL_ROOT>/...` paths below are relative to the directory containing this SKILL.md (resolve to the absolute path in your install location).
 
 ```bash
 # Create MAS
-python scripts/mas_manager.py create_mas "My Supervisor" '{
+python <SKILL_ROOT>/scripts/mas_manager.py create_mas "My Supervisor" '{
     "description": "Routes queries to specialized agents",
     "instructions": "Route data questions to analyst, document questions to docs_agent.",
     "agents": [
@@ -60,14 +67,18 @@ python scripts/mas_manager.py create_mas "My Supervisor" '{
     ]
 }'
 
-# Check status and manage
-python scripts/mas_manager.py get_mas TILE_ID
-python scripts/mas_manager.py list_mas
-python scripts/mas_manager.py update_mas TILE_ID '{"agents": [...]}'
-python scripts/mas_manager.py delete_mas TILE_ID
+# Check status and manage. list_mas enumerates every MAS you can access
+# and returns {tile_id, name, endpoint_status, agents_count} — use it to
+# find a tile_id / see which MAS are ONLINE before operations.
+python <SKILL_ROOT>/scripts/mas_manager.py list_mas
+python <SKILL_ROOT>/scripts/mas_manager.py get_mas TILE_ID
+python <SKILL_ROOT>/scripts/mas_manager.py update_mas TILE_ID '{"agents": [...]}'
+python <SKILL_ROOT>/scripts/mas_manager.py delete_mas TILE_ID
 
-# Add examples (requires ONLINE)
-python scripts/mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]'
+# Add examples — requires endpoint_status=ONLINE. After create_mas the MAS is
+# NOT_READY and takes up to ~10 min to reach ONLINE. Without --wait, this
+# fails fast if not ONLINE yet. With --wait, it blocks until ONLINE then adds.
+python <SKILL_ROOT>/scripts/mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]' [--wait]
 
 # Find IDs
 databricks knowledge-assistants list-knowledge-assistants --output json | jq '.[].id'
@@ -84,7 +95,7 @@ databricks genie list-spaces --output json | jq '.[].space_id'
 | `uc_function_name` | UC function (`catalog.schema.func`) |
 | `connection_name` | MCP server (UC HTTP Connection) |
 
-**Status:** `NOT_READY` (2-5 min) → `ONLINE` → `OFFLINE`
+**Status:** `NOT_READY` (up to ~10 min after create/big update) → `ONLINE` → `OFFLINE`
 
 ---
 
