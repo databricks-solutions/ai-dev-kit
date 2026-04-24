@@ -105,7 +105,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-app-python** - Python web apps (Dash, Streamlit, Flask) with foundation model integration
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
 - **databricks-config** - Profile authentication setup
-- **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
+- **databricks-lakebase-autoscale** - Lakebase Autoscaling managed PostgreSQL with branching, scale-to-zero, reverse ETL
 
 ### 📚 Reference
 - **databricks-docs** - Documentation index via llms.txt

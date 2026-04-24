@@ -184,23 +184,10 @@ Enable CDF on the source for TRIGGERED/CONTINUOUS: `ALTER TABLE ... SET TBLPROPE
 
 ## Not Yet Supported
 
-HA readable secondaries (use read replicas), Databricks Apps UI integration (manual connect works), Feature Store, stateful AI agents (LangChain memory), Postgres→Delta sync, custom billing tags / serverless budget policies, direct Provisioned→Autoscaling migration (use `pg_dump`/`pg_restore` or reverse ETL).
-
-## Provisioned vs Autoscaling
-
-| Aspect | Provisioned | Autoscaling |
-|--------|-------------|-------------|
-| CLI group | `databricks database` | `databricks postgres` |
-| Top-level | Instance | Project |
-| Capacity | CU_1/2/4/8 (16 GB/CU) | 0.5-112 CU (2 GB/CU) |
-| Branching | No | Yes |
-| Scale-to-zero | No | Yes |
-| Operations | Synchronous | LRO |
-| Read replicas | Readable secondaries | Dedicated read-only endpoints |
+HA readable secondaries (use read replicas), Databricks Apps UI integration (manual connect works), Feature Store, stateful AI agents (LangChain memory), Postgres→Delta sync, custom billing tags / serverless budget policies.
 
 ## Related Skills
 
-- [databricks-lakebase-provisioned](../databricks-lakebase-provisioned/SKILL.md) — fixed-capacity predecessor
 - [databricks-app-apx](../databricks-app-apx/SKILL.md), [databricks-app-python](../databricks-app-python/SKILL.md) — apps using Lakebase
 - [databricks-bundles](../databricks-bundles/SKILL.md) — bundle deploys with Lakebase resources
 - [databricks-jobs](../databricks-jobs/SKILL.md) — scheduling reverse ETL pipelines
