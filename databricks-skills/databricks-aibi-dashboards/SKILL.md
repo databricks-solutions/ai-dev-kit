@@ -51,21 +51,20 @@ databricks warehouses list
 
 ### Step 2: Discover Table Schemas and existing data pattern
 
-```bash
-# Get table schemas for designing queries
-databricks experimental aitools tools query --warehouse WAREHOUSE_ID "SHOW TABLES IN catalog.schema" 2>&1
-# Use CATALOG.SCHEMA.TABLE format for discover-schema (this is for exploration only)
-databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2
+A good dashboard comes from knowing the data first. Spend time here — the exploration drives design decisions in Step 4 (which widgets, which filters, which groupings).
 
-# Example:
-databricks experimental aitools tools discover-schema samples.nyctaxi.trips main.default.customers
+Use `discover-schema` as the default — one call returns columns, types, sample rows, null counts, and row count. If you only know the schema, list tables first with `query "SHOW TABLES IN ..."`.
 
-# Explore data patterns if needed to confirm the data tells the intended story (to understand what/how to visualize):
-databricks experimental aitools tools query --warehouse WAREHOUSE_ID "<YOUR DATA EXPLORATION QUERY>"
-```
+`databricks experimental aitools tools discover-schema catalog.schema.orders catalog.schema.customers`
 
-> **Note**: The `discover-schema` command needs the full `catalog.schema.table` path (it's a separate exploration tool).
->
+Sample rows alone don't tell you what to build. you can write aggregate SQL through `databricks experimental aitools tools query --warehouse <WH> "..."` to probe typically:
+
+- **Cardinality** of candidate grouping columns → decides chart color-group vs. table (≤8 distinct values for charts, see Cardinality & Readability below).
+- **Top categorical values** → populates filter options and chart legends meaningfully.
+- **Numeric distribution** (min/max/avg/percentiles) → decides KPI with delta vs. trend chart (flat metrics shouldn't be line charts, see Data Variance Considerations below).
+- **Trend viability** at daily/weekly/monthly grain → picks the right trend granularity.
+- **Story confirmation** — run the aggregations you plan to put in the dashboard and check they're not flat, empty, or uninteresting. Fix the query or adjust the story before moving on.
+
 > **Dashboard queries are different** — inside the dashboard JSON, the `FROM` clause must reference ONLY the table name, with no catalog or schema prefix:
 > - ✅ Correct: `FROM trips`
 > - ❌ Wrong: `FROM nyctaxi.trips`

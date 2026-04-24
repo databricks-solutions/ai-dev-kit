@@ -20,14 +20,11 @@ Before creating a Genie Space, explore the available tables to:
 - **Understand the story** — what business questions can this data answer? What insights can users discover?
 - **Design meaningful sample questions** — questions should reflect real use cases and lead to actionable insights in the data
 
-```bash
-# Discover table schemas, columns, and sample values
-databricks experimental aitools tools discover-schema catalog.schema.gold_sales catalog.schema.gold_customers
+Use `discover-schema` as the default — one call returns columns, types, sample rows, null counts, and row count. If you only know the schema, list tables first with `query "SHOW TABLES IN ..."`.
 
-# Run SQL queries to explore the data and understand relationships
-databricks sql exec "SELECT * FROM catalog.schema.gold_sales LIMIT 10"
-databricks sql exec "DESCRIBE TABLE catalog.schema.gold_sales"
-```
+`databricks experimental aitools tools discover-schema catalog.schema.gold_sales catalog.schema.gold_customers`
+
+For Genie, knowing column distribution shapes the sample questions and text instructions. Probe cardinality, ranges, and top categorical values with aggregate SQL through `databricks experimental aitools tools query --warehouse <WH> "..."` so your sample questions reflect what's actually in the data. Both commands auto-pick the default warehouse; set `DATABRICKS_WAREHOUSE_ID` or pass `--warehouse <ID>` to override.
 
 ### Step 2: Create the Space
 
@@ -70,7 +67,7 @@ If answers are inaccurate or incomplete, improve the space — see "Improving a 
 # Export space configuration (extract serialized_space from get-space output)
 databricks genie get-space SPACE_ID --include-serialized-space -o json | jq '.serialized_space' > genie_space.json
 
-# Import: Create a new space with the exported serialized_space
+# Import: Create a new space with the exported serialized_space (then don't forge to tag)
 databricks genie create-space --json "{
   \"warehouse_id\": \"WAREHOUSE_ID\",
   \"title\": \"Sales Analytics\",

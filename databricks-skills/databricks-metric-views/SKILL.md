@@ -27,16 +27,11 @@ Use this skill when:
 
 ### Inspect Source Table Schema
 
-Before creating a metric view, call `get_table_stats_and_schema` to understand available columns for dimensions and measures:
+Before authoring a metric view, inspect the source tables. Use `discover-schema` as the default — one call returns columns, types, sample rows, null counts, and row count. If you only know the schema, list tables first with `query "SHOW TABLES IN ..."`.
 
-```
-get_table_stats_and_schema(
-    catalog="catalog",
-    schema="schema",
-    table_names=["orders"],
-    table_stat_level="SIMPLE"  # Use "DETAILED" for cardinality, min/max, histograms
-)
-```
+`databricks experimental aitools tools discover-schema catalog.schema.orders catalog.schema.customers`
+
+For dimensions and measures, probe distribution beyond sampling — cardinality of candidate dimensions, min/max/percentiles for measures, top categorical values. Write aggregate SQL through `databricks experimental aitools tools query --warehouse <WH> "..."`. Both commands auto-pick the default warehouse; set `DATABRICKS_WAREHOUSE_ID` or pass `--warehouse <ID>` to override.
 
 ### Create a Metric View
 
