@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dbx-dark">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill Evaluation: databricks-aibi-dashboards</title>
+<style>
+/* ── Theme: DBX Dark (default) ── */
+[data-theme="dbx-dark"], :root {
+  --bg-l0: #11171c;
+  --bg-l1: #1f272d;
+  --bg-l2: #283035;
+  --bg-l3: #34414b;
+  --bg-l4: #37444f;
+  --text-primary: #e8ecf0;
+  --text-secondary: #92a4b3;
+  --text-muted: #5f7281;
+  --text-link: #8acaff;
+  --accent: #4299e0;
+  --accent-hover: #8acaff;
+  --success: #3ba65e;
+  --warning: #de7921;
+  --error: #e65b77;
+  --info: #4299e0;
+  --border: #283035;
+}
+
+/* ── Theme: Neon ── */
+[data-theme="neon"] {
+  --bg-l0: oklch(0.08 0.03 260);
+  --bg-l1: oklch(0.12 0.04 260);
+  --bg-l2: oklch(0.16 0.05 260);
+  --bg-l3: oklch(0.20 0.06 260);
+  --bg-l4: oklch(0.16 0.05 260);
+  --text-primary: oklch(0.96 0.02 260);
+  --text-secondary: oklch(0.62 0.06 260);
+  --text-muted: oklch(0.45 0.08 260);
+  --text-link: oklch(0.68 0.18 230);
+  --accent: oklch(0.88 0.18 165);
+  --accent-hover: oklch(0.75 0.16 165);
+  --success: oklch(0.88 0.18 165);
+  --warning: oklch(0.62 0.28 330);
+  --error: oklch(0.62 0.24 10);
+  --info: oklch(0.68 0.18 230);
+  --border: oklch(0.16 0.05 260);
+}
+
+/* ── Theme: Light ── */
+[data-theme="light"] {
+  --bg-l0: #FFFFFF;
+  --bg-l1: #F7F9FC;
+  --bg-l2: #F0F2F5;
+  --bg-l3: #E8EBF0;
+  --bg-l4: #E5E7EB;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B7280;
+  --text-muted: #9CA3AF;
+  --text-link: #2563EB;
+  --accent: #FF6A00;
+  --accent-hover: #FF8A33;
+  --success: #16A34A;
+  --warning: #CA8A04;
+  --error: #DC2626;
+  --info: #2563EB;
+  --border: #E5E7EB;
+}
+
+/* ── Reset & base ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-l0); color: var(--text-primary);
+  max-width: 1200px; margin: 0 auto; padding: 0 20px 40px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-l3); border-radius: 3px; }
+
+/* ── Typography ── */
+.mono { font-family: ui-monospace, 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+
+/* ── Top bar ── */
+.top-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 0; margin-bottom: 20px;
+  background: var(--bg-l0);
+  border-bottom: 1px solid var(--border);
+}
+.top-bar-title { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
+.top-bar-meta { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+/* ── Buttons ── */
+.btn-primary {
+  padding: 6px 14px; font-size: 12px; font-weight: 500;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 4px; cursor: pointer; font-family: inherit;
+  transition: background 0.15s ease;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; font-size: 11px; font-weight: 500;
+  color: var(--text-secondary); background: transparent;
+  border: 1px solid var(--border); border-radius: 4px;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.15s ease;
+}
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Section titles ── */
+.section { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.section-title {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* ── Cards ── */
+.card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px; background: var(--bg-l1);
+  border: 1px solid var(--border); border-radius: 6px;
+  animation: card-reveal 0.3s ease-out both;
+}
+.card-header { display: flex; align-items: center; gap: 6px; }
+.card-header .icon { color: var(--text-muted); width: 14px; height: 14px; flex-shrink: 0; }
+.card-title { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.card-body { display: flex; flex-direction: column; gap: 4px; }
+.card-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.card-label { color: var(--text-muted); min-width: 50px; }
+.card-value { color: var(--text-secondary); font-family: ui-monospace, 'SF Mono', monospace; }
+
+/* ── Metric grid ── */
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.hero-metric {
+  font-size: 28px; font-weight: 700;
+  font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+  line-height: 1.2;
+}
+.hero-metric.color-pass { color: var(--success); }
+.hero-metric.color-warn { color: var(--warning); }
+.hero-metric.color-fail { color: var(--error); }
+
+/* ── Badges ── */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 600;
+  white-space: nowrap;
+}
+.badge-pass { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.badge-fail { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
+.badge-skip { color: var(--text-muted); background: var(--bg-l3); }
+.badge-warn { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.badge-positive { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.badge-regression { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
+.badge-needs-skill { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.badge-neutral { color: var(--text-muted); background: var(--bg-l3); }
+.badge-code {
+  color: var(--text-muted); background: var(--bg-l3);
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 9px; padding: 1px 6px; border-radius: 3px;
+}
+.badge-llm {
+  color: var(--info); background: color-mix(in srgb, var(--info) 12%, transparent);
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 9px; padding: 1px 6px; border-radius: 3px;
+}
+.badge-score {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px; font-weight: 700; padding: 2px 10px;
+}
+
+/* ── Tables ── */
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th {
+  background: var(--bg-l2); font-weight: 600; text-align: left;
+  padding: 6px 10px; border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+td {
+  padding: 6px 10px; border: 1px solid var(--border);
+  color: var(--text-secondary); vertical-align: top;
+}
+
+/* ── Pre / code ── */
+pre {
+  background: var(--bg-l2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 10px; overflow-x: auto;
+  font-size: 12px; white-space: pre-wrap; word-wrap: break-word;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  color: var(--text-secondary); max-height: 400px; overflow-y: auto;
+  line-height: 1.5;
+}
+
+/* ── Output comparison (2-pane) ── */
+.output-comparison {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--border); border: 1px solid var(--border);
+  border-radius: 6px; overflow: hidden;
+}
+.output-pane { display: flex; flex-direction: column; background: var(--bg-l0); }
+.output-pane-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  background: var(--bg-l1);
+}
+.output-pane-header span { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+.output-pane-content { padding: 12px; overflow: auto; max-height: 400px; }
+.output-pane-content pre {
+  background: transparent; border: none; padding: 0;
+  font-size: 12px; line-height: 1.6; max-height: none;
+}
+
+/* ── Dimension bars ── */
+.dim-bar-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; font-size: 11px;
+}
+.dim-bar-label { min-width: 140px; color: var(--text-secondary); font-size: 11px; }
+.dim-bar-track {
+  flex: 1; height: 18px; background: var(--bg-l3);
+  border-radius: 4px; overflow: hidden; position: relative;
+}
+.dim-bar-fill {
+  height: 100%; border-radius: 4px; opacity: 0.85;
+  transition: width 0.4s ease;
+}
+.dim-bar-value {
+  min-width: 36px; text-align: right;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 11px; font-weight: 600;
+}
+
+/* ── Accent-bordered card (suggestions/recommendations) ── */
+.card-accent {
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 3%, var(--bg-l1));
+}
+
+/* ── Details/summary for expandable sections ── */
+details { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+details + details { margin-top: 8px; }
+summary {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; cursor: pointer;
+  background: var(--bg-l1); font-size: 12px; font-weight: 500;
+  color: var(--text-primary); list-style: none;
+  transition: background 0.15s ease;
+}
+summary:hover { background: var(--bg-l2); }
+summary::-webkit-details-marker { display: none; }
+summary::before {
+  content: '\25B6'; font-size: 9px; color: var(--text-muted);
+  transition: transform 0.2s ease; display: inline-block;
+}
+details[open] > summary::before { transform: rotate(90deg); }
+details > .details-body { padding: 14px; background: var(--bg-l0); }
+
+/* ── Form elements ── */
+textarea, select {
+  font-size: 12px; color: var(--text-primary); background: var(--bg-l1);
+  border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+  font-family: inherit; outline: none; width: 100%;
+  transition: border-color 0.15s ease;
+}
+textarea { resize: vertical; min-height: 60px; }
+textarea:focus, select:focus { border-color: var(--accent); }
+select { max-width: 220px; cursor: pointer; }
+
+/* ── Staggered card animation ── */
+@keyframes card-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.card:nth-child(1) { animation-delay: 0s; }
+.card:nth-child(2) { animation-delay: 0.05s; }
+.card:nth-child(3) { animation-delay: 0.1s; }
+.card:nth-child(4) { animation-delay: 0.15s; }
+.card:nth-child(5) { animation-delay: 0.2s; }
+.card:nth-child(6) { animation-delay: 0.25s; }
+.card:nth-child(7) { animation-delay: 0.3s; }
+.card:nth-child(8) { animation-delay: 0.35s; }
+
+/* ── Level score bar chart ── */
+.score-bars { display: flex; flex-direction: column; gap: 6px; }
+.score-bar-row { display: flex; align-items: center; gap: 8px; }
+.score-bar-label {
+  min-width: 100px; font-size: 11px; font-weight: 600;
+  color: var(--text-secondary); text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.score-bar-track {
+  flex: 1; height: 22px; background: var(--bg-l3);
+  border-radius: 4px; overflow: hidden;
+}
+.score-bar-fill {
+  height: 100%; border-radius: 4px; opacity: 0.85;
+  transition: width 0.5s ease;
+}
+.score-bar-value {
+  min-width: 40px; text-align: right;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px; font-weight: 700;
+}
+
+/* ── Mini metric cards (for L5 task scores) ── */
+.mini-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.mini-metric {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; background: var(--bg-l2);
+  border-radius: 4px; border: 1px solid var(--border);
+}
+.mini-metric-value {
+  font-size: 18px; font-weight: 700;
+  font-family: ui-monospace, 'SF Mono', monospace;
+}
+.mini-metric-label {
+  font-size: 9px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .metric-grid { grid-template-columns: 1fr 1fr; }
+  .output-comparison { grid-template-columns: 1fr; }
+  .mini-metrics { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="icon-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 16v-4"/><path d="M12 8h.01"/>
+    <circle cx="12" cy="12" r="10"/>
+  </symbol>
+  <symbol id="icon-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>
+  </symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+  </symbol>
+  <symbol id="icon-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
+  </symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+  </symbol>
+  <symbol id="icon-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+  </symbol>
+  <symbol id="icon-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+    <path d="M9 18h6"/><path d="M10 22h4"/>
+  </symbol>
+  <symbol id="icon-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.7 1.7-1.5 0-.4-.2-.7-.4-1-.2-.3-.3-.7-.3-1 0-.8.7-1.5 1.5-1.5H16c3.3 0 6-2.7 6-6 0-5.5-4.5-10-10-10z"/>
+  </symbol>
+  <symbol id="icon-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+    <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+    <path d="M12 5v13"/>
+  </symbol>
+  <symbol id="icon-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+  </symbol>
+  <symbol id="icon-flask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 3h6"/><path d="M10 9V3"/><path d="M14 9V3"/>
+    <path d="M7.5 21h9"/><path d="M5.2 16.7 10 9h4l4.8 7.7a1 1 0 0 1-.8 1.3H6a1 1 0 0 1-.8-1.3z"/>
+  </symbol>
+</svg>
+
+<script>
+(function() {
+  var THEMES = ['dbx-dark', 'neon', 'light'];
+  var LABELS = {'dbx-dark': 'DBX Dark', 'neon': 'Neon', 'light': 'Light'};
+  var current = 'dbx-dark';
+  try { current = localStorage.getItem('dse-theme') || 'dbx-dark'; } catch(e) {}
+
+  function apply(mode) {
+    document.documentElement.setAttribute('data-theme', mode);
+    try { localStorage.setItem('dse-theme', mode); } catch(e) {}
+    current = mode;
+    var btn = document.getElementById('theme-toggle');
+    if (btn) btn.textContent = LABELS[mode];
+  }
+  apply(current);
+
+  window.toggleTheme = function() {
+    var idx = THEMES.indexOf(current);
+    apply(THEMES[(idx + 1) % THEMES.length]);
+  };
+})();
+</script>
+
+<div class="top-bar">
+    <span class="top-bar-title">Skill Evaluation: databricks-aibi-dashboards</span>
+    <span class="top-bar-meta">2026-04-24 15:59 | MLflow: 0ccf59dc0f704872a8d46973583bc454</span>
+    <button id="theme-toggle" class="btn-secondary" onclick="toggleTheme()">DBX Dark</button>
+</div>
+
+<div class="section">
+    <div class="section-title">Summary</div>
+    <div class="metric-grid">
+        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-gauge"/></svg><span class="card-title">Composite Score</span></div><div class="hero-metric color-warn">78%</div></div>
+        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-layers"/></svg><span class="card-title">Levels Run</span></div><div class="hero-metric">3</div></div>
+        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-clock"/></svg><span class="card-title">Duration</span></div><div class="hero-metric">2557s</div></div>
+        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-hash"/></svg><span class="card-title">Total Checks</span></div><div class="hero-metric">65</div></div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section-title">Level Scores</div>
+    <div class="card"><div class="score-bars">
+        <div class="score-bar-row">
+            <span class="score-bar-label">L1 unit</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:84%;background:var(--success)"></div></div>
+            <span class="score-bar-value" style="color:var(--success)">84%</span>
+        </div>
+        <div class="score-bar-row" style="opacity:0.4">
+            <span class="score-bar-label">L2 integration</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:0%"></div></div>
+            <span class="score-bar-value" style="color:var(--text-muted)">--</span>
+        </div>
+        <div class="score-bar-row">
+            <span class="score-bar-label">L3 static</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:82%;background:var(--success)"></div></div>
+            <span class="score-bar-value" style="color:var(--success)">82%</span>
+        </div>
+        <div class="score-bar-row" style="opacity:0.4">
+            <span class="score-bar-label">L4 thinking</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:0%"></div></div>
+            <span class="score-bar-value" style="color:var(--text-muted)">--</span>
+        </div>
+        <div class="score-bar-row">
+            <span class="score-bar-label">L5 output</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:67%;background:var(--warning)"></div></div>
+            <span class="score-bar-value" style="color:var(--warning)">67%</span>
+        </div></div></div>
+</div>
+
+
+        <div class="section">
+            <div class="section-title">Level 1: UNIT</div>
+            <div class="card">
+                <div class="card-header">
+                    <svg class="icon"><use href="#icon-check"/></svg>
+                    <span class="card-title">Unit</span>
+                    <span class="badge badge-score badge-pass">84%</span>
+                    <span class="badge badge-skip" title="Carried forward from a prior run (2026-04-23T12:03:55.084793+00:00); not re-run this session">FROM PREVIOUS RUN</span>
+                </div>
+                <div class="card-body">
+                <table style="margin-top:8px">
+                    <tr><th>Status</th><th>Check</th><th>Details</th><th>Source</th></tr>
+                    
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/python_syntax/SKILL.md:block_2</td>
+                    <td style="font-size:11px">Valid Python syntax</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/python_syntax/3-examples.md:block_1</td>
+                    <td style="font-size:11px">Valid Python syntax</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/python_syntax/3-examples.md:block_2</td>
+                    <td style="font-size:11px">Valid Python syntax</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/SKILL.md/1-widget-specifications.md</td>
+                    <td style="font-size:11px">Link to &#x27;1-widget-specifications.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">unit/link/SKILL.md/2-filters.md</td>
+                    <td style="font-size:11px">Link to &#x27;2-filters.md&#x27; not found</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/SKILL.md/3-examples.md</td>
+                    <td style="font-size:11px">Link to &#x27;3-examples.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">unit/link/SKILL.md/4-troubleshooting.md</td>
+                    <td style="font-size:11px">Link to &#x27;4-troubleshooting.md&#x27; not found</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/SKILL.md/databricks-unity-catalog</td>
+                    <td style="font-size:11px">Link to &#x27;../databricks-unity-catalog/SKILL.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/SKILL.md/databricks-spark-declarative-pipelines</td>
+                    <td style="font-size:11px">Link to &#x27;../databricks-spark-declarative-pipelines/SKILL.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/SKILL.md/databricks-jobs</td>
+                    <td style="font-size:11px">Link to &#x27;../databricks-jobs/SKILL.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/1-widget-specifications.md/2-advanced-widget-specifications.md</td>
+                    <td style="font-size:11px">Link to &#x27;2-advanced-widget-specifications.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/1-widget-specifications.md/3-filters.md</td>
+                    <td style="font-size:11px">Link to &#x27;3-filters.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/1-widget-specifications.md/2-advanced-widget-specifications.md</td>
+                    <td style="font-size:11px">Link to &#x27;2-advanced-widget-specifications.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/1-widget-specifications.md/2-advanced-widget-specifications.md</td>
+                    <td style="font-size:11px">Link to &#x27;2-advanced-widget-specifications.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/1-widget-specifications.md/2-advanced-widget-specifications.md</td>
+                    <td style="font-size:11px">Link to &#x27;2-advanced-widget-specifications.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/1-widget-specifications.md/2-advanced-widget-specifications.md</td>
+                    <td style="font-size:11px">Link to &#x27;2-advanced-widget-specifications.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/1-widget-specifications.md/3-filters.md</td>
+                    <td style="font-size:11px">Link to &#x27;3-filters.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">unit/link/2-advanced-widget-specifications.md/1-widget-specifications.md</td>
+                    <td style="font-size:11px">Link to &#x27;1-widget-specifications.md&#x27; exists</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-skip">SKIP</span></td>
+                    <td style="font-size:11px">unit/tool_available</td>
+                    <td style="font-size:11px">No MCP tools available for verification (MCP server not resolved)</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                </table></div>
+            </div>
+        </div>
+        <div class="section" style="opacity:0.5">
+            <div class="section-title">Level 2: INTEGRATION</div>
+            <div class="card"><div class="card-header"><span class="card-title">Integration</span>
+            <span class="badge" style="background:var(--bg-l3);color:var(--text-muted)">NOT RUN</span></div></div>
+        </div>
+        <div class="section">
+            <div class="section-title">Level 3: STATIC</div>
+            <div class="card">
+                <div class="card-header">
+                    <svg class="icon"><use href="#icon-check"/></svg>
+                    <span class="card-title">Static</span>
+                    <span class="badge badge-score badge-pass">82%</span>
+                    
+                </div>
+                <div class="card-body">
+                <table style="margin-top:8px">
+                    <tr><th>Status</th><th>Check</th><th>Details</th><th>Source</th></tr>
+                    
+                <tr>
+                    <td><span class="badge badge-skip">SKIP</span></td>
+                    <td style="font-size:11px">static/tool_accuracy</td>
+                    <td style="font-size:11px">No MCP tools available for verification (derived from L1). Fix: ensure .mcp.json exists at the project root and its servers resolve (command on PATH, required env vars set).</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/examples_valid</td>
+                    <td style="font-size:11px">Derived from L1: 3/3 code blocks valid. Score: 10.0/10</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/security/secrets_scan</td>
+                    <td style="font-size:11px">No hardcoded secrets detected</td>
+                    <td><span class="badge-code">CODE</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/self_contained</td>
+                    <td style="font-size:11px">Score: 9/10. The skill provides comprehensive coverage: exact CLI commands for every lifecycle step (list warehouses, discover schema, test queries, create/update/publish/delete dashboards), complete JSON structure with skeleton and full working example in 4-examples.md, widget version requirements </td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/no_conflicts</td>
+                    <td style="font-size:11px">Score: 9/10. Instructions are remarkably consistent throughout. The version requirements (counter=2, table=2, charts=3, filters=2, combo/choropleth=1) are stated identically in the main file, 1-widget-specifications.md, 4-examples.md, and 5-troubleshooting.md. The field name matching rule (&#x27;name in </td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/security</td>
+                    <td style="font-size:11px">Score: 9/10. No hardcoded tokens, secrets, or credentials anywhere. Warehouse IDs use placeholder values like &#x27;abc123def456&#x27; and &#x27;WH&#x27;. The pre-check confirms no secrets detected. The skill uses CLI-based authentication (inheriting from `databricks` CLI config), which is the standard secure approach.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/llm_navigable_structure</td>
+                    <td style="font-size:11px">Score: 10/10. Excellent organization: starts with a Quick Reference table for immediate lookup, then a critical version requirements table (called out as &#x27;#1 cause of dashboard errors&#x27;), followed by a numbered workflow (Steps 1-5), then detailed Implementation Guidelines (numbered 1-6), then referen</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/actionable_instructions</td>
+                    <td style="font-size:11px">Score: 10/10. Nearly every instruction is directly executable. CLI commands are copy-pasteable: `databricks warehouses list`, `databricks experimental aitools tools discover-schema catalog.schema.orders catalog.schema.customers`, `databricks lakeview create --display-name &quot;My Dashboard&quot; --warehouse-</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/scoped_clearly</td>
+                    <td style="font-size:11px">Score: 8/10. The description explicitly states &#x27;Must use when creating, updating, or deploying Lakeview dashboards.&#x27; The &#x27;Related Skills&#x27; section at the bottom clearly delineates boundaries: Unity Catalog for querying data, Spark Declarative Pipelines for building data pipelines, and Jobs for schedu</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/error_handling</td>
+                    <td style="font-size:11px">Score: 9/10. The 5-troubleshooting.md file is comprehensive, covering: JSON parse failures (wrong structure), &#x27;no selected fields to visualize&#x27; (field name mismatch), &#x27;Invalid widget definition&#x27; (wrong version numbers), empty widgets (data/disaggregated issues), layout gaps, filter errors (wrong wid</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">static/no_hallucination_triggers</td>
+                    <td style="font-size:11px">Score: 8/10. The skill uses `databricks experimental aitools tools` commands which are real but marked as &#x27;experimental&#x27; — these could change or not be available in all environments. The skill correctly notes there is no `widgetType: &quot;assistant&quot;` and warns against using `associative_filter_predicate</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                </table></div>
+            </div>
+        </div>
+        <div class="section" style="opacity:0.5">
+            <div class="section-title">Level 4: THINKING</div>
+            <div class="card"><div class="card-header"><span class="card-title">Thinking</span>
+            <span class="badge" style="background:var(--bg-l3);color:var(--text-muted)">NOT RUN</span></div></div>
+        </div>
+        <div class="section">
+            <div class="section-title">Level 5: OUTPUT</div>
+            <div class="card">
+                <div class="card-header">
+                    <svg class="icon"><use href="#icon-check"/></svg>
+                    <span class="card-title">Output</span>
+                    <span class="badge badge-score badge-warn">67%</span>
+                    
+                </div>
+                <div class="card-body">
+                <table style="margin-top:8px">
+                    <tr><th>Status</th><th>Check</th><th>Details</th><th>Source</th></tr>
+                    
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/Should inspect the source table schema before desi</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The transcript shows the agent ran &#x27;DESCRIBE samples.nyctaxi.trips&#x27; to inspect the schema, discovering columns like tpep_pickup_datetime, tpep_dropoff_datetime, trip_distance, fare_amount, pickup_zip, dropoff_zip before designing widgets. The response also mentions &#x27;Good s</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/Should test SQL queries before deployment</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The transcript shows multiple SQL queries executed before deployment: KPI stats query, monthly trends, daily trends, zip code cardinality check, and hourly distribution query. These all ran against the warehouse to verify data patterns before building the dashboard.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/Should deploy the dashboard to the workspace</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response explicitly states &#x27;Now deploying the dashboard&#x27; and &#x27;Dashboard updated successfully. Now publishing it: Published!&#x27; The transcript confirms the dashboard was deployed and published with ID 01f13fe8dc3d11eaa09f883a10d3a3f6.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/Should include counter widgets (version 2)</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response includes 3 KPI counters: &#x27;Total Trips&#x27; (21.9K), &#x27;Total Revenue&#x27; ($270.8K), and &#x27;Avg Fare per Trip&#x27; ($12.35), listed as &#x27;KPI Counter&#x27; type widgets in the summary table. However, there is no explicit mention of &#x27;version 2&#x27; counter widgets in the response or tran</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/Should include bar chart (version 3)</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response includes &#x27;Trips by Hour of Day&#x27; described as a &#x27;Bar chart&#x27; showing &#x27;Clear morning rush (7–9am) and evening rush (6–8pm) patterns&#x27;. However, there is no explicit mention of &#x27;version 3&#x27; for the bar chart.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/Should include table widget (version 2)</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response includes &#x27;Top 10 Pickup Zip Codes&#x27; described as a &#x27;Table&#x27; widget &#x27;Ranked by trip count with avg fare &amp; distance per zip&#x27;. However, there is no explicit mention of &#x27;version 2&#x27; for the table widget.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/Should follow 6-column grid layout</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should follow 6-column grid layout</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/basic-dashboard-nyctaxi/response/The response follows this guideline: Scoring conte</td>
+                    <td style="font-size:11px">[NEUTRAL] The response provides a comprehensive summary with a URL, dashboard ID, detailed widget descriptions in a table format, data sources explanation, and filter information. It includes specific KPI values (21.9K trips, $270.8K revenue, $12.35 avg fare), chart descriptions with insights, and c</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should test SQL queries before deployment</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The transcript shows multiple SQL queries executed before deployment, e.g., &#x27;Both queries validated ✓ — 5 regions, avg order value ~$151K, trends 1992–1998. Writing the dashboard JSON file now.&#x27; and the agent ran queries to check regions, date ranges, and revenue trends be</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should deploy the dashboard to the workspace</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response states &#x27;Dashboard created, published, and tagged. ✅&#x27; and mentions the dashboard is &#x27;live at&#x27; a workspace path, confirming deployment. The transcript shows &#x27;Creating the dashboard with samples.tpch as catalog/schema&#x27; and &#x27;Dashboard created ✓. Now publishing and</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should create PAGE_TYPE_GLOBAL_FILTERS page</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response mentions &#x27;Global Region Filter (on the Filters page)&#x27; and describes it as a filter page. The response references creating a PAGE_TYPE_GLOBAL_FILTERS page implicitly by stating the filter is on &#x27;the Filters page&#x27;. However, the exact term &#x27;PAGE_TYPE_GLOBAL_FILTE</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should use filter-multi-select widget (version 2)</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response explicitly states &#x27;filter-multi-select bound to both datasets&#x27; in the Global Region Filter description. The transcript mentions writing the dashboard JSON with this widget type.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should include counter widgets (version 2)</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response describes &#x27;3 KPI counters&#x27; in the result summary and lists Total Revenue, Total Orders, and Avg Order Value as KPI widgets in the layout table, which are counter widgets.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should include bar chart (version 3)</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response explicitly lists &#x27;Bar chart — Revenue by Region&#x27; in the layout table under Revenue Analysis section, stating &#x27;Shows all 5 regions, filters to selected&#x27;.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should set disaggregated: false for filter queries</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should set disaggregated: false for filter queries</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/Should include frame with showTitle for filters</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should include frame with showTitle for filters</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/global-filter-dashboard/response/The response follows this guideline: Scoring conte</td>
+                    <td style="font-size:11px">[POSITIVE] The response provides a comprehensive dashboard with multiple widget types (KPIs, bar chart, line chart, table), a global filter, validated SQL queries before deployment, and published the dashboard. The response includes detailed layout information, data source details, and confirms succ</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Should test SQL queries before deployment</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The transcript shows extensive SQL query testing before building the dashboard - multiple queries were run to validate data (revenue by year, quarterly granularity, order priority cardinality, nation-level detail, KPI queries, status/priority breakdowns). The response also</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Should deploy the dashboard to the workspace</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response explicitly states &#x27;Now publishing it&#x27; and confirms &#x27;✅ Dashboard created, published, and tagged!&#x27; with a URL. The transcript shows the dashboard was deployed/published to the workspace.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Should create PAGE_TYPE_CANVAS pages (not PAGE_TYP</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should create PAGE_TYPE_CANVAS pages (not PAGE_TYPE_GLOBAL_FILTERS)</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Should place filter on same page as charts it affe</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response describes Page 2 — Regional Breakdown as having both the &#x27;Multi-select region filter&#x27; and the charts it affects (revenue/order KPIs, dual bar charts, quarterly trend line chart, nation detail table) all on the same page.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Should use filter-multi-select widget (version 2)</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should use filter-multi-select widget (version 2)</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Should create datasets with and without region dim</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should create datasets with and without region dimension</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Overview page should not be affected by filter</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: Page 1 (Overall Metrics) shows global KPIs, quarterly trend, and order status breakdown with no mention of being affected by the region filter. The filter is described only on Page 2, and the response says it &#x27;Filters all 3 datasets on this page&#x27; (Page 2 only).</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/Regional page should be affected by filter</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response explicitly states Page 2 has a &#x27;page-level multi-select region filter&#x27; that &#x27;Filters all 3 datasets on this page&#x27; and &#x27;drives revenue/order KPIs, dual bar charts, a 5-region quarterly trend line chart, and a 25-nation detail table.&#x27;</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/page-level-filter-dashboard/response/The response follows this guideline: Scoring conte</td>
+                    <td style="font-size:11px">[NEUTRAL] The response provides a comprehensive summary with dashboard URL, ID, data source, detailed page-by-page widget descriptions in table format, and key lessons learned. It demonstrates thorough execution with iterative debugging (textbox_spec format, queries array placement, catalog/schema e</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should test SQL queries before deployment</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The transcript shows the agent ran multiple SQL queries to probe the data before designing the dashboard, e.g., &#x27;databricks experimental aitools tools query &quot;SELECT MIN(tpep_pickup_datetime)...&quot;&#x27; and daily aggregation queries. The agent explicitly stated &#x27;Now probing the d</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should deploy the dashboard to the workspace</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The transcript shows the agent deployed the dashboard: &#x27;Dashboard created. Now publishing it and tagging it.&#x27; The response confirms &#x27;Dashboard ID: 01f13fed5f97118a96a5da9589525281&#x27; and states it was &#x27;created and published successfully.&#x27;</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should use DATE_TRUNC for daily aggregation</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The transcript shows SQL queries using DATE_TRUNC(&#x27;DAY&#x27;, tpep_pickup_datetime) for daily aggregation, both in the exploratory queries and in the dashboard dataset definition (ds_daily).</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should create line chart widget (version 3)</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should create line chart widget (version 3)</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should use scale.type: &#x27;temporal&#x27; for x-axis with </td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should use scale.type: &#x27;temporal&#x27; for x-axis with dates</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should use scale.type: &#x27;quantitative&#x27; for y-axis w</td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should use scale.type: &#x27;quantitative&#x27; for y-axis with numbers</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-fail">FAIL</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should use disaggregated: true for pre-aggregated </td>
+                    <td style="font-size:11px">[NEEDS_SKILL] Missing: Should use disaggregated: true for pre-aggregated data</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/Should include counter widgets (version 2)</td>
+                    <td style="font-size:11px">[POSITIVE] Semantic match: The response explicitly mentions &#x27;3 counters&#x27; in the KPIs section: &#x27;Total Trips · Total Revenue (USD) · Avg Fare per Trip&#x27;. The agent also references &#x27;KPI counters will aggregate across it&#x27; in the narrative. However, version 2 is not explicitly mentioned.</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pass">PASS</span></td>
+                    <td style="font-size:11px">output/line-chart-time-series/response/The response follows this guideline: Scoring conte</td>
+                    <td style="font-size:11px">[NEUTRAL] The response provides a comprehensive summary with a structured table of dashboard contents, data source details, dashboard ID and URL, and a clear result statement. The agent followed a systematic workflow: schema discovery, data probing, reference file consultation, JSON creation, deploy</td>
+                    <td><span class="badge-llm">LLM</span></td>
+                </tr>
+                </table></div>
+            </div>
+        </div>
+
+</body></html>

@@ -1,0 +1,2202 @@
+{
+  "skill_name": "databricks-dbsql",
+  "composite_score": 0.9450000000000001,
+  "duration_seconds": 52.19237184524536,
+  "mlflow_run_id": "33fb0fd752954855a37d09806774eca1",
+  "levels": {
+    "unit": {
+      "level": "L1",
+      "score": 1.0,
+      "passed": true,
+      "num_feedbacks": 187,
+      "feedbacks": [
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_1",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_2",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_3",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_4",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_5",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_6",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_7",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_8",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_9",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_10",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/SKILL.md:block_11",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_1",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_2",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_3",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_4",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_5",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_6",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_7",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_8",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_9",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_10",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_11",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_12",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_13",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_14",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_15",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_16",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_17",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_18",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_19",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_20",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_21",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_22",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_23",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_24",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_25",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_26",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_27",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_28",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_29",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_30",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_31",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_32",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_33",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_34",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_35",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_36",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_37",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_38",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_39",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_40",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_41",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_42",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_43",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/ai-functions.md:block_44",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/best-practices.md:block_1",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/best-practices.md:block_2",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/best-practices.md:block_3",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/best-practices.md:block_4",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/best-practices.md:block_5",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/best-practices.md:block_6",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_1",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_2",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_3",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_6",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_7",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_8",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_9",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_10",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_12",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_13",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_14",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_15",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_16",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_17",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/geospatial-collations.md:block_18",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_1",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_2",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_3",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_4",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_5",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_6",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_7",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_8",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_9",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_10",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_11",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_12",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_13",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_14",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_15",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_16",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_17",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_18",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_19",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_20",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_21",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_22",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_23",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_24",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_25",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_26",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_27",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_28",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_29",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_30",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_31",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_32",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_33",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_34",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_35",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/materialized-views-pipes.md:block_36",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_1",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_2",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_3",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_4",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_5",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_6",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_7",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_8",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_9",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_10",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_11",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_12",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_13",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_14",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_15",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_16",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_17",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_18",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_19",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_20",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_21",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_22",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_23",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_24",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_25",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_26",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_27",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_28",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_29",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_30",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_31",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_32",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_33",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_34",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_35",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_36",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_37",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_38",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_39",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_40",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_41",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_42",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_43",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_44",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_45",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_46",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_47",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_48",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_49",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/python_syntax/sql-scripting.md:block_50",
+          "value": "pass",
+          "rationale": "Valid Python syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_51",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/python_syntax/sql-scripting.md:block_52",
+          "value": "pass",
+          "rationale": "Valid Python syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_53",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_54",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/sql_syntax/sql-scripting.md:block_55",
+          "value": "pass",
+          "rationale": "Valid SQL syntax",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/sql-scripting.md",
+          "value": "pass",
+          "rationale": "Link to 'sql-scripting.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/sql-scripting.md",
+          "value": "pass",
+          "rationale": "Link to 'sql-scripting.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/sql-scripting.md",
+          "value": "pass",
+          "rationale": "Link to 'sql-scripting.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/sql-scripting.md",
+          "value": "pass",
+          "rationale": "Link to 'sql-scripting.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/materialized-views-pipes.md",
+          "value": "pass",
+          "rationale": "Link to 'materialized-views-pipes.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/materialized-views-pipes.md",
+          "value": "pass",
+          "rationale": "Link to 'materialized-views-pipes.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/materialized-views-pipes.md",
+          "value": "pass",
+          "rationale": "Link to 'materialized-views-pipes.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/geospatial-collations.md",
+          "value": "pass",
+          "rationale": "Link to 'geospatial-collations.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/geospatial-collations.md",
+          "value": "pass",
+          "rationale": "Link to 'geospatial-collations.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/geospatial-collations.md",
+          "value": "pass",
+          "rationale": "Link to 'geospatial-collations.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/ai-functions.md",
+          "value": "pass",
+          "rationale": "Link to 'ai-functions.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/ai-functions.md",
+          "value": "pass",
+          "rationale": "Link to 'ai-functions.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/ai-functions.md",
+          "value": "pass",
+          "rationale": "Link to 'ai-functions.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/ai-functions.md",
+          "value": "pass",
+          "rationale": "Link to 'ai-functions.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/best-practices.md",
+          "value": "pass",
+          "rationale": "Link to 'best-practices.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/sql-scripting.md",
+          "value": "pass",
+          "rationale": "Link to 'sql-scripting.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/materialized-views-pipes.md",
+          "value": "pass",
+          "rationale": "Link to 'materialized-views-pipes.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/geospatial-collations.md",
+          "value": "pass",
+          "rationale": "Link to 'geospatial-collations.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/ai-functions.md",
+          "value": "pass",
+          "rationale": "Link to 'ai-functions.md' exists",
+          "source": "CODE"
+        },
+        {
+          "name": "unit/link/SKILL.md/best-practices.md",
+          "value": "pass",
+          "rationale": "Link to 'best-practices.md' exists",
+          "source": "CODE"
+        }
+      ],
+      "task_results": null,
+      "artifacts": null,
+      "metadata": {
+        "code_blocks_tested": 167,
+        "syntax_errors": 0
+      },
+      "trace_ids": [],
+      "details": {
+        "checks": [
+          {
+            "name": "SKILL.md:block_1",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_2",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_3",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_4",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_5",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_6",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_7",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_8",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_9",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_10",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "SKILL.md:block_11",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_1",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_2",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_3",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_4",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_5",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_6",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_7",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_8",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_9",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_10",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_11",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_12",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_13",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_14",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_15",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_16",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_17",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_18",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_19",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_20",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_21",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_22",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_23",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_24",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_25",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_26",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_27",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_28",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_29",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_30",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_31",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_32",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_33",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_34",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_35",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_36",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_37",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_38",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_39",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_40",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_41",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_42",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_43",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "ai-functions.md:block_44",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "best-practices.md:block_1",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "best-practices.md:block_2",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "best-practices.md:block_3",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "best-practices.md:block_4",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "best-practices.md:block_5",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "best-practices.md:block_6",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_1",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_2",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_3",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_6",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_7",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_8",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_9",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_10",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_12",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_13",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_14",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_15",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_16",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_17",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "geospatial-collations.md:block_18",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_1",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_2",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_3",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_4",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_5",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_6",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_7",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_8",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_9",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_10",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_11",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_12",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_13",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_14",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_15",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_16",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_17",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_18",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_19",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_20",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_21",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_22",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_23",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_24",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_25",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_26",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_27",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_28",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_29",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_30",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_31",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_32",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_33",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_34",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_35",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "materialized-views-pipes.md:block_36",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_1",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_2",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_3",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_4",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_5",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_6",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_7",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_8",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_9",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_10",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_11",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_12",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_13",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_14",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_15",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_16",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_17",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_18",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_19",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_20",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_21",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_22",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_23",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_24",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_25",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_26",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_27",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_28",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_29",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_30",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_31",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_32",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_33",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_34",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_35",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_36",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_37",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_38",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_39",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_40",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_41",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_42",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_43",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_44",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_45",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_46",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_47",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_48",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_49",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_50",
+            "passed": true,
+            "message": "Valid Python syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_51",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_52",
+            "passed": true,
+            "message": "Valid Python syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_53",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_54",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md:block_55",
+            "passed": true,
+            "message": "Valid SQL syntax"
+          },
+          {
+            "name": "sql-scripting.md",
+            "passed": true,
+            "message": "Link to 'sql-scripting.md' exists"
+          },
+          {
+            "name": "sql-scripting.md",
+            "passed": true,
+            "message": "Link to 'sql-scripting.md' exists"
+          },
+          {
+            "name": "sql-scripting.md",
+            "passed": true,
+            "message": "Link to 'sql-scripting.md' exists"
+          },
+          {
+            "name": "sql-scripting.md",
+            "passed": true,
+            "message": "Link to 'sql-scripting.md' exists"
+          },
+          {
+            "name": "materialized-views-pipes.md",
+            "passed": true,
+            "message": "Link to 'materialized-views-pipes.md' exists"
+          },
+          {
+            "name": "materialized-views-pipes.md",
+            "passed": true,
+            "message": "Link to 'materialized-views-pipes.md' exists"
+          },
+          {
+            "name": "materialized-views-pipes.md",
+            "passed": true,
+            "message": "Link to 'materialized-views-pipes.md' exists"
+          },
+          {
+            "name": "geospatial-collations.md",
+            "passed": true,
+            "message": "Link to 'geospatial-collations.md' exists"
+          },
+          {
+            "name": "geospatial-collations.md",
+            "passed": true,
+            "message": "Link to 'geospatial-collations.md' exists"
+          },
+          {
+            "name": "geospatial-collations.md",
+            "passed": true,
+            "message": "Link to 'geospatial-collations.md' exists"
+          },
+          {
+            "name": "ai-functions.md",
+            "passed": true,
+            "message": "Link to 'ai-functions.md' exists"
+          },
+          {
+            "name": "ai-functions.md",
+            "passed": true,
+            "message": "Link to 'ai-functions.md' exists"
+          },
+          {
+            "name": "ai-functions.md",
+            "passed": true,
+            "message": "Link to 'ai-functions.md' exists"
+          },
+          {
+            "name": "ai-functions.md",
+            "passed": true,
+            "message": "Link to 'ai-functions.md' exists"
+          },
+          {
+            "name": "best-practices.md",
+            "passed": true,
+            "message": "Link to 'best-practices.md' exists"
+          },
+          {
+            "name": "sql-scripting.md",
+            "passed": true,
+            "message": "Link to 'sql-scripting.md' exists"
+          },
+          {
+            "name": "materialized-views-pipes.md",
+            "passed": true,
+            "message": "Link to 'materialized-views-pipes.md' exists"
+          },
+          {
+            "name": "geospatial-collations.md",
+            "passed": true,
+            "message": "Link to 'geospatial-collations.md' exists"
+          },
+          {
+            "name": "ai-functions.md",
+            "passed": true,
+            "message": "Link to 'ai-functions.md' exists"
+          },
+          {
+            "name": "best-practices.md",
+            "passed": true,
+            "message": "Link to 'best-practices.md' exists"
+          }
+        ],
+        "passed": 187,
+        "total": 187
+      },
+      "duration_ms": 7,
+      "last_run_at": "2026-04-23T12:07:08.151943+00:00",
+      "is_carried_forward": false
+    },
+    "static": {
+      "level": "static",
+      "score": 0.89,
+      "passed": true,
+      "num_feedbacks": 12,
+      "feedbacks": [
+        {
+          "name": "static/tool_accuracy",
+          "value": "pass",
+          "rationale": "No tool references to check (derived from L1)",
+          "source": "CODE"
+        },
+        {
+          "name": "static/examples_valid",
+          "value": "pass",
+          "rationale": "Derived from L1: 167/167 code blocks valid. Score: 10.0/10",
+          "source": "CODE"
+        },
+        {
+          "name": "static/security/secrets_scan",
+          "value": "pass",
+          "rationale": "No hardcoded secrets detected",
+          "source": "CODE"
+        },
+        {
+          "name": "static/self_contained",
+          "value": "pass",
+          "rationale": "Score: 9/10. The skill is remarkably comprehensive. Every function referenced includes full syntax, parameter tables with types and defaults, return types, and practical examples. For instance, the ai-functions.md file documents all 13+ AI functions with complete signatures, the http_request function includes connection creation syntax and all authentication options, and read_files documents every format-specific option (CSV has 20+ options, JSON has 15+, XML has 10+). The geospatial reference covers 39 H3 functions and 80+ ST functions with full signatures. The only external dependency is the referenced sub-files (sql-scripting.md, materialized-views-pipes.md, etc.), which are all included inline in the skill content. Recommendation: Minor gap: The skill references MCP tools (`execute_sql`, `execute_sql_multi`) in the Key Guidelines section but the pre-check notes 'No MCP tools available for verification.' An agent might try to use these tools and fail. Either remove the MCP tool reference or document fallback behavior when those tools aren't available.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/no_conflicts",
+          "value": "pass",
+          "rationale": "Score: 8/10. The skill is largely consistent. The best-practices.md correctly notes serverless limitations: 'On serverless SQL warehouses, delta.enableOptimizeWrite and delta.autoOptimize.autoCompact are managed automatically and cannot be set manually (they will raise DELTA_UNKNOWN_CONFIGURATION)' and repeats this warning in the Table Properties section. The Quick Reference table in SKILL.md aligns with the detailed sub-files on version requirements. One minor inconsistency: the geospatial-collations.md ST examples section says 'GEOMETRY and GEOGRAPHY column types in CREATE TABLE require serverless compute with DBR 17.1+' but then the performance tips section says 'Enable auto-optimization: delta.autoOptimize.optimizeWrite and delta.autoOptimize.autoCompact' which contradicts the best-practices.md warning about these properties not being settable on serverless. Recommendation: In geospatial-collations.md under 'Spatial Join Performance' tips, the line 'Enable auto-optimization: delta.autoOptimize.optimizeWrite and delta.autoOptimize.autoCompact' should be removed or qualified with '(classic compute only)' to match the guidance in best-practices.md.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/security",
+          "value": "pass",
+          "rationale": "Score: 9/10. The skill consistently uses `secret('scope', 'token')` for all credential references in connection creation examples (e.g., `bearer_token secret('my-scope', 'slack-token')`, `password secret('my-scope', 'pg-password')`). No hardcoded tokens or credentials are present. The ai_mask function is documented for PII redaction. SQL SECURITY INVOKER is the required characteristic for stored procedures, which is the safer option. The pre-check confirms no hardcoded secrets detected.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/llm_navigable",
+          "value": "pass",
+          "rationale": "Score: 9/10. The SKILL.md provides an excellent Quick Reference table mapping features to key syntax, version requirements, and sub-file references. The 'Reference Files' table at the bottom clearly states 'When to Read' for each sub-file (e.g., 'User needs procedural SQL, error handling, loops, dynamic SQL'). Each sub-file has a detailed Table of Contents. The ai-functions.md is organized by function category with consistent formatting: syntax block, parameter table, return type, examples. The sql-scripting.md ends with a 'Quick Reference Card' with skeleton templates. The hierarchical structure (SKILL.md overview \u2192 sub-file details) allows an LLM to quickly find relevant content.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/actionable",
+          "value": "pass",
+          "rationale": "Score: 9/10. Instructions are highly concrete throughout. Every feature includes copy-pasteable SQL examples. The stored procedure section provides a complete skeleton: 'CREATE OR REPLACE PROCEDURE my_schema.my_proc(IN input_param STRING, OUT output_param INT) LANGUAGE SQL SQL SECURITY INVOKER...' followed by the exact CALL syntax. The materialized views section specifies exact refresh strategies with syntax: 'SCHEDULE EVERY 1 HOUR', 'SCHEDULE CRON \"0 0 2 * * ?\" AT TIME ZONE \"America/New_York\"', 'TRIGGER ON UPDATE AT MOST EVERY INTERVAL 5 MINUTES'. The Key Guidelines provide direct actionable rules like 'Use LIMIT during development with AI functions to control costs' and 'Prefer Liquid Clustering over partitioning for new tables (1-4 keys max)'.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/scoped_clearly",
+          "value": "pass",
+          "rationale": "Score: 9/10. The skill description explicitly lists trigger keywords: 'This skill MUST be invoked when the user mentions: \"DBSQL\", \"Databricks SQL\", \"SQL warehouse\", \"SQL scripting\", \"stored procedure\"...' and also specifies softer triggers: 'SHOULD also invoke when the user asks about SQL best practices, data modeling patterns, or advanced SQL features on Databricks.' The Quick Reference table clearly shows version requirements (e.g., 'DBR 16.3+', 'Pro/Serverless') so an agent knows when features are available. The scope is clearly Databricks SQL features \u2014 it doesn't cover Spark DataFrame APIs, MLflow, or notebook-specific features.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/error_handling",
+          "value": "pass",
+          "rationale": "Score: 8/10. The sql-scripting.md has a thorough Exception Handling section covering DECLARE HANDLER, SIGNAL, RESIGNAL, and EXIT handlers with examples. The ai_query function documents `failOnError => false` returning `STRUCT<result: T, errorMessage: STRING>` for graceful batch processing. The stored procedure example includes `DECLARE EXIT HANDLER FOR SQLEXCEPTION`. The transactions section documents specific conflict exceptions (ConcurrentAppendException, ConcurrentDeleteReadException, etc.) and Python try/except/finally patterns. However, error handling for http_request (non-200 status codes), read_files (missing files, schema mismatches), and remote_query (connection failures) is not explicitly addressed. Recommendation: Add brief error handling guidance for http_request (checking status_code != 200), read_files (handling missing files or parse errors with mode => 'PERMISSIVE' vs 'FAILFAST'), and remote_query (connection timeout handling). A short 'Error Handling' subsection in ai-functions.md would suffice.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/no_hallucination_triggers",
+          "value": "pass",
+          "rationale": "Score: 8/10. The skill is careful about version requirements and availability status (e.g., 'Public Preview', 'GA', 'DBR 17.0+'). The materialized-views-pipes.md correctly notes limitations like 'No identity columns or surrogate keys' and 'Time travel queries are not supported'. The transactions section honestly states 'Preview' status. However, the SKILL.md Key Guidelines reference MCP tools (`execute_sql`, `execute_sql_multi`) that may not exist in the agent's environment, which could trigger hallucination of tool capabilities. Additionally, the `to_geography()` note in geospatial examples ('expects STRING (WKT/GeoJSON) or BINARY (WKB) input, not GEOMETRY') is a helpful anti-hallucination guard. Recommendation: Qualify the MCP tools reference in Key Guidelines: 'Use MCP tools (execute_sql, execute_sql_multi) if available in your environment to test and validate all SQL before deploying.' This prevents an agent from assuming these tools always exist.",
+          "source": "LLM_JUDGE"
+        },
+        {
+          "name": "static/mcp_e2e",
+          "value": "skip",
+          "rationale": "No MCP probe tools configured or auto-detected. Add mcp_e2e_probes to manifest.yaml to enable.",
+          "source": "CODE"
+        }
+      ],
+      "task_results": null,
+      "artifacts": null,
+      "metadata": {
+        "overall_score": 8.9,
+        "criteria": {
+          "tool_accuracy": 10.0,
+          "examples_valid": 10.0,
+          "self_contained": 9.0,
+          "no_conflicts": 8.0,
+          "security": 9.0,
+          "llm_navigable": 9.0,
+          "actionable": 9.0,
+          "scoped_clearly": 9.0,
+          "error_handling": 8.0,
+          "no_hallucination_triggers": 8.0
+        },
+        "recommendations": [
+          "Minor gap: The skill references MCP tools (`execute_sql`, `execute_sql_multi`) in the Key Guidelines section but the pre-check notes 'No MCP tools available for verification.' An agent might try to use these tools and fail. Either remove the MCP tool reference or document fallback behavior when those tools aren't available.",
+          "In geospatial-collations.md under 'Spatial Join Performance' tips, the line 'Enable auto-optimization: delta.autoOptimize.optimizeWrite and delta.autoOptimize.autoCompact' should be removed or qualified with '(classic compute only)' to match the guidance in best-practices.md.",
+          "Add brief error handling guidance for http_request (checking status_code != 200), read_files (handling missing files or parse errors with mode => 'PERMISSIVE' vs 'FAILFAST'), and remote_query (connection timeout handling). A short 'Error Handling' subsection in ai-functions.md would suffice.",
+          "Qualify the MCP tools reference in Key Guidelines: 'Use MCP tools (execute_sql, execute_sql_multi) if available in your environment to test and validate all SQL before deploying.' This prevents an agent from assuming these tools always exist."
+        ],
+        "dimensions_evaluated": 10,
+        "dimensions_total": 10,
+        "coverage_factor": 1.0,
+        "priority_fixes": []
+      },
+      "trace_ids": [],
+      "details": {},
+      "duration_ms": 46157,
+      "last_run_at": "2026-04-23T12:07:54.971560+00:00",
+      "is_carried_forward": false
+    }
+  },
+  "suggestions": []
+}
