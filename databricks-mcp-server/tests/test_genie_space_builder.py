@@ -158,32 +158,43 @@ def test_example_sql_adds_question_and_sql():
 def test_join_spec_full_fields():
     b = GenieSpaceBuilder()
     entry = b.add_join_spec(
-        left_table="orders",
-        right_table="customers",
-        join_type="LEFT",
-        condition="orders.customer_id = customers.customer_id",
+        left_identifier="cat.sch.orders",
+        right_identifier="cat.sch.customers",
+        condition="`o`.`customer_id` = `c`.`customer_id`",
+        left_alias="o",
+        right_alias="c",
         relationship_type="MANY_TO_ONE",
-        display_name="Orders to Customers",
         comment="Each order has one customer",
-        instruction="Use when joining customer attributes to orders",
     )
-    assert entry["join_type"] == "LEFT"
-    assert entry["relationship_type"] == "MANY_TO_ONE"
-    assert entry["display_name"] == "Orders to Customers"
+    assert entry["left"] == {"identifier": "cat.sch.orders", "alias": "o"}
+    assert entry["right"] == {"identifier": "cat.sch.customers", "alias": "c"}
+    assert entry["sql"][0] == "`o`.`customer_id` = `c`.`customer_id`"
+    assert entry["sql"][1] == "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+    assert entry["comment"] == ["Each order has one customer"]
 
 
 def test_join_spec_omits_empty_optional_fields():
     b = GenieSpaceBuilder()
     entry = b.add_join_spec(
-        left_table="a",
-        right_table="b",
-        join_type="INNER",
+        left_identifier="cat.sch.a",
+        right_identifier="cat.sch.b",
         condition="a.id = b.id",
     )
-    assert "relationship_type" not in entry
-    assert "display_name" not in entry
+    assert "alias" not in entry["left"]
+    assert "alias" not in entry["right"]
+    assert entry["sql"] == ["a.id = b.id"]
     assert "comment" not in entry
-    assert "instruction" not in entry
+
+
+def test_join_spec_invalid_relationship_type_raises():
+    b = GenieSpaceBuilder()
+    with pytest.raises(ValueError):
+        b.add_join_spec(
+            left_identifier="a",
+            right_identifier="b",
+            condition="a.id = b.id",
+            relationship_type="MANY_TO_FEW",
+        )
 
 
 # -------------------------------------------------------------- sql_snippets
@@ -208,7 +219,20 @@ def test_sql_filter_measure_expression():
     assert len(b.list_sql_filters()) == 1
     assert len(b.list_sql_measures()) == 1
     assert len(b.list_sql_expressions()) == 1
-    assert b.list_sql_filters()[0]["display_name"] == "Confirmed"
+
+    f0 = b.list_sql_filters()[0]
+    assert f0["display_name"] == "Confirmed"
+    assert f0["sql"] == ["orders.status = 'Confirmed'"]
+    assert f0["comment"] == ["Only confirmed orders"]
+
+    m0 = b.list_sql_measures()[0]
+    assert m0["alias"] == "total_revenue"
+    assert m0["sql"] == ["SUM(orders.total_amount)"]
+    assert "name" not in m0  # API field is `alias`, not `name`
+
+    e0 = b.list_sql_expressions()[0]
+    assert e0["alias"] == "order_year"
+    assert e0["sql"] == ["YEAR(orders.order_date)"]
 
 
 def test_sql_snippet_strips_empty_fields():
@@ -216,6 +240,7 @@ def test_sql_snippet_strips_empty_fields():
     entry = b.add_sql_measure("cnt", "COUNT(*)")
     assert "display_name" not in entry
     assert "comment" not in entry
+    assert entry["sql"] == ["COUNT(*)"]
 
 
 # --------------------------------------------------------------- benchmarks
@@ -226,7 +251,7 @@ def test_benchmark_structure():
         "SELECT COUNT(*) FROM orders",
     )
     assert entry["question"] == ["How many orders?"]
-    assert entry["answers"] == [{"format": "SQL", "body": ["SELECT COUNT(*) FROM orders"]}]
+    assert entry["answer"] == [{"format": "SQL", "content": ["SELECT COUNT(*) FROM orders"]}]
 
 
 # ------------------------------------------------------------- generic ops
@@ -261,7 +286,7 @@ def test_ids_are_unique_across_slots():
     b.add_sample_question("A?")
     b.add_text_instruction("T")
     b.add_example_sql("Q?", "SELECT 1")
-    b.add_join_spec("a", "b", "INNER", "a.id = b.id")
+    b.add_join_spec("cat.sch.a", "cat.sch.b", "a.id = b.id")
     b.add_sql_filter("a.x = 1")
     b.add_sql_expression("alias", "YEAR(a.d)")
     b.add_sql_measure("m", "COUNT(*)")
@@ -290,10 +315,9 @@ def test_full_build_to_import_envelope():
     src.add_sample_question("What were sales last month?")
     src.add_example_sql("Total sales?", "SELECT SUM(amt) FROM cat.sch.orders")
     src.add_join_spec(
-        "orders",
-        "customers",
-        "LEFT",
-        "orders.customer_id = customers.customer_id",
+        left_identifier="cat.sch.orders",
+        right_identifier="cat.sch.customers",
+        condition="orders.customer_id = customers.customer_id",
         relationship_type="MANY_TO_ONE",
     )
     src.add_sql_measure("rev", "SUM(orders.amt)", display_name="Revenue")

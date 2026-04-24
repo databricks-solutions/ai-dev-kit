@@ -45,10 +45,10 @@ class GenieSpaceBuilder:
         builder.add_table("main.sales.orders", description="Order facts")
         builder.add_sample_question("What were total sales last month?")
         builder.add_join_spec(
-            left_table="orders",
-            right_table="customers",
-            join_type="LEFT",
+            left_identifier="main.sales.orders",
+            right_identifier="main.sales.customers",
             condition="orders.customer_id = customers.customer_id",
+            relationship_type="MANY_TO_ONE",
         )
         envelope = builder.to_envelope()
         # envelope ready for manage_genie(action="import", **envelope)
@@ -136,12 +136,46 @@ class GenieSpaceBuilder:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Return a deep copy of the current ``serialized_space`` dict."""
-        return copy.deepcopy(self._space)
+        """Return a deep copy of the ``serialized_space`` dict, normalised for emit.
+
+        Normalisation enforces the sort constraints the Genie API expects:
+        ``data_sources.tables`` and ``data_sources.metric_views`` are sorted by
+        ``identifier``; ``column_configs`` within each are sorted by
+        ``column_name``; ``id``-keyed lists (sample questions, instructions,
+        snippets, benchmarks, joins) are sorted by ``id``.
+        """
+        out = copy.deepcopy(self._space)
+        self._normalize(out)
+        return out
 
     def to_json(self, *, indent: Optional[int] = None) -> str:
-        """Return the ``serialized_space`` as a JSON string."""
-        return json.dumps(self._space, indent=indent, sort_keys=False)
+        """Return the normalised ``serialized_space`` as a JSON string."""
+        return json.dumps(self.to_dict(), indent=indent, sort_keys=False)
+
+    @classmethod
+    def _normalize(cls, space: Dict[str, Any]) -> None:
+        """In-place: sort lists per Genie API requirements before emit."""
+        ds = space.get("data_sources") or {}
+        for key in ("tables", "metric_views"):
+            entries = ds.get(key)
+            if isinstance(entries, list):
+                entries.sort(key=lambda e: e.get("identifier", ""))
+                for entry in entries:
+                    cc = entry.get("column_configs")
+                    if isinstance(cc, list):
+                        cc.sort(key=lambda c: c.get("column_name", ""))
+
+        for path in cls.ID_LIST_PATHS:
+            node: Any = space
+            for key in path[:-1]:
+                if not isinstance(node, dict):
+                    node = None
+                    break
+                node = node.get(key)
+            if isinstance(node, dict):
+                lst = node.get(path[-1])
+                if isinstance(lst, list):
+                    lst.sort(key=lambda e: e.get("id", ""))
 
     def to_envelope(self, *, indent: Optional[int] = None) -> Dict[str, str]:
         """Return the full envelope used by ``manage_genie(action="import")``.
@@ -295,40 +329,52 @@ class GenieSpaceBuilder:
         return entry
 
     # -------------------------------------- instructions.join_specs
+    #: Valid relationship types per the Genie API protobuf.
+    RELATIONSHIP_TYPES = ("ONE_TO_ONE", "ONE_TO_MANY", "MANY_TO_ONE", "MANY_TO_MANY")
+
     def add_join_spec(
         self,
-        left_table: str,
-        right_table: str,
-        join_type: str,
+        left_identifier: str,
+        right_identifier: str,
         condition: str,
         *,
+        left_alias: str = "",
+        right_alias: str = "",
         relationship_type: str = "",
-        display_name: str = "",
         comment: str = "",
-        instruction: str = "",
         id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a join definition used by Genie when queries span tables.
 
-        ``join_type`` is typically ``INNER``, ``LEFT``, or ``RIGHT``.
-        ``relationship_type`` is optional and one of ``MANY_TO_ONE``,
-        ``ONE_TO_MANY``, or ``ONE_TO_ONE``.
+        ``left_identifier`` and ``right_identifier`` are fully-qualified table
+        or metric-view identifiers (``catalog.schema.table``). ``condition`` is
+        the join predicate; reference columns via the table alias when one is
+        given. ``relationship_type``, when provided, is encoded as a marker in
+        the ``sql`` list — the format the API uses to round-trip the
+        relationship — and must be one of :attr:`RELATIONSHIP_TYPES`.
         """
+        if relationship_type and relationship_type not in self.RELATIONSHIP_TYPES:
+            raise ValueError(f"relationship_type must be one of {self.RELATIONSHIP_TYPES}, got {relationship_type!r}")
+
+        left: Dict[str, Any] = {"identifier": left_identifier}
+        if left_alias:
+            left["alias"] = left_alias
+        right: Dict[str, Any] = {"identifier": right_identifier}
+        if right_alias:
+            right["alias"] = right_alias
+
+        sql_parts: List[str] = [condition]
+        if relationship_type:
+            sql_parts.append(f"--rt=FROM_RELATIONSHIP_TYPE_{relationship_type}--")
+
         entry: Dict[str, Any] = {
             "id": id or self._gen_id(),
-            "left_table": left_table,
-            "right_table": right_table,
-            "join_type": join_type,
-            "condition": condition,
+            "left": left,
+            "right": right,
+            "sql": sql_parts,
         }
-        if relationship_type:
-            entry["relationship_type"] = relationship_type
-        if display_name:
-            entry["display_name"] = display_name
         if comment:
-            entry["comment"] = comment
-        if instruction:
-            entry["instruction"] = instruction
+            entry["comment"] = self._as_str_list(comment)
         self._get_list(self.JOIN_SPECS_PATH).append(entry)
         return entry
 
@@ -340,10 +386,13 @@ class GenieSpaceBuilder:
         display_name: str = "",
         synonyms: Optional[Iterable[str]] = None,
         comment: str = "",
-        instruction: str = "",
         id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Add a named, reusable WHERE-style predicate (e.g. status filters)."""
+        """Add a named, reusable WHERE-style predicate (e.g. status filters).
+
+        ``sql`` is the predicate body without ``WHERE`` (e.g.
+        ``"category_l3 = 'Dresses'"``).
+        """
         return self._add_snippet(
             self.SQL_SNIPPETS_FILTERS_PATH,
             id=id,
@@ -351,7 +400,6 @@ class GenieSpaceBuilder:
             display_name=display_name,
             synonyms=synonyms,
             comment=comment,
-            instruction=instruction,
         )
 
     # --------------------------- instructions.sql_snippets.expressions
@@ -363,10 +411,12 @@ class GenieSpaceBuilder:
         display_name: str = "",
         synonyms: Optional[Iterable[str]] = None,
         comment: str = "",
-        instruction: str = "",
         id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Add a named, reusable SELECT-list expression (e.g. date extracts, CASE bucketing)."""
+        """Add a named, reusable SELECT-list expression (date extracts, CASE bucketing).
+
+        ``alias`` is the projected column name (e.g. ``"snapshot_year"``).
+        """
         return self._add_snippet(
             self.SQL_SNIPPETS_EXPRESSIONS_PATH,
             id=id,
@@ -375,32 +425,36 @@ class GenieSpaceBuilder:
             display_name=display_name,
             synonyms=synonyms,
             comment=comment,
-            instruction=instruction,
         )
 
     # ----------------------------- instructions.sql_snippets.measures
     def add_sql_measure(
         self,
-        name: str,
+        alias: str,
         sql: str,
         *,
         display_name: str = "",
         synonyms: Optional[Iterable[str]] = None,
         comment: str = "",
-        instruction: str = "",
         id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Add a named, reusable aggregate (e.g. ``SUM(orders.total_amount)``)."""
+        """Add a named, reusable aggregate (e.g. ``SUM(orders.total_amount)``).
+
+        ``alias`` is the measure identifier (the API field is ``alias``, not
+        ``name``).
+        """
         return self._add_snippet(
             self.SQL_SNIPPETS_MEASURES_PATH,
             id=id,
-            name=name,
+            alias=alias,
             sql=sql,
             display_name=display_name,
             synonyms=synonyms,
             comment=comment,
-            instruction=instruction,
         )
+
+    #: Snippet fields whose values are stored as ``[str]`` lists per the Genie API.
+    _SNIPPET_LIST_FIELDS = frozenset({"sql", "comment"})
 
     def _add_snippet(
         self,
@@ -416,6 +470,8 @@ class GenieSpaceBuilder:
                 continue
             if key == "synonyms":
                 entry[key] = list(value)
+            elif key in self._SNIPPET_LIST_FIELDS:
+                entry[key] = self._as_str_list(value)
             else:
                 entry[key] = value
         self._get_list(path).append(entry)
@@ -426,12 +482,13 @@ class GenieSpaceBuilder:
         """Add a benchmark question with a canonical SQL answer.
 
         Benchmarks are used by the Genie quality evaluator; each entry pairs a
-        question with one or more SQL bodies treated as ground truth.
+        question with one or more SQL bodies treated as ground truth. The wire
+        format is ``{"answer": [{"format": "SQL", "content": ["SELECT ..."]}]}``.
         """
         entry = {
             "id": id or self._gen_id(),
             "question": [question],
-            "answers": [{"format": "SQL", "body": [sql]}],
+            "answer": [{"format": "SQL", "content": [sql]}],
         }
         self._get_list(self.BENCHMARKS_PATH).append(entry)
         return entry

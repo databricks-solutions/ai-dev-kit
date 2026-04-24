@@ -129,18 +129,20 @@ for ad-hoc queries:
 
 ```python
 builder.add_join_spec(
-    left_table="orders",
-    right_table="customers",
-    join_type="LEFT",
-    condition="orders.customer_id = customers.customer_id",
+    left_identifier="my_catalog.sales.orders",
+    right_identifier="my_catalog.sales.customers",
+    condition="`o`.`customer_id` = `c`.`customer_id`",
+    left_alias="o",
+    right_alias="c",
     relationship_type="MANY_TO_ONE",
-    display_name="Orders to Customers",
     comment="Each order is placed by one customer",
-    instruction="Use when joining customer attributes onto orders",
 )
 ```
 
 Ground your join columns against the actual column names — do not assume.
+`relationship_type` must be one of `ONE_TO_ONE`, `ONE_TO_MANY`,
+`MANY_TO_ONE`, `MANY_TO_MANY`. The builder encodes it as a marker inside the
+`sql` list (the format the API uses to round-trip the value).
 
 ### 4. Add table and column descriptions
 
@@ -205,22 +207,21 @@ Snippets are named SQL fragments Genie can substitute by name. They reduce
 drift between queries and cut down on ad-hoc rewrites:
 
 ```python
-# Measures — named aggregates
+# Measures — named aggregates (the API field is `alias`, not `name`)
 builder.add_sql_measure(
-    name="total_revenue",
+    alias="total_revenue",
     sql="SUM(orders.total_amount)",
     display_name="Total Revenue",
     synonyms=["revenue", "sales"],
-    instruction="Use when asked about top-line revenue.",
+    comment="Top-line revenue across all orders.",
 )
 builder.add_sql_measure(
-    name="cancellation_rate",
+    alias="cancellation_rate",
     sql="COUNT(CASE WHEN orders.status='Cancelled' THEN 1 END) * 100.0 / COUNT(*)",
     display_name="Cancellation Rate",
-    instruction="Percentage of cancelled orders.",
 )
 
-# Filters — named predicates
+# Filters — named predicates (no `name` field — uses `display_name`)
 builder.add_sql_filter(
     sql="orders.status = 'Confirmed'",
     display_name="Confirmed orders only",
@@ -235,7 +236,9 @@ builder.add_sql_expression(
 ```
 
 Keep formulas short, valid, and table-prefixed (`table_name.column_name`).
-Genie degrades when snippets reference ambiguous bare columns.
+Genie degrades when snippets reference ambiguous bare columns. The builder
+stores `sql` and `comment` as single-element lists — the format the Genie
+API uses on the wire.
 
 ### 7. Add text instructions and benchmarks
 
