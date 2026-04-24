@@ -39,7 +39,7 @@ description: "Creates, configures, and updates Databricks Lakeflow Spark Declara
 - When the user provides table schema and asks for code, respond directly with the code. Don't ask clarifying questions if the request is clear.
 
 ## Tools
-- List files in volume: `databricks fs ls /Volumes/{catalog}/{schema}/{volume}/{path}`
+- List files in volume: `databricks fs ls dbfs:/Volumes/{catalog}/{schema}/{volume}/{path}` (the `dbfs:` prefix is required even for UC Volume paths)
 - Query data: `databricks experimental aitools tools query --warehouse abc123 "SELECT 1 FROM catalog.schema.table"`
 - Discover schema: `databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2`
 - Pipelines CLI: `databricks pipelines create|get|delete|start-update|list-pipelines` or use `databricks pipelines --help` for more options

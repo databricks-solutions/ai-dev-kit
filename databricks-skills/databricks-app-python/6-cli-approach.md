@@ -49,9 +49,11 @@ my_app/
 
 ### Step 2: Upload to Workspace
 
+`--overwrite` is required for redeploys — without it the CLI **silently skips files that already exist**, so your updated code never makes it to the workspace and the app keeps running the old version. Harmless on the first deploy.
+
 ```bash
 # Upload local folder to workspace
-databricks workspace import-dir /path/to/my_app /Workspace/Users/user@example.com/my_app
+databricks workspace import-dir /path/to/my_app /Workspace/Users/user@example.com/my_app --overwrite
 ```
 
 ### Step 3: Create and Deploy App
@@ -77,7 +79,7 @@ databricks apps logs my-dashboard
 ### Step 5: Iterate
 
 1. Fix issues in local files
-2. Re-upload with `databricks workspace import-dir /path/to/my_app /Workspace/Users/user@example.com/my_app`
+2. Re-upload with `databricks workspace import-dir /path/to/my_app /Workspace/Users/user@example.com/my_app --overwrite`
 3. Re-deploy with `databricks apps deploy my-dashboard --source-code-path ...`
 4. Check `databricks apps logs my-dashboard` for errors
 5. Repeat until app is healthy

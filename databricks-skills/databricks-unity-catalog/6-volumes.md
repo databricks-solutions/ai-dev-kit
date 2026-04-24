@@ -39,14 +39,16 @@ All volume operations use the path format:
 
 ## CLI Commands
 
+`databricks fs` requires the `dbfs:` scheme prefix for UC Volume paths — without it the CLI treats the path as local filesystem and fails with `no such directory`.
+
 | Command | Description |
 |---------|-------------|
-| `databricks fs ls /Volumes/catalog/schema/volume/path/` | List files in a volume |
-| `databricks fs cp /tmp/data/* /Volumes/.../dest --recursive` | Upload files/folders to volume |
-| `databricks fs cp /Volumes/.../file.csv /tmp/file.csv` | Download files from volume |
-| `databricks fs mkdirs /Volumes/.../new_folder` | Create directory (like `mkdir -p`) |
-| `databricks fs rm /Volumes/.../file.csv` | Delete file |
-| `databricks fs rm /Volumes/.../folder --recursive` | Delete directory recursively |
+| `databricks fs ls dbfs:/Volumes/catalog/schema/volume/path/` | List files in a volume |
+| `databricks fs cp -r --overwrite /tmp/data dbfs:/Volumes/.../dest` | Upload a directory's contents to a volume |
+| `databricks fs cp dbfs:/Volumes/.../file.csv /tmp/file.csv` | Download a file from a volume |
+| `databricks fs mkdirs dbfs:/Volumes/.../new_folder` | Create directory (like `mkdir -p`) |
+| `databricks fs rm dbfs:/Volumes/.../file.csv` | Delete file |
+| `databricks fs rm -r dbfs:/Volumes/.../folder` | Delete directory recursively |
 
 ---
 

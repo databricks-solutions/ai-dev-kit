@@ -39,8 +39,10 @@ Skips files where PDF exists and is newer than HTML. Use `--force` to reconvert 
 
 ## Step 3: Upload to Volume
 
+`databricks fs` requires the `dbfs:` scheme prefix even for UC Volume paths. `-r` copies the *contents* of the source directory into the target (the source directory name is not preserved), so files land directly under `raw_data/`.
+
 ```bash
-databricks fs cp -r ./raw_data/pdf /Volumes/my_catalog/my_schema/raw_data/
+databricks fs cp -r --overwrite ./raw_data/pdf dbfs:/Volumes/my_catalog/my_schema/raw_data
 ```
 
 ## Step 4: Generate Test Questions
@@ -111,4 +113,4 @@ Subfolder structure is preserved:
 |-------|----------|
 | "plutoprint not installed" | `uv pip install plutoprint` |
 | PDF looks wrong | Check HTML/CSS syntax |
-| "Volume does not exist" | `databricks volumes create catalog.schema.volume MANAGED` |
+| "Volume does not exist" | `databricks volumes create CATALOG SCHEMA VOLUME_NAME MANAGED` (four separate positional args, not `catalog.schema.volume`) |

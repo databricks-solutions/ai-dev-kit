@@ -37,13 +37,15 @@ env:
 
 ### Step 2: Create and Deploy
 
+`--overwrite` on `workspace import-dir` is required for redeploys — without it the CLI **silently skips files that already exist**, so your updated code never makes it to the workspace and the app keeps running the old version. Harmless on the first deploy.
+
 ```bash
 # Create the app
 databricks apps create <app-name>
 
 # Upload source code
 databricks workspace mkdirs /Workspace/Users/<user>/apps/<app-name>
-databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name>
+databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name> --overwrite
 
 # Deploy
 databricks apps deploy <app-name> \
@@ -57,9 +59,11 @@ databricks apps get <app-name>
 
 ### Redeployment
 
+Use this recipe after the initial deploy, when you want a clean upload (stale files removed). On a first-ever deploy the `workspace delete` line errors because the directory doesn't exist yet — either run Step 2 first, or prefix the delete with ` 2>/dev/null || true` if you want this recipe to double as a clean deploy.
+
 ```bash
 databricks workspace delete /Workspace/Users/<user>/apps/<app-name> --recursive
-databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name>
+databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name> --overwrite
 databricks apps deploy <app-name> \
   --source-code-path /Workspace/Users/<user>/apps/<app-name>
 ```

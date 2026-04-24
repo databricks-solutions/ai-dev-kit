@@ -51,18 +51,20 @@ databricks volumes list my_catalog.my_schema
 
 ### Volume File Operations (CLI)
 
+`databricks fs` requires the `dbfs:` scheme prefix even for UC Volume paths — without it the CLI treats the path as local filesystem and errors with `no such directory`.
+
 ```bash
 # List files in a volume
-databricks fs ls /Volumes/catalog/schema/volume/path/
+databricks fs ls dbfs:/Volumes/catalog/schema/volume/path/
 
-# Upload files to a volume
-databricks fs cp /tmp/data/* /Volumes/catalog/schema/volume/dest/ --recursive
+# Upload a directory's contents to a volume (-r copies contents, not the directory itself)
+databricks fs cp -r --overwrite /tmp/data dbfs:/Volumes/catalog/schema/volume/dest
 
-# Download files from a volume
-databricks fs cp /Volumes/catalog/schema/volume/file.csv /tmp/file.csv
+# Download a file from a volume
+databricks fs cp dbfs:/Volumes/catalog/schema/volume/file.csv /tmp/file.csv
 
 # Create a directory in a volume
-databricks fs mkdirs /Volumes/catalog/schema/volume/new_folder
+databricks fs mkdirs dbfs:/Volumes/catalog/schema/volume/new_folder
 ```
 
 ### Enable System Tables Access
