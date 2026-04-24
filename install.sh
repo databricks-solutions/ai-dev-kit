@@ -149,7 +149,7 @@ while [ $# -gt 0 ]; do
             echo "  --mcp-only            Skip skills installation"
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
-            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf"
+            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode"
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
@@ -504,6 +504,7 @@ detect_tools() {
     local has_gemini=false
     local has_antigravity=false
     local has_windsurf=false
+    local has_opencode=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
@@ -512,10 +513,11 @@ detect_tools() {
     { command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/local/gemini" ]; } && has_gemini=true
     { [ -d "/Applications/Antigravity.app" ] || command -v antigravity >/dev/null 2>&1; } && has_antigravity=true
     { [ -d "/Applications/Windsurf.app" ] || command -v windsurf >/dev/null 2>&1; } && has_windsurf=true
+    command -v opencode >/dev/null 2>&1 && has_opencode=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" windsurf_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" windsurf_hint="not found"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" windsurf_state="off" opencode_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" windsurf_hint="not found" opencode_hint="not found"
     [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
     [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
     [ "$has_codex" = true ]         && codex_state="on"         && codex_hint="detected"
@@ -523,9 +525,10 @@ detect_tools() {
     [ "$has_gemini" = true ]        && gemini_state="on"        && gemini_hint="detected"
     [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
     [ "$has_windsurf" = true ]      && windsurf_state="on"      && windsurf_hint="detected"
+    [ "$has_opencode" = true ]      && opencode_state="on"      && opencode_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_windsurf" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_windsurf" = false ] && [ "$has_opencode" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
@@ -543,6 +546,7 @@ detect_tools() {
             "Gemini CLI|gemini|${gemini_state}|${gemini_hint}" \
             "Antigravity|antigravity|${antigravity_state}|${antigravity_hint}" \
             "Windsurf|windsurf|${windsurf_state}|${windsurf_hint}" \
+            "OpenCode|opencode|${opencode_state}|${opencode_hint}" \
         )
     else
         # Silent: use detected defaults
@@ -554,6 +558,7 @@ detect_tools() {
         [ "$has_gemini" = true ]        && tools="${tools:+$tools }gemini"
         [ "$has_antigravity" = true ]   && tools="${tools:+$tools }antigravity"
         [ "$has_windsurf" = true ]      && tools="${tools:+$tools }windsurf"
+        [ "$has_opencode" = true ]      && tools="${tools:+$tools }opencode"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -1108,6 +1113,13 @@ install_skills() {
                     dirs+=("$base_dir/.windsurf/skills")
                 fi
                 ;;
+            opencode)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.config/opencode/skills")
+                else
+                    dirs+=("$base_dir/.opencode/skills")
+                fi
+                ;;
         esac
     done
 
@@ -1342,6 +1354,54 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 EOF
 }
 
+write_opencode_json() {
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+
+    # Backup existing file before any modifications
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
+
+    if [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
+import json
+try:
+    with open('$path') as f: cfg = json.load(f)
+except: cfg = {}
+cfg.setdefault('\$schema', 'https://opencode.ai/config.json')
+cfg.setdefault('mcp', {})['databricks'] = {
+    'type': 'local',
+    'command': ['$VENV_PYTHON', '$MCP_ENTRY'],
+    'environment': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'},
+    'enabled': True
+}
+with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
+    fi
+
+    # Fallback: only safe for new files
+    if [ -f "$path" ]; then
+        warn "Cannot merge MCP config into $path without Python. Add manually."
+        return
+    fi
+
+    cat > "$path" << EOF
+{
+  "\$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "databricks": {
+      "type": "local",
+      "command": ["$VENV_PYTHON", "$MCP_ENTRY"],
+      "environment": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"},
+      "enabled": true
+    }
+  }
+}
+EOF
+}
+
 write_gemini_md() {
     local path=$1
     [ -f "$path" ] && return  # Don't overwrite existing file
@@ -1506,6 +1566,14 @@ write_mcp_configs() {
                 write_mcp_json "$HOME/.codeium/windsurf/mcp_config.json"
                 ok "Windsurf MCP config"
                 ;;
+            opencode)
+                if [ "$SCOPE" = "global" ]; then
+                    write_opencode_json "$HOME/.config/opencode/opencode.json"
+                else
+                    write_opencode_json "$base_dir/opencode.json"
+                fi
+                ok "OpenCode MCP config"
+                ;;
         esac
     done
 }
@@ -1555,6 +1623,10 @@ summary() {
         fi
         if echo "$TOOLS" | grep -q windsurf; then
             msg "${step}. Restart Windsurf to pick up the ${B}databricks${N} MCP server (Windsurf → Settings → Windsurf Settings → MCP)"
+            step=$((step + 1))
+        fi
+        if echo "$TOOLS" | grep -q opencode; then
+            msg "${step}. Launch OpenCode in your project: ${B}opencode${N}"
             step=$((step + 1))
         fi
         msg "${step}. Open your project in your tool of choice"

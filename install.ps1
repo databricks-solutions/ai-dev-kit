@@ -233,7 +233,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
@@ -571,6 +571,7 @@ function Invoke-DetectTools {
                       (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe")
     $hasWindsurf = ($null -ne (Get-Command windsurf -ErrorAction SilentlyContinue)) -or
                    (Test-Path "$env:LOCALAPPDATA\Programs\Windsurf\Windsurf.exe")
+    $hasOpencode = $null -ne (Get-Command opencode -ErrorAction SilentlyContinue)
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -579,9 +580,10 @@ function Invoke-DetectTools {
     $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
     $windsurfState = $hasWindsurf; $windsurfHint = if ($hasWindsurf) { "detected" } else { "not found" }
+    $opencodeState = $hasOpencode; $opencodeHint = if ($hasOpencode) { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasWindsurf) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasWindsurf -and -not $hasOpencode) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -599,6 +601,7 @@ function Invoke-DetectTools {
         @{ Label = "Gemini CLI";     Value = "gemini";       State = $geminiState;       Hint = $geminiHint }
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
         @{ Label = "Windsurf";       Value = "windsurf";     State = $windsurfState;     Hint = $windsurfHint }
+        @{ Label = "OpenCode";       Value = "opencode";     State = $opencodeState;     Hint = $opencodeHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1175,6 +1178,13 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".windsurf\skills"
                 }
             }
+            "opencode" {
+                if ($script:Scope -eq "global") {
+                    $dirs += Join-Path $env:USERPROFILE ".config\opencode\skills"
+                } else {
+                    $dirs += Join-Path $BaseDir ".opencode\skills"
+                }
+            }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1489,6 +1499,65 @@ function Write-GeminiMcpJson {
     }
 }
 
+function Write-OpenCodeJson {
+    param([string]$Path)
+
+    $dir = Split-Path $Path -Parent
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+
+    # Backup existing
+    if (Test-Path $Path) {
+        Copy-Item $Path "$Path.bak" -Force
+        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
+    }
+
+    # Try to merge with existing config
+    $existing = $null
+    if ((Test-Path $Path) -and (Test-Path $script:VenvPython)) {
+        try {
+            $existing = Get-Content $Path -Raw | ConvertFrom-Json
+        } catch {
+            $existing = $null
+        }
+    }
+
+    if ($existing) {
+        if (-not $existing.'$schema') {
+            $existing | Add-Member -NotePropertyName '$schema' -NotePropertyValue 'https://opencode.ai/config.json' -Force
+        }
+        if (-not $existing.mcp) {
+            $existing | Add-Member -NotePropertyName "mcp" -NotePropertyValue ([PSCustomObject]@{}) -Force
+        }
+        $dbEntry = [PSCustomObject]@{
+            type        = "local"
+            command     = @($script:VenvPython -replace '\\', '/', $script:McpEntry -replace '\\', '/')
+            environment = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
+            enabled     = $true
+        }
+        $existing.mcp | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
+        $existing | ConvertTo-Json -Depth 10 | Set-Content $Path -Encoding UTF8
+    } else {
+        $pythonPath = $script:VenvPython -replace '\\', '/'
+        $entryPath  = $script:McpEntry -replace '\\', '/'
+        $json = @"
+{
+  "`$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "databricks": {
+      "type": "local",
+      "command": ["$pythonPath", "$entryPath"],
+      "environment": {"DATABRICKS_CONFIG_PROFILE": "$($script:Profile_)"},
+      "enabled": true
+    }
+  }
+}
+"@
+        Set-Content -Path $Path -Value $json -Encoding UTF8
+    }
+}
+
 function Write-GeminiMd {
     param([string]$Path)
 
@@ -1608,6 +1677,14 @@ function Write-McpConfigs {
                 Write-McpJson (Join-Path $env:USERPROFILE ".codeium\windsurf\mcp_config.json")
                 Write-Ok "Windsurf MCP config"
             }
+            "opencode" {
+                if ($script:Scope -eq "global") {
+                    Write-OpenCodeJson (Join-Path $env:USERPROFILE ".config\opencode\opencode.json")
+                } else {
+                    Write-OpenCodeJson (Join-Path $BaseDir "opencode.json")
+                }
+                Write-Ok "OpenCode MCP config"
+            }
         }
     }
 }
@@ -1665,6 +1742,10 @@ function Show-Summary {
     }
     if ($script:Tools -match 'windsurf') {
         Write-Msg "$step. Restart Windsurf to pick up the databricks MCP server (Windsurf -> Settings -> Windsurf Settings -> MCP)"
+        $step++
+    }
+    if ($script:Tools -match 'opencode') {
+        Write-Msg "$step. Launch OpenCode in your project: opencode"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"
