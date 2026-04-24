@@ -35,13 +35,13 @@ Use this skill when:
 
 ```bash
 # Create a catalog
-databricks catalogs create --json '{"name": "my_catalog"}'
+databricks catalogs create my_catalog
 
-# Create a schema
-databricks schemas create --json '{"name": "my_schema", "catalog_name": "my_catalog"}'
+# Create a schema  (args: NAME CATALOG_NAME — positional, name first)
+databricks schemas create my_schema my_catalog
 
-# Create a volume
-databricks volumes create --json '{"name": "my_volume", "catalog_name": "my_catalog", "schema_name": "my_schema", "volume_type": "MANAGED"}'
+# Create a volume  (args: CATALOG_NAME SCHEMA_NAME NAME VOLUME_TYPE — catalog first)
+databricks volumes create my_catalog my_schema my_volume MANAGED
 
 # List catalogs, schemas, volumes
 databricks catalogs list

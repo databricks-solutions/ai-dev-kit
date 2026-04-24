@@ -281,17 +281,33 @@ After running a pipeline (via DAB or CLI), you **MUST** validate both the execut
 
 ### Step 1: Check Pipeline Execution Status
 
+`list-pipeline-events` returns a bare JSON array (not `{"events": [...]}`). For DAB runs, also check `databricks bundle run` output; `pipelines get`/`list-pipeline-events` still apply.
+
 ```bash
-# Get pipeline status and details (pipeline_id is positional)
 databricks pipelines get <pipeline_id>
 
-# Get recent events/logs
-databricks pipelines list-pipeline-events <pipeline_id>
+# Surface just failures
+databricks pipelines list-pipeline-events <pipeline_id> \
+  | jq '[.[] | select(.level=="ERROR" or .level=="WARN") | {level, event_type, message: (.message // "")[0:200]}] | .[0:10]'
 ```
 
-**From DAB (`databricks bundle run`):**
-- Check the command output for success/failure
-- Use `databricks pipelines get <pipeline_id>` to get detailed status and recent events
+### Updating a Pipeline (edit → re-upload → restart)
+
+Use `--format RAW --overwrite` — pipelines use raw `.sql`/`.py` FILE entries. `--format SOURCE --language SQL|PYTHON` uploads a workspace notebook instead and **notebooks are deprecated for pipelines**; mixing the two on the same path fails with `Cannot overwrite the asset ... due to type mismatch (asked: NOTEBOOK, actual: FILE)`.
+
+```bash
+# Single file
+databricks workspace import /Workspace/Users/<user>/pipeline/07_gold.sql \
+    --file ./src/pipeline/07_gold.sql --format RAW --overwrite
+
+# Whole directory
+databricks workspace import-dir ./src/pipeline /Workspace/Users/<user>/pipeline --overwrite
+
+# Restart. --full-refresh reprocesses everything (destructive on streaming state); omit for incremental.
+databricks pipelines start-update <pipeline_id> --full-refresh
+```
+
+If pipeline is RUNNING, `start-update` queues the new update. Force-stop with `databricks pipelines stop <pipeline_id>` first if needed.
 
 ### Step 2: Validate Output Data
 
@@ -340,12 +356,14 @@ If validation reveals problems, trace upstream to find the root cause:
 | **Empty output tables** | Use `discover-schema` to check upstream tables. Verify source files exist and paths are correct. |
 | **Pipeline stuck INITIALIZING** | Normal for serverless, wait a few minutes |
 | **"Column not found"** | Check `schemaHints` match actual data |
-| **Streaming reads fail** | For file ingestion in a streaming table, you must use the `STREAM` keyword with `read_files`: `FROM STREAM read_files(...)`. For table streams use `FROM stream(table)`. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
+| **Streaming reads fail** | Use `FROM STREAM read_files(...)` only for file ingestion; use `FROM stream(table)` for table-to-table streams. `FROM STREAM table` (no parens) parses but is legacy DLT — prefer the function form. See [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
 | **Timeout during run** | Use `databricks pipelines get <pipeline_id>` to check status |
 | **MV doesn't refresh** | Enable row tracking on source tables |
 | **SCD2: query column not found** | Lakeflow uses `__START_AT` and `__END_AT` (double underscore), not `START_AT`/`END_AT`. Use `WHERE __END_AT IS NULL` for current rows. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
 | **AUTO CDC parse error at APPLY/SEQUENCE** | Put `APPLY AS DELETE WHEN` **before** `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that exist in the source (omit `_rescued_data` unless bronze uses rescue data). Omit `TRACK HISTORY ON *` if it causes "end of input" errors; default is equivalent. See [sql/4-cdc-patterns.md](references/sql/4-cdc-patterns.md). |
 | **"Cannot create streaming table from batch query"** | In a streaming table query, use `FROM STREAM read_files(...)` so `read_files` leverages Auto Loader; `FROM read_files(...)` alone is batch. See [sql/2-ingestion.md](references/sql/2-ingestion.md) and [read_files — Usage in streaming tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables). |
+| **"Paths must end with .py or .sql"** on `pipelines create` | `{"file": {"path": ...}}` needs a single file. Use `{"glob": {"include": "<dir>/**"}}` for a directory, or enumerate files individually. |
+| **`type mismatch (asked: NOTEBOOK, actual: FILE)`** on `workspace import` | Existing path is a FILE (raw `.sql`/`.py`). Re-upload with `--format RAW --overwrite`, not `--format SOURCE --language SQL` (creates a NOTEBOOK — deprecated for pipelines). |
 
 **For detailed errors**, use `databricks pipelines get <pipeline_id>` which includes recent events, or `databricks pipelines list-pipeline-events <pipeline_id>` for full event history.
 

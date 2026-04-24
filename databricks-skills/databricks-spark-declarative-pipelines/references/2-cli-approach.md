@@ -20,27 +20,26 @@ databricks workspace import-dir ./my_pipeline /Workspace/Users/user@example.com/
 ### Step 3: Create Pipeline
 
 ```bash
-# Create pipeline with JSON config
-# Use "file" - can point to a single .sql/.py file OR a directory (includes all files)
+# libraries: "file" = single .sql/.py file; "glob" = directory of files.
+# A "file" pointing at a folder fails: "Paths must end with .py or .sql".
+# "notebook" is deprecated — use "file" or "glob".
 databricks pipelines create --json '{
   "name": "my_orders_pipeline",
   "catalog": "my_catalog",
   "schema": "my_schema",
   "serverless": true,
   "libraries": [
-    {"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}
+    {"glob": {"include": "/Workspace/Users/user@example.com/my_pipeline/**"}}
   ],
   "tags": {"aidevkit_project": "ai-dev-kit"},
   "development": true
 }'
 
-# Or specify individual files:
+# Enumerate files instead of glob:
 # "libraries": [
 #   {"file": {"path": "/Workspace/.../bronze/ingest_orders.sql"}},
 #   {"file": {"path": "/Workspace/.../silver/clean_orders.sql"}}
 # ]
-#
-# Legacy (avoid): {"notebook": {"path": "..."}} - use "file" instead
 ```
 
 Save the returned `pipeline_id` for subsequent operations.
