@@ -4,23 +4,29 @@ For commands, see [SKILL.md](SKILL.md).
 
 ## Source Types
 
+Both shapes go inside the `--json` body alongside `display_name` and `description` — see SKILL.md for the full invocation.
+
 ### Files (Volume)
 
 ```json
 {
+  "display_name": "...",
+  "description": "...",
   "source_type": "files",
   "files": {"path": "/Volumes/catalog/schema/volume/folder/"}
 }
 ```
 
-Supported formats: PDF, TXT, MD, DOCX
+Supported formats: PDF, TXT, MD, DOCX.
 
 ### Vector Search Index
 
-Use existing index instead of auto-indexing:
+Use an existing index instead of auto-indexing:
 
 ```json
 {
+  "display_name": "...",
+  "description": "...",
   "source_type": "index",
   "index": {
     "index_name": "catalog.schema.my_index",
