@@ -28,14 +28,15 @@ dependencies = [
   "psycopg2-binary>=2.9.11",  # For alembic migrations (sync)
   # Claude Agent SDK (successor to claude-code-sdk)
   "claude-agent-sdk>=0.1.19",
-  "anthropic>=0.42.0",
+  "anthropic>=0.94.1",
   # Databricks MCP tools (databricks-mcp-server installed from sibling dir in dev)
   "mcp>=1.0.0",
-  "fastmcp==3.1.1",
+  "fastmcp>=3.2.4,<4",
   # databricks-tools-core and databricks-mcp-server are bundled in packages/ directory
   "requests>=2.31.0",
   # MLflow 3+ for Claude Code tracing (not mlflow[databricks] to avoid litellm)
-  "mlflow>=3.9.0",
+  # Cap at <3.11 to avoid pre-release resolution via tool.uv.prerelease=allow
+  "mlflow>=3.9.0,<3.11",
   "sqlglot>=20.0.0",
   "sqlfluff>=3.0.0",
   "plutoprint==0.19.0",
@@ -48,8 +49,8 @@ dependencies = [
   "rich==14.0.0",
   "protobuf>=3.12.0,<5",
   "pandas==2.3.0",
-  "flask==3.1.0",
-  "werkzeug==3.1.3",
+  "flask==3.1.3",
+  "werkzeug==3.1.8",
 ]
 
 [dependency-groups]
