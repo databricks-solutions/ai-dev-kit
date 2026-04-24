@@ -3,6 +3,10 @@
 # This file contains verified test cases that represent expected skill behavior.
 # Test cases promoted from candidates.yaml after batch review on 2026-02-13
 
+metadata:
+  skill_name: databricks-aibi-dashboards
+  version: 0.1.0
+  created_at: '2026-02-13T00:00:00.000000'
 test_cases:
 - id: "basic-dashboard-nyctaxi"
   inputs:
