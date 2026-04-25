@@ -80,7 +80,7 @@ databricks postgres delete-branch projects/my-app/branches/development
 
 ## Endpoints (Compute)
 
-A compute runs Postgres for one branch. One R/W endpoint per branch (plus optional read replicas). Autoscale range: 0.5-32 CU with max-min ≤ 8 CU. Large fixed sizes: 36-112 CU.
+A compute runs Postgres for one branch. One R/W endpoint per branch (plus optional read replicas). Autoscale range: 0.5-32 CU with max-min ≤ 16 CU. Large fixed sizes: 36-112 CU.
 
 ```bash
 # Create an R/W endpoint — replace RW with ENDPOINT_TYPE_READ_ONLY for read replicas
@@ -93,6 +93,9 @@ databricks postgres create-endpoint \
 # Get host, state, CU range
 databricks postgres get-endpoint projects/my-app/branches/production/endpoints/primary
 
+# List all endpoints on a branch
+databricks postgres list-endpoints projects/my-app/branches/production
+
 # Resize — mask is a comma-separated positional; JSON holds new values
 databricks postgres update-endpoint \
     projects/my-app/branches/production/endpoints/primary \
@@ -103,7 +106,7 @@ databricks postgres update-endpoint \
 databricks postgres delete-endpoint projects/my-app/branches/production/endpoints/my-compute
 ```
 
-**Scale-to-zero:** off on `production` by default, configurable elsewhere (min 60s, default 5min). Reactivation takes a few hundred ms; session context (temp tables, prepared statements, in-memory cache) is **reset** on wake.
+**Scale-to-zero:** off on `production` by default, configurable elsewhere (min 60s, default 5min). Reactivation takes ~100ms; session context (temp tables, prepared statements, in-memory cache) is **reset** on wake.
 
 → CU sizing table, autoscaling math, scale-to-zero internals, SDK equivalents: [computes.md](computes.md).
 
@@ -137,7 +140,7 @@ echo "postgresql://${USER/@/%40}:$TOKEN@$HOST:5432/databricks_postgres?sslmode=r
 PGPASSWORD="$TOKEN" psql "host=$HOST dbname=databricks_postgres user=$USER sslmode=require"
 ```
 
-Token TTL is ~1 hour. For app deployment, store **only the endpoint path** as config and generate the token at startup (and every ~50 min thereafter) — never bake the token into env files.
+Token TTL is ~1 hour. For app deployment, store **only the endpoint path** as config and generate the token at startup (and every 30-40 min thereafter) — never bake the token into env files.
 
 Application code is the one place to use the SDK — tokens expire hourly and must be refreshed in-process.
 
@@ -151,16 +154,18 @@ Syncs Unity Catalog Delta tables into Lakebase as Postgres tables via managed La
 
 ```bash
 # Create a synced table — swap scheduling_policy to SNAPSHOT | TRIGGERED | CONTINUOUS
-databricks database create-synced-database-table \
-    --json '{"name": "lakebase_catalog.schema.synced_table",
-             "spec": {"source_table_full_name": "analytics.gold.user_profiles",
+databricks postgres create-synced-table lakebase_catalog.schema.synced_table \
+    --json '{"spec": {"source_table_full_name": "analytics.gold.user_profiles",
                       "primary_key_columns": ["user_id"],
                       "scheduling_policy": "TRIGGERED",
                       "new_pipeline_spec": {"storage_catalog": "lakebase_catalog",
                                             "storage_schema": "staging"}}}'
 
 # Status (detailed_state shows sync progress)
-databricks database get-synced-database-table lakebase_catalog.schema.synced_table
+databricks postgres get-synced-table synced_tables/lakebase_catalog.schema.synced_table
+
+# Delete (also drop the Postgres-side table separately)
+databricks postgres delete-synced-table synced_tables/lakebase_catalog.schema.synced_table
 ```
 
 Enable CDF on the source for TRIGGERED/CONTINUOUS: `ALTER TABLE ... SET TBLPROPERTIES (delta.enableChangeDataFeed = true)`. Each synced table uses up to 16 connections and counts against per-branch limits.
@@ -173,18 +178,37 @@ Enable CDF on the source for TRIGGERED/CONTINUOUS: `ALTER TABLE ... SET TBLPROPE
 
 | Issue | Solution |
 |-------|----------|
-| Token expired during long query | Refresh tokens every ~50 min (1h TTL) |
-| Connection refused after scale-to-zero | Compute wakes on connect (~few hundred ms); add retry logic |
+| Token expired during long query | Refresh tokens every 30-40 min (1h TTL) |
+| Connection refused after scale-to-zero | Compute wakes on connect (~100ms); add retry logic |
 | DNS resolution fails on macOS | Pass `hostaddr` (resolved via `dig`) alongside `host` to psycopg |
 | Branch delete blocked | Delete child branches first; remove protection first |
-| Autoscaling range rejected | max-min must be ≤ 8 CU (e.g., 8-16 valid; 0.5-32 invalid) |
+| Autoscaling range rejected | max-min must be ≤ 16 CU (e.g., 4-20 valid; 0.5-32 invalid) |
 | SSL required error | Always `sslmode=require` |
 | Update mask required | CLI `update-*` commands take the mask as a positional arg |
 | Connection closed after 24h idle | 24h idle timeout, 3-day max lifetime — add retry |
 
+## Databricks Apps Integration
+
+Scaffold an app connected to Lakebase at creation time:
+
+```bash
+databricks apps init --name my-app \
+    --features lakebase \
+    --set "lakebase.postgres.branch=production" \
+    --set "lakebase.postgres.database=databricks_postgres"
+```
+
+## High Availability
+
+HA adds 1–3 read secondaries across availability zones with automatic failover. Secondaries are accessible via a `-ro` suffix on the host and independently autoscale (but won't drop below the primary's current CU). HA is incompatible with scale-to-zero. See [computes.md](computes.md) for sizing constraints.
+
+## Lakehouse Sync (Beta — AWS only)
+
+Reverse direction: continuously streams Postgres changes from Lakebase into Unity Catalog Delta tables via CDC. Azure support TBD. Enable via the project UI.
+
 ## Not Yet Supported
 
-HA readable secondaries (use read replicas), Databricks Apps UI integration (manual connect works), Feature Store, stateful AI agents (LangChain memory), Postgres→Delta sync, custom billing tags / serverless budget policies.
+Custom billing tags / serverless budget policies.
 
 ## Related Skills
 

@@ -15,8 +15,8 @@ The pipeline is a managed Lakeflow Spark Declarative Pipeline that runs on Datab
 
 | Mode | Throughput (per CU) | Latency |
 |------|---------------------|---------|
-| Continuous writes | ~1,200 rows/s | seconds |
-| Bulk writes (initial load / snapshot) | ~15,000 rows/s | minutes-hours depending on size |
+| Snapshot (initial load) | ~2,000 rows/s | minutes-hours depending on size |
+| Triggered / Continuous (incremental) | ~150 rows/s | seconds (Continuous); scheduled (Triggered) |
 
 Each synced table uses **up to 16 connections** on the target endpoint. Account for this when sizing concurrency-heavy apps alongside reverse ETL on the same endpoint.
 
@@ -96,9 +96,8 @@ DROP TABLE your_database.your_schema.your_table;
 Product catalog for a web app (hourly refresh is plenty):
 
 ```bash
-databricks database create-synced-database-table \
-    --json '{"name": "ecommerce_catalog.public.products",
-             "spec": {"source_table_full_name": "gold.products.catalog",
+databricks postgres create-synced-table ecommerce_catalog.public.products \
+    --json '{"spec": {"source_table_full_name": "gold.products.catalog",
                       "primary_key_columns": ["product_id"],
                       "scheduling_policy": "TRIGGERED"}}'
 ```
@@ -106,28 +105,31 @@ databricks database create-synced-database-table \
 Real-time feature serving for ML (needs CDF on `ml.features.user_features`):
 
 ```bash
-databricks database create-synced-database-table \
-    --json '{"name": "ml_catalog.public.user_features",
-             "spec": {"source_table_full_name": "ml.features.user_features",
+databricks postgres create-synced-table ml_catalog.public.user_features \
+    --json '{"spec": {"source_table_full_name": "ml.features.user_features",
                       "primary_key_columns": ["user_id"],
                       "scheduling_policy": "CONTINUOUS"}}'
 ```
 
+## Lakehouse Sync (Beta — AWS only)
+
+Reverse direction: continuously streams Postgres row changes from Lakebase into Unity Catalog Delta tables via CDC. Enable via the project UI. Azure support TBD.
+
 ## SDK Equivalents
 
-Synced tables use the `w.database` SDK module (not `w.postgres`):
+Synced tables use the `w.postgres` SDK module (CLI v0.294.0+):
 
 ```python
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.database import (
-    SyncedDatabaseTable, SyncedTableSpec,
+from databricks.sdk.service.postgres import (
+    SyncedTable, SyncedTableSpec,
     NewPipelineSpec, SyncedTableSchedulingPolicy,
 )
 
 w = WorkspaceClient()
 
-w.database.create_synced_database_table(
-    SyncedDatabaseTable(
+w.postgres.create_synced_table(
+    SyncedTable(
         name="lakebase_catalog.schema.synced_table",
         spec=SyncedTableSpec(
             source_table_full_name="analytics.gold.user_profiles",
@@ -141,6 +143,6 @@ w.database.create_synced_database_table(
     )
 )
 
-status = w.database.get_synced_database_table(name="lakebase_catalog.schema.synced_table")
+status = w.postgres.get_synced_table(name="synced_tables/lakebase_catalog.schema.synced_table")
 print(status.data_synchronization_status.detailed_state)
 ```
