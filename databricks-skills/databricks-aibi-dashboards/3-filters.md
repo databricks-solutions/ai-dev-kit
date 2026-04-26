@@ -60,7 +60,7 @@
       "frame": {"showTitle": true, "title": "Region"}
     }
   },
-  "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+  "position": {"x": 0, "y": 0, "width": 4, "height": 2}
 }
 ```
 
@@ -100,7 +100,7 @@ Place on a dedicated filter page:
           "frame": {"showTitle": true, "title": "Campaign"}
         }
       },
-      "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+      "position": {"x": 0, "y": 0, "width": 4, "height": 2}
     }
   ]
 }
@@ -130,7 +130,7 @@ Place filter widget directly on a `PAGE_TYPE_CANVAS` page (same widget structure
           "frame": {"showTitle": true, "title": "Platform"}
         }
       },
-      "position": {"x": 4, "y": 0, "width": 2, "height": 2}
+      "position": {"x": 8, "y": 0, "width": 4, "height": 2}
     }
   ]
 }
@@ -181,7 +181,7 @@ Place filter widget directly on a `PAGE_TYPE_CANVAS` page (same widget structure
       "frame": {"showTitle": true, "title": "Date Range"}
     }
   },
-  "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+  "position": {"x": 0, "y": 0, "width": 4, "height": 2}
 }
 ```
 
@@ -225,7 +225,7 @@ When a filter should affect multiple datasets (e.g., "Region" filter for both sa
       "frame": {"showTitle": true, "title": "Region"}
     }
   },
-  "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+  "position": {"x": 0, "y": 0, "width": 4, "height": 2}
 }
 ```
 
@@ -237,4 +237,4 @@ Each `queryName` in `encodings.fields` binds the filter to that specific dataset
 
 - Global filters: Position on dedicated filter page, stack vertically at `x=0`
 - Page-level filters: Position in header area of page (e.g., top-right corner)
-- Typical sizing: `width: 2, height: 2`
+- Typical sizing: `width: 4, height: 2`
