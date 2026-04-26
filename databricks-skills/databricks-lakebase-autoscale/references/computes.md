@@ -1,6 +1,6 @@
 # Lakebase Autoscaling — Computes (deep dive)
 
-Deep dive for Endpoints (computes). Basic CLI is in [SKILL.md](SKILL.md).
+Deep dive for Endpoints (computes). Basic CLI is in [SKILL.md](../SKILL.md).
 
 ## What an Endpoint Is
 
@@ -31,7 +31,7 @@ Max connections flattens at 4,000 above 32 CU — scale up past 32 CU for memory
 | Large fixed | 36-112 CU | Fixed size, no autoscaling |
 
 **Autoscaling window constraint.** The spread between `autoscaling_limit_min_cu` and `autoscaling_limit_max_cu` cannot exceed 16 CU:
-- Valid: 4-20, 8-16, 2-18
+- Valid: .5-4, 4-20, 8-32
 - Invalid: 0.5-32 (31.5 CU spread), 1-24 (23 CU spread)
 
 Set the minimum high enough to keep your working set in memory — traffic that lands after a scale-up pays a cache-warm penalty until hot pages are faulted back in.

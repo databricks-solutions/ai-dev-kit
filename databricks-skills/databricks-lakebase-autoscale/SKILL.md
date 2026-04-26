@@ -7,7 +7,7 @@ description: "Patterns and best practices for Lakebase Autoscaling (next-gen man
 
 Next-generation managed PostgreSQL on Databricks — autoscaling compute (0.5-112 CU, ~2 GB/CU), Git-like branching, scale-to-zero, and point-in-time restore (up to 35 days).
 
-**Interface: Databricks CLI (`databricks postgres ...`).** Every admin command below uses the CLI. The only place SDK is preferred is inside an application that needs to refresh 1-hour OAuth tokens — see [connection-patterns.md](connection-patterns.md).
+**Interface: Databricks CLI (`databricks postgres ...`).** Every admin command below uses the CLI. The only place SDK is preferred is inside an application that needs to refresh 1-hour OAuth tokens — see [connection-patterns.md](references/connection-patterns.md).
 
 ## Hierarchy
 
@@ -46,7 +46,7 @@ databricks postgres update-project projects/my-app spec.display_name \
 databricks postgres delete-project projects/my-app
 ```
 
-→ Defaults, limits table, LRO mechanics, SDK equivalents: [projects.md](projects.md).
+→ Defaults, limits table, LRO mechanics, SDK equivalents: [projects.md](references/projects.md).
 
 ---
 
@@ -74,7 +74,7 @@ databricks postgres reset-branch projects/my-app/branches/development
 databricks postgres delete-branch projects/my-app/branches/development
 ```
 
-→ Copy-on-write internals, TTL rules (max 30 days), reset constraints, SDK equivalents: [branches.md](branches.md).
+→ Copy-on-write internals, TTL rules (max 30 days), reset constraints, SDK equivalents: [branches.md](references/branches.md).
 
 ---
 
@@ -108,7 +108,7 @@ databricks postgres delete-endpoint projects/my-app/branches/production/endpoint
 
 **Scale-to-zero:** off on `production` by default, configurable elsewhere (min 60s, default 5min). Reactivation takes ~100ms; session context (temp tables, prepared statements, in-memory cache) is **reset** on wake.
 
-→ CU sizing table, autoscaling math, scale-to-zero internals, SDK equivalents: [computes.md](computes.md).
+→ CU sizing table, autoscaling math, scale-to-zero internals, SDK equivalents: [computes.md](references/computes.md).
 
 ---
 
@@ -140,11 +140,11 @@ echo "postgresql://${USER/@/%40}:$TOKEN@$HOST:5432/databricks_postgres?sslmode=r
 PGPASSWORD="$TOKEN" psql "host=$HOST dbname=databricks_postgres user=$USER sslmode=require"
 ```
 
-Token TTL is ~1 hour. For app deployment, store **only the endpoint path** as config and generate the token at startup (and every 30-40 min thereafter) — never bake the token into env files.
+Token TTL is ~1 hour. For app deployment, store **only the endpoint path** as config and generate the token at startup (and every 45 min thereafter) — never bake the token into env files.
 
 Application code is the one place to use the SDK — tokens expire hourly and must be refreshed in-process.
 
-→ Runtime connection patterns (minimal SDK snippet, SQLAlchemy pooling, async refresh loop, macOS DNS workaround, static-URL local dev): [connection-patterns.md](connection-patterns.md).
+→ Runtime connection patterns (minimal SDK snippet, SQLAlchemy pooling, async refresh loop, macOS DNS workaround, static-URL local dev): [connection-patterns.md](references/connection-patterns.md).
 
 ---
 
@@ -170,7 +170,7 @@ databricks postgres delete-synced-table synced_tables/lakebase_catalog.schema.sy
 
 Enable CDF on the source for TRIGGERED/CONTINUOUS: `ALTER TABLE ... SET TBLPROPERTIES (delta.enableChangeDataFeed = true)`. Each synced table uses up to 16 connections and counts against per-branch limits.
 
-→ Mode comparison, type mapping (UC → Postgres), capacity planning, schema evolution rules, SDK equivalents: [reverse-etl.md](reverse-etl.md).
+→ Mode comparison, type mapping (UC → Postgres), capacity planning, schema evolution rules, SDK equivalents: [reverse-etl.md](references/reverse-etl.md).
 
 ---
 
@@ -178,7 +178,7 @@ Enable CDF on the source for TRIGGERED/CONTINUOUS: `ALTER TABLE ... SET TBLPROPE
 
 | Issue | Solution |
 |-------|----------|
-| Token expired during long query | Refresh tokens every 30-40 min (1h TTL) |
+| Token expired during long query | Refresh tokens every 45 min (1h TTL) |
 | Connection refused after scale-to-zero | Compute wakes on connect (~100ms); add retry logic |
 | DNS resolution fails on macOS | Pass `hostaddr` (resolved via `dig`) alongside `host` to psycopg |
 | Branch delete blocked | Delete child branches first; remove protection first |
@@ -200,7 +200,7 @@ databricks apps init --name my-app \
 
 ## High Availability
 
-HA adds 1–3 read secondaries across availability zones with automatic failover. Secondaries are accessible via a `-ro` suffix on the host and independently autoscale (but won't drop below the primary's current CU). HA is incompatible with scale-to-zero. See [computes.md](computes.md) for sizing constraints.
+HA adds 1–3 read secondaries across availability zones with automatic failover. Secondaries are accessible via a `-ro` suffix on the host and independently autoscale (but won't drop below the primary's current CU). HA is incompatible with scale-to-zero. See [computes.md](references/computes.md) for sizing constraints.
 
 ## Lakehouse Sync (Beta — AWS only)
 

@@ -1,6 +1,6 @@
 # Lakebase Autoscaling — Reverse ETL (deep dive)
 
-Deep dive for synced tables. Basic CLI is in [SKILL.md](SKILL.md).
+Deep dive for synced tables. Basic CLI is in [SKILL.md](../SKILL.md).
 
 ## How Synced Tables Work
 
