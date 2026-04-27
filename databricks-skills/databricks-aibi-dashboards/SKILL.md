@@ -149,6 +149,18 @@ If you need conditional logic or multi-field formulas, compute a derived column 
 
 ### 4) LAYOUT (12-Column Grid, NO GAPS)
 
+**Every page must include `"layoutVersion": "GRID_V1"`** alongside `pageType`.
+
+```json
+{
+  "name": "overview",
+  "displayName": "Overview",
+  "pageType": "PAGE_TYPE_CANVAS",
+  "layoutVersion": "GRID_V1",
+  "layout": [...]
+}
+```
+
 Each widget has a position: `{"x": 0, "y": 0, "width": 4, "height": 4}`
 
 **CRITICAL**: Each row must fill width=12 exactly. No gaps allowed.
@@ -194,15 +206,16 @@ y=12: Table (w=12, h=6) - Detailed data
 
 Before deploying, verify:
 1. All widget names use only alphanumeric + hyphens + underscores
-2. All rows sum to width=12 with no gaps
-3. KPIs use height 3-4, charts use height 5-6
-4. Chart dimensions have ≤8 distinct values
-5. All widget fieldNames match dataset columns exactly
-6. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
-7. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
-8. Percent values are 0-1 (not 0-100)
-9. SQL uses Spark syntax (date_sub, not INTERVAL)
-10. **All SQL queries tested via `execute_sql` and return expected data**
+2. **Every page has `"layoutVersion": "GRID_V1"`**
+3. All rows sum to width=12 with no gaps
+4. KPIs use height 3-4, charts use height 5-6
+5. Chart dimensions have ≤8 distinct values
+6. All widget fieldNames match dataset columns exactly
+7. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
+8. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
+9. Percent values are 0-1 (not 0-100)
+10. SQL uses Spark syntax (date_sub, not INTERVAL)
+11. **All SQL queries tested via `execute_sql` and return expected data**
 
 ---
 

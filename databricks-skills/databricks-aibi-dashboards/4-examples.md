@@ -85,6 +85,7 @@ This example shows a complete dashboard with:
       "name": "sales_overview",
       "displayName": "Sales Overview",
       "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
       "layout": [
         {
           "widget": {
@@ -383,6 +384,7 @@ This example shows a complete dashboard with:
       "name": "global_filters",
       "displayName": "Filters",
       "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1",
       "layout": [
         {
           "widget": {

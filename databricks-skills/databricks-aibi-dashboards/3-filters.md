@@ -75,6 +75,7 @@ Place on a dedicated filter page:
   "name": "filters",
   "displayName": "Filters",
   "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+  "layoutVersion": "GRID_V1",
   "layout": [
     {
       "widget": {
@@ -117,6 +118,7 @@ Place filter widget directly on a `PAGE_TYPE_CANVAS` page (same widget structure
   "name": "platform_breakdown",
   "displayName": "Platform Breakdown",
   "pageType": "PAGE_TYPE_CANVAS",
+  "layoutVersion": "GRID_V1",
   "layout": [
     {"widget": {...}, "position": {...}},
     {

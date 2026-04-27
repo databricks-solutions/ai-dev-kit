@@ -48,6 +48,7 @@ dashboard = {
         "name": "overview",
         "displayName": "NYC Taxi Overview",
         "pageType": "PAGE_TYPE_CANVAS",
+        "layoutVersion": "GRID_V1",
         "layout": [
             # Text header - NO spec block! Use SEPARATE widgets for title and subtitle!
             {
@@ -229,6 +230,7 @@ dashboard_with_filters = {
             "name": "overview",
             "displayName": "Sales Overview",
             "pageType": "PAGE_TYPE_CANVAS",
+            "layoutVersion": "GRID_V1",
             "layout": [
                 {
                     "widget": {
@@ -258,6 +260,7 @@ dashboard_with_filters = {
             "name": "filters",
             "displayName": "Filters",
             "pageType": "PAGE_TYPE_GLOBAL_FILTERS",  # Required for global filter page!
+            "layoutVersion": "GRID_V1",
             "layout": [
                 {
                     "widget": {
