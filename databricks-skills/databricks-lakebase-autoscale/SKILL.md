@@ -27,7 +27,7 @@ Lakebase Autoscaling is Databricks' next-generation managed PostgreSQL service f
 | Language | Credential SDK | DB Driver |
 |----------|----------------|-----------|
 | **Python** | `databricks-sdk` (`WorkspaceClient`) | `psycopg[binary,pool]` (canonical) or `SQLAlchemy` |
-| **Node/TS** | `@databricks/lakebase` (handles both) | `@databricks/lakebase` wraps `pg` pool |
+| **Node/TS** | `@databricks/lakebase` (Autoscaling only) | `@databricks/lakebase` wraps `pg` pool |
 | **Java/Go** | Databricks SDK for Java/Go | Standard JDBC / `pgx` |
 
 ### What NOT to do

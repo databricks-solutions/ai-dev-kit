@@ -55,8 +55,9 @@ This is the pattern from the official Databricks tutorial, external app guide, a
 ```yaml
 command: ['flask', '--app', 'app.py', 'run', '--host', '0.0.0.0', '--port', '8000']
 env:
-  # These 5 are auto-injected when you add a Lakebase (postgres) resource in the UI:
-  # PGHOST, PGPORT, PGDATABASE, PGUSER, PGSSLMODE
+  # These 6 are auto-injected when you add a Lakebase (postgres) resource in the UI:
+  # PGAPPNAME, PGHOST, PGPORT, PGDATABASE, PGUSER, PGSSLMODE
+  # Only the *first* database resource gets auto-injected; extra resources need explicit valueFrom.
   # You MUST manually add ENDPOINT_NAME — it's needed by generate_database_credential():
   - name: ENDPOINT_NAME
     value: 'projects/<project-id>/branches/<branch-id>/endpoints/<endpoint-id>'
@@ -66,7 +67,7 @@ env:
 
 ```
 flask
-psycopg[binary,pool]>=3.1.0
+psycopg[binary,pool]>=3.1.0  # psycopg3 required — psycopg2.pool has no connection_class hook for OAuthConnection
 databricks-sdk>=0.81.0
 ```
 
@@ -142,7 +143,7 @@ if __name__ == '__main__':
 
 ### FastAPI variant
 
-Identical pattern, but use `open=False` with an explicit lifespan so startup failures surface immediately:
+Identical pattern, but use `open=False` with an explicit lifespan. Two reasons: (1) startup failures surface immediately via `pool.open(wait=True)`; (2) `open=True` is deprecated for `AsyncConnectionPool` and will raise an error in psycopg 4.0 — using `open=False` + lifespan is the forward-compatible pattern for any FastAPI app regardless of sync/async pool.
 
 ```python
 from contextlib import asynccontextmanager
