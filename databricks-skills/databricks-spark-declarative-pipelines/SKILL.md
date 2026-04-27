@@ -281,15 +281,25 @@ After running a pipeline (via DAB or CLI), you **MUST** validate both the execut
 
 ### Step 1: Check Pipeline Execution Status
 
-`list-pipeline-events` returns a bare JSON array (not `{"events": [...]}`). For DAB runs, also check `databricks bundle run` output; `pipelines get`/`list-pipeline-events` still apply.
+A freshly created pipeline has `state: IDLE` and `latest_updates: null` until you trigger the first run with `start-update`. `list-pipeline-events` returns a bare JSON array (not `{"events": [...]}`). For DAB runs, also check `databricks bundle run` output.
 
 ```bash
-databricks pipelines get <pipeline_id>
+# Kick off (or re-run) a pipeline. --full-refresh reprocesses everything
+# from scratch (destructive on streaming state); omit for incremental.
+databricks pipelines start-update <pipeline_id>
+databricks pipelines start-update <pipeline_id> --full-refresh
 
-# Surface just failures
+# Poll status. The (.latest_updates // [{}]) guard handles the null case
+# on a never-run pipeline so jq doesn't crash.
+databricks pipelines get <pipeline_id> \
+  | jq '{state, latest: (.latest_updates // [{}])[0] | {state, update_id, creation_time}}'
+
+# Surface just failures from the event log
 databricks pipelines list-pipeline-events <pipeline_id> \
   | jq '[.[] | select(.level=="ERROR" or .level=="WARN") | {level, event_type, message: (.message // "")[0:200]}] | .[0:10]'
 ```
+
+If a pipeline is already RUNNING, `start-update` queues the new update; force-stop with `databricks pipelines stop <pipeline_id>` first if needed.
 
 ### Updating a Pipeline (edit → re-upload → restart)
 
@@ -302,12 +312,9 @@ databricks workspace import /Workspace/Users/<user>/pipeline/07_gold.sql \
 
 # Whole directory
 databricks workspace import-dir ./src/pipeline /Workspace/Users/<user>/pipeline --overwrite
-
-# Restart. --full-refresh reprocesses everything (destructive on streaming state); omit for incremental.
-databricks pipelines start-update <pipeline_id> --full-refresh
 ```
 
-If pipeline is RUNNING, `start-update` queues the new update. Force-stop with `databricks pipelines stop <pipeline_id>` first if needed.
+After re-uploading, trigger a new run with `databricks pipelines start-update <pipeline_id>` (see Step 1 above for the full polling pattern).
 
 ### Step 2: Validate Output Data
 

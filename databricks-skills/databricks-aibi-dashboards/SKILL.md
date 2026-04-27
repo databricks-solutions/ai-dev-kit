@@ -65,6 +65,15 @@ Sample rows alone don't tell you what to build. you can write aggregate SQL thro
 - **Trend viability** at daily/weekly/monthly grain → picks the right trend granularity.
 - **Story confirmation** — run the aggregations you plan to put in the dashboard and check they're not flat, empty, or uninteresting. Fix the query or adjust the story before moving on.
 
+Fan out independent probes (state ∈ `PENDING|RUNNING|SUCCEEDED|FAILED|CANCELED|CLOSED`):
+
+```bash
+submit() { databricks api post /api/2.0/sql/statements --json "$(jq -nc --arg w "$1" --arg s "$2" '{warehouse_id:$w,statement:$s,wait_timeout:"0s",on_wait_timeout:"CONTINUE"}')" | jq -r .statement_id; }
+SIDS=(); for q in "$@"; do SIDS+=( "$(submit "$WH" "$q")" ); done
+for s in "${SIDS[@]}"; do databricks api get "/api/2.0/sql/statements/$s" | jq '{state:.status.state, rows:.result.data_array}'; done
+# cancel: databricks api post "/api/2.0/sql/statements/$SID/cancel"
+```
+
 > **Dashboard queries are different** — inside the dashboard JSON, the `FROM` clause must reference ONLY the table name, with no catalog or schema prefix:
 > - ✅ Correct: `FROM trips`
 > - ❌ Wrong: `FROM nyctaxi.trips`

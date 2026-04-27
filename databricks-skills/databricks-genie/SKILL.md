@@ -24,7 +24,16 @@ Use `discover-schema` as the default — one call returns columns, types, sample
 
 `databricks experimental aitools tools discover-schema catalog.schema.gold_sales catalog.schema.gold_customers`
 
-For Genie, knowing column distribution shapes the sample questions and text instructions. Probe cardinality, ranges, and top categorical values with aggregate SQL through `databricks experimental aitools tools query --warehouse <WH> "..."` so your sample questions reflect what's actually in the data. Both commands auto-pick the default warehouse; set `DATABRICKS_WAREHOUSE_ID` or pass `--warehouse <ID>` to override.
+For Genie, knowing column distribution shapes the sample questions and text instructions. If you don't already know the data, probe cardinality, ranges, and top categorical values with aggregate SQL through `databricks experimental aitools tools query --warehouse <WH> "..."` so your sample questions reflect what's actually in the data. Both commands auto-pick the default warehouse; set `DATABRICKS_WAREHOUSE_ID` or pass `--warehouse <ID>` to override.
+
+Fan out independent probes (state ∈ `PENDING|RUNNING|SUCCEEDED|FAILED|CANCELED|CLOSED`):
+
+```bash
+submit() { databricks api post /api/2.0/sql/statements --json "$(jq -nc --arg w "$1" --arg s "$2" '{warehouse_id:$w,statement:$s,wait_timeout:"0s",on_wait_timeout:"CONTINUE"}')" | jq -r .statement_id; }
+SIDS=(); for q in "$@"; do SIDS+=( "$(submit "$WH" "$q")" ); done
+for s in "${SIDS[@]}"; do databricks api get "/api/2.0/sql/statements/$s" | jq '{state:.status.state, rows:.result.data_array}'; done
+# cancel: databricks api post "/api/2.0/sql/statements/$SID/cancel"
+```
 
 ### Step 2: Create the Space
 
@@ -103,8 +112,10 @@ The `serialized_space` field is a JSON string containing the full space configur
 | `instructions.example_question_sqls[]` | `{"id": "32hexchars", "question": ["..."], "sql": ["..."]}` |
 | `instructions.text_instructions[]` | `{"id": "32hexchars", "content": ["..."]}` |
 
-- **ID format:** 32-character lowercase hex UUID without hyphens.
+- **ID format:** 32-character lowercase hex, unique across **all three lists combined** (a duplicate between e.g. `text_instructions` and `example_question_sqls` is rejected).
 - **Text fields are arrays:** `question`, `sql`, and `content` are arrays of strings, not plain strings.
+- **Sort order matters:** `data_sources.tables` must be sorted by `identifier`; `example_question_sqls` and `text_instructions` must be sorted by `id`. (`sample_questions` is silently re-sorted server-side.)
+- **Simple ID scheme that satisfies both rules:** prefix per list + monotonic counter, total 32 hex chars — `1…0001`, `1…0002` for `sample_questions`; `2…0001`, `2…0002` for `example_question_sqls`; `3…0001` for `text_instructions`. Authoring order = sort order, no collisions.
 
 ### Text Instructions
 
