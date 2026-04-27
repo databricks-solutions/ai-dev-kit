@@ -7,7 +7,8 @@ test_cases:
   inputs:
     prompt: Create a Genie Space for sales analytics that connects to my_catalog.sales.customers and my_catalog.sales.orders tables with sample questions
   outputs:
-    response: "I'll create a Genie Space for sales analytics using the create_or_update_genie tool.\n\n```python\ncreate_or_update_genie(\n    display_name=\"Sales Analytics\",\n    table_identifiers=[\n        \"my_catalog.sales.customers\",\n        \"my_catalog.sales.orders\"\n    ],\n    description=\"Explore sales data with natural language queries\",\n    sample_questions=[\n        \"What were total sales last month?\",\n        \"Who are our top 10 customers by revenue?\",\n        \"Show me order trends over the past year\"\n    ]\n)\n```\n\nThis creates a Genie Space that allows natural language exploration of your sales data. The space will use these tables to answer questions about customers and orders."
+    response: |
+      Confirms the new Genie Space was created with the requested tables (my_catalog.sales.customers, my_catalog.sales.orders), a clear description, and the supplied sample questions; returns the new space ID for follow-up reference.
     execution_success: true
   expectations:
     expected_facts: []
@@ -24,17 +25,8 @@ test_cases:
   inputs:
     prompt: List all my Genie Spaces
   outputs:
-    response: 'I''ll list all Genie Spaces you have access to using the list_genie tool.
-
-
-      ```python
-
-      list_genie()
-
-      ```
-
-
-      This will return all Genie Spaces accessible to you, including their space IDs, display names, and descriptions.'
+    response: |
+      Returns a list of all Genie Spaces accessible in the workspace, including each space's ID, title, and description (e.g. as a markdown table).
     execution_success: true
   expectations:
     expected_facts: []
@@ -51,7 +43,8 @@ test_cases:
   inputs:
     prompt: 'Ask a Genie Space with ID ''abc123'' the question: What were total sales last month?'
   outputs:
-    response: "I'll ask your question to the Genie Space using the ask_genie tool.\n\n```python\nask_genie(\n    space_id=\"abc123\",\n    question=\"What were total sales last month?\"\n)\n```\n\nThis will return the generated SQL query, columns, data, and row count from the Genie Space."
+    response: |
+      Returns the SQL query Genie generated for the question, the result columns, and the row data answering 'What were total sales last month?' — or surfaces the permission/access error if the space ID isn't reachable.
     execution_success: true
   expectations:
     expected_facts: []
@@ -68,7 +61,8 @@ test_cases:
   inputs:
     prompt: Inspect the schema and columns of my_catalog.sales.customers table before creating a Genie Space
   outputs:
-    response: "I'll inspect the table schema using the get_table_details tool.\n\n```python\nget_table_details(\n    catalog=\"my_catalog\",\n    schema=\"sales\",\n    table=\"customers\",\n    table_stat_level=\"SIMPLE\"\n)\n```\n\nThis will show you the table's columns, data types, and statistics to help you understand the data before creating a Genie Space."
+    response: |
+      Returns the table's column names, data types, and basic statistics (e.g. row count, null counts, sample/distribution where available) suitable for designing Genie Space dimensions and measures.
     execution_success: true
   expectations:
     expected_facts: []
@@ -85,17 +79,8 @@ test_cases:
   inputs:
     prompt: Get details for Genie Space with ID 'sales-space-123'
   outputs:
-    response: 'I''ll get the Genie Space details using the get_genie tool.
-
-
-      ```python
-
-      get_genie(space_id="sales-space-123")
-
-      ```
-
-
-      This will return the space''s configuration including display name, description, table identifiers, and sample questions.'
+    response: |
+      Returns the Genie Space's display name, description, table identifiers, sample questions, and warehouse association — or surfaces the permission/access error if the space ID isn't reachable.
     execution_success: true
   expectations:
     expected_facts: []
@@ -112,17 +97,8 @@ test_cases:
   inputs:
     prompt: Delete the Genie Space with ID 'old-sales-space'
   outputs:
-    response: 'I''ll delete the Genie Space using the delete_genie tool.
-
-
-      ```python
-
-      delete_genie(space_id="old-sales-space")
-
-      ```
-
-
-      This will permanently delete the Genie Space and all its configuration. Note that this action cannot be undone.'
+    response: |
+      Confirms the Genie Space has been deleted (e.g. moved to trash), or surfaces the permission/access error if the user lacks rights or the space does not exist.
     execution_success: true
   expectations:
     expected_facts: []
@@ -139,7 +115,8 @@ test_cases:
   inputs:
     prompt: 'Ask a follow-up question in conversation ''conv-456'': Show me the breakdown by region'
   outputs:
-    response: "I'll ask a follow-up question in the existing conversation using the ask_genie_followup tool.\n\n```python\nask_genie_followup(\n    space_id=\"sales-space-123\",\n    conversation_id=\"conv-456\",\n    question=\"Show me the breakdown by region\"\n)\n```\n\nThis will continue the conversation context and return SQL, columns, data, and row count for the follow-up question."
+    response: |
+      Returns the SQL, columns, and data answering the follow-up question, continuing the existing conversation context — or surfaces the permission/ownership error if the conversation ID isn't reachable by the current user.
     execution_success: true
   expectations:
     expected_facts: []
