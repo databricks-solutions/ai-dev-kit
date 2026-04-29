@@ -401,17 +401,17 @@ select { max-width: 220px; cursor: pointer; }
 
 <div class="top-bar">
     <span class="top-bar-title">Skill Evaluation: databricks-genie</span>
-    <span class="top-bar-meta">2026-04-24 16:01 | MLflow: 54498890013449479d8fa1eb819e5003</span>
+    <span class="top-bar-meta">2026-04-29 10:38 | MLflow: 6a30044feed04c9d972cdb4809a8e238</span>
     <button id="theme-toggle" class="btn-secondary" onclick="toggleTheme()">DBX Dark</button>
 </div>
 
 <div class="section">
     <div class="section-title">Summary</div>
     <div class="metric-grid">
-        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-gauge"/></svg><span class="card-title">Composite Score</span></div><div class="hero-metric color-warn">79%</div></div>
+        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-gauge"/></svg><span class="card-title">Composite Score</span></div><div class="hero-metric color-pass">82%</div></div>
         <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-layers"/></svg><span class="card-title">Levels Run</span></div><div class="hero-metric">3</div></div>
-        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-clock"/></svg><span class="card-title">Duration</span></div><div class="hero-metric">1018s</div></div>
-        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-hash"/></svg><span class="card-title">Total Checks</span></div><div class="hero-metric">49</div></div>
+        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-clock"/></svg><span class="card-title">Duration</span></div><div class="hero-metric">636s</div></div>
+        <div class="card"><div class="card-header"><svg class="icon"><use href="#icon-hash"/></svg><span class="card-title">Total Checks</span></div><div class="hero-metric">47</div></div>
     </div>
 </div>
 
@@ -440,8 +440,8 @@ select { max-width: 220px; cursor: pointer; }
         </div>
         <div class="score-bar-row">
             <span class="score-bar-label">L5 output</span>
-            <div class="score-bar-track"><div class="score-bar-fill" style="width:64%;background:var(--warning)"></div></div>
-            <span class="score-bar-value" style="color:var(--warning)">64%</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:73%;background:var(--warning)"></div></div>
+            <span class="score-bar-value" style="color:var(--warning)">73%</span>
         </div></div></div>
 </div>
 
@@ -675,19 +675,19 @@ select { max-width: 220px; cursor: pointer; }
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">static/self_contained</td>
-                    <td style="font-size:11px">Score: 8/10. The skill documents the full lifecycle: schema discovery, space creation, export/import, improvement, conversation API, and troubleshooting. It includes the serialized_space JSON format with field requirements (32-char hex IDs, array text fields), CLI commands for all operations, and jq</td>
+                    <td style="font-size:11px">Score: 8/10. The skill documents the full lifecycle: schema discovery, space creation, export/import, conversation API, and troubleshooting. It includes the serialized_space JSON format with field requirements (32-char hex IDs, array text fields, sort order), CLI commands for all operations, and eve</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">static/no_conflicts</td>
-                    <td style="font-size:11px">Score: 9/10. The serialization convention is consistently applied: the file on disk is always parsed JSON, and at every use site (create, update, import) the same `jq -c &#x27;.&#x27; | jq -Rs &#x27;.&#x27;` pattern is used to stringify. The export uses `jq &#x27;.serialized_space | fromjson&#x27;` to unwrap. The convention is e</td>
+                    <td style="font-size:11px">Score: 9/10. The skill is internally consistent. The export/import convention is clearly stated (&#x27;genie_space.json always holds the parsed space object&#x27;) and the same jq stringify pattern (`jq -c &#x27;.&#x27; | jq -Rs &#x27;.&#x27;`) is used consistently in Step 2 Create, Export &amp; Import, and Improving a Genie Space s</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">static/security</td>
-                    <td style="font-size:11px">Score: 8/10. No hardcoded tokens or secrets are present (pre-check confirms this). The skill uses placeholder values like `WAREHOUSE_ID`, `SPACE_ID`, `you@company.com`. It mentions `DATABRICKS_CONFIG_PROFILE` for cross-workspace migration. The `trash-space` (delete) operation is listed without a war</td>
+                    <td style="font-size:11px">Score: 8/10. No hardcoded tokens or secrets detected (confirmed by pre-check). The skill uses environment variables (DATABRICKS_WAREHOUSE_ID, DATABRICKS_CONFIG_PROFILE) rather than inline credentials. The `trash-space` (delete) operation is listed plainly without a destructive-action warning. The ta</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
@@ -699,25 +699,25 @@ select { max-width: 220px; cursor: pointer; }
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">static/actionable_instructions</td>
-                    <td style="font-size:11px">Score: 9/10. Instructions are concrete and directly executable. For example: `databricks genie create-space --json &quot;{...}&quot;` with the full JSON payload including the jq serialization pattern. The Conversation API section provides exact commands for start, poll, extract SQL, get results, and follow-up</td>
+                    <td style="font-size:11px">Score: 9/10. Instructions are highly concrete with copy-pasteable CLI commands throughout. For example, the create-space command includes the exact JSON structure with jq piping. The Conversation API section shows the exact sequence: start-conversation → poll get-message → extract SQL/text → get que</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">static/scoped_clearly</td>
-                    <td style="font-size:11px">Score: 8/10. The description explicitly states: &#x27;Use when building Genie Spaces, exporting and importing Genie Spaces, migrating Genie Spaces between workspaces or environments, or asking questions via the Genie Conversation API.&#x27; The Related Skills section points to other skills for data generation</td>
+                    <td style="font-size:11px">Score: 8/10. The description explicitly states the scope: &#x27;Create and query Databricks Genie Spaces for natural language SQL exploration. Use when building Genie Spaces, exporting and importing Genie Spaces, migrating Genie Spaces between workspaces or environments, or asking questions via the Genie</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">static/error_handling</td>
-                    <td style="font-size:11px">Score: 8/10. The troubleshooting table covers 7 specific issues with solutions. The Conversation API section documents failure states: &#x27;On FAILED, get-message populates .error.error with the underlying error string (e.g. [INSUFFICIENT_PERMISSIONS] ...) and .error.type (e.g. SQL_EXECUTION_EXCEPTION).</td>
+                    <td style="font-size:11px">Score: 8/10. The troubleshooting table covers 7 specific error scenarios with solutions. The Conversation API section documents failure states: &#x27;On FAILED, get-message populates .error.error with the underlying error string (e.g. [INSUFFICIENT_PERMISSIONS] ...) and .error.type (e.g. SQL_EXECUTION_EX</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">static/no_hallucination_triggers</td>
-                    <td style="font-size:11px">Score: 7/10. The skill references `databricks experimental aitools tools discover-schema` and `databricks experimental aitools tools query` which are marked as &#x27;experimental&#x27; — these may not exist in all CLI versions or may have been renamed/removed. The `databricks workspace-entity-tag-assignments </td>
+                    <td style="font-size:11px">Score: 7/10. The skill references `databricks experimental aitools tools discover-schema` and `databricks experimental aitools tools query` which are under the &#x27;experimental&#x27; namespace — these may not exist in all CLI versions or may have been renamed/removed. The `databricks genie` subcommands (lis</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 </table></div>
@@ -734,7 +734,7 @@ select { max-width: 220px; cursor: pointer; }
                 <div class="card-header">
                     <svg class="icon"><use href="#icon-check"/></svg>
                     <span class="card-title">Output</span>
-                    <span class="badge badge-score badge-warn">64%</span>
+                    <span class="badge badge-score badge-warn">73%</span>
                     
                 </div>
                 <div class="card-body">
@@ -744,55 +744,43 @@ select { max-width: 220px; cursor: pointer; }
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">output/grp_20260211_134332/response/The response follows this guideline: Scoring conte</td>
-                    <td style="font-size:11px">[NEUTRAL] The response demonstrates high quality: it successfully created a working Genie Space (ID 01f13fec962c19628df9ee23a73660d6) with verified asset creation, included 6 sample questions, SQL templates, text instructions with business definitions, and performed a live test confirming correct SQ</td>
+                    <td style="font-size:11px">[POSITIVE] The agent successfully created a Genie Space (asset verification: space ID 01f143ae13c81657bbc6674ab3181585 confirmed created, tables created via CTAS with SUCCEEDED states, tagged for resource tracking). The response includes detailed summary with Space ID, warehouse, parent path, connec</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
-                    <td style="font-size:11px">output/grp_20260211_134332/auto_asset/catalog/unknown</td>
-                    <td style="font-size:11px">Detected catalog &#x27;unknown&#x27; (layer 2, confidence: medium, source: Bash(databricks catalogs create my_catalog --comment &quot;Sales analy))</td>
-                    <td><span class="badge-code">CODE</span></td>
-                </tr>
-                <tr>
-                    <td><span class="badge badge-pass">PASS</span></td>
-                    <td style="font-size:11px">output/grp_20260211_134332/auto_asset/catalog/myCatalog</td>
-                    <td style="font-size:11px">Detected catalog &#x27;myCatalog&#x27; (layer 3, confidence: medium, source: Bash(databricks catalogs create my_catalog --))</td>
-                    <td><span class="badge-code">CODE</span></td>
-                </tr>
-                <tr>
-                    <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">output/grp_20260211_134357/response/The response follows this guideline: Scoring conte</td>
-                    <td style="font-size:11px">[POSITIVE] The response accurately lists all 17 Genie Spaces with their titles, space IDs, and descriptions, matching the data returned in the tool result. The agent successfully executed the CLI command &#x27;databricks genie list-spaces&#x27;, verified the assets by presenting them in a well-formatted table</td>
+                    <td style="font-size:11px">[POSITIVE] The response accurately lists all 7 Genie Spaces from the tool output, correctly presenting titles, space IDs, and descriptions in a well-formatted table. The descriptions are appropriately summarized from the full API response. The agent also adds a useful observation about duplicate &#x27;Sa</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">output/grp_20260211_134412/response/The response follows this guideline: Scoring conte</td>
-                    <td style="font-size:11px">[NEUTRAL] The agent&#x27;s response demonstrates high-quality behavior: it attempted the requested action with space ID `abc123`, encountered a permission error, retried to rule out transient issues, then proactively verified by listing available spaces (`databricks genie list-spaces`). It clearly commun</td>
+                    <td style="font-size:11px">[POSITIVE] The agent&#x27;s response demonstrates high quality: it correctly identified the permission error, attempted a retry to confirm it wasn&#x27;t transient, listed visible spaces to diagnose the issue, correctly identified that `abc123` is a placeholder (not a valid 32-char hex space ID), explained th</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">output/grp_20260211_134422/response/The response follows this guideline: Scoring conte</td>
-                    <td style="font-size:11px">[NEUTRAL] The response demonstrates strong asset verification (30% weight): the agent discovered the correct table schema by querying the catalog, verified all 7 columns with types, confirmed 0 nulls across all columns, and profiled data distributions (regions, segments, countries) with exact counts</td>
+                    <td style="font-size:11px">[NEUTRAL] The agent&#x27;s response demonstrates high-quality behavior: it attempted to discover the schema, verified the catalog doesn&#x27;t exist by listing available catalogs, clearly communicated the issue to the user, suggested possible alternatives (samples.tpch.customer, jss_sandbox_catalog), and expl</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">output/grp_20260211_134431/response/The response follows this guideline: Scoring conte</td>
-                    <td style="font-size:11px">[POSITIVE] The response demonstrates high quality: it clearly explains what was tried (two commands with different permission levels), identifies the root cause (insufficient permissions), and provides actionable remediation steps including checking auth profiles and retrying. The agent appropriatel</td>
+                    <td style="font-size:11px">[NEUTRAL] The response demonstrates high-quality behavior: it attempted multiple approaches (get-space with --include-serialized-space, then without, then list-spaces), clearly explained the errors encountered, provided diagnostic reasoning about why the space isn&#x27;t accessible (three plausible expla</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">output/grp_20260211_134914/response/The response follows this guideline: Scoring conte</td>
-                    <td style="font-size:11px">[NEUTRAL] The response accurately reports the permission error from the tool execution, correctly identifies the required permission (&#x27;Can Manage&#x27;), and provides actionable next steps. The agent attempted the deletion via &#x27;databricks genie trash-space old-sales-space&#x27;, received an error about needin</td>
+                    <td style="font-size:11px">[NEUTRAL] The response accurately reports the outcome of the attempted deletion: it correctly identifies the command used (&#x27;databricks genie trash-space old-sales-space&#x27;), the exact error message (&#x27;You need &quot;Can Manage&quot; permission to perform this action&#x27;), and provides a clear explanation that this </td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-pass">PASS</span></td>
                     <td style="font-size:11px">output/grp_20260211_134933/response/The response follows this guideline: Scoring conte</td>
-                    <td style="font-size:11px">[NEUTRAL] The response demonstrates high quality by: (1) systematically attempting to find the correct space by listing all Genie spaces and trying multiple space IDs, (2) clearly explaining the error &#x27;User 1966729502871703 does not own conversation conv-456&#x27; with two plausible root causes (placehol</td>
+                    <td style="font-size:11px">[POSITIVE] The response demonstrates high quality by: (1) correctly identifying the root cause — a placeholder SPACE_ID was used instead of a real one, (2) providing the exact CLI commands needed to send the follow-up message, poll for completion, and retrieve results, (3) explaining the Genie API r</td>
                     <td><span class="badge-llm">LLM</span></td>
                 </tr>
                 </table></div>
