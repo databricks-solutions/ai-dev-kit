@@ -1803,7 +1803,6 @@ function Invoke-PromptChannel {
         # Build argument list preserving current flags
         $newArgs = @("--experimental")
         if ($script:Force)               { $newArgs += "--force" }
-        if ($script:Silent)              { $newArgs += "--silent" }
         if ($script:UserTools)           { $newArgs += "--tools"; $newArgs += $script:UserTools }
         if ($script:UserMcpPath)         { $newArgs += "--mcp-path"; $newArgs += $script:UserMcpPath }
         if ($script:SkillsProfile)       { $newArgs += "--skills-profile"; $newArgs += $script:SkillsProfile }

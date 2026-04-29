@@ -1663,21 +1663,20 @@ prompt_channel() {
         echo -e "  ${D}Downloading installer from experimental branch...${N}"
         echo ""
 
-        # Build the command with all current flags preserved
-        local args="--experimental"
-        [ "$FORCE" = true ] && args="$args --force"
-        [ "$SILENT" = true ] && args="$args --silent"
-        [ -n "$USER_TOOLS" ] && args="$args --tools $USER_TOOLS"
-        [ -n "$USER_MCP_PATH" ] && args="$args --mcp-path $USER_MCP_PATH"
-        [ -n "$SKILLS_PROFILE" ] && args="$args --skills-profile $SKILLS_PROFILE"
-        [ -n "$USER_SKILLS" ] && args="$args --skills $USER_SKILLS"
-        [ "$SCOPE_EXPLICIT" = true ] && [ "$SCOPE" = "global" ] && args="$args --global"
-        [ "$PROFILE" != "DEFAULT" ] && args="$args --profile $PROFILE"
-        [ "$INSTALL_MCP" = false ] && args="$args --skills-only"
-        [ "$INSTALL_SKILLS" = false ] && args="$args --mcp-only"
+        # Build the command with all current flags preserved (array preserves quoting)
+        local args=("--experimental")
+        [ "$FORCE" = true ] && args+=("--force")
+        [ -n "$USER_TOOLS" ] && args+=("--tools" "$USER_TOOLS")
+        [ -n "$USER_MCP_PATH" ] && args+=("--mcp-path" "$USER_MCP_PATH")
+        [ -n "$SKILLS_PROFILE" ] && args+=("--skills-profile" "$SKILLS_PROFILE")
+        [ -n "$USER_SKILLS" ] && args+=("--skills" "$USER_SKILLS")
+        [ "$SCOPE_EXPLICIT" = true ] && [ "$SCOPE" = "global" ] && args+=("--global")
+        [ "$PROFILE" != "DEFAULT" ] && args+=("--profile" "$PROFILE")
+        [ "$INSTALL_MCP" = false ] && args+=("--skills-only")
+        [ "$INSTALL_SKILLS" = false ] && args+=("--mcp-only")
 
         # Download and execute the experimental installer
-        exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") $args
+        exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") "${args[@]}"
     fi
 }
 
