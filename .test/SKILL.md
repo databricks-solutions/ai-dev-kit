@@ -44,6 +44,7 @@ The `/skill-test` command provides an interactive CLI for testing Databricks ski
 | `list-traces` | List available traces (MLflow or local) |
 | `scorers` | List configured scorers for a skill |
 | `scorers update` | Add/remove scorers or update default guidelines |
+| `quick-trigger` | Quick smoke test: does the skill trigger on expected prompts? |
 | `sync` | Sync YAML to Unity Catalog (Phase 2) |
 
 ### Quick Examples
@@ -92,6 +93,7 @@ uv run python .test/scripts/{subcommand}.py {skill_name} [options]
 | `sync` | `sync.py` |
 | `trace-eval` | `trace_eval.py` |
 | `list-traces` | `list_traces.py` |
+| `quick-trigger` | `quick_trigger.py` |
 | `_routing mlflow` | `routing_eval.py` |
 
 Use `--help` on any script for available options.

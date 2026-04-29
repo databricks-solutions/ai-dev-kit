@@ -1,40 +1,54 @@
-# Example Pattern 2
+# Migration Guide
+
+Reference file for migration patterns from deprecated APIs or older approaches.
 
 ## When to Use
 
-Use this pattern when you need to accomplish Y.
+Use this reference when migrating from legacy patterns or when Claude detects deprecated API usage in existing code.
 
-## Code Example
+## Deprecated Patterns
 
+### Old Pattern → New Pattern
+
+**Before (deprecated):**
 ```python
-def another_example():
-    """
-    Another example showing a different pattern.
-    """
-    # Configure settings
-    config = {
-        "option1": "value1",
-        "option2": "value2"
-    }
-
-    # Execute
-    result = execute_task(config)
-
-    # Handle result
-    if result.success:
-        print("Success!")
-    else:
-        print(f"Error: {result.error}")
+# Do NOT use — this API was deprecated in version X.Y
+old_api.legacy_method(param="value")
 ```
 
-## Best Practices
+**After (current):**
+```python
+# Use this instead
+from databricks.sdk import WorkspaceClient
 
-- Keep it simple
-- Use clear variable names
-- Handle errors appropriately
+w = WorkspaceClient()
+w.new_api.current_method(param="value")
+```
 
-## Tips
+**Why it changed:** Brief explanation of why the API was updated and what benefits the new approach provides.
 
-- Tip 1: A helpful hint
-- Tip 2: Another useful suggestion
-- Tip 3: One more thing to remember
+### Another Migration
+
+**Before:**
+```sql
+-- Deprecated: PARTITION BY is no longer recommended
+CREATE TABLE my_table
+PARTITION BY (date_col)
+AS SELECT * FROM source;
+```
+
+**After:**
+```sql
+-- Use CLUSTER BY for better performance with liquid clustering
+CREATE TABLE my_table
+CLUSTER BY (date_col)
+AS SELECT * FROM source;
+```
+
+## Migration Checklist
+
+| Old Pattern | New Pattern | Notes |
+|-------------|-------------|-------|
+| `old_function()` | `new_function()` | Direct replacement |
+| `@dlt.table` | `@dp.table` | Requires import change |
+| `PARTITION BY` | `CLUSTER BY` | Liquid clustering, better performance |
