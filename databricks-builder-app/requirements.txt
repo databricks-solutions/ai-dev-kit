@@ -297,7 +297,7 @@ pathable==0.5.0
     # via jsonschema-path
 pathspec==1.0.4
     # via sqlfluff
-pillow==11.1.0
+pillow==12.2.0
     # via
     #   databricks-builder-app
     #   matplotlib
