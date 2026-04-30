@@ -19,40 +19,36 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 SKILL_TOOL_MAPPING: dict[str, list[str]] = {
   'databricks-agent-bricks': ['manage_ka', 'manage_mas'],
-  'databricks-aibi-dashboards': [
-    'create_or_update_dashboard', 'get_dashboard',
-    'delete_dashboard', 'publish_dashboard',
-  ],
-  'databricks-genie': [
-    'create_or_update_genie', 'get_genie', 'delete_genie', 'ask_genie',
-  ],
-  'databricks-spark-declarative-pipelines': [
-    'create_or_update_pipeline', 'get_pipeline',
-    'delete_pipeline', 'run_pipeline',
-  ],
-  'databricks-model-serving': [
-    'get_serving_endpoint_status', 'query_serving_endpoint', 'list_serving_endpoints',
-  ],
-  'databricks-jobs': [
-    'list_jobs', 'get_job', 'find_job_by_name', 'create_job', 'update_job',
-    'delete_job', 'run_job_now', 'get_run', 'get_run_output', 'cancel_run',
-    'list_runs', 'wait_for_run',
-  ],
+  'databricks-aibi-dashboards': ['manage_dashboard'],
+  'databricks-genie': ['manage_genie', 'ask_genie'],
+  'databricks-spark-declarative-pipelines': ['manage_pipeline', 'manage_pipeline_run'],
+  'databricks-model-serving': ['manage_serving_endpoint'],
+  'databricks-jobs': ['manage_jobs', 'manage_job_runs'],
   'databricks-unity-catalog': [
     'manage_uc_objects', 'manage_uc_grants', 'manage_uc_storage',
     'manage_uc_connections', 'manage_uc_tags', 'manage_uc_security_policies',
     'manage_uc_monitors', 'manage_uc_sharing',
-    'list_volume_files', 'upload_to_volume', 'download_from_volume',
-    'delete_from_volume', 'create_volume_directory', 'get_volume_file_info',
+    'manage_volume_files', 'get_volume_folder_details',
+    'manage_metric_views',
+  ],
+  'databricks-vector-search': [
+    'manage_vs_endpoint', 'manage_vs_index', 'manage_vs_data', 'query_vs_index',
+  ],
+  'databricks-metric-views': ['manage_metric_views'],
+  # Provisioned and Autoscale Lakebase share the core database/sync/credential
+  # tools.  Autoscale additionally claims branch tools.  If either skill is
+  # enabled, the shared tools are available.
+  'databricks-lakebase-provisioned': [
+    'manage_lakebase_database', 'manage_lakebase_sync', 'generate_lakebase_credential',
+  ],
+  'databricks-lakebase-autoscale': [
+    'manage_lakebase_database', 'manage_lakebase_sync', 'generate_lakebase_credential',
+    'manage_lakebase_branch',
   ],
   # APX (FastAPI+React) and Python (Dash/Streamlit/etc.) share the same
   # app lifecycle tools — the skill content differs, not the MCP operations.
-  'databricks-app-apx': [
-    'create_or_update_app', 'get_app', 'delete_app',
-  ],
-  'databricks-app-python': [
-    'create_or_update_app', 'get_app', 'delete_app',
-  ],
+  'databricks-app-apx': ['manage_app'],
+  'databricks-app-python': ['manage_app'],
 }
 
 
@@ -95,25 +91,40 @@ def get_allowed_mcp_tools(
   ]
 
 
-# Source skills directory - check multiple locations
-# 1. Sibling to this app (local development): ../../databricks-skills
-# 2. Deployed location (Databricks Apps): ./skills at app root
-_DEV_SKILLS_DIR = Path(__file__).parent.parent.parent.parent / 'databricks-skills'
-_DEPLOYED_SKILLS_DIR = Path(__file__).parent.parent.parent / 'skills'
+# Skills source directories.  install_skills.sh aggregates skills from
+# multiple repos (this repo's databricks-skills/, mlflow/skills, apx) into
+# the app's .claude/skills/ directory.  We check several locations so that
+# the server works both in local development and when deployed.
+#
+# Candidate source directories (checked in priority order):
+#   1. .claude/skills/ inside the app — populated by install_skills.sh with
+#      the *full* union of Databricks + MLflow + APX skills.
+#   2. Sibling ../../databricks-skills — the repo-local Databricks-only skills.
+#   3. ./skills at app root — the deployed bundle location.
+_APP_ROOT = Path(__file__).parent.parent.parent
+_INSTALLED_SKILLS_DIR = _APP_ROOT / '.claude' / 'skills'
+_DEV_SKILLS_DIR = _APP_ROOT.parent / 'databricks-skills'
+_DEPLOYED_SKILLS_DIR = _APP_ROOT / 'skills'
 
 # Local cache of skills within this app (copied on startup)
-APP_SKILLS_DIR = Path(__file__).parent.parent.parent / 'skills'
+APP_SKILLS_DIR = _APP_ROOT / 'skills'
 
-# Prefer dev location (sibling repo) when available to avoid self-deletion:
-# APP_SKILLS_DIR == _DEPLOYED_SKILLS_DIR, so using deployed as source would
-# delete the source during copy_skills_to_app(). Only fall back to deployed
-# location when the dev source repo isn't available (actual deployment).
-if _DEV_SKILLS_DIR.exists() and any(_DEV_SKILLS_DIR.iterdir()):
-  SKILLS_SOURCE_DIR = _DEV_SKILLS_DIR
-elif _DEPLOYED_SKILLS_DIR.exists() and any(_DEPLOYED_SKILLS_DIR.iterdir()):
-  SKILLS_SOURCE_DIR = _DEPLOYED_SKILLS_DIR
-else:
-  SKILLS_SOURCE_DIR = _DEV_SKILLS_DIR
+def _non_empty_dir(p: Path) -> bool:
+  return p.exists() and p.is_dir() and any(p.iterdir())
+
+# Build an ordered list of source directories.  The first directory that
+# contains a given skill wins, so put the most-complete source first.
+_SKILLS_SOURCE_DIRS: list[Path] = []
+if _non_empty_dir(_INSTALLED_SKILLS_DIR):
+  _SKILLS_SOURCE_DIRS.append(_INSTALLED_SKILLS_DIR)
+if _non_empty_dir(_DEV_SKILLS_DIR):
+  _SKILLS_SOURCE_DIRS.append(_DEV_SKILLS_DIR)
+if _non_empty_dir(_DEPLOYED_SKILLS_DIR) and _DEPLOYED_SKILLS_DIR.resolve() != APP_SKILLS_DIR.resolve():
+  _SKILLS_SOURCE_DIRS.append(_DEPLOYED_SKILLS_DIR)
+
+# Legacy single-directory reference used by callers that haven't been
+# updated yet.  Points to the first available source.
+SKILLS_SOURCE_DIR = _SKILLS_SOURCE_DIRS[0] if _SKILLS_SOURCE_DIRS else _DEV_SKILLS_DIR
 
 
 def _get_enabled_skills() -> list[str] | None:
@@ -190,8 +201,24 @@ class SkillNotFoundError(Exception):
   pass
 
 
+def _find_skill_source(skill_name: str) -> Path | None:
+  """Find a skill directory across all source directories.
+
+  Returns the first directory that contains ``skill_name/SKILL.md``.
+  """
+  for src_dir in _SKILLS_SOURCE_DIRS:
+    candidate = src_dir / skill_name
+    if candidate.is_dir() and (candidate / 'SKILL.md').exists():
+      return candidate
+  return None
+
+
 def copy_skills_to_app() -> bool:
-  """Copy skills from source repo to app's skills directory.
+  """Copy skills from source directories to app's skills directory.
+
+  Skills may originate from multiple locations (the repo's databricks-skills/,
+  the .claude/skills/ directory populated by install_skills.sh, or the
+  deployed skills bundle).  This function merges them into APP_SKILLS_DIR.
 
   Called on server startup to ensure we have the latest skills.
   Only copies skills listed in ENABLED_SKILLS env var (if set).
@@ -200,68 +227,71 @@ def copy_skills_to_app() -> bool:
       True if successful, False otherwise
 
   Raises:
-      SkillNotFoundError: If an enabled skill folder doesn't exist or lacks SKILL.md
+      SkillNotFoundError: If an enabled skill folder doesn't exist in any
+          source directory or lacks SKILL.md.
   """
-  if not SKILLS_SOURCE_DIR.exists():
-    logger.warning(f'Skills source directory not found: {SKILLS_SOURCE_DIR}')
+  if not _SKILLS_SOURCE_DIRS:
+    # No external source directories found.  In a deployed app the skills
+    # are bundled directly into APP_SKILLS_DIR (== _DEPLOYED_SKILLS_DIR),
+    # so there is nothing to copy — skills are already in place.
+    if _non_empty_dir(APP_SKILLS_DIR):
+      logger.info(f'No external source dirs; skills already in place at {APP_SKILLS_DIR}')
+      return True
+    logger.warning('No skills source directories found')
     return False
 
-  # Guard against self-deletion: in deployed apps, SKILLS_SOURCE_DIR and
-  # APP_SKILLS_DIR resolve to the same directory. Deleting APP_SKILLS_DIR
-  # would destroy the source. Skills are already in place, so skip the copy.
-  if SKILLS_SOURCE_DIR.resolve() == APP_SKILLS_DIR.resolve():
-    logger.info(f'Skills source and app directory are the same ({APP_SKILLS_DIR}), skipping copy')
+  # Guard against self-deletion: when every source *is* APP_SKILLS_DIR we
+  # would wipe the only copy.  Skills are already in place, so skip.
+  all_same = all(
+    src.resolve() == APP_SKILLS_DIR.resolve() for src in _SKILLS_SOURCE_DIRS
+  )
+  if all_same:
+    logger.info(f'All skills sources resolve to {APP_SKILLS_DIR}, skipping copy')
     return True
 
   enabled_skills = _get_enabled_skills()
   if enabled_skills:
     logger.info(f'Filtering skills to: {enabled_skills}')
 
-    # Validate that all enabled skills exist before copying
     for skill_name in enabled_skills:
-      skill_path = SKILLS_SOURCE_DIR / skill_name
-      skill_md_path = skill_path / 'SKILL.md'
-
-      if not skill_path.exists():
+      found = _find_skill_source(skill_name)
+      if found is None:
+        searched = ', '.join(str(d) for d in _SKILLS_SOURCE_DIRS)
         raise SkillNotFoundError(
-          f"Skill '{skill_name}' not found. "
-          f"Directory does not exist: {skill_path}. "
+          f"Skill '{skill_name}' not found in any source directory. "
+          f"Searched: {searched}. "
           f"Check ENABLED_SKILLS in your .env file."
         )
 
-      if not skill_md_path.exists():
-        raise SkillNotFoundError(
-          f"Skill '{skill_name}' is invalid. "
-          f"Missing SKILL.md file in: {skill_path}. "
-          f"Each skill must have a SKILL.md file."
-        )
-
   try:
-    # Remove existing skills directory if it exists
     if APP_SKILLS_DIR.exists():
       shutil.rmtree(APP_SKILLS_DIR)
 
-    # Copy skill directories (filtered by ENABLED_SKILLS if set)
     APP_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
 
-    copied_count = 0
-    for item in SKILLS_SOURCE_DIR.iterdir():
-      if item.is_dir() and (item / 'SKILL.md').exists():
-        # Skip if not in enabled list (when list is specified)
+    copied: set[str] = set()
+    for src_dir in _SKILLS_SOURCE_DIRS:
+      if src_dir.resolve() == APP_SKILLS_DIR.resolve():
+        continue
+      for item in src_dir.iterdir():
+        if not item.is_dir() or not (item / 'SKILL.md').exists():
+          continue
+        if item.name in copied:
+          continue
         if enabled_skills and item.name not in enabled_skills:
           logger.debug(f'Skipping skill (not enabled): {item.name}')
           continue
 
         dest = APP_SKILLS_DIR / item.name
         shutil.copytree(item, dest)
-        copied_count += 1
+        copied.add(item.name)
         logger.debug(f'Copied skill: {item.name}')
 
-    logger.info(f'Copied {copied_count} skills to {APP_SKILLS_DIR}')
+    logger.info(f'Copied {len(copied)} skills to {APP_SKILLS_DIR}')
     return True
 
   except SkillNotFoundError:
-    raise  # Re-raise validation errors
+    raise
   except Exception as e:
     logger.error(f'Failed to copy skills: {e}')
     return False

@@ -34,14 +34,14 @@ Each filter query binds the filter to one dataset. Add multiple queries to filte
 ]
 ```
 
-### 5. Layout Grid (6 columns)
+### 5. Layout Grid (12 columns)
 ```
-y=0:  Header with title + description (w=6, h=2)
-y=2:  KPI(w=2,h=3) | KPI(w=2,h=3) | KPI(w=2,h=3)  ← fills 6
-y=5:  Section header (w=6, h=1)
-y=6:  Area chart (w=6, h=5)
-y=11: Section header (w=6, h=1)
-y=12: Pie(w=2,h=5) | Bar chart(w=4,h=5)           ← fills 6
+y=0:  Header with title + description (w=12, h=2)
+y=2:  KPI(w=4,h=3) | KPI(w=4,h=3) | KPI(w=4,h=3)  ← fills 12
+y=5:  Section header (w=12, h=1)
+y=6:  Area chart (w=12, h=5)
+y=11: Section header (w=12, h=1)
+y=12: Pie(w=4,h=5) | Bar chart(w=8,h=5)           ← fills 12
 ```
 
 Use `\n\n` in text widget lines array to create line breaks within a single widget.
@@ -87,6 +87,7 @@ This example shows a complete dashboard with:
       "name": "sales_overview",
       "displayName": "Sales Overview",
       "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
       "layout": [
         {
           "widget": {
@@ -95,7 +96,7 @@ This example shows a complete dashboard with:
               "lines": ["# Sales Dashboard\n\nMonitor daily sales, revenue, and profit margins across regions and departments."]
             }
           },
-          "position": {"x": 0, "y": 0, "width": 6, "height": 2}
+          "position": {"x": 0, "y": 0, "width": 12, "height": 2}
         },
         {
           "widget": {
@@ -126,7 +127,7 @@ This example shows a complete dashboard with:
               "frame": {"title": "Total Revenue", "showTitle": true, "description": "For the selected period", "showDescription": true}
             }
           },
-          "position": {"x": 0, "y": 2, "width": 2, "height": 3}
+          "position": {"x": 0, "y": 2, "width": 4, "height": 3}
         },
         {
           "widget": {
@@ -156,7 +157,7 @@ This example shows a complete dashboard with:
               "frame": {"title": "Total Orders", "showTitle": true, "description": "For the selected period", "showDescription": true}
             }
           },
-          "position": {"x": 2, "y": 2, "width": 2, "height": 3}
+          "position": {"x": 4, "y": 2, "width": 4, "height": 3}
         },
         {
           "widget": {
@@ -185,7 +186,7 @@ This example shows a complete dashboard with:
               "frame": {"title": "Profit Margin", "showTitle": true, "description": "Average for period", "showDescription": true}
             }
           },
-          "position": {"x": 4, "y": 2, "width": 2, "height": 3}
+          "position": {"x": 8, "y": 2, "width": 4, "height": 3}
         },
         {
           "widget": {
@@ -194,7 +195,7 @@ This example shows a complete dashboard with:
               "lines": ["## Revenue Trend"]
             }
           },
-          "position": {"x": 0, "y": 5, "width": 6, "height": 1}
+          "position": {"x": 0, "y": 5, "width": 12, "height": 1}
         },
         {
           "widget": {
@@ -239,7 +240,7 @@ This example shows a complete dashboard with:
               }
             }
           },
-          "position": {"x": 0, "y": 6, "width": 6, "height": 5}
+          "position": {"x": 0, "y": 6, "width": 12, "height": 5}
         },
         {
           "widget": {
@@ -248,7 +249,7 @@ This example shows a complete dashboard with:
               "lines": ["## Breakdown"]
             }
           },
-          "position": {"x": 0, "y": 11, "width": 6, "height": 1}
+          "position": {"x": 0, "y": 11, "width": 12, "height": 1}
         },
         {
           "widget": {
@@ -283,7 +284,7 @@ This example shows a complete dashboard with:
               "frame": {"title": "Revenue by Department", "showTitle": true}
             }
           },
-          "position": {"x": 0, "y": 12, "width": 2, "height": 5}
+          "position": {"x": 0, "y": 12, "width": 4, "height": 5}
         },
         {
           "widget": {
@@ -330,7 +331,7 @@ This example shows a complete dashboard with:
               "frame": {"title": "Revenue by Region", "showTitle": true}
             }
           },
-          "position": {"x": 2, "y": 12, "width": 4, "height": 5}
+          "position": {"x": 4, "y": 12, "width": 8, "height": 5}
         },
         {
           "widget": {
@@ -339,7 +340,7 @@ This example shows a complete dashboard with:
               "lines": ["## Top Products"]
             }
           },
-          "position": {"x": 0, "y": 17, "width": 6, "height": 1}
+          "position": {"x": 0, "y": 17, "width": 12, "height": 1}
         },
         {
           "widget": {
@@ -377,7 +378,7 @@ This example shows a complete dashboard with:
               }
             }
           },
-          "position": {"x": 0, "y": 18, "width": 6, "height": 6}
+          "position": {"x": 0, "y": 18, "width": 12, "height": 6}
         }
       ]
     },
@@ -385,6 +386,7 @@ This example shows a complete dashboard with:
       "name": "global_filters",
       "displayName": "Filters",
       "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1",
       "layout": [
         {
           "widget": {
@@ -419,7 +421,7 @@ This example shows a complete dashboard with:
               "frame": {"showTitle": true, "title": "Date Range"}
             }
           },
-          "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+          "position": {"x": 0, "y": 0, "width": 4, "height": 2}
         },
         {
           "widget": {
@@ -454,7 +456,7 @@ This example shows a complete dashboard with:
               "frame": {"showTitle": true, "title": "Region"}
             }
           },
-          "position": {"x": 2, "y": 0, "width": 2, "height": 2}
+          "position": {"x": 4, "y": 0, "width": 4, "height": 2}
         },
         {
           "widget": {
@@ -489,7 +491,7 @@ This example shows a complete dashboard with:
               "frame": {"showTitle": true, "title": "Department"}
             }
           },
-          "position": {"x": 4, "y": 0, "width": 2, "height": 2}
+          "position": {"x": 8, "y": 0, "width": 4, "height": 2}
         }
       ]
     }

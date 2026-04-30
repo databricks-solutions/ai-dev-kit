@@ -279,39 +279,51 @@ If you need conditional logic or multi-field formulas, compute a derived column 
 - Date truncation: `DATE_TRUNC('DAY'|'WEEK'|'MONTH'|'QUARTER'|'YEAR', column)`
 - **AVOID** `INTERVAL` syntax - use functions instead
 
-### 4) LAYOUT (6-Column Grid, NO GAPS)
+### 4) LAYOUT (12-Column Grid, NO GAPS)
 
-Each widget has a position: `{"x": 0, "y": 0, "width": 2, "height": 4}`
+**Every page must include `"layoutVersion": "GRID_V1"`** alongside `pageType`.
 
-**CRITICAL**: Each row must fill width=6 exactly. No gaps allowed.
+```json
+{
+  "name": "overview",
+  "displayName": "Overview",
+  "pageType": "PAGE_TYPE_CANVAS",
+  "layoutVersion": "GRID_V1",
+  "layout": [...]
+}
+```
+
+Each widget has a position: `{"x": 0, "y": 0, "width": 4, "height": 4}`
+
+**CRITICAL**: Each row must fill width=12 exactly. No gaps allowed.
 
 ```
-CORRECT:                          WRONG:
-y=0: [w=6]                        y=0: [w=4]____  ← gap!
-y=1: [w=2][w=2][w=2]  ← fills 6   y=1: [w=1][w=1][w=1][w=1]__  ← gap!
-y=4: [w=3][w=3]       ← fills 6
+CORRECT:                            WRONG:
+y=0: [w=12]                         y=0: [w=8]____  ← gap!
+y=1: [w=4][w=4][w=4]  ← fills 12    y=1: [w=2][w=2][w=2][w=2]__  ← gap!
+y=4: [w=6][w=6]       ← fills 12
 ```
 
 **Recommended widget sizes:**
 
 | Widget Type | Width | Height | Notes |
 |-------------|-------|--------|-------|
-| Text header | 6 | 1 | Full width; use SEPARATE widgets for title and subtitle |
-| Counter/KPI | 2 | **3-4** | **NEVER height=2** - too cramped! |
-| Line/Bar/Area chart | 3 | **5-6** | Pair side-by-side to fill row |
-| Pie chart | 3 | **5-6** | Needs space for legend |
-| Full-width chart | 6 | 5-7 | For detailed time series |
-| Table | 6 | 5-8 | Full width for readability |
+| Text header | 12 | 1 | Full width; use SEPARATE widgets for title and subtitle |
+| Counter/KPI | 4 | **3-4** | **NEVER height=2** - too cramped! |
+| Line/Bar/Area chart | 6 | **5-6** | Pair side-by-side to fill row |
+| Pie chart | 6 | **5-6** | Needs space for legend |
+| Full-width chart | 12 | 5-7 | For detailed time series |
+| Table | 12 | 5-8 | Full width for readability |
 
 **Standard dashboard structure:**
 ```text
-y=0:  Title (w=6, h=1) - Dashboard title (use separate widget!)
-y=1:  Subtitle (w=6, h=1) - Description (use separate widget!)
-y=2:  KPIs (w=2 each, h=3) - 3 key metrics side-by-side
-y=5:  Section header (w=6, h=1) - "Trends" or similar
-y=6:  Charts (w=3 each, h=5) - Two charts side-by-side
-y=11: Section header (w=6, h=1) - "Details"
-y=12: Table (w=6, h=6) - Detailed data
+y=0:  Title (w=12, h=1) - Dashboard title (use separate widget!)
+y=1:  Subtitle (w=12, h=1) - Description (use separate widget!)
+y=2:  KPIs (w=4 each, h=3) - 3 key metrics side-by-side
+y=5:  Section header (w=12, h=1) - "Trends" or similar
+y=6:  Charts (w=6 each, h=5) - Two charts side-by-side
+y=11: Section header (w=12, h=1) - "Details"
+y=12: Table (w=12, h=6) - Detailed data
 ```
 
 ### 5) CARDINALITY & READABILITY (CRITICAL)
@@ -333,16 +345,17 @@ y=12: Table (w=6, h=6) - Detailed data
 
 Before deploying, verify:
 1. All widget names use only alphanumeric + hyphens + underscores
-2. All rows sum to width=6 with no gaps
-3. KPIs use height 3-4, charts use height 5-6
-4. Chart dimensions have reasonable cardinality (≤8 for colors/groups)
-5. All widget fieldNames match dataset columns exactly
-6. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
-7. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
-8. **Percent values must be 0-1 for `number-percent` format** (0.865 displays as "86.5%", don't forget to set the format). If data is 0-100, either divide by 100 in SQL or use `number` format instead.
-9. SQL uses Spark syntax (date_sub, not INTERVAL)
-10. **All SQL queries tested via CLI and return expected data**
-11. **Every dataset you want filtered MUST contain the filter field** — filters only affect datasets with that column in their query
+2. **Every page has `"layoutVersion": "GRID_V1"`**
+3. All rows sum to width=12 with no gaps
+4. KPIs use height 3-4, charts use height 5-6
+5. Chart dimensions have reasonable cardinality (≤8 for colors/groups)
+6. All widget fieldNames match dataset columns exactly
+7. **Field `name` in query.fields matches `fieldName` in encodings exactly** (e.g., both `"sum(spend)"`)
+8. Counter datasets: use `disaggregated: true` for 1-row datasets, `disaggregated: false` with aggregation for multi-row
+9. **Percent values must be 0-1 for `number-percent` format** (0.865 displays as "86.5%", don't forget to set the format). If data is 0-100, either divide by 100 in SQL or use `number` format instead.
+10. SQL uses Spark syntax (date_sub, not INTERVAL)
+11. **All SQL queries tested via CLI and return expected data**
+12. **Every dataset you want filtered MUST contain the filter field** — filters only affect datasets with that column in their query
 
 ---
 

@@ -41,6 +41,7 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 |----------------------------------|----------|------------|
 | :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | [Quick Start (install)](#install-in-existing-project)
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
+| [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
 | [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
 | [**Genie Code Skills**](databricks-skills/install_skills.sh) | Install skills into your workspace for Genie Code (`--install-to-genie`) | [Genie Code skills (install)](#genie-code-skills) |
@@ -60,11 +61,13 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
   - [Antigravity](https://antigravity.google)
   - [Codex](https://openai.com/codex/)
   - [Copilot](https://github.com/features/copilot/cli)
+  - [Windsurf](https://windsurf.com)
+  - [OpenCode](https://opencode.ai)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github or .agents_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, or opencode.json_
 
 #### Mac / Linux
 
@@ -92,7 +95,7 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 **Install for specific tools only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity,windsurf,opencode
 ```
 
 </details>
@@ -150,7 +153,12 @@ cd ai-dev-kit/databricks-builder-app
 
 # Deploy everything (Lakebase + app + permissions)
 ./scripts/deploy.sh my-builder-app --profile <your-profile>
+
+# Deploy with MCP Gateway for Genie Code (name must start with mcp-)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --profile <your-profile>
 ```
+
+With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
 
 For local development:
 
@@ -202,6 +210,10 @@ curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main
 ```
 
 Combine `--profile`, `--local`, specific skill names, `--mlflow-version`, etc. as needed; see `./databricks-skills/install_skills.sh --help` or [databricks-skills/README.md](databricks-skills/README.md).
+
+**From a Databricks notebook** (no local terminal needed):
+
+Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py) into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them to your workspace using the Databricks SDK. This works on any compute, including serverless.
 
 **Skill modification or Custom Skill**
 

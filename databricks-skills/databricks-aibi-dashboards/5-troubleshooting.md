@@ -63,7 +63,7 @@ These errors occur when the JSON structure is wrong:
 
 ## Layout has gaps
 
-- Ensure each row sums to width=6
+- Ensure each row sums to width=12
 - Check that y positions don't skip values
 
 ## Filter shows "Invalid widget definition"

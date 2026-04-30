@@ -44,14 +44,14 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
     "name": "title",
     "multilineTextboxSpec": {"lines": ["## Dashboard Title"]}
   },
-  "position": {"x": 0, "y": 0, "width": 6, "height": 1}
+  "position": {"x": 0, "y": 0, "width": 12, "height": 1}
 },
 {
   "widget": {
     "name": "subtitle",
     "multilineTextboxSpec": {"lines": ["Description text here"]}
   },
-  "position": {"x": 0, "y": 1, "width": 6, "height": 1}
+  "position": {"x": 0, "y": 1, "width": 12, "height": 1}
 }
 
 // WRONG: Multiple lines concatenate into one line!
@@ -62,7 +62,7 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
       "lines": ["## Dashboard Title", "Description text here"]  // Becomes "## Dashboard TitleDescription text here"
     }
   },
-  "position": {"x": 0, "y": 0, "width": 6, "height": 2}
+  "position": {"x": 0, "y": 0, "width": 12, "height": 2}
 }
 ```
 
@@ -117,7 +117,7 @@ Format types: `number`, `number-currency`, `number-percent`
       "frame": {"showTitle": true, "title": "Total Revenue"}
     }
   },
-  "position": {"x": 0, "y": 0, "width": 2, "height": 3}
+  "position": {"x": 0, "y": 0, "width": 4, "height": 3}
 }
 ```
 
@@ -147,7 +147,7 @@ Format types: `number`, `number-currency`, `number-percent`
       "frame": {"showTitle": true, "title": "Total Spend"}
     }
   },
-  "position": {"x": 0, "y": 0, "width": 2, "height": 3}
+  "position": {"x": 0, "y": 0, "width": 4, "height": 3}
 }
 ```
 
@@ -188,7 +188,7 @@ Format types: `number`, `number-currency`, `number-percent`
       "frame": {"showTitle": true, "title": "Details"}
     }
   },
-  "position": {"x": 0, "y": 0, "width": 6, "height": 6}
+  "position": {"x": 0, "y": 0, "width": 12, "height": 6}
 }
 ```
 
