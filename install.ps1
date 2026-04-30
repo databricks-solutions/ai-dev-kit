@@ -76,6 +76,7 @@ $script:ProfileProvided = $false
 $script:SkillsProfile = ""
 $script:UserSkills   = ""
 $script:ListSkills   = $false
+$script:Channel      = if ($env:AIDEVKIT_CHANNEL) { $env:AIDEVKIT_CHANNEL } else { "stable" }  # stable or experimental
 
 # Databricks skills (bundled in repo)
 $script:Skills = @(
@@ -220,6 +221,7 @@ while ($i -lt $args.Count) {
         { $_ -in "--skills-profile", "-SkillsProfile" } { $script:SkillsProfile = $args[$i + 1]; $i += 2 }
         { $_ -in "--skills", "-Skills" }       { $script:UserSkills = $args[$i + 1]; $i += 2 }
         { $_ -in "--list-skills", "-ListSkills" } { $script:ListSkills = $true; $i++ }
+        { $_ -in "--experimental", "-Experimental" } { $script:Channel = "experimental"; $i++ }
         { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
@@ -239,12 +241,14 @@ while ($i -lt $args.Count) {
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
+            Write-Host "  --experimental        Install from experimental branch (early access features)"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
             Write-Host ""
             Write-Host "Environment Variables:"
             Write-Host "  AIDEVKIT_BRANCH       Branch or tag to install (default: latest release)"
             Write-Host "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
+            Write-Host "  AIDEVKIT_CHANNEL      'stable' (default) or 'experimental'"
             Write-Host ""
             Write-Host "Examples:"
             Write-Host "  # Basic installation"
@@ -1743,7 +1747,19 @@ function Show-Summary {
     Write-Msg "Location: $($script:InstallDir)"
     Write-Msg "Scope:    $($script:Scope)"
     Write-Msg "Tools:    $(($script:Tools -split ' ') -join ', ')"
+    if ($script:Channel -eq "experimental") {
+        Write-Msg "Channel:  experimental 🧪"
+    }
     Write-Host ""
+    if ($script:Channel -eq "experimental") {
+        Write-Host "  ============================================================" -ForegroundColor Yellow
+        Write-Host "  🧪 You're using the experimental channel" -ForegroundColor White
+        Write-Host "  ============================================================" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Msg "Thank you for testing early features! Your feedback helps us improve."
+        Write-Msg "Report issues: https://github.com/databricks-solutions/ai-dev-kit/issues"
+        Write-Host ""
+    }
     Write-Msg "Next steps:"
     $step = 1
     if ($script:Tools -match 'cursor') {
@@ -1917,6 +1933,71 @@ function Invoke-PromptAuth {
     }
 }
 
+# ─── Release channel prompt ───────────────────────────────────
+function Invoke-PromptChannel {
+    # Skip if already set via --experimental flag or env var
+    if ($script:Channel -eq "experimental") { return }
+
+    # Skip in silent mode or non-interactive
+    if ($script:Silent) { return }
+    if (-not (Test-Interactive)) { return }
+
+    Write-Host ""
+    Write-Host "  Select release channel" -ForegroundColor White
+
+    $items = @(
+        @{ Label = "Stable";       Value = "stable";       Selected = $true;  Hint = "Latest stable release (recommended)" }
+        @{ Label = "Experimental"; Value = "experimental"; Selected = $false; Hint = "Early access to new features -- help us test!" }
+    )
+
+    $script:Channel = Select-Radio -Items $items
+
+    # If experimental was selected, re-download and re-exec from experimental branch
+    if ($script:Channel -eq "experimental") {
+        Write-Host ""
+        Write-Host "  ============================================================" -ForegroundColor Yellow
+        Write-Host "  🧪 Experimental Channel" -ForegroundColor White
+        Write-Host "  ============================================================" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  You're about to install the " -NoNewline
+        Write-Host "experimental" -ForegroundColor White -NoNewline
+        Write-Host " version of AI Dev Kit."
+        Write-Host "  This includes early access features that may change or break."
+        Write-Host ""
+        Write-Host "  We'd love your feedback!" -ForegroundColor White
+        Write-Host "  Report issues: https://github.com/databricks-solutions/ai-dev-kit/issues" -ForegroundColor Blue
+        Write-Host "  Discussions:   https://github.com/databricks-solutions/ai-dev-kit/discussions" -ForegroundColor Blue
+        Write-Host ""
+        Write-Host "  Downloading installer from experimental branch..." -ForegroundColor DarkGray
+        Write-Host ""
+
+        # Build argument list preserving current flags
+        $newArgs = @("--experimental")
+        if ($script:Force)               { $newArgs += "--force" }
+        if ($script:UserTools)           { $newArgs += "--tools"; $newArgs += $script:UserTools }
+        if ($script:UserMcpPath)         { $newArgs += "--mcp-path"; $newArgs += $script:UserMcpPath }
+        if ($script:SkillsProfile)       { $newArgs += "--skills-profile"; $newArgs += $script:SkillsProfile }
+        if ($script:UserSkills)          { $newArgs += "--skills"; $newArgs += $script:UserSkills }
+        if ($script:ScopeExplicit -and $script:Scope -eq "global") { $newArgs += "--global" }
+        if ($script:Profile_ -ne "DEFAULT") { $newArgs += "--profile"; $newArgs += $script:Profile_ }
+        if ($script:InstallMcp)          { $newArgs += "--mcp" }
+        if (-not $script:InstallSkills)  { $newArgs += "--mcp-only" }
+
+        # Download experimental installer to a temp file and execute
+        $expUrl = "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.ps1"
+        $tempScript = Join-Path $env:TEMP "ai-dev-kit-install-experimental.ps1"
+        try {
+            Invoke-WebRequest -Uri $expUrl -OutFile $tempScript -UseBasicParsing -ErrorAction Stop
+        } catch {
+            Write-Err "Failed to download experimental installer from ${expUrl}: $($_.Exception.Message)"
+        }
+
+        # Execute the experimental installer with preserved args, then exit
+        & $tempScript @newArgs
+        exit $LASTEXITCODE
+    }
+}
+
 # ─── Main ─────────────────────────────────────────────────────
 function Invoke-Main {
     if (-not $script:Silent) {
@@ -1924,6 +2005,9 @@ function Invoke-Main {
         Write-Host "Databricks AI Dev Kit Installer" -ForegroundColor White
         Write-Host "--------------------------------"
     }
+
+    # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
+    Invoke-PromptChannel
 
     # Check dependencies
     Write-Step "Checking prerequisites"
@@ -1977,6 +2061,9 @@ function Invoke-Main {
         Write-Host ""
         Write-Host "  Summary" -ForegroundColor White
         Write-Host "  ------------------------------------"
+        if ($script:Channel -eq "experimental") {
+            Write-Host "  Channel:     " -NoNewline; Write-Host "experimental 🧪" -ForegroundColor Yellow
+        }
         Write-Host "  Tools:       " -NoNewline; Write-Host "$(($script:Tools -split ' ') -join ', ')" -ForegroundColor Green
         Write-Host "  Profile:     " -NoNewline; Write-Host $script:Profile_ -ForegroundColor Green
         Write-Host "  Scope:       " -NoNewline; Write-Host $script:Scope -ForegroundColor Green
