@@ -280,7 +280,7 @@ opentelemetry-sdk==1.40.0
     #   sentry-sdk
 opentelemetry-semantic-conventions==0.61b0
     # via opentelemetry-sdk
-packaging==26.0
+packaging==26.2
     # via
     #   fastmcp
     #   gunicorn
