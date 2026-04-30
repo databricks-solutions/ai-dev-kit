@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, and Antigravity.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Kiro.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -233,7 +233,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,kiro"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
@@ -569,6 +569,8 @@ function Invoke-DetectTools {
     $hasGemini  = $null -ne (Get-Command gemini -ErrorAction SilentlyContinue)
     $hasAntigravity = ($null -ne (Get-Command antigravity -ErrorAction SilentlyContinue)) -or
                       (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe")
+    $hasKiro    = ($null -ne (Get-Command kiro -ErrorAction SilentlyContinue)) -or
+                  (Test-Path "$env:LOCALAPPDATA\Programs\Kiro\Kiro.exe")
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -576,9 +578,10 @@ function Invoke-DetectTools {
     $copilotState = $hasCopilot; $copilotHint = if ($hasCopilot) { "detected" } else { "not found" }
     $geminiState  = $hasGemini;  $geminiHint  = if ($hasGemini)  { "detected" } else { "not found" }
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
+    $kiroState    = $hasKiro;    $kiroHint    = if ($hasKiro)    { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasKiro) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -595,6 +598,7 @@ function Invoke-DetectTools {
         @{ Label = "OpenAI Codex";   Value = "codex";        State = $codexState;        Hint = $codexHint }
         @{ Label = "Gemini CLI";     Value = "gemini";       State = $geminiState;       Hint = $geminiHint }
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
+        @{ Label = "Kiro";           Value = "kiro";         State = $kiroState;         Hint = $kiroHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1164,6 +1168,7 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".agents\skills"
                 }
             }
+            "kiro" { $dirs += Join-Path $BaseDir ".kiro\skills" }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1588,6 +1593,16 @@ function Write-McpConfigs {
                 }
                 Write-GeminiMcpJson (Join-Path $env:USERPROFILE ".gemini\antigravity\mcp_config.json")
                 Write-Ok "Antigravity MCP config"
+            }
+            "kiro" {
+                if ($script:Scope -eq "global") {
+                    $kiroSettings = Join-Path $env:USERPROFILE ".kiro\settings"
+                } else {
+                    $kiroSettings = Join-Path $BaseDir ".kiro\settings"
+                }
+                if (-not (Test-Path $kiroSettings)) { New-Item -ItemType Directory -Path $kiroSettings -Force | Out-Null }
+                Write-McpJson (Join-Path $kiroSettings "mcp.json")
+                Write-Ok "Kiro MCP config"
             }
         }
     }
