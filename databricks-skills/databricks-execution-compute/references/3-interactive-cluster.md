@@ -1,6 +1,8 @@
 # Interactive Cluster Execution
 
-**Use when:** You have an existing running cluster and need to preserve state across multiple MCP tool calls, or need Scala/R support.
+**Use when:** You have an existing running cluster and need to preserve state across multiple tool calls, or need Scala/R support.
+
+> `<SKILL_ROOT>` in examples = the directory containing the parent SKILL.md — substitute the absolute install path (e.g. `~/.claude/skills/databricks-execution-compute`).
 
 ## When to Choose Interactive Cluster
 
@@ -20,8 +22,8 @@
 
 **Starting a cluster takes 3-8 minutes and costs money.** Always check first:
 
-```python
-list_compute(resource="clusters")
+```bash
+python <SKILL_ROOT>/scripts/compute.py list-compute --resource clusters
 ```
 
 If no cluster is running, ask the user:
@@ -34,58 +36,80 @@ If no cluster is running, ask the user:
 
 ### First Command: Creates Context
 
-```python
-result = execute_code(
-    code="import pandas as pd\ndf = pd.DataFrame({'a': [1, 2, 3]})",
-    compute_type="cluster",
-    cluster_id="1234-567890-abcdef"
-)
-# result contains context_id for reuse
+```bash
+python <SKILL_ROOT>/scripts/compute.py execute-code \
+    --code "import pandas as pd; df = pd.DataFrame({'a': [1, 2, 3]}); print(df)" \
+    --compute-type cluster \
+    --cluster-id "1234-567890-abcdef"
+```
+
+Response includes `context_id` for reuse:
+```json
+{
+  "success": true,
+  "output": "   a\n0  1\n1  2\n2  3",
+  "context_id": "ctx_abc123",
+  "cluster_id": "1234-567890-abcdef"
+}
 ```
 
 ### Follow-up Commands: Reuse Context
 
-```python
+```bash
 # Variables from first command still available
-execute_code(
-    code="print(df.shape)",  # df exists
-    context_id=result["context_id"],
-    cluster_id=result["cluster_id"]
-)
+python <SKILL_ROOT>/scripts/compute.py execute-code \
+    --code "print(df.shape)" \
+    --compute-type cluster \
+    --cluster-id "1234-567890-abcdef" \
+    --context-id "ctx_abc123"
 ```
 
 ### Auto-Select Best Running Cluster
 
-```python
-best_cluster = list_compute(resource="clusters", auto_select=True)
-execute_code(
-    code="spark.range(100).show()",
-    compute_type="cluster",
-    cluster_id=best_cluster["cluster_id"]
-)
+```bash
+# Get best running cluster
+python <SKILL_ROOT>/scripts/compute.py list-compute --auto-select
+# Returns: {"cluster_id": "1234-567890-abcdef"}
+
+# Then execute on it
+python <SKILL_ROOT>/scripts/compute.py execute-code \
+    --code "spark.range(100).show()" \
+    --compute-type cluster \
+    --cluster-id "1234-567890-abcdef"
 ```
 
 ## Language Support
 
-```python
-execute_code(code='println("Hello")', compute_type="cluster", language="scala")
-execute_code(code="SELECT * FROM table LIMIT 10", compute_type="cluster", language="sql")
-execute_code(code='print("Hello")', compute_type="cluster", language="r")
+```bash
+# Scala
+python <SKILL_ROOT>/scripts/compute.py execute-code --code 'println("Hello")' --compute-type cluster --language scala --cluster-id ...
+                   
+# SQL
+python <SKILL_ROOT>/scripts/compute.py execute-code --code "SELECT * FROM table LIMIT 10" --compute-type cluster --language sql --cluster-id ...
+
+# R
+python <SKILL_ROOT>/scripts/compute.py execute-code --code 'print("Hello")' --compute-type cluster --language r --cluster-id ...
 ```
 
 ## Installing Libraries
 
-Install pip packages directly in the execution context (pandas/numpy are there by default):
+Install pip packages directly in the execution context:
 
-```python
-# Install library
-execute_code(
-    code="""%pip install faker
-    dbutils.library.restartPython()""", # Restart Python to pick up new packages (if needed)
-    compute_type="cluster",
-    cluster_id="...",
-    context_id="..."
-)
+```bash
+python <SKILL_ROOT>/scripts/compute.py execute-code \
+    --code "%pip install faker" \
+    --compute-type cluster \
+    --cluster-id "..." \
+    --context-id "..."
+```
+
+If needed, restart Python to pick up new packages:
+```bash
+python <SKILL_ROOT>/scripts/compute.py execute-code \
+    --code "dbutils.library.restartPython()" \
+    --compute-type cluster \
+    --cluster-id "..." \
+    --context-id "..."
 ```
 
 ## Context Lifecycle
@@ -93,32 +117,57 @@ execute_code(
 **Keep alive (default):** Context persists until cluster terminates.
 
 **Destroy when done:**
-```python
-execute_code(
-    code="print('Done!')",
-    compute_type="cluster",
-    destroy_context_on_completion=True
-)
+```bash
+python <SKILL_ROOT>/scripts/compute.py execute-code \
+    --code "print('Done!')" \
+    --compute-type cluster \
+    --cluster-id "..." \
+    --destroy-context
 ```
 
-## Handling No Running Cluster
+## Managing Clusters
 
-When no cluster is running, `execute_code` returns:
-```json
-{
-  "success": false,
-  "error": "No running cluster available",
-  "startable_clusters": [{"cluster_id": "...", "cluster_name": "...", "state": "TERMINATED"}],
-  "suggestions": ["Start a terminated cluster", "Use serverless instead"]
-}
+Two equivalent paths: the standalone script (convenience wrapper) or the raw `databricks` CLI (more fields exposed). Prefer the script for the common operations listed here.
+
+```bash
+# List all clusters
+python <SKILL_ROOT>/scripts/compute.py list-compute --resource clusters
+
+# Get specific cluster status
+python <SKILL_ROOT>/scripts/compute.py list-compute --cluster-id "1234-567890-abcdef"
+
+# Start a cluster (WITH USER APPROVAL ONLY - costs money, 3-8min startup)
+python <SKILL_ROOT>/scripts/compute.py manage-cluster --action start --cluster-id "1234-567890-abcdef"
+
+# Terminate a cluster (reversible)
+python <SKILL_ROOT>/scripts/compute.py manage-cluster --action terminate --cluster-id "1234-567890-abcdef"
+
+# Create a new cluster
+python <SKILL_ROOT>/scripts/compute.py manage-cluster --action create --name "my-cluster" --num-workers 2
 ```
 
-### Starting a Cluster (With User Approval Only)
+### Filter running interactive clusters only (raw CLI)
 
-```python
-manage_cluster(action="start", cluster_id="1234-567890-abcdef")
-# Poll until running (wait 20sec)
-list_compute(resource="clusters", cluster_id="1234-567890-abcdef")
+Useful before asking the user which cluster to reuse. `--cluster-sources UI,API` excludes job clusters (which would otherwise dominate the list on busy workspaces):
+
+```bash
+databricks clusters list --cluster-sources UI,API --output json \
+  | jq '.[] | select(.state == "RUNNING")'
+```
+
+### Create with a full spec (raw CLI)
+
+The script's `manage-cluster --action create` is fine for quick defaults; for full control (DBR version, instance type, tags) use the raw CLI:
+
+```bash
+# SPARK_VERSION is positional; custom_tags recommended for resource tracking
+databricks clusters create 15.4.x-scala2.12 --json '{
+  "cluster_name": "my-cluster",
+  "node_type_id": "i3.xlarge",
+  "num_workers": 2,
+  "autotermination_minutes": 60,
+  "custom_tags": {"aidevkit_project": "ai-dev-kit"}
+}'
 ```
 
 ## Common Issues
@@ -127,7 +176,7 @@ list_compute(resource="clusters", cluster_id="1234-567890-abcdef")
 |-------|----------|
 | "No running cluster" | Ask user to start or use serverless |
 | Context not found | Context expired; create new one |
-| Library not found | `%pip install <library>` then if needed `dbutils.library.restartPython()` |
+| Library not found | `%pip install <library>` then restart Python if needed |
 
 ## When NOT to Use
 

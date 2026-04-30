@@ -53,6 +53,7 @@ USER_TOOLS=""
 USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
+CHANNEL="${DEVKIT_CHANNEL:-stable}"  # stable or experimental
 
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
@@ -77,8 +78,17 @@ else
 fi
 
 # Installation mode defaults
-INSTALL_MCP=true
 INSTALL_SKILLS=true
+INSTALL_MCP="${DEVKIT_INSTALL_MCP:-false}"
+MCP_INSTALL_PATH="${DEVKIT_MCP_PATH:-$HOME/.ai-dev-kit}"
+
+# Required config fields - if any new field is added here, saved configs become stale
+# (hash is computed automatically, no manual version bump needed)
+REQUIRED_CONFIG_FIELDS="SAVED_TOOLS SAVED_PROFILE SAVED_SCOPE SAVED_SKILLS_PROFILE SAVED_INSTALL_MCP"
+
+# Flags to track config state
+USE_PREVIOUS_CONFIG=false
+HAS_PREVIOUS_CONFIG=false  # True if previous config exists (for pre-selecting defaults)
 
 # Minimum required versions
 MIN_CLI_VERSION="0.278.0"
@@ -129,12 +139,14 @@ while [ $# -gt 0 ]; do
         -b|--branch)      BRANCH="$2"; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; shift ;;
-        --mcp-path)       USER_MCP_PATH="$2"; shift 2 ;;
+        --mcp-path)       USER_MCP_PATH="$2"; MCP_INSTALL_PATH="$2"; INSTALL_MCP=true; shift 2 ;;
         --skills-profile) SKILLS_PROFILE="$2"; shift 2 ;;
         --skills)         USER_SKILLS="$2"; shift 2 ;;
         --list-skills)    LIST_SKILLS=true; shift ;;
         --silent)         SILENT=true; shift ;;
+        --mcp)            INSTALL_MCP=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
+        --experimental)   CHANNEL="experimental"; shift ;;
         -f|--force)       FORCE=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
@@ -153,6 +165,9 @@ while [ $# -gt 0 ]; do
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
+            echo "  --experimental        Install from experimental branch (early access features)"
+            echo "  --mcp                 Install deprecated MCP server (default: no)"
+            echo "  --mcp-path PATH       MCP server install path (default: ~/.ai-dev-kit)"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             echo ""
@@ -166,6 +181,9 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SKILLS_PROFILE Comma-separated skill profiles"
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
+            echo "  DEVKIT_CHANNEL        'stable' (default) or 'experimental'"
+            echo "  DEVKIT_INSTALL_MCP    Set to 'true' to install MCP server"
+            echo "  DEVKIT_MCP_PATH       MCP server install path"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             echo ""
             echo "Examples:"
@@ -494,6 +512,150 @@ radio_select() {
     echo "${values[$selected]}"
 }
 
+# ─── Configuration persistence ───────────────────────────────────
+# Saves all user choices to allow quick reinstalls
+
+# Compute hash of required fields list (auto-detects schema changes)
+get_config_schema_hash() {
+    # Use md5/md5sum depending on platform, truncate for readability
+    if command -v md5 >/dev/null 2>&1; then
+        echo "$REQUIRED_CONFIG_FIELDS" | md5 | cut -c1-8
+    elif command -v md5sum >/dev/null 2>&1; then
+        echo "$REQUIRED_CONFIG_FIELDS" | md5sum | cut -c1-8
+    else
+        # Fallback: simple checksum
+        echo "$REQUIRED_CONFIG_FIELDS" | cksum | cut -d' ' -f1
+    fi
+}
+
+# Get config file path (scope-aware)
+get_config_file() {
+    local state_dir
+    if [ "$SCOPE" = "global" ]; then
+        state_dir="$INSTALL_DIR"
+    else
+        state_dir="$(pwd)/.ai-dev-kit"
+    fi
+    echo "$state_dir/.ai-dev-kit-install-config"
+}
+
+# Save current configuration to file
+save_config() {
+    local config_file
+    config_file=$(get_config_file)
+    mkdir -p "$(dirname "$config_file")"
+
+    local schema_hash
+    schema_hash=$(get_config_schema_hash)
+
+    cat > "$config_file" << EOF
+# AI Dev Kit installation configuration
+# Generated on $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+CONFIG_SCHEMA_HASH="$schema_hash"
+SAVED_TOOLS="$TOOLS"
+SAVED_PROFILE="$PROFILE"
+SAVED_SCOPE="$SCOPE"
+SAVED_SKILLS_PROFILE="${SKILLS_PROFILE:-all}"
+SAVED_USER_SKILLS="$USER_SKILLS"
+SAVED_INSTALL_MCP="$INSTALL_MCP"
+SAVED_MCP_INSTALL_PATH="$MCP_INSTALL_PATH"
+EOF
+}
+
+# Load and validate previous configuration
+# Returns 0 if valid config exists, 1 otherwise
+# Sets SAVED_* variables if successful
+# Robust: any error silently falls back to fresh install
+load_previous_config() {
+    local config_file=""
+
+    # First try project-local config, then global
+    if [ -f "$(pwd)/.ai-dev-kit/.ai-dev-kit-install-config" ]; then
+        config_file="$(pwd)/.ai-dev-kit/.ai-dev-kit-install-config"
+    elif [ -f "$INSTALL_DIR/.ai-dev-kit-install-config" ]; then
+        config_file="$INSTALL_DIR/.ai-dev-kit-install-config"
+    fi
+    [ -z "$config_file" ] && return 1
+
+    # Safely read config using grep instead of source (avoids code execution)
+    CONFIG_SCHEMA_HASH=$(grep -E '^CONFIG_SCHEMA_HASH=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_TOOLS=$(grep -E '^SAVED_TOOLS=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_PROFILE=$(grep -E '^SAVED_PROFILE=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_SCOPE=$(grep -E '^SAVED_SCOPE=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_SKILLS_PROFILE=$(grep -E '^SAVED_SKILLS_PROFILE=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_INSTALL_MCP=$(grep -E '^SAVED_INSTALL_MCP=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || return 1
+    SAVED_USER_SKILLS=$(grep -E '^SAVED_USER_SKILLS=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || true
+    SAVED_MCP_INSTALL_PATH=$(grep -E '^SAVED_MCP_INSTALL_PATH=' "$config_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"') || true
+
+    # Validate schema hash matches
+    local expected_hash
+    expected_hash=$(get_config_schema_hash)
+    [ "${CONFIG_SCHEMA_HASH:-}" != "$expected_hash" ] && return 1
+
+    # Validate required fields are present
+    [ -z "$SAVED_TOOLS" ] && return 1
+    [ -z "$SAVED_PROFILE" ] && return 1
+    [ -z "$SAVED_SCOPE" ] && return 1
+    [ -z "$SAVED_SKILLS_PROFILE" ] && return 1
+    [ -z "$SAVED_INSTALL_MCP" ] && return 1
+
+    return 0
+}
+
+# Apply loaded config to current session variables
+apply_previous_config() {
+    TOOLS="$SAVED_TOOLS"
+    PROFILE="$SAVED_PROFILE"
+    SCOPE="$SAVED_SCOPE"
+    SCOPE_EXPLICIT=true
+
+    if [ "$SAVED_SKILLS_PROFILE" = "custom" ] || [[ "$SAVED_USER_SKILLS" == *","* ]] || [[ "$SAVED_USER_SKILLS" == *" "* ]]; then
+        USER_SKILLS="$SAVED_USER_SKILLS"
+    else
+        SKILLS_PROFILE="$SAVED_SKILLS_PROFILE"
+    fi
+
+    INSTALL_MCP="$SAVED_INSTALL_MCP"
+    MCP_INSTALL_PATH="${SAVED_MCP_INSTALL_PATH:-$HOME/.ai-dev-kit}"
+
+    USE_PREVIOUS_CONFIG=true
+}
+
+# Display previous config and ask if user wants to use it
+# Returns 0 if user wants to keep previous config (skip prompts)
+# Returns 1 if user wants to reconfigure (but SAVED_* are set as defaults)
+prompt_use_previous_config() {
+    if ! load_previous_config; then
+        return 1  # No valid config, proceed with prompts
+    fi
+
+    echo ""
+    echo -e "  ${B}Previous installation${N}"
+    echo -e "  Tools: ${G}$(echo "$SAVED_TOOLS" | tr ' ' ', ')${N}, Profile: ${G}$SAVED_PROFILE${N}, Scope: ${G}$SAVED_SCOPE${N}"
+    if [ -n "$SAVED_USER_SKILLS" ]; then
+        echo -e "  Skills: ${G}custom${N}, MCP: ${G}${SAVED_INSTALL_MCP}${N}"
+    else
+        echo -e "  Skills: ${G}${SAVED_SKILLS_PROFILE:-all}${N}, MCP: ${G}${SAVED_INSTALL_MCP}${N}"
+    fi
+
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        apply_previous_config
+        return 0
+    fi
+
+    local keep
+    keep=$(prompt "Keep this configuration? ${D}(Y/n)${N}" "y")
+
+    if [ "$keep" = "y" ] || [ "$keep" = "Y" ] || [ "$keep" = "yes" ] || [ -z "$keep" ]; then
+        apply_previous_config
+        return 0
+    else
+        # User wants to reconfigure - SAVED_* values remain set as defaults for prompts
+        HAS_PREVIOUS_CONFIG=true
+        return 1
+    fi
+}
+
 # ─── Tool detection & selection ─────────────────────────────────
 detect_tools() {
     # If provided via --tools flag or TOOLS env var, skip detection and prompts
@@ -528,19 +690,32 @@ detect_tools() {
     # Build checkbox items: "Label|value|on_or_off|hint"
     local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" windsurf_state="off" opencode_state="off"
     local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" windsurf_hint="not found" opencode_hint="not found"
-    [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
-    [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
-    [ "$has_codex" = true ]         && codex_state="on"         && codex_hint="detected"
-    [ "$has_copilot" = true ]       && copilot_state="on"       && copilot_hint="detected"
-    [ "$has_gemini" = true ]        && gemini_state="on"        && gemini_hint="detected"
-    [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
-    [ "$has_windsurf" = true ]      && windsurf_state="on"      && windsurf_hint="detected"
-    [ "$has_opencode" = true ]      && opencode_state="on"      && opencode_hint="detected"
 
-    # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_windsurf" = false ] && [ "$has_opencode" = false ]; then
-        claude_state="on"
-        claude_hint="default"
+    # If previous config exists, use those selections; otherwise use auto-detection
+    if [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_TOOLS" ]; then
+        [[ " $SAVED_TOOLS " == *" claude "* ]]      && claude_state="on"      && claude_hint="previous"
+        [[ " $SAVED_TOOLS " == *" cursor "* ]]      && cursor_state="on"      && cursor_hint="previous"
+        [[ " $SAVED_TOOLS " == *" codex "* ]]       && codex_state="on"       && codex_hint="previous"
+        [[ " $SAVED_TOOLS " == *" copilot "* ]]     && copilot_state="on"     && copilot_hint="previous"
+        [[ " $SAVED_TOOLS " == *" gemini "* ]]      && gemini_state="on"      && gemini_hint="previous"
+        [[ " $SAVED_TOOLS " == *" antigravity "* ]] && antigravity_state="on" && antigravity_hint="previous"
+        [[ " $SAVED_TOOLS " == *" windsurf "* ]]    && windsurf_state="on"    && windsurf_hint="previous"
+        [[ " $SAVED_TOOLS " == *" opencode "* ]]    && opencode_state="on"    && opencode_hint="previous"
+    else
+        [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
+        [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
+        [ "$has_codex" = true ]         && codex_state="on"         && codex_hint="detected"
+        [ "$has_copilot" = true ]       && copilot_state="on"       && copilot_hint="detected"
+        [ "$has_gemini" = true ]        && gemini_state="on"        && gemini_hint="detected"
+        [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
+        [ "$has_windsurf" = true ]      && windsurf_state="on"      && windsurf_hint="detected"
+        [ "$has_opencode" = true ]      && opencode_state="on"      && opencode_hint="detected"
+
+        # If nothing detected, pre-select claude as default
+        if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_windsurf" = false ] && [ "$has_opencode" = false ]; then
+            claude_state="on"
+            claude_hint="default"
+        fi
     fi
 
     # Interactive or fallback
@@ -589,6 +764,7 @@ prompt_profile() {
 
     # Skip in silent mode or non-interactive
     if [ "$SILENT" = true ] || ! is_interactive; then
+        [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_PROFILE" ] && PROFILE="$SAVED_PROFILE"
         return
     fi
 
@@ -606,27 +782,33 @@ prompt_profile() {
     fi
 
     echo ""
-    echo -e "  ${B}Select Databricks profile${N}"
+    echo -e "  ${B}Which Databricks profile for this project?${N}"
+    echo -e "  ${D}This will be set in .claude/settings.json for Claude Code to use.${N}"
 
     if [ ${#profiles[@]} -gt 0 ] && is_interactive; then
+        # Determine which profile to pre-select
+        local preselect="DEFAULT"
+        [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_PROFILE" ] && preselect="$SAVED_PROFILE"
+
         # Build radio items: "Label|value|on_or_off|hint"
         local -a items=()
+        local found_preselect=false
         for p in "${profiles[@]}"; do
             local state="off"
             local hint=""
-            [ "$p" = "DEFAULT" ] && state="on" && hint="default"
+            if [ "$p" = "$preselect" ]; then
+                state="on"
+                hint="previous"
+                found_preselect=true
+            fi
             items+=("${p}|${p}|${state}|${hint}")
         done
-        
+
         # Add custom profile option at the end
         items+=("Custom profile name...|__CUSTOM__|off|Enter a custom profile name")
 
-        # If no DEFAULT profile exists, pre-select the first one
-        local has_default=false
-        for p in "${profiles[@]}"; do
-            [ "$p" = "DEFAULT" ] && has_default=true
-        done
-        if [ "$has_default" = false ]; then
+        # If preselect not found, select first one
+        if [ "$found_preselect" = false ]; then
             items[0]=$(echo "${items[0]}" | sed 's/|off|/|on|/')
         fi
 
@@ -762,27 +944,8 @@ prompt_skills_profile() {
 
     # Skip in silent mode or non-interactive
     if [ "$SILENT" = true ] || ! is_interactive; then
-        SKILLS_PROFILE="all"
+        SKILLS_PROFILE="${SAVED_SKILLS_PROFILE:-all}"
         return
-    fi
-
-    # Check for previous selection (scope-local first, then global fallback for upgrades)
-    local profile_file="$STATE_DIR/.skills-profile"
-    [ ! -f "$profile_file" ] && [ "$SCOPE" = "project" ] && profile_file="$INSTALL_DIR/.skills-profile"
-    if [ -f "$profile_file" ]; then
-        local prev_profile
-        prev_profile=$(cat "$profile_file")
-        if [ "$FORCE" != true ]; then
-            echo ""
-            local display_profile
-            display_profile=$(echo "$prev_profile" | tr ',' ', ')
-            local keep
-            keep=$(prompt "Previous skill profile: ${B}${display_profile}${N}. Keep? ${D}(Y/n)${N}" "y")
-            if [ "$keep" = "y" ] || [ "$keep" = "Y" ] || [ "$keep" = "yes" ] || [ -z "$keep" ]; then
-                SKILLS_PROFILE="$prev_profile"
-                return
-            fi
-        fi
     fi
 
     echo ""
@@ -792,7 +955,23 @@ prompt_skills_profile() {
     local -a p_labels=("All Skills" "Data Engineer" "Business Analyst" "AI/ML Engineer" "App Developer" "Custom")
     local -a p_values=("all" "data-engineer" "analyst" "ai-ml-engineer" "app-developer" "custom")
     local -a p_hints=("Install everything (34 skills)" "Pipelines, Spark, Jobs, Streaming (14 skills)" "Dashboards, SQL, Genie, Metrics (8 skills)" "Agents, RAG, Vector Search, MLflow (17 skills)" "Apps, Lakebase, Deployment (10 skills)" "Pick individual skills")
-    local -a p_states=(1 0 0 0 0 0)  # "All" selected by default
+
+    # Pre-select based on previous config if available and add "previous" hint
+    local -a p_states=(0 0 0 0 0 0)
+    if [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_SKILLS_PROFILE" ]; then
+        # Parse comma-separated profiles and set states + hints
+        IFS=',' read -ra prev_profiles <<< "$SAVED_SKILLS_PROFILE"
+        for prev in "${prev_profiles[@]}"; do
+            for i in "${!p_values[@]}"; do
+                if [ "${p_values[$i]}" = "$prev" ]; then
+                    p_states[$i]=1
+                    p_hints[$i]="previous"
+                fi
+            done
+        done
+    else
+        p_states[0]=1  # Default to "All"
+    fi
     local p_count=6
     local p_cursor=0
     local p_total_rows=$((p_count + 2))
@@ -958,6 +1137,51 @@ prompt_custom_skills() {
     USER_SKILLS=$(echo "$selected" | tr ' ' ',')
 }
 
+# ─── MCP Server installation prompt ────────────────────────────
+prompt_mcp_install() {
+    # Skip if already set via env var or flag
+    if [ "$INSTALL_MCP" = true ]; then
+        return
+    fi
+
+    # Skip in silent mode or non-interactive
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        [ "$HAS_PREVIOUS_CONFIG" = true ] && [ "$SAVED_INSTALL_MCP" = "true" ] && INSTALL_MCP=true
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Deprecated MCP Server${N}"
+    echo -e "  ${D}Skills now work via CLI for better performance. MCP server is optional for backwards compatibility.${N}"
+
+    # Build radio items with previous config pre-selection
+    local skip_state="on" skip_hint="Recommended - skills work without MCP"
+    local install_state="off" install_hint="Legacy - requires Python venv setup"
+
+    if [ "$HAS_PREVIOUS_CONFIG" = true ]; then
+        if [ "$SAVED_INSTALL_MCP" = "true" ]; then
+            skip_state="off"
+            install_state="on"
+            install_hint="previous"
+        else
+            skip_hint="previous"
+        fi
+    fi
+
+    local selected
+    selected=$(radio_select \
+        "Do not install|no|${skip_state}|${skip_hint}" \
+        "Install MCP server|yes|${install_state}|${install_hint}" \
+    )
+
+    if [ "$selected" = "yes" ]; then
+        INSTALL_MCP=true
+        # Prompt for install path
+        echo ""
+        MCP_INSTALL_PATH=$(prompt "MCP server install path" "$MCP_INSTALL_PATH")
+    fi
+}
+
 # Compare semantic versions (returns 0 if $1 >= $2)
 version_gte() {
     printf '%s\n%s' "$2" "$1" | sort -V -C
@@ -969,93 +1193,54 @@ check_cli_version() {
     cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 
     if [ -z "$cli_version" ]; then
-        warn "Could not determine Databricks CLI version"
-        return
+        PREREQ_WARNINGS+=("Could not determine Databricks CLI version")
+        return 1
     fi
 
     if version_gte "$cli_version" "$MIN_CLI_VERSION"; then
-        ok "Databricks CLI v${cli_version}"
+        PREREQS+=("Databricks CLI v${cli_version}")
+        return 0
     else
-        warn "Databricks CLI v${cli_version} is outdated (minimum: v${MIN_CLI_VERSION})"
-        msg "  ${B}Upgrade:${N} curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh"
+        PREREQ_WARNINGS+=("Databricks CLI v${cli_version} outdated (min: v${MIN_CLI_VERSION}). Upgrade: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh")
+        return 1
     fi
 }
 
-# Check Databricks SDK version in the MCP venv
-check_sdk_version() {
-    local sdk_version
-    sdk_version=$("$VENV_PYTHON" -c "from databricks.sdk.version import __version__; print(__version__)" 2>/dev/null)
-
-    if [ -z "$sdk_version" ]; then
-        warn "Could not determine Databricks SDK version"
-        return
-    fi
-
-    if version_gte "$sdk_version" "$MIN_SDK_VERSION"; then
-        ok "Databricks SDK v${sdk_version}"
-    else
-        warn "Databricks SDK v${sdk_version} is outdated (minimum: v${MIN_SDK_VERSION})"
-        msg "  ${B}Upgrade:${N} $VENV_PYTHON -m pip install --upgrade databricks-sdk"
-    fi
-}
-
-# Check prerequisites
+# Check prerequisites (prints inline)
 check_deps() {
+    PREREQS=()
+    PREREQ_WARNINGS=()
+
     command -v git >/dev/null 2>&1 || die "git required"
-    ok "git"
+    PREREQS+=("git")
 
     if command -v databricks >/dev/null 2>&1; then
         check_cli_version
     else
-        warn "Databricks CLI not found. Install: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}"
-        msg "${D}You can still install, but authentication will require the CLI later.${N}"
+        PREREQ_WARNINGS+=("Databricks CLI not found. Install: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh")
     fi
 
     if [ "$INSTALL_MCP" = true ]; then
         if command -v uv >/dev/null 2>&1; then
-            PKG="uv"
-            ok "$PKG ($(uv --version 2>/dev/null || echo 'unknown version'))"
+            PREREQS+=("uv $(uv --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo '')")
         else
             die "uv is required but not found on your PATH.
    Install it with: ${B}curl -LsSf https://astral.sh/uv/install.sh | sh${N}
    Then re-run this installer."
         fi
     fi
-}
 
-# Check if update needed
-check_version() {
-    local ver_file="$INSTALL_DIR/version"
-    [ "$SCOPE" = "project" ] && ver_file=".ai-dev-kit/version"
-    
-    [ ! -f "$ver_file" ] && return
-    [ "$FORCE" = true ] && return
-
-    # Skip version gate if user explicitly wants a different skill profile
-    if [ -n "$SKILLS_PROFILE" ] || [ -n "$USER_SKILLS" ]; then
-        local saved_profile_file="$STATE_DIR/.skills-profile"
-        [ ! -f "$saved_profile_file" ] && [ "$SCOPE" = "project" ] && saved_profile_file="$INSTALL_DIR/.skills-profile"
-        if [ -f "$saved_profile_file" ]; then
-            local saved_profile
-            saved_profile=$(cat "$saved_profile_file")
-            local requested="${USER_SKILLS:+custom:$USER_SKILLS}"
-            [ -z "$requested" ] && requested="$SKILLS_PROFILE"
-            [ "$saved_profile" != "$requested" ] && return
-        fi
+    # Print inline
+    if [ "$SILENT" = false ] && [ ${#PREREQS[@]} -gt 0 ]; then
+        local prereq_list
+        prereq_list=$(printf '%s, ' "${PREREQS[@]}" | sed 's/, $//')
+        echo -e "${G}✓${N} ${prereq_list}"
     fi
 
-    local local_ver=$(cat "$ver_file")
-    # Use -f to fail on HTTP errors (like 404)
-    local remote_ver=$(curl -fsSL "$RAW_URL/VERSION" 2>/dev/null || echo "")
-
-    # Validate remote version format (should not contain "404" or other error text)
-    if [ -n "$remote_ver" ] && [[ ! "$remote_ver" =~ (404|Not Found|error) ]]; then
-        if [ "$local_ver" = "$remote_ver" ]; then
-            ok "Already up to date (v${local_ver})"
-            msg "${D}Use --force to reinstall or --skills-profile to change profiles${N}"
-            exit 0
-        fi
-    fi
+    # Print warnings on separate lines
+    for w in "${PREREQ_WARNINGS[@]}"; do
+        warn "$w"
+    done
 }
 
 # Setup MCP server
@@ -1087,7 +1272,7 @@ setup_mcp() {
     fi
 
     msg "Installing Python dependencies..."
-    $arch_prefix uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
+    $arch_prefix uv venv --python 3.12 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
     $arch_prefix uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
 
     "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
@@ -1228,13 +1413,6 @@ install_skills() {
 
     # Save manifest of installed skills (for cleanup on profile change)
     mv "$manifest.tmp" "$manifest"
-
-    # Save selected profile for future reinstalls (scope-local)
-    if [ -n "$USER_SKILLS" ]; then
-        echo "custom:$USER_SKILLS" > "$STATE_DIR/.skills-profile"
-    else
-        echo "${SKILLS_PROFILE:-all}" > "$STATE_DIR/.skills-profile"
-    fi
 }
 
 # Write MCP configs
@@ -1448,6 +1626,57 @@ GEMINIEOF
     ok "GEMINI.md"
 }
 
+# Write DATABRICKS_CONFIG_PROFILE to Claude settings.json env section
+# Safely merges with existing settings using Python or jq
+write_claude_env() {
+    local path=$1
+    local profile=$2
+    mkdir -p "$(dirname "$path")"
+
+    # Try Python first (most reliable for JSON manipulation)
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c "
+import json
+path = '$path'
+profile = '$profile'
+try:
+    with open(path) as f: cfg = json.load(f)
+except: cfg = {}
+env = cfg.setdefault('env', {})
+env['DATABRICKS_CONFIG_PROFILE'] = profile
+with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return 0
+    fi
+
+    # Fallback: jq if available
+    if command -v jq >/dev/null 2>&1; then
+        if [ -f "$path" ]; then
+            local tmp="${path}.tmp"
+            jq --arg p "$profile" '.env = (.env // {}) | .env.DATABRICKS_CONFIG_PROFILE = $p' "$path" > "$tmp" && mv "$tmp" "$path"
+        else
+            echo "{\"env\":{\"DATABRICKS_CONFIG_PROFILE\":\"$profile\"}}" | jq '.' > "$path"
+        fi
+        return 0
+    fi
+
+    # Last resort: create new file only if it doesn't exist
+    if [ ! -f "$path" ]; then
+        cat > "$path" << EOF
+{
+  "env": {
+    "DATABRICKS_CONFIG_PROFILE": "$profile"
+  }
+}
+EOF
+        return 0
+    fi
+
+    # Can't safely merge without Python or jq
+    warn "Cannot update $path without python3 or jq. Add manually:"
+    msg "  \"env\": {\"DATABRICKS_CONFIG_PROFILE\": \"$profile\"}"
+    return 1
+}
+
 write_claude_hook() {
     local path=$1
     local script=$2
@@ -1607,6 +1836,7 @@ summary() {
         echo ""
         echo -e "${G}${B}Installation complete!${N}"
         echo "────────────────────────────────"
+        [ "$CHANNEL" = "experimental" ] && msg "Channel:  ${Y}experimental 🧪${N}"
         msg "Location: $INSTALL_DIR"
         msg "Scope:    $SCOPE"
         msg "Tools:    $(echo "$TOOLS" | tr ' ' ', ')"
@@ -1643,80 +1873,112 @@ summary() {
         step=$((step + 1))
         msg "${step}. Try: \"List my SQL warehouses\""
         echo ""
+        if [ "$CHANNEL" = "experimental" ]; then
+            echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+            echo -e "  ${B}🧪 You're using the experimental channel${N}"
+            echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+            echo ""
+            msg "Thank you for testing early features! Your feedback helps us improve."
+            msg "Report issues: ${BL}https://github.com/databricks-solutions/ai-dev-kit/issues${N}"
+            echo ""
+        fi
     fi
 }
 
 # Prompt for installation scope
 prompt_scope() {
     if [ "$SILENT" = true ] || ! is_interactive; then
+        [ "$HAS_PREVIOUS_CONFIG" = true ] && SCOPE="${SAVED_SCOPE:-project}"
         return
     fi
 
     echo ""
     echo -e "  ${B}Select installation scope${N}"
-    
-    # Simple radio selector without Confirm button
-    local -a labels=("Project" "Global")
-    local -a values=("project" "global")
-    local -a hints=("Install in current directory (.cursor/, .claude/, .gemini/)" "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
-    local count=2
-    local selected=0
-    local cursor=0
-    
-    _scope_draw() {
-        for i in 0 1; do
-            local dot="○"
-            local dot_color="\033[2m"
-            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
-            local arrow="  "
-            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
-            local hint_style="\033[2m"
-            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
-            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
-        done
-    }
-    
-    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
-    printf "\033[?25l" > /dev/tty
-    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
-    
-    _scope_draw
-    
-    while true; do
-        printf "\033[%dA" "$count" > /dev/tty
-        _scope_draw
-        
-        local key=""
-        IFS= read -rsn1 key < /dev/tty 2>/dev/null
-        
-        if [ "$key" = $'\x1b' ]; then
-            local s1="" s2=""
-            read -rsn1 s1 < /dev/tty 2>/dev/null
-            read -rsn1 s2 < /dev/tty 2>/dev/null
-            if [ "$s1" = "[" ]; then
-                case "$s2" in
-                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
-                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
-                esac
-            fi
-        elif [ "$key" = "" ]; then
-            selected=$cursor
-            printf "\033[%dA" "$count" > /dev/tty
-            _scope_draw
-            break
-        elif [ "$key" = " " ]; then
-            selected=$cursor
+
+    # Build radio items with previous config pre-selection
+    local project_state="on" project_hint="Install in current directory"
+    local global_state="off" global_hint="Install in home directory"
+
+    if [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_SCOPE" ]; then
+        if [ "$SAVED_SCOPE" = "global" ]; then
+            project_state="off"
+            global_state="on"
+            global_hint="previous"
+        else
+            project_hint="previous"
         fi
-    done
-    
-    printf "\033[?25h" > /dev/tty
-    trap - EXIT
-    
-    SCOPE="${values[$selected]}"
+    fi
+
+    SCOPE=$(radio_select \
+        "Project|project|${project_state}|${project_hint}" \
+        "Global|global|${global_state}|${global_hint}" \
+    )
 }
 
-# Prompt to run auth
+# Prompt for release channel (stable vs experimental)
+prompt_channel() {
+    # Skip if already set via --experimental flag or env var
+    if [ "$CHANNEL" = "experimental" ]; then
+        return
+    fi
+
+    # Skip in silent mode or non-interactive
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Select release channel${N}"
+
+    local selected
+    selected=$(radio_select \
+        "Stable|stable|on|Latest stable release (recommended)" \
+        "Experimental|experimental|off|Early access to new features — help us test!" \
+    )
+
+    CHANNEL="$selected"
+
+    # If experimental was selected, re-download and re-exec from experimental branch
+    if [ "$CHANNEL" = "experimental" ]; then
+        echo ""
+        echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+        echo -e "  ${B}🧪 Experimental Channel${N}"
+        echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+        echo ""
+        echo -e "  You're about to install the ${B}experimental${N} version of AI Dev Kit."
+        echo -e "  This includes early access features that may change or break."
+        echo ""
+        echo -e "  ${B}We'd love your feedback!${N}"
+        echo -e "  Report issues: ${BL}https://github.com/databricks-solutions/ai-dev-kit/issues${N}"
+        echo -e "  Discussions:   ${BL}https://github.com/databricks-solutions/ai-dev-kit/discussions${N}"
+        echo ""
+        echo -e "  ${D}Downloading installer from experimental branch...${N}"
+
+        # Build the command with all current flags preserved
+        local args="--experimental"
+        [ "$FORCE" = true ] && args="$args --force"
+        [ "$SILENT" = true ] && args="$args --silent"
+        [ -n "$USER_TOOLS" ] && args="$args --tools $USER_TOOLS"
+        [ -n "$USER_MCP_PATH" ] && args="$args --mcp-path $USER_MCP_PATH"
+        [ -n "$SKILLS_PROFILE" ] && args="$args --skills-profile $SKILLS_PROFILE"
+        [ -n "$USER_SKILLS" ] && args="$args --skills $USER_SKILLS"
+        [ "$SCOPE_EXPLICIT" = true ] && [ "$SCOPE" = "global" ] && args="$args --global"
+        [ "$PROFILE" != "DEFAULT" ] && args="$args --profile $PROFILE"
+        [ "$INSTALL_MCP" = false ] && args="$args --skills-only"
+        [ "$INSTALL_SKILLS" = false ] && args="$args --mcp-only"
+
+        # Download and execute the experimental installer
+        exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") $args
+    fi
+}
+
+# Prompt to run auth (only for Claude + project scope)
 prompt_auth() {
+    # Skip if not Claude or if global scope
+    if ! echo "$TOOLS" | grep -qw "claude" || [ "$SCOPE" = "global" ]; then
+        return
+    fi
+
     if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
@@ -1764,69 +2026,101 @@ prompt_auth() {
 
 # Main
 main() {
-    if [ "$SILENT" = false ]; then
-        echo ""
-        echo -e "${B}Databricks AI Dev Kit Installer${N}"
-        echo "────────────────────────────────"
-    fi
-    
+    [ "$SILENT" = false ] && echo -e "\n${B}Databricks AI Dev Kit Installer${N}"
+
+    # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
+    prompt_channel
+
     # Check dependencies
-    step "Checking prerequisites"
     check_deps
 
-    # ── Step 2: Interactive tool selection ──
-    step "Selecting tools"
-    detect_tools
-    ok "Selected: $(echo "$TOOLS" | tr ' ' ', ')"
+    # ── Step 2: Check for previous configuration ──
+    # Only prompt if running interactively and no explicit flags were provided
+    if [ "$SILENT" = false ] && [ -z "$USER_TOOLS" ] && [ "$SCOPE_EXPLICIT" = false ]; then
+        if prompt_use_previous_config; then
+            # Config loaded and user chose to use it - skip to skill resolution
+            # Set state directory based on loaded scope
+            if [ "$SCOPE" = "global" ]; then
+                STATE_DIR="$INSTALL_DIR"
+            else
+                STATE_DIR="$(pwd)/.ai-dev-kit"
+            fi
+            # Resolve skills from loaded config
+            if [ "$INSTALL_SKILLS" = true ]; then
+                resolve_skills
+            fi
+            # Skip to confirmation (USE_PREVIOUS_CONFIG is true)
+        fi
+    fi
 
-    # ── Step 3: Interactive profile selection ──
-    step "Databricks profile"
-    prompt_profile
-    ok "Profile: $PROFILE"
+    # ── Interactive configuration (skip if using previous config) ──
+    if [ "$USE_PREVIOUS_CONFIG" = false ]; then
+        # ── Step 2: Interactive tool selection ──
+        step "Selecting tools"
+        detect_tools
+        ok "Selected: $(echo "$TOOLS" | tr ' ' ', ')"
 
-    # ── Step 3.5: Interactive scope selection ──
-    if [ "$SCOPE_EXPLICIT" = false ]; then
-        prompt_scope
-        ok "Scope: $SCOPE"
+        # ── Step 3: Interactive scope selection ──
+        if [ "$SCOPE_EXPLICIT" = false ]; then
+            prompt_scope
+            ok "Scope: $SCOPE"
+        fi
+
+        # ── Step 4: Interactive profile selection (only if Claude + project scope) ──
+        # Profile is set in .claude/settings.json env, so only for project-scoped installs
+        # to avoid messing with global settings that affect all projects
+        if echo "$TOOLS" | grep -qw "claude" && [ "$SCOPE" != "global" ]; then
+            step "Databricks profile for this project"
+            prompt_profile
+            ok "Profile: $PROFILE"
+        fi
     fi
 
     # Set state directory based on scope (for profile/manifest storage)
+    # (Also set when using previous config, but doesn't hurt to ensure it's set)
     if [ "$SCOPE" = "global" ]; then
         STATE_DIR="$INSTALL_DIR"
     else
         STATE_DIR="$(pwd)/.ai-dev-kit"
     fi
 
-    # ── Step 4: Skill profile selection ──
-    if [ "$INSTALL_SKILLS" = true ]; then
-        step "Skill profiles"
-        prompt_skills_profile
-        resolve_skills
-        # Count for display
-        local sk_count=0
-        for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_count=$((sk_count + 1)); done
-        if [ -n "$USER_SKILLS" ]; then
-            ok "Custom selection ($sk_count skills)"
+    # ── Continue interactive configuration (skip if using previous config) ──
+    if [ "$USE_PREVIOUS_CONFIG" = false ]; then
+        # ── Step 4: Skill profile selection ──
+        if [ "$INSTALL_SKILLS" = true ]; then
+            step "Skill profiles"
+            prompt_skills_profile
+            resolve_skills
+            # Count for display
+            local sk_count=0
+            for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_count=$((sk_count + 1)); done
+            if [ -n "$USER_SKILLS" ]; then
+                ok "Custom selection ($sk_count skills)"
+            else
+                ok "Profile: ${SKILLS_PROFILE:-all} ($sk_count skills)"
+            fi
+        fi
+
+        # ── Step 4.5: MCP server installation prompt ──
+        step "MCP server (deprecated)"
+        prompt_mcp_install
+        if [ "$INSTALL_MCP" = true ]; then
+            ok "Will install MCP server to: $MCP_INSTALL_PATH"
         else
-            ok "Profile: ${SKILLS_PROFILE:-all} ($sk_count skills)"
+            ok "Skipping MCP server (recommended)"
         fi
     fi
 
-    # ── Step 5: Interactive MCP path ──
-    if [ "$INSTALL_MCP" = true ]; then
-        prompt_mcp_path
-        ok "MCP path: $INSTALL_DIR"
-    fi
-
-    # ── Step 6: Confirm before proceeding ──
+    # ── Step 5: Confirm before proceeding ──
     if [ "$SILENT" = false ]; then
         echo ""
         echo -e "  ${B}Summary${N}"
         echo -e "  ────────────────────────────────────"
+        [ "$CHANNEL" = "experimental" ] && echo -e "  Channel:     ${Y}experimental 🧪${N}"
         echo -e "  Tools:       ${G}$(echo "$TOOLS" | tr ' ' ', ')${N}"
-        echo -e "  Profile:     ${G}${PROFILE}${N}"
         echo -e "  Scope:       ${G}${SCOPE}${N}"
-        [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${G}${INSTALL_DIR}${N}"
+        # Only show profile for Claude + project scope (where it's actually used)
+        echo "$TOOLS" | grep -qw "claude" && [ "$SCOPE" != "global" ] && echo -e "  Profile:     ${G}${PROFILE}${N}"
         if [ "$INSTALL_SKILLS" = true ]; then
             if [ -n "$USER_SKILLS" ]; then
                 echo -e "  Skills:      ${G}custom selection${N}"
@@ -1836,7 +2130,11 @@ main() {
                 echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N}"
             fi
         fi
-        [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
+        if [ "$INSTALL_MCP" = true ]; then
+            echo -e "  MCP server:  ${Y}Yes${N} (legacy) → $MCP_INSTALL_PATH"
+        else
+            echo -e "  MCP server:  ${G}No${N} (recommended)"
+        fi
         echo ""
     fi
 
@@ -1850,9 +2148,6 @@ main() {
         fi
     fi
 
-    # ── Step 7: Version check (may exit early if up to date) ──
-    check_version
-    
     # Determine base directory
     local base_dir
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
@@ -1870,6 +2165,14 @@ main() {
     # Install skills
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
 
+    # Write Databricks profile to Claude settings.json (project scope only)
+    if echo "$TOOLS" | grep -qw "claude" && [ "$SCOPE" != "global" ]; then
+        local claude_settings="$base_dir/.claude/settings.json"
+        if write_claude_env "$claude_settings" "$PROFILE"; then
+            ok "Claude env: DATABRICKS_CONFIG_PROFILE=$PROFILE"
+        fi
+    fi
+
     # Write GEMINI.md if gemini is selected
     if echo "$TOOLS" | grep -q gemini; then
         if [ "$SCOPE" = "global" ]; then
@@ -1884,10 +2187,13 @@ main() {
     
     # Save version
     save_version
-    
+
+    # Save configuration for quick reinstalls
+    save_config
+
     # Prompt to run auth
     prompt_auth
-    
+
     # Done
     summary
 }

@@ -1,8 +1,6 @@
 # Development & Testing Workflow
 
-MCP-based workflow for developing and testing agents on Databricks.
-
-> **If MCP tools are not available**, use Databricks CLI or the Python SDK directly. See [Databricks CLI docs](https://docs.databricks.com/dev-tools/cli/) for `databricks workspace import` and `databricks clusters spark-submit` commands.
+CLI-based workflow for developing and testing agents on Databricks.
 
 ## Overview
 
@@ -13,17 +11,17 @@ MCP-based workflow for developing and testing agents on Databricks.
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Step 2: Upload to workspace                                 │
-│   → manage_workspace_files MCP tool                         │
+│   → databricks workspace import-dir                         │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Step 3: Install packages                                    │
-│   → execute_code MCP tool                                   │
+│   → databricks jobs (serverless with pip requirements)      │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Step 4: Test agent (iterate)                                │
-│   → execute_code MCP tool (with file_path)                  │
+│   → databricks jobs run-now                                 │
 │   → If error: fix locally, re-upload, re-run                │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -85,17 +83,13 @@ print("Response:", result.model_dump(exclude_none=True))
 
 ## Step 2: Upload to Workspace
 
-Use the `manage_workspace_files` MCP tool:
+Use the Databricks CLI:
 
-```
-manage_workspace_files(
-    action="upload",
-    local_path="./my_agent",
-    workspace_path="/Workspace/Users/you@company.com/my_agent"
-)
+```bash
+databricks workspace import-dir ./my_agent /Workspace/Users/you@company.com/my_agent
 ```
 
-This uploads all files in parallel.
+This uploads all files recursively.
 
 ## Step 3: Install Packages
 
@@ -135,8 +129,8 @@ execute_code(
 
 1. Read the error from the output
 2. Fix the local file (`agent.py` or `test_agent.py`)
-3. Re-upload: `manage_workspace_files(action="upload", ...)`
-4. Re-run: `execute_code(file_path=...)`
+3. Re-upload: `databricks workspace import-dir ./my_agent /Workspace/.../my_agent`
+4. Re-run the job
 
 ### Iteration Tips
 
@@ -188,13 +182,12 @@ print(response.content)
 
 ## Workflow Summary
 
-| Step | MCP Tool | Purpose |
-|------|----------|---------|
-| Upload files | `manage_workspace_files` (action="upload") | Sync local files to workspace |
-| Install packages | `execute_code` | Set up dependencies |
-| Restart Python | `execute_code` | Apply package changes |
-| Test agent | `execute_code` (with `file_path`) | Run test script |
-| Debug | `execute_code` | Quick checks |
+| Step | CLI Command | Purpose |
+|------|-------------|---------|
+| Upload files | `databricks workspace import-dir` | Sync local files to workspace |
+| Install packages | Job with pip requirements | Set up dependencies |
+| Test agent | `databricks jobs run-now` | Run test script |
+| Debug | Run notebook or script | Quick checks |
 
 ## Next Steps
 

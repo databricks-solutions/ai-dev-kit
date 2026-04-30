@@ -2,16 +2,16 @@
 
 Build a complete Retrieval-Augmented Generation pipeline: prepare documents, create a vector index, query it, and wire it into an agent.
 
-## MCP Tools Used
+## CLI Commands Used
 
-| Tool | Step |
-|------|------|
-| `execute_sql` | Create source table, insert documents |
-| `manage_vs_endpoint(action="create")` | Create compute endpoint |
-| `manage_vs_index(action="create")` | Create Delta Sync index with managed embeddings |
-| `manage_vs_index(action="sync")` | Trigger index sync |
-| `manage_vs_index(action="get")` | Check index status |
-| `query_vs_index` | Test similarity search |
+| Command | Step |
+|---------|------|
+| `databricks experimental aitools tools query` | Create source table, insert documents |
+| `databricks vector-search-endpoints create-endpoint` | Create compute endpoint |
+| `databricks vector-search-indexes create-index` | Create Delta Sync index with managed embeddings |
+| `databricks vector-search-indexes sync-index` | Trigger index sync |
+| `databricks vector-search-indexes get-index` | Check index status |
+| `databricks vector-search-indexes query-index` | Test similarity search |
 
 ---
 
@@ -34,10 +34,10 @@ INSERT INTO catalog.schema.knowledge_base VALUES
 ('doc-003', 'Delta Lake', 'Delta Lake is an open-source storage layer...', 'storage', current_timestamp());
 ```
 
-Or via MCP:
+Or via CLI:
 
-```python
-execute_sql(sql_query="""
+```bash
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "
     CREATE TABLE IF NOT EXISTS catalog.schema.knowledge_base (
         doc_id STRING,
         title STRING,
@@ -45,7 +45,7 @@ execute_sql(sql_query="""
         category STRING,
         updated_at TIMESTAMP DEFAULT current_timestamp()
     )
-""")
+"
 ```
 
 ## Step 2: Create Vector Search Endpoint

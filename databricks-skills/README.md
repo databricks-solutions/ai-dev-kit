@@ -1,6 +1,6 @@
 # Databricks Skills for Claude Code
 
-Skills that teach Claude Code how to work effectively with Databricks - providing patterns, best practices, and code examples that work with Databricks MCP tools.
+Skills that teach Claude Code how to work effectively with Databricks - providing patterns, best practices, and code examples using the Databricks CLI, Python SDK, and REST APIs.
 
 ## Installation
 
@@ -105,7 +105,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-app-python** - Python web apps (Dash, Streamlit, Flask) with foundation model integration
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
 - **databricks-config** - Profile authentication setup
-- **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
+- **databricks-lakebase-autoscale** - Lakebase Autoscaling managed PostgreSQL with branching, scale-to-zero, reverse ETL
 
 ### 📚 Reference
 - **databricks-docs** - Documentation index via llms.txt
@@ -113,22 +113,21 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ## How It Works
 
 ```
-┌────────────────────────────────────────────────┐
-│  .claude/skills/     +    .claude/mcp.json     │
-│  (Knowledge)               (Actions)           │
-│                                                │
-│  Skills teach HOW    +    MCP does it          │
-│  ↓                        ↓                    │
-│  Claude Code learns patterns and executes      │
-└────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  .claude/skills/     +    Databricks CLI/SDK        │
+│  (Knowledge)              (Actions)                 │
+│                                                     │
+│  Skills teach HOW    +    CLI/SDK executes          │
+│  ↓                        ↓                         │
+│  Claude Code learns patterns and executes           │
+└─────────────────────────────────────────────────────┘
 ```
 
 **Example:** User says "Create a sales dashboard"
 1. Claude loads `databricks-aibi-dashboards` skill → learns validation workflow
-2. Calls `get_table_stats_and_schema()` → gets schemas
-3. Calls `execute_sql()` → tests queries
-4. Calls `manage_dashboard(action="create_or_update")` → deploys
-5. Returns working dashboard URL
+2. Runs `databricks experimental aitools tools query` → tests queries
+3. Uses Python SDK to create dashboard via REST API
+4. Returns working dashboard URL
 
 ## Custom Skills
 
@@ -149,6 +148,26 @@ description: "What this teaches"
 ...
 ```
 
+## Testing
+
+Run tests for skill scripts (requires `pytest`):
+
+```bash
+cd databricks-skills/.tests
+
+# Run all tests (unit tests are mocked, no Databricks connection needed)
+python run_tests.py
+
+# Run only unit tests
+python run_tests.py --unit
+
+# Run integration tests (requires Databricks connection)
+python run_tests.py --integration
+
+# Verbose output
+python run_tests.py -v
+```
+
 ## Troubleshooting
 
 **Skills not loading?** Check `.claude/skills/` exists and each skill has `SKILL.md`
@@ -158,6 +177,7 @@ description: "What this teaches"
 ## Related
 
 - [databricks-tools-core](../databricks-tools-core/) - Python library
-- [databricks-mcp-server](../databricks-mcp-server/) - MCP server
+- [Databricks CLI](https://docs.databricks.com/dev-tools/cli/index.html) - Official CLI
+- [Databricks SDK](https://docs.databricks.com/en/dev-tools/sdk-python.html) - Python SDK
 - [Databricks Docs](https://docs.databricks.com/) - Official documentation
 - [MLflow Skills](https://github.com/mlflow/skills) - Upstream MLflow skills repository

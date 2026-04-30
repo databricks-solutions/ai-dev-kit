@@ -3,7 +3,7 @@
 # Databricks Skills Installer
 #
 # Installs Databricks skills for Claude Code into your project.
-# These skills teach Claude how to work with Databricks using MCP tools.
+# These skills teach Claude how to work with Databricks using CLI, SDK, and REST APIs.
 #
 # Usage:
 #   # Install all skills (Databricks + MLflow + APX)
@@ -47,7 +47,7 @@ MLFLOW_REPO_RAW_URL="https://raw.githubusercontent.com/mlflow/skills"
 MLFLOW_REPO_REF="main"
 
 # Databricks skills (hosted in this repo)
-DATABRICKS_SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-bundles databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-execution-compute databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+DATABRICKS_SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-bundles databricks-app-python databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-execution-compute databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -83,7 +83,6 @@ get_skill_description() {
         "databricks-execution-compute") echo "Execute code and manage compute on Databricks - serverless, clusters, and SQL warehouses" ;;
         "databricks-unity-catalog") echo "System tables for lineage, audit, billing" ;;
         "databricks-lakebase-autoscale") echo "Lakebase Autoscale - managed PostgreSQL with autoscaling" ;;
-        "databricks-lakebase-provisioned") echo "Lakebase Provisioned - data connections and reverse ETL" ;;
         "databricks-metric-views") echo "Unity Catalog Metric Views - governed business metrics in YAML" ;;
         "databricks-model-serving") echo "Model Serving - deploy MLflow models and AI agents" ;;
         "databricks-mlflow-evaluation") echo "MLflow evaluation and trace analysis" ;;
@@ -119,12 +118,11 @@ get_skill_extra_files() {
         "databricks-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;
         "databricks-app-apx") echo "backend-patterns.md best-practices.md frontend-patterns.md" ;;
-        "databricks-app-python") echo "1-authorization.md 2-app-resources.md 3-frameworks.md 4-deployment.md 5-lakebase.md 6-mcp-approach.md examples/llm_config.py examples/fm-minimal-chat.py examples/fm-parallel-calls.py examples/fm-structured-outputs.py" ;;
+        "databricks-app-python") echo "1-authorization.md 2-app-resources.md 3-frameworks.md 4-deployment.md 5-lakebase.md 6-cli-approach.md examples/llm_config.py examples/fm-minimal-chat.py examples/fm-parallel-calls.py examples/fm-structured-outputs.py" ;;
         "databricks-jobs") echo "task-types.md triggers-schedules.md notifications-monitoring.md examples.md" ;;
         "databricks-python-sdk") echo "doc-index.md examples/1-authentication.py examples/2-clusters-and-jobs.py examples/3-sql-and-warehouses.py examples/4-unity-catalog.py examples/5-serving-and-vector-search.py" ;;
         "databricks-unity-catalog") echo "5-system-tables.md" ;;
         "databricks-lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
-        "databricks-lakebase-provisioned") echo "connection-patterns.md reverse-etl.md" ;;
         "databricks-metric-views") echo "yaml-reference.md patterns.md" ;;
         "databricks-model-serving") echo "1-classical-ml.md 2-custom-pyfunc.md 3-genai-agents.md 4-tools-integration.md 5-development-testing.md 6-logging-registration.md 7-deployment.md 8-querying-endpoints.md 9-package-requirements.md" ;;
         "databricks-mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;

@@ -63,6 +63,7 @@ claude_agent_settings.json
 .coverage
 htmlcov/
 .pytest_cache/
+.test-results/
 
 # Skill test run results (detailed per-task logs with full responses)
 .test/skills/*/runs/

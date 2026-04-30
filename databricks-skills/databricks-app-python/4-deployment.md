@@ -1,6 +1,6 @@
 # Deploying Databricks Apps
 
-Three deployment options: Databricks CLI (simplest), Asset Bundles (multi-environment), or MCP tools (programmatic).
+Three deployment options: Databricks CLI (simplest), Asset Bundles (multi-environment), or CLI commands (programmatic).
 
 **Cookbook deployment guide**: https://apps-cookbook.dev/docs/deploy
 
@@ -45,13 +45,15 @@ If you use `databricks workspace import-dir` directly, it does **not** apply the
 
 ### Step 2: Create and Deploy
 
+`--overwrite` on `workspace import-dir` is required for redeploys — without it the CLI **silently skips files that already exist**, so your updated code never makes it to the workspace and the app keeps running the old version. Harmless on the first deploy.
+
 ```bash
 # Create the app
 databricks apps create <app-name>
 
 # Upload source code (make sure to exclude node_modules, venv, etc.)
 databricks workspace mkdirs /Workspace/Users/<user>/apps/<app-name>
-databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name>
+databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name> --overwrite
 
 # Deploy
 databricks apps deploy <app-name> \
@@ -65,9 +67,11 @@ databricks apps get <app-name>
 
 ### Redeployment
 
+Use this recipe after the initial deploy, when you want a clean upload (stale files removed). On a first-ever deploy the `workspace delete` line errors because the directory doesn't exist yet — either run Step 2 first, or prefix the delete with ` 2>/dev/null || true` if you want this recipe to double as a clean deploy.
+
 ```bash
 databricks workspace delete /Workspace/Users/<user>/apps/<app-name> --recursive
-databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name>
+databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name> --overwrite
 databricks apps deploy <app-name> \
   --source-code-path /Workspace/Users/<user>/apps/<app-name>
 ```
@@ -115,9 +119,9 @@ For complete DABs guidance, use the **databricks-bundles** skill.
 
 ---
 
-## Option 3: MCP Tools
+## Option 3: CLI Commands
 
-For programmatic app lifecycle management, see [6-mcp-approach.md](6-mcp-approach.md).
+For CLI-based app lifecycle management, see [6-cli-approach.md](6-cli-approach.md).
 
 ---
 

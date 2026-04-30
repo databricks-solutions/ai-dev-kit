@@ -82,26 +82,21 @@ ALWAYS use exact endpoint names from this table. NEVER guess or abbreviate.
 | Custom PyFunc | [2-custom-pyfunc.md](2-custom-pyfunc.md) | Custom preprocessing, signatures |
 | GenAI Agents | [3-genai-agents.md](3-genai-agents.md) | ResponsesAgent, LangGraph |
 | Tools Integration | [4-tools-integration.md](4-tools-integration.md) | UC Functions, Vector Search |
-| Development & Testing | [5-development-testing.md](5-development-testing.md) | MCP workflow, iteration |
+| Development & Testing | [5-development-testing.md](5-development-testing.md) | CLI workflow, iteration |
 | Logging & Registration | [6-logging-registration.md](6-logging-registration.md) | mlflow.pyfunc.log_model |
 | Deployment | [7-deployment.md](7-deployment.md) | Job-based async deployment |
-| Querying Endpoints | [8-querying-endpoints.md](8-querying-endpoints.md) | SDK, REST, MCP tools |
+| Querying Endpoints | [8-querying-endpoints.md](8-querying-endpoints.md) | CLI, SDK, REST |
 | Package Requirements | [9-package-requirements.md](9-package-requirements.md) | DBR versions, pip |
 
 ---
 
 ## Quick Start: Deploy a GenAI Agent
 
-### Step 1: Install Packages (in notebook or via MCP)
+### Step 1: Install Packages (in notebook)
 
 ```python
 %pip install -U mlflow==3.6.0 databricks-langchain langgraph==0.3.4 databricks-agents pydantic
 dbutils.library.restartPython()
-```
-
-Or via MCP:
-```
-execute_code(code="%pip install -U mlflow==3.6.0 databricks-langchain langgraph==0.3.4 databricks-agents pydantic")
 ```
 
 ### Step 2: Create Agent File
@@ -110,31 +105,17 @@ Create `agent.py` locally with `ResponsesAgent` pattern (see [3-genai-agents.md]
 
 ### Step 3: Upload to Workspace
 
-```
-manage_workspace_files(
-    action="upload",
-    local_path="./my_agent",
-    workspace_path="/Workspace/Users/you@company.com/my_agent"
-)
+```bash
+databricks workspace import-dir ./my_agent /Workspace/Users/you@company.com/my_agent
 ```
 
 ### Step 4: Test Agent
 
-```
-execute_code(
-    file_path="./my_agent/test_agent.py",
-    cluster_id="<cluster_id>"
-)
-```
+Run `test_agent.py` on a cluster to validate the agent works.
 
 ### Step 5: Log Model
 
-```
-execute_code(
-    file_path="./my_agent/log_model.py",
-    cluster_id="<cluster_id>"
-)
-```
+Run `log_model.py` on a cluster to register the model in Unity Catalog.
 
 ### Step 6: Deploy (Async via Job)
 
@@ -142,12 +123,10 @@ See [7-deployment.md](7-deployment.md) for job-based deployment that doesn't tim
 
 ### Step 7: Query Endpoint
 
-```
-manage_serving_endpoint(
-    action="query",
-    name="my-agent-endpoint",
-    messages=[{"role": "user", "content": "Hello!"}]
-)
+```bash
+databricks serving-endpoints query my-agent-endpoint --json '{
+  "messages": [{"role": "user", "content": "Hello!"}]
+}'
 ```
 
 ---
@@ -174,55 +153,55 @@ Then deploy via UI or SDK. See [1-classical-ml.md](1-classical-ml.md).
 
 ---
 
-## MCP Tools
+## CLI Commands
 
-> **If MCP tools are not available**, use the SDK/CLI examples in the reference files below.
+### Endpoint Management
 
-### Development & Testing
+```bash
+# List all serving endpoints
+databricks serving-endpoints list
 
-| Tool | Purpose |
-|------|---------|
-| `manage_workspace_files` (action="upload") | Upload agent files to workspace |
-| `execute_code` | Install packages, test agent, log model |
+# Get endpoint details and status
+databricks serving-endpoints get my-agent-endpoint
 
-### Deployment
-
-| Tool | Purpose |
-|------|---------|
-| `manage_jobs` (action="create") | Create deployment job (one-time) |
-| `manage_job_runs` (action="run_now") | Kick off deployment (async) |
-| `manage_job_runs` (action="get") | Check deployment job status |
-
-### manage_serving_endpoint - Querying
-
-| Action | Description | Required Params |
-|--------|-------------|-----------------|
-| `get` | Check endpoint status (READY/NOT_READY/NOT_FOUND) | name |
-| `list` | List all endpoints | (none, optional limit) |
-| `query` | Send requests to endpoint | name + one of: messages, inputs, dataframe_records |
-
-**Example usage:**
-```python
-# Check endpoint status
-manage_serving_endpoint(action="get", name="my-agent-endpoint")
-
-# List all endpoints
-manage_serving_endpoint(action="list")
+# By default, after creation, tag serving endpoints to track resources created with this skill
+databricks serving-endpoints patch my-agent-endpoint --json '{
+  "add_tags": [{"key": "aidevkit_project", "value": "ai-dev-kit"}]
+}'
 
 # Query a chat/agent endpoint
-manage_serving_endpoint(
-    action="query",
-    name="my-agent-endpoint",
-    messages=[{"role": "user", "content": "Hello!"}],
-    max_tokens=500
-)
+databricks serving-endpoints query my-agent-endpoint --json '{
+  "messages": [{"role": "user", "content": "Hello!"}],
+  "max_tokens": 500
+}'
 
 # Query a traditional ML endpoint
-manage_serving_endpoint(
-    action="query",
-    name="sklearn-classifier",
-    dataframe_records=[{"age": 25, "income": 50000, "credit_score": 720}]
-)
+databricks serving-endpoints query sklearn-classifier --json '{
+  "dataframe_records": [{"age": 25, "income": 50000, "credit_score": 720}]
+}'
+```
+
+### Workspace File Operations
+
+```bash
+# Upload agent files to workspace
+databricks workspace import-dir ./my_agent /Workspace/Users/you@company.com/my_agent
+
+# List workspace files
+databricks workspace list /Workspace/Users/you@company.com/my_agent
+```
+
+### Jobs for Deployment
+
+```bash
+# Create a deployment job
+databricks jobs create --json @deploy_job.json
+
+# Run the deployment job (JOB_ID is positional)
+databricks jobs run-now JOB_ID
+
+# Check job run status (RUN_ID is positional)
+databricks jobs get-run RUN_ID
 ```
 
 ---
@@ -231,42 +210,27 @@ manage_serving_endpoint(
 
 ### Check Endpoint Status After Deployment
 
-```
-manage_serving_endpoint(action="get", name="my-agent-endpoint")
+```bash
+databricks serving-endpoints get my-agent-endpoint
 ```
 
-Returns:
-```json
-{
-    "name": "my-agent-endpoint",
-    "state": "READY",
-    "served_entities": [...]
-}
-```
+Returns JSON with endpoint status (`READY`, `NOT_READY`, etc.).
 
 ### Query a Chat/Agent Endpoint
 
-```
-manage_serving_endpoint(
-    action="query",
-    name="my-agent-endpoint",
-    messages=[
-        {"role": "user", "content": "What is Databricks?"}
-    ],
-    max_tokens=500
-)
+```bash
+databricks serving-endpoints query my-agent-endpoint --json '{
+  "messages": [{"role": "user", "content": "What is Databricks?"}],
+  "max_tokens": 500
+}'
 ```
 
 ### Query a Traditional ML Endpoint
 
-```
-manage_serving_endpoint(
-    action="query",
-    name="sklearn-classifier",
-    dataframe_records=[
-        {"age": 25, "income": 50000, "credit_score": 720}
-    ]
-)
+```bash
+databricks serving-endpoints query sklearn-classifier --json '{
+  "dataframe_records": [{"age": 25, "income": 50000, "credit_score": 720}]
+}'
 ```
 
 ---

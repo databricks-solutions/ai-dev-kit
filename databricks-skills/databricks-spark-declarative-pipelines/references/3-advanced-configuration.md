@@ -1,13 +1,13 @@
-# Advanced Pipeline Configuration (`extra_settings`)
+# Advanced Pipeline Configuration
 
-By default, pipelines are created with **serverless compute and Unity Catalog**. Use the `extra_settings` parameter only for advanced use cases.
+By default, pipelines are created with **serverless compute and Unity Catalog**. Use advanced configuration options only when needed.
 
-**CRITICAL: Do NOT use `extra_settings` to set `serverless=false` unless the user explicitly requires:**
+**CRITICAL: Do NOT set `serverless=false` unless the user explicitly requires:**
 - R language support
 - Spark RDD APIs
 - JAR libraries or Maven coordinates
 
-## When to Use `extra_settings`
+## When to Use Advanced Configuration
 
 - **Development mode**: Faster iteration with relaxed validation
 - **Continuous pipelines**: Real-time streaming instead of triggered runs
@@ -16,7 +16,9 @@ By default, pipelines are created with **serverless compute and Unity Catalog**.
 - **Python dependencies**: Install pip packages for serverless pipelines
 - **Classic clusters** (rare): Only if user explicitly needs R, RDD APIs, or JARs
 
-## `extra_settings` Parameter Reference
+## Pipeline JSON Configuration Reference
+
+These fields can be passed to `databricks pipelines create --json '{...}'` or `databricks pipelines update <id> --json '{...}'`.
 
 ### Top-Level Fields
 
@@ -157,197 +159,160 @@ Install pip dependencies for serverless pipelines:
 
 ## Configuration Examples
 
+All examples use `databricks pipelines create --json '{...}'`. For updates, use `databricks pipelines update <pipeline_id> --json '{...}'`.
+
+> **Tagging**: By default, add `"tags": {"aidevkit_project": "ai-dev-kit"}` to track resources created with this skill.
+
 ### Development Mode Pipeline
 
-Use `manage_pipeline(action="create_or_update")` tool with:
-- `name`: "my_dev_pipeline"
-- `root_path`: "/Workspace/Users/user@example.com/my_pipeline"
-- `catalog`: "dev_catalog"
-- `schema`: "dev_schema"
-- `workspace_file_paths`: [...]
-- `start_run`: true
-- `extra_settings`:
-```json
-{
-    "development": true,
-    "tags": {"environment": "development", "owner": "data-team"}
-}
+```bash
+databricks pipelines create --json '{
+  "name": "my_dev_pipeline",
+  "catalog": "dev_catalog",
+  "schema": "dev_schema",
+  "serverless": true,
+  "development": true,
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
+  "tags": {"environment": "development", "owner": "data-team"}
+}'
 ```
 
 ### Non-Serverless with Dedicated Cluster
 
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "serverless": false,
-    "clusters": [{
-        "label": "default",
-        "num_workers": 4,
-        "node_type_id": "i3.xlarge",
-        "custom_tags": {"cost_center": "analytics"}
-    }],
-    "photon": true,
-    "edition": "ADVANCED"
-}
+```bash
+databricks pipelines create --json '{
+  "name": "my_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": false,
+  "photon": true,
+  "edition": "ADVANCED",
+  "clusters": [{
+    "label": "default",
+    "num_workers": 4,
+    "node_type_id": "i3.xlarge",
+    "custom_tags": {"cost_center": "analytics"}
+  }],
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}]
+}'
 ```
 
 ### Continuous Streaming Pipeline
 
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "continuous": true,
-    "configuration": {
-        "spark.sql.shuffle.partitions": "auto"
-    }
-}
-```
-
-### Using Instance Pool
-
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "serverless": false,
-    "clusters": [{
-        "label": "default",
-        "instance_pool_id": "0727-104344-hauls13-pool-xyz",
-        "num_workers": 2,
-        "custom_tags": {"project": "analytics"}
-    }]
-}
-```
-
-### Custom Event Log Location
-
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "event_log": {
-        "catalog": "audit_catalog",
-        "schema": "pipeline_logs",
-        "name": "my_pipeline_events"
-    }
-}
+```bash
+databricks pipelines create --json '{
+  "name": "my_streaming_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": true,
+  "continuous": true,
+  "configuration": {"spark.sql.shuffle.partitions": "auto"},
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}]
+}'
 ```
 
 ### Pipeline with Email Notifications
 
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "notifications": [{
-        "email_recipients": ["team@example.com", "oncall@example.com"],
-        "alerts": ["on-update-failure", "on-update-fatal-failure", "on-flow-failure"]
-    }]
-}
+```bash
+databricks pipelines create --json '{
+  "name": "my_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": true,
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
+  "notifications": [{
+    "email_recipients": ["team@example.com", "oncall@example.com"],
+    "alerts": ["on-update-failure", "on-update-fatal-failure", "on-flow-failure"]
+  }]
+}'
 ```
 
 ### Production Pipeline with Autoscaling
 
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "serverless": false,
-    "development": false,
-    "photon": true,
-    "edition": "ADVANCED",
-    "clusters": [{
-        "label": "default",
-        "autoscale": {
-            "min_workers": 2,
-            "max_workers": 8,
-            "mode": "ENHANCED"
-        },
-        "node_type_id": "i3.xlarge",
-        "spark_conf": {
-            "spark.sql.adaptive.enabled": "true"
-        },
-        "custom_tags": {"environment": "production"}
-    }],
-    "notifications": [{
-        "email_recipients": ["data-team@example.com"],
-        "alerts": ["on-update-failure"]
-    }]
-}
-```
-
-### Run as Service Principal
-
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "run_as": {
-        "service_principal_name": "00000000-0000-0000-0000-000000000000"
-    }
-}
-```
-
-### Continuous Pipeline with Restart Window
-
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "continuous": true,
-    "restart_window": {
-        "start_hour": 2,
-        "days_of_week": ["SATURDAY", "SUNDAY"],
-        "time_zone_id": "America/Los_Angeles"
-    }
-}
+```bash
+databricks pipelines create --json '{
+  "name": "prod_pipeline",
+  "catalog": "prod_catalog",
+  "schema": "prod_schema",
+  "serverless": false,
+  "development": false,
+  "photon": true,
+  "edition": "ADVANCED",
+  "clusters": [{
+    "label": "default",
+    "autoscale": {"min_workers": 2, "max_workers": 8, "mode": "ENHANCED"},
+    "node_type_id": "i3.xlarge",
+    "spark_conf": {"spark.sql.adaptive.enabled": "true"},
+    "custom_tags": {"environment": "production"}
+  }],
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
+  "notifications": [{"email_recipients": ["data-team@example.com"], "alerts": ["on-update-failure"]}]
+}'
 ```
 
 ### Serverless with Python Dependencies
 
-Use `manage_pipeline(action="create_or_update")` tool with `extra_settings`:
-```json
-{
-    "serverless": true,
-    "environment": {
-        "dependencies": [
-            "scikit-learn==1.3.0",
-            "pandas>=2.0.0",
-            "requests"
-        ]
-    }
-}
+```bash
+databricks pipelines create --json '{
+  "name": "ml_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": true,
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
+  "environment": {
+    "dependencies": ["scikit-learn==1.3.0", "pandas>=2.0.0", "requests"]
+  }
+}'
 ```
 
-### Update Existing Pipeline by ID
+### Continuous Pipeline with Restart Window
 
-If you have a pipeline ID from the Databricks UI, you can force an update by including `id` in `extra_settings`:
-```json
-{
-    "id": "554f4497-4807-4182-bff0-ffac4bb4f0ce"
-}
+```bash
+databricks pipelines create --json '{
+  "name": "realtime_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": true,
+  "continuous": true,
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
+  "restart_window": {
+    "start_hour": 2,
+    "days_of_week": ["SATURDAY", "SUNDAY"],
+    "time_zone_id": "America/Los_Angeles"
+  }
+}'
 ```
 
-### Full JSON Export from Databricks UI
+### Custom Event Log Location
 
-You can copy pipeline settings from the Databricks UI (Pipeline Settings > JSON) and pass them directly as `extra_settings`. Invalid fields like `pipeline_type` are automatically filtered:
-
-```json
-{
-    "id": "554f4497-4807-4182-bff0-ffac4bb4f0ce",
-    "pipeline_type": "WORKSPACE",
-    "continuous": false,
-    "development": true,
-    "photon": false,
-    "edition": "ADVANCED",
-    "channel": "CURRENT",
-    "clusters": [{
-        "label": "default",
-        "num_workers": 1,
-        "instance_pool_id": "0727-104344-pool-xyz"
-    }],
-    "configuration": {
-        "catalog": "main",
-        "schema": "my_schema"
-    }
-}
+```bash
+databricks pipelines create --json '{
+  "name": "my_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": true,
+  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
+  "event_log": {
+    "catalog": "audit_catalog",
+    "schema": "pipeline_logs",
+    "name": "my_pipeline_events"
+  }
+}'
 ```
 
-**Note**: Explicit tool parameters (`name`, `root_path`, `catalog`, `schema`, `workspace_file_paths`) always take precedence over values in `extra_settings`.
+### Update Existing Pipeline
+
+```bash
+# Update pipeline configuration
+databricks pipelines update <pipeline_id> --json '{
+  "name": "updated_pipeline_name",
+  "development": false,
+  "notifications": [{"email_recipients": ["team@example.com"], "alerts": ["on-update-failure"]}]
+}'
+
+# Then run it
+databricks pipelines start-update <pipeline_id> --full-refresh
+```
 
 ---
 

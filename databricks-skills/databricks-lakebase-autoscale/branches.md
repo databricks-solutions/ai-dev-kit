@@ -1,212 +1,133 @@
-# Lakebase Autoscaling Branches
+# Lakebase Autoscaling — Branches (deep dive)
 
-## Overview
+Deep dive for the Branches concept. Basic CLI is in [SKILL.md](SKILL.md).
 
-Branches in Lakebase Autoscaling are isolated database environments that share storage with their parent through copy-on-write. They enable Git-like workflows for databases: create isolated dev/test environments, test schema changes safely, and recover from mistakes.
+## How Branching Works
 
-## Branch Types
+A branch is a logical Postgres instance whose storage is a **copy-on-write** fork of its parent at a specific LSN (point in the parent's WAL history). Reads hit the shared base until a page is modified; writes create branch-local copies. This is why branches are cheap to create and diverge gradually.
 
-| Option | Description | Use Case |
-|--------|-------------|----------|
-| **Current data** | Branch from latest state of parent | Development, testing with current data |
-| **Past data** | Branch from a specific point in time | Point-in-time recovery, historical analysis |
+Consequences:
+- Creating a branch is nearly instant regardless of parent size.
+- Storage grows with write volume on the branch, not with the parent's size.
+- Resetting a branch drops its CoW layer and re-points at the parent's current state.
 
-## Creating a Branch
+## Branch Sources
 
-### With Expiration (TTL)
+When creating a branch you pick a source LSN implicitly:
 
-```python
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.postgres import Branch, BranchSpec, Duration
+| Option | `spec` field | Use case |
+|--------|--------------|----------|
+| Current data | `source_branch` only | Dev/test with up-to-date data |
+| Past data | `source_branch` + `source_lsn` or `source_time` | Point-in-time recovery, reproduce a bug |
 
-w = WorkspaceClient()
+Past-data branching is bounded by the project's `history_retention_seconds` (default 7 days, max 35).
 
-# Create branch with 7-day expiration
-result = w.postgres.create_branch(
-    parent="projects/my-app",
-    branch=Branch(
-        spec=BranchSpec(
-            source_branch="projects/my-app/branches/production",
-            ttl=Duration(seconds=604800)  # 7 days
-        )
-    ),
-    branch_id="development"
-).wait()
+## TTL & Permanence
 
-print(f"Branch created: {result.name}")
-print(f"Expires: {result.status.expire_time}")
-```
+Branches are either ephemeral (TTL) or permanent (`no_expiry: true`). Max TTL is 30 days from creation. You **cannot** set TTL on:
+- Protected branches
+- The default branch (`production`)
+- Branches that have children
 
-### Permanent Branch (No Expiration)
+When a TTL branch expires, its endpoints and data are deleted.
 
-```python
-result = w.postgres.create_branch(
-    parent="projects/my-app",
-    branch=Branch(
-        spec=BranchSpec(
-            source_branch="projects/my-app/branches/production",
-            no_expiry=True
-        )
-    ),
-    branch_id="staging"
-).wait()
-```
+## Protection
 
-### CLI
+A protected branch cannot be deleted, reset, or archived. Only 1 branch per project can be protected. Typically this is `production`. Protection is stored on the branch spec and toggled with `update-branch`.
+
+## Reset
+
+`reset-branch` replaces a branch's CoW layer with a fresh fork from its parent's current head. Effect:
+- All local schema and data changes are discarded
+- Active connections are interrupted briefly
+- Cannot run on: root branches (no parent), protected branches, parents-of-others
+
+Use reset when your dev branch has drifted and you want fresh data without recreating the branch (preserves the branch name and any downstream config).
+
+## Constraints Cheat-Sheet
+
+| Action | Blocked when |
+|--------|-------------|
+| Delete | Has children; is protected; is default |
+| Reset | Is root; has children; is protected |
+| TTL/expire | Is protected; is default; has children |
+| Archive | Is protected |
+
+## Advanced CLI
+
+Past-data branch from LSN:
 
 ```bash
-# With TTL
-databricks postgres create-branch projects/my-app development \
-    --json '{
-        "spec": {
-            "source_branch": "projects/my-app/branches/production",
-            "ttl": "604800s"
-        }
-    }'
-
-# Permanent
-databricks postgres create-branch projects/my-app staging \
-    --json '{
-        "spec": {
-            "source_branch": "projects/my-app/branches/production",
-            "no_expiry": true
-        }
-    }'
+databricks postgres create-branch projects/my-app debug-bug-1234 \
+    --json '{"spec": {"source_branch": "projects/my-app/branches/production",
+                      "source_lsn": "0/1A2B3C4D",
+                      "no_expiry": true}}'
 ```
 
-## Getting Branch Details
+Past-data branch from timestamp:
 
-```python
-branch = w.postgres.get_branch(
-    name="projects/my-app/branches/development"
-)
-
-print(f"Branch: {branch.name}")
-print(f"Protected: {branch.status.is_protected}")
-print(f"Default: {branch.status.default}")
-print(f"State: {branch.status.current_state}")
-print(f"Size: {branch.status.logical_size_bytes} bytes")
+```bash
+databricks postgres create-branch projects/my-app pre-incident \
+    --json '{"spec": {"source_branch": "projects/my-app/branches/production",
+                      "source_time": "2026-04-20T14:30:00Z",
+                      "ttl": "86400s"}}'
 ```
 
-## Listing Branches
+Extend or drop a TTL:
 
-```python
-branches = list(w.postgres.list_branches(
-    parent="projects/my-app"
-))
-
-for branch in branches:
-    print(f"Branch: {branch.name}")
-    print(f"  Default: {branch.status.default}")
-    print(f"  Protected: {branch.status.is_protected}")
-```
-
-## Protecting a Branch
-
-Protected branches cannot be deleted, reset, or archived.
-
-```python
-from databricks.sdk.service.postgres import Branch, BranchSpec, FieldMask
-
-w.postgres.update_branch(
-    name="projects/my-app/branches/production",
-    branch=Branch(
-        name="projects/my-app/branches/production",
-        spec=BranchSpec(is_protected=True)
-    ),
-    update_mask=FieldMask(field_mask=["spec.is_protected"])
-).wait()
-```
-
-To remove protection:
-
-```python
-w.postgres.update_branch(
-    name="projects/my-app/branches/production",
-    branch=Branch(
-        name="projects/my-app/branches/production",
-        spec=BranchSpec(is_protected=False)
-    ),
-    update_mask=FieldMask(field_mask=["spec.is_protected"])
-).wait()
-```
-
-## Updating Branch Expiration
-
-```python
+```bash
 # Extend to 14 days
-w.postgres.update_branch(
-    name="projects/my-app/branches/development",
-    branch=Branch(
-        name="projects/my-app/branches/development",
-        spec=BranchSpec(
-            is_protected=False,
-            ttl=Duration(seconds=1209600)  # 14 days
-        )
-    ),
-    update_mask=FieldMask(field_mask=["spec.is_protected", "spec.expiration"])
-).wait()
+databricks postgres update-branch projects/my-app/branches/development \
+    spec.expiration --json '{"spec": {"ttl": "1209600s"}}'
 
-# Remove expiration
-w.postgres.update_branch(
-    name="projects/my-app/branches/development",
-    branch=Branch(
-        name="projects/my-app/branches/development",
-        spec=BranchSpec(no_expiry=True)
-    ),
-    update_mask=FieldMask(field_mask=["spec.expiration"])
-).wait()
+# Convert to permanent
+databricks postgres update-branch projects/my-app/branches/development \
+    spec.expiration --json '{"spec": {"no_expiry": true}}'
 ```
-
-## Resetting a Branch from Parent
-
-Reset completely replaces a branch's data and schema with the latest from its parent. Local changes are lost.
-
-```python
-w.postgres.reset_branch(
-    name="projects/my-app/branches/development"
-).wait()
-```
-
-**Constraints:**
-- Root branches (like `production`) cannot be reset (no parent)
-- Branches with children cannot be reset (delete children first)
-- Connections are temporarily interrupted during reset
-
-## Deleting a Branch
-
-```python
-w.postgres.delete_branch(
-    name="projects/my-app/branches/development"
-).wait()
-```
-
-**Constraints:**
-- Cannot delete branches with child branches (delete children first)
-- Cannot delete protected branches (remove protection first)
-- Cannot delete the default branch
-
-## Branch Expiration
-
-Branch expiration sets an automatic deletion timestamp. Useful for:
-- **CI/CD environments**: 2-4 hours
-- **Demos**: 24-48 hours
-- **Feature development**: 1-7 days
-- **Long-term testing**: up to 30 days
-
-**Maximum expiration period:** 30 days from current time.
-
-### Expiration Restrictions
-
-- Cannot expire protected branches
-- Cannot expire default branches
-- Cannot expire branches that have children
-- When a branch expires, all compute resources are also deleted
 
 ## Best Practices
 
-1. **Use TTL for ephemeral branches**: Set expiration for dev/test branches to avoid accumulation
-2. **Protect production branches**: Prevent accidental deletion or reset
-3. **Reset instead of recreate**: Use reset from parent when you need fresh data without new branch overhead
-4. **Schema diff before merge**: Compare schemas between branches before applying changes to production
-5. **Monitor unarchived limit**: Only 10 unarchived branches are allowed per project
+- TTL everything ephemeral — dev/CI branches accumulate fast against the 10-unarchived limit.
+- Protect `production` at project creation time, not "eventually".
+- Prefer reset over recreate when you just need fresh data — it preserves the branch name and downstream references.
+- Compare schemas between branches (`pg_dump --schema-only`) before merging changes back upstream.
+
+## Typical TTL Envelopes
+
+| Workload | TTL |
+|----------|-----|
+| CI run | 2-4 h |
+| Demo | 24-48 h |
+| Feature branch | 1-7 days |
+| Long-lived test env | up to 30 days |
+
+## SDK Equivalents
+
+```python
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.postgres import Branch, BranchSpec, Duration, FieldMask
+
+w = WorkspaceClient()
+
+# Create (TTL or permanent)
+w.postgres.create_branch(
+    parent="projects/my-app",
+    branch=Branch(spec=BranchSpec(
+        source_branch="projects/my-app/branches/production",
+        ttl=Duration(seconds=604800),      # or: no_expiry=True
+    )),
+    branch_id="development",
+).wait()
+
+# Protect
+w.postgres.update_branch(
+    name="projects/my-app/branches/production",
+    branch=Branch(name="projects/my-app/branches/production",
+                  spec=BranchSpec(is_protected=True)),
+    update_mask=FieldMask(field_mask=["spec.is_protected"]),
+).wait()
+
+# Reset / delete
+w.postgres.reset_branch(name="projects/my-app/branches/development").wait()
+w.postgres.delete_branch(name="projects/my-app/branches/development").wait()
+```

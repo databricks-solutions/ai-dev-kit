@@ -46,8 +46,10 @@ print(f"Created job: {job.job_id}")
 ### CLI
 
 ```bash
+# By default, add tags to track resources created with this skill
 databricks jobs create --json '{
   "name": "my-etl-job",
+  "tags": {"aidevkit_project": "ai-dev-kit"},
   "tasks": [{
     "task_key": "extract",
     "notebook_task": {
@@ -57,6 +59,8 @@ databricks jobs create --json '{
   }]
 }'
 ```
+
+> **Tagging**: By default, add `"tags": {"aidevkit_project": "ai-dev-kit"}` to track resources created with this skill.
 
 ### Asset Bundles (DABs)
 
@@ -261,8 +265,8 @@ databricks jobs get 12345
 # Run job
 databricks jobs run-now 12345
 
-# Run with parameters
-databricks jobs run-now 12345 --job-params '{"env": "prod"}'
+# Run with parameters (must use --json with job_id inside)
+databricks jobs run-now --json '{"job_id": 12345, "job_parameters": {"env": "prod"}}'
 
 # Cancel run
 databricks jobs cancel-run 67890

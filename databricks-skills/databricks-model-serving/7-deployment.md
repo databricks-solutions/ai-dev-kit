@@ -2,7 +2,7 @@
 
 Deploy models to serving endpoints. Uses async job-based approach for agents (deployment takes ~15 min).
 
-> **If MCP tools are not available**, use `databricks.agents.deploy()` directly in a notebook, or create jobs via CLI: `databricks jobs create --json @job.json`
+> Use `databricks.agents.deploy()` directly in a notebook, or create jobs via CLI: `databricks jobs create --json @job.json`
 
 ## Deployment Options
 
@@ -13,7 +13,7 @@ Deploy models to serving endpoints. Uses async job-based approach for agents (de
 
 ## GenAI Agent Deployment (Job-Based)
 
-Since agent deployment takes ~15 minutes, use a job to avoid MCP timeouts.
+Since agent deployment takes ~15 minutes, use a job for async deployment.
 
 ### Step 1: Create Deployment Script
 
@@ -32,7 +32,7 @@ print(f"Deploying {model_name} version {version}...")
 deployment = agents.deploy(
     model_name,
     version,
-    tags={"source": "mcp", "environment": "dev"}
+    tags={"source": "cli", "environment": "dev"}
 )
 
 print(f"Deployment complete!")
@@ -41,40 +41,40 @@ print(f"Endpoint: {deployment.endpoint_name}")
 
 ### Step 2: Create Deployment Job (One-Time)
 
-Use the `manage_jobs` MCP tool with action="create":
+Use the Databricks CLI:
 
-```
-manage_jobs(
-    action="create",
-    name="deploy-agent-job",
-    tasks=[
-        {
-            "task_key": "deploy",
-            "spark_python_task": {
-                "python_file": "/Workspace/Users/you@company.com/my_agent/deploy_agent.py",
-                "parameters": ["{{job.parameters.model_name}}", "{{job.parameters.version}}"]
-            }
-        }
-    ],
-    parameters=[
-        {"name": "model_name", "default": "main.agents.my_agent"},
-        {"name": "version", "default": "1"}
-    ]
-)
+```bash
+databricks jobs create --json '{
+  "name": "deploy-agent-job",
+  "tags": {"aidevkit_project": "ai-dev-kit"},
+  "tasks": [{
+    "task_key": "deploy",
+    "spark_python_task": {
+      "python_file": "/Workspace/Users/you@company.com/my_agent/deploy_agent.py",
+      "parameters": ["{{job.parameters.model_name}}", "{{job.parameters.version}}"]
+    },
+    "new_cluster": {
+      "spark_version": "16.1.x-scala2.12",
+      "node_type_id": "i3.xlarge",
+      "num_workers": 0
+    }
+  }],
+  "parameters": [
+    {"name": "model_name", "default": "main.agents.my_agent"},
+    {"name": "version", "default": "1"}
+  ]
+}'
 ```
 
 Save the returned `job_id`.
 
 ### Step 3: Run Deployment (Async)
 
-Use `manage_job_runs` with action="run_now" - returns immediately:
+Run the job - returns immediately:
 
-```
-manage_job_runs(
-    action="run_now",
-    job_id="<job_id>",
-    job_parameters={"model_name": "main.agents.my_agent", "version": "1"}
-)
+```bash
+# Note: job_id is positional, parameters go in --json
+databricks jobs run-now --json '{"job_id": <job_id>, "job_parameters": {"model_name": "main.agents.my_agent", "version": "1"}}'
 ```
 
 Save the returned `run_id`.
@@ -83,14 +83,15 @@ Save the returned `run_id`.
 
 Check job run status:
 
-```
-manage_job_runs(action="get", run_id="<run_id>")
+```bash
+# run_id is positional
+databricks jobs get-run <run_id>
 ```
 
 Or check endpoint directly:
 
-```
-manage_serving_endpoint(action="get", name="<endpoint_name>")
+```bash
+databricks serving-endpoints get <endpoint_name>
 ```
 
 ## Classical ML Deployment
@@ -163,7 +164,7 @@ deployment = agents.deploy(
     "main.agents.my_agent",
     "1",
     endpoint_name="my-agent-endpoint",  # Control the name
-    tags={"source": "mcp", "environment": "dev"}
+    tags={"source": "cli", "environment": "dev"}
 )
 ```
 
@@ -172,7 +173,7 @@ deployment = agents.deploy(
 Endpoints created via `agents.deploy()` appear under **Serving** in the Databricks UI. If you don't see your endpoint:
 
 1. **Check the filter** - The Serving page defaults to "Owned by me". If the deployment ran as a service principal (e.g., via a job), switch to "All" to see it.
-2. **Verify via API** - Use `manage_serving_endpoint(action="list")` or `manage_serving_endpoint(action="get", name="...")` to confirm the endpoint exists and check its state.
+2. **Verify via CLI** - Use `databricks serving-endpoints list` or `databricks serving-endpoints get <name>` to confirm the endpoint exists and check its state.
 3. **Check the name** - The auto-generated name may not be what you expect. Print `deployment.endpoint_name` in the deploy script or check the job run output.
 
 ### Deployment Script with Explicit Naming
@@ -261,18 +262,18 @@ client.update_endpoint(
 
 ## Workflow Summary
 
-| Step | MCP Tool | Waits? |
-|------|----------|--------|
-| Upload deploy script | `manage_workspace_files` (action="upload") | Yes |
-| Create job (one-time) | `manage_jobs` (action="create") | Yes |
-| Run deployment | `manage_job_runs` (action="run_now") | **No** - returns immediately |
-| Check job status | `manage_job_runs` (action="get") | Yes |
-| Check endpoint status | `manage_serving_endpoint` (action="get") | Yes |
+| Step | CLI Command | Waits? |
+|------|-------------|--------|
+| Upload deploy script | `databricks workspace import-dir` | Yes |
+| Create job (one-time) | `databricks jobs create` | Yes |
+| Run deployment | `databricks jobs run-now` | **No** - returns immediately |
+| Check job status | `databricks jobs get-run` | Yes |
+| Check endpoint status | `databricks serving-endpoints get` | Yes |
 
 ## After Deployment
 
 Once endpoint is READY:
 
-1. **Test with MCP**: `manage_serving_endpoint(action="query", name="...", messages=[...])`
+1. **Test with CLI**: `databricks serving-endpoints query <name> --json '{"messages": [...]}'`
 2. **Share with team**: Endpoint URL in Databricks UI
 3. **Integrate in apps**: Use REST API or SDK

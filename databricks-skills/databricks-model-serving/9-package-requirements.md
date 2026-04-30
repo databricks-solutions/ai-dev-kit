@@ -137,24 +137,23 @@ export DATABRICKS_TOKEN="your-token"
 export DATABRICKS_CONFIG_PROFILE="your-profile"
 ```
 
-## Installing Packages via MCP
+## Installing Packages
 
-Use `execute_code`:
+In a notebook or Python script on Databricks:
 
+```python
+%pip install -U mlflow==3.6.0 databricks-langchain langgraph==0.3.4 databricks-agents pydantic
+dbutils.library.restartPython()
 ```
-execute_code(
-    code="%pip install -U mlflow==3.6.0 databricks-langchain langgraph==0.3.4 databricks-agents pydantic"
-)
-```
 
-Then restart Python:
+Or via job libraries configuration:
 
-```
-execute_code(
-    code="dbutils.library.restartPython()",
-    cluster_id="<cluster_id>",
-    context_id="<context_id>"
-)
+```json
+"libraries": [
+  {"pypi": {"package": "mlflow==3.6.0"}},
+  {"pypi": {"package": "databricks-langchain"}},
+  {"pypi": {"package": "langgraph==0.3.4"}}
+]
 ```
 
 ## Checking Installed Versions
@@ -171,17 +170,13 @@ for pkg in packages:
         print(f"{pkg}: NOT INSTALLED")
 ```
 
-Via MCP:
+In a notebook:
 
-```
-execute_code(
-    code="""
+```python
 import pkg_resources
 for pkg in ['mlflow', 'langchain', 'langgraph', 'pydantic', 'databricks-langchain']:
     try:
         print(f"{pkg}: {pkg_resources.get_distribution(pkg).version}")
     except:
         print(f"{pkg}: NOT INSTALLED")
-    """
-)
 ```

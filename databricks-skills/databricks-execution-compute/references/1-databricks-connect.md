@@ -30,16 +30,12 @@ auth_type = databricks-cli
 ## Usage Pattern
 
 ```python
-from databricks.connect import DatabricksSession, DatabricksEnv
+from databricks.connect import DatabricksSession
 
-# Declare dependencies installed on serverless compute
-# CRITICAL: Include ALL packages used inside UDFs (pandas/numpy are there by default)
-env = DatabricksEnv().withDependencies("faker", "holidays")
-
+# Install dependencies locally first: uv pip install faker holidays
 spark = (
     DatabricksSession.builder
-    .profile("my-workspace")  # optional: run on a specific profile from ~/.databrickscfg instead of default
-    .withEnvironment(env)
+    .profile("my-workspace")  # optional: use a specific profile from ~/.databrickscfg
     .serverless(True)
     .getOrCreate()
 )
@@ -54,9 +50,8 @@ df.write.mode('overwrite').saveAsTable("catalog.schema.table")
 | Issue | Solution |
 |-------|----------|
 | `Python 3.12 required` | create venv with correct python version |
-| `DatabricksEnv not found` | Upgrade to databricks-connect >= 16.4 |
 | `serverless_compute_id` error | Add `serverless_compute_id = auto` to ~/.databrickscfg |
-| `ModuleNotFoundError` inside UDF | Add the package to `withDependencies()` |
+| `ModuleNotFoundError` inside UDF | Install the package locally: `uv pip install <package>` |
 | `PERSIST TABLE not supported` | Don't use `.cache()` or `.persist()` with serverless |
 | `broadcast` is used | Don't broadcast small DF using spark connect, have a small python list instead or join small DF |
 
@@ -68,5 +63,5 @@ Switch to **[Serverless Job](2-serverless-job.md)** when:
 - Non-Spark Python code (pure sklearn, pytorch, etc.)
 
 Switch to **[Interactive Cluster](3-interactive-cluster.md)** when:
-- Need state across multiple separate MCP tool calls
+- Need state across multiple separate tool calls
 - Need Scala or R support

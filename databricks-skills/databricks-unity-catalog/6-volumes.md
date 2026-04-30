@@ -37,18 +37,18 @@ All volume operations use the path format:
 
 ---
 
-## MCP Tools
+## CLI Commands
 
-| Tool | Usage |
-|------|-------|
-| `list_volume_files` | `list_volume_files(volume_path="/Volumes/catalog/schema/volume/path/")` |
-| `get_volume_folder_details` | `get_volume_folder_details(volume_path="catalog/schema/volume/path", format="parquet")` - schema, row counts, stats |
-| `upload_to_volume` | `upload_to_volume(local_path="/tmp/data/*", volume_path="/Volumes/.../dest")` - supports files, folders, globs |
-| `download_from_volume` | `download_from_volume(volume_path="/Volumes/.../file.csv", local_path="/tmp/file.csv")` |
-| `create_volume_directory` | `create_volume_directory(volume_path="/Volumes/.../new_folder")` - creates parents like `mkdir -p` |
-| `delete_volume_file` | `delete_volume_file(volume_path="/Volumes/.../file.csv")` |
-| `delete_volume_directory` | `delete_volume_directory(volume_path="/Volumes/.../folder")` - directory must be empty |
-| `get_volume_file_info` | `get_volume_file_info(volume_path="/Volumes/.../file.csv")` - returns size, modified date |
+`databricks fs` requires the `dbfs:` scheme prefix for UC Volume paths — without it the CLI treats the path as local filesystem and fails with `no such directory`.
+
+| Command | Description |
+|---------|-------------|
+| `databricks fs ls dbfs:/Volumes/catalog/schema/volume/path/` | List files in a volume |
+| `databricks fs cp -r --overwrite /tmp/data dbfs:/Volumes/.../dest` | Upload a directory's contents to a volume |
+| `databricks fs cp dbfs:/Volumes/.../file.csv /tmp/file.csv` | Download a file from a volume |
+| `databricks fs mkdirs dbfs:/Volumes/.../new_folder` | Create directory (like `mkdir -p`) |
+| `databricks fs rm dbfs:/Volumes/.../file.csv` | Delete file |
+| `databricks fs rm -r dbfs:/Volumes/.../folder` | Delete directory recursively |
 
 ---
 

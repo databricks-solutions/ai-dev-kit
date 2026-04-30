@@ -91,7 +91,7 @@ databricks --profile MY_PROFILE clusters list
 # Common commands
 databricks clusters list
 databricks jobs list
-databricks workspace ls /Users/me
+databricks workspace list /Users/me
 ```
 
 ---
@@ -622,4 +622,4 @@ If I'm unsure about a method, I should:
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - catalog governance
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving endpoint management
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - vector index operations
-- **[databricks-lakebase-provisioned](../databricks-lakebase-provisioned/SKILL.md)** - managed PostgreSQL via SDK
+- **[databricks-lakebase-autoscale](../databricks-lakebase-autoscale/SKILL.md)** - managed PostgreSQL with autoscaling + branching

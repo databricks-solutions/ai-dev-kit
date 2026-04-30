@@ -1,0 +1,161 @@
+"""
+Integration tests for databricks-agent-bricks/scripts/mas_manager.py
+
+Tests the Supervisor Agent (MAS) CLI interface functions.
+The mas_manager.py is self-contained - requires only databricks-sdk and requests.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+# Add the skills directory to the path
+SKILLS_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(SKILLS_DIR / "databricks-agent-bricks"))
+
+from mas_manager import (
+    create_mas,
+    get_mas,
+    find_mas,
+    update_mas,
+    delete_mas,
+    list_mas,
+    add_examples,
+    add_examples_queued,
+    list_examples,
+    _build_agent_list,
+)
+
+
+@pytest.fixture
+def sample_agent_config():
+    """Sample agent configuration for testing."""
+    return {
+        "name": "Test Agent",
+        "description": "A test agent for unit testing",
+        "endpoint_name": "test-endpoint",
+    }
+
+
+@pytest.fixture
+def sample_genie_agent():
+    """Sample Genie agent configuration."""
+    return {
+        "name": "Genie Agent",
+        "description": "A Genie-based agent",
+        "genie_space_id": "test-space-123",
+    }
+
+
+@pytest.fixture
+def sample_uc_function_agent():
+    """Sample UC Function agent configuration."""
+    return {
+        "name": "UC Function Agent",
+        "description": "A UC function agent",
+        "uc_function_name": "catalog.schema.function_name",
+    }
+
+
+class TestBuildAgentList:
+    """Tests for _build_agent_list helper function."""
+
+    def test_build_serving_endpoint_agent(self, sample_agent_config):
+        """Should build serving endpoint agent config."""
+        result = _build_agent_list([sample_agent_config])
+
+        assert len(result) == 1
+        agent = result[0]
+        assert agent["name"] == "Test Agent"
+        assert agent["description"] == "A test agent for unit testing"
+        assert agent["agent_type"] == "serving_endpoint"
+        assert agent["serving_endpoint"]["name"] == "test-endpoint"
+
+    def test_build_genie_agent(self, sample_genie_agent):
+        """Should build Genie agent config."""
+        result = _build_agent_list([sample_genie_agent])
+
+        assert len(result) == 1
+        agent = result[0]
+        assert agent["agent_type"] == "genie"
+        assert agent["genie_space"]["id"] == "test-space-123"
+
+    def test_build_uc_function_agent(self, sample_uc_function_agent):
+        """Should build UC function agent config."""
+        result = _build_agent_list([sample_uc_function_agent])
+
+        assert len(result) == 1
+        agent = result[0]
+        assert agent["agent_type"] == "unity_catalog_function"
+        assert agent["unity_catalog_function"]["uc_path"]["catalog"] == "catalog"
+        assert agent["unity_catalog_function"]["uc_path"]["schema"] == "schema"
+        assert agent["unity_catalog_function"]["uc_path"]["name"] == "function_name"
+
+    def test_build_mcp_connection_agent(self):
+        """Should build external MCP server agent config."""
+        agent_config = {
+            "name": "MCP Agent",
+            "description": "External MCP server",
+            "connection_name": "my-mcp-connection",
+        }
+        result = _build_agent_list([agent_config])
+
+        assert len(result) == 1
+        agent = result[0]
+        assert agent["agent_type"] == "external_mcp_server"
+        assert agent["external_mcp_server"]["connection_name"] == "my-mcp-connection"
+
+    def test_build_multiple_agents(self, sample_agent_config, sample_genie_agent):
+        """Should build multiple agent configs."""
+        result = _build_agent_list([sample_agent_config, sample_genie_agent])
+
+        assert len(result) == 2
+        assert result[0]["agent_type"] == "serving_endpoint"
+        assert result[1]["agent_type"] == "genie"
+
+
+@pytest.mark.integration
+class TestMASLifecycle:
+    """Integration tests for MAS CRUD operations.
+
+    Note: These tests require a Databricks workspace with Agent Bricks enabled.
+    They are marked as integration tests and may be skipped if connection fails.
+    """
+
+    @pytest.fixture
+    def test_mas_name(self):
+        """Unique name for test MAS."""
+        import uuid
+        return f"test-mas-{uuid.uuid4().hex[:8]}"
+
+    def test_list_mas(self, workspace_client):
+        """Should list existing MAS tiles."""
+        try:
+            result = list_mas()
+            assert isinstance(result, list)
+        except Exception as e:
+            if "Agent Bricks" in str(e) or "not enabled" in str(e).lower():
+                pytest.skip("Agent Bricks not enabled in workspace")
+            raise
+
+    def test_find_mas_not_found(self, workspace_client):
+        """Should return not found for non-existent MAS."""
+        try:
+            result = find_mas("nonexistent-mas-name-xyz-123")
+            assert result["found"] is False
+        except Exception as e:
+            if "Agent Bricks" in str(e) or "not enabled" in str(e).lower():
+                pytest.skip("Agent Bricks not enabled in workspace")
+            raise
+
+    def test_get_mas_not_found(self, workspace_client):
+        """Should return error for non-existent tile ID."""
+        try:
+            result = get_mas("00000000-0000-0000-0000-000000000000")
+            assert "error" in result or result.get("tile_id") == ""
+        except Exception as e:
+            if "Agent Bricks" in str(e) or "not enabled" in str(e).lower():
+                pytest.skip("Agent Bricks not enabled in workspace")
+            raise

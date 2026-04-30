@@ -6,9 +6,9 @@ This is the recommended approach for ALL data generation tasks:
 - Direct write to Unity Catalog
 - Works with serverless and classic compute
 
-Auto-detects environment and uses:
-- DatabricksEnv with managed dependencies if databricks-connect >= 16.4 (local)
-- Standard session if running on Databricks Runtime or older databricks-connect
+Prerequisites:
+- Install dependencies locally: uv pip install faker pandas numpy holidays databricks-connect
+- Configure ~/.databrickscfg with serverless_compute_id = auto
 """
 import sys
 import os
@@ -61,105 +61,23 @@ TIER_PROBS = [0.6, 0.3, 0.1]
 REGION_PROBS = [0.4, 0.25, 0.2, 0.15]
 
 # =============================================================================
-# ENVIRONMENT DETECTION AND SESSION CREATION
+# SESSION CREATION
 # =============================================================================
 
-def is_databricks_runtime():
-    """Check if running on Databricks Runtime vs locally."""
-    return "DATABRICKS_RUNTIME_VERSION" in os.environ
-
-def get_databricks_connect_version():
-    """Get databricks-connect version as (major, minor) tuple or None."""
-    try:
-        import importlib.metadata
-        version_str = importlib.metadata.version('databricks-connect')
-        parts = version_str.split('.')
-        return (int(parts[0]), int(parts[1]))
-    except Exception:
-        return None
-
-# Detect environment
-on_runtime = is_databricks_runtime()
-db_version = get_databricks_connect_version()
+from databricks.connect import DatabricksSession
 
 print("=" * 80)
-print("ENVIRONMENT DETECTION")
+print("CREATING SPARK SESSION")
 print("=" * 80)
-print(f"Running on Databricks Runtime: {on_runtime}")
-if db_version:
-    print(f"databricks-connect version: {db_version[0]}.{db_version[1]}")
+
+if USE_SERVERLESS:
+    spark = DatabricksSession.builder.serverless(True).getOrCreate()
+    print("Connected to serverless compute")
 else:
-    print("databricks-connect: not available")
-
-# Use DatabricksEnv with managed dependencies if:
-# - Running locally (not on Databricks Runtime)
-# - databricks-connect >= 16.4
-use_managed_deps = (not on_runtime) and db_version and db_version >= (16, 4)
-
-if use_managed_deps:
-    print("Using DatabricksEnv with managed dependencies")
-    print("=" * 80)
-    from databricks.connect import DatabricksSession, DatabricksEnv
-
-    env = DatabricksEnv().withDependencies("faker", "pandas", "numpy", "holidays")
-
-    if USE_SERVERLESS:
-        spark = DatabricksSession.builder.withEnvironment(env).serverless(True).getOrCreate()
-        print("Connected to serverless compute with managed dependencies!")
-    else:
-        if not CLUSTER_ID:
-            raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
-        spark = DatabricksSession.builder.withEnvironment(env).clusterId(CLUSTER_ID).getOrCreate()
-        print(f"Connected to cluster <cluster_id> with managed dependencies!")
-else:
-    print("Using standard session (dependencies must be pre-installed)")
-    print("=" * 80)
-
-    # Check that UDF dependencies are available
-    print("\nChecking UDF dependencies...")
-    missing_deps = []
-
-    try:
-        from faker import Faker
-        print("  faker: OK")
-    except ImportError:
-        missing_deps.append("faker")
-        print("  faker: MISSING")
-
-    try:
-        import pandas as pd
-        print("  pandas: OK")
-    except ImportError:
-        missing_deps.append("pandas")
-        print("  pandas: MISSING")
-
-    if missing_deps:
-        print("\n" + "=" * 80)
-        print("ERROR: Missing dependencies for UDFs")
-        print("=" * 80)
-        print(f"Missing: {', '.join(missing_deps)}")
-        if on_runtime:
-            print('\nSolution: Install libraries via Databricks CLI:')
-            print('  databricks libraries install --json \'{"cluster_id": "<cluster_id>", "libraries": [{"pypi": {"package": "faker"}}, {"pypi": {"package": "holidays"}}]}\'')
-        else:
-            print("\nSolution: Upgrade to databricks-connect >= 16.4 for managed deps")
-            print("          Or create a job with environment settings")
-        print("=" * 80)
-        sys.exit(1)
-
-    print("\nAll dependencies available")
-    print("=" * 80)
-
-    from databricks.connect import DatabricksSession
-
-    if USE_SERVERLESS:
-        spark = DatabricksSession.builder.serverless(True).getOrCreate()
-        print("Connected to serverless compute")
-    else:
-        if not CLUSTER_ID:
-            raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
-        spark = DatabricksSession.builder.clusterId(CLUSTER_ID).getOrCreate()
-        print(f"Connected to cluster <cluster_id>")
+    if not CLUSTER_ID:
+        raise ValueError("CLUSTER_ID must be set when USE_SERVERLESS=False")
+    spark = DatabricksSession.builder.clusterId(CLUSTER_ID).getOrCreate()
+    print(f"Connected to cluster {CLUSTER_ID}")
 
 # Import Faker for UDF definitions
 from faker import Faker
@@ -259,10 +177,6 @@ customers_df = (
 # Save customers
 customers_df.write.mode(WRITE_MODE).parquet(f"{VOLUME_PATH}/customers")
 print(f"  Saved customers to {VOLUME_PATH}/customers")
-
-# Show tier distribution
-print("\n  Tier distribution:")
-customers_df.groupBy("tier").count().orderBy("tier").show()
 
 # =============================================================================
 # GENERATE ORDERS (Child Table with Referential Integrity)
@@ -365,10 +279,6 @@ orders_final = orders_with_fk.drop("tier")
 # Save orders
 orders_final.write.mode(WRITE_MODE).parquet(f"{VOLUME_PATH}/orders")
 print(f"  Saved orders to {VOLUME_PATH}/orders")
-
-# Show status distribution
-print("\n  Status distribution:")
-orders_final.groupBy("status").count().orderBy("status").show()
 
 # =============================================================================
 # CLEANUP AND SUMMARY

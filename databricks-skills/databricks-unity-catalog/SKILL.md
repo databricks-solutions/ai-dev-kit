@@ -29,15 +29,43 @@ Use this skill when:
 
 ## Quick Start
 
-### Volume File Operations (MCP Tools)
+### Create Unity Catalog Objects (CLI)
 
-| Tool | Usage |
-|------|-------|
-| `list_volume_files` | `list_volume_files(volume_path="/Volumes/catalog/schema/volume/path/")` |
-| `get_volume_folder_details` | `get_volume_folder_details(volume_path="catalog/schema/volume/path", format="parquet")` - schema, row counts, stats |
-| `upload_to_volume` | `upload_to_volume(local_path="/tmp/data/*", volume_path="/Volumes/.../dest")` |
-| `download_from_volume` | `download_from_volume(volume_path="/Volumes/.../file.csv", local_path="/tmp/file.csv")` |
-| `create_volume_directory` | `create_volume_directory(volume_path="/Volumes/.../new_folder")` |
+**IMPORTANT**: Use `--json` for creating UC objects. Positional args vary by command and version.
+
+```bash
+# Create a catalog
+databricks catalogs create my_catalog
+
+# Create a schema  (args: NAME CATALOG_NAME — positional, name first)
+databricks schemas create my_schema my_catalog
+
+# Create a volume  (args: CATALOG_NAME SCHEMA_NAME NAME VOLUME_TYPE — catalog first)
+databricks volumes create my_catalog my_schema my_volume MANAGED
+
+# List catalogs, schemas, volumes
+databricks catalogs list
+databricks schemas list my_catalog
+databricks volumes list my_catalog.my_schema
+```
+
+### Volume File Operations (CLI)
+
+`databricks fs` requires the `dbfs:` scheme prefix even for UC Volume paths — without it the CLI treats the path as local filesystem and errors with `no such directory`.
+
+```bash
+# List files in a volume
+databricks fs ls dbfs:/Volumes/catalog/schema/volume/path/
+
+# Upload a directory's contents to a volume (-r copies contents, not the directory itself)
+databricks fs cp -r --overwrite /tmp/data dbfs:/Volumes/catalog/schema/volume/dest
+
+# Download a file from a volume
+databricks fs cp dbfs:/Volumes/catalog/schema/volume/file.csv /tmp/file.csv
+
+# Create a directory in a volume
+databricks fs mkdirs dbfs:/Volumes/catalog/schema/volume/new_folder
+```
 
 ### Enable System Tables Access
 
@@ -71,20 +99,17 @@ WHERE usage_date >= current_date() - 30
 GROUP BY workspace_id, sku_name;
 ```
 
-## MCP Tool Integration
+## SQL Queries via CLI
 
-Use `mcp__databricks__execute_sql` for system table queries:
+Use `databricks experimental aitools tools query` for system table queries:
 
-```python
-# Query lineage
-mcp__databricks__execute_sql(
-    sql_query="""
-        SELECT source_table_full_name, target_table_full_name
-        FROM system.access.table_lineage
-        WHERE event_date >= current_date() - 7
-    """,
-    catalog="system"
-)
+```bash
+# Query lineage via CLI
+databricks experimental aitools tools query --warehouse WAREHOUSE_ID "
+  SELECT source_table_full_name, target_table_full_name
+  FROM system.access.table_lineage
+  WHERE event_date >= current_date() - 7
+"
 ```
 
 ## Best Practices
