@@ -64,7 +64,7 @@ $MinSdkVersion = "0.85.0"
 $script:Profile_     = "DEFAULT"
 $script:Scope        = "project"
 $script:ScopeExplicit = $false  # Track if --global was explicitly passed
-$script:InstallMcp   = $true
+$script:InstallMcp   = $false
 $script:InstallSkills = $true
 $script:Force        = $false
 $script:Silent       = $false
@@ -212,8 +212,9 @@ while ($i -lt $args.Count) {
         { $_ -in "-p", "--profile" }  { $script:Profile_ = $args[$i + 1]; $script:ProfileProvided = $true; $i += 2 }
         { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $script:ScopeExplicit = $true; $i++ }
         { $_ -in "--skills-only", "-SkillsOnly" } { $script:InstallMcp = $false; $i++ }
+        { $_ -in "--mcp", "-Mcp" }             { $script:InstallMcp = $true; $i++ }
         { $_ -in "--mcp-only", "-McpOnly" }    { $script:InstallSkills = $false; $i++ }
-        { $_ -in "--mcp-path", "-McpPath" }    { $script:UserMcpPath = $args[$i + 1]; $i += 2 }
+        { $_ -in "--mcp-path", "-McpPath" }    { $script:UserMcpPath = $args[$i + 1]; $script:InstallMcp = $true; $i += 2 }
         { $_ -in "--silent", "-Silent" }       { $script:Silent = $true; $i++ }
         { $_ -in "--tools", "-Tools" }         { $script:UserTools = $args[$i + 1]; $i += 2 }
         { $_ -in "--skills-profile", "-SkillsProfile" } { $script:SkillsProfile = $args[$i + 1]; $i += 2 }
@@ -232,6 +233,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --skills-only         Skip MCP server setup"
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
+            Write-Host "  --mcp                 Install deprecated MCP server (default: no)"
             Write-Host "  --silent              Silent mode (no output except errors)"
             Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
@@ -687,6 +689,28 @@ function Invoke-PromptMcpPath {
     $script:VenvDir    = Join-Path $script:InstallDir ".venv"
     $script:VenvPython = Join-Path $script:VenvDir "Scripts\python.exe"
     $script:McpEntry   = Join-Path $script:RepoDir "databricks-mcp-server\run_server.py"
+}
+
+# ─── MCP install prompt ──────────────────────────────────────
+function Invoke-PromptMcpInstall {
+    if ($script:InstallMcp) { return }
+    if ($script:Silent -or -not (Test-Interactive)) { return }
+
+    Write-Host ""
+    Write-Host "  Deprecated MCP Server" -ForegroundColor White
+    Write-Host "  Skills now work via CLI for better performance. MCP server is optional for backwards compatibility." -ForegroundColor DarkGray
+
+    $items = @(
+        @{ Label = "Do not install";    Value = "no";  Selected = $true;  Hint = "Recommended - skills work without MCP" }
+        @{ Label = "Install MCP server"; Value = "yes"; Selected = $false; Hint = "Legacy - requires Python venv setup" }
+    )
+
+    $selected = Select-Radio -Items $items
+
+    if ($selected -eq "yes") {
+        $script:InstallMcp = $true
+        Invoke-PromptMcpPath
+    }
 }
 
 # ─── Check prerequisites ─────────────────────────────────────
@@ -1942,9 +1966,9 @@ function Invoke-Main {
         }
     }
 
-    # MCP path
+    # MCP server
+    Invoke-PromptMcpInstall
     if ($script:InstallMcp) {
-        Invoke-PromptMcpPath
         Write-Ok "MCP path: $($script:InstallDir)"
     }
 
