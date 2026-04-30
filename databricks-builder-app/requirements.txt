@@ -119,7 +119,7 @@ fastapi-cli==0.0.24
     # via fastapi
 fastapi-cloud-cli==0.15.1
     # via fastapi-cli
-fastar==0.9.0
+fastar==0.11.0
     # via fastapi-cloud-cli
 fastmcp==3.2.4
     # via databricks-builder-app
