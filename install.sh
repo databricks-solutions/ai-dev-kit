@@ -46,6 +46,8 @@ PROFILE="${DEVKIT_PROFILE:-DEFAULT}"
 SCOPE="${DEVKIT_SCOPE:-project}"
 SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
 FORCE="${DEVKIT_FORCE:-false}"
+FORCE_EXPLICIT=false
+[ -n "${DEVKIT_FORCE:-}" ] && FORCE_EXPLICIT=true
 IS_UPDATE=false
 SILENT="${DEVKIT_SILENT:-false}"
 TOOLS="${DEVKIT_TOOLS:-}"
@@ -149,7 +151,7 @@ while [ $# -gt 0 ]; do
         --mcp)            INSTALL_MCP=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --experimental)   CHANNEL="experimental"; shift ;;
-        -f|--force)       FORCE=true; shift ;;
+        -f|--force)       FORCE=true; FORCE_EXPLICIT=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
             echo ""
@@ -267,11 +269,22 @@ if [ "$CHANNEL" = "experimental" ] && [ "$BRANCH_EXPLICIT" != true ]; then
     BRANCH="experimental"
 fi
 
+# Experimental installs default to FORCE=true (always refresh the cached repo)
+# unless the user explicitly set DEVKIT_FORCE or passed --force.
+if [ "$CHANNEL" = "experimental" ] && [ "$FORCE_EXPLICIT" != true ]; then
+    FORCE=true
+fi
+
 # Set configuration URLs after parsing branch argument
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
 RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/${BRANCH}"
 INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
-REPO_DIR="$INSTALL_DIR/repo"
+# Keep stable and experimental clones in separate directories so they don't clobber each other
+if [ "$CHANNEL" = "experimental" ]; then
+    REPO_DIR="$INSTALL_DIR/experimental-repo"
+else
+    REPO_DIR="$INSTALL_DIR/repo"
+fi
 VENV_DIR="$INSTALL_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
 MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
@@ -861,7 +874,11 @@ prompt_mcp_path() {
     fi
 
     # Update derived paths
-    REPO_DIR="$INSTALL_DIR/repo"
+    if [ "$CHANNEL" = "experimental" ]; then
+        REPO_DIR="$INSTALL_DIR/experimental-repo"
+    else
+        REPO_DIR="$INSTALL_DIR/repo"
+    fi
     VENV_DIR="$INSTALL_DIR/.venv"
     VENV_PYTHON="$VENV_DIR/bin/python"
     MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
@@ -2164,7 +2181,18 @@ main() {
     # Setup MCP server
     if [ "$INSTALL_MCP" = true ]; then
         setup_mcp
-    elif [ ! -d "$REPO_DIR" ]; then
+    elif [ -d "$REPO_DIR/.git" ]; then
+        # Repo already exists — refresh it when FORCE is true, otherwise leave as-is
+        if [ "$FORCE" = true ]; then
+            step "Refreshing sources"
+            git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
+            git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
+                rm -rf "$REPO_DIR"
+                git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+            }
+            ok "Repository refreshed ($BRANCH)"
+        fi
+    else
         step "Downloading sources"
         mkdir -p "$INSTALL_DIR"
         git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
