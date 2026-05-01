@@ -36,8 +36,10 @@ $Owner = "databricks-solutions"
 $Repo  = "ai-dev-kit"
 
 # Determine branch/tag to use
+$script:BranchExplicit = $false
 if ($env:AIDEVKIT_BRANCH) {
     $Branch = $env:AIDEVKIT_BRANCH
+    $script:BranchExplicit = $true
 } else {
     try {
         $latestReleaseUri = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
@@ -49,7 +51,7 @@ if ($env:AIDEVKIT_BRANCH) {
 }
 
 $RepoUrl   = "https://github.com/$Owner/$Repo.git"
-$RawUrl    = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
+# $RawUrl is set after argument parsing so --branch / --experimental can affect it
 $InstallDir = if ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $env:USERPROFILE ".ai-dev-kit" }
 $RepoDir   = Join-Path $InstallDir "repo"
 $VenvDir   = Join-Path $InstallDir ".venv"
@@ -222,6 +224,7 @@ while ($i -lt $args.Count) {
         { $_ -in "--skills", "-Skills" }       { $script:UserSkills = $args[$i + 1]; $i += 2 }
         { $_ -in "--list-skills", "-ListSkills" } { $script:ListSkills = $true; $i++ }
         { $_ -in "--experimental", "-Experimental" } { $script:Channel = "experimental"; $i++ }
+        { $_ -in "-b", "--branch", "-Branch" }  { $Branch = $args[$i + 1]; $script:BranchExplicit = $true; $i += 2 }
         { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
@@ -242,6 +245,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
             Write-Host "  --experimental        Install from experimental branch (early access features)"
+            Write-Host "  -b, --branch NAME     Git branch/tag to install (default: latest release)"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
             Write-Host ""
@@ -265,6 +269,15 @@ while ($i -lt $args.Count) {
         default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
     }
 }
+
+# If experimental channel is selected and branch wasn't explicitly overridden,
+# install skills from the experimental branch instead of the latest release.
+if ($script:Channel -eq "experimental" -and -not $script:BranchExplicit) {
+    $Branch = "experimental"
+}
+
+# Set raw URL after branch resolution
+$RawUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
 
 # ─── Interactive helpers ──────────────────────────────────────
 
@@ -1982,6 +1995,7 @@ function Invoke-PromptChannel {
         if ($script:Profile_ -ne "DEFAULT") { $newArgs += "--profile"; $newArgs += $script:Profile_ }
         if ($script:InstallMcp)          { $newArgs += "--mcp" }
         if (-not $script:InstallSkills)  { $newArgs += "--mcp-only" }
+        if ($script:BranchExplicit)      { $newArgs += "--branch"; $newArgs += $Branch }
 
         # Download experimental installer to a temp file and execute
         $expUrl = "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.ps1"
