@@ -1,6 +1,6 @@
 # Lakebase Autoscaling — Projects (deep dive)
 
-Deep dive for the Projects concept. Basic CLI is in [SKILL.md](SKILL.md).
+Deep dive for the Projects concept. Basic CLI is in [SKILL.md](../SKILL.md).
 
 ## What a Project Is
 
