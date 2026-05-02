@@ -315,3 +315,648 @@ test_cases:
     category: happy_path
     difficulty: easy
     source: auto_generated
+
+- id: lakebase_auto_full_project_setup_007
+  inputs:
+    prompt: |
+      Create a new Lakebase Autoscaling project for a retail customer support system.
+      - Project name: `support-autoscale`
+      - Display name: `Support Autoscale`
+      - PG version 17
+      - Set autoscaling compute: min 0 CU, max 2 CU with scale-to-zero enabled (5 minute suspend timeout)
+      - Create a `production` branch (default, protected) with a read-write endpoint
+      - Create a `dev` branch from production with a 7-day TTL expiration
+      - Generate an OAuth credential and verify connectivity to the production endpoint by running `SELECT version()`
+      - Create a database named `support_db`
+  outputs:
+    response: |
+      Here's how to set up a complete Lakebase Autoscaling project for a retail customer support system:
+
+      ```python
+      from databricks.sdk import WorkspaceClient
+      from databricks.sdk.service.postgres import (
+          Project, ProjectSpec, Branch, BranchSpec,
+          Endpoint, EndpointSpec, FieldMask, Duration
+      )
+      import psycopg
+
+      w = WorkspaceClient()
+
+      # Step 1: Create the project (production branch + default endpoint created automatically)
+      project = w.postgres.create_project(
+          project=Project(
+              spec=ProjectSpec(
+                  display_name="Support Autoscale",
+                  pg_version="17"
+              )
+          ),
+          project_id="support-autoscale"
+      ).wait()
+      print(f"Created project: {project.name}")
+
+      # Step 2: Configure autoscaling on the production endpoint (0-2 CU, scale-to-zero 5 min)
+      w.postgres.update_endpoint(
+          name="projects/support-autoscale/branches/production/endpoints/ep-primary",
+          endpoint=Endpoint(
+              name="projects/support-autoscale/branches/production/endpoints/ep-primary",
+              spec=EndpointSpec(
+                  autoscaling_limit_min_cu=0,
+                  autoscaling_limit_max_cu=2.0,
+                  suspend_timeout_seconds=300
+              )
+          ),
+          update_mask=FieldMask(field_mask=[
+              "spec.autoscaling_limit_min_cu",
+              "spec.autoscaling_limit_max_cu",
+              "spec.suspend_timeout_seconds"
+          ])
+      ).wait()
+      print("Configured autoscaling: 0-2 CU with 5-minute scale-to-zero")
+
+      # Step 3: Protect the production branch
+      w.postgres.update_branch(
+          name="projects/support-autoscale/branches/production",
+          branch=Branch(
+              name="projects/support-autoscale/branches/production",
+              spec=BranchSpec(is_protected=True)
+          ),
+          update_mask=FieldMask(field_mask=["spec.is_protected"])
+      ).wait()
+      print("Production branch is now protected")
+
+      # Step 4: Create dev branch from production with 7-day TTL
+      dev_branch = w.postgres.create_branch(
+          parent="projects/support-autoscale",
+          branch=Branch(
+              spec=BranchSpec(
+                  source_branch="projects/support-autoscale/branches/production",
+                  ttl=Duration(seconds=604800)  # 7 days
+              )
+          ),
+          branch_id="dev"
+      ).wait()
+      print(f"Created dev branch: {dev_branch.name} (expires in 7 days)")
+
+      # Step 5: Generate OAuth credential and verify connectivity
+      endpoint = w.postgres.get_endpoint(
+          name="projects/support-autoscale/branches/production/endpoints/ep-primary"
+      )
+      host = endpoint.status.hosts.host
+
+      cred = w.postgres.generate_database_credential(
+          endpoint="projects/support-autoscale/branches/production/endpoints/ep-primary"
+      )
+
+      conn_string = (
+          f"host={host} "
+          f"dbname=databricks_postgres "
+          f"user={w.current_user.me().user_name} "
+          f"password={cred.token} "
+          f"sslmode=require"
+      )
+      with psycopg.connect(conn_string) as conn:
+          with conn.cursor() as cur:
+              cur.execute("SELECT version()")
+              print(f"Connected! PostgreSQL version: {cur.fetchone()[0]}")
+
+      # Step 6: Create the support_db database
+      with psycopg.connect(conn_string) as conn:
+          conn.autocommit = True
+          with conn.cursor() as cur:
+              cur.execute("CREATE DATABASE support_db")
+      print("Created database: support_db")
+      ```
+
+      **Key points:**
+
+      - The `production` branch and a primary read-write endpoint (`ep-primary`) are created automatically when you create a project.
+      - `update_endpoint` with `FieldMask` configures autoscaling limits (0-2 CU) and the scale-to-zero suspend timeout (300 seconds = 5 minutes).
+      - `update_branch` with `is_protected=True` prevents accidental deletion or reset of the production branch.
+      - The `dev` branch uses copy-on-write from production, so it's storage-efficient. The 7-day TTL (`Duration(seconds=604800)`) auto-deletes it after expiration.
+      - OAuth tokens expire after 1 hour; for production apps, implement token refresh at ~50 minutes.
+      - `CREATE DATABASE` is standard PostgreSQL DDL executed over the psycopg connection. The connection must have `autocommit = True` since `CREATE DATABASE` cannot run inside a transaction.
+      - All SDK create/update/delete operations are long-running and require `.wait()` to block until completion.
+      - Always use `sslmode=require` in connection strings.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Project is created with w.postgres.create_project() using ProjectSpec"
+    - "create_project returns a long-running operation that requires .wait()"
+    - "Production branch and primary endpoint (ep-primary) are created automatically with the project"
+    - "Autoscaling is configured via update_endpoint with FieldMask"
+    - "Scale-to-zero is set via suspend_timeout_seconds (300 = 5 minutes)"
+    - "Production branch is protected using update_branch with is_protected=True"
+    - "Dev branch is created with create_branch using a TTL Duration for 7-day expiration"
+    - "OAuth tokens are generated via generate_database_credential()"
+    - "Connectivity is verified by running SELECT version() over psycopg"
+    - "CREATE DATABASE requires autocommit=True on the psycopg connection"
+    - "All connection strings must include sslmode=require"
+    expected_patterns:
+    - pattern: "create_project"
+      min_count: 1
+      description: "Uses create_project() to create the Lakebase project"
+    - pattern: "update_endpoint"
+      min_count: 1
+      description: "Uses update_endpoint() to configure autoscaling"
+    - pattern: "autoscaling_limit_min_cu"
+      min_count: 1
+      description: "Sets minimum autoscaling CU"
+    - pattern: "autoscaling_limit_max_cu"
+      min_count: 1
+      description: "Sets maximum autoscaling CU"
+    - pattern: "is_protected"
+      min_count: 1
+      description: "Protects the production branch"
+    - pattern: "create_branch"
+      min_count: 1
+      description: "Creates the dev branch"
+    - pattern: "Duration\\(seconds=604800\\)"
+      min_count: 1
+      description: "Sets 7-day TTL on dev branch"
+    - pattern: "CREATE DATABASE support_db"
+      min_count: 1
+      description: "Creates the support_db database"
+    guidelines:
+    - "Must create the project with display_name='Support Autoscale' and pg_version='17'"
+    - "Must configure autoscaling with min 0 CU and max 2.0 CU"
+    - "Must enable scale-to-zero with a 5-minute (300 second) timeout"
+    - "Must protect the production branch using update_branch"
+    - "Must create a dev branch from production with 7-day TTL expiration"
+    - "Must create a database named support_db using standard Postgres DDL"
+    - "Must include sslmode=require in connection strings"
+    - "Must use FieldMask for all update operations"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: interactive_add
+
+- id: lakebase_auto_schema_ddl_008
+  inputs:
+    prompt: |
+      Connect to the `support_db` database on the `production` branch of the `support-autoscale` Lakebase project.
+      Create a `support` schema and build the following tables with appropriate constraints, indexes, and foreign keys:
+
+      **products** - Product catalog for referencing in support cases
+      - product_id (PK, serial), sku (unique, varchar 50), name (varchar 200), category (varchar 100), price (numeric 10,2), is_active (boolean default true), created_at (timestamptz default now)
+
+      **customers** - Customer records
+      - customer_id (PK, serial), email (unique, varchar 255), first_name (varchar 100), last_name (varchar 100), membership_tier (varchar 20, check in 'Free','Pro','Enterprise'), region (varchar 50), created_at (timestamptz default now)
+
+      **orders** - Order history tied to customers
+      - order_id (PK, serial), customer_id (FK to customers), order_date (timestamptz default now), total_amount (numeric 12,2), status (varchar 20, check in 'pending','processing','shipped','delivered','cancelled','returned'), shipping_address (text), created_at (timestamptz default now)
+
+      **order_items** - Line items tying orders to products
+      - order_item_id (PK, serial), order_id (FK to orders ON DELETE CASCADE), product_id (FK to products), quantity (integer, check > 0), unit_price (numeric 10,2), created_at (timestamptz default now)
+
+      Add indexes on: customers(email), orders(customer_id, order_date), order_items(order_id), order_items(product_id), orders(status).
+
+      Verify the schema was created correctly by querying information_schema.
+  outputs:
+    response: |
+      Here's how to connect to the Lakebase Autoscale project and build the support schema:
+
+      ```python
+      import psycopg
+      from databricks.sdk import WorkspaceClient
+
+      w = WorkspaceClient()
+
+      # Get production endpoint for the support-autoscale project
+      endpoint = w.postgres.get_endpoint(
+          name="projects/support-autoscale/branches/production/endpoints/ep-primary"
+      )
+      host = endpoint.status.hosts.host
+
+      # Generate OAuth credential scoped to this endpoint
+      cred = w.postgres.generate_database_credential(
+          endpoint="projects/support-autoscale/branches/production/endpoints/ep-primary"
+      )
+
+      # Connect to support_db on the production branch
+      conn_string = (
+          f"host={host} "
+          f"dbname=support_db "
+          f"user={w.current_user.me().user_name} "
+          f"password={cred.token} "
+          f"sslmode=require"
+      )
+
+      with psycopg.connect(conn_string) as conn:
+          conn.autocommit = True
+          with conn.cursor() as cur:
+              cur.execute("CREATE SCHEMA IF NOT EXISTS support")
+
+              cur.execute("""
+                  CREATE TABLE support.products (
+                      product_id SERIAL PRIMARY KEY,
+                      sku VARCHAR(50) UNIQUE NOT NULL,
+                      name VARCHAR(200) NOT NULL,
+                      category VARCHAR(100),
+                      price NUMERIC(10, 2),
+                      is_active BOOLEAN DEFAULT TRUE,
+                      created_at TIMESTAMPTZ DEFAULT NOW()
+                  )
+              """)
+
+              cur.execute("""
+                  CREATE TABLE support.customers (
+                      customer_id SERIAL PRIMARY KEY,
+                      email VARCHAR(255) UNIQUE NOT NULL,
+                      first_name VARCHAR(100) NOT NULL,
+                      last_name VARCHAR(100) NOT NULL,
+                      membership_tier VARCHAR(20) CHECK (
+                          membership_tier IN ('Free', 'Pro', 'Enterprise')
+                      ),
+                      region VARCHAR(50),
+                      created_at TIMESTAMPTZ DEFAULT NOW()
+                  )
+              """)
+
+              cur.execute("""
+                  CREATE TABLE support.orders (
+                      order_id SERIAL PRIMARY KEY,
+                      customer_id INTEGER NOT NULL
+                          REFERENCES support.customers(customer_id),
+                      order_date TIMESTAMPTZ DEFAULT NOW(),
+                      total_amount NUMERIC(12, 2),
+                      status VARCHAR(20) CHECK (
+                          status IN ('pending', 'processing', 'shipped',
+                                     'delivered', 'cancelled', 'returned')
+                      ),
+                      shipping_address TEXT,
+                      created_at TIMESTAMPTZ DEFAULT NOW()
+                  )
+              """)
+
+              cur.execute("""
+                  CREATE TABLE support.order_items (
+                      order_item_id SERIAL PRIMARY KEY,
+                      order_id INTEGER NOT NULL
+                          REFERENCES support.orders(order_id) ON DELETE CASCADE,
+                      product_id INTEGER NOT NULL
+                          REFERENCES support.products(product_id),
+                      quantity INTEGER CHECK (quantity > 0),
+                      unit_price NUMERIC(10, 2),
+                      created_at TIMESTAMPTZ DEFAULT NOW()
+                  )
+              """)
+
+              cur.execute("CREATE INDEX idx_customers_email ON support.customers(email)")
+              cur.execute("CREATE INDEX idx_orders_customer_date ON support.orders(customer_id, order_date)")
+              cur.execute("CREATE INDEX idx_order_items_order ON support.order_items(order_id)")
+              cur.execute("CREATE INDEX idx_order_items_product ON support.order_items(product_id)")
+              cur.execute("CREATE INDEX idx_orders_status ON support.orders(status)")
+
+              cur.execute("""
+                  SELECT table_name, column_name, data_type, is_nullable
+                  FROM information_schema.columns
+                  WHERE table_schema = 'support'
+                  ORDER BY table_name, ordinal_position
+              """)
+              print("Schema columns:")
+              for row in cur.fetchall():
+                  print(f"  {row[0]}.{row[1]}: {row[2]} (nullable: {row[3]})")
+
+              cur.execute("""
+                  SELECT indexname, tablename
+                  FROM pg_indexes
+                  WHERE schemaname = 'support'
+                  ORDER BY tablename, indexname
+              """)
+              print("\nIndexes:")
+              for row in cur.fetchall():
+                  print(f"  {row[0]} on {row[1]}")
+      ```
+
+      **Key points:**
+
+      - Connect to `support_db` (not the default `databricks_postgres`) by specifying `dbname=support_db`.
+      - `autocommit = True` is required for DDL statements.
+      - Foreign keys: `orders.customer_id` references `customers`; `order_items` references `orders` (ON DELETE CASCADE) and `products`.
+      - CHECK constraints enforce valid values for `membership_tier`, `status`, and `quantity > 0`.
+      - The composite index on `orders(customer_id, order_date)` optimizes queries that filter by customer and sort by date.
+      - Verification uses `information_schema.columns` and `pg_indexes`.
+      - Always use `sslmode=require` in connection strings.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "Connection uses w.postgres.get_endpoint() and generate_database_credential() for Autoscale"
+    - "Connects to support_db via dbname=support_db in the connection string"
+    - "autocommit must be True for DDL statements"
+    - "Creates a support schema with CREATE SCHEMA IF NOT EXISTS"
+    - "products table has SERIAL PK, UNIQUE sku, and BOOLEAN default"
+    - "customers table has CHECK constraint on membership_tier"
+    - "orders table has FK to customers(customer_id)"
+    - "order_items table has FK to orders with ON DELETE CASCADE"
+    - "order_items table has FK to products(product_id)"
+    - "CHECK constraint on quantity > 0"
+    - "Composite index on orders(customer_id, order_date) for query optimization"
+    - "Verification queries information_schema.columns and pg_indexes"
+    - "sslmode=require is used in the connection string"
+    expected_patterns:
+    - pattern: "get_endpoint"
+      min_count: 1
+      description: "Gets endpoint details for connection host"
+    - pattern: "generate_database_credential"
+      min_count: 1
+      description: "Generates OAuth token for authentication"
+    - pattern: "support_db"
+      min_count: 1
+      description: "Connects to the support_db database"
+    - pattern: "sslmode=require"
+      min_count: 1
+      description: "Requires SSL for the connection"
+    - pattern: "CREATE SCHEMA"
+      min_count: 1
+      description: "Creates the support schema"
+    - pattern: "CREATE TABLE support\\.products"
+      min_count: 1
+      description: "Creates the products table in support schema"
+    - pattern: "CREATE TABLE support\\.customers"
+      min_count: 1
+      description: "Creates the customers table in support schema"
+    - pattern: "CREATE TABLE support\\.orders"
+      min_count: 1
+      description: "Creates the orders table in support schema"
+    - pattern: "CREATE TABLE support\\.order_items"
+      min_count: 1
+      description: "Creates the order_items table in support schema"
+    - pattern: "ON DELETE CASCADE"
+      min_count: 1
+      description: "Cascade delete on order_items when order is deleted"
+    - pattern: "REFERENCES"
+      min_count: 3
+      description: "Foreign key constraints (orders->customers, order_items->orders, order_items->products)"
+    - pattern: "CHECK"
+      min_count: 3
+      description: "CHECK constraints on membership_tier, status, and quantity"
+    - pattern: "CREATE INDEX"
+      min_count: 5
+      description: "Creates all 5 requested indexes"
+    - pattern: "information_schema"
+      min_count: 1
+      description: "Verifies schema using information_schema"
+    - pattern: "WorkspaceClient"
+      min_count: 1
+      description: "Uses WorkspaceClient for SDK access"
+    guidelines:
+    - "Must connect to support_db, not the default databricks_postgres"
+    - "Must use autocommit=True for DDL execution"
+    - "Must create all 4 tables in the support schema: products, customers, orders, order_items"
+    - "Must include all specified columns with correct data types and constraints"
+    - "Must define foreign keys between orders->customers and order_items->orders/products"
+    - "order_items.order_id FK must include ON DELETE CASCADE"
+    - "Must include CHECK constraints on membership_tier, status, and quantity"
+    - "Must create all 5 requested indexes including the composite index"
+    - "Must verify the schema using information_schema queries"
+    - "Must use Autoscale connection pattern (w.postgres, not w.database)"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: interactive_add
+
+- id: lakebase_auto_support_cases_ddl_009
+  inputs:
+    prompt: |
+      Use uv to install psycopg if not installed (use pip as a fallback).
+      Connect to `support_db` on `production` of `support-autoscale` and add support case tables to the `support` schema:
+
+      **support_cases** - Customer support tickets tied to orders
+      - case_id (PK, serial), customer_id (FK to customers NOT NULL), order_id (FK to orders, nullable - not all cases relate to an order), subject (varchar 300 NOT NULL), description (text), category (varchar 50, check in 'order_issue','product_defect','shipping','billing','returns','general'), priority (varchar 20, check in 'low','medium','high','critical'), status (varchar 20 default 'open', check in 'open','in_progress','waiting_customer','resolved','closed'), assigned_agent (varchar 100), created_at (timestamptz default now), updated_at (timestamptz default now), resolved_at (timestamptz nullable)
+
+      **case_products** - Junction table linking cases to one or more products involved
+      - case_product_id (PK, serial), case_id (FK to support_cases ON DELETE CASCADE), product_id (FK to products), is_primary (boolean default false), created_at (timestamptz default now)
+      - Add unique constraint on (case_id, product_id)
+
+      **case_notes** - Activity log / notes on each support case
+      - note_id (PK, serial), case_id (FK to support_cases ON DELETE CASCADE), author (varchar 100 NOT NULL), note_type (varchar 20, check in 'internal','customer_reply','agent_reply','system'), content (text NOT NULL), created_at (timestamptz default now)
+
+      Add indexes on: support_cases(customer_id), support_cases(order_id), support_cases(status, priority), support_cases(created_at), case_products(case_id), case_products(product_id), case_notes(case_id, created_at).
+  outputs:
+    response: |
+      Here's how to install psycopg, connect to the Lakebase Autoscale project, and create the support case tables:
+
+      ```python
+      import subprocess
+      import sys
+
+      try:
+          import psycopg
+      except ImportError:
+          try:
+              subprocess.check_call(["uv", "pip", "install", "psycopg[binary]>=3.0"])
+          except (subprocess.CalledProcessError, FileNotFoundError):
+              subprocess.check_call(
+                  [sys.executable, "-m", "pip", "install", "psycopg[binary]>=3.0"]
+              )
+          import psycopg
+
+      from databricks.sdk import WorkspaceClient
+
+      w = WorkspaceClient()
+
+      endpoint = w.postgres.get_endpoint(
+          name="projects/support-autoscale/branches/production/endpoints/ep-primary"
+      )
+      host = endpoint.status.hosts.host
+
+      cred = w.postgres.generate_database_credential(
+          endpoint="projects/support-autoscale/branches/production/endpoints/ep-primary"
+      )
+
+      conn_string = (
+          f"host={host} "
+          f"dbname=support_db "
+          f"user={w.current_user.me().user_name} "
+          f"password={cred.token} "
+          f"sslmode=require"
+      )
+
+      with psycopg.connect(conn_string) as conn:
+          conn.autocommit = True
+          with conn.cursor() as cur:
+              cur.execute("""
+                  CREATE TABLE support.support_cases (
+                      case_id SERIAL PRIMARY KEY,
+                      customer_id INTEGER NOT NULL
+                          REFERENCES support.customers(customer_id),
+                      order_id INTEGER
+                          REFERENCES support.orders(order_id),
+                      subject VARCHAR(300) NOT NULL,
+                      description TEXT,
+                      category VARCHAR(50) CHECK (
+                          category IN ('order_issue', 'product_defect', 'shipping',
+                                       'billing', 'returns', 'general')
+                      ),
+                      priority VARCHAR(20) CHECK (
+                          priority IN ('low', 'medium', 'high', 'critical')
+                      ),
+                      status VARCHAR(20) DEFAULT 'open' CHECK (
+                          status IN ('open', 'in_progress', 'waiting_customer',
+                                     'resolved', 'closed')
+                      ),
+                      assigned_agent VARCHAR(100),
+                      created_at TIMESTAMPTZ DEFAULT NOW(),
+                      updated_at TIMESTAMPTZ DEFAULT NOW(),
+                      resolved_at TIMESTAMPTZ
+                  )
+              """)
+
+              cur.execute("""
+                  CREATE TABLE support.case_products (
+                      case_product_id SERIAL PRIMARY KEY,
+                      case_id INTEGER NOT NULL
+                          REFERENCES support.support_cases(case_id) ON DELETE CASCADE,
+                      product_id INTEGER NOT NULL
+                          REFERENCES support.products(product_id),
+                      is_primary BOOLEAN DEFAULT FALSE,
+                      created_at TIMESTAMPTZ DEFAULT NOW(),
+                      UNIQUE (case_id, product_id)
+                  )
+              """)
+
+              cur.execute("""
+                  CREATE TABLE support.case_notes (
+                      note_id SERIAL PRIMARY KEY,
+                      case_id INTEGER NOT NULL
+                          REFERENCES support.support_cases(case_id) ON DELETE CASCADE,
+                      author VARCHAR(100) NOT NULL,
+                      note_type VARCHAR(20) CHECK (
+                          note_type IN ('internal', 'customer_reply',
+                                        'agent_reply', 'system')
+                      ),
+                      content TEXT NOT NULL,
+                      created_at TIMESTAMPTZ DEFAULT NOW()
+                  )
+              """)
+
+              cur.execute("CREATE INDEX idx_cases_customer ON support.support_cases(customer_id)")
+              cur.execute("CREATE INDEX idx_cases_order ON support.support_cases(order_id)")
+              cur.execute("CREATE INDEX idx_cases_status_priority ON support.support_cases(status, priority)")
+              cur.execute("CREATE INDEX idx_cases_created ON support.support_cases(created_at)")
+              cur.execute("CREATE INDEX idx_case_products_case ON support.case_products(case_id)")
+              cur.execute("CREATE INDEX idx_case_products_product ON support.case_products(product_id)")
+              cur.execute("CREATE INDEX idx_case_notes_case_created ON support.case_notes(case_id, created_at)")
+
+              cur.execute("""
+                  SELECT table_name, column_name, data_type, column_default, is_nullable
+                  FROM information_schema.columns
+                  WHERE table_schema = 'support'
+                    AND table_name IN ('support_cases', 'case_products', 'case_notes')
+                  ORDER BY table_name, ordinal_position
+              """)
+              print("New table columns:")
+              for row in cur.fetchall():
+                  print(f"  {row[0]}.{row[1]}: {row[2]} (default: {row[3]}, nullable: {row[4]})")
+
+              cur.execute("""
+                  SELECT indexname, tablename
+                  FROM pg_indexes
+                  WHERE schemaname = 'support'
+                    AND tablename IN ('support_cases', 'case_products', 'case_notes')
+                  ORDER BY tablename, indexname
+              """)
+              print("\nIndexes:")
+              for row in cur.fetchall():
+                  print(f"  {row[0]} on {row[1]}")
+
+              cur.execute("""
+                  SELECT constraint_name, constraint_type
+                  FROM information_schema.table_constraints
+                  WHERE table_schema = 'support'
+                    AND table_name = 'case_products'
+                    AND constraint_type = 'UNIQUE'
+              """)
+              for row in cur.fetchall():
+                  print(f"\nUnique constraint: {row[0]} ({row[1]})")
+      ```
+
+      **Key points:**
+
+      - **psycopg install**: Tries `uv pip install` first for speed, falls back to `pip` if uv is unavailable.
+      - **Nullable FK**: `order_id` on `support_cases` is nullable because not all cases relate to an order.
+      - **Default status**: `status DEFAULT 'open'` with CHECK means new cases start open and can only transition to valid states.
+      - **Junction table**: `case_products` uses `UNIQUE (case_id, product_id)` to prevent duplicate product associations.
+      - **ON DELETE CASCADE**: Deleting a support case automatically removes its `case_products` and `case_notes`.
+      - **Composite indexes**: `idx_cases_status_priority` optimizes dashboard queries; `idx_case_notes_case_created` optimizes chronological note retrieval.
+      - OAuth tokens expire after 1 hour. Always use `sslmode=require`.
+    execution_success: true
+  expectations:
+    expected_facts:
+    - "psycopg is installed via uv pip install with pip as fallback"
+    - "Connection uses Autoscale pattern: w.postgres.get_endpoint() and generate_database_credential()"
+    - "Connects to support_db, not the default databricks_postgres"
+    - "autocommit must be True for DDL statements"
+    - "support_cases has nullable FK order_id (not all cases relate to an order)"
+    - "support_cases has customer_id FK that is NOT NULL"
+    - "support_cases status defaults to 'open' with CHECK constraint"
+    - "case_products is a junction table with UNIQUE(case_id, product_id) constraint"
+    - "case_products and case_notes have ON DELETE CASCADE from support_cases"
+    - "case_notes has CHECK constraint on note_type"
+    - "Composite index on support_cases(status, priority) for dashboard queries"
+    - "Composite index on case_notes(case_id, created_at) for chronological note retrieval"
+    - "Verification uses information_schema and table_constraints"
+    expected_patterns:
+    - pattern: "uv.*pip.*install.*psycopg"
+      min_count: 1
+      description: "Installs psycopg via uv"
+    - pattern: "pip.*install.*psycopg"
+      min_count: 1
+      description: "Falls back to pip for psycopg install"
+    - pattern: "get_endpoint"
+      min_count: 1
+      description: "Gets endpoint details for connection host"
+    - pattern: "generate_database_credential"
+      min_count: 1
+      description: "Generates OAuth token for authentication"
+    - pattern: "sslmode=require"
+      min_count: 1
+      description: "Requires SSL for the connection"
+    - pattern: "CREATE TABLE support\\.support_cases"
+      min_count: 1
+      description: "Creates the support_cases table"
+    - pattern: "CREATE TABLE support\\.case_products"
+      min_count: 1
+      description: "Creates the case_products junction table"
+    - pattern: "CREATE TABLE support\\.case_notes"
+      min_count: 1
+      description: "Creates the case_notes table"
+    - pattern: "ON DELETE CASCADE"
+      min_count: 2
+      description: "Cascade delete on case_products and case_notes when case is deleted"
+    - pattern: "UNIQUE.*case_id.*product_id"
+      min_count: 1
+      description: "Unique constraint preventing duplicate case-product associations"
+    - pattern: "REFERENCES"
+      min_count: 5
+      description: "FK constraints (support_cases->customers, ->orders, case_products->cases, ->products, case_notes->cases)"
+    - pattern: "CHECK"
+      min_count: 4
+      description: "CHECK constraints on category, priority, status, and note_type"
+    - pattern: "CREATE INDEX"
+      min_count: 7
+      description: "Creates all 7 requested indexes"
+    - pattern: "information_schema"
+      min_count: 1
+      description: "Verifies schema using information_schema"
+    - pattern: "table_constraints"
+      min_count: 1
+      description: "Verifies unique constraint via table_constraints"
+    - pattern: "DEFAULT 'open'"
+      min_count: 1
+      description: "Status defaults to open for new cases"
+    guidelines:
+    - "Must install psycopg using uv with pip fallback"
+    - "Must connect to support_db using Autoscale pattern (w.postgres)"
+    - "Must create all 3 tables: support_cases, case_products, case_notes"
+    - "support_cases.order_id must be nullable (not all cases relate to an order)"
+    - "support_cases.customer_id must be NOT NULL with FK to customers"
+    - "support_cases.status must default to 'open' with CHECK constraint"
+    - "case_products must have UNIQUE(case_id, product_id) constraint"
+    - "case_products and case_notes must have ON DELETE CASCADE from support_cases"
+    - "Must create all 7 requested indexes including composite indexes"
+    - "Must verify schema using information_schema and table_constraints queries"
+  metadata:
+    category: happy_path
+    difficulty: hard
+    source: interactive_add
