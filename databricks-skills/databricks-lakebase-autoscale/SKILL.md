@@ -20,6 +20,25 @@ Use this skill when:
 
 Lakebase Autoscaling is Databricks' next-generation managed PostgreSQL service for OLTP workloads. It provides autoscaling compute, Git-like branching, scale-to-zero, and instant point-in-time restore.
 
+> **There is no separate "Lakebase SDK" for Python.** You use the Databricks SDK (`databricks-sdk`) **only** to mint short-lived OAuth credentials via `WorkspaceClient().postgres.generate_database_credential(...)`, then connect with a standard Postgres driver (`psycopg`, `SQLAlchemy`, JDBC, etc.). For Node/TypeScript, the convenience wrapper [`@databricks/lakebase`](https://github.com/databricks/appkit/blob/main/packages/lakebase/README.md) exists (Autoscaling only — not Provisioned).
+
+### Cross-language summary
+
+| Language | Credential SDK | DB Driver |
+|----------|----------------|-----------|
+| **Python** | `databricks-sdk` (`WorkspaceClient`) | `psycopg[binary,pool]` (canonical) or `SQLAlchemy` |
+| **Node/TS** | `@databricks/lakebase` (Autoscaling only) | `@databricks/lakebase` wraps `pg` pool |
+| **Java/Go** | Databricks SDK for Java/Go | Standard JDBC / `pgx` |
+
+### What NOT to do
+
+- ❌ Hardcode a static Postgres password
+- ❌ Manually manage long-lived DB credentials
+- ❌ Use `WorkspaceClient().config.token` as the Postgres password — that's a **workspace-scoped** token and will fail at Postgres login. You need the Lakebase-scoped token from `generate_database_credential()`.
+- ❌ Treat Lakebase like a Databricks SQL warehouse connection (it's Postgres, not DBSQL)
+- ❌ Bypass the app resource model when running inside a Databricks App
+
+
 | Feature | Description |
 |---------|-------------|
 | **Autoscaling Compute** | 0.5-112 CU with 2 GB RAM per CU; scales dynamically based on load |
