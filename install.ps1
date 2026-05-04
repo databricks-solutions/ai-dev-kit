@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Windsurf.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -235,7 +235,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-only            Skip skills installation"
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
@@ -576,6 +576,8 @@ function Invoke-DetectTools {
     $hasWindsurf = ($null -ne (Get-Command windsurf -ErrorAction SilentlyContinue)) -or
                    (Test-Path "$env:LOCALAPPDATA\Programs\Windsurf\Windsurf.exe")
     $hasOpencode = $null -ne (Get-Command opencode -ErrorAction SilentlyContinue)
+    $hasKiro    = ($null -ne (Get-Command kiro -ErrorAction SilentlyContinue)) -or
+                  (Test-Path "$env:LOCALAPPDATA\Programs\Kiro\Kiro.exe")
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -585,9 +587,10 @@ function Invoke-DetectTools {
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
     $windsurfState = $hasWindsurf; $windsurfHint = if ($hasWindsurf) { "detected" } else { "not found" }
     $opencodeState = $hasOpencode; $opencodeHint = if ($hasOpencode) { "detected" } else { "not found" }
+    $kiroState    = $hasKiro;    $kiroHint    = if ($hasKiro)    { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasWindsurf -and -not $hasOpencode) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasWindsurf -and -not $hasOpencode -and -not $hasKiro) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -606,6 +609,7 @@ function Invoke-DetectTools {
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
         @{ Label = "Windsurf";       Value = "windsurf";     State = $windsurfState;     Hint = $windsurfHint }
         @{ Label = "OpenCode";       Value = "opencode";     State = $opencodeState;     Hint = $opencodeHint }
+        @{ Label = "Kiro";           Value = "kiro";         State = $kiroState;         Hint = $kiroHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -1189,6 +1193,13 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".opencode\skills"
                 }
             }
+            "kiro" {
+                if ($script:Scope -eq "global") {
+                    $dirs += Join-Path $env:USERPROFILE ".kiro\skills"
+                } else {
+                    $dirs += Join-Path $BaseDir ".kiro\skills"
+                }
+            }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1689,6 +1700,16 @@ function Write-McpConfigs {
                 }
                 Write-Ok "OpenCode MCP config"
             }
+            "kiro" {
+                if ($script:Scope -eq "global") {
+                    $kiroSettings = Join-Path $env:USERPROFILE ".kiro\settings"
+                } else {
+                    $kiroSettings = Join-Path $BaseDir ".kiro\settings"
+                }
+                if (-not (Test-Path $kiroSettings)) { New-Item -ItemType Directory -Path $kiroSettings -Force | Out-Null }
+                Write-McpJson (Join-Path $kiroSettings "mcp.json")
+                Write-Ok "Kiro MCP config"
+            }
         }
     }
 }
@@ -1753,6 +1774,10 @@ function Show-Summary {
     }
     if ($script:Tools -match 'opencode') {
         Write-Msg "$step. Launch OpenCode in your project: opencode"
+        $step++
+    }
+    if ($script:Tools -match 'kiro') {
+        Write-Msg "$step. Open your project in Kiro to use Databricks skills and MCP tools"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"
