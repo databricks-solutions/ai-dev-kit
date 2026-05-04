@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Official Databricks AI Dev Kit plugin marketplace",
-    "version": "1.1.0"
+    "version": "1.1.9"
   },
   "plugins": [
     {
       "name": "databricks-ai-dev-kit",
       "source": "./",
       "description": "Databricks development toolkit with 19 skills and MCP tools for direct Databricks operations",
-      "version": "1.1.0"
+      "version": "1.1.9"
     }
   ]
 }

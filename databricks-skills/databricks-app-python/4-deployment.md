@@ -35,13 +35,21 @@ env:
 | FastAPI | `["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]` |
 | Reflex | `["reflex", "run", "--env", "prod"]` |
 
+### Excluded directories
+
+When uploading via the SDK's `upload_folder()` / `upload_to_workspace()`, the following directories are automatically skipped to keep uploads fast:
+
+`node_modules`, `__pycache__`, `.venv`, `venv`, `.tox`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `dist`, `build`, `.eggs`, `*.egg-info`
+
+If you use `databricks workspace import-dir` directly, it does **not** apply these exclusions. Either clean the directory first or use the SDK upload functions instead.
+
 ### Step 2: Create and Deploy
 
 ```bash
 # Create the app
 databricks apps create <app-name>
 
-# Upload source code
+# Upload source code (make sure to exclude node_modules, venv, etc.)
 databricks workspace mkdirs /Workspace/Users/<user>/apps/<app-name>
 databricks workspace import-dir . /Workspace/Users/<user>/apps/<app-name>
 

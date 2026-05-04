@@ -4,17 +4,20 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Format
     runs-on: linux-ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
-          version: "latest"
-      
+          version: "0.11.4"
+
       - name: Run ruff check
         run: |
           uvx ruff@0.11.0 check \
@@ -35,15 +38,14 @@ jobs:
     name: Validate Skills
     runs-on: linux-ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
-      
+
       - name: Install dependencies
-        run: pip install pyyaml
-      
+        run: pip install "pyyaml==6.0.3"
+
       - name: Validate skill structure
         run: python .github/scripts/validate_skills.py
-

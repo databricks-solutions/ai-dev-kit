@@ -56,6 +56,7 @@ from .jobs import (
 
 from .runs import (
     run_job_now,
+    repair_run,
     get_run,
     get_run_output,
     cancel_run,
@@ -79,6 +80,7 @@ __all__ = [
     "delete_job",
     # Run Operations
     "run_job_now",
+    "repair_run",
     "get_run",
     "get_run_output",
     "cancel_run",

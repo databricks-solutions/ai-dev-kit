@@ -24,6 +24,7 @@ STAGING_DIR=""
 SKIP_BUILD="${SKIP_BUILD:-false}"
 SKIP_LAKEBASE="${SKIP_LAKEBASE:-false}"
 SKIP_SKILLS="${SKIP_SKILLS:-false}"
+ENABLE_MCP_GATEWAY="${ENABLE_MCP_GATEWAY:-false}"
 LAKEBASE_PROJECT_ID="${LAKEBASE_PROJECT_ID:-builder-app-db}"
 
 usage() {
@@ -43,6 +44,7 @@ usage() {
   echo "  --skip-build          Skip frontend build (use existing build)"
   echo "  --skip-lakebase       Skip Lakebase provisioning (already exists)"
   echo "  --skip-skills        Skip skills installation (reuse cached skills)"
+  echo "  --enable-mcp          Enable MCP Gateway at /mcp (for Genie Code / AI Playground)"
   echo "  --lakebase-id ID      Lakebase project ID (default: builder-app-db)"
   echo "  --staging-dir DIR     Custom staging directory"
   echo "  -h, --help            Show this help message"
@@ -50,6 +52,7 @@ usage() {
   echo "Example:"
   echo "  $0 my-builder-app --profile dbx_shared_demo"
   echo "  $0 my-builder-app --skip-lakebase --skip-build"
+  echo "  $0 mcp-builder-app --enable-mcp --profile demo  # With MCP Gateway (Genie Code compatible)"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -59,6 +62,7 @@ while [[ $# -gt 0 ]]; do
     --skip-build) SKIP_BUILD=true; shift ;;
     --skip-lakebase) SKIP_LAKEBASE=true; shift ;;
     --skip-skills) SKIP_SKILLS=true; shift ;;
+    --enable-mcp) ENABLE_MCP_GATEWAY=true; shift ;;
     --lakebase-id) LAKEBASE_PROJECT_ID="$2"; shift 2 ;;
     --staging-dir) STAGING_DIR="$2"; shift 2 ;;
     -*) echo -e "${RED}Error: Unknown option $1${NC}"; usage; exit 1 ;;
@@ -70,6 +74,37 @@ done
 
 if [ -z "$APP_NAME" ]; then
   echo -e "${RED}Error: App name is required${NC}"; echo ""; usage; exit 1
+fi
+
+# Validate app name for Genie Code MCP compatibility
+if [ "$ENABLE_MCP_GATEWAY" = true ] && [[ ! "$APP_NAME" == mcp-* ]]; then
+  echo ""
+  echo -e "${YELLOW}╔════════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${YELLOW}║  ⚠  Genie Code MCP Naming Requirement                     ║${NC}"
+  echo -e "${YELLOW}╚════════════════════════════════════════════════════════════╝${NC}"
+  echo ""
+  echo -e "  Your app name is: ${RED}${APP_NAME}${NC}"
+  echo -e "  Genie Code only discovers apps whose names start with ${GREEN}mcp-${NC}"
+  echo ""
+  echo -e "  Suggested name: ${GREEN}mcp-${APP_NAME}${NC}"
+  echo ""
+  echo -e "  Without the ${GREEN}mcp-${NC} prefix, the app will still work as an MCP"
+  echo -e "  server, but it ${RED}will not appear${NC} in the Genie Code MCP picker."
+  echo ""
+  read -r -p "  Continue with '$APP_NAME' anyway? [y/N] " response
+  case "$response" in
+    [yY][eE][sS]|[yY])
+      echo -e "  Continuing with '${APP_NAME}'..."
+      echo ""
+      ;;
+    *)
+      echo ""
+      echo -e "  Aborting. Re-run with a name starting with ${GREEN}mcp-${NC}:"
+      echo -e "    $0 mcp-${APP_NAME} --enable-mcp ${PROFILE:+--profile $PROFILE}"
+      echo ""
+      exit 0
+      ;;
+  esac
 fi
 
 CLI_ARGS=""
@@ -90,6 +125,7 @@ echo -e "  Profile:           ${PROFILE:-<default>}"
 echo -e "  Skip Build:        ${SKIP_BUILD}"
 echo -e "  Skip Lakebase:     ${SKIP_LAKEBASE}"
 echo -e "  Skip Skills:       ${SKIP_SKILLS}"
+echo -e "  MCP Gateway:       ${ENABLE_MCP_GATEWAY}"
 echo ""
 
 TOTAL_STEPS=8
@@ -277,6 +313,18 @@ env:
   - name: AUTO_GRANT_PERMISSIONS_TO
     value: "account users"
 APPYAML
+
+# Append MCP Gateway env vars if enabled
+if [ "$ENABLE_MCP_GATEWAY" = true ]; then
+  cat >> "$STAGING_DIR/app.yaml" << 'MCPYAML'
+  - name: ENABLE_MCP_GATEWAY
+    value: "true"
+  - name: FASTMCP_STATELESS_HTTP
+    value: "true"
+MCPYAML
+  echo -e "  ${GREEN}✓${NC} MCP Gateway env vars added to app.yaml"
+fi
+
 echo -e "  ${GREEN}✓${NC} app.yaml generated with LAKEBASE_ENDPOINT=${LAKEBASE_ENDPOINT}"
 
 find "$STAGING_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -404,6 +452,26 @@ if echo "$DEPLOY_OUTPUT" | grep -q '"state":"SUCCEEDED"'; then
   echo -e "  Lakebase Project:  ${LAKEBASE_PROJECT_ID}"
   echo -e "  Lakebase Endpoint: ${LAKEBASE_ENDPOINT}"
   echo -e "  Service Principal: ${SP_CLIENT_ID}"
+  if [ "$ENABLE_MCP_GATEWAY" = true ]; then
+    echo -e "  MCP Endpoint:      ${GREEN}${APP_URL}/mcp${NC}"
+    echo -e "  MCP Info Page:     ${APP_URL}/mcp/info"
+    echo ""
+    echo -e "${BLUE}  ── Genie Code Setup ──────────────────────────────────────${NC}"
+    if [[ "$APP_NAME" == mcp-* ]]; then
+      echo -e "  ${GREEN}✓${NC} App name starts with 'mcp-' — visible to Genie Code"
+    else
+      echo -e "  ${YELLOW}⚠${NC} App name does NOT start with 'mcp-' — not visible to Genie Code"
+    fi
+    echo ""
+    echo -e "  To use with Genie Code:"
+    echo -e "    1. Open a Genie Space in the Databricks UI"
+    echo -e "    2. Click the ${BOLD}gear icon${NC} (Settings) > ${BOLD}MCP Servers${NC}"
+    echo -e "    3. Select ${GREEN}${APP_NAME}${NC} from the app list"
+    echo -e "    4. Also add skills to the space via ${BOLD}Instructions${NC}"
+    echo ""
+    echo -e "  To use with AI Playground or other MCP clients:"
+    echo -e "    MCP URL: ${GREEN}${APP_URL}/mcp${NC}"
+  fi
   echo ""
 
   # Clean up old deployments

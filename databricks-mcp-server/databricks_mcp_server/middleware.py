@@ -9,6 +9,7 @@ import json
 import logging
 import traceback
 
+from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware, MiddlewareContext, CallNext
 from fastmcp.tools.tool import ToolResult
 from mcp.types import CallToolRequestParams, TextContent
@@ -70,24 +71,24 @@ class TimeoutHandlingMiddleware(Middleware):
             # In Python 3.11+, asyncio.TimeoutError is an alias for TimeoutError,
             # so this single handler catches both
             logger.warning(
-                "Tool '%s' timed out. Returning structured result.",
+                "Tool '%s' timed out. Raising ToolError.",
                 tool_name,
             )
-            # Don't set structured_content for errors - it would be validated against
-            # the tool's outputSchema and fail (error dict doesn't match expected type)
-            return ToolResult(
-                content=[TextContent(type="text", text=json.dumps({
-                    "error": True,
-                    "error_type": "timeout",
-                    "tool": tool_name,
-                    "message": str(e) or "Operation timed out",
-                    "action_required": (
-                        "Operation may still be in progress. "
-                        "Do NOT retry the same call. "
-                        "Use the appropriate get/status tool to check current state."
-                    ),
-                }))]
-            )
+            # Raise ToolError so the MCP SDK sets isError=True on the response,
+            # which bypasses outputSchema validation. Returning a ToolResult here
+            # would be treated as a success and fail validation when outputSchema
+            # is defined (e.g., tools with -> Dict[str, Any] return type).
+            raise ToolError(json.dumps({
+                "error": True,
+                "error_type": "timeout",
+                "tool": tool_name,
+                "message": str(e) or "Operation timed out",
+                "action_required": (
+                    "Operation may still be in progress. "
+                    "Do NOT retry the same call. "
+                    "Use the appropriate get/status tool to check current state."
+                ),
+            })) from e
 
         except anyio.get_cancelled_exc_class():
             # Re-raise CancelledError so MCP SDK's handler catches it and skips
@@ -110,14 +111,13 @@ class TimeoutHandlingMiddleware(Middleware):
                 traceback.format_exc(),
             )
 
-            # Return error as text content only - don't set structured_content.
-            # Setting structured_content would cause MCP SDK to validate it against
-            # the tool's outputSchema, which fails (error dict doesn't match expected type).
-            return ToolResult(
-                content=[TextContent(type="text", text=json.dumps({
-                    "error": True,
-                    "error_type": type(e).__name__,
-                    "tool": tool_name,
-                    "message": str(e),
-                }))]
-            )
+            # Raise ToolError so the MCP SDK sets isError=True on the response,
+            # which bypasses outputSchema validation. Returning a ToolResult here
+            # would be treated as a success and fail validation when outputSchema
+            # is defined (e.g., tools with -> Dict[str, Any] return type).
+            raise ToolError(json.dumps({
+                "error": True,
+                "error_type": type(e).__name__,
+                "tool": tool_name,
+                "message": str(e),
+            })) from e

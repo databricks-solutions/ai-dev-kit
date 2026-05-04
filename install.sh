@@ -2,7 +2,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Kiro.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
 #
 # Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
@@ -53,6 +53,7 @@ USER_TOOLS=""
 USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
+CHANNEL="${DEVKIT_CHANNEL:-stable}"  # stable or experimental
 
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
@@ -135,6 +136,7 @@ while [ $# -gt 0 ]; do
         --list-skills)    LIST_SKILLS=true; shift ;;
         --silent)         SILENT=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
+        --experimental)   CHANNEL="experimental"; shift ;;
         -f|--force)       FORCE=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
@@ -149,10 +151,11 @@ while [ $# -gt 0 ]; do
             echo "  --mcp-only            Skip skills installation"
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
-            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,kiro"
+            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
+            echo "  --experimental        Install from experimental branch (early access features)"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             echo ""
@@ -166,6 +169,7 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SKILLS_PROFILE Comma-separated skill profiles"
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
+            echo "  DEVKIT_CHANNEL        'stable' (default) or 'experimental'"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             echo ""
             echo "Examples:"
@@ -253,6 +257,16 @@ MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 # ─── Interactive helpers ────────────────────────────────────────
 # Reads from /dev/tty so prompts work even when piped via curl | bash
 
+# True if we have an interactive tty we can read from.
+# `[ -e /dev/tty ]` is not safe here — on macOS the device node always exists
+# even when the process has no controlling terminal, so existence does not
+# imply we can open it. We check stdin first (normal interactive runs) and
+# fall back to attempting to open /dev/tty (needed for `curl … | bash` where
+# stdin is piped but a controlling terminal is still available).
+is_interactive() {
+    [ -t 0 ] || ( : < /dev/tty ) 2>/dev/null
+}
+
 # Simple text prompt with default value
 prompt() {
     local prompt_text=$1
@@ -264,7 +278,7 @@ prompt() {
         return
     fi
 
-    if [ -e /dev/tty ]; then
+    if ( : < /dev/tty ) 2>/dev/null; then
         printf "  %b [%s]: " "$prompt_text" "$default_value" > /dev/tty
         read -r result < /dev/tty
     elif [ -t 0 ]; then
@@ -503,6 +517,8 @@ detect_tools() {
     local has_copilot=false
     local has_gemini=false
     local has_antigravity=false
+    local has_windsurf=false
+    local has_opencode=false
     local has_kiro=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
@@ -511,27 +527,31 @@ detect_tools() {
     { [ -d "/Applications/Visual Studio Code.app" ] || command -v code >/dev/null 2>&1; } && has_copilot=true
     { command -v gemini >/dev/null 2>&1 || [ -f "$HOME/.gemini/local/gemini" ]; } && has_gemini=true
     { [ -d "/Applications/Antigravity.app" ] || command -v antigravity >/dev/null 2>&1; } && has_antigravity=true
+    { [ -d "/Applications/Windsurf.app" ] || command -v windsurf >/dev/null 2>&1; } && has_windsurf=true
+    command -v opencode >/dev/null 2>&1 && has_opencode=true
     { [ -d "/Applications/Kiro.app" ] || command -v kiro >/dev/null 2>&1; } && has_kiro=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" kiro_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" kiro_hint="not found"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" windsurf_state="off" opencode_state="off" kiro_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" windsurf_hint="not found" opencode_hint="not found" kiro_hint="not found"
     [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
     [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
     [ "$has_codex" = true ]         && codex_state="on"         && codex_hint="detected"
     [ "$has_copilot" = true ]       && copilot_state="on"       && copilot_hint="detected"
     [ "$has_gemini" = true ]        && gemini_state="on"        && gemini_hint="detected"
     [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
+    [ "$has_windsurf" = true ]      && windsurf_state="on"      && windsurf_hint="detected"
+    [ "$has_opencode" = true ]      && opencode_state="on"      && opencode_hint="detected"
     [ "$has_kiro" = true ]          && kiro_state="on"          && kiro_hint="detected"
 
     # If nothing detected, pre-select claude as default
-    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_kiro" = false ]; then
+    if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_windsurf" = false ] && [ "$has_opencode" = false ] && [ "$has_kiro" = false ]; then
         claude_state="on"
         claude_hint="default"
     fi
 
     # Interactive or fallback
-    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+    if [ "$SILENT" = false ] && is_interactive; then
         [ "$SILENT" = false ] && echo ""
         [ "$SILENT" = false ] && echo -e "  ${B}Select tools to install for:${N}"
 
@@ -542,6 +562,8 @@ detect_tools() {
             "OpenAI Codex|codex|${codex_state}|${codex_hint}" \
             "Gemini CLI|gemini|${gemini_state}|${gemini_hint}" \
             "Antigravity|antigravity|${antigravity_state}|${antigravity_hint}" \
+            "Windsurf|windsurf|${windsurf_state}|${windsurf_hint}" \
+            "OpenCode|opencode|${opencode_state}|${opencode_hint}" \
             "Kiro|kiro|${kiro_state}|${kiro_hint}" \
         )
     else
@@ -553,6 +575,8 @@ detect_tools() {
         [ "$has_codex" = true ]         && tools="${tools:+$tools }codex"
         [ "$has_gemini" = true ]        && tools="${tools:+$tools }gemini"
         [ "$has_antigravity" = true ]   && tools="${tools:+$tools }antigravity"
+        [ "$has_windsurf" = true ]      && tools="${tools:+$tools }windsurf"
+        [ "$has_opencode" = true ]      && tools="${tools:+$tools }opencode"
         [ "$has_kiro" = true ]          && tools="${tools:+$tools }kiro"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
@@ -573,7 +597,7 @@ prompt_profile() {
     fi
 
     # Skip in silent mode or non-interactive
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
 
@@ -593,7 +617,7 @@ prompt_profile() {
     echo ""
     echo -e "  ${B}Select Databricks profile${N}"
 
-    if [ ${#profiles[@]} -gt 0 ] && [ -e /dev/tty ]; then
+    if [ ${#profiles[@]} -gt 0 ] && is_interactive; then
         # Build radio items: "Label|value|on_or_off|hint"
         local -a items=()
         for p in "${profiles[@]}"; do
@@ -641,7 +665,7 @@ prompt_mcp_path() {
     # If provided via --mcp-path flag, skip prompt
     if [ -n "$USER_MCP_PATH" ]; then
         INSTALL_DIR="$USER_MCP_PATH"
-    elif [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+    elif [ "$SILENT" = false ] && is_interactive; then
         [ "$SILENT" = false ] && echo ""
         [ "$SILENT" = false ] && echo -e "  ${B}MCP server location${N}"
         [ "$SILENT" = false ] && echo -e "  ${D}The MCP server runtime (Python venv + source) will be installed here.${N}"
@@ -746,7 +770,7 @@ prompt_skills_profile() {
     fi
 
     # Skip in silent mode or non-interactive
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         SKILLS_PROFILE="all"
         return
     fi
@@ -1101,7 +1125,27 @@ install_skills() {
                     dirs+=("$base_dir/.agents/skills")
                 fi
                 ;;
-            kiro) dirs+=("$base_dir/.kiro/skills") ;;
+            windsurf)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.codeium/windsurf/skills")
+                else
+                    dirs+=("$base_dir/.windsurf/skills")
+                fi
+                ;;
+            opencode)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.config/opencode/skills")
+                else
+                    dirs+=("$base_dir/.opencode/skills")
+                fi
+                ;;
+            kiro)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.kiro/skills")
+                else
+                    dirs+=("$base_dir/.kiro/skills")
+                fi
+                ;;
         esac
     done
 
@@ -1336,6 +1380,54 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 EOF
 }
 
+write_opencode_json() {
+    local path=$1
+    mkdir -p "$(dirname "$path")"
+
+    # Backup existing file before any modifications
+    if [ -f "$path" ]; then
+        cp "$path" "${path}.bak"
+        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
+    fi
+
+    if [ -f "$VENV_PYTHON" ]; then
+        "$VENV_PYTHON" -c "
+import json
+try:
+    with open('$path') as f: cfg = json.load(f)
+except: cfg = {}
+cfg.setdefault('\$schema', 'https://opencode.ai/config.json')
+cfg.setdefault('mcp', {})['databricks'] = {
+    'type': 'local',
+    'command': ['$VENV_PYTHON', '$MCP_ENTRY'],
+    'environment': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'},
+    'enabled': True
+}
+with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && return
+    fi
+
+    # Fallback: only safe for new files
+    if [ -f "$path" ]; then
+        warn "Cannot merge MCP config into $path without Python. Add manually."
+        return
+    fi
+
+    cat > "$path" << EOF
+{
+  "\$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "databricks": {
+      "type": "local",
+      "command": ["$VENV_PYTHON", "$MCP_ENTRY"],
+      "environment": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"},
+      "enabled": true
+    }
+  }
+}
+EOF
+}
+
 write_gemini_md() {
     local path=$1
     [ -f "$path" ] && return  # Don't overwrite existing file
@@ -1492,6 +1584,22 @@ write_mcp_configs() {
                 write_gemini_mcp_json "$HOME/.gemini/antigravity/mcp_config.json"
                 ok "Antigravity MCP config"
                 ;;
+            windsurf)
+                if [ "$SCOPE" = "project" ]; then
+                    warn "Windsurf only supports global MCP configuration."
+                    msg "  Config written to ${B}~/.codeium/windsurf/mcp_config.json${N}"
+                fi
+                write_mcp_json "$HOME/.codeium/windsurf/mcp_config.json"
+                ok "Windsurf MCP config"
+                ;;
+            opencode)
+                if [ "$SCOPE" = "global" ]; then
+                    write_opencode_json "$HOME/.config/opencode/opencode.json"
+                else
+                    write_opencode_json "$base_dir/opencode.json"
+                fi
+                ok "OpenCode MCP config"
+                ;;
             kiro)
                 if [ "$SCOPE" = "global" ]; then
                     mkdir -p "$HOME/.kiro/settings"
@@ -1525,6 +1633,7 @@ summary() {
         echo ""
         echo -e "${G}${B}Installation complete!${N}"
         echo "────────────────────────────────"
+        [ "$CHANNEL" = "experimental" ] && msg "Channel:  ${Y}experimental 🧪${N}"
         msg "Location: $INSTALL_DIR"
         msg "Scope:    $SCOPE"
         msg "Tools:    $(echo "$TOOLS" | tr ' ' ', ')"
@@ -1549,16 +1658,37 @@ summary() {
             msg "${step}. Open your project in Antigravity to use Databricks skills and MCP tools"
             step=$((step + 1))
         fi
+        if echo "$TOOLS" | grep -q windsurf; then
+            msg "${step}. Restart Windsurf to pick up the ${B}databricks${N} MCP server (Windsurf → Settings → Windsurf Settings → MCP)"
+            step=$((step + 1))
+        fi
+        if echo "$TOOLS" | grep -q opencode; then
+            msg "${step}. Launch OpenCode in your project: ${B}opencode${N}"
+            step=$((step + 1))
+        fi
+        if echo "$TOOLS" | grep -q kiro; then
+            msg "${step}. Open your project in Kiro to use Databricks skills and MCP tools"
+            step=$((step + 1))
+        fi
         msg "${step}. Open your project in your tool of choice"
         step=$((step + 1))
         msg "${step}. Try: \"List my SQL warehouses\""
         echo ""
+        if [ "$CHANNEL" = "experimental" ]; then
+            echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+            echo -e "  ${B}🧪 You're using the experimental channel${N}"
+            echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+            echo ""
+            msg "Thank you for testing early features! Your feedback helps us improve."
+            msg "Report issues: ${BL}https://github.com/databricks-solutions/ai-dev-kit/issues${N}"
+            echo ""
+        fi
     fi
 }
 
 # Prompt for installation scope
 prompt_scope() {
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
 
@@ -1625,9 +1755,66 @@ prompt_scope() {
     SCOPE="${values[$selected]}"
 }
 
+# Prompt for release channel (stable vs experimental)
+prompt_channel() {
+    # Skip if already set via --experimental flag or env var
+    if [ "$CHANNEL" = "experimental" ]; then
+        return
+    fi
+
+    # Skip in silent mode or non-interactive
+    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Select release channel${N}"
+
+    local selected
+    selected=$(radio_select \
+        "Stable|stable|on|Latest stable release (recommended)" \
+        "Experimental|experimental|off|Early access to new features — help us test!" \
+    )
+
+    CHANNEL="$selected"
+
+    # If experimental was selected, re-download and re-exec from experimental branch
+    if [ "$CHANNEL" = "experimental" ]; then
+        echo ""
+        echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+        echo -e "  ${B}🧪 Experimental Channel${N}"
+        echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+        echo ""
+        echo -e "  You're about to install the ${B}experimental${N} version of AI Dev Kit."
+        echo -e "  This includes early access features that may change or break."
+        echo ""
+        echo -e "  ${B}We'd love your feedback!${N}"
+        echo -e "  Report issues: ${BL}https://github.com/databricks-solutions/ai-dev-kit/issues${N}"
+        echo -e "  Discussions:   ${BL}https://github.com/databricks-solutions/ai-dev-kit/discussions${N}"
+        echo ""
+        echo -e "  ${D}Downloading installer from experimental branch...${N}"
+        echo ""
+
+        # Build the command with all current flags preserved (array preserves quoting)
+        local args=("--experimental")
+        [ "$FORCE" = true ] && args+=("--force")
+        [ -n "$USER_TOOLS" ] && args+=("--tools" "$USER_TOOLS")
+        [ -n "$USER_MCP_PATH" ] && args+=("--mcp-path" "$USER_MCP_PATH")
+        [ -n "$SKILLS_PROFILE" ] && args+=("--skills-profile" "$SKILLS_PROFILE")
+        [ -n "$USER_SKILLS" ] && args+=("--skills" "$USER_SKILLS")
+        [ "$SCOPE_EXPLICIT" = true ] && [ "$SCOPE" = "global" ] && args+=("--global")
+        [ "$PROFILE" != "DEFAULT" ] && args+=("--profile" "$PROFILE")
+        [ "$INSTALL_MCP" = false ] && args+=("--skills-only")
+        [ "$INSTALL_SKILLS" = false ] && args+=("--mcp-only")
+
+        # Download and execute the experimental installer
+        exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") "${args[@]}"
+    fi
+}
+
 # Prompt to run auth
 prompt_auth() {
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
 
@@ -1680,6 +1867,9 @@ main() {
         echo "────────────────────────────────"
     fi
     
+    # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
+    prompt_channel
+
     # Check dependencies
     step "Checking prerequisites"
     check_deps
@@ -1733,24 +1923,25 @@ main() {
         echo ""
         echo -e "  ${B}Summary${N}"
         echo -e "  ────────────────────────────────────"
+        [ "$CHANNEL" = "experimental" ] && echo -e "  Channel:     ${Y}experimental 🧪${N}"
         echo -e "  Tools:       ${G}$(echo "$TOOLS" | tr ' ' ', ')${N}"
         echo -e "  Profile:     ${G}${PROFILE}${N}"
         echo -e "  Scope:       ${G}${SCOPE}${N}"
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${G}${INSTALL_DIR}${N}"
         if [ "$INSTALL_SKILLS" = true ]; then
             if [ -n "$USER_SKILLS" ]; then
-                echo -e "  Skills:      ${G}custom selection${N}"
+                echo -e "  Skills:      ${G}custom selection${N} ${Y}(will be overwritten, backup your changes first)${N}"
             else
                 local sk_total=0
                 for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_total=$((sk_total + 1)); done
-                echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N}"
+                echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N} ${Y}(will be overwritten, backup your changes first)${N}"
             fi
         fi
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
         echo ""
     fi
 
-    if [ "$SILENT" = false ] && [ -e /dev/tty ]; then
+    if [ "$SILENT" = false ] && is_interactive; then
         local confirm
         confirm=$(prompt "Proceed with installation? ${D}(y/n)${N}" "y")
         if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && [ "$confirm" != "yes" ]; then

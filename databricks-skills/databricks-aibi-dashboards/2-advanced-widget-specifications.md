@@ -96,7 +96,7 @@ Combines bar and line visualizations on the same chart - useful for showing rela
       "frame": {"title": "Revenue & Growth Rate", "showTitle": true}
     }
   },
-  "position": {"x": 0, "y": 0, "width": 6, "height": 5}
+  "position": {"x": 0, "y": 0, "width": 12, "height": 5}
 }
 ```
 

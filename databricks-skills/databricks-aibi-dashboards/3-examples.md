@@ -48,6 +48,7 @@ dashboard = {
         "name": "overview",
         "displayName": "NYC Taxi Overview",
         "pageType": "PAGE_TYPE_CANVAS",
+        "layoutVersion": "GRID_V1",
         "layout": [
             # Text header - NO spec block! Use SEPARATE widgets for title and subtitle!
             {
@@ -57,7 +58,7 @@ dashboard = {
                         "lines": ["## NYC Taxi Dashboard"]
                     }
                 },
-                "position": {"x": 0, "y": 0, "width": 6, "height": 1}
+                "position": {"x": 0, "y": 0, "width": 12, "height": 1}
             },
             {
                 "widget": {
@@ -66,9 +67,9 @@ dashboard = {
                         "lines": ["Trip statistics and analysis"]
                     }
                 },
-                "position": {"x": 0, "y": 1, "width": 6, "height": 1}
+                "position": {"x": 0, "y": 1, "width": 12, "height": 1}
             },
-            # Counter - version 2, width 2!
+            # Counter - version 2, width 4!
             {
                 "widget": {
                     "name": "total-trips",
@@ -89,7 +90,7 @@ dashboard = {
                         "frame": {"title": "Total Trips", "showTitle": True}
                     }
                 },
-                "position": {"x": 0, "y": 2, "width": 2, "height": 3}
+                "position": {"x": 0, "y": 2, "width": 4, "height": 3}
             },
             {
                 "widget": {
@@ -111,7 +112,7 @@ dashboard = {
                         "frame": {"title": "Average Fare", "showTitle": True}
                     }
                 },
-                "position": {"x": 2, "y": 2, "width": 2, "height": 3}
+                "position": {"x": 4, "y": 2, "width": 4, "height": 3}
             },
             {
                 "widget": {
@@ -133,7 +134,7 @@ dashboard = {
                         "frame": {"title": "Average Distance", "showTitle": True}
                     }
                 },
-                "position": {"x": 4, "y": 2, "width": 2, "height": 3}
+                "position": {"x": 8, "y": 2, "width": 4, "height": 3}
             },
             # Bar chart - version 3
             {
@@ -160,7 +161,7 @@ dashboard = {
                         "frame": {"title": "Trips by Pickup ZIP", "showTitle": True}
                     }
                 },
-                "position": {"x": 0, "y": 5, "width": 6, "height": 5}
+                "position": {"x": 0, "y": 5, "width": 12, "height": 5}
             },
             # Table - version 2, minimal column props!
             {
@@ -189,7 +190,7 @@ dashboard = {
                         "frame": {"title": "Top ZIP Codes", "showTitle": True}
                     }
                 },
-                "position": {"x": 0, "y": 10, "width": 6, "height": 5}
+                "position": {"x": 0, "y": 10, "width": 12, "height": 5}
             }
         ]
     }]
@@ -229,6 +230,7 @@ dashboard_with_filters = {
             "name": "overview",
             "displayName": "Sales Overview",
             "pageType": "PAGE_TYPE_CANVAS",
+            "layoutVersion": "GRID_V1",
             "layout": [
                 {
                     "widget": {
@@ -250,7 +252,7 @@ dashboard_with_filters = {
                             "frame": {"title": "Total Revenue", "showTitle": True}
                         }
                     },
-                    "position": {"x": 0, "y": 0, "width": 6, "height": 3}
+                    "position": {"x": 0, "y": 0, "width": 12, "height": 3}
                 }
             ]
         },
@@ -258,6 +260,7 @@ dashboard_with_filters = {
             "name": "filters",
             "displayName": "Filters",
             "pageType": "PAGE_TYPE_GLOBAL_FILTERS",  # Required for global filter page!
+            "layoutVersion": "GRID_V1",
             "layout": [
                 {
                     "widget": {
@@ -286,7 +289,7 @@ dashboard_with_filters = {
                             "frame": {"showTitle": True, "title": "Region"}  # Always show title!
                         }
                     },
-                    "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+                    "position": {"x": 0, "y": 0, "width": 4, "height": 2}
                 }
             ]
         }
