@@ -6,50 +6,37 @@ metadata:
 test_cases:
 - id: lakebase_auto_create_project_001
   inputs:
-    prompt: "How do I create a new Lakebase Autoscale project using the Python SDK?"
+    prompt: "How do I create a new Lakebase Autoscale project?"
   outputs:
     response: |
-      ```python
-      from databricks.sdk import WorkspaceClient
-      from databricks.sdk.service.postgres import Project, ProjectSpec
-
-      w = WorkspaceClient()
-
-      # Create a project (long-running operation)
-      operation = w.postgres.create_project(
-          project=Project(
-              spec=ProjectSpec(
-                  display_name="My Application",
-                  pg_version="17"
-              )
-          ),
-          project_id="my-app"
-      )
-      result = operation.wait()
-      print(f"Created project: {result.name}")
+      ```bash
+      databricks postgres create-project my-app \
+          --json '{"spec": {"display_name": "My Application", "pg_version": "17"}}'
       ```
+
+      The CLI blocks until the long-running operation completes and returns the final resource.
     execution_success: true
   expectations:
     expected_facts:
-    - "Projects are created with w.postgres.create_project()"
-    - "create_project returns a long-running operation that requires .wait()"
-    - "ProjectSpec requires display_name and pg_version"
+    - "Projects are created with 'databricks postgres create-project'"
+    - "Project spec is passed as --json with display_name and pg_version"
+    - "The CLI blocks until the long-running operation completes"
     expected_patterns:
-    - pattern: "create_project"
+    - pattern: "databricks postgres create-project"
       min_count: 1
-      description: "Uses create_project() method"
-    - pattern: "ProjectSpec"
+      description: "Uses CLI create-project command"
+    - pattern: "display_name"
       min_count: 1
-      description: "Uses ProjectSpec for configuration"
-    - pattern: "\\.wait\\(\\)"
+      description: "Specifies project display name in spec"
+    - pattern: "pg_version"
       min_count: 1
-      description: "Waits for the long-running operation to complete"
-    - pattern: "WorkspaceClient"
+      description: "Specifies Postgres version"
+    - pattern: "--json"
       min_count: 1
-      description: "Uses WorkspaceClient for SDK access"
+      description: "Passes spec as JSON"
     guidelines:
-    - "Must show the long-running operation pattern with .wait()"
-    - "Must include ProjectSpec with display_name and pg_version"
+    - "Must use databricks postgres create-project with --json for the spec"
+    - "Must include display_name and pg_version in the spec"
   metadata:
     category: happy_path
     difficulty: easy
@@ -60,44 +47,32 @@ test_cases:
     prompt: "How do I create a development branch in Lakebase Autoscale with an expiration?"
   outputs:
     response: |
-      ```python
-      from databricks.sdk.service.postgres import Branch, BranchSpec, Duration
-
-      # Create a dev branch with 7-day expiration
-      branch = w.postgres.create_branch(
-          parent="projects/my-app",
-          branch=Branch(
-              spec=BranchSpec(
-                  source_branch="projects/my-app/branches/production",
-                  ttl=Duration(seconds=604800)  # 7 days
-              )
-          ),
-          branch_id="development"
-      ).wait()
-      print(f"Branch created: {branch.name}")
+      ```bash
+      databricks postgres create-branch projects/my-app development \
+          --json '{"spec": {"source_branch": "projects/my-app/branches/production", "ttl": "604800s"}}'
       ```
 
       Branches are copy-on-write snapshots of the production branch, ideal for development and testing.
     execution_success: true
   expectations:
     expected_facts:
-    - "Branches are created with w.postgres.create_branch()"
-    - "BranchSpec takes a source_branch and optional ttl for expiration"
-    - "Duration(seconds=604800) sets a 7-day TTL"
+    - "Branches are created with 'databricks postgres create-branch'"
+    - "Branch spec is passed as --json with source_branch and ttl in seconds"
+    - "TTL of 604800s sets a 7-day expiration"
     - "Branches use copy-on-write from the source branch"
     expected_patterns:
-    - pattern: "create_branch"
+    - pattern: "databricks postgres create-branch"
       min_count: 1
-      description: "Uses create_branch() method"
-    - pattern: "BranchSpec"
-      min_count: 1
-      description: "Uses BranchSpec for branch configuration"
-    - pattern: "Duration"
-      min_count: 1
-      description: "Uses Duration for TTL specification"
+      description: "Uses CLI create-branch command"
     - pattern: "source_branch"
       min_count: 1
       description: "Specifies the parent branch to fork from"
+    - pattern: "604800s"
+      min_count: 1
+      description: "Sets 7-day TTL in seconds"
+    - pattern: "copy-on-write"
+      min_count: 1
+      description: "Explains branch isolation model"
     guidelines:
     - "Must include TTL/expiration on the development branch"
     - "Must explain that branches are copy-on-write snapshots"
@@ -119,13 +94,13 @@ test_cases:
 
       # Get endpoint details
       endpoint = w.postgres.get_endpoint(
-          name="projects/my-app/branches/production/endpoints/ep-primary"
+          name="projects/my-app/branches/production/endpoints/primary"
       )
       host = endpoint.status.hosts.host
 
       # Generate OAuth token (scoped to endpoint)
       cred = w.postgres.generate_database_credential(
-          endpoint="projects/my-app/branches/production/endpoints/ep-primary"
+          endpoint="projects/my-app/branches/production/endpoints/primary"
       )
 
       # Connect using psycopg3
@@ -152,15 +127,15 @@ test_cases:
     - pattern: "psycopg\\.connect"
       min_count: 1
       description: "Connects using psycopg3"
-    - pattern: "generate_database_credential"
+    - pattern: "generate.database.credential"
       min_count: 1
-      description: "Generates OAuth token for authentication"
+      description: "Generates OAuth token for authentication (CLI or SDK)"
     - pattern: "sslmode=require"
       min_count: 1
       description: "Requires SSL for the connection"
-    - pattern: "get_endpoint"
+    - pattern: "get.endpoint"
       min_count: 1
-      description: "Retrieves endpoint details"
+      description: "Retrieves endpoint details (CLI or SDK)"
     guidelines:
     - "Must use psycopg (not psycopg2) for the connection"
     - "Must generate OAuth token and use it as password"
@@ -182,7 +157,7 @@ test_cases:
 
       # Generate database credential (optionally scoped to an endpoint)
       cred = w.postgres.generate_database_credential(
-          endpoint="projects/my-app/branches/production/endpoints/ep-primary"
+          endpoint="projects/my-app/branches/production/endpoints/primary"
       )
       token = cred.token  # Use as password in connection string
       # Token expires after 1 hour
@@ -192,17 +167,17 @@ test_cases:
     execution_success: true
   expectations:
     expected_facts:
-    - "OAuth tokens are generated via w.postgres.generate_database_credential()"
+    - "OAuth tokens are generated with 'databricks postgres generate-database-credential'"
     - "Tokens expire after 1 hour"
     - "Tokens can be scoped to a specific endpoint"
     - "The token is used as the password in PostgreSQL connection strings"
     expected_patterns:
-    - pattern: "generate_database_credential"
+    - pattern: "generate.database.credential"
       min_count: 1
-      description: "Uses generate_database_credential() method"
-    - pattern: "cred\\.token"
+      description: "Uses generate-database-credential (CLI or SDK)"
+    - pattern: "token"
       min_count: 1
-      description: "Accesses the token from the credential response"
+      description: "References the token field from the credential response"
     guidelines:
     - "Must mention the 1-hour token expiration"
     - "Must show that the token is used as the connection password"
@@ -216,50 +191,37 @@ test_cases:
     prompt: "How do I resize the compute capacity for a Lakebase Autoscale endpoint?"
   outputs:
     response: |
-      ```python
-      from databricks.sdk.service.postgres import Endpoint, EndpointSpec, FieldMask
-
-      # Update compute to autoscale between 2-8 CU
-      w.postgres.update_endpoint(
-          name="projects/my-app/branches/production/endpoints/ep-primary",
-          endpoint=Endpoint(
-              name="projects/my-app/branches/production/endpoints/ep-primary",
-              spec=EndpointSpec(
-                  autoscaling_limit_min_cu=2.0,
-                  autoscaling_limit_max_cu=8.0
-              )
-          ),
-          update_mask=FieldMask(field_mask=[
-              "spec.autoscaling_limit_min_cu",
-              "spec.autoscaling_limit_max_cu"
-          ])
-      ).wait()
+      ```bash
+      databricks postgres update-endpoint \
+          projects/my-app/branches/production/endpoints/primary \
+          "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu" \
+          --json '{"spec": {"autoscaling_limit_min_cu": 2.0, "autoscaling_limit_max_cu": 8.0}}'
       ```
 
       Compute Units (CU) scale automatically within the min/max range based on workload.
     execution_success: true
   expectations:
     expected_facts:
-    - "Compute is resized with w.postgres.update_endpoint()"
+    - "Compute is resized with 'databricks postgres update-endpoint'"
     - "Autoscaling is configured with min and max CU limits"
-    - "FieldMask specifies which fields to update"
-    - "The operation is long-running and requires .wait()"
+    - "The update mask is passed as a positional argument"
+    - "The CLI blocks until the update completes"
     expected_patterns:
-    - pattern: "update_endpoint"
+    - pattern: "databricks postgres update-endpoint"
       min_count: 1
-      description: "Uses update_endpoint() to resize"
+      description: "Uses CLI update-endpoint command"
     - pattern: "autoscaling_limit_min_cu"
       min_count: 1
       description: "Sets minimum autoscaling CU"
     - pattern: "autoscaling_limit_max_cu"
       min_count: 1
       description: "Sets maximum autoscaling CU"
-    - pattern: "FieldMask"
+    - pattern: "spec\\.autoscaling"
       min_count: 1
-      description: "Uses FieldMask for partial update"
+      description: "Positional mask specifies autoscaling fields"
     guidelines:
     - "Must include both min and max CU configuration"
-    - "Must use FieldMask to specify updated fields"
+    - "Must pass update mask as positional argument to update-endpoint"
   metadata:
     category: happy_path
     difficulty: medium
@@ -356,9 +318,9 @@ test_cases:
 
       # Step 2: Configure autoscaling on the production endpoint (0-2 CU, scale-to-zero 5 min)
       w.postgres.update_endpoint(
-          name="projects/support-autoscale/branches/production/endpoints/ep-primary",
+          name="projects/support-autoscale/branches/production/endpoints/primary",
           endpoint=Endpoint(
-              name="projects/support-autoscale/branches/production/endpoints/ep-primary",
+              name="projects/support-autoscale/branches/production/endpoints/primary",
               spec=EndpointSpec(
                   autoscaling_limit_min_cu=0,
                   autoscaling_limit_max_cu=2.0,
@@ -399,12 +361,12 @@ test_cases:
 
       # Step 5: Generate OAuth credential and verify connectivity
       endpoint = w.postgres.get_endpoint(
-          name="projects/support-autoscale/branches/production/endpoints/ep-primary"
+          name="projects/support-autoscale/branches/production/endpoints/primary"
       )
       host = endpoint.status.hosts.host
 
       cred = w.postgres.generate_database_credential(
-          endpoint="projects/support-autoscale/branches/production/endpoints/ep-primary"
+          endpoint="projects/support-autoscale/branches/production/endpoints/primary"
       )
 
       conn_string = (
@@ -429,7 +391,7 @@ test_cases:
 
       **Key points:**
 
-      - The `production` branch and a primary read-write endpoint (`ep-primary`) are created automatically when you create a project.
+      - The `production` branch and a primary read-write endpoint named `primary` are created automatically when you create a project.
       - `update_endpoint` with `FieldMask` configures autoscaling limits (0-2 CU) and the scale-to-zero suspend timeout (300 seconds = 5 minutes).
       - `update_branch` with `is_protected=True` prevents accidental deletion or reset of the production branch.
       - The `dev` branch uses copy-on-write from production, so it's storage-efficient. The 7-day TTL (`Duration(seconds=604800)`) auto-deletes it after expiration.
@@ -440,24 +402,24 @@ test_cases:
     execution_success: true
   expectations:
     expected_facts:
-    - "Project is created with w.postgres.create_project() using ProjectSpec"
-    - "create_project returns a long-running operation that requires .wait()"
-    - "Production branch and primary endpoint (ep-primary) are created automatically with the project"
-    - "Autoscaling is configured via update_endpoint with FieldMask"
+    - "Project is created with 'databricks postgres create-project'"
+    - "The CLI blocks until project creation completes"
+    - "Production branch and a read-write endpoint named 'primary' are created automatically with the project"
+    - "Autoscaling is configured via 'databricks postgres update-endpoint' with positional mask"
     - "Scale-to-zero is set via suspend_timeout_seconds (300 = 5 minutes)"
-    - "Production branch is protected using update_branch with is_protected=True"
-    - "Dev branch is created with create_branch using a TTL Duration for 7-day expiration"
+    - "Production branch is protected using 'databricks postgres update-branch'"
+    - "Dev branch is created with 'databricks postgres create-branch' using 7-day TTL (604800s)"
     - "OAuth tokens are generated via generate_database_credential()"
     - "Connectivity is verified by running SELECT version() over psycopg"
     - "CREATE DATABASE requires autocommit=True on the psycopg connection"
     - "All connection strings must include sslmode=require"
     expected_patterns:
-    - pattern: "create_project"
+    - pattern: "databricks postgres create-project"
       min_count: 1
-      description: "Uses create_project() to create the Lakebase project"
-    - pattern: "update_endpoint"
+      description: "Uses CLI create-project command"
+    - pattern: "databricks postgres update-endpoint"
       min_count: 1
-      description: "Uses update_endpoint() to configure autoscaling"
+      description: "Uses CLI update-endpoint to configure autoscaling"
     - pattern: "autoscaling_limit_min_cu"
       min_count: 1
       description: "Sets minimum autoscaling CU"
@@ -467,10 +429,10 @@ test_cases:
     - pattern: "is_protected"
       min_count: 1
       description: "Protects the production branch"
-    - pattern: "create_branch"
+    - pattern: "databricks postgres create-branch"
       min_count: 1
-      description: "Creates the dev branch"
-    - pattern: "Duration\\(seconds=604800\\)"
+      description: "Uses CLI create-branch for the dev branch"
+    - pattern: "604800s"
       min_count: 1
       description: "Sets 7-day TTL on dev branch"
     - pattern: "CREATE DATABASE support_db"
@@ -480,11 +442,11 @@ test_cases:
     - "Must create the project with display_name='Support Autoscale' and pg_version='17'"
     - "Must configure autoscaling with min 0 CU and max 2.0 CU"
     - "Must enable scale-to-zero with a 5-minute (300 second) timeout"
-    - "Must protect the production branch using update_branch"
+    - "Must protect the production branch using update-branch"
     - "Must create a dev branch from production with 7-day TTL expiration"
     - "Must create a database named support_db using standard Postgres DDL"
     - "Must include sslmode=require in connection strings"
-    - "Must use FieldMask for all update operations"
+    - "Must use positional mask argument in update-endpoint and update-branch"
   metadata:
     category: happy_path
     difficulty: hard
@@ -523,13 +485,13 @@ test_cases:
 
       # Get production endpoint for the support-autoscale project
       endpoint = w.postgres.get_endpoint(
-          name="projects/support-autoscale/branches/production/endpoints/ep-primary"
+          name="projects/support-autoscale/branches/production/endpoints/primary"
       )
       host = endpoint.status.hosts.host
 
       # Generate OAuth credential scoped to this endpoint
       cred = w.postgres.generate_database_credential(
-          endpoint="projects/support-autoscale/branches/production/endpoints/ep-primary"
+          endpoint="projects/support-autoscale/branches/production/endpoints/primary"
       )
 
       # Connect to support_db on the production branch
@@ -640,7 +602,7 @@ test_cases:
     execution_success: true
   expectations:
     expected_facts:
-    - "Connection uses w.postgres.get_endpoint() and generate_database_credential() for Autoscale"
+    - "Connection uses get-endpoint and generate-database-credential to get host and OAuth token"
     - "Connects to support_db via dbname=support_db in the connection string"
     - "autocommit must be True for DDL statements"
     - "Creates a support schema with CREATE SCHEMA IF NOT EXISTS"
@@ -654,12 +616,12 @@ test_cases:
     - "Verification queries information_schema.columns and pg_indexes"
     - "sslmode=require is used in the connection string"
     expected_patterns:
-    - pattern: "get_endpoint"
+    - pattern: "get.endpoint"
       min_count: 1
-      description: "Gets endpoint details for connection host"
-    - pattern: "generate_database_credential"
+      description: "Gets endpoint details for connection host (CLI or SDK)"
+    - pattern: "generate.database.credential"
       min_count: 1
-      description: "Generates OAuth token for authentication"
+      description: "Generates OAuth token for authentication (CLI or SDK)"
     - pattern: "support_db"
       min_count: 1
       description: "Connects to the support_db database"
@@ -696,9 +658,9 @@ test_cases:
     - pattern: "information_schema"
       min_count: 1
       description: "Verifies schema using information_schema"
-    - pattern: "WorkspaceClient"
+    - pattern: "sslmode=require"
       min_count: 1
-      description: "Uses WorkspaceClient for SDK access"
+      description: "Requires SSL for the connection"
     guidelines:
     - "Must connect to support_db, not the default databricks_postgres"
     - "Must use autocommit=True for DDL execution"
@@ -709,7 +671,7 @@ test_cases:
     - "Must include CHECK constraints on membership_tier, status, and quantity"
     - "Must create all 5 requested indexes including the composite index"
     - "Must verify the schema using information_schema queries"
-    - "Must use Autoscale connection pattern (w.postgres, not w.database)"
+    - "Must use Lakebase connection pattern: get-endpoint + generate-database-credential + sslmode=require"
   metadata:
     category: happy_path
     difficulty: hard
@@ -756,12 +718,12 @@ test_cases:
       w = WorkspaceClient()
 
       endpoint = w.postgres.get_endpoint(
-          name="projects/support-autoscale/branches/production/endpoints/ep-primary"
+          name="projects/support-autoscale/branches/production/endpoints/primary"
       )
       host = endpoint.status.hosts.host
 
       cred = w.postgres.generate_database_credential(
-          endpoint="projects/support-autoscale/branches/production/endpoints/ep-primary"
+          endpoint="projects/support-autoscale/branches/production/endpoints/primary"
       )
 
       conn_string = (
@@ -884,7 +846,7 @@ test_cases:
   expectations:
     expected_facts:
     - "psycopg is installed via uv pip install with pip as fallback"
-    - "Connection uses Autoscale pattern: w.postgres.get_endpoint() and generate_database_credential()"
+    - "Connection uses get-endpoint and generate-database-credential to get host and OAuth token"
     - "Connects to support_db, not the default databricks_postgres"
     - "autocommit must be True for DDL statements"
     - "support_cases has nullable FK order_id (not all cases relate to an order)"
@@ -903,12 +865,12 @@ test_cases:
     - pattern: "pip.*install.*psycopg"
       min_count: 1
       description: "Falls back to pip for psycopg install"
-    - pattern: "get_endpoint"
+    - pattern: "get.endpoint"
       min_count: 1
-      description: "Gets endpoint details for connection host"
-    - pattern: "generate_database_credential"
+      description: "Gets endpoint details for connection host (CLI or SDK)"
+    - pattern: "generate.database.credential"
       min_count: 1
-      description: "Generates OAuth token for authentication"
+      description: "Generates OAuth token for authentication (CLI or SDK)"
     - pattern: "sslmode=require"
       min_count: 1
       description: "Requires SSL for the connection"

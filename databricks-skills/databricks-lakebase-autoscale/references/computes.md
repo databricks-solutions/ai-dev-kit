@@ -4,7 +4,7 @@ Deep dive for Endpoints (computes). Basic CLI is in [SKILL.md](../SKILL.md).
 
 ## What an Endpoint Is
 
-An endpoint is a Postgres server instance attached to one branch. Each branch has exactly one R/W endpoint (conventionally `ep-primary`) and may have additional read-only replicas. The endpoint owns the hostname clients connect to and the CU budget that determines concurrency and RAM.
+An endpoint is a Postgres server instance attached to one branch. Each branch has exactly one R/W endpoint (named `primary` by default) and may have additional read-only replicas. The endpoint owns the hostname clients connect to and the CU budget that determines concurrency and RAM.
 
 ## Compute Units
 

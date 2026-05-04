@@ -13,6 +13,8 @@ dependencies = [
     "mlflow[databricks]>=3.10.1",
     "protobuf>=5.26",
     "python-dotenv>=1.0.0",
+    "claude-agent-sdk>=0.1.39",
+    "gepa>=0.1.0",
 ]
 
 [project.optional-dependencies]

@@ -144,6 +144,21 @@ Token TTL is ~1 hour. For app deployment, store **only the endpoint path** as co
 
 Application code is the one place to use the SDK — tokens expire hourly and must be refreshed in-process.
 
+```python
+# Application code — refresh token every 45 min:
+import psycopg
+from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+ep = "projects/my-app/branches/production/endpoints/primary"
+host = w.postgres.get_endpoint(name=ep).status.hosts.host
+token = w.postgres.generate_database_credential(endpoint=ep).token
+conn = psycopg.connect(
+    f"host={host} dbname=databricks_postgres "
+    f"user={w.current_user.me().user_name} password={token} sslmode=require"
+)
+```
+
 → Runtime connection patterns (minimal SDK snippet, SQLAlchemy pooling, async refresh loop, macOS DNS workaround, static-URL local dev): [connection-patterns.md](references/connection-patterns.md).
 
 ---
