@@ -233,33 +233,42 @@ test_cases:
   outputs:
     response: |
       ```bash
-      # Create a project
-      databricks postgres create-project \
-          --project-id my-app \
+      # Create a project (PROJECT_ID is a positional argument)
+      databricks postgres create-project my-app \
           --json '{"spec": {"display_name": "My App", "pg_version": "17"}}'
 
-      # List projects
+      # List / get projects
       databricks postgres list-projects
-
-      # Get project details
       databricks postgres get-project projects/my-app
 
-      # Create a branch
+      # Create a branch (TTL in seconds; use no_expiry: true for permanent)
       databricks postgres create-branch projects/my-app development \
-          --json '{"spec": {"source_branch": "projects/my-app/branches/production", "no_expiry": true}}'
+          --json '{"spec": {"source_branch": "projects/my-app/branches/production", "ttl": "604800s"}}'
 
       # List branches
       databricks postgres list-branches projects/my-app
 
-      # Delete a project
+      # Resize endpoint compute
+      databricks postgres update-endpoint \
+          projects/my-app/branches/production/endpoints/primary \
+          "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu" \
+          --json '{"spec": {"autoscaling_limit_min_cu": 2.0, "autoscaling_limit_max_cu": 8.0}}'
+
+      # Generate OAuth credential for connecting
+      databricks postgres generate-database-credential \
+          projects/my-app/branches/production/endpoints/primary
+
+      # Delete a project (irreversible)
       databricks postgres delete-project projects/my-app
       ```
     execution_success: true
   expectations:
     expected_facts:
-    - "Lakebase Autoscale CLI commands are under databricks postgres"
-    - "Project creation uses --json for the spec configuration"
-    - "Resource names follow the pattern projects/{id}/branches/{id}/endpoints/{id}"
+    - "All Lakebase Autoscale CLI commands are under 'databricks postgres'"
+    - "The project ID is a positional argument to create-project, not a flag"
+    - "Spec is passed as --json for create and update commands"
+    - "Resource names follow the hierarchical path: projects/{id}/branches/{id}/endpoints/{id}"
+    - "update-endpoint takes the field mask as a positional argument before --json"
     expected_patterns:
     - pattern: "databricks postgres create-project"
       min_count: 1
@@ -270,9 +279,16 @@ test_cases:
     - pattern: "databricks postgres create-branch"
       min_count: 1
       description: "Shows branch creation command"
+    - pattern: "databricks postgres.*endpoint"
+      min_count: 1
+      description: "Shows endpoint management command"
+    - pattern: "generate-database-credential"
+      min_count: 1
+      description: "Shows credential generation for connecting"
     guidelines:
-    - "Must show at least 4 different CLI subcommands"
-    - "Must include both project and branch management commands"
+    - "Must show at least 5 different CLI subcommands covering projects, branches, endpoints, and credentials"
+    - "Must not use --project-id flag; project ID is always a positional argument"
+    - "Must show the correct positional field-mask syntax for update-endpoint"
   metadata:
     category: happy_path
     difficulty: easy
