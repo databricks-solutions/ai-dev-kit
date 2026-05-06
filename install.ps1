@@ -69,6 +69,7 @@ $script:ScopeExplicit = $false  # Track if --global was explicitly passed
 $script:InstallMcp   = $false
 $script:InstallSkills = $true
 $script:Force        = $false
+$script:ForceExplicit = $false
 $script:Silent       = $false
 $script:UserTools    = ""
 $script:Tools        = ""
@@ -225,7 +226,7 @@ while ($i -lt $args.Count) {
         { $_ -in "--list-skills", "-ListSkills" } { $script:ListSkills = $true; $i++ }
         { $_ -in "--experimental", "-Experimental" } { $script:Channel = "experimental"; $i++ }
         { $_ -in "-b", "--branch", "-Branch" }  { $Branch = $args[$i + 1]; $script:BranchExplicit = $true; $i += 2 }
-        { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
+        { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $script:ForceExplicit = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
             Write-Host ""
@@ -276,8 +277,20 @@ if ($script:Channel -eq "experimental" -and -not $script:BranchExplicit) {
     $Branch = "experimental"
 }
 
+# Experimental installs default to Force=true (always refresh the cached repo)
+# unless the user explicitly passed --force.
+if ($script:Channel -eq "experimental" -and -not $script:ForceExplicit) {
+    $script:Force = $true
+}
+
 # Set raw URL after branch resolution
 $RawUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
+
+# Keep stable and experimental clones in separate directories so they don't clobber each other
+if ($script:Channel -eq "experimental") {
+    $RepoDir  = Join-Path $InstallDir "experimental-repo"
+    $McpEntry = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
+}
 
 # ─── Interactive helpers ──────────────────────────────────────
 
@@ -702,7 +715,8 @@ function Invoke-PromptMcpPath {
     }
 
     # Update derived paths
-    $script:RepoDir    = Join-Path $script:InstallDir "repo"
+    $repoSubdir = if ($script:Channel -eq "experimental") { "experimental-repo" } else { "repo" }
+    $script:RepoDir    = Join-Path $script:InstallDir $repoSubdir
     $script:VenvDir    = Join-Path $script:InstallDir ".venv"
     $script:VenvPython = Join-Path $script:VenvDir "Scripts\python.exe"
     $script:McpEntry   = Join-Path $script:RepoDir "databricks-mcp-server\run_server.py"
@@ -2121,7 +2135,21 @@ function Invoke-Main {
     # Setup MCP server
     if ($script:InstallMcp) {
         Install-McpServer
-    } elseif (-not (Test-Path $script:RepoDir)) {
+    } elseif (Test-Path (Join-Path $script:RepoDir ".git")) {
+        # Repo already exists — refresh it when Force is true, otherwise leave as-is
+        if ($script:Force) {
+            Write-Step "Refreshing sources"
+            $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            & git -C $script:RepoDir fetch -q --depth 1 origin $Branch 2>&1 | Out-Null
+            & git -C $script:RepoDir reset --hard FETCH_HEAD 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Remove-Item -Recurse -Force $script:RepoDir -ErrorAction SilentlyContinue
+                & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
+            }
+            $ErrorActionPreference = $prevEAP
+            Write-Ok "Repository refreshed ($Branch)"
+        }
+    } else {
         Write-Step "Downloading sources"
         if (-not (Test-Path $script:InstallDir)) {
             New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
