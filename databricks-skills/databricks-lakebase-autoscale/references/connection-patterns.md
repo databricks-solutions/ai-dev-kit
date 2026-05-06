@@ -1,6 +1,6 @@
 # Lakebase Autoscaling — Connection Patterns (deep dive)
 
-Deep dive for the application-runtime connection layer. Basic credential generation and a minimal Python snippet are in [SKILL.md](SKILL.md#credentials--connecting).
+Deep dive for the application-runtime connection layer. Basic credential generation and a minimal Python snippet are in [SKILL.md](../SKILL.md#credentials--connecting).
 
 **Why this file uses the SDK and the others don't.** OAuth tokens are 1-hour TTL and must be refreshed from inside the running process — shelling out to the CLI per refresh is slow, fragile, and awkward to embed in a pool. All admin operations (project, branch, endpoint, synced-table lifecycle) stay on the CLI; only runtime token rotation and connection pooling live here.
 
@@ -105,7 +105,7 @@ class LakebaseAutoscaleConnectionManager:
         database_name: str = "databricks_postgres",
         pool_size: int = 5,
         max_overflow: int = 10,
-        token_refresh_seconds: int = 3000  # 50 minutes
+        token_refresh_seconds: int = 2700  # 45 minutes
     ):
         self.project_id = project_id
         self.branch_id = branch_id
@@ -308,9 +308,47 @@ conn = psycopg.connect(**conn_params)
 ## Best Practices
 
 1. **Always use SSL**: Set `sslmode=require` in all connections
-2. **Implement token refresh**: Tokens expire after 1 hour; refresh at 50 minutes
+2. **Implement token refresh**: Tokens expire after 1 hour; refresh every 45 minutes
 3. **Use connection pooling**: Avoid creating new connections per request
 4. **Handle DNS issues on macOS**: Use the `hostaddr` workaround if needed
 5. **Close connections properly**: Use context managers or explicit cleanup
-6. **Handle scale-to-zero wake-up**: First connection after idle may take 2-5 seconds
+6. **Handle scale-to-zero wake-up**: First connection after idle may take ~100ms; implement retry logic
 7. **Log token refresh events**: Helps debug authentication issues
+
+## Data API (Autoscaling only)
+
+A PostgREST-compatible HTTP CRUD interface — no Postgres driver required. Enable in the project UI (auto-creates an `authenticator` role and `pgrst` schema).
+
+All requests require a Databricks OAuth bearer token:
+
+```bash
+TOKEN=$(databricks postgres generate-database-credential \
+    projects/my-app/branches/production/endpoints/primary | jq -r '.token')
+DATA_API_URL="https://<workspace-host>/api/2.0/lakebase/projects/my-app/data"
+```
+
+```bash
+# GET — filter, paginate, order
+curl -H "Authorization: Bearer $TOKEN" \
+    "$DATA_API_URL/public/users?age=gt.21&limit=10&order=created_at.desc"
+
+# POST — insert
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Alice", "email": "alice@example.com"}' \
+    "$DATA_API_URL/public/users"
+
+# PATCH — update (filter is required)
+curl -X PATCH -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"status": "active"}' \
+    "$DATA_API_URL/public/users?id=eq.42"
+
+# DELETE — filter is required
+curl -X DELETE -H "Authorization: Bearer $TOKEN" \
+    "$DATA_API_URL/public/users?id=eq.42"
+```
+
+**Row-level security** with `current_user` policies is strongly recommended for multi-tenant apps.
+
+**Unsupported:** computed relationships, inner-join embedding, custom media types, transaction control headers, EXPLAIN/trace, pre-request functions, PostGIS auto-GeoJSON.

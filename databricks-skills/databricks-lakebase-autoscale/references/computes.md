@@ -1,10 +1,10 @@
 # Lakebase Autoscaling — Computes (deep dive)
 
-Deep dive for Endpoints (computes). Basic CLI is in [SKILL.md](SKILL.md).
+Deep dive for Endpoints (computes). Basic CLI is in [SKILL.md](../SKILL.md).
 
 ## What an Endpoint Is
 
-An endpoint is a Postgres server instance attached to one branch. Each branch has exactly one R/W endpoint (conventionally `ep-primary`) and may have additional read-only replicas. The endpoint owns the hostname clients connect to and the CU budget that determines concurrency and RAM.
+An endpoint is a Postgres server instance attached to one branch. Each branch has exactly one R/W endpoint (named `primary` by default) and may have additional read-only replicas. The endpoint owns the hostname clients connect to and the CU budget that determines concurrency and RAM.
 
 ## Compute Units
 
@@ -27,12 +27,12 @@ Max connections flattens at 4,000 above 32 CU — scale up past 32 CU for memory
 
 | Category | Range | Behavior |
 |----------|-------|----------|
-| Autoscale | 0.5-32 CU | Dynamic scaling; `max − min ≤ 8 CU` |
+| Autoscale | 0.5-32 CU | Dynamic scaling; `max − min ≤ 16 CU` |
 | Large fixed | 36-112 CU | Fixed size, no autoscaling |
 
-**Autoscaling window constraint.** The spread between `autoscaling_limit_min_cu` and `autoscaling_limit_max_cu` cannot exceed 8 CU:
-- Valid: 4-8, 8-16, 16-24
-- Invalid: 0.5-32 (31.5 CU spread), 0.5-16 (15.5 CU spread)
+**Autoscaling window constraint.** The spread between `autoscaling_limit_min_cu` and `autoscaling_limit_max_cu` cannot exceed 16 CU:
+- Valid: .5-4, 4-20, 8-32
+- Invalid: 0.5-32 (31.5 CU spread), 1-24 (23 CU spread)
 
 Set the minimum high enough to keep your working set in memory — traffic that lands after a scale-up pays a cache-warm penalty until hot pages are faulted back in.
 
@@ -47,7 +47,7 @@ When enabled, an endpoint suspends after an inactivity window (min 60 s, default
 
 ### Wake-up
 
-Incoming connections to a suspended endpoint trigger reactivation. Expected latency is a few hundred ms, but:
+Incoming connections to a suspended endpoint trigger reactivation. Expected latency is ~100ms, but:
 - First connection may see a timeout — applications must retry.
 - Endpoint resumes at the **minimum** of its autoscaling range; expect cache-cold performance until load ramps up.
 - All session-scoped state is lost: in-memory stats, temp tables, prepared statements, session GUCs, active transactions.
@@ -92,6 +92,20 @@ databricks postgres update-endpoint \
     "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu" \
     --json '{"spec": {"autoscaling_limit_min_cu": 64.0, "autoscaling_limit_max_cu": 64.0}}'
 ```
+
+## High Availability
+
+HA adds 1–3 read secondaries across availability zones with automatic failover (hot standby, automatic primary promotion on failure).
+
+**Secondaries vs. read replicas:**
+- **HA secondaries** share a `-ro` hostname suffix and floor at the primary's current CU. Use for failover with optional read offload.
+- **Read replicas** are separate endpoints (`ENDPOINT_TYPE_READ_ONLY`) with independent sizing. Use for dedicated read scaling.
+
+**HA constraints:**
+- Scale-to-zero is **not supported** with HA enabled.
+- Autoscaling spread limit (≤16 CU) still applies.
+- Secondaries autoscale independently but won't drop below the primary's current minimum.
+- Total compute instances per project: 2–4 (primary + 1–3 secondaries).
 
 ## Sizing Guidance
 
