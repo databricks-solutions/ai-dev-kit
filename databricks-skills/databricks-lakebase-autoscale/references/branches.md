@@ -1,6 +1,6 @@
 # Lakebase Autoscaling — Branches (deep dive)
 
-Deep dive for the Branches concept. Basic CLI is in [SKILL.md](SKILL.md).
+Deep dive for the Branches concept. Basic CLI is in [SKILL.md](../SKILL.md).
 
 ## How Branching Works
 

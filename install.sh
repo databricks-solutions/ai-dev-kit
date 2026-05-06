@@ -65,8 +65,10 @@ CHANNEL="${DEVKIT_CHANNEL:-stable}"  # stable or experimental
 OWNER="databricks-solutions"
 REPO="ai-dev-kit"
 
+BRANCH_EXPLICIT=false
 if [ -n "${DEVKIT_BRANCH:-}" ]; then
   BRANCH="$DEVKIT_BRANCH"
+  BRANCH_EXPLICIT=true
 else
   BRANCH="$(
     curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" \
@@ -136,7 +138,7 @@ while [ $# -gt 0 ]; do
     case $1 in
         -p|--profile)     PROFILE="$2"; shift 2 ;;
         -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
-        -b|--branch)      BRANCH="$2"; shift 2 ;;
+        -b|--branch)      BRANCH="$2"; BRANCH_EXPLICIT=true; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; shift ;;
         --mcp-path)       USER_MCP_PATH="$2"; MCP_INSTALL_PATH="$2"; INSTALL_MCP=true; shift 2 ;;
@@ -257,6 +259,12 @@ if [ "${LIST_SKILLS:-false}" = true ]; then
     echo -e "${D}       bash install.sh --skills databricks-jobs,databricks-dbsql${N}"
     echo ""
     exit 0
+fi
+
+# If experimental channel is selected and branch wasn't explicitly overridden,
+# install skills from the experimental branch instead of the latest release.
+if [ "$CHANNEL" = "experimental" ] && [ "$BRANCH_EXPLICIT" != true ]; then
+    BRANCH="experimental"
 fi
 
 # Set configuration URLs after parsing branch argument
@@ -1966,6 +1974,7 @@ prompt_channel() {
         [ "$PROFILE" != "DEFAULT" ] && args="$args --profile $PROFILE"
         [ "$INSTALL_MCP" = false ] && args="$args --skills-only"
         [ "$INSTALL_SKILLS" = false ] && args="$args --mcp-only"
+        [ "$BRANCH_EXPLICIT" = true ] && args="$args --branch $BRANCH"
 
         # Download and execute the experimental installer
         exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") $args

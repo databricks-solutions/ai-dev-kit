@@ -292,7 +292,9 @@ def _get_agent_env() -> dict[str, str]:
                 file_env = settings.get("env", {})
                 for k, v in file_env.items():
                     if isinstance(v, str):
-                        env[k] = _resolve_env_refs(v)
+                        resolved = _resolve_env_refs(v)
+                        if resolved:  # Skip empty values so Claude Code falls back to keychain/token-cache auth
+                            env[k] = resolved
                 logger.info("Loaded agent env from %s (%d vars)", p, len(file_env))
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("Failed to load %s: %s", p, e)
