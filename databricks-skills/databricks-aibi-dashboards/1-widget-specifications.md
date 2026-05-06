@@ -198,7 +198,7 @@ Format types: `number`, `number-currency`, `number-percent`
 
 - `version`: **3**
 - `widgetType`: "line" or "bar"
-- Use `x`, `y`, optional `color` encodings
+- **`x` and `y` are both REQUIRED** (one categorical/temporal dimension + one quantitative measure). `color` is optional for splitting into series.
 - `scale.type`: `"temporal"` (dates), `"quantitative"` (numbers), `"categorical"` (strings)
 - Use `"disaggregated": true` with pre-aggregated dataset data
 

@@ -210,7 +210,7 @@ Apply unless user specifies otherwise:
 - **Global date filter**: When data has temporal columns, add a date range filter. Most dashboards need time-based filtering.
 - **KPI time bounds**: Use time-bounded metrics that enable period comparison (MoM, YoY). Unbounded "all-time" totals are less actionable.
 - **Value formatting**: Format values based on their meaning — currency with symbol, percentages with %, large numbers compacted (K/M/B).
-- **Chart selection**: Match cardinality to chart type. Few distinct values → pie/bar with color grouping; many values → table.
+- **Chart selection**: Match cardinality to chart type. Few distinct values → bar with color grouping (or pie if you really want a snapshot); many values → table.
 
 ## Reference Files
 
