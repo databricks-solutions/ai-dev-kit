@@ -174,6 +174,50 @@ AS \$\$
 "
 ```
 
+> **Avoiding heredoc escaping**: the `\$\$` token-quoting above is fragile (it interacts with bash variable expansion, sed, and JSON encoding). For long DDL, prefer the Statement Execution API which takes the SQL as a JSON string:
+>
+> ```bash
+> databricks api post /api/2.0/sql/statements --json '{
+>   "warehouse_id": "WAREHOUSE_ID",
+>   "statement": "CREATE OR REPLACE VIEW catalog.schema.orders_metrics WITH METRICS LANGUAGE YAML AS $$\nversion: 1.1\nsource: catalog.schema.orders\ndimensions:\n  - name: Order Month\n    expr: DATE_TRUNC(MONTH, order_date)\nmeasures:\n  - name: Total Revenue\n    expr: SUM(total_price)\n$$"
+> }'
+> ```
+>
+> JSON-escaped strings are easier to template programmatically than shell heredocs.
+
+### Convert an Existing View to a Metric View
+
+To migrate a regular view to a metric view, treat its `SELECT` source as the metric view's `source`, then promote `GROUP BY` columns to `dimensions` and aggregations to `measures`. The new metric view does not replace the original — it sits alongside it as a governed metric layer.
+
+```sql
+-- Existing regular view (keep as-is or drop later)
+-- CREATE VIEW catalog.schema.orders_summary AS
+-- SELECT DATE_TRUNC('MONTH', order_date) AS month,
+--        SUM(total_price) AS revenue,
+--        COUNT(*) AS order_count
+-- FROM catalog.schema.orders
+-- GROUP BY 1;
+
+-- Equivalent metric view (new artifact, governed)
+CREATE OR REPLACE VIEW catalog.schema.orders_metrics
+WITH METRICS
+LANGUAGE YAML
+AS $$
+  version: 1.1
+  source: catalog.schema.orders
+  dimensions:
+    - name: Order Month
+      expr: DATE_TRUNC('MONTH', order_date)
+  measures:
+    - name: Revenue
+      expr: SUM(total_price)
+    - name: Order Count
+      expr: COUNT(1)
+$$
+```
+
+After verifying parity (`SELECT ... FROM <orders_metrics>` returns the same numbers as the original view), update downstream consumers and drop the original view.
+
 ## YAML Spec Quick Reference
 
 ```yaml
