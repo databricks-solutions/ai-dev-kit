@@ -297,4 +297,4 @@ Load these for detailed syntax, full parameter lists, and advanced patterns:
 - **Star schema in Gold layer** for BI; OBT acceptable in Silver
 - **Define PK/FK constraints** on dimensional models for query optimization
 - **Use `COLLATE UTF8_LCASE`** for user-facing string columns that need case-insensitive search
-- **Test SQL via CLI** (`databricks experimental aitools tools query`) or notebooks before deploying
+- **Test SQL via CLI** (`databricks experimental aitools tools query`) or notebooks before deploying. If `--warehouse` is rejected on your CLI version, set `DATABRICKS_WAREHOUSE_ID` in the environment instead.
