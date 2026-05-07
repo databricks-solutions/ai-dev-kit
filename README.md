@@ -116,11 +116,12 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
   - [Copilot](https://github.com/features/copilot/cli)
   - [Windsurf](https://windsurf.com)
   - [OpenCode](https://opencode.ai)
+  - [Kiro](https://kiro.dev)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, or opencode.json_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, .kiro, or opencode.json_
 
 #### Mac / Linux
 
