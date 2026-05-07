@@ -108,12 +108,16 @@ Before writing JSON, plan your dashboard:
 3. **What filters?** For each filter, verify ALL datasets you want filtered contain the filter field.
    > **Filters only affect datasets that have the filter field.** A pre-aggregated table without dates WON'T be date-filtered.
 
-4. **Write JSON locally** as a file.
+4. **Build the dashboard JSON** as a local working file (intermediate step, not the deliverable).
 
-### Step 5: Dashboard Lifecycle
-Once created, you can edit the file as following:
+### Step 5: Deploy
+
+**Now deploy the JSON to the workspace.** Run `databricks lakeview create` (below). Your task is not complete until this command succeeds and returns a dashboard ID — the JSON file alone is an intermediate working artifact.
+
+After deploying, the same `lakeview` subcommands manage the dashboard's lifecycle (list, get, update, publish, trash).
+
 ```bash
-# Create a dashboard
+# Deploy: creates the dashboard in the workspace and returns a dashboard ID
 # IMPORTANT: Use --dataset-catalog and --dataset-schema to set the catalog/schema for all queries
 # Queries in the JSON MUST use bare table names only (e.g., "FROM trips"),
 # NOT "FROM schema.trips" and NOT "FROM catalog.schema.trips".
