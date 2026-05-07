@@ -10,13 +10,66 @@
 > For full third-party attribution, see NOTICE.txt.
 ---
 
-## Overview
+## AI-Assisted Development on Databricks
 
-AI-Driven Development (vibe coding) on Databricks just got a whole lot better. The **AI Dev Kit** gives your AI coding assistant (Claude Code, Cursor, Antigravity, Windsurf, etc.) the trusted sources it needs to build faster and smarter on Databricks.
+Databricks offers two paths for AI-assisted coding. Choose the one that matches your environment.
 
-<p align="center">
-  <img src="databricks-tools-core/docs/architecture.svg" alt="Architecture" width="700">
-</p>
+<table>
+<tr>
+<td width="50%" align="center" valign="top">
+
+<br>
+
+<img src="https://img.shields.io/badge/Genie_Code-1B3139?style=for-the-badge&logo=databricks&logoColor=FF3621" alt="Genie Code" height="42">
+
+<br><br>
+
+**Free, first-party AI coding inside Databricks**
+
+Built into every Databricks workspace at no extra cost, with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks.
+
+</td>
+<td width="50%" align="center" valign="top">
+
+<br>
+
+<img src="https://img.shields.io/badge/AI_Dev_Kit-FF3621?style=for-the-badge&logo=databricks&logoColor=white" alt="AI Dev Kit" height="42">
+
+<br><br>
+
+**Databricks expertise, in the editor you already use**
+
+Curated by Databricks field experts. Brings the patterns, skills, and 75+ executable tools your AI assistant needs to build on Databricks — wherever you're already coding.
+
+<br>
+
+<img src="https://img.shields.io/badge/Claude_Code-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude Code">
+<img src="https://img.shields.io/badge/Cursor-000000?style=flat-square&logo=cursor&logoColor=white" alt="Cursor">
+<img src="https://img.shields.io/badge/Codex-412991?style=flat-square&logo=openai&logoColor=white" alt="Codex">
+<img src="https://img.shields.io/badge/Gemini-1B72E8?style=flat-square&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+<img src="https://img.shields.io/badge/Copilot-000000?style=flat-square&logo=github&logoColor=white" alt="GitHub Copilot">
+<br>
+<sub>+ Antigravity · Windsurf · OpenCode · and more!</sub>
+
+</td>
+</tr>
+<tr>
+<td align="center">
+
+<a href="https://docs.databricks.com/aws/en/genie-code/"><img src="https://img.shields.io/badge/Learn_more-→-1B3139?style=for-the-badge" alt="Learn more" height="36"></a>
+
+<br>
+
+</td>
+<td align="center">
+
+<a href="#install-in-existing-project"><img src="https://img.shields.io/badge/Get_started-→-FF3621?style=for-the-badge" alt="Get started" height="36"></a>
+
+<br>
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -220,6 +273,14 @@ Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/inst
 After the script successfully installs the skills to your workspace, you may find the skills under `/Workspace/Users/<your_user_name>/.assistant/skills`.
 
 This directory is customizable if you wish to only use certain skills or even create custom skills that are related to your organization to make Genie Code even better.  You can modify/remove existing skills or create new skills folders that Genie Code will automatically use in any session.
+
+## Architecture
+
+The AI Dev Kit ships as four composable pieces — install the whole kit, or pick just the parts you need.
+
+<p align="center">
+  <img src="databricks-tools-core/docs/architecture.svg" alt="Architecture" width="700">
+</p>
 
 ## What's Included
 
