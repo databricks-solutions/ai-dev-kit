@@ -14,15 +14,15 @@ A dashboard should be showing something relevant for a human, typically some KPI
 | Task | Command |
 |------|---------|
 | List warehouses | `databricks warehouses list` |
-| List tables | `databricks experimental aitools tools query --warehouse WH "SHOW TABLES IN catalog.schema"` |
+| List tables | `databricks experimental aitools tools query "SHOW TABLES IN catalog.schema"` |
 | Get schema | `databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2` |
-| Test query | `databricks experimental aitools tools query --warehouse WH "SELECT..."` |
+| Test query | `databricks experimental aitools tools query "SELECT..."` |
 | Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "Y" --dataset-catalog "catalog" --dataset-schema "schema" --serialized-dashboard "$(cat file.json)"` (always set `--dataset-catalog` and `--dataset-schema` — queries must use bare table names only to support install on different catalog.schema) |
 | Update dashboard | `databricks lakeview update DASHBOARD_ID --serialized-dashboard "$(cat file.json)"` |
 | Publish | `databricks lakeview publish DASHBOARD_ID --warehouse-id WH` |
 | Delete | `databricks lakeview trash DASHBOARD_ID` |
 
-> **`--warehouse` flag**: if `databricks experimental aitools tools query --warehouse WH "..."` fails with `unknown flag: --warehouse` on your CLI version, set `DATABRICKS_WAREHOUSE_ID=WH` in the environment instead and drop the flag — the command auto-picks it from there.
+> `databricks experimental aitools tools query` auto-picks an available warehouse; set `DATABRICKS_WAREHOUSE_ID` to override.
 
 ---
 
@@ -59,7 +59,7 @@ Use `discover-schema` as the default — one call returns columns, types, sample
 
 `databricks experimental aitools tools discover-schema catalog.schema.orders catalog.schema.customers`
 
-Sample rows alone don't tell you what to build. you can write aggregate SQL through `databricks experimental aitools tools query --warehouse <WH> "..."` to probe typically:
+Sample rows alone don't tell you what to build. you can write aggregate SQL through `databricks experimental aitools tools query "..."` to probe typically:
 
 - **Cardinality** of candidate grouping columns → decides chart color-group vs. table (≤8 distinct values for charts, see Cardinality & Readability below).
 - **Top categorical values** → populates filter options and chart legends meaningfully.

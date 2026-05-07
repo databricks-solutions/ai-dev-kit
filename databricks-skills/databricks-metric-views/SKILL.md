@@ -31,7 +31,7 @@ Before authoring a metric view, inspect the source tables. Use `discover-schema`
 
 `databricks experimental aitools tools discover-schema catalog.schema.orders catalog.schema.customers`
 
-For dimensions and measures, probe distribution beyond sampling — cardinality of candidate dimensions, min/max/percentiles for measures, top categorical values. Write aggregate SQL through `databricks experimental aitools tools query --warehouse <WH> "..."`. Both commands auto-pick the default warehouse; set `DATABRICKS_WAREHOUSE_ID` or pass `--warehouse <ID>` to override.
+For dimensions and measures, probe distribution beyond sampling — cardinality of candidate dimensions, min/max/percentiles for measures, top categorical values. Write aggregate SQL through `databricks experimental aitools tools query "..."`. Both commands auto-pick the default warehouse; set `DATABRICKS_WAREHOUSE_ID` to override.
 
 ### Create a Metric View
 
@@ -156,8 +156,8 @@ DROP VIEW IF EXISTS catalog.schema.orders_metrics;
 ### CLI Execution
 
 ```bash
-# Execute SQL via CLI
-databricks experimental aitools tools query --warehouse WAREHOUSE_ID "
+# Execute SQL via CLI (set DATABRICKS_WAREHOUSE_ID to pick a specific warehouse, otherwise auto-detected)
+databricks experimental aitools tools query "
 CREATE OR REPLACE VIEW catalog.schema.orders_metrics
 WITH METRICS
 LANGUAGE YAML
