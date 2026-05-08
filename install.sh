@@ -2,7 +2,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Windsurf.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
 #
 # Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
@@ -165,7 +165,7 @@ while [ $# -gt 0 ]; do
             echo "  --mcp-only            Skip skills installation"
             echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
-            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode"
+            echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
@@ -698,6 +698,7 @@ detect_tools() {
     local has_antigravity=false
     local has_windsurf=false
     local has_opencode=false
+    local has_kiro=false
 
     command -v claude >/dev/null 2>&1 && has_claude=true
     { [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1; } && has_cursor=true
@@ -707,10 +708,11 @@ detect_tools() {
     { [ -d "/Applications/Antigravity.app" ] || command -v antigravity >/dev/null 2>&1; } && has_antigravity=true
     { [ -d "/Applications/Windsurf.app" ] || command -v windsurf >/dev/null 2>&1; } && has_windsurf=true
     command -v opencode >/dev/null 2>&1 && has_opencode=true
+    { [ -d "/Applications/Kiro.app" ] || command -v kiro >/dev/null 2>&1; } && has_kiro=true
 
     # Build checkbox items: "Label|value|on_or_off|hint"
-    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" windsurf_state="off" opencode_state="off"
-    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" windsurf_hint="not found" opencode_hint="not found"
+    local claude_state="off" cursor_state="off" codex_state="off" copilot_state="off" gemini_state="off" antigravity_state="off" windsurf_state="off" opencode_state="off" kiro_state="off"
+    local claude_hint="not found" cursor_hint="not found" codex_hint="not found" copilot_hint="not found" gemini_hint="not found" antigravity_hint="not found" windsurf_hint="not found" opencode_hint="not found" kiro_hint="not found"
 
     # If previous config exists, use those selections; otherwise use auto-detection
     if [ "$HAS_PREVIOUS_CONFIG" = true ] && [ -n "$SAVED_TOOLS" ]; then
@@ -722,6 +724,7 @@ detect_tools() {
         [[ " $SAVED_TOOLS " == *" antigravity "* ]] && antigravity_state="on" && antigravity_hint="previous"
         [[ " $SAVED_TOOLS " == *" windsurf "* ]]    && windsurf_state="on"    && windsurf_hint="previous"
         [[ " $SAVED_TOOLS " == *" opencode "* ]]    && opencode_state="on"    && opencode_hint="previous"
+        [[ " $SAVED_TOOLS " == *" kiro "* ]]        && kiro_state="on"        && kiro_hint="previous"
     else
         [ "$has_claude" = true ]        && claude_state="on"        && claude_hint="detected"
         [ "$has_cursor" = true ]        && cursor_state="on"        && cursor_hint="detected"
@@ -731,9 +734,10 @@ detect_tools() {
         [ "$has_antigravity" = true ]   && antigravity_state="on"   && antigravity_hint="detected"
         [ "$has_windsurf" = true ]      && windsurf_state="on"      && windsurf_hint="detected"
         [ "$has_opencode" = true ]      && opencode_state="on"      && opencode_hint="detected"
+        [ "$has_kiro" = true ]          && kiro_state="on"          && kiro_hint="detected"
 
         # If nothing detected, pre-select claude as default
-        if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_windsurf" = false ] && [ "$has_opencode" = false ]; then
+        if [ "$has_claude" = false ] && [ "$has_cursor" = false ] && [ "$has_codex" = false ] && [ "$has_copilot" = false ] && [ "$has_gemini" = false ] && [ "$has_antigravity" = false ] && [ "$has_windsurf" = false ] && [ "$has_opencode" = false ] && [ "$has_kiro" = false ]; then
             claude_state="on"
             claude_hint="default"
         fi
@@ -753,6 +757,7 @@ detect_tools() {
             "Antigravity|antigravity|${antigravity_state}|${antigravity_hint}" \
             "Windsurf|windsurf|${windsurf_state}|${windsurf_hint}" \
             "OpenCode|opencode|${opencode_state}|${opencode_hint}" \
+            "Kiro|kiro|${kiro_state}|${kiro_hint}" \
         )
     else
         # Silent: use detected defaults
@@ -765,6 +770,7 @@ detect_tools() {
         [ "$has_antigravity" = true ]   && tools="${tools:+$tools }antigravity"
         [ "$has_windsurf" = true ]      && tools="${tools:+$tools }windsurf"
         [ "$has_opencode" = true ]      && tools="${tools:+$tools }opencode"
+        [ "$has_kiro" = true ]          && tools="${tools:+$tools }kiro"
         [ -z "$tools" ] && tools="claude"
         TOOLS="$tools"
     fi
@@ -1340,6 +1346,13 @@ install_skills() {
                     dirs+=("$base_dir/.opencode/skills")
                 fi
                 ;;
+            kiro)
+                if [ "$SCOPE" = "global" ]; then
+                    dirs+=("$HOME/.kiro/skills")
+                else
+                    dirs+=("$base_dir/.kiro/skills")
+                fi
+                ;;
         esac
     done
 
@@ -1838,6 +1851,16 @@ write_mcp_configs() {
                 fi
                 ok "OpenCode MCP config"
                 ;;
+            kiro)
+                if [ "$SCOPE" = "global" ]; then
+                    mkdir -p "$HOME/.kiro/settings"
+                    write_mcp_json "$HOME/.kiro/settings/mcp.json"
+                else
+                    mkdir -p "$base_dir/.kiro/settings"
+                    write_mcp_json "$base_dir/.kiro/settings/mcp.json"
+                fi
+                ok "Kiro MCP config"
+                ;;
         esac
     done
 }
@@ -1892,6 +1915,10 @@ summary() {
         fi
         if echo "$TOOLS" | grep -q opencode; then
             msg "${step}. Launch OpenCode in your project: ${B}opencode${N}"
+            step=$((step + 1))
+        fi
+        if echo "$TOOLS" | grep -q kiro; then
+            msg "${step}. Open your project in Kiro to use Databricks skills and MCP tools"
             step=$((step + 1))
         fi
         msg "${step}. Open your project in your tool of choice"
