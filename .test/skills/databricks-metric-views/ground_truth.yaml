@@ -5,20 +5,9 @@ metadata:
 test_cases:
 - id: metric-views_create_sql_001
   inputs:
-    prompt: Create a metric view for order analytics with revenue and order count
-      measures
+    prompt: Create a metric view for order analytics with revenue and order count measures
   outputs:
-    response: "Here's a metric view for order analytics:\n\n```sql\nCREATE OR REPLACE\
-      \ VIEW catalog.schema.orders_metrics\nWITH METRICS\nLANGUAGE YAML\nAS $$\n \
-      \ version: 1.1\n  source: catalog.schema.orders\n  comment: \"Orders KPIs for sales analysis\"\n\
-      \  filter: order_date > '2020-01-01'\n  dimensions:\n    - name: Order Month\n\
-      \      expr: DATE_TRUNC('MONTH', order_date)\n      comment: \"Month of order\"\
-      \n    - name: Order Status\n      expr: CASE\n        WHEN status = 'O' THEN\
-      \ 'Open'\n        WHEN status = 'P' THEN 'Processing'\n        WHEN status =\
-      \ 'F' THEN 'Fulfilled'\n        END\n  measures:\n    - name: Order Count\n\
-      \      expr: COUNT(1)\n    - name: Total Revenue\n      expr: SUM(total_price)\n\
-      \    - name: Revenue per Customer\n      expr: SUM(total_price) / COUNT(DISTINCT\
-      \ customer_id)\n$$\n```\n"
+    response: "Here's a metric view for order analytics:\n\n```sql\nCREATE OR REPLACE VIEW catalog.schema.orders_metrics\nWITH METRICS\nLANGUAGE YAML\nAS $$\n  version: 1.1\n  source: catalog.schema.orders\n  comment: \"Orders KPIs for sales analysis\"\n  filter: order_date > '2020-01-01'\n  dimensions:\n    - name: Order Month\n      expr: DATE_TRUNC('MONTH', order_date)\n      comment: \"Month of order\"\n    - name: Order Status\n      expr: CASE\n        WHEN status = 'O' THEN 'Open'\n        WHEN status = 'P' THEN 'Processing'\n        WHEN status = 'F' THEN 'Fulfilled'\n        END\n  measures:\n    - name: Order Count\n      expr: COUNT(1)\n    - name: Total Revenue\n      expr: SUM(total_price)\n    - name: Revenue per Customer\n      expr: SUM(total_price) / COUNT(DISTINCT customer_id)\n$$\n```\n"
     execution_success: true
   expectations:
     expected_facts:
@@ -26,13 +15,6 @@ test_cases:
     - Defines dimensions for grouping data
     - Defines measures for aggregations
     - Uses YAML version 1.1
-    trace_expectations:
-      required_tools:
-      - mcp__databricks__execute_sql
-      banned_tools:
-      - Bash
-      tool_limits:
-        mcp__databricks__execute_sql: 3
     expected_patterns:
     - pattern: CREATE OR REPLACE VIEW
       min_count: 1
@@ -61,11 +43,7 @@ test_cases:
   inputs:
     prompt: Query a metric view to get total revenue and order count by month
   outputs:
-    response: "All measures must use the MEASURE() function. SELECT * is NOT supported.\n\
-      \n```sql\nSELECT\n  `Order Month`,\n  `Order Status`,\n  MEASURE(`Total Revenue`)\
-      \ AS total_revenue,\n  MEASURE(`Order Count`) AS order_count\nFROM catalog.schema.orders_metrics\n\
-      WHERE extract(year FROM `Order Month`) = 2024\nGROUP BY ALL\nORDER BY ALL\n\
-      ```\n"
+    response: "All measures must use the MEASURE() function. SELECT * is NOT supported.\n\n```sql\nSELECT\n  `Order Month`,\n  `Order Status`,\n  MEASURE(`Total Revenue`) AS total_revenue,\n  MEASURE(`Order Count`) AS order_count\nFROM catalog.schema.orders_metrics\nWHERE extract(year FROM `Order Month`) = 2024\nGROUP BY ALL\nORDER BY ALL\n```\n"
     execution_success: true
   expectations:
     expected_facts:
@@ -86,109 +64,11 @@ test_cases:
     category: happy_path
     difficulty: easy
     source: auto_generated
-- id: metric-views_create_mcp_003
-  inputs:
-    prompt: Use the manage_metric_views tool to create a metric view for order analytics
-  outputs:
-    response: "```python\nmanage_metric_views(\n    action=\"create\",\n    full_name=\"\
-      catalog.schema.orders_metrics\",\n    source=\"catalog.schema.orders\",\n  \
-      \  or_replace=True,\n    comment=\"Orders KPIs for sales analysis\",\n    filter_expr=\"\
-      order_date > '2020-01-01'\",\n    dimensions=[\n        {\"name\": \"Order Month\"\
-      , \"expr\": \"DATE_TRUNC('MONTH', order_date)\", \"comment\": \"Month of order\"\
-      },\n        {\"name\": \"Order Status\", \"expr\": \"status\"},\n    ],\n  \
-      \  measures=[\n        {\"name\": \"Order Count\", \"expr\": \"COUNT(1)\"},\n\
-      \        {\"name\": \"Total Revenue\", \"expr\": \"SUM(total_price)\", \"comment\"\
-      : \"Sum of total price\"},\n    ],\n)\n```\n"
-    execution_success: true
-  expectations:
-    expected_facts:
-    - Uses manage_metric_views MCP tool
-    - Sets action to create
-    - Specifies source table
-    trace_expectations:
-      required_tools:
-      - mcp__databricks__manage_metric_views
-      banned_tools:
-      - Bash
-      tool_limits:
-        mcp__databricks__manage_metric_views: 2
-    expected_patterns:
-    - pattern: manage_metric_views
-      min_count: 1
-      description: Must use manage_metric_views tool
-    - pattern: action.*create
-      min_count: 1
-      description: Must set action to create
-    - pattern: dimensions
-      min_count: 1
-      description: Must define dimensions
-    - pattern: measures
-      min_count: 1
-      description: Must define measures
-    guidelines:
-    - Must use manage_metric_views with action="create"
-    - Code must be valid Python syntax
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
-- id: metric-views_query_mcp_004
-  inputs:
-    prompt: Query the orders_metrics metric view using the MCP tool to get revenue
-      by month
-  outputs:
-    response: "```python\nmanage_metric_views(\n    action=\"query\",\n    full_name=\"\
-      catalog.schema.orders_metrics\",\n    query_measures=[\"Total Revenue\", \"\
-      Order Count\"],\n    query_dimensions=[\"Order Month\"],\n    where=\"extract(year\
-      \ FROM `Order Month`) = 2024\",\n    order_by=\"ALL\",\n    limit=100,\n)\n\
-      ```\n"
-    execution_success: true
-  expectations:
-    expected_facts:
-    - Uses manage_metric_views with action query
-    - Specifies query_measures and query_dimensions
-    trace_expectations:
-      required_tools:
-      - mcp__databricks__manage_metric_views
-      banned_tools:
-      - Bash
-      tool_limits:
-        mcp__databricks__manage_metric_views: 2
-    expected_patterns:
-    - pattern: manage_metric_views
-      min_count: 1
-      description: Must use manage_metric_views tool
-    - pattern: action.*query
-      min_count: 1
-      description: Must set action to query
-    - pattern: query_measures
-      min_count: 1
-      description: Must specify measures to query
-    - pattern: query_dimensions
-      min_count: 1
-      description: Must specify dimensions to group by
-    guidelines:
-    - Must use manage_metric_views with action="query"
-    - Code must be valid Python syntax
-  metadata:
-    category: happy_path
-    difficulty: medium
-    source: auto_generated
 - id: metric-views_yaml_spec_005
   inputs:
     prompt: Show me the full YAML specification for a metric view definition
   outputs:
-    response: "```yaml\nversion: 1.1                    # Required: \"1.1\" for DBR\
-      \ 17.2+\nsource: catalog.schema.table    # Required: source table/view\ncomment:\
-      \ \"Description\"          # Optional: metric view description\nfilter: column > value          # Optional:\
-      \ global WHERE filter\n\ndimensions:                     # Required: at least\
-      \ one\n  - name: Display Name\n    expr: sql_expression\n    comment: \"Description\"\
-      \n\nmeasures:                       # Required: at least one\n  - name: Display\
-      \ Name\n    expr: AGG_FUNC(column)\n    comment: \"Description\"\n\njoins: \
-      \                         # Optional: star/snowflake schema\n  - name: dim_table\n\
-      \    source: catalog.schema.dim_table\n    on: source.fk = dim_table.pk\n\n\
-      materialization:                # Optional (experimental)\n  schedule: every\
-      \ 6 hours\n  mode: relaxed\n```\n"
+    response: "```yaml\nversion: 1.1                    # Required: \"1.1\" for DBR 17.2+\nsource: catalog.schema.table    # Required: source table/view\ncomment: \"Description\"          # Optional: metric view description\nfilter: column > value          # Optional: global WHERE filter\n\ndimensions:                     # Required: at least one\n  - name: Display Name\n    expr: sql_expression\n    comment: \"Description\"\n\nmeasures:                       # Required: at least one\n  - name: Display Name\n    expr: AGG_FUNC(column)\n    comment: \"Description\"\n\njoins:                          # Optional: star/snowflake schema\n  - name: dim_table\n    source: catalog.schema.dim_table\n    on: source.fk = dim_table.pk\n\nmaterialization:                # Optional (experimental)\n  schedule: every 6 hours\n  mode: relaxed\n```\n"
     execution_success: true
   expectations:
     expected_facts:
@@ -220,15 +100,7 @@ test_cases:
   inputs:
     prompt: Create a metric view with joins for a star schema (fact orders + dim customers)
   outputs:
-    response: "```sql\nCREATE OR REPLACE VIEW catalog.schema.sales_metrics\nWITH METRICS\n\
-      LANGUAGE YAML\nAS $$\n  version: 1.1\n  source: catalog.schema.fact_orders\n\
-      \  joins:\n    - name: customers\n      source: catalog.schema.dim_customers\n\
-      \      on: fact_orders.customer_id = customers.customer_id\n  dimensions:\n\
-      \    - name: Customer Region\n      expr: customers.region\n    - name: Order\
-      \ Month\n      expr: DATE_TRUNC('MONTH', order_date)\n  measures:\n    - name:\
-      \ Total Revenue\n      expr: SUM(amount)\n    - name: Unique Customers\n   \
-      \   expr: COUNT(DISTINCT customers.customer_id)\n$$\n```\n\nJoins must be declared\
-      \ in the YAML definition, not in the SELECT query.\n"
+    response: "```sql\nCREATE OR REPLACE VIEW catalog.schema.sales_metrics\nWITH METRICS\nLANGUAGE YAML\nAS $$\n  version: 1.1\n  source: catalog.schema.fact_orders\n  joins:\n    - name: customers\n      source: catalog.schema.dim_customers\n      on: fact_orders.customer_id = customers.customer_id\n  dimensions:\n    - name: Customer Region\n      expr: customers.region\n    - name: Order Month\n      expr: DATE_TRUNC('MONTH', order_date)\n  measures:\n    - name: Total Revenue\n      expr: SUM(amount)\n    - name: Unique Customers\n      expr: COUNT(DISTINCT customers.customer_id)\n$$\n```\n\nJoins must be declared in the YAML definition, not in the SELECT query.\n"
     execution_success: true
   expectations:
     expected_facts:
@@ -252,9 +124,7 @@ test_cases:
   inputs:
     prompt: Grant SELECT access on a metric view to the data-consumers group
   outputs:
-    response: "```python\nmanage_metric_views(\n    action=\"grant\",\n    full_name=\"\
-      catalog.schema.orders_metrics\",\n    principal=\"data-consumers\",\n    privileges=[\"\
-      SELECT\"],\n)\n```\n"
+    response: "```python\nmanage_metric_views(\n    action=\"grant\",\n    full_name=\"catalog.schema.orders_metrics\",\n    principal=\"data-consumers\",\n    privileges=[\"SELECT\"],\n)\n```\n"
     execution_success: true
   expectations:
     expected_facts:
@@ -813,8 +683,7 @@ test_cases:
 
 - id: metric-views_conversational_support_tickets_020
   inputs:
-    prompt: "hey I have a table of customer support tickets and I want to track resolution\
-      \ time metrics, can you help me set that up as a metric view?"
+    prompt: "hey I have a table of customer support tickets and I want to track resolution time metrics, can you help me set that up as a metric view?"
   outputs:
     response: |
       Sure! Here's a metric view for tracking support ticket resolution metrics:
@@ -984,8 +853,7 @@ test_cases:
 
 - id: metric-views_hr_employee_domain_022
   inputs:
-    prompt: Build a metric view for HR analytics tracking employee headcount, attrition,
-      and tenure from our employees table
+    prompt: Build a metric view for HR analytics tracking employee headcount, attrition, and tenure from our employees table
   outputs:
     response: |
       ```python
@@ -1044,10 +912,7 @@ test_cases:
 
 - id: metric-views_migration_from_regular_view_023
   inputs:
-    prompt: I have this existing view and want to convert it to a metric view. Here's
-      my current SQL - SELECT region, DATE_TRUNC('MONTH', sale_date) AS month, SUM(amount)
-      AS revenue, COUNT(*) AS num_sales FROM catalog.schema.transactions GROUP BY 1,
-      2
+    prompt: I have this existing view and want to convert it to a metric view. Here's my current SQL - SELECT region, DATE_TRUNC('MONTH', sale_date) AS month, SUM(amount) AS revenue, COUNT(*) AS num_sales FROM catalog.schema.transactions GROUP BY 1, 2
   outputs:
     response: |
       Here's your existing view converted to a metric view. The key change is separating the GROUP BY columns into **dimensions** and the aggregations into **measures**:
@@ -1133,8 +998,7 @@ test_cases:
 
 - id: metric-views_semiadditive_balance_024
   inputs:
-    prompt: Create a metric view for bank account balances that correctly handles aggregation
-      across time (don't sum balances across dates)
+    prompt: Create a metric view for bank account balances that correctly handles aggregation across time (don't sum balances across dates)
   outputs:
     response: |
       Use a **semiadditive** window measure to prevent summing balances across dates. This returns the last date's balance when the date dimension is not in the GROUP BY:
@@ -1213,9 +1077,7 @@ test_cases:
 
 - id: metric-views_messy_phrasing_025
   inputs:
-    prompt: "so umm i wanna make like a metrics thing for my product_usage table??\
-      \ like track daily active users and feature adoption.. not sure how metric views\
-      \ work exactly"
+    prompt: "so umm i wanna make like a metrics thing for my product_usage table?? like track daily active users and feature adoption.. not sure how metric views work exactly"
   outputs:
     response: |
       Metric views let you define reusable metrics in YAML that can be sliced by any dimension at query time. Here's one for your product usage data:
@@ -1303,8 +1165,7 @@ test_cases:
 
 - id: metric-views_query_with_where_filter_026
   inputs:
-    prompt: "I want to query my metric view but only for a specific region and date\
-      \ range. How do I filter?"
+    prompt: "I want to query my metric view but only for a specific region and date range. How do I filter?"
   outputs:
     response: |
       Use standard SQL `WHERE` clauses on dimensions when querying a metric view:

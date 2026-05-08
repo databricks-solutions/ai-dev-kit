@@ -22,6 +22,8 @@ A dashboard should be showing something relevant for a human, typically some KPI
 | Publish | `databricks lakeview publish DASHBOARD_ID --warehouse-id WH` |
 | Delete | `databricks lakeview trash DASHBOARD_ID` |
 
+> **`--warehouse` flag**: if `databricks experimental aitools tools query --warehouse WH "..."` fails with `unknown flag: --warehouse` on your CLI version, set `DATABRICKS_WAREHOUSE_ID=WH` in the environment instead and drop the flag — the command auto-picks it from there.
+
 ---
 
 ## CRITICAL: Widget Version Requirements
@@ -108,15 +110,21 @@ Before writing JSON, plan your dashboard:
 3. **What filters?** For each filter, verify ALL datasets you want filtered contain the filter field.
    > **Filters only affect datasets that have the filter field.** A pre-aggregated table without dates WON'T be date-filtered.
 
-4. **Write JSON locally** as a file.
+4. **Build the dashboard JSON** as a local working file (intermediate step, not the deliverable).
 
-### Step 5: Dashboard Lifecycle
-Once created, you can edit the file as following:
+### Step 5: Deploy
+
+**Now deploy the JSON to the workspace.** Run `databricks lakeview create` (below). Your task is not complete until this command succeeds and returns a dashboard ID — the JSON file alone is an intermediate working artifact.
+
+After deploying, the same `lakeview` subcommands manage the dashboard's lifecycle (list, get, update, publish, trash).
+
 ```bash
-# Create a dashboard — canonical form. Everything is a flag EXCEPT parent_path
-# (JSON-only, no flag — without it, dashboard lands at /Users/<you>/<name>).
-# --dataset-catalog/--dataset-schema inject `catalog`/`schema` into each saved
-# dataset; queries inside dashboard.json must use bare table names.
+# Deploy: creates the dashboard in the workspace and returns a dashboard ID.
+# Canonical form — everything is a flag EXCEPT parent_path (JSON-only, no flag;
+# without it the dashboard lands at /Users/<you>/<display-name>).
+# --dataset-catalog/--dataset-schema inject the catalog/schema into each saved
+# dataset; queries inside dashboard.json MUST use bare table names only (e.g.,
+# "FROM trips"), NOT "FROM schema.trips" or "FROM catalog.schema.trips".
 databricks lakeview create \
   --display-name "My Dashboard" \
   --warehouse-id "abc123def456" \

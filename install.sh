@@ -95,7 +95,7 @@ USE_PREVIOUS_CONFIG=false
 HAS_PREVIOUS_CONFIG=false  # True if previous config exists (for pre-selecting defaults)
 
 # Minimum required versions
-MIN_CLI_VERSION="0.278.0"
+MIN_CLI_VERSION="0.299.0"
 MIN_SDK_VERSION="0.85.0"
 
 # Colors
