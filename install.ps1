@@ -59,7 +59,7 @@ $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $McpEntry  = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
 
 # Minimum required versions
-$MinCliVersion = "0.278.0"
+$MinCliVersion = "0.299.0"
 $MinSdkVersion = "0.85.0"
 
 # ─── Defaults ─────────────────────────────────────────────────
