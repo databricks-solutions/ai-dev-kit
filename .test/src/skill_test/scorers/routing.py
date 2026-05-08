@@ -73,7 +73,7 @@ SKILL_TRIGGERS = {
         "multi-agent",
         "supervisor",
     ],
-    "databricks-lakebase-provisioned": ["lakebase", "postgresql", "postgres"],
+    "databricks-lakebase-autoscale": ["lakebase", "postgresql", "postgres"],
     "databricks-model-serving": ["model serving", "serving endpoint", "inference endpoint"],
 }
 

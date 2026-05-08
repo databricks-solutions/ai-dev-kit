@@ -82,7 +82,7 @@ $script:Channel      = if ($env:DEVKIT_CHANNEL) { $env:DEVKIT_CHANNEL } else { "
 $script:Skills = @(
     "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-app-python",
     "databricks-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
-    "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
+    "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale",
     "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-ai-functions",
     "databricks-python-sdk", "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
     "databricks-synthetic-data-gen", "databricks-unity-catalog", "databricks-unstructured-pdf-generation",
@@ -125,7 +125,7 @@ $script:ProfileAiMlMlflow = @(
 )
 $script:ProfileAppDeveloper = @(
     "databricks-app-python", "databricks-app-apx", "databricks-lakebase-autoscale",
-    "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
+    "databricks-model-serving", "databricks-dbsql",
     "databricks-jobs", "databricks-bundles"
 )
 
@@ -1137,7 +1137,6 @@ function Invoke-PromptCustomSkills {
         @{ Label = "Unstructured PDF";     Value = "databricks-unstructured-pdf-generation"; State = ($preselected -contains "databricks-unstructured-pdf-generation"); Hint = "Synthetic PDFs for RAG" }
         @{ Label = "Synthetic Data";       Value = "databricks-synthetic-data-gen";          State = ($preselected -contains "databricks-synthetic-data-gen");          Hint = "Generate test data" }
         @{ Label = "Lakebase Autoscale";   Value = "databricks-lakebase-autoscale";          State = ($preselected -contains "databricks-lakebase-autoscale");          Hint = "Managed PostgreSQL" }
-        @{ Label = "Lakebase Provisioned"; Value = "databricks-lakebase-provisioned";        State = ($preselected -contains "databricks-lakebase-provisioned");        Hint = "Provisioned PostgreSQL" }
         @{ Label = "App Python";           Value = "databricks-app-python";                  State = ($preselected -contains "databricks-app-python");                  Hint = "Dash, Streamlit, Flask" }
         @{ Label = "App APX";              Value = "databricks-app-apx";                     State = ($preselected -contains "databricks-app-apx");                     Hint = "FastAPI + React" }
         @{ Label = "MLflow Onboarding";    Value = "mlflow-onboarding";                      State = ($preselected -contains "mlflow-onboarding");                      Hint = "Getting started" }

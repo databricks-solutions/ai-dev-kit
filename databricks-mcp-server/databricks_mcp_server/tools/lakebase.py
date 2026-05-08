@@ -116,7 +116,7 @@ def manage_lakebase_database(
       force=True cascades to children (provisioned). Autoscale deletes all branches/computes/data.
       Returns: {status, ...}.
 
-    See databricks-lakebase-provisioned or databricks-lakebase-autoscale skill for details."""
+    See databricks-lakebase-autoscale skill for details."""
     act = action.lower()
 
     if act == "create_or_update":
@@ -235,7 +235,7 @@ def manage_lakebase_sync(
       Requires table_name. Optional catalog_name to also delete catalog.
       Returns: {synced_table, catalog (if deleted)}.
 
-    See databricks-lakebase-provisioned skill for sync workflows."""
+    See databricks-lakebase-autoscale skill for sync workflows."""
     act = action.lower()
 
     if act == "create_or_update":

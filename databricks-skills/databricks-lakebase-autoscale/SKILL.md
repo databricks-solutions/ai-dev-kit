@@ -326,7 +326,6 @@ These features are NOT yet supported in Lakebase Autoscaling:
 
 ## Related Skills
 
-- **[databricks-lakebase-provisioned](../databricks-lakebase-provisioned/SKILL.md)** - fixed-capacity managed PostgreSQL (predecessor)
 - **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps that can use Lakebase for persistence
 - **[databricks-app-python](../databricks-app-python/SKILL.md)** - Python apps with Lakebase backend
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for project management and token generation

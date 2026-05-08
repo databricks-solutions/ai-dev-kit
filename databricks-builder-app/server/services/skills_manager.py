@@ -35,12 +35,6 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
     'manage_vs_endpoint', 'manage_vs_index', 'manage_vs_data', 'query_vs_index',
   ],
   'databricks-metric-views': ['manage_metric_views'],
-  # Provisioned and Autoscale Lakebase share the core database/sync/credential
-  # tools.  Autoscale additionally claims branch tools.  If either skill is
-  # enabled, the shared tools are available.
-  'databricks-lakebase-provisioned': [
-    'manage_lakebase_database', 'manage_lakebase_sync', 'generate_lakebase_credential',
-  ],
   'databricks-lakebase-autoscale': [
     'manage_lakebase_database', 'manage_lakebase_sync', 'generate_lakebase_credential',
     'manage_lakebase_branch',
