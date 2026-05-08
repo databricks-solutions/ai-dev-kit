@@ -1,7 +1,7 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, and Windsurf.
+# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -69,6 +69,7 @@ $script:ScopeExplicit = $false  # Track if --global was explicitly passed
 $script:InstallMcp   = $false
 $script:InstallSkills = $true
 $script:Force        = $false
+$script:ForceExplicit = $false
 $script:Silent       = $false
 $script:UserTools    = ""
 $script:Tools        = ""
@@ -225,7 +226,7 @@ while ($i -lt $args.Count) {
         { $_ -in "--list-skills", "-ListSkills" } { $script:ListSkills = $true; $i++ }
         { $_ -in "--experimental", "-Experimental" } { $script:Channel = "experimental"; $i++ }
         { $_ -in "-b", "--branch", "-Branch" }  { $Branch = $args[$i + 1]; $script:BranchExplicit = $true; $i += 2 }
-        { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
+        { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $script:ForceExplicit = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
             Write-Host ""
@@ -240,7 +241,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --mcp-path PATH       Path to MCP server installation"
             Write-Host "  --mcp                 Install deprecated MCP server (default: no)"
             Write-Host "  --silent              Silent mode (no output except errors)"
-            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode"
+            Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
@@ -276,8 +277,20 @@ if ($script:Channel -eq "experimental" -and -not $script:BranchExplicit) {
     $Branch = "experimental"
 }
 
+# Experimental installs default to Force=true (always refresh the cached repo)
+# unless the user explicitly passed --force.
+if ($script:Channel -eq "experimental" -and -not $script:ForceExplicit) {
+    $script:Force = $true
+}
+
 # Set raw URL after branch resolution
 $RawUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
+
+# Keep stable and experimental clones in separate directories so they don't clobber each other
+if ($script:Channel -eq "experimental") {
+    $RepoDir  = Join-Path $InstallDir "experimental-repo"
+    $McpEntry = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
+}
 
 # ─── Interactive helpers ──────────────────────────────────────
 
@@ -591,6 +604,8 @@ function Invoke-DetectTools {
     $hasWindsurf = ($null -ne (Get-Command windsurf -ErrorAction SilentlyContinue)) -or
                    (Test-Path "$env:LOCALAPPDATA\Programs\Windsurf\Windsurf.exe")
     $hasOpencode = $null -ne (Get-Command opencode -ErrorAction SilentlyContinue)
+    $hasKiro    = ($null -ne (Get-Command kiro -ErrorAction SilentlyContinue)) -or
+                  (Test-Path "$env:LOCALAPPDATA\Programs\Kiro\Kiro.exe")
 
     $claudeState  = $hasClaude;  $claudeHint  = if ($hasClaude)  { "detected" } else { "not found" }
     $cursorState  = $hasCursor;  $cursorHint  = if ($hasCursor)  { "detected" } else { "not found" }
@@ -600,9 +615,10 @@ function Invoke-DetectTools {
     $antigravityState = $hasAntigravity; $antigravityHint = if ($hasAntigravity) { "detected" } else { "not found" }
     $windsurfState = $hasWindsurf; $windsurfHint = if ($hasWindsurf) { "detected" } else { "not found" }
     $opencodeState = $hasOpencode; $opencodeHint = if ($hasOpencode) { "detected" } else { "not found" }
+    $kiroState    = $hasKiro;    $kiroHint    = if ($hasKiro)    { "detected" } else { "not found" }
 
     # If nothing detected, default to claude
-    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasWindsurf -and -not $hasOpencode) {
+    if (-not $hasClaude -and -not $hasCursor -and -not $hasCodex -and -not $hasCopilot -and -not $hasGemini -and -not $hasAntigravity -and -not $hasWindsurf -and -not $hasOpencode -and -not $hasKiro) {
         $claudeState = $true
         $claudeHint  = "default"
     }
@@ -621,6 +637,7 @@ function Invoke-DetectTools {
         @{ Label = "Antigravity";    Value = "antigravity";  State = $antigravityState;  Hint = $antigravityHint }
         @{ Label = "Windsurf";       Value = "windsurf";     State = $windsurfState;     Hint = $windsurfHint }
         @{ Label = "OpenCode";       Value = "opencode";     State = $opencodeState;     Hint = $opencodeHint }
+        @{ Label = "Kiro";           Value = "kiro";         State = $kiroState;         Hint = $kiroHint }
     )
 
     $result = Select-Checkbox -Items $items
@@ -702,7 +719,8 @@ function Invoke-PromptMcpPath {
     }
 
     # Update derived paths
-    $script:RepoDir    = Join-Path $script:InstallDir "repo"
+    $repoSubdir = if ($script:Channel -eq "experimental") { "experimental-repo" } else { "repo" }
+    $script:RepoDir    = Join-Path $script:InstallDir $repoSubdir
     $script:VenvDir    = Join-Path $script:InstallDir ".venv"
     $script:VenvPython = Join-Path $script:VenvDir "Scripts\python.exe"
     $script:McpEntry   = Join-Path $script:RepoDir "databricks-mcp-server\run_server.py"
@@ -1226,6 +1244,13 @@ function Install-Skills {
                     $dirs += Join-Path $BaseDir ".opencode\skills"
                 }
             }
+            "kiro" {
+                if ($script:Scope -eq "global") {
+                    $dirs += Join-Path $env:USERPROFILE ".kiro\skills"
+                } else {
+                    $dirs += Join-Path $BaseDir ".kiro\skills"
+                }
+            }
         }
     }
     $dirs = $dirs | Select-Object -Unique
@@ -1726,6 +1751,16 @@ function Write-McpConfigs {
                 }
                 Write-Ok "OpenCode MCP config"
             }
+            "kiro" {
+                if ($script:Scope -eq "global") {
+                    $kiroSettings = Join-Path $env:USERPROFILE ".kiro\settings"
+                } else {
+                    $kiroSettings = Join-Path $BaseDir ".kiro\settings"
+                }
+                if (-not (Test-Path $kiroSettings)) { New-Item -ItemType Directory -Path $kiroSettings -Force | Out-Null }
+                Write-McpJson (Join-Path $kiroSettings "mcp.json")
+                Write-Ok "Kiro MCP config"
+            }
         }
     }
 }
@@ -1799,6 +1834,10 @@ function Show-Summary {
     }
     if ($script:Tools -match 'opencode') {
         Write-Msg "$step. Launch OpenCode in your project: opencode"
+        $step++
+    }
+    if ($script:Tools -match 'kiro') {
+        Write-Msg "$step. Open your project in Kiro to use Databricks skills and MCP tools"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"
@@ -2121,7 +2160,21 @@ function Invoke-Main {
     # Setup MCP server
     if ($script:InstallMcp) {
         Install-McpServer
-    } elseif (-not (Test-Path $script:RepoDir)) {
+    } elseif (Test-Path (Join-Path $script:RepoDir ".git")) {
+        # Repo already exists — refresh it when Force is true, otherwise leave as-is
+        if ($script:Force) {
+            Write-Step "Refreshing sources"
+            $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            & git -C $script:RepoDir fetch -q --depth 1 origin $Branch 2>&1 | Out-Null
+            & git -C $script:RepoDir reset --hard FETCH_HEAD 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Remove-Item -Recurse -Force $script:RepoDir -ErrorAction SilentlyContinue
+                & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
+            }
+            $ErrorActionPreference = $prevEAP
+            Write-Ok "Repository refreshed ($Branch)"
+        }
+    } else {
         Write-Step "Downloading sources"
         if (-not (Test-Path $script:InstallDir)) {
             New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
