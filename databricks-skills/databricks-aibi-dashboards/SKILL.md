@@ -17,7 +17,7 @@ A dashboard should be showing something relevant for a human, typically some KPI
 | List tables | `databricks experimental aitools tools query --warehouse WH "SHOW TABLES IN catalog.schema"` |
 | Get schema | `databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2` |
 | Test query | `databricks experimental aitools tools query --warehouse WH "SELECT..."` |
-| Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "Y" --dataset-catalog "catalog" --dataset-schema "schema" --serialized-dashboard "$(cat file.json)"` (always set `--dataset-catalog` and `--dataset-schema` — queries must use bare table names only to support install on different catalog.schema) |
+| Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "WH" --dataset-catalog CATALOG --dataset-schema SCHEMA --serialized-dashboard "$(cat file.json)" --json '{"parent_path": "/Workspace/Users/<you>/path"}'` — `parent_path` is JSON-only (no flag); everything else stays as flags. Queries must use bare table names. |
 | Update dashboard | `databricks lakeview update DASHBOARD_ID --serialized-dashboard "$(cat file.json)"` |
 | Publish | `databricks lakeview publish DASHBOARD_ID --warehouse-id WH` |
 | Delete | `databricks lakeview trash DASHBOARD_ID` |
@@ -113,17 +113,17 @@ Before writing JSON, plan your dashboard:
 ### Step 5: Dashboard Lifecycle
 Once created, you can edit the file as following:
 ```bash
-# Create a dashboard
-# IMPORTANT: Use --dataset-catalog and --dataset-schema to set the catalog/schema for all queries
-# Queries in the JSON MUST use bare table names only (e.g., "FROM trips"),
-# NOT "FROM schema.trips" and NOT "FROM catalog.schema.trips".
-# The CLI flags only provide a default — they do NOT override hardcoded catalog/schema in queries.
+# Create a dashboard — canonical form. Everything is a flag EXCEPT parent_path
+# (JSON-only, no flag — without it, dashboard lands at /Users/<you>/<name>).
+# --dataset-catalog/--dataset-schema inject `catalog`/`schema` into each saved
+# dataset; queries inside dashboard.json must use bare table names.
 databricks lakeview create \
   --display-name "My Dashboard" \
   --warehouse-id "abc123def456" \
   --dataset-catalog "my_catalog" \
   --dataset-schema "my_schema" \
-  --serialized-dashboard "$(cat dashboard.json)"
+  --serialized-dashboard "$(cat dashboard.json)" \
+  --json '{"parent_path": "/Workspace/Users/me@co.com/dashboards"}'
 
 # List all dashboards
 databricks lakeview list
