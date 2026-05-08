@@ -19,7 +19,7 @@ test_cases:
     - "Should include counter widgets (version 2)"
     - "Should include bar chart (version 3)"
     - "Should include table widget (version 2)"
-    - "Should follow 12-column grid layout"
+    - "Should follow 6-column grid layout"
     unexpected_facts:
     - "Should not show 'Invalid widget definition' errors"
     - "Should not deploy without testing queries"
