@@ -219,12 +219,12 @@ test_cases:
     expectations:
       expected_skills:
         - "databricks-app-python"
-        - "databricks-lakebase-provisioned"
+        - "databricks-lakebase-autoscale"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
       difficulty: "medium"
-      reasoning: "Combines 'Streamlit' (app-python) with 'Lakebase' (databricks-lakebase-provisioned)"
+      reasoning: "Combines 'Streamlit' (app-python) with 'Lakebase' (databricks-lakebase-autoscale)"
 
   - id: "routing_multi_app_serving_001"
     inputs:

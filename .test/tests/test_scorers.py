@@ -118,10 +118,10 @@ class TestDetectSkillsFromPrompt:
         assert "databricks-app-python" in skills
 
     def test_detect_lakebase(self):
-        """Test detection of databricks-lakebase-provisioned skill."""
+        """Test detection of databricks-lakebase-autoscale skill."""
         prompt = "Create an app that stores data in Lakebase"
         skills = detect_skills_from_prompt(prompt)
-        assert "databricks-lakebase-provisioned" in skills
+        assert "databricks-lakebase-autoscale" in skills
 
     def test_detect_model_serving(self):
         """Test detection of databricks-model-serving skill."""
@@ -141,7 +141,7 @@ class TestDetectSkillsFromPrompt:
         prompt = "Create a Streamlit app that stores data in Lakebase"
         skills = detect_skills_from_prompt(prompt)
         assert "databricks-app-python" in skills
-        assert "databricks-lakebase-provisioned" in skills
+        assert "databricks-lakebase-autoscale" in skills
 
     def test_detect_multi_app_serving(self):
         """Test detection of app + model serving."""
@@ -178,7 +178,7 @@ class TestSkillTriggers:
             "databricks-synthetic-data-gen",
             "databricks-mlflow-evaluation",
             "databricks-agent-bricks",
-            "databricks-lakebase-provisioned",
+            "databricks-lakebase-autoscale",
             "databricks-model-serving",
         ]
         for skill in expected_skills:
