@@ -194,10 +194,10 @@ Autoscaling uses ~2 GB RAM per CU.
 
 Rules:
 - Autoscale range: 0.5–32 CU.
-- `autoscaling_limit_max_cu - autoscaling_limit_min_cu <= 8`.
-- Valid: 4–8, 8–16, 16–24.
-- Invalid: 0.5–32.
-- Large fixed-size computes: 36–112 CU; no autoscaling.
+- `autoscaling_limit_max_cu - autoscaling_limit_min_cu <= 16`.
+- Valid: 4–20, 8–16, 16–32.
+- Invalid: 0.5–32 (spread of 31.5 exceeds 16).
+- Fixed-size always-on computes: 40–112 CU; no autoscaling.
 - Connection limit is based on max CU.
 - Set min CU high enough for working-set cache and latency needs.
 

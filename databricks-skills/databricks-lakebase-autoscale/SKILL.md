@@ -94,8 +94,8 @@ Most create/update/delete calls return long-running operations; call `.wait()`.
 - Postgres versions: **16 and 17**.
 - AWS regions: `us-east-1`, `us-east-2`, `eu-central-1`, `eu-west-1`, `eu-west-2`, `ap-south-1`, `ap-southeast-1`, `ap-southeast-2`.
 - Azure beta regions: `eastus2`, `westeurope`, `westus`.
-- Autoscaling computes: 0.5–32 CU with `max - min <= 8`.
-- Large fixed computes: 36–112 CU.
+- Autoscaling computes: 0.5–32 CU with `max - min <= 16`.
+- Fixed-size always-on computes: 40–112 CU.
 - Autoscaling CU ≈ 2 GB RAM.
 - `sslmode=require` on all driver connections.
 - Endpoint host comes from `w.postgres.get_endpoint(...).status.hosts.host`.
