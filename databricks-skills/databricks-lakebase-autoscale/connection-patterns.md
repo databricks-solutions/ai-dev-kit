@@ -48,7 +48,7 @@ This is the pattern from the official Databricks tutorial, external app guide, a
 
 **Result:** Fully transparent token rotation with zero background tasks, zero timers, zero manual refresh logic.
 
-> **Why not `max_lifetime=3600` (the default)?** You'd hand out connections with nearly-expired tokens. A connection established at minute 59 with a token that expires at minute 60 will fail a minute later. Always use 2700.
+> **Why not `max_lifetime=3600` (the default)?** You'd hand out connections with nearly-expired tokens. A connection established at minute 59 with a token that expires at minute 60 will fail a minute later. Prefer 2700 — a 15-minute buffer before the 1-hour expiry. (The official tutorial leaves `max_lifetime` unset and relies on psycopg's defaults; `databricks-ai-bridge` uses 2700. 2700 isn't prescribed by any official spec — it's a defensive convention.)
 
 ### `app.yaml`
 
@@ -121,8 +121,8 @@ pool = ConnectionPool(
     connection_class=OAuthConnection,
     min_size=1,
     max_size=10,
-    # CRITICAL: 2700 (45 min), not the 3600 default.
-    # Recycles connections 15 min before the 1-hour token expiry.
+    # 2700 (45 min) recycles connections 15 min before the 1-hour token expiry.
+    # The official tutorial doesn't set max_lifetime; databricks-ai-bridge uses 2700.
     max_lifetime=2700,
     open=True,
 )
@@ -176,9 +176,11 @@ def get_data():  # sync def — FastAPI runs in threadpool automatically
             return cur.fetchall()
 ```
 
-## 2. SQLAlchemy `do_connect` Event (Alternative)
+## 2. SQLAlchemy `do_connect` Event + Background Refresh Loop (Alternative)
 
-**Use only if your app is already SQLAlchemy-async.** Otherwise prefer pattern 1 — this adds a background refresh task you don't need.
+**Use only if your app is already SQLAlchemy-async.** Otherwise prefer pattern 1 — the variant below adds a background refresh task you don't need.
+
+> **What's official vs. what's a community variant.** The `do_connect` event itself is the official Databricks-recommended way to inject credentials into a SQLAlchemy engine, and `databricks-ai-bridge.AsyncLakebaseSQLAlchemy` uses it. What's *not* in any official doc is layering a background `asyncio.Task` on top to pre-warm tokens. That's the part this section demotes. If you're already on SQLAlchemy and want to avoid a background loop, the simplest port is to call `engine.dispose()` on a schedule (or rely on `pool_recycle`) and let `do_connect` re-mint the credential on the next checkout — same idea as pattern 1, just routed through SQLAlchemy.
 
 ```python
 import asyncio
@@ -406,7 +408,7 @@ conn = psycopg.connect(**conn_params)
 ## Best Practices
 
 1. **Default to pattern 1** (`psycopg_pool.ConnectionPool` + `OAuthConnection`). It's the canonical Databricks App pattern, works out of the box, no background tasks.
-2. **Use `max_lifetime=2700`, not 3600.** The default creates a race condition where connections are handed out with nearly-expired tokens.
+2. **Prefer `max_lifetime=2700` over the 3600 default.** A 15-minute buffer before the 1-hour token expiry avoids handing out connections with nearly-expired tokens. Not a hard spec — the official tutorial doesn't set it; `databricks-ai-bridge` uses 2700.
 3. **Always `sslmode=require`** on every connection (it's auto-injected as `PGSSLMODE` in Databricks Apps).
 4. **Never use `config.token` / `oauth_token().access_token` as the PG password** — that's a workspace-scoped token. Use `generate_database_credential()` to mint a Lakebase-scoped one.
 5. **Handle DNS issues on macOS** using the `hostaddr` workaround if your dev machine can't resolve Lakebase hostnames.
