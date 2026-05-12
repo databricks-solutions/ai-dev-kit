@@ -1,0 +1,144 @@
+/* ─── Databricks Brand ─── */
+:root {
+  --md-primary-fg-color: #FF3621;
+  --md-primary-fg-color--light: #FF6B59;
+  --md-primary-fg-color--dark: #CC2B1A;
+  --md-accent-fg-color: #FF3621;
+  --db-red: #FF3621;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #FF3621;
+  --md-primary-fg-color--light: #FF6B59;
+  --md-primary-fg-color--dark: #CC2B1A;
+  --md-accent-fg-color: #FF6B59;
+}
+
+/* ─── Global ─── */
+.md-content__inner { max-width: 820px; margin: 0 auto; }
+.md-typeset h1 { font-weight: 800; letter-spacing: -0.02em; }
+.md-typeset h2 { font-weight: 700; margin-top: 1.8em; }
+.md-typeset hr { margin: 1.5em 0; }
+
+/* ─── CTA Button ─── */
+.cta-primary {
+  display: inline-block;
+  background: var(--db-red);
+  color: #fff !important;
+  padding: 0.7rem 1.8rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none !important;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 54, 33, 0.3);
+}
+
+/* ─── Landing: whole page centered ─── */
+.landing {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto;
+}
+.landing .md-typeset__table, .landing table { margin: 0 auto; }
+.landing-hero {
+  padding: 2.5rem 0 1.5rem;
+}
+.landing-hero h1 {
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+}
+.landing-hero .tagline {
+  font-size: 1.05rem;
+  opacity: 0.6;
+  margin-bottom: 1.5rem;
+}
+
+/* ─── Landing: Stats ─── */
+.stats-bar {
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 1rem 0;
+  margin: 0 auto 1rem;
+  max-width: 420px;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+.stat { text-align: center; }
+.stat .num { display: block; font-size: 1.5rem; font-weight: 800; color: var(--db-red); }
+.stat .label { font-size: 0.7rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ─── Landing: description + prereqs ─── */
+.landing-desc {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  opacity: 0.8;
+  margin: 1rem auto 1.2rem;
+  max-width: 560px;
+}
+.landing-prereqs {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin: 1rem auto 1.2rem;
+}
+
+/* ─── Quickstart: step headings ─── */
+.md-typeset .qs h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.3rem;
+  margin-top: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .qs h2 .num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--db-red);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.md-typeset .qs h2 .dur {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.45;
+}
+
+/* ─── Quickstart: tighter admonition spacing ─── */
+.md-typeset .qs .admonition { margin-top: 0.5em; margin-bottom: 0.5em; }
+
+/* ─── Quickstart: step screenshots ─── */
+.step-screenshot {
+  margin: 0.8em 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+.step-screenshot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ─── Completion banner ─── */
+.completion-banner {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.completion-banner h2 { border: none !important; font-size: 1.6rem; }
