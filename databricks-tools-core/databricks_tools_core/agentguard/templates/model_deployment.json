@@ -1,0 +1,37 @@
+{
+  "_description": "Scope for deploying an ML model to a serving endpoint. Agent can read model registry and feature store, update the target serving endpoint. No table writes, no deletes.",
+  "_variables": ["catalog", "endpoint_name"],
+  "_example_usage": "agentguard_start(mode='enforce', scope_template='model_deployment', scope_variables={'catalog': 'main', 'endpoint_name': 'fraud_detection_v2'})",
+
+  "tables": {
+    "read": [
+      "${catalog}.ml_models.*",
+      "${catalog}.feature_store.*"
+    ],
+    "write": [],
+    "ddl": [],
+    "delete": []
+  },
+  "serving_endpoints": {
+    "read": ["*"],
+    "write": ["${endpoint_name}"],
+    "ddl": [],
+    "delete": []
+  },
+  "unity_catalog": {
+    "read": ["*"],
+    "write": [],
+    "ddl": [],
+    "delete": []
+  },
+  "clusters": {
+    "read": ["*"],
+    "write": [],
+    "ddl": [],
+    "delete": []
+  },
+
+  "default_deny": true,
+  "max_actions": 75,
+  "max_write_actions": 10
+}
