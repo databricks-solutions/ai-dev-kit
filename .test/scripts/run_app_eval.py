@@ -9,8 +9,8 @@ Unlike run_eval.py (which runs code on clusters/warehouses), this script:
 5. Cleans up all test apps
 
 Usage:
-    DATABRICKS_CONFIG_PROFILE=ffe python run_app_eval.py databricks-app-python [--test-ids id1 id2]
-    DATABRICKS_CONFIG_PROFILE=ffe python run_app_eval.py databricks-app-python --keep  # Don't delete apps after
+    DATABRICKS_CONFIG_PROFILE=ffe python run_app_eval.py databricks-apps-python [--test-ids id1 id2]
+    DATABRICKS_CONFIG_PROFILE=ffe python run_app_eval.py databricks-apps-python --keep  # Don't delete apps after
 """
 
 import argparse
@@ -226,7 +226,7 @@ def detect_framework_yaml(python_code: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Run app skill integration tests on Databricks")
-    parser.add_argument("skill_name", help="Name of skill to evaluate (e.g., databricks-app-python)")
+    parser.add_argument("skill_name", help="Name of skill to evaluate (e.g., databricks-apps-python)")
     parser.add_argument("--test-ids", nargs="+", help="Specific test IDs to run")
     parser.add_argument("--keep", action="store_true", help="Don't delete apps after testing")
     args = parser.parse_args()

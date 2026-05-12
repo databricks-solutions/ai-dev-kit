@@ -32,7 +32,7 @@ SKILL_TRIGGERS = {
         "fastapi react",
         "react frontend",
     ],
-    "databricks-app-python": [
+    "databricks-apps-python": [
         "python app",
         "streamlit",
         "dash",
