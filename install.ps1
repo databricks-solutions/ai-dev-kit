@@ -1402,6 +1402,8 @@ function Install-Skills {
                 Write-Ok "Agent skills ($agentCount) -> $shortDir"
             } elseif ($agentSuccess -gt 0) {
                 Write-Warn "Agent skills (only $agentSuccess of $agentCount installed) -> $shortDir"
+            } else {
+                Write-Warn "Agent skills (0 of $agentCount installed) -> $shortDir"
             }
         }
     }
