@@ -21,6 +21,11 @@
 #   ./install_skills.sh --install-to-genie --profile prod --local
 #   ./install_skills.sh --list                       # List available skills
 #   ./install_skills.sh --help                       # Show help
+#   ./install_skills.sh --global                     # Install to ~/.claude/skills (Claude global config)
+#   ./install_skills.sh --agents                     # Install to .agents/skills (multi-agent project)
+#   ./install_skills.sh --global --agents            # Install to ~/.agents/skills (global agents config)
+#   ./install_skills.sh --cursor                     # Install to .cursor/skills (Cursor IDE)
+#   ./install_skills.sh --cursor --global            # Install to ~/.cursor/skills (Cursor global)
 #
 
 set -e
@@ -38,6 +43,9 @@ REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/
 SKILLS_DIR=".claude/skills"
 INSTALL_FROM_LOCAL=false
 INSTALL_TO_GENIE=false
+INSTALL_GLOBAL=false
+INSTALL_AGENTS=false
+INSTALL_CURSOR=false
 # Databricks CLI profile for workspace upload (only used with --install-to-genie)
 DB_PROFILE="${DATABRICKS_CONFIG_PROFILE:-DEFAULT}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -187,9 +195,13 @@ show_help() {
     echo "  --local                 Install from local files instead of downloading"
     echo "  --install-to-genie      After install, upload ./.claude/skills to workspace"
     echo "                          /Users/<you>/.assistant/skills for Genie Code (uses cwd; requires databricks CLI)"
+    echo "                          With --global: uploads to /Workspace/.assistant/skills (workspace-shared)"
     echo "  --profile <name>        Databricks config profile for workspace upload (default: DEFAULT or \$DATABRICKS_CONFIG_PROFILE)"
     echo "  --mlflow-version <ref>  Pin MLflow skills to specific version/branch/tag (default: main)"
     echo "  --apx-version <ref>    Pin APX skills to specific version/branch/tag (default: main)"
+    echo "  --global                Install to user's home directory (~/.claude/skills by default)"
+    echo "  --agents                Install to .agents/skills (multi-agent); with --global: ~/.agents/skills"
+    echo "  --cursor                Install to .cursor/skills (Cursor IDE); with --global: ~/.cursor/skills"
     echo ""
     echo "Examples:"
     echo "  ./install_skills.sh                          # Install all skills"
@@ -201,7 +213,13 @@ show_help() {
     echo "  ./install_skills.sh --local                  # Install all from local directory"
     echo "  ./install_skills.sh --install-to-genie       # Install all, then upload to workspace for Genie Code"
     echo "  ./install_skills.sh --install-to-genie --profile prod  # Same with explicit Databricks CLI profile"
+    echo "  ./install_skills.sh --install-to-genie --global  # Upload to /Workspace/.assistant/skills (shared)"
     echo "  ./install_skills.sh --list                   # List available skills"
+    echo "  ./install_skills.sh --global                 # Install to ~/.claude/skills"
+    echo "  ./install_skills.sh --agents                 # Install to .agents/skills"
+    echo "  ./install_skills.sh --global --agents        # Install to ~/.agents/skills"
+    echo "  ./install_skills.sh --cursor                 # Install to .cursor/skills"
+    echo "  ./install_skills.sh --cursor --global        # Install to ~/.cursor/skills"
     echo ""
     echo -e "${GREEN}Databricks Skills:${NC}"
     for skill in $DATABRICKS_SKILLS; do
@@ -308,17 +326,24 @@ install_skills_to_genie_workspace() {
     echo -e "Local skills (cwd-relative): ${SKILLS_DIR}/ → ${abs_skills_dir}"
     echo ""
 
-    local user_name
-    user_name=$(databricks current-user me --profile "$DB_PROFILE" --output json 2>/dev/null | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('userName', ''))" 2>/dev/null || echo "")
-    if [ -z "$user_name" ]; then
-        echo -e "${RED}Error: Could not determine workspace user. Check authentication and --profile.${NC}"
-        return 1
-    fi
+    local skills_path
+    if [ "$INSTALL_GLOBAL" = true ]; then
+        skills_path="/Workspace/.assistant/skills"
+        echo -e "Workspace path: ${skills_path} (global)"
+        echo ""
+    else
+        local user_name
+        user_name=$(databricks current-user me --profile "$DB_PROFILE" --output json 2>/dev/null | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('userName', ''))" 2>/dev/null || echo "")
+        if [ -z "$user_name" ]; then
+            echo -e "${RED}Error: Could not determine workspace user. Check authentication and --profile.${NC}"
+            return 1
+        fi
 
-    local skills_path="/Users/$user_name/.assistant/skills"
-    echo -e "Workspace user: ${user_name}"
-    echo -e "Workspace path: ${skills_path}"
-    echo ""
+        skills_path="/Users/$user_name/.assistant/skills"
+        echo -e "Workspace user: ${user_name}"
+        echo -e "Workspace path: ${skills_path}"
+        echo ""
+    fi
 
     echo -e "${GREEN}Creating workspace skills directory...${NC}"
     databricks workspace mkdirs "$skills_path" --profile "$DB_PROFILE" 2>/dev/null || true
@@ -552,6 +577,18 @@ while [ $# -gt 0 ]; do
             INSTALL_FROM_LOCAL=true
             shift
             ;;
+        --global)
+            INSTALL_GLOBAL=true
+            shift
+            ;;
+        --agents)
+            INSTALL_AGENTS=true
+            shift
+            ;;
+        --cursor)
+            INSTALL_CURSOR=true
+            shift
+            ;;
         --install-to-genie|--deploy-to-assistant)
             INSTALL_TO_GENIE=true
             shift
@@ -610,14 +647,27 @@ if [ -z "$SKILLS_TO_INSTALL" ]; then
     SKILLS_TO_INSTALL="$ALL_SKILLS"
 fi
 
+# Resolve SKILLS_DIR based on --cursor, --agents, and --global
+if [ "$INSTALL_CURSOR" = true ] && [ "$INSTALL_GLOBAL" = true ]; then
+    SKILLS_DIR="${HOME}/.cursor/skills"
+elif [ "$INSTALL_CURSOR" = true ]; then
+    SKILLS_DIR=".cursor/skills"
+elif [ "$INSTALL_AGENTS" = true ] && [ "$INSTALL_GLOBAL" = true ]; then
+    SKILLS_DIR="${HOME}/.agents/skills"
+elif [ "$INSTALL_GLOBAL" = true ]; then
+    SKILLS_DIR="${HOME}/.claude/skills"
+elif [ "$INSTALL_AGENTS" = true ]; then
+    SKILLS_DIR=".agents/skills"
+fi
+
 # Header
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║        Databricks Skills Installer for Claude Code         ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check if we're in a git repo or project directory
-if [ ! -d ".git" ] && [ ! -f "pyproject.toml" ] && [ ! -f "package.json" ] && [ ! -f "databricks.yml" ]; then
+# Check if we're in a git repo or project directory (skip when installing globally)
+if [ "$INSTALL_GLOBAL" = false ] && [ ! -d ".git" ] && [ ! -f "pyproject.toml" ] && [ ! -f "package.json" ] && [ ! -f "databricks.yml" ]; then
     echo -e "${YELLOW}Warning: This doesn't look like a project root directory.${NC}"
     echo -e "Current directory: $(pwd)"
     read -p "Continue anyway? (y/N): " confirm

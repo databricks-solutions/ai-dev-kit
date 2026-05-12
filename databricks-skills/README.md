@@ -4,7 +4,7 @@ Skills that teach Claude Code how to work effectively with Databricks - providin
 
 ## Installation
 
-Run from your **project root** (the directory where you want `.claude/skills` created).
+Run from your **project root** (the directory where you want `.claude/skills` created), or pass `--global` to install into your home directory instead.
 
 ### From this repository (local script)
 
@@ -57,7 +57,38 @@ curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main
 curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie --profile prod
 ```
 
-`--install-to-genie` uploads the tree under `./.claude/skills` to the workspace (requires the `databricks` CLI).
+`--install-to-genie` uploads the tree under `./.claude/skills` to the workspace (requires the `databricks` CLI). By default it uploads to `/Users/<you>/.assistant/skills`. Combine with `--global` to upload to the workspace-shared location `/Workspace/.assistant/skills` instead — useful when you want a single set of skills available to every user in the workspace.
+
+### Install location
+
+By default skills install to `./.claude/skills` in the current directory. Use these flags to change the destination:
+
+| Flags                  | Destination               | Use case                                  |
+| ---------------------- | ------------------------- | ----------------------------------------- |
+| _(none)_               | `./.claude/skills`        | Per-project install for Claude Code       |
+| `--global`             | `~/.claude/skills`        | Make skills available in every project    |
+| `--agents`             | `./.agents/skills`        | Per-project install for Codex/Copilot/... |
+| `--global --agents`    | `~/.agents/skills`        | Global install for multi-agent tools      |
+| `--cursor`             | `./.cursor/skills`        | Per-project install for Cursor IDE        |
+| `--cursor --global`    | `~/.cursor/skills`        | Global install for Cursor IDE             |
+
+Examples:
+
+```bash
+# Install all skills globally for Claude Code
+./databricks-skills/install_skills.sh --global
+
+# Install for Cursor in the current project
+./databricks-skills/install_skills.sh --cursor
+
+# Same via curl, globally for the .agents/ convention
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --global --agents
+
+# Install + upload to workspace-shared Genie skills path (/Workspace/.assistant/skills)
+./databricks-skills/install_skills.sh --global --install-to-genie
+```
+
+When `--global` is set, the installer skips the project-root sanity check. With `--install-to-genie`, `--global` also switches the workspace destination from `/Users/<you>/.assistant/skills` to the shared `/Workspace/.assistant/skills`.
 
 This creates `.claude/skills/` and downloads all skills. Claude Code loads them automatically.
 - **Databricks skills** are downloaded from this repository
