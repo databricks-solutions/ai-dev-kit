@@ -2,6 +2,11 @@
 
 Skills that teach Claude Code how to work effectively with Databricks - providing patterns, best practices, and code examples that work with Databricks MCP tools.
 
+> **Note**: the [`imported/`](./imported/) subdirectory is synced from
+> [`databricks/databricks-agent-skills/experimental/`](https://github.com/databricks/databricks-agent-skills/tree/main/experimental).
+> See [SYNC.md](./SYNC.md) for the mechanism. **Do not edit files under
+> `imported/`** — open PRs against the upstream repo instead.
+
 ## Installation
 
 Run from your **project root** (the directory where you want `.claude/skills` created).
