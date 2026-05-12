@@ -915,12 +915,16 @@ resolve_skills() {
         # Separate into DB, MLflow, APX, and Agent buckets
         db_skills=""
         for skill in $user_list; do
-            if echo "$MLFLOW_SKILLS" | grep -qw "$skill"; then
+            # Exact-match bucketing — `grep -w` treats `-` as a word boundary, so e.g.
+            # `grep -w databricks` would match `databricks-app-apx` and misclassify
+            # an agent install-name (`databricks`) as APX.
+            if echo "$MLFLOW_SKILLS" | tr ' ' '\n' | grep -Fxq "$skill"; then
                 mlflow_skills="${mlflow_skills:+$mlflow_skills }$skill"
-            elif echo "$APX_SKILLS" | grep -qw "$skill"; then
+            elif echo "$APX_SKILLS" | tr ' ' '\n' | grep -Fxq "$skill"; then
                 apx_skills="${apx_skills:+$apx_skills }$skill"
-            elif echo "$AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | grep -qw "$skill"; then
-                agent_skills="${agent_skills:+$agent_skills }$(echo "$AGENT_SKILLS" | tr ' ' '\n' | grep -w ".*:${skill}\|^${skill}$")"
+            elif echo "$AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | grep -Fxq "$skill"; then
+                # Look up the full source:install-name entry (or bare entry if no colon)
+                agent_skills="${agent_skills:+$agent_skills }$(echo "$AGENT_SKILLS" | tr ' ' '\n' | grep -E "^.*:${skill}$|^${skill}$")"
             else
                 db_skills="${db_skills:+$db_skills }$skill"
             fi
@@ -1529,6 +1533,8 @@ install_skills() {
                 ok "Agent skills ($agent_count) → ${dir#$HOME/}"
             elif [ "$agent_success" -gt 0 ]; then
                 warn "Agent skills (only $agent_success of $agent_count installed) → ${dir#$HOME/}"
+            else
+                warn "Agent skills (0 of $agent_count installed) → ${dir#$HOME/}"
             fi
         fi
     done
