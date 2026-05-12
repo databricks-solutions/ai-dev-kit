@@ -92,7 +92,7 @@ function OverviewSection() {
                   Skills explain <em>how</em> to do things and reference the tools from databricks-tools-core.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {['databricks-bundles/', 'databricks-app-apx/', 'databricks-app-python/', 'databricks-python-sdk/', 'databricks-mlflow-evaluation/', 'databricks-spark-declarative-pipelines/', 'databricks-synthetic-data-gen/'].map((skill) => (
+                  {['databricks-bundles/', 'databricks-app-apx/', 'databricks-apps-python/', 'databricks-python-sdk/', 'databricks-mlflow-evaluation/', 'databricks-spark-declarative-pipelines/', 'databricks-synthetic-data-gen/'].map((skill) => (
                     <span key={skill} className="text-xs px-2 py-1 rounded bg-[var(--color-accent-primary)]/10 text-[var(--color-text-secondary)] font-mono">
                       {skill}
                     </span>

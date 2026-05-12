@@ -1,24 +1,71 @@
 ---
-name: databricks-app-python
-description: "Builds Python-based Databricks applications using Dash, Streamlit, Gradio, Flask, FastAPI, or Reflex. Handles OAuth authorization (app and user auth), app resources, SQL warehouse and Lakebase connectivity, model serving integration, foundation model APIs, LLM integration, and deployment. Use when building Python web apps, dashboards, ML demos, or REST APIs for Databricks, or when the user mentions Streamlit, Dash, Gradio, Flask, FastAPI, Reflex, or Databricks app."
+name: databricks-apps-python
+description: "Builds Databricks applications. Prefers AppKit (TypeScript + React SDK) for new apps; falls back to Python frameworks (Dash, Streamlit, Gradio, Flask, FastAPI, Reflex) when Python is required. Handles OAuth authorization, app resources, SQL warehouse and Lakebase connectivity, model serving, foundation model APIs, and deployment. Use when building web apps, dashboards, ML demos, or REST APIs for Databricks, or when the user mentions AppKit, Streamlit, Dash, Gradio, Flask, FastAPI, Reflex, or Databricks app."
 ---
 
-# Databricks Python Application
+# Databricks Applications
 
-Build Python-based Databricks applications. For full examples and recipes, see the **[Databricks Apps Cookbook](https://apps-cookbook.dev/)**.
+Build Databricks applications. For full examples and recipes, see the **[Databricks Apps Cookbook](https://apps-cookbook.dev/)**.
 
 ---
 
-## Critical Rules (always follow)
+## AppKit (Preferred for New Apps)
 
-- **MUST** confirm framework choice or use [Framework Selection](#framework-selection) below
+**[AppKit](https://github.com/databricks/appkit)** is the recommended SDK for new Databricks apps. It is a TypeScript + React SDK with a plugin architecture, built-in caching, telemetry, and end-to-end type safety.
+
+### Requirements
+- Node.js v22+
+- Databricks CLI v0.295.0+
+
+### Scaffold a new app
+```bash
+databricks apps init
+```
+This interactive command scaffolds the full project, installs dependencies, and optionally deploys.
+
+### Deploy
+```bash
+databricks apps deploy
+```
+
+### AppKit plugins
+| Plugin | Purpose |
+|--------|---------|
+| **Analytics** | SQL queries against Databricks SQL Warehouses — file-based, typed, cached |
+| **Genie** | Conversational AI/BI interface with natural language queries |
+| **Files** | Browse/upload Unity Catalog Volumes |
+| **Lakebase** | OLTP PostgreSQL via Lakebase with OAuth token management |
+
+### AI-assisted development
+```bash
+# Install agent skills for AI-powered scaffolding
+databricks experimental aitools skills install
+
+# Query AppKit docs inline
+npx @databricks/appkit docs "your question here"
+```
+
+### AppKit documentation
+- **[AppKit Docs](https://databricks.github.io/appkit/docs/)** — getting started, plugins, API reference
+- **[AI-assisted development](https://databricks.github.io/appkit/docs/development/ai-assisted-development)** — guidance for code assistants
+- **[llms.txt](https://databricks.github.io/appkit/llms.txt)** — machine-readable docs for AI context
+
+---
+
+## Python Apps (alternative)
+
+Use Python when: the team is Python-only, you need Streamlit/Dash/Gradio, or you are extending an existing Python app.
+
+## Critical Rules for Python apps (always follow)
+
+- **MUST** confirm framework choice or use [Python Framework Selection](#python-framework-selection) below
 - **MUST** use SDK `Config()` for authentication (never hardcode tokens)
 - **MUST** use `app.yaml` `valueFrom` for resources (never hardcode resource IDs)
 - **MUST** use `dash-bootstrap-components` for Dash app layout and styling
 - **MUST** use `@st.cache_resource` for Streamlit database connections
 - **MUST** deploy Flask with Gunicorn, FastAPI with uvicorn (not dev servers)
 
-## Required Steps
+## Required Steps for Python apps
 
 Copy this checklist and verify each item:
 ```
@@ -31,7 +78,7 @@ Copy this checklist and verify each item:
 
 ---
 
-## Framework Selection
+## Python Framework Selection
 
 | Framework | Best For | app.yaml Command |
 |-----------|----------|------------------|
@@ -82,7 +129,7 @@ Copy this checklist and verify each item:
 
 1. Determine the task type:
 
-   **New app from scratch?** → Use [Framework Selection](#framework-selection), then read [3-frameworks.md](3-frameworks.md)
+   **New app from scratch?** → Use [AppKit](#appkit-preferred-for-new-apps) (`databricks apps init`). Fall back to [Python Framework Selection](#python-framework-selection) only if Python is required.
    **Setting up authorization?** → Read [1-authorization.md](1-authorization.md)
    **Connecting to data/resources?** → Read [2-app-resources.md](2-app-resources.md)
    **Using Lakebase (PostgreSQL)?** → Read [5-lakebase.md](5-lakebase.md)
@@ -195,6 +242,7 @@ class EntityIn(BaseModel):
 
 ## Official Documentation
 
+- **[AppKit](https://databricks.github.io/appkit/docs/)** — preferred SDK for new apps (TypeScript + React)
 - **[Databricks Apps Overview](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/)** — main docs hub
 - **[Apps Cookbook](https://apps-cookbook.dev/)** — ready-to-use code snippets (Streamlit, Dash, Reflex, FastAPI)
 - **[Authorization](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/auth)** — app auth and user auth
