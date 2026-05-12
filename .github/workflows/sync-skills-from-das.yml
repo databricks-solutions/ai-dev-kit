@@ -1,0 +1,49 @@
+name: Sync skills from databricks-agent-skills
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Pull experimental skills from upstream subtree
+        run: |
+          git subtree pull \
+            --prefix=databricks-skills/imported \
+            https://github.com/databricks/databricks-agent-skills \
+            experimental-only \
+            --squash \
+            -m "chore(skills): sync from databricks-agent-skills/experimental"
+
+      - name: Open PR if there is drift
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: sync/databricks-agent-skills
+          title: "chore(skills): sync from databricks-agent-skills/experimental"
+          body: |
+            Automated sync from
+            [databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills)
+            `experimental-only` branch (`git subtree pull`).
+
+            See [`databricks-skills/SYNC.md`](databricks-skills/SYNC.md) for the
+            mechanism. Edits to imported skills should be made upstream; this
+            PR will overwrite them on next sync.
+          delete-branch: true
