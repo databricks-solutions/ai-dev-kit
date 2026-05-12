@@ -210,7 +210,7 @@ When running `/skill-test <skill-name>`, the framework follows this workflow:
 2. **Generate Phase**: Invoke the skill to generate a response
 3. **Fixture Phase** (if test requires infrastructure):
    - Create catalog/schema via `mcp__databricks__execute_sql`
-   - Create volume and upload test files via `mcp__databricks__upload_file`
+   - Create volume and upload test files via `mcp__databricks__upload_to_volume`
    - Create any required source tables
 4. **Execute Phase**:
    - Extract code blocks from response

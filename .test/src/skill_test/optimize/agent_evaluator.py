@@ -1,20 +1,19 @@
 """Agent-based evaluator: run real Claude Code agent and score behavior.
 
 GEPA-compatible evaluator that runs a Claude Code instance via the Agent SDK,
-captures the full execution trace, and scores using trace-based MLflow judges
-with adaptive evaluation criteria plus deterministic trace scorers.
+captures the full execution trace, and scores using focused field-based MLflow
+judges plus deterministic scorers.
 
-Trace-based judges (using ``{{ trace }}`` template) inspect the actual
-execution trace — tool calls, parameters, outputs, errors — and can load
-domain-specific evaluation rubrics via ``read_eval_criteria`` /
-``read_eval_reference`` tools registered in MLflow's JudgeToolRegistry.
+Each focused judge asks ONE clear question and makes 1 LLM call using
+``{{ inputs }}/{{ outputs }}`` templates (no agentic tool-calling loop).
+Eval criteria are loaded on-demand via ``skills=`` parameter when supported.
 
 Scoring weights:
-  25% Effectiveness delta (WITH vs WITHOUT, per-dimension)
-  20% Correctness (trace-based judge: facts, APIs, tool correctness)
-  15% Completeness (trace-based judge: task completion, coverage)
-  15% Guideline adherence (trace-based judge: patterns, tool selection)
-  10% Assertion coverage (deterministic: expected_facts + expected_patterns)
+  20% Effectiveness delta (WITH vs WITHOUT, per-dimension)
+  20% Correctness (field-based judge: facts, APIs, code syntax)
+  15% Completeness (field-based judge: task completion, coverage)
+  15% Guideline adherence (field-based judge: patterns, conventions)
+  15% Assertion coverage (deterministic: expected_facts + expected_patterns)
    5% Execution success (deterministic: tool call success ratio)
    5% Token efficiency (deterministic: candidate size)
   -5% Regression penalty (conditional: regression judge)
@@ -38,14 +37,12 @@ from ..scorers.trace import (
 from .assertions import run_all_assertions, summarize_failures
 from .judges import (
     JudgeFeedback,
-    _categorical_to_float,
+    _safe_parse_score,
     create_correctness_judge,
     create_completeness_judge,
     create_guideline_adherence_judge,
-    create_trace_correctness_judge,
-    create_trace_completeness_judge,
-    create_trace_guideline_judge,
     create_regression_judge,
+    discover_skill_paths,
     run_judge_safe,
 )
 from .utils import count_tokens
@@ -112,12 +109,14 @@ def _compute_execution_success(agent_result: AgentResult) -> float:
 
 
 class AgentEvaluator:
-    """GEPA-compatible evaluator using real Claude Code agent + trace-based judges.
+    """GEPA-compatible evaluator using real Claude Code agent + focused judges.
 
-    Three trace-based judges (correctness, completeness, guideline adherence)
-    inspect the actual execution trace via MLflow's tool-calling loop.  They
-    can call ``read_eval_criteria`` and ``read_eval_reference`` to load
-    domain-specific evaluation rubrics.
+    Three focused field-based judges (correctness, completeness, guideline
+    adherence) each ask ONE clear question and make 1 LLM call.  They use
+    ``{{ inputs }}/{{ outputs }}`` templates — no agentic tool-calling loop.
+
+    Eval criteria are loaded on-demand via ``skills=`` parameter on
+    ``make_judge()`` when supported by MLflow (PR #21725).
 
     Deterministic assertions and trace scorers remain as the static spine.
 
@@ -163,39 +162,22 @@ class AgentEvaluator:
         # Caches for WITHOUT-skill runs (keyed by prompt hash)
         self._baseline_response_cache: dict[str, str] = {}
         self._baseline_trace_cache: dict[str, dict] = {}
-        self._baseline_mlflow_trace_cache: dict[str, Any] = {}
-        # Per-judge baseline caches (WITHOUT trace-based results are stable)
+        # Per-judge baseline caches (WITHOUT results are stable per prompt)
         self._baseline_correctness_cache: dict[str, JudgeFeedback] = {}
         self._baseline_completeness_cache: dict[str, JudgeFeedback] = {}
         self._cache_lock = threading.Lock()
-        self._trace_judges_disabled = False
 
-        # --- Adaptive eval criteria (from MLflow #21255 design) ---
-        from .eval_criteria import discover_eval_criteria
-        from .judge_tools import register_eval_tools
+        # --- Skill discovery (static spine + adaptive layer) ---
+        skill_paths = discover_skill_paths(tool_modules=tool_modules)
 
-        self._eval_criteria = discover_eval_criteria()
-        if tool_modules:
-            self._eval_criteria = self._eval_criteria.filter_by_modules(tool_modules)
-        register_eval_tools(self._eval_criteria)
-
-        # --- Trace-based judges (primary — when mlflow_trace is available) ---
-        # All use judge_model from --judge-model CLI flag.
-        self._trace_correctness_judge = create_trace_correctness_judge(
-            self._eval_criteria, skill_guidelines, judge_model=judge_model
+        # --- Focused field-based judges (1 LLM call each) ---
+        self._correctness_judge = create_correctness_judge(skill_paths=skill_paths, judge_model=judge_model)
+        self._completeness_judge = create_completeness_judge(skill_paths=skill_paths, judge_model=judge_model)
+        self._guideline_judge = create_guideline_adherence_judge(
+            skill_paths=skill_paths,
+            skill_guidelines=skill_guidelines,
+            judge_model=judge_model,
         )
-        self._trace_completeness_judge = create_trace_completeness_judge(
-            self._eval_criteria, skill_guidelines, judge_model=judge_model
-        )
-        self._trace_guideline_judge = create_trace_guideline_judge(
-            self._eval_criteria, skill_guidelines, judge_model=judge_model
-        )
-
-        # --- Field-based judges (fallback — when mlflow_trace is None) ---
-        self._field_correctness_judge = create_correctness_judge(skill_guidelines, judge_model=judge_model)
-        self._field_completeness_judge = create_completeness_judge(judge_model=judge_model)
-        self._field_guideline_judge = create_guideline_adherence_judge(skill_guidelines, judge_model=judge_model)
-
         self._regression_judge = create_regression_judge(judge_model=judge_model)
 
     def _run_agent(self, prompt: str, skill_md: str | None = None) -> AgentResult:
@@ -211,15 +193,14 @@ class AgentEvaluator:
             skill_name=self._skill_name,
         )
 
-    def _get_baseline(self, prompt: str) -> tuple[str, dict, Any]:
-        """Get WITHOUT-skill baseline response, trace, and MLflow trace, cached by prompt hash."""
+    def _get_baseline(self, prompt: str) -> tuple[str, dict]:
+        """Get WITHOUT-skill baseline response and trace dict, cached by prompt hash."""
         key = _prompt_hash(prompt)
         with self._cache_lock:
             if key in self._baseline_response_cache:
                 return (
                     self._baseline_response_cache[key],
                     self._baseline_trace_cache[key],
-                    self._baseline_mlflow_trace_cache.get(key),
                 )
         # Agent run is expensive — release lock while running
         result = self._run_agent(prompt, skill_md=None)
@@ -227,11 +208,9 @@ class AgentEvaluator:
             if key not in self._baseline_response_cache:
                 self._baseline_response_cache[key] = result.response_text
                 self._baseline_trace_cache[key] = result.trace_metrics.to_dict()
-                self._baseline_mlflow_trace_cache[key] = result.mlflow_trace
             return (
                 self._baseline_response_cache[key],
                 self._baseline_trace_cache[key],
-                self._baseline_mlflow_trace_cache.get(key),
             )
 
     def __call__(
@@ -290,7 +269,7 @@ class AgentEvaluator:
 
         # Phase 2: Run agent WITHOUT skill (cached)
         logger.info("Running agent WITHOUT skill (cached if available)...")
-        without_response, without_trace, without_mlflow_trace = self._get_baseline(prompt)
+        without_response, without_trace = self._get_baseline(prompt)
 
         with_response = with_result.response_text
         with_trace = with_result.trace_metrics.to_dict()
@@ -316,68 +295,25 @@ class AgentEvaluator:
 
         baseline_key = _prompt_hash(prompt)
 
-        # Phase 3: Multi-judge scoring
-        # Try trace-based judges first (richer signal from actual execution).
-        # If trace judge fails (model doesn't support tool-calling + structured
-        # output, or trace is None), fall back to field-based judges.
-        # Circuit breaker: after first failure, skip trace judges entirely
-        # to avoid wasting API calls on a model that can't handle them.
-        def _judge_with_fallback(
-            trace_judge,
-            field_judge,
-            *,
-            mlflow_trace,
-            response_text,
-            judge_name,
-        ) -> JudgeFeedback:
-            """Try trace-based judge, fall back to field-based on failure."""
-            with self._cache_lock:
-                trace_disabled = self._trace_judges_disabled
-            if mlflow_trace is not None and not trace_disabled:
-                fb = run_judge_safe(
-                    trace_judge,
-                    trace=mlflow_trace,
-                    expectations=expectations_dict,
-                    name=judge_name,
-                )
-                # Trace judge succeeded if it returned a real verdict
-                if "Judge error" not in fb.rationale:
-                    return fb
-                # Circuit breaker: disable trace judges for this evaluator
-                with self._cache_lock:
-                    if not self._trace_judges_disabled:
-                        self._trace_judges_disabled = True
-                        logger.warning(
-                            "Trace-based judges not supported by current model — "
-                            "using field-based judges for all remaining evaluations"
-                        )
-
-            # Field-based judge (always works)
-            return run_judge_safe(
-                field_judge,
-                inputs=prompt,
-                outputs=response_text,
-                expectations=expectations_dict,
-                name=judge_name,
-            )
+        # Phase 3: Focused judge scoring (1 LLM call each, no trace/field fallback)
 
         # Correctness: WITH + WITHOUT (WITHOUT cached)
-        correctness_with_fb = _judge_with_fallback(
-            self._trace_correctness_judge,
-            self._field_correctness_judge,
-            mlflow_trace=with_result.mlflow_trace,
-            response_text=with_response,
-            judge_name="correctness_with",
+        correctness_with_fb = run_judge_safe(
+            self._correctness_judge,
+            inputs=prompt,
+            outputs=with_response,
+            expectations=expectations_dict,
+            name="correctness_with",
         )
         with self._cache_lock:
             need_correctness_baseline = baseline_key not in self._baseline_correctness_cache
         if need_correctness_baseline:
-            fb = _judge_with_fallback(
-                self._trace_correctness_judge,
-                self._field_correctness_judge,
-                mlflow_trace=without_mlflow_trace,
-                response_text=without_response,
-                judge_name="correctness_without",
+            fb = run_judge_safe(
+                self._correctness_judge,
+                inputs=prompt,
+                outputs=without_response,
+                expectations=expectations_dict,
+                name="correctness_without",
             )
             with self._cache_lock:
                 if baseline_key not in self._baseline_correctness_cache:
@@ -386,22 +322,22 @@ class AgentEvaluator:
             correctness_without_fb = self._baseline_correctness_cache[baseline_key]
 
         # Completeness: WITH + WITHOUT (WITHOUT cached)
-        completeness_with_fb = _judge_with_fallback(
-            self._trace_completeness_judge,
-            self._field_completeness_judge,
-            mlflow_trace=with_result.mlflow_trace,
-            response_text=with_response,
-            judge_name="completeness_with",
+        completeness_with_fb = run_judge_safe(
+            self._completeness_judge,
+            inputs=prompt,
+            outputs=with_response,
+            expectations=expectations_dict,
+            name="completeness_with",
         )
         with self._cache_lock:
             need_completeness_baseline = baseline_key not in self._baseline_completeness_cache
         if need_completeness_baseline:
-            fb = _judge_with_fallback(
-                self._trace_completeness_judge,
-                self._field_completeness_judge,
-                mlflow_trace=without_mlflow_trace,
-                response_text=without_response,
-                judge_name="completeness_without",
+            fb = run_judge_safe(
+                self._completeness_judge,
+                inputs=prompt,
+                outputs=without_response,
+                expectations=expectations_dict,
+                name="completeness_without",
             )
             with self._cache_lock:
                 if baseline_key not in self._baseline_completeness_cache:
@@ -410,20 +346,20 @@ class AgentEvaluator:
             completeness_without_fb = self._baseline_completeness_cache[baseline_key]
 
         # Guideline adherence: WITH only
-        guideline_adherence_fb = _judge_with_fallback(
-            self._trace_guideline_judge,
-            self._field_guideline_judge,
-            mlflow_trace=with_result.mlflow_trace,
-            response_text=with_response,
-            judge_name="guideline_adherence",
+        guideline_adherence_fb = run_judge_safe(
+            self._guideline_judge,
+            inputs=prompt,
+            outputs=with_response,
+            expectations=expectations_dict,
+            name="guideline_adherence",
         )
 
-        # Convert categorical verdicts to float scores
-        correctness_with = _categorical_to_float(correctness_with_fb.value)
-        correctness_without = _categorical_to_float(correctness_without_fb.value)
-        completeness_with = _categorical_to_float(completeness_with_fb.value)
-        completeness_without = _categorical_to_float(completeness_without_fb.value)
-        guideline_adherence_score = _categorical_to_float(guideline_adherence_fb.value)
+        # Convert binary yes/no verdicts to float scores
+        correctness_with = _safe_parse_score(correctness_with_fb.value)
+        correctness_without = _safe_parse_score(correctness_without_fb.value)
+        completeness_with = _safe_parse_score(completeness_with_fb.value)
+        completeness_without = _safe_parse_score(completeness_without_fb.value)
+        guideline_adherence_score = _safe_parse_score(guideline_adherence_fb.value)
 
         # Per-dimension effectiveness deltas
         correctness_delta = correctness_with - correctness_without
@@ -491,19 +427,20 @@ class AgentEvaluator:
         else:
             token_efficiency = 1.0
 
-        # Composite score: trace judges subsume tool_correctness + behavioral
+        # Composite score
         quality_composite = (correctness_with + completeness_with + guideline_adherence_score) / 3.0
         assertion_coverage = 0.5 * fact_score + 0.5 * pattern_score
 
+        # Updated weights: assertion_coverage 10%→15%, effectiveness_delta 25%→20%
         final_score = max(
             0.0,
             min(
                 1.0,
-                0.25 * effectiveness_delta
+                0.20 * effectiveness_delta
                 + 0.20 * correctness_with
                 + 0.15 * completeness_with
                 + 0.15 * guideline_adherence_score
-                + 0.10 * assertion_coverage
+                + 0.15 * assertion_coverage
                 + 0.05 * execution_success
                 + 0.05 * token_efficiency
                 - 0.05 * regression_penalty,
@@ -656,7 +593,7 @@ def create_agent_evaluator(
     mlflow_experiment: str | None = None,
     tool_modules: list[str] | None = None,
 ) -> Callable:
-    """Factory for agent-based evaluator with trace-based judges.
+    """Factory for agent-based evaluator with focused judges.
 
     Returns a GEPA-compatible callable: (candidate, example) -> (score, side_info)
 
@@ -670,7 +607,7 @@ def create_agent_evaluator(
 
     skill_guidelines = _collect_skill_guidelines(skill_name)
     if skill_guidelines:
-        logger.info("Loaded %d domain guidelines for agent trace judges", len(skill_guidelines))
+        logger.info("Loaded %d domain guidelines for judges", len(skill_guidelines))
 
     return AgentEvaluator(
         original_token_counts=original_token_counts,
@@ -696,7 +633,7 @@ def build_agent_eval_background(
 ) -> str:
     """Build GEPA reflection context specific to agent evaluation.
 
-    Highlights trace-based judge signals and adaptive eval criteria.
+    Highlights focused judge signals and skill discovery.
     """
     baseline_desc = ""
     if baseline_scores:
@@ -739,14 +676,12 @@ def build_agent_eval_background(
     return (
         f"You are refining SKILL.md for '{skill_name}'.\n"
         "The skill is scored by a real Claude Code agent that executes tasks.\n"
-        "Three trace-based MLflow judges inspect the actual execution trace:\n"
-        "  1. CORRECTNESS — facts, API references, code syntax, tool call accuracy\n"
-        "  2. COMPLETENESS — all parts addressed, expected facts/patterns present\n"
-        "  3. GUIDELINE ADHERENCE — Databricks patterns, tool selection, conventions\n"
-        "Each judge returns 'excellent', 'acceptable', or 'poor' with rationale.\n\n"
-        "Judges can load domain-specific rubrics (SQL patterns, tool selection guides)\n"
-        "via read_eval_criteria/read_eval_reference tools — their rationale includes\n"
-        "trace-specific evidence (which spans, which tool calls, which errors).\n\n"
+        "Three focused MLflow judges each ask ONE question (1 LLM call each):\n"
+        "  1. CORRECTNESS — Is the response factually and technically correct? (yes/no)\n"
+        "  2. COMPLETENESS — Does it fully address the question? (yes/no)\n"
+        "  3. GUIDELINE ADHERENCE — Does it follow Databricks conventions? (yes/no)\n\n"
+        "Judges load domain-specific eval criteria on-demand via skills= parameter.\n"
+        "Deterministic scorers check tool usage, assertions, and token efficiency.\n\n"
         "Use Judge_correctness_with/without for accuracy feedback.\n"
         "Use Judge_completeness_with/without for coverage feedback.\n"
         "Use Judge_guideline_adherence for pattern compliance feedback.\n"

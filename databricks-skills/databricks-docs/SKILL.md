@@ -16,7 +16,7 @@ This is a **reference skill**, not an action skill. Use it to:
 - Find detailed information to inform how you use MCP tools
 - Discover features and capabilities you may not know about
 
-**Always prefer using MCP tools for actions** (execute_sql, create_or_update_pipeline, etc.) and **load specific skills for workflows** (databricks-python-sdk, databricks-spark-declarative-pipelines, etc.). Use this skill when you need reference documentation.
+**Always prefer using MCP tools for actions** (execute_sql, manage_pipeline, etc.) and **load specific skills for workflows** (databricks-python-sdk, databricks-spark-declarative-pipelines, etc.). Use this skill when you need reference documentation.
 
 ## How to Use
 
@@ -47,7 +47,7 @@ The llms.txt file is organized by category:
 
 1. Load `databricks-spark-declarative-pipelines` skill for workflow patterns
 2. Use this skill to fetch docs if you need clarification on specific DLT features
-3. Use `create_or_update_pipeline` MCP tool to actually create the pipeline
+3. Use `manage_pipeline(action="create_or_update")` MCP tool to actually create the pipeline
 
 **Scenario:** User asks about an unfamiliar Databricks feature
 

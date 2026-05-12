@@ -13,11 +13,11 @@ When processing documents with AI Functions, apply this order of preference for 
 | Stage | Preferred function | Use `ai_query` when... |
 |---|---|---|
 | Parse binary docs (PDF, DOCX, images) | `ai_parse_document` | Need image-level reasoning |
-| Extract flat fields from text | `ai_extract` | Schema has nested arrays |
+| Extract fields from text (flat or nested) | `ai_extract` | Schema exceeds 128 fields or 7 nesting levels |
 | Classify document type or status | `ai_classify` | More than 20 categories |
 | Score item similarity / matching | `ai_similarity` | Need cross-document reasoning |
 | Summarize long sections | `ai_summarize` | — |
-| Extract nested JSON (e.g. line items) | `ai_query` with `responseFormat` | (This is the intended use case) |
+| Extract deeply nested JSON | `ai_query` with `responseFormat` | Schema exceeds `ai_extract` limits (128 fields, 7 levels) |
 
 ---
 
@@ -105,11 +105,17 @@ PROMPT   = CFG["prompts"]["extract_invoice"]
 def raw_parsed():
     return (
         spark.read.format("binaryFile").load(VOL_IN)
-        .withColumn("parsed", expr("ai_parse_document(content)"))
+        .withColumn("parsed", expr("ai_parse_document(content, MAP('version', '2.0'))"))
+        .withColumn("text_blocks", expr("""
+            concat_ws('\n', transform(
+                parsed:document:elements,
+                e -> e:content::STRING
+            ))
+        """))
         .selectExpr(
             "path",
-            "parsed:pages[*].elements[*].content AS text_blocks",
-            "parsed:error AS parse_error",
+            "text_blocks",
+            "parsed:error_status AS parse_error",
         )
         .filter("parse_error IS NULL")
     )
@@ -124,7 +130,13 @@ def classified_docs():
         dlt.read("raw_parsed")
         .withColumn(
             "doc_type",
-            expr("ai_classify(text_blocks, array('invoice', 'purchase_order', 'receipt', 'contract', 'other'))")
+            expr("""
+                ai_classify(
+                    text_blocks,
+                    '["invoice", "purchase_order", "receipt", "contract", "other"]',
+                    MAP('version', '2.0')
+                ):response[0]::STRING
+            """)
         )
     )
 
@@ -137,21 +149,39 @@ def extracted_flat():
     return (
         dlt.read("classified_docs")
         .filter("doc_type = 'invoice'")
+        .filter("text_blocks IS NOT NULL")
         .withColumn(
-            "header",
-            expr("ai_extract(text_blocks, array('invoice_number', 'vendor_name', 'issue_date', 'total_amount', 'tax_id'))")
+            "result",
+            expr("""
+                ai_extract(
+                    text_blocks,
+                    '{
+                        "invoice_number": {"type": "string"},
+                        "vendor_name":    {"type": "string"},
+                        "issue_date":     {"type": "string", "description": "dd/mm/yyyy"},
+                        "total_amount":   {"type": "number"},
+                        "tax_id":         {"type": "string"}
+                     }',
+                    MAP('version', '2.0')
+                )
+            """)
         )
-        .select("path", "doc_type", "text_blocks", col("header"))
+        .selectExpr(
+            "path", "doc_type", "text_blocks",
+            "result:response AS header",
+            "result:error_message::STRING AS extract_error"
+        )
     )
 
 
 # ── Stage 3b: Nested JSON extraction (last resort: ai_query) ─────────────────
-# Use ai_query only because line_items is a nested array — ai_extract can't handle it
+# Use ai_query only for deeply nested schemas that exceed ai_extract's 7-level limit
 
 @dlt.table(comment="Nested line items extracted — ai_query used for array schema only")
 def extracted_line_items():
     return (
         dlt.read("extracted_flat")
+        .filter("extract_error IS NULL")
         .withColumn(
             "ai_response",
             expr(f"""
@@ -188,7 +218,7 @@ def vendor_matched():
         extracted.crossJoin(vendors)
         .withColumn(
             "name_similarity",
-            expr("ai_similarity(header.vendor_name, vendor_name)")
+            expr("ai_similarity(header:vendor_name::STRING, vendor_name)")
         )
         .filter("name_similarity > 0.80")
         .orderBy("name_similarity", ascending=False)
@@ -208,10 +238,10 @@ def processed_docs():
         .selectExpr(
             "path",
             "doc_type",
-            "header.invoice_number",
-            "header.vendor_name",
-            "header.issue_date",
-            "header.total_amount",
+            "header:invoice_number::STRING AS invoice_number",
+            "header:vendor_name::STRING AS vendor_name",
+            "header:issue_date::STRING AS issue_date",
+            "header:total_amount::DOUBLE AS total_amount",
             "line_items.line_items AS items",
         )
     )
@@ -220,9 +250,14 @@ def processed_docs():
 @dlt.table(comment="Rows that failed at any extraction stage — review and reprocess")
 def processing_errors():
     return (
-        dlt.read("extracted_line_items")
-        .filter("extraction_error IS NOT NULL")
-        .select("path", "doc_type", col("extraction_error").alias("error"))
+        dlt.read("extracted_flat")
+        .filter("extract_error IS NOT NULL")
+        .select("path", "doc_type", col("extract_error").alias("error"))
+        .unionByName(
+            dlt.read("extracted_line_items")
+            .filter("extraction_error IS NOT NULL")
+            .select("path", "doc_type", col("extraction_error").alias("error"))
+        )
     )
 ```
 
@@ -463,7 +498,7 @@ with mlflow.start_run():
 ## Tips
 
 1. **Parse first, enrich second** — always run `ai_parse_document` as the first stage. Feed its text output to task-specific functions; never pass raw binary to `ai_query`.
-2. **Flat fields → `ai_extract`; nested arrays → `ai_query`** — this is the clearest decision boundary.
+2. **Flat or nested fields → `ai_extract`; deeply nested JSON exceeding 7 levels → `ai_query`** — pass `MAP('version', '2.0')` and access results through `:response`.
 3. **`failOnError => false` is mandatory in batch** — write errors to a sidecar `_errors` table rather than crashing the pipeline.
 4. **Truncate before sending to `ai_query`** — use `LEFT(text, 6000)` or chunk long documents to stay within context window limits.
 5. **Prompts belong in `config.yml`** — never hardcode prompt strings in pipeline code. A prompt change should be a config change, not a code change.

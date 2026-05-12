@@ -63,7 +63,7 @@ print(f"Registered: {uc_model_info.name} version {uc_model_info.version}")
 Run via MCP:
 
 ```
-run_python_file_on_databricks(file_path="./my_agent/log_model.py")
+execute_code(file_path="./my_agent/log_model.py")
 ```
 
 ## Resources for Auto Authentication

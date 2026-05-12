@@ -1,194 +1,337 @@
 ---
 name: databricks-unstructured-pdf-generation
-description: "Generate synthetic PDF documents for RAG and unstructured data use cases. Use when creating test PDFs, demo documents, or evaluation datasets for retrieval systems."
+description: "Generate PDF documents from HTML and upload to Unity Catalog volumes. Use for creating test PDFs, demo documents, reports, or evaluation datasets."
 ---
 
-# Unstructured PDF Generation
+# PDF Generation from HTML
 
-Generate realistic synthetic PDF documents using LLM for RAG (Retrieval-Augmented Generation) and unstructured data use cases.
+Convert HTML content to PDF documents and upload them to Unity Catalog Volumes.
 
 ## Overview
 
-This skill uses the `generate_pdf_documents` MCP tool to create professional PDF documents with:
-- LLM-generated content based on your description
-- Accompanying JSON files with questions and evaluation guidelines (for RAG testing)
-- Automatic upload to Unity Catalog Volumes
+The `generate_and_upload_pdf` MCP tool converts HTML to PDF and uploads to a Unity Catalog Volume. You (the LLM) generate the HTML content, and the tool handles conversion and upload.
+
+## Tool Signature
+
+```
+generate_and_upload_pdf(
+    html_content: str,      # Complete HTML document
+    filename: str,          # PDF filename (e.g., "report.pdf")
+    catalog: str,           # Unity Catalog name
+    schema: str,            # Schema name
+    volume: str = "raw_data",  # Volume name (default: "raw_data")
+    folder: str = None,     # Optional subfolder
+)
+```
+
+**Returns:**
+```json
+{
+    "success": true,
+    "volume_path": "/Volumes/catalog/schema/volume/filename.pdf",
+    "error": null
+}
+```
 
 ## Quick Start
 
-Use the `generate_pdf_documents` MCP tool:
-- `catalog`: "my_catalog"
-- `schema`: "my_schema"
-- `description`: "Technical documentation for a cloud infrastructure platform including setup guides, troubleshooting procedures, and API references."
-- `count`: 10
+Generate a simple PDF:
 
-This generates 10 PDF documents and saves them to `/Volumes/my_catalog/my_schema/raw_data/pdf_documents/` (using default volume and folder).
+```
+generate_and_upload_pdf(
+    html_content='''<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
+        .section { margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>Quarterly Report Q1 2024</h1>
+    <div class="section">
+        <h2>Executive Summary</h2>
+        <p>Revenue increased 15% year-over-year...</p>
+    </div>
+</body>
+</html>''',
+    filename="q1_report.pdf",
+    catalog="my_catalog",
+    schema="my_schema"
+)
+```
 
-### With Custom Location
+## Performance: Generate Multiple PDFs in Parallel
 
-Use the `generate_pdf_documents` MCP tool:
-- `catalog`: "my_catalog"
-- `schema`: "my_schema"
-- `description`: "HR policy documents..."
-- `count`: 10
-- `volume`: "custom_volume"
-- `folder`: "hr_policies"
-- `overwrite_folder`: true
+**IMPORTANT**: PDF generation and upload can take 2-5 seconds per document. When generating multiple PDFs, **call the tool in parallel** to maximize throughput.
 
-## Parameters
+### Example: Generate 5 PDFs in Parallel
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `catalog` | string | Yes | - | Unity Catalog name |
-| `schema` | string | Yes | - | Schema name |
-| `description` | string | Yes | - | Detailed description of what PDFs should contain |
-| `count` | int | Yes | - | Number of PDFs to generate |
-| `volume` | string | No | `raw_data` | Volume name (created if not exists) |
-| `folder` | string | No | `pdf_documents` | Folder within volume for output files |
-| `doc_size` | string | No | `MEDIUM` | Document size: `SMALL` (~1 page), `MEDIUM` (~5 pages), `LARGE` (~10+ pages) |
-| `overwrite_folder` | bool | No | `false` | If true, deletes existing folder contents first |
+Make 5 simultaneous `generate_and_upload_pdf` calls:
 
-### Document Size Guide
+```
+# Call 1
+generate_and_upload_pdf(
+    html_content="<html>...Employee Handbook content...</html>",
+    filename="employee_handbook.pdf",
+    catalog="hr_catalog", schema="policies", folder="2024"
+)
 
-- **SMALL**: ~1 page, concise content. Best for quick demos or testing.
-- **MEDIUM**: ~4-6 pages, comprehensive coverage. Good balance for most use cases.
-- **LARGE**: ~10+ pages, exhaustive documentation. Use for thorough RAG evaluation.
+# Call 2 (parallel)
+generate_and_upload_pdf(
+    html_content="<html>...Leave Policy content...</html>",
+    filename="leave_policy.pdf",
+    catalog="hr_catalog", schema="policies", folder="2024"
+)
 
-## Output Files
+# Call 3 (parallel)
+generate_and_upload_pdf(
+    html_content="<html>...Code of Conduct content...</html>",
+    filename="code_of_conduct.pdf",
+    catalog="hr_catalog", schema="policies", folder="2024"
+)
 
-For each document, the tool creates two files:
+# Call 4 (parallel)
+generate_and_upload_pdf(
+    html_content="<html>...Benefits Guide content...</html>",
+    filename="benefits_guide.pdf",
+    catalog="hr_catalog", schema="policies", folder="2024"
+)
 
-1. **PDF file** (`<model_id>.pdf`): The generated document
-2. **JSON file** (`<model_id>.json`): Metadata for RAG evaluation
+# Call 5 (parallel)
+generate_and_upload_pdf(
+    html_content="<html>...Remote Work Policy content...</html>",
+    filename="remote_work_policy.pdf",
+    catalog="hr_catalog", schema="policies", folder="2024"
+)
+```
 
-### JSON Structure
+By calling these in parallel (not sequentially), 5 PDFs that would take 15-25 seconds sequentially complete in 3-5 seconds total.
 
-```json
-{
-  "title": "API Authentication Guide",
-  "category": "Technical",
-  "pdf_path": "/Volumes/catalog/schema/volume/folder/doc_001.pdf",
-  "question": "What authentication methods are supported by the API?",
-  "guideline": "Answer should mention OAuth 2.0, API keys, and JWT tokens with their use cases."
-}
+## HTML Best Practices
+
+### Use Complete HTML5 Structure
+
+Always include the full HTML structure:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        /* Your CSS here */
+    </style>
+</head>
+<body>
+    <!-- Your content here -->
+</body>
+</html>
+```
+
+### CSS Features Supported
+
+PlutoPrint supports modern CSS3:
+- Flexbox and Grid layouts
+- CSS variables (`--var-name`)
+- Web fonts (system fonts recommended)
+- Colors, backgrounds, borders
+- Tables with styling
+
+### CSS to Avoid
+
+- Animations and transitions (static PDF)
+- Interactive elements (forms, hover effects)
+- External resources (images via URL) - use embedded base64 if needed
+
+### Professional Document Template
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --text: #202124;
+            --gray: #5f6368;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 50px;
+            color: var(--text);
+            line-height: 1.6;
+        }
+        h1 {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+        }
+        h2 { color: var(--text); margin-top: 30px; }
+        .highlight {
+            background: #e8f0fe;
+            padding: 15px;
+            border-left: 4px solid var(--primary);
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #dadce0;
+            padding: 12px;
+            text-align: left;
+        }
+        th { background: #f1f3f4; }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #dadce0;
+            color: var(--gray);
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Document Title</h1>
+
+    <h2>Section 1</h2>
+    <p>Content here...</p>
+
+    <div class="highlight">
+        <strong>Important:</strong> Key information highlighted here.
+    </div>
+
+    <h2>Data Table</h2>
+    <table>
+        <tr><th>Column 1</th><th>Column 2</th><th>Column 3</th></tr>
+        <tr><td>Data</td><td>Data</td><td>Data</td></tr>
+    </table>
+
+    <div class="footer">
+        Generated on 2024-01-15 | Confidential
+    </div>
+</body>
+</html>
 ```
 
 ## Common Patterns
 
-### Pattern 1: HR Policy Documents
+### Pattern 1: Technical Documentation
 
-Use the `generate_pdf_documents` MCP tool:
-- `catalog`: "ai_dev_kit"
-- `schema`: "hr_demo"
-- `description`: "HR policy documents for a technology company including employee handbook, leave policies, performance review procedures, benefits guide, and workplace conduct guidelines."
-- `count`: 15
-- `folder`: "hr_policies"
-- `overwrite_folder`: true
+Generate API documentation, user guides, or technical specs:
 
-### Pattern 2: Technical Documentation
-
-Use the `generate_pdf_documents` MCP tool:
-- `catalog`: "ai_dev_kit"
-- `schema`: "tech_docs"
-- `description`: "Technical documentation for a SaaS analytics platform including installation guides, API references, troubleshooting procedures, security best practices, and integration tutorials."
-- `count`: 20
-- `folder`: "product_docs"
-- `overwrite_folder`: true
-
-### Pattern 3: Financial Reports
-
-Use the `generate_pdf_documents` MCP tool:
-- `catalog`: "ai_dev_kit"
-- `schema`: "finance_demo"
-- `description`: "Financial documents for a retail company including quarterly reports, expense policies, budget guidelines, and audit procedures."
-- `count`: 12
-- `folder`: "reports"
-- `overwrite_folder`: true
-
-### Pattern 4: Training Materials
-
-Use the `generate_pdf_documents` MCP tool:
-- `catalog`: "ai_dev_kit"
-- `schema`: "training"
-- `description`: "Training materials for new software developers including onboarding guides, coding standards, code review procedures, and deployment workflows."
-- `count`: 8
-- `folder`: "courses"
-- `overwrite_folder`: true
-
-## Workflow
-
-1. **Ask for destination**: Default to `ai_dev_kit` catalog, ask user for schema name
-2. **Get description**: Ask what kind of documents they need
-3. **Generate PDFs**: Call `generate_pdf_documents` MCP tool with appropriate parameters
-4. **Verify output**: Check the volume path for generated files
-
-## Best Practices
-
-1. **Detailed descriptions**: The more specific your description, the better the generated content
-   - BAD: "Generate some HR documents"
-   - GOOD: "HR policy documents for a technology company including employee handbook covering remote work policies, leave policies with PTO and sick leave details, performance review procedures with quarterly and annual cycles, and workplace conduct guidelines"
-
-2. **Appropriate count**:
-   - For demos: 5-10 documents
-   - For RAG testing: 15-30 documents
-   - For comprehensive evaluation: 50+ documents
-
-3. **Folder organization**: Use descriptive folder names that indicate content type
-   - `hr_policies/`
-   - `technical_docs/`
-   - `training_materials/`
-
-4. **Use overwrite_folder**: Set to `true` when regenerating to ensure clean state
-
-## Integration with RAG Pipelines
-
-The generated JSON files are designed for RAG evaluation:
-
-1. **Ingest PDFs**: Use the PDF files as source documents for your vector database
-2. **Test retrieval**: Use the `question` field to query your RAG system
-3. **Evaluate answers**: Use the `guideline` field to assess if the RAG response is correct
-
-Example evaluation workflow:
-```python
-# Load questions from JSON files
-questions = load_json_files(f"/Volumes/{catalog}/{schema}/{volume}/{folder}/*.json")
-
-for q in questions:
-    # Query RAG system
-    response = rag_system.query(q["question"])
-
-    # Evaluate using guideline
-    is_correct = evaluate_response(response, q["guideline"])
+```
+generate_and_upload_pdf(
+    html_content='''<!DOCTYPE html>
+<html>
+<head><style>
+    body { font-family: monospace; margin: 40px; }
+    code { background: #f4f4f4; padding: 2px 6px; }
+    pre { background: #f4f4f4; padding: 15px; overflow-x: auto; }
+    .endpoint { background: #e3f2fd; padding: 10px; margin: 10px 0; }
+</style></head>
+<body>
+    <h1>API Reference</h1>
+    <div class="endpoint">
+        <code>GET /api/v1/users</code>
+        <p>Returns a list of all users.</p>
+    </div>
+    <h2>Request Headers</h2>
+    <pre>Authorization: Bearer {token}
+Content-Type: application/json</pre>
+</body>
+</html>''',
+    filename="api_reference.pdf",
+    catalog="docs_catalog",
+    schema="api_docs"
+)
 ```
 
-## Environment Configuration
+### Pattern 2: Business Reports
 
-The tool requires LLM configuration via environment variables:
-
-```bash
-# Databricks Foundation Models (default)
-LLM_PROVIDER=DATABRICKS
-DATABRICKS_MODEL=databricks-meta-llama-3-3-70b-instruct
-
-# Or Azure OpenAI
-LLM_PROVIDER=AZURE
-AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_DEPLOYMENT=gpt-4o
+```
+generate_and_upload_pdf(
+    html_content='''<!DOCTYPE html>
+<html>
+<head><style>
+    body { font-family: Georgia, serif; margin: 50px; }
+    .metric { display: inline-block; text-align: center; margin: 20px; }
+    .metric-value { font-size: 2em; color: #1a73e8; }
+    .metric-label { color: #666; }
+</style></head>
+<body>
+    <h1>Q1 2024 Performance Report</h1>
+    <div class="metric">
+        <div class="metric-value">$2.4M</div>
+        <div class="metric-label">Revenue</div>
+    </div>
+    <div class="metric">
+        <div class="metric-value">+15%</div>
+        <div class="metric-label">Growth</div>
+    </div>
+</body>
+</html>''',
+    filename="q1_2024_report.pdf",
+    catalog="finance",
+    schema="reports",
+    folder="quarterly"
+)
 ```
 
-## Common Issues
+### Pattern 3: HR Policies
+
+```
+generate_and_upload_pdf(
+    html_content='''<!DOCTYPE html>
+<html>
+<head><style>
+    body { font-family: Arial; margin: 40px; line-height: 1.8; }
+    .policy-section { margin: 30px 0; }
+    .important { background: #fff3e0; padding: 15px; border-radius: 5px; }
+</style></head>
+<body>
+    <h1>Employee Leave Policy</h1>
+    <p><em>Effective: January 1, 2024</em></p>
+
+    <div class="policy-section">
+        <h2>1. Annual Leave</h2>
+        <p>All full-time employees are entitled to 20 days of paid annual leave per calendar year.</p>
+    </div>
+
+    <div class="important">
+        <strong>Note:</strong> Leave requests must be submitted at least 2 weeks in advance.
+    </div>
+</body>
+</html>''',
+    filename="leave_policy.pdf",
+    catalog="hr_catalog",
+    schema="policies"
+)
+```
+
+## Workflow for Multiple Documents
+
+When asked to generate multiple PDFs:
+
+1. **Plan the documents**: Determine titles, content structure for each
+2. **Generate HTML for each**: Create complete HTML documents
+3. **Call tool in parallel**: Make multiple simultaneous `generate_and_upload_pdf` calls
+4. **Report results**: Summarize successful uploads and any errors
+
+## Prerequisites
+
+- Unity Catalog schema must exist
+- Volume must exist (default: `raw_data`)
+- User must have WRITE permission on the volume
+
+## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| **"No LLM endpoint configured"** | Set `DATABRICKS_MODEL` or `AZURE_OPENAI_DEPLOYMENT` environment variable |
-| **"Volume does not exist"** | The tool creates volumes automatically; ensure you have CREATE VOLUME permission |
-| **"PDF generation timeout"** | Reduce `count` or check LLM endpoint availability |
-| **Low quality content** | Provide more detailed `description` with specific topics and document types |
-
-## Related Skills
-
-- **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Create Knowledge Assistants that ingest the generated PDFs
-- **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Index generated documents for semantic search and RAG
-- **[databricks-synthetic-data-gen](../databricks-synthetic-data-gen/SKILL.md)** - Generate structured tabular data (complement to unstructured PDFs)
-- **[databricks-mlflow-evaluation](../databricks-mlflow-evaluation/SKILL.md)** - Evaluate RAG systems using the generated question/guideline pairs
+| "Volume does not exist" | Create the volume first or use an existing one |
+| "Schema does not exist" | Create the schema or check the name |
+| PDF looks wrong | Check HTML/CSS syntax, use supported CSS features |
+| Slow generation | Call multiple PDFs in parallel, not sequentially |

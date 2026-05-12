@@ -11,7 +11,7 @@ Send requests to deployed Model Serving endpoints.
 Before querying, verify the endpoint is ready:
 
 ```
-get_serving_endpoint_status(name="my-agent-endpoint")
+manage_serving_endpoint(action="get", name="my-agent-endpoint")
 ```
 
 Response:
@@ -28,7 +28,8 @@ Response:
 ### Query Chat/Agent Endpoint
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="my-agent-endpoint",
     messages=[
         {"role": "user", "content": "What is Databricks?"}
@@ -61,7 +62,8 @@ Response:
 ### Query ML Model Endpoint
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="sklearn-classifier",
     dataframe_records=[
         {"age": 25, "income": 50000, "credit_score": 720},
@@ -80,7 +82,7 @@ Response:
 ### List All Endpoints
 
 ```
-list_serving_endpoints(limit=20)
+manage_serving_endpoint(action="list", limit=20)
 ```
 
 ## Python SDK

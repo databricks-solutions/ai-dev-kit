@@ -33,7 +33,7 @@ from ..fixtures import (
     setup_fixtures,
     teardown_fixtures,
 )
-from ..fixtures.setup import MCPUploadFile
+from ..fixtures.setup import MCPUploadToVolume
 from ..dataset import YAMLDatasetSource
 
 
@@ -48,7 +48,7 @@ class CLIContext:
     # MCP tools for Databricks execution
     mcp_execute_command: Optional[MCPExecuteCommand] = None
     mcp_execute_sql: Optional[MCPExecuteSQL] = None
-    mcp_upload_file: Optional[MCPUploadFile] = None
+    mcp_upload_to_volume: Optional[MCPUploadToVolume] = None
     mcp_get_best_warehouse: Optional[MCPGetBestWarehouse] = None
     mcp_get_best_cluster: Optional[MCPGetBestCluster] = None
 
@@ -577,11 +577,11 @@ def interactive(
     result = InteractiveResult(success=False, test_id=test_id, skill_name=skill_name, execution_mode="local")
 
     # 1. Set up fixtures if provided
-    if fixture_config and ctx.mcp_execute_sql and ctx.mcp_upload_file:
+    if fixture_config and ctx.mcp_execute_sql and ctx.mcp_upload_to_volume:
         fixture_result = setup_fixtures(
             fixture_config,
             ctx.mcp_execute_sql,
-            ctx.mcp_upload_file,
+            ctx.mcp_upload_to_volume,
             ctx.mcp_get_best_warehouse,
             base_path=str(ctx.base_path.parent.parent),  # Go up to skill-test root
         )
@@ -1005,16 +1005,16 @@ def setup_test_fixtures(
             success=False, message="MCP execute_sql tool required for fixture setup", error="Missing MCP tool"
         )
 
-    if not ctx.mcp_upload_file and fixture_config.files:
+    if not ctx.mcp_upload_to_volume and fixture_config.files:
         return FixtureResult(
-            success=False, message="MCP upload_file tool required for file fixtures", error="Missing MCP tool"
+            success=False, message="MCP upload_to_volume tool required for file fixtures", error="Missing MCP tool"
         )
 
     # Set up fixtures
     return setup_fixtures(
         fixture_config,
         ctx.mcp_execute_sql,
-        ctx.mcp_upload_file,
+        ctx.mcp_upload_to_volume,
         ctx.mcp_get_best_warehouse,
         base_path=str(ctx.base_path.parent.parent),
     )

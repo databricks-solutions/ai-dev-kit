@@ -1,9 +1,12 @@
 """Tests for the TimeoutHandlingMiddleware."""
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+from fastmcp.exceptions import ToolError
 
 from databricks_mcp_server.middleware import TimeoutHandlingMiddleware
 
@@ -35,50 +38,58 @@ async def test_normal_call_passes_through(middleware):
 
 
 @pytest.mark.asyncio
-async def test_timeout_returns_structured_result(middleware):
-    """TimeoutError is caught and converted to a structured JSON result."""
+async def test_timeout_error_raises_tool_error(middleware):
+    """TimeoutError is caught and re-raised as ToolError with structured JSON."""
     call_next = AsyncMock(side_effect=TimeoutError("Run did not complete within 3600 seconds"))
-    ctx = _make_context(
-        tool_name="wait_for_run",
-        arguments={"run_id": 42, "timeout": 3600},
-    )
+    ctx = _make_context(tool_name="wait_for_run")
 
-    result = await middleware.on_call_tool(ctx, call_next)
+    with pytest.raises(ToolError) as exc_info:
+        await middleware.on_call_tool(ctx, call_next)
 
-    # Should return a ToolResult, not raise
-    assert result is not None
-    assert len(result.content) == 1
-
-    payload = json.loads(result.content[0].text)
-    assert payload["timed_out"] is True
+    payload = json.loads(str(exc_info.value))
+    assert payload["error"] is True
+    assert payload["error_type"] == "timeout"
     assert payload["tool"] == "wait_for_run"
-    assert payload["arguments"] == {"run_id": 42, "timeout": 3600}
     assert "3600 seconds" in payload["message"]
     assert "Do NOT retry" in payload["action_required"]
 
 
 @pytest.mark.asyncio
-async def test_non_timeout_exceptions_propagate(middleware):
-    """Non-timeout exceptions are NOT caught — they propagate normally."""
-    call_next = AsyncMock(side_effect=ValueError("bad input"))
-    ctx = _make_context()
+async def test_asyncio_timeout_error_raises_tool_error(middleware):
+    """asyncio.TimeoutError is caught and re-raised as ToolError with structured JSON."""
+    call_next = AsyncMock(side_effect=asyncio.TimeoutError())
+    ctx = _make_context(tool_name="long_running_tool")
 
-    with pytest.raises(ValueError, match="bad input"):
+    with pytest.raises(ToolError) as exc_info:
+        await middleware.on_call_tool(ctx, call_next)
+
+    payload = json.loads(str(exc_info.value))
+    assert payload["error"] is True
+    assert payload["error_type"] == "timeout"
+    assert payload["tool"] == "long_running_tool"
+
+
+@pytest.mark.asyncio
+async def test_cancelled_error_is_reraised(middleware):
+    """asyncio.CancelledError is re-raised to let MCP SDK handle cleanup."""
+    call_next = AsyncMock(side_effect=asyncio.CancelledError())
+    ctx = _make_context(tool_name="cancelled_tool")
+
+    with pytest.raises(asyncio.CancelledError):
         await middleware.on_call_tool(ctx, call_next)
 
 
 @pytest.mark.asyncio
-async def test_timeout_preserves_arguments(middleware):
-    """The structured result includes the original arguments for debugging."""
-    call_next = AsyncMock(side_effect=TimeoutError("timed out"))
-    args = {"pipeline_id": "abc-123", "update_id": "upd-456", "timeout": 1800}
-    ctx = _make_context(
-        tool_name="wait_for_pipeline_update",
-        arguments=args,
-    )
+async def test_generic_exception_raises_tool_error(middleware):
+    """Generic exceptions are caught and re-raised as ToolError with structured JSON."""
+    call_next = AsyncMock(side_effect=ValueError("bad input"))
+    ctx = _make_context(tool_name="failing_tool")
 
-    result = await middleware.on_call_tool(ctx, call_next)
-    payload = json.loads(result.content[0].text)
+    with pytest.raises(ToolError) as exc_info:
+        await middleware.on_call_tool(ctx, call_next)
 
-    assert payload["arguments"] == args
-    assert payload["tool"] == "wait_for_pipeline_update"
+    payload = json.loads(str(exc_info.value))
+    assert payload["error"] is True
+    assert payload["error_type"] == "ValueError"
+    assert payload["tool"] == "failing_tool"
+    assert "bad input" in payload["message"]

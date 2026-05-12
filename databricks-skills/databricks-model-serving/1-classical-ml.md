@@ -143,7 +143,8 @@ endpoint = w.serving_endpoints.create_and_wait(
 ### Via MCP Tool
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="diabetes-predictor",
     dataframe_records=[
         {"age": 45, "bmi": 25.3, "bp": 120, "s1": 200}

@@ -172,30 +172,30 @@ warehouse_id = get_best_warehouse()
 Get detailed table information and column statistics:
 
 ```python
-from databricks_tools_core.sql import get_table_details, TableStatLevel
+from databricks_tools_core.sql import get_table_stats_and_schema, TableStatLevel
 
 # Get all tables in a schema with basic stats
-result = get_table_details(
+result = get_table_stats_and_schema(
     catalog="my_catalog",
     schema="my_schema",
 )
 
 # Get specific tables (faster - no listing required)
-result = get_table_details(
+result = get_table_stats_and_schema(
     catalog="my_catalog",
     schema="my_schema",
     table_names=["customers", "orders"],
 )
 
 # Use glob patterns
-result = get_table_details(
+result = get_table_stats_and_schema(
     catalog="my_catalog",
     schema="my_schema",
     table_names=["raw_*", "gold_customers"],  # Mix of patterns and exact names
 )
 
 # Control stat level
-result = get_table_details(
+result = get_table_stats_and_schema(
     catalog="my_catalog",
     schema="my_schema",
     table_names=["customers"],
@@ -323,7 +323,7 @@ databricks-tools-core/
 │   ├── sql/                          # SQL operations
 │   │   ├── sql.py                    # execute_sql, execute_sql_multi
 │   │   ├── warehouse.py              # list_warehouses, get_best_warehouse
-│   │   ├── table_stats.py            # get_table_details
+│   │   ├── table_stats.py            # get_table_stats_and_schema
 │   │   └── sql_utils/                # Internal utilities
 │   │       ├── executor.py           # SQLExecutor class
 │   │       ├── parallel_executor.py  # Multi-statement execution
@@ -401,7 +401,7 @@ tests/
 |-----------|----------|
 | `test_warehouse.py` | `list_warehouses`, `get_best_warehouse` |
 | `test_sql.py` | `execute_sql`, `execute_sql_multi`, error handling, parallel execution |
-| `test_table_stats.py` | `get_table_details`, all stat levels, glob patterns, caching |
+| `test_table_stats.py` | `get_table_stats_and_schema`, all stat levels, glob patterns, caching |
 | `test_jobs.py` | `list_jobs`, `find_job_by_name`, `create_job`, `get_job`, `update_job`, `delete_job` |
 | `test_runs.py` | `run_job_now`, `get_run`, `cancel_run`, `list_runs`, `wait_for_run` |
 

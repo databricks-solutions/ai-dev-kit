@@ -32,7 +32,7 @@ scorers:
       Bash: 20
       mcp__databricks__execute_databricks_command: 15
       mcp__databricks__run_python_file_on_databricks: 10
-      mcp__databricks__upload_folder: 5
+      mcp__databricks__upload_to_workspace: 5
       mcp__databricks__query_serving_endpoint: 10
       mcp__databricks__get_serving_endpoint_status: 10
     token_budget:

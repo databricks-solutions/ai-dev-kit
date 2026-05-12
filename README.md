@@ -5,14 +5,71 @@
 </p>
 
 ---
+> 🔒 Proactive Dependency Security  
+> As part of our commitment to supply chain integrity, we continually monitor our dependency tree against known vulnerabilities and industry advisories. In response to a recently disclosed supply chain incident affecting litellm versions 1.82.7–1.82.8, we have audited our packages and removed the litellm dependency for most usage. It is solely used in the test directory for skills evaluation and optimization, and has been pinned to a safe version.  
+> For full third-party attribution, see NOTICE.txt.
+---
 
-## Overview
+## AI-Assisted Development on Databricks
 
-AI-Driven Development (vibe coding) on Databricks just got a whole lot better. The **AI Dev Kit** gives your AI coding assistant (Claude Code, Cursor, Windsurf, etc.) the trusted sources it needs to build faster and smarter on Databricks.
+Databricks offers two paths for AI-assisted coding. Choose the one that matches your environment.
 
-<p align="center">
-  <img src="databricks-tools-core/docs/architecture.svg" alt="Architecture" width="700">
-</p>
+<table>
+<tr>
+<td width="50%" align="center" valign="top">
+
+<br>
+
+<img src="https://img.shields.io/badge/Genie_Code-1B3139?style=for-the-badge&logo=databricks&logoColor=FF3621" alt="Genie Code" height="42">
+
+<br><br>
+
+**Free, first-party AI coding inside Databricks**
+
+Built into every Databricks workspace at no extra cost, with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks.
+
+</td>
+<td width="50%" align="center" valign="top">
+
+<br>
+
+<img src="https://img.shields.io/badge/AI_Dev_Kit-FF3621?style=for-the-badge&logo=databricks&logoColor=white" alt="AI Dev Kit" height="42">
+
+<br><br>
+
+**Databricks expertise, in the editor you already use**
+
+Curated by Databricks field experts. Brings the patterns, skills, and 75+ executable tools your AI assistant needs to build on Databricks — wherever you're already coding.
+
+<br>
+
+<img src="https://img.shields.io/badge/Claude_Code-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude Code">
+<img src="https://img.shields.io/badge/Cursor-000000?style=flat-square&logo=cursor&logoColor=white" alt="Cursor">
+<img src="https://img.shields.io/badge/Codex-412991?style=flat-square&logo=openai&logoColor=white" alt="Codex">
+<img src="https://img.shields.io/badge/Gemini-1B72E8?style=flat-square&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+<img src="https://img.shields.io/badge/Copilot-000000?style=flat-square&logo=github&logoColor=white" alt="GitHub Copilot">
+<br>
+<sub>+ Antigravity · Windsurf · OpenCode · and more!</sub>
+
+</td>
+</tr>
+<tr>
+<td align="center">
+
+<a href="https://docs.databricks.com/aws/en/genie-code/"><img src="https://img.shields.io/badge/Learn_more-→-1B3139?style=for-the-badge" alt="Learn more" height="36"></a>
+
+<br>
+
+</td>
+<td align="center">
+
+<a href="#install-in-existing-project"><img src="https://img.shields.io/badge/Get_started-→-FF3621?style=for-the-badge" alt="Get started" height="36"></a>
+
+<br>
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -37,8 +94,10 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
 |----------------------------------|----------|------------|
 | :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | [Quick Start (install)](#install-in-existing-project)
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
+| [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
 | [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
+| [**Genie Code Skills**](databricks-skills/install_skills.sh) | Install skills into your workspace for Genie Code (`--install-to-genie`) | [Genie Code skills (install)](#genie-code-skills) |
 | [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
 ---
 
@@ -52,11 +111,17 @@ AI-Driven Development (vibe coding) on Databricks just got a whole lot better. T
   - [Claude Code](https://claude.ai/code)
   - [Cursor](https://cursor.com)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+  - [Antigravity](https://antigravity.google)
+  - [Codex](https://openai.com/codex/)
+  - [Copilot](https://github.com/features/copilot/cli)
+  - [Windsurf](https://windsurf.com)
+  - [OpenCode](https://opencode.ai)
+  - [Kiro](https://kiro.dev)
 
 
 ### Install in existing project
 By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, or .gemini_
+_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, .kiro, or opencode.json_
 
 #### Mac / Linux
 
@@ -84,7 +149,7 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 **Install for specific tools only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity,windsurf,opencode
 ```
 
 </details>
@@ -124,7 +189,7 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 **Install for specific tools only**
 
 ```powershell
-.\install.ps1 -Tools cursor,gemini
+.\install.ps1 -Tools cursor,gemini,antigravity
 ```
 
 </details>
@@ -135,13 +200,29 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 
 ### Visual Builder App
 
-Full-stack web application with chat UI for Databricks development:
+Full-stack web application with chat UI for Databricks development. Deploys a Lakebase database and Databricks App with a single command:
 
 ```bash
 cd ai-dev-kit/databricks-builder-app
-./scripts/setup.sh
-# Follow instructions to start the app
+
+# Deploy everything (Lakebase + app + permissions)
+./scripts/deploy.sh my-builder-app --profile <your-profile>
+
+# Deploy with MCP Gateway for Genie Code (name must start with mcp-)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --profile <your-profile>
 ```
+
+With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
+
+For local development:
+
+```bash
+./scripts/setup.sh        # Install dependencies
+# Edit .env.local with your credentials
+./scripts/start_dev.sh    # Start locally at http://localhost:3000
+```
+
+See [`databricks-builder-app/`](databricks-builder-app/) for full documentation.
 
 
 ### Core Library
@@ -157,6 +238,50 @@ results = execute_sql("SELECT * FROM my_catalog.schema.table LIMIT 10")
 Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databricks-tools-core/](databricks-tools-core/) for details.
 
 ---
+## Genie Code Skills
+
+Install skills into `./.claude/skills` (relative to the directory where you run the script), then upload them to your workspace at `/Workspace/Users/<you>/.assistant/skills` so Genie Code can use them in the UI. Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for your workspace.
+
+**Always run from the project directory** where you want `.claude/skills` created (for example your repo root or `ai-dev-kit`).
+
+**From this repo (recommended if you have a clone):**
+
+```bash
+# Databricks skills from this checkout + upload (DEFAULT CLI profile)
+./databricks-skills/install_skills.sh --local --install-to-genie
+
+# Download all skills from GitHub, then upload
+./databricks-skills/install_skills.sh --install-to-genie
+
+# Explicit Databricks CLI profile
+./databricks-skills/install_skills.sh --install-to-genie --profile YOUR_PROFILE
+```
+
+**Without cloning** (run from the directory that should contain `.claude/skills`):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie
+```
+
+Combine `--profile`, `--local`, specific skill names, `--mlflow-version`, etc. as needed; see `./databricks-skills/install_skills.sh --help` or [databricks-skills/README.md](databricks-skills/README.md).
+
+**From a Databricks notebook** (no local terminal needed):
+
+Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py) into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them to your workspace using the Databricks SDK. This works on any compute, including serverless.
+
+**Skill modification or Custom Skill**
+
+After the script successfully installs the skills to your workspace, you may find the skills under `/Workspace/Users/<your_user_name>/.assistant/skills`.
+
+This directory is customizable if you wish to only use certain skills or even create custom skills that are related to your organization to make Genie Code even better.  You can modify/remove existing skills or create new skills folders that Genie Code will automatically use in any session.
+
+## Architecture
+
+The AI Dev Kit ships as four composable pieces — install the whole kit, or pick just the parts you need.
+
+<p align="center">
+  <img src="databricks-tools-core/docs/architecture.svg" alt="Architecture" width="700">
+</p>
 
 ## What's Included
 
@@ -196,8 +321,7 @@ The source in this project is provided subject to the [Databricks License](https
 | [mcp](https://github.com/modelcontextprotocol/python-sdk) | ≥1.0.0 | MIT | https://github.com/modelcontextprotocol/python-sdk |
 | [sqlglot](https://github.com/tobymao/sqlglot) | ≥20.0.0 | MIT | https://github.com/tobymao/sqlglot |
 | [sqlfluff](https://github.com/sqlfluff/sqlfluff) | ≥3.0.0 | MIT | https://github.com/sqlfluff/sqlfluff |
-| [litellm](https://github.com/BerriAI/litellm) | ≥1.0.0 | MIT | https://github.com/BerriAI/litellm |
-| [pymupdf](https://github.com/pymupdf/PyMuPDF) | ≥1.24.0 | AGPL-3.0 | https://github.com/pymupdf/PyMuPDF |
+| [plutoprint](https://github.com/nicvagn/plutoprint) | ==0.19.0 | MIT | https://github.com/plutoprint/plutoprint |
 | [claude-agent-sdk](https://github.com/anthropics/claude-code) | ≥0.1.19 | MIT | https://github.com/anthropics/claude-code |
 | [fastapi](https://github.com/fastapi/fastapi) | ≥0.115.8 | MIT | https://github.com/fastapi/fastapi |
 | [uvicorn](https://github.com/encode/uvicorn) | ≥0.34.0 | BSD-3-Clause | https://github.com/encode/uvicorn |

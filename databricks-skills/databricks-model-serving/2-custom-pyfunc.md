@@ -189,7 +189,8 @@ endpoint = client.create_endpoint(
 ## Query Custom Model
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="custom-model-endpoint",
     dataframe_records=[
         {"age": 25, "income": 50000, "category": "A"}
@@ -200,7 +201,8 @@ query_serving_endpoint(
 Or with inputs format:
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="custom-model-endpoint",
     inputs={"age": 25, "income": 50000, "category": "A"}
 )

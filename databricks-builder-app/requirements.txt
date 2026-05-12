@@ -1,47 +1,559 @@
-# FastAPI and server
-fastapi[standard]>=0.115.8
-uvicorn>=0.34.0
-httpx>=0.28.0
-pydantic>=2.10.0
-python-dotenv>=1.0.1
-
-# Databricks SDK
-databricks-sdk>=0.81.0
-
-# Database
-sqlalchemy[asyncio]>=2.0.41
-alembic>=1.16.1
-psycopg[binary]>=3.2.0
-greenlet>=3.0.0
-psycopg2-binary>=2.9.11
-
-# Claude Agent SDK
-claude-agent-sdk>=0.1.39
-anthropic>=0.42.0
-
-# MLflow for tracing Claude Code conversations
-# See: https://docs.databricks.com/aws/en/mlflow3/genai/tracing/integrations/claude-code
-mlflow[databricks]>=3.9.0
-
-# MCP
-mcp>=1.0.0
-fastmcp>=0.1.0
-
-# Dependencies for databricks-tools-core
-requests>=2.31.0
-sqlglot>=20.0.0
-sqlfluff>=3.0.0
-litellm>=1.0.0
-pymupdf>=1.24.0
-
-# Conflict resolution pins for Databricks Apps pre-installed packages
-tenacity==9.0.0
-pillow==11.1.0
-websockets==15.0
-pyarrow==18.1.0
+aiofile==3.9.0
+    # via py-key-value-aio
+alembic==1.18.4
+    # via
+    #   databricks-builder-app
+    #   mlflow
+annotated-doc==0.0.4
+    # via
+    #   fastapi
+    #   typer
+annotated-types==0.7.0
+    # via pydantic
+anthropic==0.96.0
+    # via databricks-builder-app
+anyio==4.13.0
+    # via
+    #   anthropic
+    #   claude-agent-sdk
+    #   httpx
+    #   mcp
+    #   py-key-value-aio
+    #   sse-starlette
+    #   starlette
+    #   watchfiles
+attrs==26.1.0
+    # via
+    #   cyclopts
+    #   jsonschema
+    #   referencing
+authlib==1.6.9
+    # via fastmcp
+backports-tarfile==1.2.0 ; python_full_version < '3.12'
+    # via jaraco-context
+beartype==0.22.9
+    # via py-key-value-aio
+blinker==1.9.0
+    # via flask
+cachetools==7.0.5
+    # via
+    #   mlflow-skinny
+    #   mlflow-tracing
+    #   py-key-value-aio
+caio==0.9.25
+    # via aiofile
+certifi==2026.2.25
+    # via
+    #   httpcore
+    #   httpx
+    #   requests
+    #   sentry-sdk
+cffi==2.0.0 ; platform_python_implementation != 'PyPy'
+    # via cryptography
+chardet==7.4.0.post2
+    # via
+    #   diff-cover
+    #   sqlfluff
+charset-normalizer==3.4.7
+    # via requests
+claude-agent-sdk==0.1.56
+    # via databricks-builder-app
+click==8.3.2
+    # via
+    #   flask
+    #   mlflow-skinny
+    #   rich-toolkit
+    #   sqlfluff
+    #   typer
+    #   uvicorn
+cloudpickle==3.1.2
+    # via mlflow-skinny
+colorama==0.4.6
+    # via
+    #   click
+    #   pytest
+    #   sqlfluff
+    #   tqdm
+    #   uvicorn
+contourpy==1.3.3
+    # via matplotlib
+cryptography==46.0.6
+    # via
+    #   authlib
+    #   google-auth
+    #   mlflow
+    #   pyjwt
+    #   secretstorage
+cycler==0.12.1
+    # via matplotlib
+cyclopts==5.0.0a6
+    # via fastmcp
+databricks-sdk==0.102.0
+    # via
+    #   databricks-builder-app
+    #   mlflow-skinny
+    #   mlflow-tracing
+diff-cover==10.2.0
+    # via sqlfluff
+distro==1.9.0
+    # via anthropic
+dnspython==2.8.0
+    # via email-validator
+docker==7.1.0
+    # via mlflow
+docstring-parser==0.17.0
+    # via
+    #   anthropic
+    #   cyclopts
+email-validator==2.3.0
+    # via
+    #   fastapi
+    #   pydantic
+exceptiongroup==1.3.1
+    # via fastmcp
+fastapi==0.135.3
+    # via
+    #   databricks-builder-app
+    #   mlflow-skinny
+fastapi-cli==0.0.24
+    # via fastapi
+fastapi-cloud-cli==0.15.1
+    # via fastapi-cli
+fastar==0.9.0
+    # via fastapi-cloud-cli
+fastmcp==3.2.4
+    # via databricks-builder-app
+flask==3.1.3
+    # via
+    #   databricks-builder-app
+    #   flask-cors
+    #   mlflow
+flask-cors==6.0.2
+    # via mlflow
+fonttools==4.62.1
+    # via matplotlib
+gitdb==4.0.12
+    # via gitpython
+gitpython==3.1.46
+    # via mlflow-skinny
+google-auth==2.49.1
+    # via databricks-sdk
+graphene==3.4.3
+    # via mlflow
+graphql-core==3.2.8
+    # via
+    #   graphene
+    #   graphql-relay
+graphql-relay==3.2.0
+    # via graphene
+greenlet==3.3.2
+    # via
+    #   databricks-builder-app
+    #   sqlalchemy
+griffelib==2.0.2
+    # via fastmcp
+gunicorn==25.3.0 ; sys_platform != 'win32'
+    # via mlflow
+h11==0.16.0
+    # via
+    #   httpcore
+    #   uvicorn
+httpcore==1.0.9
+    # via httpx
+httptools==0.7.1
+    # via uvicorn
+httpx==0.28.1
+    # via
+    #   anthropic
+    #   databricks-builder-app
+    #   fastapi
+    #   fastapi-cloud-cli
+    #   fastmcp
+    #   mcp
+httpx-sse==0.4.3
+    # via mcp
+huey==2.6.0
+    # via mlflow
+idna==3.11
+    # via
+    #   anyio
+    #   email-validator
+    #   httpx
+    #   requests
+importlib-metadata==8.7.1
+    # via
+    #   keyring
+    #   mlflow-skinny
+    #   opentelemetry-api
+iniconfig==2.3.0
+    # via pytest
+itsdangerous==2.2.0
+    # via flask
+jaraco-classes==3.4.0
+    # via keyring
+jaraco-context==6.1.2
+    # via keyring
+jaraco-functools==4.4.0
+    # via keyring
+jeepney==0.9.0 ; sys_platform == 'linux'
+    # via
+    #   keyring
+    #   secretstorage
+jinja2==3.1.6
+    # via
+    #   diff-cover
+    #   fastapi
+    #   flask
+    #   sqlfluff
+jiter==0.13.0
+    # via anthropic
+joblib==1.5.3
+    # via scikit-learn
+jsonref==1.1.0
+    # via fastmcp
+jsonschema==4.26.0
+    # via mcp
+jsonschema-path==0.4.5
+    # via fastmcp
+jsonschema-specifications==2025.9.1
+    # via jsonschema
+keyring==25.7.0
+    # via py-key-value-aio
+kiwisolver==1.5.0
+    # via matplotlib
+mako==1.3.10
+    # via alembic
+markdown-it-py==4.0.0
+    # via rich
 markupsafe==3.0.2
-rich==14.0.0
-protobuf>=3.12.0,<5
+    # via
+    #   databricks-builder-app
+    #   flask
+    #   jinja2
+    #   mako
+    #   werkzeug
+matplotlib==3.10.8
+    # via mlflow
+mcp==1.27.0
+    # via
+    #   claude-agent-sdk
+    #   databricks-builder-app
+    #   fastmcp
+mdurl==0.1.2
+    # via markdown-it-py
+mlflow==3.10.1
+    # via databricks-builder-app
+mlflow-skinny==3.10.1
+    # via mlflow
+mlflow-tracing==3.10.1
+    # via mlflow
+more-itertools==11.0.1
+    # via
+    #   jaraco-classes
+    #   jaraco-functools
+numpy==2.4.4
+    # via
+    #   contourpy
+    #   matplotlib
+    #   mlflow
+    #   pandas
+    #   scikit-learn
+    #   scipy
+    #   skops
+openapi-pydantic==0.5.1
+    # via fastmcp
+opentelemetry-api==1.40.0
+    # via
+    #   fastmcp
+    #   mlflow-skinny
+    #   mlflow-tracing
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-proto==1.27.0
+    # via
+    #   mlflow-skinny
+    #   mlflow-tracing
+opentelemetry-sdk==1.40.0
+    # via
+    #   mlflow-skinny
+    #   mlflow-tracing
+    #   sentry-sdk
+opentelemetry-semantic-conventions==0.61b0
+    # via opentelemetry-sdk
+packaging==26.0
+    # via
+    #   fastmcp
+    #   gunicorn
+    #   matplotlib
+    #   mlflow-skinny
+    #   mlflow-tracing
+    #   pytest
+    #   skops
 pandas==2.3.0
-flask==3.1.0
-werkzeug==3.1.3
+    # via
+    #   databricks-builder-app
+    #   mlflow
+pathable==0.5.0
+    # via jsonschema-path
+pathspec==1.0.4
+    # via sqlfluff
+pillow==11.1.0
+    # via
+    #   databricks-builder-app
+    #   matplotlib
+platformdirs==4.9.4
+    # via
+    #   fastmcp
+    #   sqlfluff
+pluggy==1.6.0
+    # via
+    #   diff-cover
+    #   pytest
+plutoprint==0.19.0
+    # via databricks-builder-app
+prettytable==3.17.0
+    # via skops
+protobuf==4.25.9
+    # via
+    #   databricks-builder-app
+    #   databricks-sdk
+    #   mlflow-skinny
+    #   mlflow-tracing
+    #   opentelemetry-proto
+psycopg==3.3.3
+    # via databricks-builder-app
+psycopg-binary==3.3.3 ; implementation_name != 'pypy'
+    # via psycopg
+psycopg2-binary==2.9.11
+    # via databricks-builder-app
+py-key-value-aio==0.4.4
+    # via fastmcp
+pyarrow==18.1.0
+    # via
+    #   databricks-builder-app
+    #   mlflow
+pyasn1==0.6.3
+    # via pyasn1-modules
+pyasn1-modules==0.4.2
+    # via google-auth
+pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+    # via cffi
+pydantic==2.13.0b3
+    # via
+    #   anthropic
+    #   databricks-builder-app
+    #   fastapi
+    #   fastapi-cloud-cli
+    #   fastmcp
+    #   mcp
+    #   mlflow-skinny
+    #   mlflow-tracing
+    #   openapi-pydantic
+    #   pydantic-extra-types
+    #   pydantic-settings
+pydantic-core==2.45.0
+    # via pydantic
+pydantic-extra-types==2.11.1
+    # via fastapi
+pydantic-settings==2.13.1
+    # via
+    #   fastapi
+    #   mcp
+pygments==2.20.0
+    # via
+    #   diff-cover
+    #   pytest
+    #   rich
+pyjwt==2.12.1
+    # via mcp
+pyparsing==3.3.2
+    # via matplotlib
+pyperclip==1.11.0
+    # via fastmcp
+pytest==9.0.2
+    # via sqlfluff
+python-dateutil==2.9.0.post0
+    # via
+    #   graphene
+    #   matplotlib
+    #   pandas
+python-dotenv==1.2.2
+    # via
+    #   databricks-builder-app
+    #   fastmcp
+    #   mlflow-skinny
+    #   pydantic-settings
+    #   uvicorn
+python-multipart==0.0.24
+    # via
+    #   fastapi
+    #   mcp
+pytz==2026.1.post1
+    # via pandas
+pywin32==311 ; sys_platform == 'win32'
+    # via
+    #   docker
+    #   mcp
+pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
+    # via keyring
+pyyaml==6.0.3
+    # via
+    #   fastmcp
+    #   jsonschema-path
+    #   mlflow-skinny
+    #   sqlfluff
+    #   uvicorn
+referencing==0.37.0
+    # via
+    #   jsonschema
+    #   jsonschema-path
+    #   jsonschema-specifications
+regex==2026.4.4
+    # via sqlfluff
+requests==2.33.1
+    # via
+    #   databricks-builder-app
+    #   databricks-sdk
+    #   docker
+    #   mlflow-skinny
+rich==14.0.0
+    # via
+    #   cyclopts
+    #   databricks-builder-app
+    #   fastmcp
+    #   rich-toolkit
+    #   typer
+rich-toolkit==0.19.7
+    # via
+    #   fastapi-cli
+    #   fastapi-cloud-cli
+rignore==0.7.6
+    # via fastapi-cloud-cli
+rpds-py==0.30.0
+    # via
+    #   jsonschema
+    #   referencing
+scikit-learn==1.8.0
+    # via
+    #   mlflow
+    #   skops
+scipy==1.17.1
+    # via
+    #   mlflow
+    #   scikit-learn
+    #   skops
+secretstorage==3.5.0 ; sys_platform == 'linux'
+    # via keyring
+sentry-sdk==3.0.0a7
+    # via fastapi-cloud-cli
+shellingham==1.5.4
+    # via typer
+six==1.17.0
+    # via python-dateutil
+skops==0.13.0
+    # via mlflow
+smmap==5.0.3
+    # via gitdb
+sniffio==1.3.1
+    # via anthropic
+sqlalchemy==2.1.0b1
+    # via
+    #   alembic
+    #   databricks-builder-app
+    #   mlflow
+sqlfluff==4.1.0
+    # via databricks-builder-app
+sqlglot==30.2.1
+    # via databricks-builder-app
+sqlparse==0.5.5
+    # via mlflow-skinny
+sse-starlette==3.3.4
+    # via mcp
+starlette==1.0.0
+    # via
+    #   fastapi
+    #   mcp
+    #   sse-starlette
+tblib==3.2.2
+    # via sqlfluff
+tenacity==9.0.0
+    # via databricks-builder-app
+threadpoolctl==3.6.0
+    # via scikit-learn
+tqdm==4.67.3
+    # via sqlfluff
+typer==0.24.1
+    # via
+    #   fastapi-cli
+    #   fastapi-cloud-cli
+typing-extensions==4.15.0
+    # via
+    #   alembic
+    #   anthropic
+    #   anyio
+    #   exceptiongroup
+    #   fastapi
+    #   graphene
+    #   mcp
+    #   mlflow-skinny
+    #   opentelemetry-api
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+    #   psycopg
+    #   py-key-value-aio
+    #   pydantic
+    #   pydantic-core
+    #   pydantic-extra-types
+    #   referencing
+    #   rich-toolkit
+    #   sqlalchemy
+    #   starlette
+    #   typing-inspection
+typing-inspection==0.4.2
+    # via
+    #   fastapi
+    #   mcp
+    #   pydantic
+    #   pydantic-settings
+tzdata==2026.1
+    # via
+    #   pandas
+    #   psycopg
+uncalled-for==0.2.0
+    # via fastmcp
+urllib3==2.6.3
+    # via
+    #   docker
+    #   requests
+    #   sentry-sdk
+uvicorn==0.44.0
+    # via
+    #   databricks-builder-app
+    #   fastapi
+    #   fastapi-cli
+    #   fastapi-cloud-cli
+    #   fastmcp
+    #   mcp
+    #   mlflow-skinny
+uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
+    # via uvicorn
+waitress==3.0.2 ; sys_platform == 'win32'
+    # via mlflow
+watchfiles==1.1.1
+    # via
+    #   fastmcp
+    #   uvicorn
+wcwidth==0.6.0
+    # via prettytable
+websockets==16.0
+    # via
+    #   databricks-builder-app
+    #   fastmcp
+    #   uvicorn
+werkzeug==3.1.8
+    # via
+    #   databricks-builder-app
+    #   flask
+    #   flask-cors
+zipp==3.23.0
+    # via importlib-metadata

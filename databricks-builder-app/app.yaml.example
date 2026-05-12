@@ -28,29 +28,35 @@ env:
   # =============================================================================
   # Skills Configuration
   # =============================================================================
-  # Comma-separated list of skills to enable
+  # Comma-separated list of skills to enable.
+  # AUTO-POPULATED by deploy.sh at deploy time based on installed skills.
+  # To override, set a specific list here before deploying.
   - name: ENABLED_SKILLS
-    value: "databricks-bundles,databricks-agent-bricks,databricks-aibi-dashboards,databricks-app-apx,databricks-app-python,databricks-config,databricks-docs,databricks-jobs,databricks-python-sdk,databricks-unity-catalog,databricks-mlflow-evaluation,databricks-spark-declarative-pipelines,databricks-synthetic-data-gen,databricks-unstructured-pdf-generation"
+    value: ""
   - name: SKILLS_ONLY_MODE
     value: "false"
   
   # =============================================================================
   # Database Configuration (Lakebase)
   # =============================================================================
-  # IMPORTANT: You must add Lakebase as an app resource for database connectivity.
-  # 
-  # Steps:
-  #   1. Create a Lakebase instance in your workspace (if not exists)
-  #   2. Add it as an app resource:
-  #      databricks apps add-resource <app-name> \
-  #        --resource-type database \
-  #        --resource-name lakebase \
-  #        --database-instance <your-lakebase-instance-name>
+  # Choose ONE of the two options below.
   #
-  # When added as a resource, Databricks automatically sets:
-  #   - PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+  # --- Option A: Autoscale Lakebase (recommended) ---
+  # Scales to zero when idle. No add-resource step needed — connects via OAuth.
+  # Find endpoint name in: Catalog → Lakebase → your project → Branches → Endpoints
   #
-  # You only need to specify the instance name for OAuth token generation:
+  # - name: LAKEBASE_ENDPOINT
+  #   value: "projects/<project-name>/branches/production/endpoints/<endpoint>"
+  # - name: LAKEBASE_DATABASE_NAME
+  #   value: "databricks_postgres"
+  #
+  # --- Option B: Provisioned Lakebase ---
+  # Fixed-capacity instance. Must add as an app resource:
+  #   databricks apps add-resource <app-name> \
+  #     --resource-type database \
+  #     --resource-name lakebase \
+  #     --database-instance <your-lakebase-instance-name>
+  #
   - name: LAKEBASE_INSTANCE_NAME
     value: "<your-lakebase-instance-name>"
   - name: LAKEBASE_DATABASE_NAME

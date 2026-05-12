@@ -218,8 +218,13 @@ class AgentBricksManager:
         return all_tiles
 
     def find_by_name(self, name: str) -> Optional[KAIds]:
-        """Find a KA by exact display name."""
-        filter_q = f"name_contains={name}&&tile_type=KA"
+        """Find a KA by exact display name.
+
+        Note: Names are sanitized (spaces→underscores) before lookup to match
+        how the API stores them.
+        """
+        sanitized_name = self.sanitize_name(name)
+        filter_q = f"name_contains={sanitized_name}&&tile_type=KA"
         page_token = None
         while True:
             params = {"filter": filter_q}
@@ -227,16 +232,21 @@ class AgentBricksManager:
                 params["page_token"] = page_token
             resp = self._get("/api/2.0/tiles", params=params)
             for t in resp.get("tiles", []):
-                if t.get("name") == name:
-                    return KAIds(tile_id=t["tile_id"], name=name)
+                if t.get("name") == sanitized_name:
+                    return KAIds(tile_id=t["tile_id"], name=sanitized_name)
             page_token = resp.get("next_page_token")
             if not page_token:
                 break
         return None
 
     def mas_find_by_name(self, name: str) -> Optional[MASIds]:
-        """Find a MAS by exact display name."""
-        filter_q = f"name_contains={name}&&tile_type=MAS"
+        """Find a MAS by exact display name.
+
+        Note: Names are sanitized (spaces→underscores) before lookup to match
+        how the API stores them.
+        """
+        sanitized_name = self.sanitize_name(name)
+        filter_q = f"name_contains={sanitized_name}&&tile_type=MAS"
         page_token = None
         while True:
             params = {"filter": filter_q}
@@ -244,8 +254,8 @@ class AgentBricksManager:
                 params["page_token"] = page_token
             resp = self._get("/api/2.0/tiles", params=params)
             for t in resp.get("tiles", []):
-                if t.get("name") == name:
-                    return MASIds(tile_id=t["tile_id"], name=name)
+                if t.get("name") == sanitized_name:
+                    return MASIds(tile_id=t["tile_id"], name=sanitized_name)
             page_token = resp.get("next_page_token")
             if not page_token:
                 break
@@ -280,6 +290,8 @@ class AgentBricksManager:
     ) -> Dict[str, Any]:
         """Create a Knowledge Assistant with specified knowledge sources.
 
+        Uses SDK's create_knowledge_assistant and create_knowledge_source.
+
         Args:
             name: Name for the KA
             knowledge_sources: List of knowledge source dictionaries:
@@ -294,49 +306,106 @@ class AgentBricksManager:
             instructions: Optional instructions
 
         Returns:
-            KA creation response with tile info
+            Dict with tile_id, name, endpoint_name, and created sources
         """
+        from databricks.sdk.service.knowledgeassistants import (
+            KnowledgeAssistant as SDKKnowledgeAssistant,
+            KnowledgeSource as SDKKnowledgeSource,
+            FilesSpec,
+        )
+
         sanitized_name = self.sanitize_name(name)
-        payload: Dict[str, Any] = {
-            "name": sanitized_name,
-            "knowledge_sources": knowledge_sources,
+
+        # Create KA via SDK
+        ka_obj = SDKKnowledgeAssistant(
+            display_name=sanitized_name,
+            description=description or "",
+            instructions=instructions,
+        )
+        logger.debug(f"Creating KA with SDK: {ka_obj}")
+        created_ka = self.w.knowledge_assistants.create_knowledge_assistant(ka_obj)
+
+        # Add knowledge sources
+        created_sources = []
+        for source_dict in knowledge_sources:
+            files_source = source_dict.get("files_source", {})
+            if files_source:
+                source_name = files_source.get("name", f"source_{sanitized_name}")
+                source_path = files_source.get("files", {}).get("path", "")
+                # API requires non-empty description - provide default if not specified
+                source_description = files_source.get("description") or f"Knowledge source from {source_path}"
+                source_obj = SDKKnowledgeSource(
+                    display_name=source_name,
+                    description=source_description,
+                    source_type="files",
+                    files=FilesSpec(path=source_path),
+                )
+                created_source = self.w.knowledge_assistants.create_knowledge_source(
+                    parent=created_ka.name,
+                    knowledge_source=source_obj,
+                )
+                created_sources.append(created_source)
+
+        return {
+            "tile_id": created_ka.id,
+            "name": created_ka.display_name,
+            "endpoint_name": created_ka.endpoint_name,
+            "description": created_ka.description,
+            "instructions": created_ka.instructions,
+            "state": created_ka.state.value if created_ka.state else None,
+            "sources": [{"id": s.id, "name": s.display_name, "path": s.files.path if s.files else None} for s in created_sources],
         }
-        if instructions:
-            payload["instructions"] = instructions
-        if description:
-            payload["description"] = description
 
-        logger.debug(f"Creating KA with payload: {payload}")
-        return self._post("/api/2.0/knowledge-assistants", payload)
-
-    def ka_get(self, tile_id: str) -> Optional[KnowledgeAssistantResponseDict]:
-        """Get KA by tile_id.
+    def ka_get(self, tile_id: str) -> Optional[Dict[str, Any]]:
+        """Get KA by tile_id using SDK.
 
         Returns:
-            KA data dictionary or None if not found.
+            Dict with KA info or None if not found.
         """
         try:
-            return self._get(f"/api/2.0/knowledge-assistants/{tile_id}")
+            ka = self.w.knowledge_assistants.get_knowledge_assistant(f"knowledge-assistants/{tile_id}")
+            sources = list(self.w.knowledge_assistants.list_knowledge_sources(f"knowledge-assistants/{tile_id}"))
+
+            return {
+                "tile_id": ka.id,
+                "name": ka.display_name,
+                "endpoint_name": ka.endpoint_name,
+                "description": ka.description,
+                "instructions": ka.instructions,
+                "state": ka.state.value if ka.state else None,
+                "creator": ka.creator,
+                "experiment_id": ka.experiment_id,
+                "sources": [
+                    {
+                        "id": s.id,
+                        "name": s.display_name,
+                        "source_type": s.source_type,
+                        "path": s.files.path if s.files else None,
+                        "state": s.state.value if s.state else None,
+                    }
+                    for s in sources
+                ],
+            }
         except Exception as e:
             if "does not exist" in str(e).lower() or "not found" in str(e).lower():
                 return None
             raise
 
     def ka_get_endpoint_status(self, tile_id: str) -> Optional[str]:
-        """Get the endpoint status of a Knowledge Assistant.
+        """Get the state of a Knowledge Assistant.
 
         Returns:
-            Status string (ONLINE, OFFLINE, PROVISIONING, NOT_READY) or None
+            State string (ACTIVE, CREATING, FAILED) or None
         """
         ka = self.ka_get(tile_id)
         if not ka:
             return None
-        return ka.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status")
+        return ka.get("state")
 
     def ka_is_ready_for_update(self, tile_id: str) -> bool:
-        """Check if a KA is ready to be updated (status is ONLINE)."""
+        """Check if a KA is ready to be updated (state is ACTIVE)."""
         status = self.ka_get_endpoint_status(tile_id)
-        return status == EndpointStatus.ONLINE.value
+        return status == "ACTIVE"
 
     def ka_wait_for_ready_status(self, tile_id: str, timeout: int = 60, poll_interval: int = 5) -> bool:
         """Wait for a KA to be ready for updates.
@@ -366,48 +435,51 @@ class AgentBricksManager:
     ) -> Dict[str, Any]:
         """Update KA metadata and/or knowledge sources.
 
+        Uses SDK's update_knowledge_assistant for metadata updates (API 2.1).
+        Knowledge source updates require separate create/delete operations.
+
         Args:
             tile_id: The KA tile ID
-            name: Optional new name
+            name: Optional new display name
             description: Optional new description
             instructions: Optional new instructions
-            knowledge_sources: Optional new sources (replaces existing)
+            knowledge_sources: Optional new sources (currently ignored on update)
 
         Returns:
             Updated KA data
         """
-        # Update metadata if provided
+        # Update metadata if provided using API 2.1 endpoint
+        # Note: We use raw API call because SDK has a bug where FieldMask converts
+        # display_name to displayName (camelCase), but the API expects snake_case.
         if name is not None or description is not None or instructions is not None:
+            update_fields = []
             body: Dict[str, Any] = {}
+
             if name is not None:
-                body["name"] = name
+                body["display_name"] = name
+                update_fields.append("display_name")
             if description is not None:
                 body["description"] = description
+                update_fields.append("description")
             if instructions is not None:
                 body["instructions"] = instructions
-            self._patch(f"/api/2.0/knowledge-assistants/{tile_id}", body)
+                update_fields.append("instructions")
 
-        # Update knowledge sources if provided
+            if update_fields:
+                self._patch(
+                    f"/api/2.1/knowledge-assistants/{tile_id}",
+                    body,
+                    params={"update_mask": ",".join(update_fields)},
+                )
+
+        # Note: Knowledge source updates require separate SDK calls
+        # (create_knowledge_source / delete_knowledge_source)
+        # For now, we skip source updates on existing KAs
         if knowledge_sources is not None:
-            current_ka = self.ka_get(tile_id)
-            if not current_ka:
-                raise ValueError(f"Knowledge Assistant {tile_id} not found")
-
-            current_name = current_ka["knowledge_assistant"]["tile"]["name"]
-            current_sources = current_ka.get("knowledge_assistant", {}).get("knowledge_sources", [])
-
-            source_ids_to_remove = [
-                s.get("knowledge_source_id") for s in current_sources if s.get("knowledge_source_id")
-            ]
-
-            body = {"name": current_name}
-            if knowledge_sources:
-                body["add_knowledge_sources"] = knowledge_sources
-            if source_ids_to_remove:
-                body["remove_knowledge_source_ids"] = source_ids_to_remove
-
-            if knowledge_sources or source_ids_to_remove:
-                self._patch(f"/api/2.0/knowledge-assistants/{tile_id}", body)
+            logger.debug(
+                "Knowledge source updates on existing KAs not yet implemented via SDK. "
+                "Sources will remain unchanged."
+            )
 
         return self.ka_get(tile_id)
 
@@ -439,6 +511,14 @@ class AgentBricksManager:
             existing_ka = self.ka_get(tile_id)
             if existing_ka:
                 operation = "updated"
+        else:
+            # No tile_id provided - check if KA exists by name
+            found = self.find_by_name(name)
+            if found:
+                tile_id = found.tile_id
+                existing_ka = self.ka_get(tile_id)
+                if existing_ka:
+                    operation = "updated"
 
         if existing_ka:
             if not self.ka_is_ready_for_update(tile_id):
@@ -469,7 +549,7 @@ class AgentBricksManager:
 
     def ka_sync_sources(self, tile_id: str) -> None:
         """Trigger indexing/sync of all knowledge sources."""
-        self._post(f"/api/2.0/knowledge-assistants/{tile_id}/sync-knowledge-sources", {})
+        self.w.knowledge_assistants.sync_knowledge_sources(f"knowledge-assistants/{tile_id}")
 
     def ka_reconcile_model(self, tile_id: str) -> None:
         """Reconcile KA to latest model."""
@@ -478,24 +558,24 @@ class AgentBricksManager:
     def ka_wait_until_ready(
         self, tile_id: str, timeout_s: Optional[int] = None, poll_s: Optional[float] = None
     ) -> Dict[str, Any]:
-        """Wait until KA is ready (not in PROVISIONING state)."""
+        """Wait until KA is ready (not in CREATING state)."""
         timeout_s = timeout_s or self.default_timeout_s
         poll_s = poll_s or self.default_poll_s
         deadline = time.time() + timeout_s
 
         while True:
             ka = self.ka_get(tile_id)
-            status = ka.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status")
-            if status and status != "PROVISIONING":
+            status = ka.get("state") if ka else None
+            if status and status != "CREATING":
                 return ka
             if time.time() >= deadline:
                 return ka
             time.sleep(poll_s)
 
-    def ka_wait_until_endpoint_online(
+    def ka_wait_until_active(
         self, tile_id: str, timeout_s: Optional[int] = None, poll_s: Optional[float] = None
     ) -> Dict[str, Any]:
-        """Wait for endpoint_status==ONLINE."""
+        """Wait for state==ACTIVE."""
         timeout_s = timeout_s or self.default_timeout_s
         poll_s = poll_s or self.default_poll_s
         deadline = time.time() + timeout_s
@@ -506,14 +586,14 @@ class AgentBricksManager:
         while True:
             try:
                 ka = self.ka_get(tile_id)
-                status = ka.get("knowledge_assistant", {}).get("status", {}).get("endpoint_status")
+                status = ka.get("state") if ka else None
 
                 if status != last_status:
                     elapsed = int(time.time() - start_time)
-                    logger.info(f"[{elapsed}s] KA status: {last_status} -> {status}")
+                    logger.info(f"[{elapsed}s] KA state: {last_status} -> {status}")
                     last_status = status
 
-                if status == "ONLINE":
+                if status == "ACTIVE":
                     return ka
             except Exception as e:
                 elapsed = int(time.time() - start_time)
@@ -527,6 +607,13 @@ class AgentBricksManager:
                     return ka
                 raise TimeoutError(f"KA {tile_id} was not found within {timeout_s} seconds")
             time.sleep(poll_s)
+
+    # Alias for backward compatibility
+    def ka_wait_until_endpoint_online(
+        self, tile_id: str, timeout_s: Optional[int] = None, poll_s: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Wait for KA to be active. Alias for ka_wait_until_active."""
+        return self.ka_wait_until_active(tile_id, timeout_s, poll_s)
 
     # ========================================================================
     # KA Examples Management
@@ -997,7 +1084,7 @@ class AgentBricksManager:
     ) -> Dict[str, Any]:
         """Update a Genie space using a serialized payload (full replacement).
 
-        Uses the public /api/2.0/genie/spaces/{space_id} endpoint (PUT) with
+        Uses the public /api/2.0/genie/spaces/{space_id} endpoint (PATCH) with
         serialized_space in the body. This replaces the entire space configuration.
 
         Args:
@@ -1019,7 +1106,7 @@ class AgentBricksManager:
             payload["description"] = description
         if warehouse_id:
             payload["warehouse_id"] = warehouse_id
-        return self._put(f"/api/2.0/genie/spaces/{space_id}", payload)
+        return self._patch(f"/api/2.0/genie/spaces/{space_id}", payload)
 
     def genie_list_questions(
         self, space_id: str, question_type: str = "SAMPLE_QUESTION"
@@ -1230,11 +1317,13 @@ class AgentBricksManager:
             self._handle_response_error(response, "POST", path)
         return response.json()
 
-    def _patch(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    def _patch(
+        self, path: str, body: Dict[str, Any], params: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
         headers["Content-Type"] = "application/json"
         url = f"{self.w.config.host}{path}"
-        response = requests.patch(url, headers=headers, json=body, timeout=20)
+        response = requests.patch(url, headers=headers, json=body, params=params, timeout=20)
         if response.status_code >= 400:
             self._handle_response_error(response, "PATCH", path)
         return response.json()

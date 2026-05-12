@@ -1,4 +1,12 @@
-"""SQL tools - Execute SQL queries and get table information."""
+"""SQL tools - Execute SQL queries and get table information.
+
+Tools:
+- execute_sql: Single SQL query
+- execute_sql_multi: Multiple SQL statements with parallel execution
+- manage_warehouse: list, get_best
+- get_table_stats_and_schema: Schema and stats for tables
+- get_volume_folder_details: Schema for volume files
+"""
 
 from typing import Any, Dict, List, Optional, Union
 
@@ -7,7 +15,8 @@ from databricks_tools_core.sql import (
     execute_sql_multi as _execute_sql_multi,
     list_warehouses as _list_warehouses,
     get_best_warehouse as _get_best_warehouse,
-    get_table_details as _get_table_details,
+    get_table_stats_and_schema as _get_table_stats_and_schema,
+    get_volume_folder_details as _get_volume_folder_details,
     TableStatLevel,
 )
 
@@ -53,7 +62,7 @@ def _format_results_markdown(rows: List[Dict[str, Any]]) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool
+@mcp.tool(timeout=60)
 def execute_sql(
     sql_query: str,
     warehouse_id: str = None,
@@ -63,31 +72,10 @@ def execute_sql(
     query_tags: str = None,
     output_format: str = "markdown",
 ) -> Union[str, List[Dict[str, Any]]]:
-    """
-    Execute a SQL query on a Databricks SQL Warehouse.
+    """Execute SQL query on Databricks warehouse. Auto-selects warehouse if not provided.
 
-    If no warehouse_id is provided, automatically selects the best available warehouse.
-
-    IMPORTANT: For creating or dropping schemas, catalogs, and volumes, use the
-    manage_uc_objects tool instead of SQL DDL. Only use execute_sql for queries
-    (SELECT, INSERT, UPDATE) and table DDL (CREATE TABLE, DROP TABLE).
-
-    Args:
-        sql_query: SQL query to execute
-        warehouse_id: Optional warehouse ID. If not provided, auto-selects one.
-        catalog: Optional catalog context for unqualified table names.
-        schema: Optional schema context for unqualified table names.
-        timeout: Timeout in seconds (default: 180)
-        query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701").
-            Appears in system.query.history and Query History UI.
-        output_format: Result format — "markdown" (default) or "json".
-            Markdown tables are ~50% smaller than JSON because column names appear
-            only once in the header instead of on every row. Use "json" when you
-            need machine-parseable output.
-
-    Returns:
-        Markdown table string (default) or list of row dictionaries (if output_format="json").
-    """
+    Use for SELECT/INSERT/UPDATE/table DDL. For catalog/schema/volume DDL, use manage_uc_objects.
+    output_format: "markdown" (default, 50% smaller) or "json"."""
     rows = _execute_sql(
         sql_query=sql_query,
         warehouse_id=warehouse_id,
@@ -101,7 +89,7 @@ def execute_sql(
     return _format_results_markdown(rows)
 
 
-@mcp.tool
+@mcp.tool(timeout=120)
 def execute_sql_multi(
     sql_content: str,
     warehouse_id: str = None,
@@ -112,31 +100,9 @@ def execute_sql_multi(
     query_tags: str = None,
     output_format: str = "markdown",
 ) -> Dict[str, Any]:
-    """
-    Execute multiple SQL statements with dependency-aware parallelism.
+    """Execute multiple SQL statements with dependency-aware parallelism. Independent queries run in parallel.
 
-    Parses SQL content into statements, analyzes dependencies, and executes
-    in optimal order. Independent queries run in parallel.
-
-    IMPORTANT: For creating or dropping schemas, catalogs, and volumes, use the
-    manage_uc_objects tool instead of SQL DDL. Only use execute_sql/execute_sql_multi
-    for queries (SELECT, INSERT, UPDATE) and table DDL (CREATE TABLE, DROP TABLE).
-
-    Args:
-        sql_content: SQL content with multiple statements separated by ;
-        warehouse_id: Optional warehouse ID. If not provided, auto-selects one.
-        catalog: Optional catalog context for unqualified table names.
-        schema: Optional schema context for unqualified table names.
-        timeout: Timeout per query in seconds (default: 180)
-        max_workers: Maximum parallel queries per group (default: 4)
-        query_tags: Optional query tags for cost attribution (e.g., "team:eng,cost_center:701").
-        output_format: Result format — "markdown" (default) or "json".
-            Markdown tables are ~50% smaller than JSON because column names appear
-            only once in the header instead of on every row.
-
-    Returns:
-        Dictionary with results per query and execution summary.
-    """
+    For catalog/schema/volume DDL, use manage_uc_objects instead."""
     result = _execute_sql_multi(
         sql_content=sql_content,
         warehouse_id=warehouse_id,
@@ -155,58 +121,46 @@ def execute_sql_multi(
     return result
 
 
-@mcp.tool
-def list_warehouses() -> List[Dict[str, Any]]:
-    """
-    List all SQL warehouses in the workspace.
+@mcp.tool(timeout=30)
+def manage_warehouse(
+    action: str = "get_best",
+) -> Union[str, List[Dict[str, Any]], Dict[str, Any]]:
+    """Manage SQL warehouses: list, get_best.
 
-    Returns:
-        List of warehouse info dicts with id, name, state, size, etc.
-    """
-    return _list_warehouses()
+    Actions:
+    - list: List all SQL warehouses.
+      Returns: {warehouses: [{id, name, state, size, ...}]}.
+    - get_best: Get best available warehouse ID. Prefers running, then starting, smaller sizes.
+      Returns: {warehouse_id} or {warehouse_id: null, error}."""
+    act = action.lower()
+
+    if act == "list":
+        return {"warehouses": _list_warehouses()}
+
+    elif act == "get_best":
+        warehouse_id = _get_best_warehouse()
+        if warehouse_id:
+            return {"warehouse_id": warehouse_id}
+        return {"warehouse_id": None, "error": "No available warehouses found"}
+
+    else:
+        return {"error": f"Invalid action '{action}'. Valid actions: list, get_best"}
 
 
-@mcp.tool
-def get_best_warehouse() -> Optional[str]:
-    """
-    Get the ID of the best available SQL warehouse.
-
-    Prioritizes running warehouses, then starting ones, preferring smaller sizes.
-
-    Returns:
-        Warehouse ID string, or None if no warehouses available.
-    """
-    return _get_best_warehouse()
-
-
-@mcp.tool
-def get_table_details(
+@mcp.tool(timeout=60)
+def get_table_stats_and_schema(
     catalog: str,
     schema: str,
     table_names: List[str] = None,
     table_stat_level: str = "SIMPLE",
     warehouse_id: str = None,
 ) -> Dict[str, Any]:
-    """
-    Get table schema and statistics for one or more tables.
+    """Get schema and stats for tables. table_stat_level: NONE (schema only), SIMPLE (default, +row count), DETAILED (+cardinality/min/max/histograms).
 
-    Args:
-        catalog: Unity Catalog name
-        schema: Schema name
-        table_names: List of table names or GLOB patterns (e.g., ["bronze_*", "silver_orders"]).
-                    If None, returns all tables in the schema.
-        table_stat_level: Level of statistics to collect:
-            - "NONE": Schema only, no statistics
-            - "SIMPLE": Row count and basic info (default)
-            - "DETAILED": Column-level statistics including histograms
-        warehouse_id: Optional warehouse ID. If not provided, auto-selects one.
-
-    Returns:
-        Dictionary with tables list containing schema and statistics per table.
-    """
+    table_names: list or glob patterns, None=all tables."""
     # Convert string to enum
     level = TableStatLevel[table_stat_level.upper()]
-    result = _get_table_details(
+    result = _get_table_stats_and_schema(
         catalog=catalog,
         schema=schema,
         table_names=table_names,
@@ -214,4 +168,22 @@ def get_table_details(
         warehouse_id=warehouse_id,
     )
     # Convert to dict for JSON serialization
+    return result.model_dump(exclude_none=True) if hasattr(result, "model_dump") else result
+
+
+@mcp.tool(timeout=60)
+def get_volume_folder_details(
+    volume_path: str,
+    format: str = "parquet",
+    table_stat_level: str = "SIMPLE",
+    warehouse_id: str = None,
+) -> Dict[str, Any]:
+    """Get schema/stats for data files in Volume folder. format: parquet/csv/json/delta/file."""
+    level = TableStatLevel[table_stat_level.upper()]
+    result = _get_volume_folder_details(
+        volume_path=volume_path,
+        format=format,
+        table_stat_level=level,
+        warehouse_id=warehouse_id,
+    )
     return result.model_dump(exclude_none=True) if hasattr(result, "model_dump") else result

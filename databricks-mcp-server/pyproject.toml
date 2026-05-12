@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "databricks-tools-core",
-    "fastmcp>=0.1.0",
+    "fastmcp>=3.2.4,<4",
 ]
 
 [project.optional-dependencies]

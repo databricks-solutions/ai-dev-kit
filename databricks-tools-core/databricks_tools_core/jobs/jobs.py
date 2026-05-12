@@ -7,12 +7,7 @@ Uses serverless compute by default for optimal performance and cost.
 
 from typing import Optional, List, Dict, Any
 
-from databricks.sdk.service.jobs import (
-    Task,
-    JobCluster,
-    JobEnvironment,
-    JobSettings,
-)
+from databricks.sdk.service.jobs import JobSettings
 
 from ..auth import get_workspace_client
 from .models import JobError
@@ -187,60 +182,81 @@ def create_job(
     w = get_workspace_client()
 
     try:
-        # Build kwargs for SDK call
-        kwargs: Dict[str, Any] = {
+        # Build settings dict - JobSettings.from_dict() handles all nested conversions
+        settings_dict: Dict[str, Any] = {
             "name": name,
             "max_concurrent_runs": max_concurrent_runs,
         }
 
-        # Convert tasks from dicts to SDK Task objects
+        # Add tasks
         if tasks:
-            kwargs["tasks"] = [Task.from_dict(task) for task in tasks]
+            settings_dict["tasks"] = tasks
 
-        # Convert job_clusters if provided
+        # Add job_clusters if provided
         if job_clusters:
-            kwargs["job_clusters"] = [JobCluster.from_dict(jc) for jc in job_clusters]
+            settings_dict["job_clusters"] = job_clusters
 
-        # Convert environments if provided (for serverless tasks with dependencies)
+        # Add environments if provided (for serverless tasks with dependencies)
         # Auto-inject "client": "4" into spec if missing to avoid API error:
         # "Either base environment or version must be provided for environment"
         if environments:
             for env in environments:
                 if "spec" in env and "client" not in env["spec"]:
                     env["spec"]["client"] = "4"
-            kwargs["environments"] = [JobEnvironment.from_dict(env) for env in environments]
+            settings_dict["environments"] = environments
 
         # Add optional parameters
         if tags:
-            kwargs["tags"] = tags
+            settings_dict["tags"] = tags
         if timeout_seconds is not None:
-            kwargs["timeout_seconds"] = timeout_seconds
+            settings_dict["timeout_seconds"] = timeout_seconds
         if email_notifications:
-            kwargs["email_notifications"] = email_notifications
+            settings_dict["email_notifications"] = email_notifications
         if webhook_notifications:
-            kwargs["webhook_notifications"] = webhook_notifications
+            settings_dict["webhook_notifications"] = webhook_notifications
         if notification_settings:
-            kwargs["notification_settings"] = notification_settings
+            settings_dict["notification_settings"] = notification_settings
         if schedule:
-            kwargs["schedule"] = schedule
+            settings_dict["schedule"] = schedule
         if queue:
-            kwargs["queue"] = queue
+            settings_dict["queue"] = queue
         if run_as:
-            kwargs["run_as"] = run_as
+            settings_dict["run_as"] = run_as
         if git_source:
-            kwargs["git_source"] = git_source
+            settings_dict["git_source"] = git_source
         if parameters:
-            kwargs["parameters"] = parameters
+            settings_dict["parameters"] = parameters
         if health:
-            kwargs["health"] = health
+            settings_dict["health"] = health
         if deployment:
-            kwargs["deployment"] = deployment
+            settings_dict["deployment"] = deployment
 
         # Add any extra settings
-        kwargs.update(extra_settings)
+        settings_dict.update(extra_settings)
 
-        # Create job
-        response = w.jobs.create(**kwargs)
+        # Convert entire dict to JobSettings - handles all nested type conversions
+        settings = JobSettings.from_dict(settings_dict)
+
+        # Create job using the converted SDK objects
+        response = w.jobs.create(
+            name=settings.name,
+            tasks=settings.tasks,
+            job_clusters=settings.job_clusters,
+            environments=settings.environments,
+            tags=settings.tags,
+            timeout_seconds=settings.timeout_seconds,
+            max_concurrent_runs=settings.max_concurrent_runs,
+            email_notifications=settings.email_notifications,
+            webhook_notifications=settings.webhook_notifications,
+            notification_settings=settings.notification_settings,
+            schedule=settings.schedule,
+            queue=settings.queue,
+            run_as=settings.run_as,
+            git_source=settings.git_source,
+            parameters=settings.parameters,
+            health=settings.health,
+            deployment=settings.deployment,
+        )
 
         # Convert response to dict
         return response.as_dict()

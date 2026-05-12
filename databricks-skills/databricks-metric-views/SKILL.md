@@ -25,6 +25,19 @@ Use this skill when:
 
 ## Quick Start
 
+### Inspect Source Table Schema
+
+Before creating a metric view, call `get_table_stats_and_schema` to understand available columns for dimensions and measures:
+
+```
+get_table_stats_and_schema(
+    catalog="catalog",
+    schema="schema",
+    table_names=["orders"],
+    table_stat_level="SIMPLE"  # Use "DETAILED" for cardinality, min/max, histograms
+)
+```
+
 ### Create a Metric View
 
 ```sql
@@ -33,8 +46,8 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Orders KPIs for sales analysis"
   source: catalog.schema.orders
+  comment: "Orders KPIs for sales analysis"
   filter: order_date > '2020-01-01'
   dimensions:
     - name: Order Month
@@ -154,8 +167,8 @@ manage_metric_views(
 
 ```yaml
 version: 1.1                    # Required: "1.1" for DBR 17.2+
-comment: "Description"          # Optional: metric view description
 source: catalog.schema.table    # Required: source table/view
+comment: "Description"          # Optional: metric view description
 filter: column > value          # Optional: global WHERE filter
 
 dimensions:                     # Required: at least one

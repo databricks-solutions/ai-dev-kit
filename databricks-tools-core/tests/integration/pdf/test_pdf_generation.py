@@ -1,143 +1,107 @@
 """Integration tests for PDF generation."""
 
-import asyncio
-import os
-import shutil
-from pathlib import Path
-
 import pytest
 
-# Local output directory for generated PDFs
-GENERATED_PDF_DIR = Path(__file__).parent / "generated_pdf"
+from databricks_tools_core.pdf import generate_and_upload_pdf
+from databricks_tools_core.pdf.generator import _convert_html_to_pdf
 
 
-def requires_llm():
-    """Skip decorator for tests that require LLM."""
-    return pytest.mark.skipif(
-        not os.getenv("DATABRICKS_MODEL") and not os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-        reason="No LLM endpoint configured (set DATABRICKS_MODEL or AZURE_OPENAI_DEPLOYMENT)",
-    )
+@pytest.fixture
+def sample_html():
+    """Sample HTML document for testing."""
+    return """<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        h1 { color: #333; }
+        .highlight { background-color: #ffffcc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Test Document</h1>
+    <p>This is a simple test paragraph.</p>
+    <div class="highlight">
+        <p>This is highlighted content.</p>
+    </div>
+    <ul>
+        <li>Item 1</li>
+        <li>Item 2</li>
+        <li>Item 3</li>
+    </ul>
+</body>
+</html>"""
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_generated_pdf_dir():
-    """Setup generated_pdf directory - clean at start, keep at end."""
-    # Clean up at the beginning
-    if GENERATED_PDF_DIR.exists():
-        shutil.rmtree(GENERATED_PDF_DIR)
-    GENERATED_PDF_DIR.mkdir(parents=True, exist_ok=True)
-    yield
-    # Don't clean up at end - keep files for inspection
+@pytest.fixture
+def test_config():
+    """Test configuration using ai_dev_kit catalog."""
+    return {
+        "catalog": "ai_dev_kit",
+        "schema": "test_pdf_generation",
+        "volume": "raw_data",
+    }
 
 
 @pytest.mark.integration
 class TestHTMLToPDF:
-    """Test HTML to PDF conversion (no LLM required)."""
+    """Test HTML to PDF conversion (local only, no Databricks connection)."""
 
-    def test_convert_simple_html(self):
-        """Test converting simple HTML to PDF."""
-        from databricks_tools_core.pdf.generator import _convert_html_to_pdf
-
-        html_content = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 50px; }
-                h1 { color: #333; }
-            </style>
-        </head>
-        <body>
-            <h1>Test Document</h1>
-            <p>This is a simple test paragraph.</p>
-        </body>
-        </html>
-        """
-
-        output_path = str(GENERATED_PDF_DIR / "simple_test.pdf")
-        success = asyncio.run(_convert_html_to_pdf(html_content, output_path))
+    def test_convert_simple_html(self, sample_html, tmp_path):
+        """Test converting HTML to PDF locally."""
+        output_path = str(tmp_path / "test.pdf")
+        success = _convert_html_to_pdf(sample_html, output_path)
 
         assert success, "HTML to PDF conversion failed"
-        assert Path(output_path).exists()
-        assert Path(output_path).stat().st_size > 0
+        assert (tmp_path / "test.pdf").exists()
+        assert (tmp_path / "test.pdf").stat().st_size > 0
 
 
-@requires_llm()
 @pytest.mark.integration
-class TestPDFGeneration:
-    """Integration tests for PDF document generation (requires LLM)."""
+class TestGenerateAndUploadPDF:
+    """Test PDF generation and upload to Unity Catalog volume."""
 
-    @pytest.fixture
-    def test_config(self):
-        """Test configuration using ai_dev_kit catalog."""
-        return {
-            "catalog": "ai_dev_kit",
-            "schema": "test_pdf_generation",
-            "volume": "raw_data",
-            "folder": "test_docs",
-        }
-
-    def test_generate_single_pdf(self, test_config):
-        """Test generating a single PDF document."""
-        from databricks_tools_core.pdf import DocSize, generate_single_pdf
-        from databricks_tools_core.pdf.models import DocumentSpecification
-
-        doc_spec = DocumentSpecification(
-            title="Test API Guide",
-            category="Technical",
-            model="TEST-001",
-            description="A simple test document about REST API best practices.",
-            question="What are the recommended HTTP methods for CRUD operations?",
-            guideline="Answer should mention GET, POST, PUT/PATCH, DELETE methods.",
-        )
-
-        # Use local directory for temp files
-        temp_dir = str(GENERATED_PDF_DIR / "single_pdf")
-        Path(temp_dir).mkdir(parents=True, exist_ok=True)
-
-        result = asyncio.run(
-            generate_single_pdf(
-                doc_spec=doc_spec,
-                description="Technical documentation for a REST API service.",
-                catalog=test_config["catalog"],
-                schema=test_config["schema"],
-                volume=test_config["volume"],
-                folder=test_config["folder"],
-                temp_dir=temp_dir,
-                doc_size=DocSize.SMALL,  # Use SMALL for faster tests
-            )
+    def test_generate_and_upload_pdf(self, sample_html, test_config):
+        """Test generating PDF from HTML and uploading to volume."""
+        result = generate_and_upload_pdf(
+            html_content=sample_html,
+            filename="test_document.pdf",
+            catalog=test_config["catalog"],
+            schema=test_config["schema"],
+            volume=test_config["volume"],
         )
 
         assert result.success, f"PDF generation failed: {result.error}"
-        assert result.pdf_path.endswith(".pdf")
-        assert test_config["catalog"] in result.pdf_path
+        assert result.volume_path is not None
+        assert result.volume_path.endswith(".pdf")
+        assert test_config["catalog"] in result.volume_path
 
-    def test_generate_pdf_documents_batch(self, test_config):
-        """Test generating multiple PDF documents."""
-        from databricks_tools_core.pdf import DocSize, generate_pdf_documents
-
-        # Use local directory for batch output
-        batch_dir = str(GENERATED_PDF_DIR / "batch_pdf")
-        Path(batch_dir).mkdir(parents=True, exist_ok=True)
-
-        result = asyncio.run(
-            generate_pdf_documents(
-                catalog=test_config["catalog"],
-                schema=test_config["schema"],
-                description="HR policy documents including employee guidelines and procedures.",
-                count=2,  # Small count for faster test
-                volume=test_config["volume"],
-                folder="batch_test",
-                doc_size=DocSize.SMALL,  # Use SMALL for faster tests
-                overwrite_folder=True,
-                max_workers=4,
-                temp_dir=batch_dir,
-            )
+    def test_generate_and_upload_pdf_with_folder(self, sample_html, test_config):
+        """Test generating PDF and uploading to a subfolder."""
+        result = generate_and_upload_pdf(
+            html_content=sample_html,
+            filename="subfolder_test",  # Without .pdf extension
+            catalog=test_config["catalog"],
+            schema=test_config["schema"],
+            volume=test_config["volume"],
+            folder="test_folder",
         )
 
-        assert result.success or result.pdfs_generated > 0, f"No PDFs generated: {result.errors}"
-        assert result.pdfs_generated >= 1
-        assert (
-            result.volume_path
-            == f"/Volumes/{test_config['catalog']}/{test_config['schema']}/{test_config['volume']}/batch_test"
+        assert result.success, f"PDF generation failed: {result.error}"
+        assert result.volume_path is not None
+        assert result.volume_path.endswith(".pdf")
+        assert "test_folder" in result.volume_path
+
+    def test_generate_pdf_invalid_volume(self, sample_html, test_config):
+        """Test error handling for invalid volume."""
+        result = generate_and_upload_pdf(
+            html_content=sample_html,
+            filename="test.pdf",
+            catalog=test_config["catalog"],
+            schema=test_config["schema"],
+            volume="nonexistent_volume",
         )
+
+        assert not result.success
+        assert result.error is not None
+        assert "does not exist" in result.error

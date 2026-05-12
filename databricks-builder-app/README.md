@@ -1,6 +1,10 @@
 # Databricks Builder App
 
+> **Security Notice:** This application wraps Claude Code. Projects created within the app by different users are not strongly isolated from each other (this project doesn't implement solutions like Firecracker microVM or Docker to isolate Claude sessions from the app). Only grant access to users you trust.
+
 A web application that provides a Claude Code agent interface with integrated Databricks tools. Users interact with Claude through a chat interface, and the agent can execute SQL queries, manage pipelines, upload files, and more on their Databricks workspace.
+
+Optionally, the app can also serve as an **MCP server** for [Genie Code](https://docs.databricks.com/en/genie/genie-code.html) and other MCP clients, exposing all 75+ Databricks tools via the MCP protocol at `/mcp`.
 
 > **✅ Event Loop Fix Implemented**
 >
@@ -35,7 +39,7 @@ A web application that provides a Claude Code agent interface with integrated Da
 │  │ Read, Write, Edit│         │ execute_sql             │    │ sdp       │  │
 │  │ Glob, Grep, Skill│         │ create_or_update_pipeline    │ dabs      │  │
 │  └──────────────────┘         │ upload_folder           │    │ sdk       │  │
-│                               │ run_python_file         │    │ ...       │  │
+│                               │ execute_code            │    │ ...       │  │
 │                               │ ...                     │    └───────────┘  │
 │                               └─────────────────────────┘                   │
 │                                          │                                  │
@@ -159,9 +163,9 @@ options = ClaudeAgentOptions(
 Tools are exposed as `mcp__databricks__<tool_name>` and include:
 - SQL execution (`execute_sql`, `execute_sql_multi`)
 - Warehouse management (`list_warehouses`, `get_best_warehouse`)
-- Cluster execution (`execute_databricks_command`, `run_python_file_on_databricks`)
+- Cluster execution (`execute_code`)
 - Pipeline management (`create_or_update_pipeline`, `start_update`, etc.)
-- File operations (`upload_file`, `upload_folder`)
+- File operations (`upload_to_workspace`)
 
 ### 4. Skills System
 
@@ -213,88 +217,56 @@ projects/
   - Unity Catalog enabled (recommended)
 - PostgreSQL database (Lakebase) for project persistence — autoscale or provisioned
 
-### Quick Start
+### Quick Start (Local Development)
 
-#### 1. Run the Setup Script
-
-From the repository root:
+One command provisions Lakebase, installs all dependencies, and starts the app:
 
 ```bash
 cd databricks-builder-app
-./scripts/setup.sh
+./scripts/start_local.sh --profile <your-profile>
 ```
 
 This will:
+- Check prerequisites (uv, Node.js, npm, Databricks CLI v0.287.0+)
+- Get credentials from your Databricks CLI profile
+- Provision a Lakebase Autoscale database via DAB (if needed)
+- Generate `.env.local` with your workspace settings
+- Install backend and frontend dependencies
+- Install all Databricks skills (local + external)
+- Test the Lakebase connection
+- Start backend (http://localhost:8000) and frontend (http://localhost:3000)
 
-- Verify prerequisites (uv, Node.js, npm)
-- Create a `.env.local` file from `.env.example` (if one doesn't already exist)
-- Install backend Python dependencies via `uv sync`
-- Install sibling packages (`databricks-tools-core`, `databricks-mcp-server`)
-- Install frontend Node.js dependencies
-
-#### 2. Configure Your `.env.local` File
-
-> **You must do this before running the app.** The setup script creates a `.env.local` file from `.env.example`, but all values are placeholders. Open `.env.local` and fill in your actual values.
-
-The `.env.local` file is gitignored and will never be committed. At a minimum, you need to set these:
+#### Options
 
 ```bash
-# Required: Your Databricks workspace
-DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
-DATABRICKS_TOKEN=dapi...
+# First time — everything from scratch
+./scripts/start_local.sh --profile dbx_shared_demo
 
-# Required: Database for project persistence (pick ONE option)
+# Subsequent runs — fast (deps cached, Lakebase exists)
+./scripts/start_local.sh --profile dbx_shared_demo
 
-# Option A — Autoscale Lakebase (recommended, scales to zero):
-LAKEBASE_ENDPOINT=projects/<project-name>/branches/production/endpoints/primary
-LAKEBASE_DATABASE_NAME=databricks_postgres
+# Skip Lakebase provisioning
+./scripts/start_local.sh --profile dbx_shared_demo --skip-lakebase
 
-# Option B — Provisioned Lakebase (fixed capacity):
-# LAKEBASE_INSTANCE_NAME=your-lakebase-instance
-# LAKEBASE_DATABASE_NAME=databricks_postgres
+# Force reinstall all dependencies
+./scripts/start_local.sh --profile dbx_shared_demo --force-install
 
-# Option C — Static connection URL (any type, simplest for local dev):
-# LAKEBASE_PG_URL=postgresql://user:password@host:5432/database?sslmode=require
+# Regenerate .env.local
+./scripts/start_local.sh --profile dbx_shared_demo --force-env
+
+# Custom Lakebase project name
+./scripts/start_local.sh --profile dbx_shared_demo --lakebase-id my-custom-db
 ```
 
-The app auto-detects the mode based on which variable is set:
-- `LAKEBASE_ENDPOINT` → autoscale mode (`client.postgres` API, host looked up automatically)
-- `LAKEBASE_INSTANCE_NAME` → provisioned mode (`client.database` API)
-- `LAKEBASE_PG_URL` → static URL mode (no OAuth token refresh)
-
-See `.env.example` for the full list of available settings including LLM provider, skills configuration, and MLflow tracing. The app loads `.env.local` (not `.env`) at startup.
-
-**Getting your Databricks token:**
-1. Go to your Databricks workspace
-2. Click your username → User Settings
-3. Go to Developer → Access Tokens → Generate New Token
-4. Copy the token value
-
-#### 3. Start the Development Servers
-
-```bash
-./scripts/start_dev.sh
-```
-
-This starts both the backend and frontend in one terminal.
-
-You can also start them separately if you prefer:
-
-```bash
-# Terminal 1 — Backend
-uvicorn server.app:app --reload --port 8000 --reload-dir server
-
-# Terminal 2 — Frontend
-cd client && npm run dev
-```
-
-#### 4. Access the App
+#### Access the App
 
 - **Frontend**: <http://localhost:3000>
 - **Backend API**: <http://localhost:8000>
 - **API Docs**: <http://localhost:8000/docs>
 
-#### 5. (Optional) Configure Claude via Databricks Model Serving
+Press `Ctrl+C` to stop both servers.
+
+#### (Optional) Configure Claude via Databricks Model Serving
 
 If you're routing Claude API calls through Databricks Model Serving instead of directly to Anthropic, create `.claude/settings.json` in the **repository root** (not in the app directory):
 
@@ -432,6 +404,7 @@ databricks-builder-app/
 │   │   ├── agent.py       # /api/agent/* (invoke, etc.)
 │   │   ├── projects.py    # /api/projects/*
 │   │   └── conversations.py
+│   ├── mcp_gateway.py     # MCP Gateway for Genie Code (optional, via ENABLE_MCP_GATEWAY)
 │   └── services/          # Business logic
 │       ├── agent.py       # Claude Code session management
 │       ├── databricks_tools.py  # MCP tool loading from SDK
@@ -446,7 +419,8 @@ databricks-builder-app/
 │   └── package.json
 ├── alembic/               # Database migrations
 ├── scripts/               # Utility scripts
-│   └── start_dev.sh       # Development startup
+│   ├── start_local.sh     # Local development (one command)
+│   └── _legacy/            # Old setup.sh and start_dev.sh
 ├── skills/                # Cached skills (gitignored)
 ├── projects/              # Project working directories (gitignored)
 ├── pyproject.toml         # Python dependencies
@@ -480,289 +454,228 @@ databricks-builder-app/
 | `/api/clusters` | GET | List available Databricks clusters |
 | `/api/warehouses` | GET | List available SQL warehouses |
 | `/api/mlflow/status` | GET | Get MLflow tracing status |
+| **MCP Gateway** (when `ENABLE_MCP_GATEWAY=true`) | | |
+| `/mcp` | POST | MCP protocol endpoint (Streamable HTTP) |
+| `/mcp/health` | GET | MCP gateway health check |
+| `/mcp/tools` | GET | List all registered MCP tools |
+| `/mcp/skills` | GET | List all available skills |
+| `/mcp/info` | GET | HTML info page with tools and skills |
 
 ## Deploying to Databricks Apps
 
-This section covers deploying the Builder App to Databricks Apps platform for production use.
+The Builder App uses an automated deploy script that provisions all infrastructure and deploys the app in a single command.
 
 ### Prerequisites
 
-Before deploying, ensure you have:
-
-1. **Databricks CLI** installed and authenticated
-2. **Node.js 18+** for building the frontend
-3. **A Lakebase instance** in your Databricks workspace (for database persistence)
-4. Access to the **full repository** (not just this directory) since the app depends on sibling packages
+- **Databricks CLI v0.287.0+** — [Install](https://docs.databricks.com/aws/en/dev-tools/cli/install)
+- **Node.js 18+** — for building the frontend
+- **uv** — Python package manager ([Install](https://github.com/astral-sh/uv))
+- **Databricks workspace** with Lakebase Autoscaling enabled
 
 ### Quick Deploy
 
 ```bash
-# 1. Authenticate with Databricks CLI
-databricks auth login --host https://your-workspace.cloud.databricks.com
+cd databricks-builder-app
 
-# 2. Create the app (first time only)
-databricks apps create my-builder-app
-
-# 3. Add Lakebase as a resource (first time only)
-databricks apps add-resource my-builder-app \
-  --resource-type database \
-  --resource-name lakebase \
-  --database-instance <your-lakebase-instance-name>
-
-# 4. Configure app.yaml (copy and edit the example)
-cp app.yaml.example app.yaml
-# Edit app.yaml with your Lakebase instance name and other settings
-
-# 5. Deploy
-./scripts/deploy.sh my-builder-app
+# Full deploy — creates Lakebase, builds frontend, installs skills, creates app, grants permissions, deploys
+./scripts/deploy.sh <app-name> --profile <your-profile>
 ```
 
-### Step-by-Step Deployment Guide
+That's it. The script handles everything:
 
-#### 1. Install and Authenticate Databricks CLI
+| Step | What the script does |
+|------|---------------------|
+| 1 | Checks prerequisites (CLI version, auth) |
+| 2 | Provisions Lakebase Autoscale via Databricks Asset Bundle (`databricks.yml`) |
+| 3 | Builds the React frontend |
+| 4 | Stages server code, packages, skills, and generates `app.yaml` |
+| 5 | Creates the Databricks App (if it doesn't exist) |
+| 6 | Creates Lakebase OAuth role and grants PostgreSQL permissions for the app's service principal |
+| 7 | Uploads everything to workspace |
+| 8 | Deploys the app |
+
+### Deploy Options
 
 ```bash
-# Install Databricks CLI
-pip install databricks-cli
+# Full deploy from scratch
+./scripts/deploy.sh my-builder-app --profile dbx_shared_demo
 
-# Authenticate (interactive browser login)
-databricks auth login --host https://your-workspace.cloud.databricks.com
+# Deploy with MCP Gateway for Genie Code (name MUST start with mcp-)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --profile dbx_shared_demo
 
-# Verify authentication
-databricks auth describe
+# Quick redeploy (skip Lakebase + frontend build + skills download)
+./scripts/deploy.sh my-builder-app --profile dbx_shared_demo --skip-lakebase --skip-build --skip-skills
+
+# Custom Lakebase project name
+./scripts/deploy.sh my-builder-app --profile dbx_shared_demo --lakebase-id my-custom-db
+
+# All options
+./scripts/deploy.sh --help
 ```
 
-If you have multiple profiles, set the profile before deploying:
-```bash
-export DATABRICKS_CONFIG_PROFILE=your-profile-name
-```
+### What Gets Created
 
-#### 2. Create the Databricks App
+| Resource | Details |
+|----------|---------|
+| **Lakebase Autoscale project** | PostgreSQL 17, 0.5-2 CU, scale-to-zero after 5 min |
+| **Databricks App** | FastAPI backend + React frontend |
+| **Lakebase OAuth role** | For the app's service principal |
+| **PostgreSQL schema** | `builder_app` with full grants for the SP |
+| **Database tables** | Created automatically via alembic migrations on first startup |
 
-```bash
-# Create a new app
-databricks apps create my-builder-app
+### Infrastructure as Code
 
-# Verify it was created
-databricks apps get my-builder-app
-```
-
-#### 3. Create a Lakebase Instance
-
-The app requires a PostgreSQL database (Lakebase) for storing projects, conversations, and messages.
-
-**Autoscale Lakebase** (recommended — scales to zero when idle):
-1. Go to your Databricks workspace → **Catalog** → **Lakebase**
-2. Click **Create** → select **Autoscale**
-3. Note the endpoint resource name (e.g., `projects/my-app/branches/production/endpoints/primary`)
-4. Set in `app.yaml`: `LAKEBASE_ENDPOINT=projects/my-app/branches/production/endpoints/primary`
-
-**Provisioned Lakebase** (fixed capacity):
-1. Go to **Catalog** → **Lakebase** → **Create** → select **Provisioned**
-2. Note the instance name (e.g., `my-lakebase-instance`)
-3. Set in `app.yaml`: `LAKEBASE_INSTANCE_NAME=my-lakebase-instance`
-
-#### 4. Add Lakebase as an App Resource
-
-```bash
-databricks apps add-resource my-builder-app \
-  --resource-type database \
-  --resource-name lakebase \
-  --database-instance <your-lakebase-instance-name>
-```
-
-This automatically configures the database connection environment variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`).
-
-#### 5. Configure app.yaml
-
-Copy the example configuration and customize it:
-
-```bash
-cp app.yaml.example app.yaml
-```
-
-Edit `app.yaml` with your settings:
+The Lakebase database is managed declaratively via a Databricks Asset Bundle (`databricks.yml`):
 
 ```yaml
-command:
-  - "uvicorn"
-  - "server.app:app"
-  - "--host"
-  - "0.0.0.0"
-  - "--port"
-  - "$DATABRICKS_APP_PORT"
+bundle:
+  name: databricks-builder-app
 
-env:
-  # Required: Lakebase database (pick ONE option)
+variables:
+  lakebase_project_id:
+    description: "Lakebase project ID"
+    default: "builder-app-db"
 
-  # Option A — Autoscale Lakebase (recommended):
-  - name: LAKEBASE_ENDPOINT
-    value: "projects/<project-name>/branches/production/endpoints/primary"
-  - name: LAKEBASE_DATABASE_NAME
-    value: "databricks_postgres"
-
-  # Option B — Provisioned Lakebase:
-  # - name: LAKEBASE_INSTANCE_NAME
-  #   value: "<your-lakebase-instance-name>"
-  # - name: LAKEBASE_DATABASE_NAME
-  #   value: "databricks_postgres"
-
-  # Skills to enable (comma-separated)
-  - name: ENABLED_SKILLS
-    value: "databricks-agent-bricks,databricks-python-sdk,databricks-spark-declarative-pipelines"
-
-  # MLflow tracing (optional)
-  - name: MLFLOW_TRACKING_URI
-    value: "databricks"
-  # - name: MLFLOW_EXPERIMENT_NAME
-  #   value: "/Users/your-email@company.com/claude-code-traces"
-
-  # Other settings
-  - name: ENV
-    value: "production"
-  - name: PROJECTS_BASE_DIR
-    value: "./projects"
+resources:
+  postgres_projects:
+    builder_db:
+      project_id: ${var.lakebase_project_id}
+      display_name: "builder-app-db"
+      pg_version: 17
+      default_endpoint_settings:
+        autoscaling_limit_min_cu: 0.5
+        autoscaling_limit_max_cu: 2
+        suspend_timeout_duration: "300s"
 ```
 
-#### 6. Deploy the App
-
-Run the deploy script from the `databricks-builder-app` directory:
+You can manage the Lakebase infrastructure independently:
 
 ```bash
-./scripts/deploy.sh my-builder-app
+# Deploy/update Lakebase only
+databricks bundle deploy --profile <profile>
+
+# Destroy Lakebase (does NOT affect the app)
+databricks bundle destroy --profile <profile>
 ```
 
-The deploy script will:
-1. Build the React frontend
-2. Package the server code
-3. Bundle sibling packages (`databricks-tools-core`, `databricks-mcp-server`)
-4. Copy skills from `databricks-skills/`
-5. Upload everything to your Databricks workspace
-6. Deploy the app
-
-**Skip frontend build** (if already built):
-```bash
-./scripts/deploy.sh my-builder-app --skip-build
-```
-
-#### 7. Grant Database Permissions
-
-After the first deployment, grant table permissions to the app's service principal:
-
-```sql
--- Run this in a Databricks notebook or SQL editor
--- Replace <service-principal-id> with your app's service principal
-
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public
-  TO `<service-principal-id>`;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public
-  TO `<service-principal-id>`;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT ALL ON TABLES TO `<service-principal-id>`;
-```
-
-To find your app's service principal ID:
-```bash
-databricks apps get my-builder-app --output json | jq '.service_principal_id'
-```
-
-#### 8. Access Your App
-
-After successful deployment, the script will display your app URL:
-```
-App URL: https://my-builder-app-1234567890.aws.databricksapps.com
-```
-
-### Deployment Troubleshooting
-
-#### "Could not determine Databricks workspace"
-
-Your Databricks CLI authentication may be invalid or using the wrong profile:
-```bash
-# Check available profiles
-databricks auth profiles
-
-# Use a specific profile
-export DATABRICKS_CONFIG_PROFILE=your-valid-profile
-
-# Re-authenticate if needed
-databricks auth login --host https://your-workspace.cloud.databricks.com
-```
-
-#### "Build directory client/out not found"
-
-The frontend build is missing. The deploy script should build it automatically, but you can build manually:
-```bash
-cd client
-npm install
-npm run build
-cd ..
-```
-
-#### "Skill 'X' not found"
-
-Skills are copied from the sibling `databricks-skills/` directory. Ensure:
-1. You're running the deploy script from the full repository (not just this directory)
-2. The skill name in `ENABLED_SKILLS` matches a directory in `databricks-skills/`
-3. The skill directory contains a `SKILL.md` file
-
-#### "Permission denied for table projects" or Database Errors
-
-When using a shared Lakebase instance, you need to grant the app's service principal permissions on the tables:
+### Redeploying After Code Changes
 
 ```bash
-# 1. Get your app's service principal ID
-databricks apps get my-builder-app --output json | python3 -c "import sys, json; print(json.load(sys.stdin)['service_principal_id'])"
+# Full redeploy (rebuilds everything)
+./scripts/deploy.sh my-builder-app --profile <profile>
+
+# Quick redeploy (server code changes only)
+./scripts/deploy.sh my-builder-app --profile <profile> --skip-lakebase --skip-build --skip-skills
 ```
 
-2. Connect to your Lakebase instance via psql or a Databricks notebook, then run:
+### MCP Gateway for Genie Code
 
-```sql
--- Replace <service-principal-id> with the ID from step 1
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "<service-principal-id>";
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "<service-principal-id>";
-GRANT USAGE ON SCHEMA public TO "<service-principal-id>";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "<service-principal-id>";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "<service-principal-id>";
+The Builder App can optionally serve as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. This turns the app into a dual-purpose deployment: **visual builder UI** at `/` and **MCP server** at `/mcp`.
+
+#### How It Works
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Builder App (single Databricks App deployment)     │
+│                                                     │
+│  /              → React Builder UI                  │
+│  /api/*         → REST API (projects, agent, etc.)  │
+│                                                     │
+│  /mcp           → MCP Protocol (Streamable HTTP)    │
+│  /mcp/health    → Health check (JSON)               │
+│  /mcp/tools     → Tool listing (JSON)               │
+│  /mcp/skills    → Skill listing (JSON)              │
+│  /mcp/info      → Info page (HTML)                  │
+└─────────────────────────────────────────────────────┘
 ```
 
-Alternatively, if you have a fresh/private Lakebase instance, the app's migrations will create the tables with proper ownership automatically.
+The MCP gateway reuses the same FastMCP server and tool registrations that the in-process Claude agent uses — no duplicate tool loading, no separate deployment.
 
-#### App shows blank page or "Not Found"
+#### Deploying with MCP Gateway
 
-Check the app logs in Databricks:
+> **Genie Code requires app names to start with `mcp-`** to appear in the MCP server picker. The deploy script will warn you if the name doesn't match.
+
 ```bash
-databricks apps get-logs my-builder-app
+# Deploy with MCP Gateway enabled (Genie Code compatible name)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --profile <your-profile>
+
+# Quick redeploy (code changes only)
+./scripts/deploy.sh mcp-builder-app --enable-mcp --skip-lakebase --skip-build --skip-skills --profile <profile>
 ```
 
-Common causes:
-- Frontend files not properly deployed (check `client/out` exists in staging)
-- Database connection issues (verify Lakebase resource is added)
-- Python import errors (check logs for traceback)
+The `--enable-mcp` flag sets `ENABLE_MCP_GATEWAY=true` and `FASTMCP_STATELESS_HTTP=true` in the generated `app.yaml`. Without this flag, the MCP gateway is completely disabled and the app behaves identically to a standard deployment.
 
-#### Redeploying After Changes
+#### Registering with Genie Code
+
+After deploying with `--enable-mcp` and an `mcp-` prefixed name:
+
+1. Open a **Genie Space** in the Databricks UI
+2. Click the **gear icon** (Settings) > **MCP Servers**
+3. Select your app (e.g., `mcp-builder-app`) from the list
+4. Genie Code now has access to all Databricks tools via MCP
+
+You can also install skills to the Genie Space for additional context:
 
 ```bash
-# Full redeploy (rebuilds frontend)
-./scripts/deploy.sh my-builder-app
+# From the repo root — installs skills to your workspace for Genie Code
+./databricks-skills/install_skills_to_genie_code.sh
+```
 
-# Quick redeploy (skip frontend build)
-./scripts/deploy.sh my-builder-app --skip-build
+#### Using with Other MCP Clients
+
+The MCP endpoint works with any MCP client that supports Streamable HTTP transport:
+
+```
+MCP URL: https://<app-url>/mcp
+```
+
+| Client | Configuration |
+|--------|---------------|
+| **Genie Code** | Settings > MCP Servers > Select app |
+| **AI Playground** | Add MCP server URL |
+| **Claude Desktop** | `mcpServers` config with HTTP transport |
+| **Cursor / VS Code** | MCP server config with HTTP transport |
+
+#### Local Development
+
+The MCP gateway does **not** activate during local development unless you explicitly set the environment variable:
+
+```bash
+# Normal local dev (no MCP gateway)
+./scripts/start_dev.sh
+
+# Local dev with MCP gateway (for testing)
+ENABLE_MCP_GATEWAY=true uvicorn server.app:app --reload --port 8000 --reload-dir server
+```
+
+### Destroying Everything
+
+```bash
+# Delete the app
+databricks apps delete my-builder-app --profile <profile>
+
+# Delete the Lakebase database
+databricks bundle destroy --profile <profile> --auto-approve
 ```
 
 ### MLflow Tracing
 
-The app supports MLflow tracing for Claude Code conversations. To enable:
+The app automatically traces Claude Code conversations to MLflow. Traces include user prompts, Claude responses, tool usage, and session metadata.
 
-1. Set `MLFLOW_TRACKING_URI=databricks` in `app.yaml`
-2. Optionally set `MLFLOW_EXPERIMENT_NAME` to a specific experiment path
-
-Traces will appear in your Databricks MLflow UI and include:
-- User prompts and Claude responses
-- Tool usage and results
-- Session metadata
+The deploy script configures tracing to the `/Workspace/Shared/builder_app_ml_trace` experiment by default. To customize, edit the `MLFLOW_EXPERIMENT_NAME` value in the generated `app.yaml` section of `scripts/deploy.sh`.
 
 See the [Databricks MLflow Tracing documentation](https://docs.databricks.com/aws/en/mlflow3/genai/tracing/integrations/claude-code) for more details.
+
+### Deployment Troubleshooting
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| CLI version too old | Need v0.287.0+ for Lakebase DAB support | `curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh \| sh` |
+| `project with such id already exists` | Lakebase project name conflict | Use `--lakebase-id <different-name>` or destroy existing: `databricks bundle destroy` |
+| `password authentication failed` | Lakebase OAuth role not created | Re-run deploy — Step 6 handles this automatically |
+| `permission denied for table` | PostgreSQL grants missing | Re-run deploy — Step 6 is idempotent |
+| `relation does not exist` | Migrations didn't run | Redeploy the app to trigger migrations |
+| App shows blank page | Check logs: `databricks apps logs <app-name>` | Usually a package install error — check requirements.txt |
 
 ## Embedding in Other Apps
 

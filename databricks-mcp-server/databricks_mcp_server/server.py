@@ -55,17 +55,40 @@ def _patch_subprocess_stdin():
     subprocess.Popen = _PatchedPopen
 
 
-def _patch_tool_decorator_for_windows():
-    """Wrap sync tool functions in asyncio.to_thread() on Windows.
+
+
+def _wrap_sync_in_thread(fn):
+    """Wrap a sync function to run in asyncio.to_thread(), preserving metadata."""
+
+    @functools.wraps(fn)
+    async def async_wrapper(**kwargs):
+        return await asyncio.to_thread(fn, **kwargs)
+
+    return async_wrapper
+
+
+# Apply subprocess patch early — before any Databricks SDK import (Windows only)
+if sys.platform == "win32":
+    _patch_subprocess_stdin()
+
+
+def _patch_tool_decorator_for_async():
+    """Wrap sync tool functions in asyncio.to_thread() on all platforms.
 
     FastMCP's FunctionTool.run() calls sync functions directly on the asyncio
-    event loop thread, which blocks the stdio transport's I/O tasks. On Windows
-    (ProactorEventLoop), this causes a deadlock — all MCP tools hang indefinitely.
+    event loop thread, which blocks the stdio transport's I/O tasks. This causes:
+
+    1. On Windows with ProactorEventLoop: deadlock where all MCP tools hang.
+
+    2. On ALL platforms: cancellation race conditions. When the MCP client
+       cancels a request (e.g., timeout), the event loop can't propagate the
+       CancelledError to blocking sync code. The sync function eventually
+       returns, but the MCP SDK has already responded to the cancellation,
+       causing "Request already responded to" assertion errors and crashes.
 
     This patch intercepts @mcp.tool registration to wrap sync functions so they
-    run in a thread pool, yielding control back to the event loop for I/O.
-
-    See: https://github.com/modelcontextprotocol/python-sdk/issues/671
+    run in a thread pool, yielding control back to the event loop for I/O and
+    enabling proper cancellation handling via anyio's task cancellation.
     """
     original_tool = mcp.tool
 
@@ -89,21 +112,6 @@ def _patch_tool_decorator_for_windows():
         return original_tool(fn, *args, **kwargs)
 
     mcp.tool = patched_tool
-
-
-def _wrap_sync_in_thread(fn):
-    """Wrap a sync function to run in asyncio.to_thread(), preserving metadata."""
-
-    @functools.wraps(fn)
-    async def async_wrapper(**kwargs):
-        return await asyncio.to_thread(fn, **kwargs)
-
-    return async_wrapper
-
-
-# Apply subprocess patch early — before any Databricks SDK import
-if sys.platform == "win32":
-    _patch_subprocess_stdin()
 
 # ---------------------------------------------------------------------------
 # Server initialisation
@@ -132,8 +140,14 @@ if sys.platform == "win32":
 # Register middleware (see middleware.py for details on each)
 mcp.add_middleware(TimeoutHandlingMiddleware())
 
-if sys.platform == "win32":
-    _patch_tool_decorator_for_windows()
+# Apply async wrapper on ALL platforms to:
+# 1. Prevent event loop deadlocks (critical on Windows)
+# 2. Enable proper cancellation handling (critical on all platforms)
+# Without this, sync tools block the event loop, preventing CancelledError
+# propagation and causing "Request already responded to" crashes.
+# TODO: FastMCP 3.x automatically wraps sync functions in asyncio.to_thread().
+#       Test if this patch is still needed with FastMCP 3.x.
+_patch_tool_decorator_for_async()
 
 # Import and register all tools (side-effect imports: each module registers @mcp.tool decorators)
 from .tools import (  # noqa: F401, E402
@@ -154,4 +168,5 @@ from .tools import (  # noqa: F401, E402
     user,
     apps,
     workspace,
+    pdf,
 )

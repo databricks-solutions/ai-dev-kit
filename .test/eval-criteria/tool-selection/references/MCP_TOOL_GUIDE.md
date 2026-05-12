@@ -8,13 +8,16 @@
 ## File & Volume Operations
 | Tool | Use For |
 |------|---------|
-| `mcp__databricks__upload_file_to_volume` | Upload files to Unity Catalog volumes |
-| `mcp__databricks__download_file_from_volume` | Download files from volumes |
+| `mcp__databricks__upload_to_volume` | Upload files/folders to volumes (handles files, folders, globs) |
+| `mcp__databricks__download_from_volume` | Download files from volumes |
+| `mcp__databricks__delete_from_volume` | Delete files/folders from volumes (supports recursive) |
 | `mcp__databricks__list_volume_files` | List files in a volume path |
 
 ## Workspace Operations
 | Tool | Use For |
 |------|---------|
+| `mcp__databricks__upload_to_workspace` | Upload files/folders to workspace (handles files, folders, globs) |
+| `mcp__databricks__delete_from_workspace` | Delete files/folders from workspace (with safety checks) |
 | `mcp__databricks__workspace_get_object` | Read notebooks/files from workspace |
 | `mcp__databricks__workspace_list` | List workspace directory contents |
 

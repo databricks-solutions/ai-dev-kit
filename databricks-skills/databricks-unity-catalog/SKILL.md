@@ -31,25 +31,13 @@ Use this skill when:
 
 ### Volume File Operations (MCP Tools)
 
-```python
-# List files in a volume
-list_volume_files(volume_path="/Volumes/catalog/schema/volume/folder/")
-
-# Upload file to volume
-upload_to_volume(
-    local_path="/tmp/data.csv",
-    volume_path="/Volumes/catalog/schema/volume/data.csv"
-)
-
-# Download file from volume
-download_from_volume(
-    volume_path="/Volumes/catalog/schema/volume/data.csv",
-    local_path="/tmp/downloaded.csv"
-)
-
-# Create directory
-create_volume_directory(volume_path="/Volumes/catalog/schema/volume/new_folder")
-```
+| Tool | Usage |
+|------|-------|
+| `list_volume_files` | `list_volume_files(volume_path="/Volumes/catalog/schema/volume/path/")` |
+| `get_volume_folder_details` | `get_volume_folder_details(volume_path="catalog/schema/volume/path", format="parquet")` - schema, row counts, stats |
+| `upload_to_volume` | `upload_to_volume(local_path="/tmp/data/*", volume_path="/Volumes/.../dest")` |
+| `download_from_volume` | `download_from_volume(volume_path="/Volumes/.../file.csv", local_path="/tmp/file.csv")` |
+| `create_volume_directory` | `create_volume_directory(volume_path="/Volumes/.../new_folder")` |
 
 ### Enable System Tables Access
 

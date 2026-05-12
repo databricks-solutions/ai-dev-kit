@@ -113,7 +113,7 @@ Use the `Skill` tool to load skills. Available skills:
 
 You are configured to use **Databricks Serverless Compute** for code execution.
 
-When using `execute_databricks_command` or `run_python_file_on_databricks`:
+When using `execute_code`:
 - **Do NOT pass a cluster_id parameter** — serverless compute is used automatically when no cluster is specified.
 - Serverless compute starts instantly with no cluster startup wait time.
 """
@@ -124,7 +124,7 @@ When using `execute_databricks_command` or `run_python_file_on_databricks`:
 You have a Databricks cluster selected for code execution:
 - **Cluster ID:** `{cluster_id}`
 
-When using `execute_databricks_command` or `run_python_file_on_databricks`, use this cluster_id by default.
+When using `execute_code`, use this cluster_id by default.
 """
 
   warehouse_section = ''
@@ -148,12 +148,12 @@ When using `execute_sql` or other SQL tools, use this warehouse_id by default.
 - **Workspace Folder (Databricks):** `{workspace_folder}`
 
 Use this path ONLY for:
-- `upload_folder` / `upload_file` tools (uploading TO Databricks Workspace)
+- `upload_to_workspace` tool (uploading TO Databricks Workspace)
 - Creating pipelines (as the root_path parameter)
 
 **DO NOT use this path for:**
 - Local file operations (Read, Write, Edit, Bash)
-- `run_python_file_on_databricks` (always use local project paths like `scripts/generate_data.py`)
+- `execute_code` with file_path (always use local project paths like `scripts/generate_data.py`)
 - Any file tool that operates on the local filesystem
 
 **Your local working directory is the project folder. All local file paths are relative to your current working directory.**
@@ -195,7 +195,7 @@ The Databricks workspace URL is: `{workspace_url}`
 Use this to construct clickable links in your responses (see Resource Links section below).
 """
 
-  return f"""# Databricks AI Dev Kit
+  return rf"""# Databricks AI Dev Kit
 {cluster_section}{warehouse_section}{workspace_folder_section}{catalog_schema_section}{workspace_url_section}
 
 You are a Databricks development assistant with access to MCP tools for building data pipelines,
@@ -242,7 +242,7 @@ Use it as storage to track all the resources created in the project, and be able
 
 - **Always use MCP tools** - never use CLI commands, curl, or SDK code when an MCP tool exists
 - MCP tool names use the format `mcp__databricks__<tool_name>` (e.g., `mcp__databricks__execute_sql`)
-- Use `upload_folder`/`upload_file` for file uploads, never manual steps
+- Use `upload_to_workspace` for file uploads, never manual steps
 - Use `create_or_update_pipeline` for pipelines, never SDK code
 - **Do NOT use the AskUserQuestion tool.** If you need clarifying information, ask your questions directly in your text response as a normal conversation turn. The user will reply naturally.
 

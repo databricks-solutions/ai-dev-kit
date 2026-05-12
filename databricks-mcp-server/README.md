@@ -84,23 +84,22 @@ Claude now has both:
 | `execute_sql_multi` | Execute multiple SQL statements with parallel execution |
 | `list_warehouses` | List all SQL warehouses in the workspace |
 | `get_best_warehouse` | Get the ID of the best available warehouse |
-| `get_table_details` | Get table schema and statistics |
+| `get_table_stats_and_schema` | Get table schema and statistics |
 
 ### Compute
 
 | Tool | Description |
 |------|-------------|
-| `list_clusters` | List all clusters in the workspace |
-| `get_best_cluster` | Get the best available cluster for execution |
-| `execute_databricks_command` | Execute code on a Databricks cluster |
-| `run_python_file_on_databricks` | Run a local Python file on a cluster |
+| `execute_code` | Execute code on Databricks (serverless or cluster), or run a local file |
+| `manage_cluster` | Create, modify, start, terminate, or delete clusters |
+| `manage_sql_warehouse` | Create, modify, or delete SQL warehouses |
+| `list_compute` | List clusters, node types, or spark versions |
 
 ### File Operations
 
 | Tool | Description |
 |------|-------------|
-| `upload_folder` | Upload a local folder to Databricks workspace (parallel) |
-| `upload_file` | Upload a single file to workspace |
+| `upload_to_workspace` | Upload files/folders to workspace (works like `cp` - handles files, folders, globs) |
 
 ### Jobs
 
@@ -211,6 +210,28 @@ Claude now has both:
 ## Development
 
 The server is intentionally simple - each tool file just imports functions from `databricks-tools-core` and decorates them with `@mcp.tool`.
+
+### Running Integration Tests
+
+Integration tests run against a real Databricks workspace. Configure authentication first (see Step 3 above).
+
+```bash
+# Run all tests (excluding slow tests like cluster creation)
+python tests/integration/run_tests.py
+
+# Run all tests including slow tests
+python tests/integration/run_tests.py --all
+
+# Show report from the latest run
+python tests/integration/run_tests.py --report
+
+# Run with fewer parallel workers (default: 8)
+python tests/integration/run_tests.py -j 4
+```
+
+Results are saved to `tests/integration/.test-results/<timestamp>/` with logs for each test folder.
+
+See [tests/integration/README.md](tests/integration/README.md) for more details.
 
 To add a new tool:
 

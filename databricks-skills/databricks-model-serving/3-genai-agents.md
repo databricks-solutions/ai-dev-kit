@@ -224,7 +224,7 @@ for event in AGENT.predict_stream(request):
 Run via MCP:
 
 ```
-run_python_file_on_databricks(file_path="./my_agent/test_agent.py")
+execute_code(file_path="./my_agent/test_agent.py")
 ```
 
 ## Logging the Agent
@@ -275,7 +275,8 @@ agents.deploy(
 ## Query Deployed Agent
 
 ```
-query_serving_endpoint(
+manage_serving_endpoint(
+    action="query",
     name="my-agent-endpoint",
     messages=[{"role": "user", "content": "What is Databricks?"}],
     max_tokens=500

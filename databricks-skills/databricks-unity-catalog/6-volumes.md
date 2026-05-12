@@ -39,69 +39,16 @@ All volume operations use the path format:
 
 ## MCP Tools
 
-### List Files in Volume
-
-```python
-# List files and directories
-list_volume_files(
-    volume_path="/Volumes/main/default/my_volume/data/"
-)
-# Returns: [{"name": "file.csv", "path": "...", "is_directory": false, "file_size": 1024, "last_modified": "..."}]
-```
-
-### Upload File to Volume
-
-```python
-# Upload a local file
-upload_to_volume(
-    local_path="/tmp/data.csv",
-    volume_path="/Volumes/main/default/my_volume/data.csv",
-    overwrite=True
-)
-# Returns: {"local_path": "...", "volume_path": "...", "success": true}
-```
-
-### Download File from Volume
-
-```python
-# Download to local path
-download_from_volume(
-    volume_path="/Volumes/main/default/my_volume/data.csv",
-    local_path="/tmp/downloaded.csv",
-    overwrite=True
-)
-# Returns: {"volume_path": "...", "local_path": "...", "success": true}
-```
-
-### Create Directory
-
-```python
-# Create directory (creates parents like mkdir -p)
-create_volume_directory(
-    volume_path="/Volumes/main/default/my_volume/data/2024/01"
-)
-# Returns: {"volume_path": "...", "success": true}
-```
-
-### Delete File
-
-```python
-# Delete a file
-delete_volume_file(
-    volume_path="/Volumes/main/default/my_volume/old_data.csv"
-)
-# Returns: {"volume_path": "...", "success": true}
-```
-
-### Get File Info
-
-```python
-# Get file metadata
-get_volume_file_info(
-    volume_path="/Volumes/main/default/my_volume/data.csv"
-)
-# Returns: {"name": "data.csv", "file_size": 1024, "last_modified": "...", "success": true}
-```
+| Tool | Usage |
+|------|-------|
+| `list_volume_files` | `list_volume_files(volume_path="/Volumes/catalog/schema/volume/path/")` |
+| `get_volume_folder_details` | `get_volume_folder_details(volume_path="catalog/schema/volume/path", format="parquet")` - schema, row counts, stats |
+| `upload_to_volume` | `upload_to_volume(local_path="/tmp/data/*", volume_path="/Volumes/.../dest")` - supports files, folders, globs |
+| `download_from_volume` | `download_from_volume(volume_path="/Volumes/.../file.csv", local_path="/tmp/file.csv")` |
+| `create_volume_directory` | `create_volume_directory(volume_path="/Volumes/.../new_folder")` - creates parents like `mkdir -p` |
+| `delete_volume_file` | `delete_volume_file(volume_path="/Volumes/.../file.csv")` |
+| `delete_volume_directory` | `delete_volume_directory(volume_path="/Volumes/.../folder")` - directory must be empty |
+| `get_volume_file_info` | `get_volume_file_info(volume_path="/Volumes/.../file.csv")` - returns size, modified date |
 
 ---
 

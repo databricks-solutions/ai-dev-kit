@@ -1,7 +1,8 @@
 """
-Compute - Execution Context Operations
+Compute - Code Execution and Compute Management Operations
 
-Functions for executing code on Databricks clusters.
+Functions for executing code on Databricks clusters and serverless compute,
+and for creating, modifying, and deleting compute resources.
 """
 
 from .execution import (
@@ -14,7 +15,24 @@ from .execution import (
     create_context,
     destroy_context,
     execute_databricks_command,
-    run_python_file_on_databricks,
+    run_file_on_databricks,
+)
+
+from .serverless import (
+    ServerlessRunResult,
+    run_code_on_serverless,
+)
+
+from .manage import (
+    create_cluster,
+    modify_cluster,
+    terminate_cluster,
+    delete_cluster,
+    list_node_types,
+    list_spark_versions,
+    create_sql_warehouse,
+    modify_sql_warehouse,
+    delete_sql_warehouse,
 )
 
 __all__ = [
@@ -27,5 +45,16 @@ __all__ = [
     "create_context",
     "destroy_context",
     "execute_databricks_command",
-    "run_python_file_on_databricks",
+    "run_file_on_databricks",
+    "ServerlessRunResult",
+    "run_code_on_serverless",
+    "create_cluster",
+    "modify_cluster",
+    "terminate_cluster",
+    "delete_cluster",
+    "list_node_types",
+    "list_spark_versions",
+    "create_sql_warehouse",
+    "modify_sql_warehouse",
+    "delete_sql_warehouse",
 ]

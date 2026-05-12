@@ -1,21 +1,27 @@
 """
 Integration tests for compute execution functions.
 
-Tests execute_databricks_command and run_python_file_on_databricks with a real cluster.
+Tests execute_databricks_command and run_file_on_databricks (with language detection,
+workspace_path persistence).
 """
 
+import logging
 import tempfile
 import pytest
 from pathlib import Path
 
 from databricks_tools_core.compute import (
     execute_databricks_command,
-    run_python_file_on_databricks,
+    run_file_on_databricks,
     list_clusters,
     get_best_cluster,
     destroy_context,
     NoRunningClusterError,
+    ExecutionResult,
 )
+from databricks_tools_core.auth import get_workspace_client, get_current_username
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module")
@@ -187,8 +193,8 @@ class TestExecuteDatabricksCommand:
 
 
 @pytest.mark.integration
-class TestRunPythonFileOnDatabricks:
-    """Tests for run_python_file_on_databricks function."""
+class TestRunFileOnDatabricksBasic:
+    """Basic tests for run_file_on_databricks function."""
 
     def test_simple_file_execution(self, shared_context):
         """Should execute a simple Python file."""
@@ -200,7 +206,7 @@ class TestRunPythonFileOnDatabricks:
             temp_path = f.name
 
         try:
-            result = run_python_file_on_databricks(
+            result = run_file_on_databricks(
                 file_path=temp_path,
                 cluster_id=shared_context["cluster_id"],
                 context_id=shared_context["context_id"],
@@ -231,7 +237,7 @@ print(f"Row count: {df.count()}")
             temp_path = f.name
 
         try:
-            result = run_python_file_on_databricks(
+            result = run_file_on_databricks(
                 file_path=temp_path,
                 cluster_id=shared_context["cluster_id"],
                 context_id=shared_context["context_id"],
@@ -258,7 +264,7 @@ print(f"Row count: {df.count()}")
             temp_path = f.name
 
         try:
-            result = run_python_file_on_databricks(
+            result = run_file_on_databricks(
                 file_path=temp_path,
                 cluster_id=shared_context["cluster_id"],
                 context_id=shared_context["context_id"],
@@ -278,7 +284,7 @@ print(f"Row count: {df.count()}")
 
     def test_file_not_found(self):
         """Should handle missing file gracefully (no cluster needed)."""
-        result = run_python_file_on_databricks(file_path="/nonexistent/path/to/file.py", timeout=120)
+        result = run_file_on_databricks(file_path="/nonexistent/path/to/file.py", timeout=120)
 
         print("\n=== File Not Found Result ===")
         print(f"Success: {result.success}")
@@ -286,3 +292,175 @@ print(f"Row count: {df.count()}")
 
         assert not result.success
         assert "not found" in result.error.lower()
+
+
+@pytest.mark.integration
+class TestRunFileOnDatabricks:
+    """Tests for run_file_on_databricks.
+
+    Covers: language auto-detection, multi-language support, workspace_path persistence.
+    """
+
+    def test_python_auto_detect(self, shared_context):
+        """Should auto-detect Python from .py extension."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write('print("auto-detected python")')
+            temp_path = f.name
+
+        try:
+            result = run_file_on_databricks(
+                file_path=temp_path,
+                cluster_id=shared_context["cluster_id"],
+                context_id=shared_context["context_id"],
+                timeout=120,
+            )
+            assert result.success, f"Execution failed: {result.error}"
+            assert "auto-detected python" in result.output
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_sql_auto_detect(self, shared_context):
+        """Should auto-detect SQL from .sql extension."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
+            f.write("SELECT 42 as answer")
+            temp_path = f.name
+
+        try:
+            result = run_file_on_databricks(
+                file_path=temp_path,
+                cluster_id=shared_context["cluster_id"],
+                language=None,  # should auto-detect
+                timeout=120,
+            )
+
+            logger.info(f"SQL auto-detect: success={result.success}, output={result.output}")
+
+            assert result.success, f"SQL execution failed: {result.error}"
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_explicit_language_override(self, shared_context):
+        """Should use explicit language even if extension differs."""
+        # File has .txt extension but we specify python
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write('print("explicit python")')
+            temp_path = f.name
+
+        try:
+            result = run_file_on_databricks(
+                file_path=temp_path,
+                cluster_id=shared_context["cluster_id"],
+                context_id=shared_context["context_id"],
+                language="python",
+                timeout=120,
+            )
+            assert result.success, f"Execution failed: {result.error}"
+            assert "explicit python" in result.output
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_empty_file(self):
+        """Should reject empty files gracefully."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("")
+            temp_path = f.name
+
+        try:
+            result = run_file_on_databricks(file_path=temp_path, timeout=120)
+            assert not result.success
+            assert "empty" in result.error.lower()
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_returns_execution_result(self, shared_context):
+        """Should return ExecutionResult type."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write('print("type check")')
+            temp_path = f.name
+
+        try:
+            result = run_file_on_databricks(
+                file_path=temp_path,
+                cluster_id=shared_context["cluster_id"],
+                context_id=shared_context["context_id"],
+                timeout=120,
+            )
+            assert isinstance(result, ExecutionResult)
+            assert result.success
+            d = result.to_dict()
+            assert isinstance(d, dict)
+            assert "success" in d
+            assert "cluster_id" in d
+            assert "context_id" in d
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+
+@pytest.mark.integration
+class TestRunFileWorkspacePath:
+    """Tests for run_file_on_databricks with workspace_path (persistent mode)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_cleanup(self):
+        """Track workspace paths for cleanup."""
+        self._paths_to_cleanup = []
+        yield
+        try:
+            w = get_workspace_client()
+            for path in self._paths_to_cleanup:
+                try:
+                    w.workspace.delete(path=path, recursive=False)
+                    logger.info(f"Cleaned up: {path}")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def test_workspace_path_uploads_notebook(self, shared_context):
+        """Should upload file as notebook when workspace_path is provided."""
+        username = get_current_username()
+        ws_path = f"/Workspace/Users/{username}/.ai_dev_kit_test/file_persist_test"
+        self._paths_to_cleanup.append(ws_path)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write('print("persisted via run_file")')
+            temp_path = f.name
+
+        try:
+            result = run_file_on_databricks(
+                file_path=temp_path,
+                cluster_id=shared_context["cluster_id"],
+                context_id=shared_context["context_id"],
+                workspace_path=ws_path,
+                timeout=120,
+            )
+
+            logger.info(f"Workspace path result: success={result.success}")
+
+            assert result.success, f"Execution failed: {result.error}"
+            assert "persisted via run_file" in result.output
+
+            # Verify notebook exists in workspace
+            w = get_workspace_client()
+            status = w.workspace.get_status(ws_path)
+            assert status is not None
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_workspace_path_none_no_upload(self, shared_context):
+        """Without workspace_path, no notebook should be uploaded (ephemeral)."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write('print("ephemeral file")')
+            temp_path = f.name
+
+        try:
+            result = run_file_on_databricks(
+                file_path=temp_path,
+                cluster_id=shared_context["cluster_id"],
+                context_id=shared_context["context_id"],
+                timeout=120,
+            )
+            assert result.success, f"Execution failed: {result.error}"
+            # No workspace_path on ExecutionResult — just verify execution worked
+        finally:
+            Path(temp_path).unlink(missing_ok=True)

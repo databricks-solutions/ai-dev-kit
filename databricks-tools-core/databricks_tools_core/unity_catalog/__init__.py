@@ -44,12 +44,13 @@ from .volumes import (
 from .volume_files import (
     VolumeFileInfo,
     VolumeUploadResult,
+    VolumeFolderUploadResult,
     VolumeDownloadResult,
+    VolumeDeleteResult,
     list_volume_files,
     upload_to_volume,
     download_from_volume,
-    delete_volume_file,
-    delete_volume_directory,
+    delete_from_volume,
     create_volume_directory,
     get_volume_file_metadata,
 )
@@ -178,12 +179,13 @@ __all__ = [
     # Volume Files
     "VolumeFileInfo",
     "VolumeUploadResult",
+    "VolumeFolderUploadResult",
     "VolumeDownloadResult",
+    "VolumeDeleteResult",
     "list_volume_files",
     "upload_to_volume",
     "download_from_volume",
-    "delete_volume_file",
-    "delete_volume_directory",
+    "delete_from_volume",
     "create_volume_directory",
     "get_volume_file_metadata",
     # Functions
