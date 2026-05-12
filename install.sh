@@ -1144,7 +1144,10 @@ prompt_custom_skills() {
     done
 
     _is_preselected() {
-        echo "$preselected" | grep -qw "$1" && echo "on" || echo "off"
+        # Strip "source:" prefix from each entry (e.g. "databricks-core:databricks" → "databricks"),
+        # then exact-match against $1. Plain `grep -w` is unsafe here because `-` is a non-word
+        # character — `grep -w databricks` would match `databricks-jobs`, `databricks-apps`, etc.
+        echo "$preselected" | tr ' ' '\n' | sed 's/.*://' | grep -Fxq "$1" && echo "on" || echo "off"
     }
 
     echo ""
@@ -1408,8 +1411,8 @@ install_skills() {
     if [ -f "$manifest" ]; then
         while IFS='|' read -r prev_dir prev_skill; do
             [ -z "$prev_skill" ] && continue
-            # Skip if this skill is still selected
-            if echo " $all_new_skills " | grep -qw "$prev_skill"; then
+            # Skip if this skill is still selected (exact match — see _is_preselected for why)
+            if echo "$all_new_skills" | tr ' ' '\n' | grep -Fxq "$prev_skill"; then
                 continue
             fi
             # Only remove if the directory exists
@@ -1478,7 +1481,7 @@ install_skills() {
         # Install Agent skills from databricks/databricks-agent-skills repo
         if [ -n "$SELECTED_AGENT_SKILLS" ]; then
             # Fetch the full repo tree once (single API call) for all skills
-            local agent_tree
+            local agent_tree agent_success=0
             agent_tree=$(curl -fsSL "$AGENT_SKILLS_API_URL" 2>/dev/null)
             for entry in $SELECTED_AGENT_SKILLS; do
                 local src_name="${entry%%:*}"
@@ -1508,12 +1511,17 @@ install_skills() {
                 done <<< "$files"
                 if [ "$ok_flag" -eq 1 ]; then
                     echo "$dir|$install_name" >> "$manifest.tmp"
+                    agent_success=$((agent_success + 1))
                 else
                     rm -rf "$dest_dir"
                     warn "Could not install agent skill '$src_name'"
                 fi
             done
-            ok "Agent skills ($agent_count) → ${dir#$HOME/}"
+            if [ "$agent_success" -eq "$agent_count" ]; then
+                ok "Agent skills ($agent_count) → ${dir#$HOME/}"
+            elif [ "$agent_success" -gt 0 ]; then
+                warn "Agent skills (only $agent_success of $agent_count installed) → ${dir#$HOME/}"
+            fi
         fi
     done
 
