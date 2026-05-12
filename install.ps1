@@ -1341,11 +1341,14 @@ function Install-Skills {
 
         # Install Agent skills from databricks/databricks-agent-skills repo
         if ($script:SelectedAgentSkills.Count -gt 0) {
-            # Fetch the full repo tree once (single API call) for all skills
+            # Fetch the full repo tree once (single API call) for all skills.
+            # Collapse pretty-printed JSON whitespace so the path/mode/type fields
+            # land adjacent for the per-entry regex below.
             $agentTree = $null
             $agentSuccess = 0
             try {
-                $agentTree = Invoke-WebRequest -Uri $AgentSkillsApiUrl -UseBasicParsing -ErrorAction Stop | Select-Object -ExpandProperty Content
+                $rawTree = Invoke-WebRequest -Uri $AgentSkillsApiUrl -UseBasicParsing -ErrorAction Stop | Select-Object -ExpandProperty Content
+                $agentTree = ($rawTree -replace '\s+', ' ')
             } catch {
                 Write-Warn "Could not fetch agent skills tree from GitHub API"
             }
@@ -1355,11 +1358,16 @@ function Install-Skills {
                     $srcName = ($entry -split ':')[0]
                     $installName = ($entry -replace '^.*:', '')
                     $destDir = Join-Path $dir $installName
-                    if (-not (Test-Path $destDir)) {
-                        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+                    # Wipe any prior install so upstream-deleted files don't persist
+                    if (Test-Path $destDir) {
+                        Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
                     }
-                    # Extract all file paths under skills/<srcName>/ that contain a dot (i.e. are files not dirs)
-                    $filePaths = [regex]::Matches($agentTree, '"path":"(skills/' + [regex]::Escape($srcName) + '/[^"]*\.[^"]*)"') |
+                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+                    # Extract file paths under skills/<srcName>/ — match only entries whose
+                    # next JSON fields are `"mode": "...", "type": "blob"`, so directory
+                    # entries (type=tree) are skipped. agentTree has been whitespace-collapsed
+                    # above; the GitHub tree API returns fields in order path → mode → type.
+                    $filePaths = [regex]::Matches($agentTree, '"path": *"(skills/' + [regex]::Escape($srcName) + '/[^"]+)", *"mode": *"[^"]+", *"type": *"blob"') |
                         ForEach-Object { $_.Groups[1].Value }
                     if (-not $filePaths) {
                         Remove-Item $destDir -ErrorAction SilentlyContinue
