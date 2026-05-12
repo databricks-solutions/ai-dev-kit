@@ -102,7 +102,7 @@ $script:ApxSkills = @("databricks-app-apx")
 $ApxRawUrl = "https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # Agent skills (fetched from databricks/databricks-agent-skills repo)
-$script:AgentSkills = @("databricks", "databricks-apps", "databricks-lakebase")
+$script:AgentSkills = @("databricks-core:databricks", "databricks-apps", "databricks-lakebase")
 $AgentSkillsRawUrl = "https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
 $AgentSkillsApiUrl = "https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
@@ -133,7 +133,7 @@ $script:ProfileAppDeveloper = @(
     "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
     "databricks-jobs", "databricks-bundles"
 )
-$script:ProfileAppDeveloperAgent = @("databricks", "databricks-apps", "databricks-lakebase")
+$script:ProfileAppDeveloperAgent = @("databricks-core:databricks", "databricks-apps", "databricks-lakebase")
 
 # Selected skills (populated during profile selection)
 $script:SelectedSkills = @()
@@ -1362,7 +1362,7 @@ function Install-Skills {
                         Write-Warn "Could not fetch agent skill '$srcName'"
                         continue
                     }
-                    $okFlag = $false
+                    $okFlag = $true
                     foreach ($filePath in $filePaths) {
                         $rel = $filePath.Substring("skills/$srcName/".Length)
                         $dest = Join-Path $destDir ($rel -replace '/', '\')
@@ -1372,8 +1372,9 @@ function Install-Skills {
                         }
                         try {
                             Invoke-WebRequest -Uri "$AgentSkillsRawUrl/$srcName/$rel" -OutFile $dest -UseBasicParsing -ErrorAction Stop
-                            $okFlag = $true
-                        } catch {}
+                        } catch {
+                            $okFlag = $false
+                        }
                     }
                     if ($okFlag) {
                         $manifestEntries += "$dir|$installName"

@@ -100,7 +100,7 @@ APX_SKILLS="databricks-app-apx"
 APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
 
 # Agent skills (fetched from databricks/databricks-agent-skills repo)
-AGENT_SKILLS="databricks databricks-apps databricks-lakebase"
+AGENT_SKILLS="databricks-core:databricks databricks-apps databricks-lakebase"
 AGENT_SKILLS_RAW_URL="https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
 AGENT_SKILLS_API_URL="https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
@@ -114,7 +114,7 @@ PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie da
 PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-model-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
 PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-bundles"
-PROFILE_APP_DEVELOPER_AGENT="databricks databricks-apps databricks-lakebase"
+PROFILE_APP_DEVELOPER_AGENT="databricks-core:databricks databricks-apps databricks-lakebase"
 
 # Selected skills (populated during profile selection)
 SELECTED_SKILLS=""
@@ -1289,13 +1289,15 @@ install_skills() {
                     warn "Could not fetch agent skill '$src_name'"
                     continue
                 fi
-                local ok_flag=0
+                local ok_flag=1
                 while IFS= read -r filepath; do
                     [ -z "$filepath" ] && continue
                     local rel="${filepath#skills/$src_name/}"
                     local dest="$dest_dir/$rel"
                     mkdir -p "$(dirname "$dest")"
-                    curl -fsSL "$AGENT_SKILLS_RAW_URL/$src_name/${rel}" -o "$dest" 2>/dev/null && ok_flag=1 || true
+                    if ! curl -fsSL "$AGENT_SKILLS_RAW_URL/$src_name/${rel}" -o "$dest" 2>/dev/null; then
+                        ok_flag=0
+                    fi
                 done <<< "$files"
                 if [ "$ok_flag" -eq 1 ]; then
                     echo "$dir|$install_name" >> "$manifest.tmp"
