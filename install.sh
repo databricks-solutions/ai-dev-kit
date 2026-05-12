@@ -1480,20 +1480,28 @@ install_skills() {
 
         # Install Agent skills from databricks/databricks-agent-skills repo
         if [ -n "$SELECTED_AGENT_SKILLS" ]; then
-            # Fetch the full repo tree once (single API call) for all skills
+            # Fetch the full repo tree once (single API call) for all skills.
+            # Collapse pretty-printed JSON to a single line + squeeze whitespace so the
+            # path/mode/type fields land adjacent for the per-entry regex below.
             local agent_tree agent_success=0
-            agent_tree=$(curl -fsSL "$AGENT_SKILLS_API_URL" 2>/dev/null)
+            agent_tree=$(curl -fsSL "$AGENT_SKILLS_API_URL" 2>/dev/null | tr -d '\n' | tr -s ' ')
             for entry in $SELECTED_AGENT_SKILLS; do
                 local src_name="${entry%%:*}"
                 local install_name="${entry#*:}"
                 local dest_dir="$dir/$install_name"
+                # Wipe any prior install so upstream-deleted files don't persist
+                rm -rf "$dest_dir"
                 mkdir -p "$dest_dir"
-                # Extract all file paths under skills/<src_name>/ from the tree
+                # Extract file paths under skills/<src_name>/ — match only entries whose
+                # next JSON fields are `"mode": "...", "type": "blob"`, so directory
+                # entries (type=tree) are skipped. Note the agent_tree has been
+                # whitespace-collapsed above; the GitHub tree API returns fields in
+                # the order path → mode → type → sha → size → url, so this pattern
+                # matches each blob exactly once.
                 local files
                 files=$(echo "$agent_tree" \
-                    | grep -o '"path":"skills/'"$src_name"'/[^"]*"' \
-                    | grep '\.' \
-                    | sed 's/"path":"//;s/"$//')
+                    | grep -oE '"path": *"skills/'"$src_name"'/[^"]+", *"mode": *"[^"]+", *"type": *"blob"' \
+                    | sed 's/.*"path": *"\([^"]*\)".*/\1/')
                 if [ -z "$files" ]; then
                     rmdir "$dest_dir" 2>/dev/null || true
                     warn "Could not fetch agent skill '$src_name'"
