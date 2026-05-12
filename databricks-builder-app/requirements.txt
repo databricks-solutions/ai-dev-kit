@@ -416,7 +416,7 @@ requests==2.33.1
     #   databricks-sdk
     #   docker
     #   mlflow-skinny
-rich==14.0.0
+rich==15.0.0
     # via
     #   cyclopts
     #   databricks-builder-app
