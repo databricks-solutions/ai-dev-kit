@@ -1132,6 +1132,9 @@ function Invoke-PromptCustomSkills {
             "app-developer"  { $preselected += $script:ProfileAppDeveloper + $script:ApxSkills + $script:ProfileAppDeveloperAgent }
         }
     }
+    # Normalize "source:install-name" entries (e.g. "databricks-core:databricks") to install-name only,
+    # so `-contains` exact-equality checks below match against the same names used in the menu.
+    $preselected = @($preselected | ForEach-Object { $_ -replace '^[^:]+:', '' })
 
     Write-Host ""
     Write-Host "  Select individual skills" -ForegroundColor White
@@ -1340,6 +1343,7 @@ function Install-Skills {
         if ($script:SelectedAgentSkills.Count -gt 0) {
             # Fetch the full repo tree once (single API call) for all skills
             $agentTree = $null
+            $agentSuccess = 0
             try {
                 $agentTree = Invoke-WebRequest -Uri $AgentSkillsApiUrl -UseBasicParsing -ErrorAction Stop | Select-Object -ExpandProperty Content
             } catch {
@@ -1378,6 +1382,7 @@ function Install-Skills {
                     }
                     if ($okFlag) {
                         $manifestEntries += "$dir|$installName"
+                        $agentSuccess++
                     } else {
                         Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
                         Write-Warn "Could not install agent skill '$srcName'"
@@ -1385,7 +1390,11 @@ function Install-Skills {
                 }
                 $ErrorActionPreference = $prevEAP3
             }
-            Write-Ok "Agent skills ($agentCount) -> $shortDir"
+            if ($agentSuccess -eq $agentCount) {
+                Write-Ok "Agent skills ($agentCount) -> $shortDir"
+            } elseif ($agentSuccess -gt 0) {
+                Write-Warn "Agent skills (only $agentSuccess of $agentCount installed) -> $shortDir"
+            }
         }
     }
 
