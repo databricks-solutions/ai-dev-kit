@@ -168,10 +168,11 @@ for doc in results.result.data_array:
 
 
 # Query with embedding vector directly
+query_vector = [0.1, 0.2, 0.3]  # Replace with your real embedding (list of floats matching the index's dimension)
 results = w.vector_search_indexes.query_index(
     index_name="main.default.my_index",
     columns=["id", "text"],
-    query_vector=[0.1, 0.2, 0.3, ...],  # Your embedding vector
+    query_vector=query_vector,
     num_results=10
 )
 

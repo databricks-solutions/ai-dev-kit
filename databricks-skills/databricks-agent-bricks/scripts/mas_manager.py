@@ -233,6 +233,9 @@ class MASManager:
                 logger.error(f"Failed to add MAS example '{question_text[:50]}...': {e}")
                 return None
 
+        if not questions:
+            return created_examples
+
         max_workers = min(2, len(questions))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_q = {executor.submit(create_example, q): q for q in questions}
@@ -285,7 +288,12 @@ class MASManager:
         url = f"{self.w.config.host}{path}"
         response = requests.delete(url, headers=headers, timeout=20)
         self._handle_response_error(response, "DELETE", path)
-        return response.json()
+        if not response.content:
+            return {}
+        try:
+            return response.json()
+        except ValueError:
+            return {}
 
 
 # ============================================================================
@@ -321,6 +329,10 @@ def _build_agent_list(agents: List[Dict[str, str]]) -> List[Dict[str, Any]]:
         elif agent.get("uc_function_name"):
             uc_function_name = agent.get("uc_function_name")
             uc_parts = uc_function_name.split(".")
+            if len(uc_parts) != 3:
+                raise ValueError(
+                    f"uc_function_name must be 'catalog.schema.function', got: {uc_function_name!r}"
+                )
             agent_config["agent_type"] = "unity_catalog_function"
             agent_config["unity_catalog_function"] = {
                 "uc_path": {
@@ -333,8 +345,14 @@ def _build_agent_list(agents: List[Dict[str, str]]) -> List[Dict[str, Any]]:
             agent_config["agent_type"] = "external_mcp_server"
             agent_config["external_mcp_server"] = {"connection_name": agent.get("connection_name")}
         else:
+            endpoint_name = agent.get("endpoint_name")
+            if not endpoint_name:
+                raise ValueError(
+                    "agent config must specify one of: genie_space_id, ka_tile_id, "
+                    "uc_function_name, connection_name, or endpoint_name"
+                )
             agent_config["agent_type"] = "serving_endpoint"
-            agent_config["serving_endpoint"] = {"name": agent.get("endpoint_name")}
+            agent_config["serving_endpoint"] = {"name": endpoint_name}
 
         agent_list.append(agent_config)
     return agent_list
@@ -578,6 +596,15 @@ def _print_json(data: Any) -> None:
     print(json.dumps(data, indent=2))
 
 
+def _parse_json_arg(arg: str, label: str) -> Any:
+    """Parse a JSON CLI arg, exiting cleanly on malformed input."""
+    try:
+        return json.loads(arg)
+    except json.JSONDecodeError as e:
+        print(f"error: {label} must be valid JSON ({e})", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """CLI entry point."""
     if len(sys.argv) < 2:
@@ -591,7 +618,7 @@ def main():
             print("Usage: python mas_manager.py create_mas NAME '{\"agents\": [...], ...}'")
             sys.exit(1)
         name = sys.argv[2]
-        config = json.loads(sys.argv[3])
+        config = _parse_json_arg(sys.argv[3], "config")
         result = create_mas(
             name=name,
             agents=config.get("agents", []),
@@ -619,7 +646,7 @@ def main():
             print("Usage: python mas_manager.py update_mas TILE_ID '{\"name\": ..., \"agents\": [...], ...}'")
             sys.exit(1)
         tile_id = sys.argv[2]
-        config = json.loads(sys.argv[3])
+        config = _parse_json_arg(sys.argv[3], "config")
         result = update_mas(
             tile_id=tile_id,
             name=config.get("name"),
@@ -645,7 +672,7 @@ def main():
             print("Usage: python mas_manager.py add_examples TILE_ID '[{\"question\": \"...\", \"guideline\": \"...\"}]' [--wait]")
             sys.exit(1)
         tile_id = sys.argv[2]
-        examples = json.loads(sys.argv[3])
+        examples = _parse_json_arg(sys.argv[3], "examples")
         wait = "--wait" in sys.argv[4:]
         result = add_examples(tile_id, examples, wait_for_online=wait)
         _print_json(result)
