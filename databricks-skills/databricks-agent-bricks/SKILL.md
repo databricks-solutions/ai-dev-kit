@@ -204,6 +204,7 @@ manage_mas(
 - **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build bronze/silver/gold tables consumed by Genie Spaces
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy custom agent endpoints used as MAS agents
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - Build vector indexes for RAG applications paired with KAs
+- **[databricks-ai-gateway](../databricks-ai-gateway/SKILL.md)** - Add guardrails, rate limits, and governance to deployed agents
 
 ## See Also
 
