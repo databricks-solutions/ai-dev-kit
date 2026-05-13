@@ -102,7 +102,7 @@ MIN_SDK_VERSION="0.85.0"
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
 # Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-app-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -111,6 +111,11 @@ MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
 # APX skills (fetched from databricks-solutions/apx repo)
 APX_SKILLS="databricks-app-apx"
 APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
+
+# Agent skills (fetched from databricks/databricks-agent-skills repo)
+AGENT_SKILLS="databricks-core:databricks databricks-apps databricks-lakebase"
+AGENT_SKILLS_RAW_URL="https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
+AGENT_SKILLS_API_URL="https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
 # ─── Skill profiles ──────────────────────────────────────────
 # Core skills always installed regardless of profile selection
@@ -121,12 +126,14 @@ PROFILE_DATA_ENGINEER="databricks-spark-declarative-pipelines databricks-spark-s
 PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie databricks-metric-views"
 PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-model-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
-PROFILE_APP_DEVELOPER="databricks-app-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-bundles"
+PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-bundles"
+PROFILE_APP_DEVELOPER_AGENT="databricks-core:databricks databricks-apps databricks-lakebase"
 
 # Selected skills (populated during profile selection)
 SELECTED_SKILLS=""
 SELECTED_MLFLOW_SKILLS=""
 SELECTED_APX_SKILLS=""
+SELECTED_AGENT_SKILLS=""
 
 # Output helpers
 msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
@@ -205,7 +212,7 @@ if [ "${LIST_SKILLS:-false}" = true ]; then
     echo -e "${B}Available Skill Profiles${N}"
     echo "────────────────────────────────"
     echo ""
-    echo -e "  ${B}all${N}              All 34 skills (default)"
+    echo -e "  ${B}all${N}              All 37 skills (default)"
     echo -e "  ${B}data-engineer${N}    Pipelines, Spark, Jobs, Streaming (14 skills)"
     echo -e "  ${B}analyst${N}          Dashboards, SQL, Genie, Metrics (8 skills)"
     echo -e "  ${B}ai-ml-engineer${N}   Agents, RAG, Vector Search, MLflow (17 skills)"
@@ -255,6 +262,12 @@ if [ "${LIST_SKILLS:-false}" = true ]; then
     echo "────────────────────────────────"
     for skill in $APX_SKILLS; do
         echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${B}Agent Skills${N} (from databricks/databricks-agent-skills repo)"
+    echo "────────────────────────────────"
+    for entry in $AGENT_SKILLS; do
+        echo -e "    ${entry#*:}"
     done
     echo ""
     echo -e "${D}Usage: bash install.sh --skills-profile data-engineer,ai-ml-engineer${N}"
@@ -893,19 +906,25 @@ prompt_mcp_path() {
 # ─── Skill profile selection ──────────────────────────────────
 # Resolve selected skills from profile names or explicit skill list
 resolve_skills() {
-    local db_skills="" mlflow_skills="" apx_skills=""
+    local db_skills="" mlflow_skills="" apx_skills="" agent_skills=""
 
     # Priority 1: Explicit --skills flag (comma-separated skill names)
     if [ -n "$USER_SKILLS" ]; then
         local user_list
         user_list=$(echo "$USER_SKILLS" | tr ',' ' ')
-        # Separate into DB, MLflow, and APX buckets, always include core
+        # Separate into DB, MLflow, APX, and Agent buckets
         db_skills=""
         for skill in $user_list; do
-            if echo "$MLFLOW_SKILLS" | grep -qw "$skill"; then
+            # Exact-match bucketing — `grep -w` treats `-` as a word boundary, so e.g.
+            # `grep -w databricks` would match `databricks-app-apx` and misclassify
+            # an agent install-name (`databricks`) as APX.
+            if echo "$MLFLOW_SKILLS" | tr ' ' '\n' | grep -Fxq "$skill"; then
                 mlflow_skills="${mlflow_skills:+$mlflow_skills }$skill"
-            elif echo "$APX_SKILLS" | grep -qw "$skill"; then
+            elif echo "$APX_SKILLS" | tr ' ' '\n' | grep -Fxq "$skill"; then
                 apx_skills="${apx_skills:+$apx_skills }$skill"
+            elif echo "$AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | grep -Fxq "$skill"; then
+                # Look up the full source:install-name entry (or bare entry if no colon)
+                agent_skills="${agent_skills:+$agent_skills }$(echo "$AGENT_SKILLS" | tr ' ' '\n' | grep -E "^.*:${skill}$|^${skill}$")"
             else
                 db_skills="${db_skills:+$db_skills }$skill"
             fi
@@ -914,6 +933,7 @@ resolve_skills() {
         SELECTED_SKILLS=$(echo "$db_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
         SELECTED_MLFLOW_SKILLS=$(echo "$mlflow_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
         SELECTED_APX_SKILLS=$(echo "$apx_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+        SELECTED_AGENT_SKILLS=$(echo "$agent_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
         return
     fi
 
@@ -922,6 +942,7 @@ resolve_skills() {
         SELECTED_SKILLS="$SKILLS"
         SELECTED_MLFLOW_SKILLS="$MLFLOW_SKILLS"
         SELECTED_APX_SKILLS="$APX_SKILLS"
+        SELECTED_AGENT_SKILLS="$AGENT_SKILLS"
         return
     fi
 
@@ -929,6 +950,7 @@ resolve_skills() {
     db_skills="$CORE_SKILLS"
     mlflow_skills=""
     apx_skills=""
+    agent_skills=""
 
     local profiles
     profiles=$(echo "$SKILLS_PROFILE" | tr ',' ' ')
@@ -938,6 +960,7 @@ resolve_skills() {
                 SELECTED_SKILLS="$SKILLS"
                 SELECTED_MLFLOW_SKILLS="$MLFLOW_SKILLS"
                 SELECTED_APX_SKILLS="$APX_SKILLS"
+                SELECTED_AGENT_SKILLS="$AGENT_SKILLS"
                 return
                 ;;
             data-engineer)
@@ -953,6 +976,7 @@ resolve_skills() {
             app-developer)
                 db_skills="$db_skills $PROFILE_APP_DEVELOPER"
                 apx_skills="$apx_skills $APX_SKILLS"
+                agent_skills="$agent_skills $PROFILE_APP_DEVELOPER_AGENT"
                 ;;
             *)
                 warn "Unknown skill profile: $profile (ignored)"
@@ -964,6 +988,7 @@ resolve_skills() {
     SELECTED_SKILLS=$(echo "$db_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
     SELECTED_MLFLOW_SKILLS=$(echo "$mlflow_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
     SELECTED_APX_SKILLS=$(echo "$apx_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    SELECTED_AGENT_SKILLS=$(echo "$agent_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
 }
 
 # Interactive skill profile selection (multi-select)
@@ -1118,12 +1143,15 @@ prompt_custom_skills() {
             data-engineer) preselected="$preselected $PROFILE_DATA_ENGINEER" ;;
             analyst)       preselected="$preselected $PROFILE_ANALYST" ;;
             ai-ml-engineer) preselected="$preselected $PROFILE_AIML_ENGINEER $PROFILE_AIML_MLFLOW" ;;
-            app-developer) preselected="$preselected $PROFILE_APP_DEVELOPER $APX_SKILLS" ;;
+            app-developer) preselected="$preselected $PROFILE_APP_DEVELOPER $APX_SKILLS $PROFILE_APP_DEVELOPER_AGENT" ;;
         esac
     done
 
     _is_preselected() {
-        echo "$preselected" | grep -qw "$1" && echo "on" || echo "off"
+        # Strip "source:" prefix from each entry (e.g. "databricks-core:databricks" → "databricks"),
+        # then exact-match against $1. Plain `grep -w` is unsafe here because `-` is a non-word
+        # character — `grep -w databricks` would match `databricks-jobs`, `databricks-apps`, etc.
+        echo "$preselected" | tr ' ' '\n' | sed 's/.*://' | grep -Fxq "$1" && echo "on" || echo "off"
     }
 
     echo ""
@@ -1152,8 +1180,11 @@ prompt_custom_skills() {
         "Synthetic Data|databricks-synthetic-data-gen|$(_is_preselected databricks-synthetic-data-gen)|Generate test data" \
         "Lakebase Autoscale|databricks-lakebase-autoscale|$(_is_preselected databricks-lakebase-autoscale)|Managed PostgreSQL" \
         "Lakebase Provisioned|databricks-lakebase-provisioned|$(_is_preselected databricks-lakebase-provisioned)|Provisioned PostgreSQL" \
-        "App Python|databricks-app-python|$(_is_preselected databricks-app-python)|Dash, Streamlit, Flask" \
+        "App (AppKit + Python)|databricks-apps-python|$(_is_preselected databricks-apps-python)|AppKit, Dash, Streamlit, Flask" \
         "App APX|databricks-app-apx|$(_is_preselected databricks-app-apx)|FastAPI + React" \
+        "Agent: Databricks|databricks|$(_is_preselected databricks)|CLI auth, data exploration" \
+        "Agent: Apps|databricks-apps|$(_is_preselected databricks-apps)|AppKit + all frameworks" \
+        "Agent: Lakebase|databricks-lakebase|$(_is_preselected databricks-lakebase)|Lakebase OLTP" \
         "MLflow Onboarding|mlflow-onboarding|$(_is_preselected mlflow-onboarding)|Getting started" \
         "Agent Evaluation|agent-evaluation|$(_is_preselected agent-evaluation)|Evaluate AI agents" \
         "MLflow Tracing|instrumenting-with-mlflow-tracing|$(_is_preselected instrumenting-with-mlflow-tracing)|Instrument with tracing" \
@@ -1364,15 +1395,18 @@ install_skills() {
     dirs=("${unique[@]}")
 
     # Count selected skills for display
-    local db_count=0 mlflow_count=0 apx_count=0
+    local db_count=0 mlflow_count=0 apx_count=0 agent_count=0
     for _ in $SELECTED_SKILLS; do db_count=$((db_count + 1)); done
     for _ in $SELECTED_MLFLOW_SKILLS; do mlflow_count=$((mlflow_count + 1)); done
     for _ in $SELECTED_APX_SKILLS; do apx_count=$((apx_count + 1)); done
-    local total_count=$((db_count + mlflow_count + apx_count))
+    for _ in $SELECTED_AGENT_SKILLS; do agent_count=$((agent_count + 1)); done
+    local total_count=$((db_count + mlflow_count + apx_count + agent_count))
     msg "Installing ${B}${total_count}${N} skills"
 
     # Build set of all skills being installed now
-    local all_new_skills="$SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS"
+    local agent_install_names
+    agent_install_names=$(echo "$SELECTED_AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | tr '\n' ' ')
+    local all_new_skills="$SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $agent_install_names"
 
     # Clean up previously installed skills that are no longer selected
     # Check scope-local manifest first, fall back to global for upgrades from older versions
@@ -1381,8 +1415,8 @@ install_skills() {
     if [ -f "$manifest" ]; then
         while IFS='|' read -r prev_dir prev_skill; do
             [ -z "$prev_skill" ] && continue
-            # Skip if this skill is still selected
-            if echo " $all_new_skills " | grep -qw "$prev_skill"; then
+            # Skip if this skill is still selected (exact match — see _is_preselected for why)
+            if echo "$all_new_skills" | tr ' ' '\n' | grep -Fxq "$prev_skill"; then
                 continue
             fi
             # Only remove if the directory exists
@@ -1446,6 +1480,62 @@ install_skills() {
                 fi
             done
             ok "APX skills ($apx_count) → ${dir#$HOME/}"
+        fi
+
+        # Install Agent skills from databricks/databricks-agent-skills repo
+        if [ -n "$SELECTED_AGENT_SKILLS" ]; then
+            # Fetch the full repo tree once (single API call) for all skills.
+            # Collapse pretty-printed JSON to a single line + squeeze whitespace so the
+            # path/mode/type fields land adjacent for the per-entry regex below.
+            local agent_tree agent_success=0
+            agent_tree=$(curl -fsSL "$AGENT_SKILLS_API_URL" 2>/dev/null | tr -d '\n' | tr -s ' ')
+            for entry in $SELECTED_AGENT_SKILLS; do
+                local src_name="${entry%%:*}"
+                local install_name="${entry#*:}"
+                local dest_dir="$dir/$install_name"
+                # Wipe any prior install so upstream-deleted files don't persist
+                rm -rf "$dest_dir"
+                mkdir -p "$dest_dir"
+                # Extract file paths under skills/<src_name>/ — match only entries whose
+                # next JSON fields are `"mode": "...", "type": "blob"`, so directory
+                # entries (type=tree) are skipped. Note the agent_tree has been
+                # whitespace-collapsed above; the GitHub tree API returns fields in
+                # the order path → mode → type → sha → size → url, so this pattern
+                # matches each blob exactly once.
+                local files
+                files=$(echo "$agent_tree" \
+                    | grep -oE '"path": *"skills/'"$src_name"'/[^"]+", *"mode": *"[^"]+", *"type": *"blob"' \
+                    | sed 's/.*"path": *"\([^"]*\)".*/\1/')
+                if [ -z "$files" ]; then
+                    rmdir "$dest_dir" 2>/dev/null || true
+                    warn "Could not fetch agent skill '$src_name'"
+                    continue
+                fi
+                local ok_flag=1
+                while IFS= read -r filepath; do
+                    [ -z "$filepath" ] && continue
+                    local rel="${filepath#skills/$src_name/}"
+                    local dest="$dest_dir/$rel"
+                    mkdir -p "$(dirname "$dest")"
+                    if ! curl -fsSL "$AGENT_SKILLS_RAW_URL/$src_name/${rel}" -o "$dest" 2>/dev/null; then
+                        ok_flag=0
+                    fi
+                done <<< "$files"
+                if [ "$ok_flag" -eq 1 ]; then
+                    echo "$dir|$install_name" >> "$manifest.tmp"
+                    agent_success=$((agent_success + 1))
+                else
+                    rm -rf "$dest_dir"
+                    warn "Could not install agent skill '$src_name'"
+                fi
+            done
+            if [ "$agent_success" -eq "$agent_count" ]; then
+                ok "Agent skills ($agent_count) → ${dir#$HOME/}"
+            elif [ "$agent_success" -gt 0 ]; then
+                warn "Agent skills (only $agent_success of $agent_count installed) → ${dir#$HOME/}"
+            else
+                warn "Agent skills (0 of $agent_count installed) → ${dir#$HOME/}"
+            fi
         fi
     done
 
@@ -2179,7 +2269,7 @@ main() {
                 echo -e "  Skills:      ${G}custom selection${N}"
             else
                 local sk_total=0
-                for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_total=$((sk_total + 1)); done
+                for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_SKILLS; do sk_total=$((sk_total + 1)); done
                 echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N}"
             fi
         fi

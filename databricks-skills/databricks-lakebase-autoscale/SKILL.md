@@ -227,6 +227,6 @@ Custom billing tags / serverless budget policies.
 
 ## Related Skills
 
-- [databricks-app-apx](../databricks-app-apx/SKILL.md), [databricks-app-python](../databricks-app-python/SKILL.md) — apps using Lakebase
+- [databricks-app-apx](../databricks-app-apx/SKILL.md), [databricks-apps-python](../databricks-apps-python/SKILL.md) — apps using Lakebase
 - [databricks-bundles](../databricks-bundles/SKILL.md) — bundle deploys with Lakebase resources
 - [databricks-jobs](../databricks-jobs/SKILL.md) — scheduling reverse ETL pipelines
