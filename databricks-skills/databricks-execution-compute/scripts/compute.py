@@ -20,7 +20,7 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError, NotFound
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import (
     ClusterSource,
     CommandStatus,
@@ -192,6 +192,7 @@ def get_cluster_status(cluster_id: str) -> Dict[str, Any]:
     w = get_workspace_client()
     c = w.clusters.get(cluster_id=cluster_id)
     return {
+        "success": True,
         "cluster_id": c.cluster_id,
         "cluster_name": c.cluster_name,
         "state": c.state.value if c.state else "UNKNOWN",
@@ -676,8 +677,6 @@ def cmd_manage_cluster(args):
             return get_cluster_status(cluster_id)
         except NotFound:
             return {"success": False, "cluster_id": cluster_id, "state": "DELETED", "exists": False}
-        except DatabricksError as e:
-            return {"success": False, "error": str(e)}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

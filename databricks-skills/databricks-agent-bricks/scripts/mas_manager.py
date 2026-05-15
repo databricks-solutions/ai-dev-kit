@@ -328,10 +328,11 @@ def _build_agent_list(agents: List[Dict[str, str]]) -> List[Dict[str, Any]]:
             agent_config["serving_endpoint"] = {"name": f"ka-{tile_id_prefix}-endpoint"}
         elif agent.get("uc_function_name"):
             uc_function_name = agent.get("uc_function_name")
-            uc_parts = uc_function_name.split(".")
-            if len(uc_parts) != 3:
+            uc_parts = [p.strip() for p in uc_function_name.split(".")]
+            if len(uc_parts) != 3 or not all(uc_parts):
                 raise ValueError(
-                    f"uc_function_name must be 'catalog.schema.function', got: {uc_function_name!r}"
+                    f"uc_function_name must be 'catalog.schema.function' with non-empty parts, "
+                    f"got: {uc_function_name!r}"
                 )
             agent_config["agent_type"] = "unity_catalog_function"
             agent_config["unity_catalog_function"] = {
@@ -613,6 +614,14 @@ def main():
 
     command = sys.argv[1]
 
+    try:
+        _dispatch(command)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _dispatch(command: str) -> None:
     if command == "create_mas":
         if len(sys.argv) < 4:
             print("Usage: python mas_manager.py create_mas NAME '{\"agents\": [...], ...}'")
