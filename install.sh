@@ -1309,16 +1309,20 @@ check_deps() {
 setup_mcp() {
     step "Setting up MCP server"
     
-    # Clone or update repo
+    # Clone or update repo. Fallback clones must `|| die` — a silent failure
+    # leaves $REPO_DIR missing and downstream `uv pip install -e "$REPO_DIR/..."`
+    # explodes with an unrelated error.
     if [ -d "$REPO_DIR/.git" ]; then
         git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
         git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+                || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
         }
     else
         mkdir -p "$INSTALL_DIR"
-        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+            || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
     fi
     ok "Repository cloned ($BRANCH)"
     
@@ -2110,8 +2114,15 @@ prompt_channel() {
         [ "$INSTALL_SKILLS" = false ] && args="$args --mcp-only"
         [ "$BRANCH_EXPLICIT" = true ] && args="$args --branch $BRANCH"
 
-        # Download and execute the experimental installer
-        exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") $args
+        # Download and execute the experimental installer.
+        # Download to a tmp file first so a curl failure (network/404/5xx) surfaces
+        # — `exec bash <(curl ...)` would silently exec an empty script otherwise.
+        local exp_installer
+        exp_installer=$(mktemp -t ai-dev-kit-exp-installer.XXXXXX) || die "Could not create temp file for experimental installer"
+        curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh" -o "$exp_installer" \
+            || die "Could not download experimental installer from GitHub. Check your network connection, then retry."
+        [ -s "$exp_installer" ] || die "Downloaded experimental installer is empty — GitHub may be having issues. Retry in a moment."
+        exec bash "$exp_installer" $args
     fi
 }
 
@@ -2305,14 +2316,16 @@ main() {
             git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
             git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
                 rm -rf "$REPO_DIR"
-                git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+                git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+                    || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
             }
             ok "Repository refreshed ($BRANCH)"
         fi
     else
         step "Downloading sources"
         mkdir -p "$INSTALL_DIR"
-        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+            || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
         ok "Repository cloned ($BRANCH)"
     fi
     

@@ -17,7 +17,7 @@ A dashboard should be showing something relevant for a human, typically some KPI
 | List tables | `databricks experimental aitools tools query --warehouse WH "SHOW TABLES IN catalog.schema"` |
 | Get schema | `databricks experimental aitools tools discover-schema catalog.schema.table1 catalog.schema.table2` |
 | Test query | `databricks experimental aitools tools query --warehouse WH "SELECT..."` |
-| Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "WH" --dataset-catalog CATALOG --dataset-schema SCHEMA --serialized-dashboard "$(cat file.json)" --json '{"parent_path": "/Workspace/Users/<you>/path"}'` — `parent_path` is JSON-only (no flag); everything else stays as flags. Queries must use bare table names. |
+| Create dashboard | `databricks lakeview create --display-name "X" --warehouse-id "WH" --dataset-catalog CATALOG --dataset-schema SCHEMA --serialized-dashboard "$(cat file.json)" --json '{"parent_path": "/Workspace/Users/<you>/path"}'` — `--dataset-catalog` / `--dataset-schema` are **flag-only** (REQUIRED; CLI silently drops them if put in `--json`); `parent_path` is JSON-only (no flag). Queries must use bare table names. |
 | Update dashboard | `databricks lakeview update DASHBOARD_ID --serialized-dashboard "$(cat file.json)"` |
 | Publish | `databricks lakeview publish DASHBOARD_ID --warehouse-id WH` |
 | Delete | `databricks lakeview trash DASHBOARD_ID` |
@@ -120,11 +120,18 @@ After deploying, the same `lakeview` subcommands manage the dashboard's lifecycl
 
 ```bash
 # Deploy: creates the dashboard in the workspace and returns a dashboard ID.
-# Canonical form — everything is a flag EXCEPT parent_path (JSON-only, no flag;
-# without it the dashboard lands at /Users/<you>/<display-name>).
-# --dataset-catalog/--dataset-schema inject the catalog/schema into each saved
-# dataset; queries inside dashboard.json MUST use bare table names only (e.g.,
-# "FROM trips"), NOT "FROM schema.trips" or "FROM catalog.schema.trips".
+# Canonical form — MIX flags + --json. Each field has exactly ONE valid place:
+#   --dataset-catalog / --dataset-schema : FLAG-ONLY (REQUIRED — no JSON field).
+#       The CLI silently warns "unknown field" and drops them if put in --json,
+#       leaving every dataset query unable to resolve its catalog.schema.
+#   parent_path : JSON-ONLY (no flag). Without it, dashboard lands at
+#       /Users/<you>/<display-name>.
+#   display_name / warehouse_id / serialized_dashboard : either form works;
+#       prefer flags for readability.
+# Queries inside dashboard.json MUST use bare table names ("FROM trips", never
+# "FROM schema.trips" or "FROM catalog.schema.trips") — --dataset-catalog and
+# --dataset-schema only fill in missing parts, they do NOT rewrite hardcoded
+# prefixes.
 databricks lakeview create \
   --display-name "My Dashboard" \
   --warehouse-id "abc123def456" \
