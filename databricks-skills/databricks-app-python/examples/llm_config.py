@@ -218,8 +218,10 @@ def get_databricks_bearer_token(
         access_token = payload.get("access_token")
         expires_in = int(payload.get("expires_in", 300))
         if not access_token:
+            payload_keys = sorted(payload.keys()) if isinstance(payload, dict) else []
             raise DatabricksLLMConfigError(
-                f"Token endpoint response is missing access_token: {payload}"
+                "Token endpoint response is missing access_token "
+                f"(keys present: {payload_keys})"
             )
 
         expires_at = int(time.time()) + expires_in
@@ -278,8 +280,7 @@ def validate_databricks_llm_config(
     if response.status_code >= 400:
         raise DatabricksLLMConfigError(
             f"Failed to validate DATABRICKS_MODEL={config.model!r} in workspace "
-            f"{config.workspace_host} (HTTP {response.status_code}). "
-            f"Response: {response.text[:300]}"
+            f"{config.workspace_host} (HTTP {response.status_code})."
         )
 
     _validation_cache[cache_key] = int(time.time()) + VALIDATION_TTL_SECONDS
