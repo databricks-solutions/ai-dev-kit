@@ -26,6 +26,7 @@ from mas_manager import (
     list_examples,
     _build_agent_list,
     MASManager,
+    MASNotFound,
 )
 
 
@@ -153,6 +154,87 @@ class TestAddExamplesBatch:
         """Empty input must short-circuit (ThreadPoolExecutor rejects max_workers=0)."""
         manager = MASManager.__new__(MASManager)  # skip __init__ (would need WorkspaceClient)
         assert manager.add_examples_batch("tile-id", []) == []
+
+
+class TestResponseErrorHandling:
+    """Unit tests for typed-404 (MASNotFound) and empty-body handling."""
+
+    @pytest.fixture
+    def manager_with_fake_workspace(self):
+        class _Cfg:
+            host = "https://example.cloud.databricks.com"
+
+            def authenticate(self):
+                return {"Authorization": "Bearer x"}
+
+        class _W:
+            config = _Cfg()
+
+        manager = MASManager.__new__(MASManager)
+        manager.w = _W()
+        return manager
+
+    def test_404_raises_MASNotFound_not_generic_exception(self, manager_with_fake_workspace, monkeypatch):
+        """A 404 response must raise MASNotFound so callers can branch on existence cleanly."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 404
+        fake_resp.content = b'{"message":"tile does not exist"}'
+        fake_resp.text = '{"message":"tile does not exist"}'
+        fake_resp.json.return_value = {"message": "tile does not exist"}
+        monkeypatch.setattr(mas_manager_module.requests, "get", lambda *a, **kw: fake_resp)
+
+        with pytest.raises(MASNotFound):
+            manager_with_fake_workspace._get("/api/2.0/multi-agent-supervisors/missing")
+
+    def test_get_method_returns_None_on_404(self, manager_with_fake_workspace, monkeypatch):
+        """MASManager.get() should swallow MASNotFound and return None."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 404
+        fake_resp.content = b'{"message":"x"}'
+        fake_resp.text = '{"message":"x"}'
+        fake_resp.json.return_value = {"message": "x"}
+        monkeypatch.setattr(mas_manager_module.requests, "get", lambda *a, **kw: fake_resp)
+
+        assert manager_with_fake_workspace.get("missing-tile") is None
+
+    def test_get_method_reraises_non_404(self, manager_with_fake_workspace, monkeypatch):
+        """Non-404 errors must still propagate from MASManager.get()."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 500
+        fake_resp.content = b'{"message":"boom"}'
+        fake_resp.text = '{"message":"boom"}'
+        fake_resp.json.return_value = {"message": "boom"}
+        monkeypatch.setattr(mas_manager_module.requests, "get", lambda *a, **kw: fake_resp)
+
+        with pytest.raises(Exception) as exc_info:
+            manager_with_fake_workspace.get("any-tile")
+        assert not isinstance(exc_info.value, MASNotFound)
+
+    def test_post_handles_empty_body(self, manager_with_fake_workspace, monkeypatch):
+        """_post must tolerate empty success responses (symmetric with _delete)."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 200
+        fake_resp.content = b""
+        fake_resp.text = ""
+        monkeypatch.setattr(mas_manager_module.requests, "post", lambda *a, **kw: fake_resp)
+
+        assert manager_with_fake_workspace._post("/api/test", {"x": 1}) == {}
 
 
 class TestDeleteResponseHandling:

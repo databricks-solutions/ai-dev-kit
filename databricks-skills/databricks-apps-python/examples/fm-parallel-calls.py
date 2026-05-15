@@ -226,6 +226,8 @@ if __name__ == "__main__":
     print(f"Time saved vs serial execution: {time_saved:.2f}s")
     if total_time > 0:
         print(f"Speedup: {(total_latency/1000) / total_time:.1f}×")
+    else:
+        print("Speedup: N/A (total_time below resolution)")
     print(f"{'='*60}")
 
 

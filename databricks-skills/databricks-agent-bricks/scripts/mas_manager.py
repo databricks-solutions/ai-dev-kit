@@ -65,6 +65,10 @@ class MASIds:
     name: str
 
 
+class MASNotFound(Exception):
+    """Raised when a MAS resource returns HTTP 404."""
+
+
 # ============================================================================
 # MAS Manager Class
 # ============================================================================
@@ -116,13 +120,11 @@ class MASManager:
         return self._post("/api/2.0/multi-agent-supervisors", payload)
 
     def get(self, tile_id: str) -> Optional[Dict[str, Any]]:
-        """Get MAS by tile_id."""
+        """Get MAS by tile_id. Returns None if the tile does not exist."""
         try:
             return self._get(f"/api/2.0/multi-agent-supervisors/{tile_id}")
-        except Exception as e:
-            if "does not exist" in str(e).lower() or "not found" in str(e).lower():
-                return None
-            raise
+        except MASNotFound:
+            return None
 
     def update(
         self,
@@ -251,21 +253,38 @@ class MASManager:
     # ========================================================================
 
     def _handle_response_error(self, response: requests.Response, method: str, path: str) -> None:
-        """Extract detailed error from response and raise."""
-        if response.status_code >= 400:
-            try:
-                error_data = response.json()
-                error_msg = error_data.get("message", error_data.get("error", str(error_data)))
-                raise Exception(f"{method} {path} failed: {error_msg}")
-            except ValueError:
-                raise Exception(f"{method} {path} failed with status {response.status_code}: {response.text}")
+        """Extract detailed error from response and raise.
+
+        Raises MASNotFound on 404 so callers can branch on existence cleanly,
+        instead of substring-matching error messages.
+        """
+        if response.status_code < 400:
+            return
+        try:
+            error_data = response.json()
+            error_msg = error_data.get("message", error_data.get("error", str(error_data)))
+        except ValueError:
+            error_msg = f"status {response.status_code}: {response.text}"
+        if response.status_code == 404:
+            raise MASNotFound(f"{method} {path} not found: {error_msg}")
+        raise Exception(f"{method} {path} failed: {error_msg}")
+
+    @staticmethod
+    def _safe_json(response: requests.Response) -> Dict[str, Any]:
+        """Return parsed JSON, or {} if the body is empty / non-JSON."""
+        if not response.content:
+            return {}
+        try:
+            return response.json()
+        except ValueError:
+            return {}
 
     def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
         url = f"{self.w.config.host}{path}"
         response = requests.get(url, headers=headers, params=params or {}, timeout=20)
         self._handle_response_error(response, "GET", path)
-        return response.json()
+        return self._safe_json(response)
 
     def _post(self, path: str, body: Dict[str, Any], timeout: int = 300) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
@@ -273,7 +292,7 @@ class MASManager:
         url = f"{self.w.config.host}{path}"
         response = requests.post(url, headers=headers, json=body, timeout=timeout)
         self._handle_response_error(response, "POST", path)
-        return response.json()
+        return self._safe_json(response)
 
     def _patch(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
@@ -281,19 +300,14 @@ class MASManager:
         url = f"{self.w.config.host}{path}"
         response = requests.patch(url, headers=headers, json=body, timeout=20)
         self._handle_response_error(response, "PATCH", path)
-        return response.json()
+        return self._safe_json(response)
 
     def _delete(self, path: str) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
         url = f"{self.w.config.host}{path}"
         response = requests.delete(url, headers=headers, timeout=20)
         self._handle_response_error(response, "DELETE", path)
-        if not response.content:
-            return {}
-        try:
-            return response.json()
-        except ValueError:
-            return {}
+        return self._safe_json(response)
 
 
 # ============================================================================

@@ -621,7 +621,12 @@ def cmd_list_compute(args):
 
     if resource == "clusters":
         if cluster_id:
-            return get_cluster_status(cluster_id)
+            try:
+                return get_cluster_status(cluster_id)
+            except NotFound:
+                return {"success": False, "cluster_id": cluster_id, "state": "DELETED", "exists": False}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
         if auto_select:
             try:
                 best = get_best_cluster()
