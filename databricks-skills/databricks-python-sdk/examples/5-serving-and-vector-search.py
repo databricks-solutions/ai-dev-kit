@@ -168,10 +168,15 @@ for doc in results.result.data_array:
 
 
 # Query with embedding vector directly
+# query_vector must be a list[float] whose length matches your index's
+# embedding dimension (e.g. 768 for bge-small, 1024 for bge-large, 1536 for
+# text-embedding-3-small / ada-002). The [0.0] * N below is a stand-in;
+# replace with the actual vector returned by your embedding model.
+query_vector = [0.0] * 768
 results = w.vector_search_indexes.query_index(
     index_name="main.default.my_index",
     columns=["id", "text"],
-    query_vector=[0.1, 0.2, 0.3, ...],  # Your embedding vector
+    query_vector=query_vector,
     num_results=10
 )
 

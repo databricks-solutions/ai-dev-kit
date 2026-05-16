@@ -13,7 +13,7 @@ import pytest
 
 # Add the skills directory to the path
 SKILLS_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SKILLS_DIR / "databricks-agent-bricks"))
+sys.path.insert(0, str(SKILLS_DIR / "databricks-agent-bricks" / "scripts"))
 
 from mas_manager import (
     create_mas,
@@ -23,9 +23,10 @@ from mas_manager import (
     delete_mas,
     list_mas,
     add_examples,
-    add_examples_queued,
     list_examples,
     _build_agent_list,
+    MASManager,
+    MASNotFound,
 )
 
 
@@ -114,6 +115,176 @@ class TestBuildAgentList:
         assert len(result) == 2
         assert result[0]["agent_type"] == "serving_endpoint"
         assert result[1]["agent_type"] == "genie"
+
+
+class TestBuildAgentListValidation:
+    """Negative tests for _build_agent_list input validation."""
+
+    def test_rejects_uc_function_name_with_two_parts(self):
+        with pytest.raises(ValueError, match="catalog.schema.function"):
+            _build_agent_list([{"name": "x", "description": "y", "uc_function_name": "catalog.schema"}])
+
+    def test_rejects_uc_function_name_with_four_parts(self):
+        with pytest.raises(ValueError, match="catalog.schema.function"):
+            _build_agent_list([{"name": "x", "description": "y", "uc_function_name": "a.b.c.d"}])
+
+    def test_rejects_uc_function_name_with_empty_segment(self):
+        """`catalog..fn` has three parts but middle is empty — must be rejected."""
+        with pytest.raises(ValueError, match="non-empty parts"):
+            _build_agent_list([{"name": "x", "description": "y", "uc_function_name": "catalog..fn"}])
+
+    def test_rejects_uc_function_name_with_whitespace_only_segment(self):
+        with pytest.raises(ValueError, match="non-empty parts"):
+            _build_agent_list([{"name": "x", "description": "y", "uc_function_name": "catalog.  .fn"}])
+
+    def test_rejects_agent_with_no_identifier(self):
+        """No genie/ka/uc/connection/endpoint -> must raise, not silently send name=None."""
+        with pytest.raises(ValueError, match="must specify one of"):
+            _build_agent_list([{"name": "x", "description": "y"}])
+
+    def test_rejects_agent_with_empty_endpoint_name(self):
+        with pytest.raises(ValueError, match="must specify one of"):
+            _build_agent_list([{"name": "x", "description": "y", "endpoint_name": ""}])
+
+
+class TestAddExamplesBatch:
+    """Unit tests for MASManager.add_examples_batch — no Databricks connection needed."""
+
+    def test_empty_list_returns_empty(self):
+        """Empty input must short-circuit (ThreadPoolExecutor rejects max_workers=0)."""
+        manager = MASManager.__new__(MASManager)  # skip __init__ (would need WorkspaceClient)
+        assert manager.add_examples_batch("tile-id", []) == []
+
+
+class TestResponseErrorHandling:
+    """Unit tests for typed-404 (MASNotFound) and empty-body handling."""
+
+    @pytest.fixture
+    def manager_with_fake_workspace(self):
+        class _Cfg:
+            host = "https://example.cloud.databricks.com"
+
+            def authenticate(self):
+                return {"Authorization": "Bearer x"}
+
+        class _W:
+            config = _Cfg()
+
+        manager = MASManager.__new__(MASManager)
+        manager.w = _W()
+        return manager
+
+    def test_404_raises_MASNotFound_not_generic_exception(self, manager_with_fake_workspace, monkeypatch):
+        """A 404 response must raise MASNotFound so callers can branch on existence cleanly."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 404
+        fake_resp.content = b'{"message":"tile does not exist"}'
+        fake_resp.text = '{"message":"tile does not exist"}'
+        fake_resp.json.return_value = {"message": "tile does not exist"}
+        monkeypatch.setattr(mas_manager_module.requests, "get", lambda *a, **kw: fake_resp)
+
+        with pytest.raises(MASNotFound):
+            manager_with_fake_workspace._get("/api/2.0/multi-agent-supervisors/missing")
+
+    def test_get_method_returns_None_on_404(self, manager_with_fake_workspace, monkeypatch):
+        """MASManager.get() should swallow MASNotFound and return None."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 404
+        fake_resp.content = b'{"message":"x"}'
+        fake_resp.text = '{"message":"x"}'
+        fake_resp.json.return_value = {"message": "x"}
+        monkeypatch.setattr(mas_manager_module.requests, "get", lambda *a, **kw: fake_resp)
+
+        assert manager_with_fake_workspace.get("missing-tile") is None
+
+    def test_get_method_reraises_non_404(self, manager_with_fake_workspace, monkeypatch):
+        """Non-404 errors must still propagate from MASManager.get()."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 500
+        fake_resp.content = b'{"message":"boom"}'
+        fake_resp.text = '{"message":"boom"}'
+        fake_resp.json.return_value = {"message": "boom"}
+        monkeypatch.setattr(mas_manager_module.requests, "get", lambda *a, **kw: fake_resp)
+
+        with pytest.raises(Exception) as exc_info:
+            manager_with_fake_workspace.get("any-tile")
+        assert not isinstance(exc_info.value, MASNotFound)
+
+    def test_post_handles_empty_body(self, manager_with_fake_workspace, monkeypatch):
+        """_post must tolerate empty success responses (symmetric with _delete)."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 200
+        fake_resp.content = b""
+        fake_resp.text = ""
+        monkeypatch.setattr(mas_manager_module.requests, "post", lambda *a, **kw: fake_resp)
+
+        assert manager_with_fake_workspace._post("/api/test", {"x": 1}) == {}
+
+
+class TestDeleteResponseHandling:
+    """Unit tests for MASManager._delete — tolerate empty / non-JSON DELETE bodies."""
+
+    @pytest.fixture
+    def manager_with_fake_workspace(self):
+        from unittest.mock import MagicMock
+
+        class _Cfg:
+            host = "https://example.cloud.databricks.com"
+
+            def authenticate(self):
+                return {"Authorization": "Bearer x"}
+
+        class _W:
+            config = _Cfg()
+
+        manager = MASManager.__new__(MASManager)
+        manager.w = _W()
+        return manager
+
+    def test_empty_body_returns_empty_dict(self, manager_with_fake_workspace, monkeypatch):
+        """204 No Content / empty body must not raise JSONDecodeError."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 204
+        fake_resp.content = b""
+        fake_resp.text = ""
+        monkeypatch.setattr(mas_manager_module.requests, "delete", lambda *a, **kw: fake_resp)
+
+        assert manager_with_fake_workspace._delete("/api/test") == {}
+
+    def test_non_json_body_returns_empty_dict(self, manager_with_fake_workspace, monkeypatch):
+        """Some endpoints return plain text on success — must not raise."""
+        from unittest.mock import MagicMock
+
+        import mas_manager as mas_manager_module
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 200
+        fake_resp.content = b"OK"
+        fake_resp.text = "OK"
+        fake_resp.json.side_effect = ValueError("not JSON")
+        monkeypatch.setattr(mas_manager_module.requests, "delete", lambda *a, **kw: fake_resp)
+
+        assert manager_with_fake_workspace._delete("/api/test") == {}
 
 
 @pytest.mark.integration

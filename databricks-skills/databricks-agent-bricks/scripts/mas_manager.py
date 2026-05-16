@@ -65,6 +65,10 @@ class MASIds:
     name: str
 
 
+class MASNotFound(Exception):
+    """Raised when a MAS resource returns HTTP 404."""
+
+
 # ============================================================================
 # MAS Manager Class
 # ============================================================================
@@ -116,13 +120,11 @@ class MASManager:
         return self._post("/api/2.0/multi-agent-supervisors", payload)
 
     def get(self, tile_id: str) -> Optional[Dict[str, Any]]:
-        """Get MAS by tile_id."""
+        """Get MAS by tile_id. Returns None if the tile does not exist."""
         try:
             return self._get(f"/api/2.0/multi-agent-supervisors/{tile_id}")
-        except Exception as e:
-            if "does not exist" in str(e).lower() or "not found" in str(e).lower():
-                return None
-            raise
+        except MASNotFound:
+            return None
 
     def update(
         self,
@@ -233,6 +235,9 @@ class MASManager:
                 logger.error(f"Failed to add MAS example '{question_text[:50]}...': {e}")
                 return None
 
+        if not questions:
+            return created_examples
+
         max_workers = min(2, len(questions))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_q = {executor.submit(create_example, q): q for q in questions}
@@ -248,21 +253,38 @@ class MASManager:
     # ========================================================================
 
     def _handle_response_error(self, response: requests.Response, method: str, path: str) -> None:
-        """Extract detailed error from response and raise."""
-        if response.status_code >= 400:
-            try:
-                error_data = response.json()
-                error_msg = error_data.get("message", error_data.get("error", str(error_data)))
-                raise Exception(f"{method} {path} failed: {error_msg}")
-            except ValueError:
-                raise Exception(f"{method} {path} failed with status {response.status_code}: {response.text}")
+        """Extract detailed error from response and raise.
+
+        Raises MASNotFound on 404 so callers can branch on existence cleanly,
+        instead of substring-matching error messages.
+        """
+        if response.status_code < 400:
+            return
+        try:
+            error_data = response.json()
+            error_msg = error_data.get("message", error_data.get("error", str(error_data)))
+        except ValueError:
+            error_msg = f"status {response.status_code}: {response.text}"
+        if response.status_code == 404:
+            raise MASNotFound(f"{method} {path} not found: {error_msg}")
+        raise Exception(f"{method} {path} failed: {error_msg}")
+
+    @staticmethod
+    def _safe_json(response: requests.Response) -> Dict[str, Any]:
+        """Return parsed JSON, or {} if the body is empty / non-JSON."""
+        if not response.content:
+            return {}
+        try:
+            return response.json()
+        except ValueError:
+            return {}
 
     def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
         url = f"{self.w.config.host}{path}"
         response = requests.get(url, headers=headers, params=params or {}, timeout=20)
         self._handle_response_error(response, "GET", path)
-        return response.json()
+        return self._safe_json(response)
 
     def _post(self, path: str, body: Dict[str, Any], timeout: int = 300) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
@@ -270,7 +292,7 @@ class MASManager:
         url = f"{self.w.config.host}{path}"
         response = requests.post(url, headers=headers, json=body, timeout=timeout)
         self._handle_response_error(response, "POST", path)
-        return response.json()
+        return self._safe_json(response)
 
     def _patch(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
@@ -278,14 +300,14 @@ class MASManager:
         url = f"{self.w.config.host}{path}"
         response = requests.patch(url, headers=headers, json=body, timeout=20)
         self._handle_response_error(response, "PATCH", path)
-        return response.json()
+        return self._safe_json(response)
 
     def _delete(self, path: str) -> Dict[str, Any]:
         headers = self.w.config.authenticate()
         url = f"{self.w.config.host}{path}"
         response = requests.delete(url, headers=headers, timeout=20)
         self._handle_response_error(response, "DELETE", path)
-        return response.json()
+        return self._safe_json(response)
 
 
 # ============================================================================
@@ -320,7 +342,12 @@ def _build_agent_list(agents: List[Dict[str, str]]) -> List[Dict[str, Any]]:
             agent_config["serving_endpoint"] = {"name": f"ka-{tile_id_prefix}-endpoint"}
         elif agent.get("uc_function_name"):
             uc_function_name = agent.get("uc_function_name")
-            uc_parts = uc_function_name.split(".")
+            uc_parts = [p.strip() for p in uc_function_name.split(".")]
+            if len(uc_parts) != 3 or not all(uc_parts):
+                raise ValueError(
+                    f"uc_function_name must be 'catalog.schema.function' with non-empty parts, "
+                    f"got: {uc_function_name!r}"
+                )
             agent_config["agent_type"] = "unity_catalog_function"
             agent_config["unity_catalog_function"] = {
                 "uc_path": {
@@ -333,8 +360,14 @@ def _build_agent_list(agents: List[Dict[str, str]]) -> List[Dict[str, Any]]:
             agent_config["agent_type"] = "external_mcp_server"
             agent_config["external_mcp_server"] = {"connection_name": agent.get("connection_name")}
         else:
+            endpoint_name = agent.get("endpoint_name")
+            if not endpoint_name:
+                raise ValueError(
+                    "agent config must specify one of: genie_space_id, ka_tile_id, "
+                    "uc_function_name, connection_name, or endpoint_name"
+                )
             agent_config["agent_type"] = "serving_endpoint"
-            agent_config["serving_endpoint"] = {"name": agent.get("endpoint_name")}
+            agent_config["serving_endpoint"] = {"name": endpoint_name}
 
         agent_list.append(agent_config)
     return agent_list
@@ -578,6 +611,15 @@ def _print_json(data: Any) -> None:
     print(json.dumps(data, indent=2))
 
 
+def _parse_json_arg(arg: str, label: str) -> Any:
+    """Parse a JSON CLI arg, exiting cleanly on malformed input."""
+    try:
+        return json.loads(arg)
+    except json.JSONDecodeError as e:
+        print(f"error: {label} must be valid JSON ({e})", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """CLI entry point."""
     if len(sys.argv) < 2:
@@ -586,12 +628,20 @@ def main():
 
     command = sys.argv[1]
 
+    try:
+        _dispatch(command)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _dispatch(command: str) -> None:
     if command == "create_mas":
         if len(sys.argv) < 4:
             print("Usage: python mas_manager.py create_mas NAME '{\"agents\": [...], ...}'")
             sys.exit(1)
         name = sys.argv[2]
-        config = json.loads(sys.argv[3])
+        config = _parse_json_arg(sys.argv[3], "config")
         result = create_mas(
             name=name,
             agents=config.get("agents", []),
@@ -619,7 +669,7 @@ def main():
             print("Usage: python mas_manager.py update_mas TILE_ID '{\"name\": ..., \"agents\": [...], ...}'")
             sys.exit(1)
         tile_id = sys.argv[2]
-        config = json.loads(sys.argv[3])
+        config = _parse_json_arg(sys.argv[3], "config")
         result = update_mas(
             tile_id=tile_id,
             name=config.get("name"),
@@ -645,7 +695,7 @@ def main():
             print("Usage: python mas_manager.py add_examples TILE_ID '[{\"question\": \"...\", \"guideline\": \"...\"}]' [--wait]")
             sys.exit(1)
         tile_id = sys.argv[2]
-        examples = json.loads(sys.argv[3])
+        examples = _parse_json_arg(sys.argv[3], "examples")
         wait = "--wait" in sys.argv[4:]
         result = add_examples(tile_id, examples, wait_for_online=wait)
         _print_json(result)

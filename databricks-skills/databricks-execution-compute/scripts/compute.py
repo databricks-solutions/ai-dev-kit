@@ -20,6 +20,7 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import (
     ClusterSource,
     CommandStatus,
@@ -191,6 +192,7 @@ def get_cluster_status(cluster_id: str) -> Dict[str, Any]:
     w = get_workspace_client()
     c = w.clusters.get(cluster_id=cluster_id)
     return {
+        "success": True,
         "cluster_id": c.cluster_id,
         "cluster_name": c.cluster_name,
         "state": c.state.value if c.state else "UNKNOWN",
@@ -619,7 +621,12 @@ def cmd_list_compute(args):
 
     if resource == "clusters":
         if cluster_id:
-            return get_cluster_status(cluster_id)
+            try:
+                return get_cluster_status(cluster_id)
+            except NotFound:
+                return {"success": False, "cluster_id": cluster_id, "state": "DELETED", "exists": False}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
         if auto_select:
             try:
                 best = get_best_cluster()
@@ -673,9 +680,9 @@ def cmd_manage_cluster(args):
             return {"success": False, "error": "cluster_id is required for get action."}
         try:
             return get_cluster_status(cluster_id)
+        except NotFound:
+            return {"success": False, "cluster_id": cluster_id, "state": "DELETED", "exists": False}
         except Exception as e:
-            if "does not exist" in str(e).lower():
-                return {"success": True, "cluster_id": cluster_id, "state": "DELETED", "exists": False}
             return {"success": False, "error": str(e)}
 
     else:
