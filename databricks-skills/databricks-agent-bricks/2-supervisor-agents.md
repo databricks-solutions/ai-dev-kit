@@ -1,6 +1,6 @@
 # Supervisor Agents - Details
 
-For commands, see [SKILL.md](SKILL.md). `<SKILL_ROOT>` in examples = the directory containing SKILL.md.
+For commands, see [SKILL.md](SKILL.md). All operations use the native `databricks supervisor-agents` CLI (Beta, requires CLI ≥ 0.299.2).
 
 ## Unity Catalog Functions
 
@@ -10,9 +10,13 @@ Call registered UC functions from the Supervisor Agent.
 - UC Function exists (`CREATE FUNCTION` or Python UDF)
 - Grant execute: `GRANT EXECUTE ON FUNCTION catalog.schema.func TO \`<agent_sp>\`;`
 
-**Config:**
-```json
-{"name": "enricher", "uc_function_name": "catalog.schema.enrich_data", "description": "Enriches customer records"}
+**Attach as a tool:**
+```bash
+databricks supervisor-agents create-tool supervisor-agents/<id> enricher --json '{
+    "tool_type": "uc_function",
+    "description": "Enriches customer records",
+    "uc_function": {"name": "catalog.schema.enrich_data"}
+}'
 ```
 
 ## External MCP Servers
@@ -39,9 +43,13 @@ OPTIONS (
 GRANT USE CONNECTION ON my_mcp TO `<agent_sp>`;
 ```
 
-**3. Config:**
-```json
-{"name": "operations", "connection_name": "my_mcp", "description": "Execute operations: approve invoices, trigger workflows"}
+**3. Attach as a tool:**
+```bash
+databricks supervisor-agents create-tool supervisor-agents/<id> operations --json '{
+    "tool_type": "uc_connection",
+    "description": "Execute operations: approve invoices, trigger workflows",
+    "uc_connection": {"name": "my_mcp"}
+}'
 ```
 
 **Test connection:**
@@ -61,20 +69,27 @@ The `description` field drives routing. Be specific:
 
 ## Adding Examples
 
-Examples help evaluation and routing optimization. **The MAS endpoint must be ONLINE.** Right after `create_mas` (or a big `update_mas`), the endpoint is `NOT_READY` and takes **up to ~10 minutes** to come ONLINE. Pass `--wait` to block until then:
+Examples help evaluation and routing optimization. **The serving endpoint must be ONLINE.** Right after `create-supervisor-agent` (or a structural `update-supervisor-agent`), the endpoint takes **up to ~10 minutes** to come ONLINE. Examples can be added before that — they're stored on the agent definition — but querying the endpoint to evaluate routing requires readiness.
 
 ```bash
-# Fails fast if endpoint isn't ONLINE yet
-python <SKILL_ROOT>/scripts/mas_manager.py add_examples TILE_ID '[
-    {"question": "I need my invoice for March", "guideline": "Route to billing_agent"},
-    {"question": "API returns 500 error", "guideline": "Route to tech_agent"}
-]'
+# Add an example (guidelines is a repeated string — must use --json)
+databricks supervisor-agents create-example supervisor-agents/<id> --json '{
+    "question": "I need my invoice for March",
+    "guidelines": ["Route to billing_agent"]
+}'
 
-# --wait blocks until endpoint is ONLINE (default timeout 15 min) then adds.
-# The process must stay alive for the whole wait — there is no background queue.
-python <SKILL_ROOT>/scripts/mas_manager.py add_examples TILE_ID '[...]' --wait
+databricks supervisor-agents create-example supervisor-agents/<id> --json '{
+    "question": "API returns 500 error",
+    "guidelines": ["Route to tech_agent"]
+}'
 
-python <SKILL_ROOT>/scripts/mas_manager.py list_examples TILE_ID
+# List / inspect / remove
+databricks supervisor-agents list-examples supervisor-agents/<id>
+databricks supervisor-agents get-example supervisor-agents/<id>/examples/<ex_id>
+databricks supervisor-agents delete-example supervisor-agents/<id>/examples/<ex_id>
+
+# Check endpoint readiness before querying
+databricks serving-endpoints get <endpoint_name>
 ```
 
 ## Troubleshooting
