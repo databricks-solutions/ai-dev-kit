@@ -1,0 +1,23 @@
+skill_name: databricks-ai-functions
+tool_modules: []
+description: |
+  Manually authored ground truth for A/B evaluation of databricks-ai-functions
+  (main MCP vs experimental CLI). Cases cover the task-specific functions
+  (ai_classify, ai_extract, ai_summarize, ai_mask), structured JSON via ai_query,
+  ai_parse_document for PDFs, and ai_forecast for time series.
+scorers:
+  enabled:
+    - pattern_adherence
+    - no_hallucinated_apis
+    - expected_facts_present
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations
+  default_guidelines:
+    - Response must address the user's request completely
+    - SQL and PySpark examples must follow documented best practices
+    - Response must prefer task-specific functions over ai_query when applicable
+quality_gates:
+  syntax_valid: 1.0
+  pattern_adherence: 0.9
+  execution_success: 0.8

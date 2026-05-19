@@ -1,0 +1,121 @@
+metadata:
+  skill_name: databricks-ai-functions
+  version: 0.1.0
+  created_at: '2026-05-07T00:00:00.000000'
+  source_note: |
+    Hand-authored for A/B evaluation (issue #485). Original `.test/skills/databricks-ai-functions/`
+    did not exist on origin/experimental — created from scratch following the SKILL.md surface
+    so the skill can participate in the A/B compare with the other ai-ml-engineering skills.
+
+test_cases:
+- id: aif_classify_001
+  inputs:
+    prompt: "Classify each row of a support_tickets table into urgent / not urgent / spam using a built-in Databricks AI function."
+  outputs:
+    response: |
+      Adds a priority column to support_tickets by classifying ticket_text against the three labels ('urgent', 'not urgent', 'spam') using the task-specific ai_classify function (preferred over ai_query for fixed-label routing). Shows the SQL form and optionally the PySpark equivalent (`spark.sql` or `expr("ai_classify(...)")`). Notes that label lists should be 2–5 mutually exclusive labels for best accuracy and that NULL inputs return NULL.
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: hand_authored
+    created_at: '2026-05-07T00:00:00.000000'
+
+- id: aif_extract_001
+  inputs:
+    prompt: "Extract product, error_code, and date entities from a ticket_text column."
+  outputs:
+    response: |
+      Uses ai_extract on ticket_text with the entity list ['product', 'error_code', 'date'] (task-specific function preferred over ai_query for entity extraction). Confirms the result is a STRUCT with one field per entity, demonstrates how to access nested fields (e.g. entities.product), and shows either the SQL or PySpark variant. Notes that missing entities come back as NULL.
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: hand_authored
+    created_at: '2026-05-07T00:00:00.000000'
+
+- id: aif_mask_pii_001
+  inputs:
+    prompt: "Redact person names, emails, phone numbers, and addresses from a raw_messages table before storing to a safe table."
+  outputs:
+    response: |
+      Uses ai_mask on the message column with the entity list ['person', 'email', 'phone', 'address'] and writes the redacted output to catalog.schema.messages_safe in Delta append mode. Notes that ai_mask is the right task-specific function for PII redaction (do not use ai_query). Confirms idempotent appends and that the original raw table is untouched.
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: hand_authored
+    created_at: '2026-05-07T00:00:00.000000'
+
+- id: aif_summarize_001
+  inputs:
+    prompt: "Summarize a content column of customer reviews down to about 30 words each."
+  outputs:
+    response: |
+      Uses ai_summarize(content, 30) to produce per-row summaries capped at ~30 words. Prefers the task-specific function over ai_query for summarization. Notes that the second argument is the target word count and that passing 0 disables the cap.
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: hand_authored
+    created_at: '2026-05-07T00:00:00.000000'
+
+- id: aif_parse_document_001
+  inputs:
+    prompt: "Parse PDFs in /Volumes/catalog/schema/landing/documents/ and extract dates, amounts, and vendors from each."
+  outputs:
+    response: |
+      Reads files as binaryFile from the UC Volume, calls ai_parse_document on the binary content, and filters out rows where parse_error is non-null. Then chains ai_extract on the parsed text blocks with the entity list ['date', 'amount', 'vendor'] to produce a structured downstream column. Notes that ai_parse_document requires DBR 17.1+ and that filtering on parse_error IS NULL avoids polluting downstream tables with malformed inputs.
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: hand_authored
+    created_at: '2026-05-07T00:00:00.000000'
+
+- id: aif_query_structured_001
+  inputs:
+    prompt: "Extract invoice records with nested line items as structured JSON from a parsed_documents.text_blocks column. The shape needs numero, total, and an itens array with codigo/descricao/qtde/vlrUnit per line."
+  outputs:
+    response: |
+      Uses ai_query as a last resort (justified because the output schema has a nested array and no task-specific function covers nested invoice extraction). Passes responseFormat='{"type":"json_object"}' to constrain the model output to JSON, sets failOnError=false so individual row failures surface as STRUCT.error instead of raising, and parses the returned JSON with from_json against an explicit STRUCT schema covering numero, total, and itens<codigo, descricao, qtde, vlrUnit>. Explains why ai_query is appropriate here (where task-specific functions are not).
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: hand_authored
+    created_at: '2026-05-07T00:00:00.000000'
+
+- id: aif_forecast_001
+  inputs:
+    prompt: "Forecast daily_sales.sales out to 2026-12-31 using a built-in Databricks function."
+  outputs:
+    response: |
+      Uses the table-valued ai_forecast function with observed=TABLE(SELECT date, sales FROM daily_sales), horizon='2026-12-31', time_col='date', value_col='sales'. Confirms the result columns: date, sales_forecast, sales_upper, sales_lower (point forecast plus a confidence interval). Notes that ai_forecast requires a Pro or Serverless SQL warehouse — not available on Classic or Starter.
+    execution_success: true
+  expectations:
+    expected_facts: []
+    expected_patterns: []
+    guidelines: []
+  metadata:
+    category: happy_path
+    source: hand_authored
+    created_at: '2026-05-07T00:00:00.000000'
