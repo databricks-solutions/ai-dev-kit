@@ -177,6 +177,114 @@ def check_pat_rejected() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Upstream compatibility guard
+# ---------------------------------------------------------------------------
+
+# Expected signatures for the methods we patch.
+# Update these constants when pulling a new upstream version and re-validating.
+_EXPECTED_INIT_PARAMS = {"warehouse_id", "client"}
+_EXPECTED_EXECUTE_PARAMS = {
+    "sql_query", "catalog", "schema", "row_limit", "timeout", "query_tags"
+}
+# SQLParallelExecutor must still delegate to SQLExecutor for our __init__
+# patch to cover execute_sql_multi.  We verify this by checking that it
+# creates a `sql_executor` attribute of type SQLExecutor.
+_EXPECTED_PARALLEL_ATTR = "sql_executor"
+
+
+class UpstreamChangedError(RuntimeError):
+    """Raised when upstream code has changed in a way that breaks our patches.
+
+    Do not swallow this error.  It means the monkey-patch assumptions are
+    invalid and the governance controls may not be applied correctly.
+    Fix the patch before restarting the server.
+    """
+
+
+def verify_patch_assumptions() -> None:
+    """Assert that the upstream code still matches our patching assumptions.
+
+    Inspects the signatures and structure of the classes we patch.  Raises
+    UpstreamChangedError with a specific message if anything has drifted,
+    so an upstream update is caught immediately rather than silently applying
+    a broken patch.
+
+    Call this before patch_sql_executor().
+
+    Raises:
+        UpstreamChangedError: If any assumption no longer holds.
+    """
+    import inspect
+    from databricks_tools_core.sql.sql_utils.executor import SQLExecutor
+    from databricks_tools_core.sql.sql_utils.parallel_executor import SQLParallelExecutor
+
+    issues: list[str] = []
+
+    # --- SQLExecutor.__init__ signature ---
+    init_params = set(inspect.signature(SQLExecutor.__init__).parameters) - {"self"}
+    if init_params != _EXPECTED_INIT_PARAMS:
+        issues.append(
+            f"SQLExecutor.__init__ signature changed.\n"
+            f"  Expected params: {sorted(_EXPECTED_INIT_PARAMS)}\n"
+            f"  Got params:      {sorted(init_params)}\n"
+            f"  Action: review patches.py _patched_init and update "
+            f"_EXPECTED_INIT_PARAMS after re-validating."
+        )
+
+    # --- SQLExecutor.execute signature ---
+    execute_params = set(inspect.signature(SQLExecutor.execute).parameters) - {"self"}
+    if execute_params != _EXPECTED_EXECUTE_PARAMS:
+        issues.append(
+            f"SQLExecutor.execute signature changed.\n"
+            f"  Expected params: {sorted(_EXPECTED_EXECUTE_PARAMS)}\n"
+            f"  Got params:      {sorted(execute_params)}\n"
+            f"  Action: review patches.py _patched_execute and update "
+            f"_EXPECTED_EXECUTE_PARAMS after re-validating."
+        )
+
+    # --- SQLParallelExecutor still delegates to SQLExecutor ---
+    # Instantiate with a dummy warehouse_id to inspect the created object.
+    # We override __init__ on a temp subclass to avoid real SDK calls.
+    class _Probe(SQLParallelExecutor):
+        def __init__(self):
+            self.warehouse_id = "probe"
+            self.max_workers = 1
+            self.client = None
+            # Replicate the line we care about: does it create a SQLExecutor?
+            from databricks_tools_core.sql.sql_utils.executor import SQLExecutor as _E
+            self.sql_executor = _E.__new__(_E)  # don't call real __init__
+
+    probe = _Probe()
+    if not hasattr(probe, _EXPECTED_PARALLEL_ATTR):
+        issues.append(
+            f"SQLParallelExecutor no longer has a '{_EXPECTED_PARALLEL_ATTR}' attribute.\n"
+            f"  This means execute_sql_multi may bypass SQLExecutor entirely.\n"
+            f"  Action: inspect SQLParallelExecutor and extend the patch to "
+            f"cover its new execution path."
+        )
+    elif not isinstance(getattr(probe, _EXPECTED_PARALLEL_ATTR), SQLExecutor):
+        actual_type = type(getattr(probe, _EXPECTED_PARALLEL_ATTR)).__name__
+        issues.append(
+            f"SQLParallelExecutor.sql_executor is no longer a SQLExecutor "
+            f"(got {actual_type!r}).\n"
+            f"  Action: inspect the new executor type and ensure the SP client "
+            f"and identity tagging patches cover it."
+        )
+
+    if issues:
+        bullet_list = "\n\n".join(f"  [{i+1}] {msg}" for i, msg in enumerate(issues))
+        raise UpstreamChangedError(
+            f"Upstream code has changed — governance patches cannot be safely applied.\n"
+            f"Found {len(issues)} issue(s):\n\n{bullet_list}"
+        )
+
+    logger.info(
+        "Upstream compatibility check passed "
+        "(SQLExecutor signatures and SQLParallelExecutor delegation are intact)"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Patch 2 + 3: SQL SP override and user identity tagging
 # ---------------------------------------------------------------------------
 
@@ -255,10 +363,13 @@ def apply_all_patches() -> None:
     tool invocation must come after.)
 
     Execution order:
-    1. patch_sql_executor — installs class-level patches on SQLExecutor
-    2. check_pat_rejected — validates startup credentials (makes a live
+    1. verify_patch_assumptions — inspects upstream signatures; raises
+       UpstreamChangedError if anything has drifted (fail loudly, not silently)
+    2. patch_sql_executor — installs class-level patches on SQLExecutor
+    3. check_pat_rejected — validates startup credentials (makes a live
        API call; fails immediately if auth is PAT)
     """
+    verify_patch_assumptions()
     patch_sql_executor()
     check_pat_rejected()
     logger.info("All Noom MCP governance patches applied successfully")

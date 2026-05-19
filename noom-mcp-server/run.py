@@ -38,10 +38,18 @@ logger = logging.getLogger("noom_mcp")
 # workspace credentials to be configured in the environment.
 # ---------------------------------------------------------------------------
 
-from noom_mcp.patches import apply_all_patches  # noqa: E402
+from noom_mcp.patches import apply_all_patches, UpstreamChangedError  # noqa: E402
 
 try:
     apply_all_patches()
+except UpstreamChangedError as exc:
+    logger.error(
+        "UPSTREAM CHANGED — patches not applied, server will not start.\n%s\n"
+        "Pull the latest noom-mcp-server and re-validate the patches "
+        "before restarting.",
+        exc,
+    )
+    sys.exit(2)
 except RuntimeError as exc:
     logger.error("Governance check failed — server will not start: %s", exc)
     sys.exit(1)
