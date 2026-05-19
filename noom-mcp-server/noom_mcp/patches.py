@@ -180,8 +180,14 @@ def check_pat_rejected() -> None:
 # Upstream compatibility guard
 # ---------------------------------------------------------------------------
 
+# The upstream repo VERSION we validated these patches against.
+# Bump this (and re-validate) every time you pull a new upstream release.
+VALIDATED_UPSTREAM_VERSION = "0.1.10"
+
 # Expected signatures for the methods we patch.
-# Update these constants when pulling a new upstream version and re-validating.
+# These are a secondary safety net — they catch mid-version drift (e.g. a
+# cherry-picked commit that changes a signature without bumping the VERSION).
+# Update these constants together with VALIDATED_UPSTREAM_VERSION.
 _EXPECTED_INIT_PARAMS = {"warehouse_id", "client"}
 _EXPECTED_EXECUTE_PARAMS = {
     "sql_query", "catalog", "schema", "row_limit", "timeout", "query_tags"
@@ -204,8 +210,18 @@ class UpstreamChangedError(RuntimeError):
 def verify_patch_assumptions() -> None:
     """Assert that the upstream code still matches our patching assumptions.
 
-    Inspects the signatures and structure of the classes we patch.  Raises
-    UpstreamChangedError with a specific message if anything has drifted,
+    Two-tier check:
+
+    1. Version pin (primary): compares the installed upstream VERSION file
+       against VALIDATED_UPSTREAM_VERSION.  Fails immediately on any upstream
+       update, prompting deliberate re-validation before bumping the pin.
+
+    2. Signature inspection (secondary): checks that SQLExecutor.__init__,
+       SQLExecutor.execute, and SQLParallelExecutor's delegation to SQLExecutor
+       still match what we patch.  Catches mid-version drift (e.g. a
+       cherry-picked commit that changes internals without bumping VERSION).
+
+    Raises UpstreamChangedError with a specific message for each issue found,
     so an upstream update is caught immediately rather than silently applying
     a broken patch.
 
@@ -215,10 +231,22 @@ def verify_patch_assumptions() -> None:
         UpstreamChangedError: If any assumption no longer holds.
     """
     import inspect
+    from databricks_tools_core.identity import PRODUCT_VERSION
     from databricks_tools_core.sql.sql_utils.executor import SQLExecutor
     from databricks_tools_core.sql.sql_utils.parallel_executor import SQLParallelExecutor
 
     issues: list[str] = []
+
+    # --- Version pin (primary check) ---
+    if PRODUCT_VERSION != VALIDATED_UPSTREAM_VERSION:
+        issues.append(
+            f"Upstream version mismatch.\n"
+            f"  Validated against: {VALIDATED_UPSTREAM_VERSION}\n"
+            f"  Installed version: {PRODUCT_VERSION}\n"
+            f"  Action: pull the latest noom-mcp-server, test the patches "
+            f"against v{PRODUCT_VERSION}, then set "
+            f"VALIDATED_UPSTREAM_VERSION = {PRODUCT_VERSION!r} in patches.py."
+        )
 
     # --- SQLExecutor.__init__ signature ---
     init_params = set(inspect.signature(SQLExecutor.__init__).parameters) - {"self"}
