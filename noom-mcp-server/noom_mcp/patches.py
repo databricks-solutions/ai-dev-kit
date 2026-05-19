@@ -51,38 +51,106 @@ _sql_sp_client = None
 # ---------------------------------------------------------------------------
 
 
+def _fetch_sp_credentials_from_secrets() -> tuple[str, str]:
+    """Fetch SQL SP credentials from a Databricks secret scope.
+
+    Reads the scope name from DATABRICKS_MCP_SECRET_SCOPE, then fetches
+    two secrets using configurable key names:
+      - DATABRICKS_MCP_SECRET_KEY_CLIENT_ID     (default: "sql-sp-client-id")
+      - DATABRICKS_MCP_SECRET_KEY_CLIENT_SECRET (default: "sql-sp-client-secret")
+
+    Uses the calling user's own credentials to fetch the secrets — they need
+    READ permission on the scope, but never see the raw secret values (the
+    SDK decodes them and they stay in process memory only).
+
+    Returns:
+        Tuple of (client_id, client_secret).
+
+    Raises:
+        RuntimeError: If the scope or keys are missing or inaccessible.
+    """
+    import base64
+    from databricks_tools_core.auth import get_workspace_client
+
+    scope = os.environ["DATABRICKS_MCP_SECRET_SCOPE"]
+    key_client_id = os.environ.get(
+        "DATABRICKS_MCP_SECRET_KEY_CLIENT_ID", "sql-sp-client-id"
+    )
+    key_client_secret = os.environ.get(
+        "DATABRICKS_MCP_SECRET_KEY_CLIENT_SECRET", "sql-sp-client-secret"
+    )
+
+    client = get_workspace_client()
+
+    def _get(key: str) -> str:
+        try:
+            response = client.secrets.get_secret(scope=scope, key=key)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to fetch secret '{key}' from scope '{scope}': {exc}\n"
+                f"Ensure the scope exists and you have READ permission on it."
+            ) from exc
+        if not response.value:
+            raise RuntimeError(
+                f"Secret '{key}' in scope '{scope}' is empty."
+            )
+        # Databricks returns secret values base64-encoded
+        return base64.b64decode(response.value).decode("utf-8")
+
+    logger.info(
+        "Fetching SQL SP credentials from Databricks secret scope %r", scope
+    )
+    client_id = _get(key_client_id)
+    client_secret = _get(key_client_secret)
+    logger.info("SQL SP credentials fetched from Databricks Secrets successfully")
+    return client_id, client_secret
+
+
 def _build_sql_sp_client():
-    """Construct the SQL Service Principal WorkspaceClient from env vars.
+    """Construct the SQL Service Principal WorkspaceClient.
+
+    Credential resolution order:
+    1. Databricks Secrets (recommended for local users) — set
+       DATABRICKS_MCP_SECRET_SCOPE to a scope where the SP credentials
+       are stored.  Users need READ on the scope but never see the values.
+    2. Environment variables (dev / CI fallback) — set
+       DATABRICKS_MCP_SQL_CLIENT_ID and DATABRICKS_MCP_SQL_CLIENT_SECRET
+       directly.
 
     Returns:
         Tagged WorkspaceClient configured for OAuth M2M with the SQL SP.
 
     Raises:
-        RuntimeError: If DATABRICKS_MCP_SQL_CLIENT_ID or
-            DATABRICKS_MCP_SQL_CLIENT_SECRET is missing.
+        RuntimeError: If neither credentials source is configured, or if
+            the Databricks Secrets fetch fails.
     """
     from databricks.sdk import WorkspaceClient
     from databricks_tools_core.auth import get_workspace_client
     from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION, tag_client
 
-    client_id = os.environ.get("DATABRICKS_MCP_SQL_CLIENT_ID")
-    client_secret = os.environ.get("DATABRICKS_MCP_SQL_CLIENT_SECRET")
-
-    missing = [
-        name
-        for name, val in [
-            ("DATABRICKS_MCP_SQL_CLIENT_ID", client_id),
-            ("DATABRICKS_MCP_SQL_CLIENT_SECRET", client_secret),
+    # --- Resolve credentials ---
+    if os.environ.get("DATABRICKS_MCP_SECRET_SCOPE"):
+        client_id, client_secret = _fetch_sp_credentials_from_secrets()
+    else:
+        client_id = os.environ.get("DATABRICKS_MCP_SQL_CLIENT_ID")
+        client_secret = os.environ.get("DATABRICKS_MCP_SQL_CLIENT_SECRET")
+        missing = [
+            name
+            for name, val in [
+                ("DATABRICKS_MCP_SQL_CLIENT_ID", client_id),
+                ("DATABRICKS_MCP_SQL_CLIENT_SECRET", client_secret),
+            ]
+            if not val
         ]
-        if not val
-    ]
-    if missing:
-        raise RuntimeError(
-            "SQL Service Principal not configured. "
-            f"Missing env vars: {', '.join(missing)}. "
-            "Set DATABRICKS_MCP_SQL_CLIENT_ID and DATABRICKS_MCP_SQL_CLIENT_SECRET "
-            "before starting noom-mcp-server."
-        )
+        if missing:
+            raise RuntimeError(
+                "SQL Service Principal credentials not configured.\n"
+                "Option 1 (recommended): set DATABRICKS_MCP_SECRET_SCOPE to a "
+                "Databricks secret scope that contains the SP credentials.\n"
+                "Option 2 (dev/CI): set DATABRICKS_MCP_SQL_CLIENT_ID and "
+                f"DATABRICKS_MCP_SQL_CLIENT_SECRET directly.\n"
+                f"Missing env vars for option 2: {', '.join(missing)}"
+            )
 
     # DATABRICKS_MCP_SQL_HOST is optional — falls back to the calling user's
     # workspace host when the SQL SP lives in the same workspace.
