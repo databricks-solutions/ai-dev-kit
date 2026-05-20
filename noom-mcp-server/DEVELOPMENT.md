@@ -2,8 +2,8 @@
 
 ## Admin setup: SQL Service Principal credentials
 
-End users only need to set `DATABRICKS_MCP_SECRET_SCOPE` in their `.env`.
 An admin must first provision the secret scope and store the SP credentials.
+End users need READ access on the scope (see below) but never interact with the secret values directly.
 
 Run this once against the prod workspace:
 
@@ -31,7 +31,7 @@ will reflect a prod identity running SQL on a dev warehouse, which is confusing.
 
 When running locally without Databricks Secrets access (e.g. in CI), set the
 SP credentials directly as environment variables. The secret scope lookup is
-skipped when `DATABRICKS_MCP_SECRET_SCOPE` is unset.
+skipped when `DATABRICKS_MCP_SQL_CLIENT_ID` is set.
 
 ```bash
 export DATABRICKS_MCP_SQL_CLIENT_ID=<service-principal-client-id>

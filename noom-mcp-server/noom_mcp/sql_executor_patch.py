@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 # Process-lifetime cache — one SP client per server process.
 _sql_sp_client = None
 
+# Guard flag so patch_sql_executor() is idempotent (safe to call multiple times).
+_sql_executor_patched = False
+
 # Fixed secret scope and key names — not user-configurable.
 _SECRET_SCOPE = "dbrix_mcp_secret"
 _SECRET_KEY_CLIENT_ID = "sql-sp-client-id"
@@ -166,7 +169,8 @@ def get_sql_warehouse_id() -> str:
 
     Reads DATABRICKS_WAREHOUSE_ID from the environment.  This overrides
     whatever warehouse_id the AI client passes to execute_sql, ensuring all
-    SQL always runs on the designated prod warehouse.
+    SQL runs on the designated warehouse rather than an arbitrary one chosen
+    by the caller.
 
     Raises:
         RuntimeError: If DATABRICKS_WAREHOUSE_ID is not set.
@@ -175,7 +179,7 @@ def get_sql_warehouse_id() -> str:
     if not wh:
         raise RuntimeError(
             "DATABRICKS_WAREHOUSE_ID is not set.\n"
-            "Set it to the prod SQL warehouse ID in your .env file."
+            "Set it to the SQL warehouse ID in your .env file."
         )
     return wh
 
@@ -220,6 +224,8 @@ def get_mcp_user_identity() -> str:
 def patch_sql_executor() -> None:
     """Patch SQLExecutor to enforce SP client and inject user identity tags.
 
+    Idempotent — calling this function more than once has no effect.
+
     __init__ patch
         Ignores both the ``warehouse_id`` and ``client`` arguments passed by
         the caller.  Always substitutes the governed warehouse ID (from
@@ -231,6 +237,11 @@ def patch_sql_executor() -> None:
         The user's identity is resolved *before* the SP client is used,
         so it still reflects the calling user's credentials.
     """
+    global _sql_executor_patched
+    if _sql_executor_patched:
+        logger.debug("SQLExecutor already patched — skipping")
+        return
+
     from databricks_tools_core.sql.sql_utils.executor import SQLExecutor
 
     _original_init = SQLExecutor.__init__
@@ -238,7 +249,14 @@ def patch_sql_executor() -> None:
 
     @wraps(_original_init)
     def _patched_init(self, warehouse_id: str, client=None) -> None:
-        _original_init(self, get_sql_warehouse_id(), client=get_sql_sp_client())
+        configured_warehouse_id = get_sql_warehouse_id()
+        if warehouse_id and warehouse_id != configured_warehouse_id:
+            logger.debug(
+                "SQLExecutor.__init__: overriding caller warehouse %r with configured warehouse %r",
+                warehouse_id,
+                configured_warehouse_id,
+            )
+        _original_init(self, configured_warehouse_id, client=get_sql_sp_client())
 
     @wraps(_original_execute)
     def _patched_execute(
@@ -264,6 +282,7 @@ def patch_sql_executor() -> None:
 
     SQLExecutor.__init__ = _patched_init
     SQLExecutor.execute = _patched_execute
+    _sql_executor_patched = True
     logger.info(
         "SQLExecutor patched: warehouse override (%s), SP client override, "
         "user identity tagging active",

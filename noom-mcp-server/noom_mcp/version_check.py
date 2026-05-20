@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Bump this (and re-validate) every time you pull a new upstream release.
-PATCHED_UPSTREAM_VERSION = "0.1.10"
+PATCHED_UPSTREAM_VERSION = "0.1.12"
 
 
 class UpstreamChangedError(RuntimeError):

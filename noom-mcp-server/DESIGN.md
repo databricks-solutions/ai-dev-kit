@@ -19,9 +19,13 @@ noom-mcp-server/
 ├── run.py                # entry point: patches → import upstream server → mcp.run()
 ├── .env.example          # required env vars
 ├── DESIGN.md             # this file
+├── DEVELOPMENT.md        # admin setup, dev/CI credentials, test commands
 └── noom_mcp/
     ├── __init__.py
-    └── patches.py        # all three governance patches
+    ├── patches.py          # orchestrator: calls apply_all_patches()
+    ├── version_check.py    # upstream version pin + UpstreamChangedError
+    ├── auth_guard_patch.py # PAT rejection at startup
+    └── sql_executor_patch.py  # SP client override + user identity tagging
 ```
 
 `run.py` does three things in order:

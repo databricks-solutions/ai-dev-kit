@@ -18,16 +18,25 @@ def check_pat_rejected() -> None:
     "databricks-cli" (browser OAuth) and "oauth-m2m" are accepted.
 
     Raises:
-        RuntimeError: If auth_type is "pat".
-        Exception: Re-raises any SDK / network error so the server exits
-            with a clear message rather than silently continuing.
+        RuntimeError: If auth_type is "pat", or if the API call fails
+            (wraps transport/auth errors with a clear startup message).
     """
     from databricks_tools_core.auth import get_workspace_client
 
     client = get_workspace_client()
 
     # Force auth resolution — SDK validates credentials lazily on first call.
-    me = client.current_user.me()
+    try:
+        me = client.current_user.me()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Startup auth check failed — could not reach Databricks or credentials are invalid.\n"
+            f"  Host: {getattr(client.config, 'host', '<unset>')}\n"
+            f"  Error: {exc}\n"
+            "Ensure DATABRICKS_HOST is set and your credentials are valid "
+            "('databricks auth login' or DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET)."
+        ) from exc
+
     logger.info("Startup auth check: authenticated as %s", me.user_name)
 
     auth_type = getattr(client.config, "auth_type", None)
