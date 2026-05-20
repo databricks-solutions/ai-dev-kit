@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 # Process-lifetime cache — one SP client per server process.
 _sql_sp_client = None
 
+# Fixed secret scope and key names — not user-configurable.
+_SECRET_SCOPE = "dbrix_mcp_secret"
+_SECRET_KEY_CLIENT_ID = "sql-sp-client-id"
+_SECRET_KEY_CLIENT_SECRET = "sql-sp-client-secret"
+
 
 # ---------------------------------------------------------------------------
 # SP credential helpers
@@ -40,8 +45,7 @@ _sql_sp_client = None
 def _fetch_sp_credentials_from_secrets() -> tuple[str, str]:
     """Fetch SQL SP credentials from the Databricks secret scope.
 
-    Reads the scope name from DATABRICKS_MCP_SECRET_SCOPE and fetches
-    two fixed-name secrets:
+    Uses the fixed scope ``dbrix_mcp_secret`` and fetches two fixed keys:
       - sql-sp-client-id
       - sql-sp-client-secret
 
@@ -58,9 +62,9 @@ def _fetch_sp_credentials_from_secrets() -> tuple[str, str]:
     import base64
     from databricks_tools_core.auth import get_workspace_client
 
-    scope = os.environ["DATABRICKS_MCP_SECRET_SCOPE"]
-    key_client_id = "sql-sp-client-id"
-    key_client_secret = "sql-sp-client-secret"
+    scope = _SECRET_SCOPE
+    key_client_id = _SECRET_KEY_CLIENT_ID
+    key_client_secret = _SECRET_KEY_CLIENT_SECRET
 
     client = get_workspace_client()
 
@@ -88,14 +92,14 @@ def _build_sql_sp_client():
     """Construct the SQL Service Principal WorkspaceClient.
 
     Credential resolution order:
-    1. Databricks Secrets (recommended) — set DATABRICKS_MCP_SECRET_SCOPE
-       to the secret scope containing the SP credentials.  Users need READ
-       on the scope but never see the values.
-    2. Environment variables (dev / CI fallback) — set
-       DATABRICKS_MCP_SQL_CLIENT_ID and DATABRICKS_MCP_SQL_CLIENT_SECRET.
+    1. Databricks Secrets (default) — fetches from the fixed scope
+       ``dbrix_mcp_secret``.  Users need READ on the scope but never see
+       the raw values.
+    2. Env vars (dev / CI override) — if DATABRICKS_MCP_SQL_CLIENT_ID is
+       set, use it along with DATABRICKS_MCP_SQL_CLIENT_SECRET directly.
+       See DEVELOPMENT.md.
 
-    DATABRICKS_MCP_SQL_HOST is always required — defaults to prod in
-    .env.example to prevent accidental SQL execution against dev/test.
+    DATABRICKS_MCP_SQL_HOST is always required.
 
     Returns:
         Tagged WorkspaceClient configured for OAuth M2M with the SQL SP.
@@ -106,28 +110,18 @@ def _build_sql_sp_client():
     from databricks.sdk import WorkspaceClient
     from databricks_tools_core.identity import PRODUCT_NAME, PRODUCT_VERSION, tag_client
 
-    if os.environ.get("DATABRICKS_MCP_SECRET_SCOPE"):
-        client_id, client_secret = _fetch_sp_credentials_from_secrets()
-    else:
-        client_id = os.environ.get("DATABRICKS_MCP_SQL_CLIENT_ID")
-        client_secret = os.environ.get("DATABRICKS_MCP_SQL_CLIENT_SECRET")
-        missing = [
-            name
-            for name, val in [
-                ("DATABRICKS_MCP_SQL_CLIENT_ID", client_id),
-                ("DATABRICKS_MCP_SQL_CLIENT_SECRET", client_secret),
-            ]
-            if not val
-        ]
-        if missing:
+    if os.environ.get("DATABRICKS_MCP_SQL_CLIENT_ID"):
+        # Dev / CI override: credentials supplied directly as env vars.
+        # See DEVELOPMENT.md for when to use this.
+        client_id = os.environ["DATABRICKS_MCP_SQL_CLIENT_ID"]
+        client_secret = os.environ.get("DATABRICKS_MCP_SQL_CLIENT_SECRET", "")
+        if not client_secret:
             raise RuntimeError(
-                "SQL Service Principal credentials not configured.\n"
-                "Option 1 (recommended): set DATABRICKS_MCP_SECRET_SCOPE to the "
-                "Databricks secret scope that contains the SP credentials.\n"
-                "Option 2 (dev/CI): set DATABRICKS_MCP_SQL_CLIENT_ID and "
-                f"DATABRICKS_MCP_SQL_CLIENT_SECRET directly.\n"
-                f"Missing env vars for option 2: {', '.join(missing)}"
+                "DATABRICKS_MCP_SQL_CLIENT_ID is set but "
+                "DATABRICKS_MCP_SQL_CLIENT_SECRET is missing."
             )
+    else:
+        client_id, client_secret = _fetch_sp_credentials_from_secrets()
 
     host = os.environ.get("DATABRICKS_MCP_SQL_HOST")
     if not host:
@@ -160,6 +154,30 @@ def get_sql_sp_client():
     if _sql_sp_client is None:
         _sql_sp_client = _build_sql_sp_client()
     return _sql_sp_client
+
+
+# ---------------------------------------------------------------------------
+# Warehouse ID
+# ---------------------------------------------------------------------------
+
+
+def get_sql_warehouse_id() -> str:
+    """Return the configured SQL warehouse ID.
+
+    Reads DATABRICKS_WAREHOUSE_ID from the environment.  This overrides
+    whatever warehouse_id the AI client passes to execute_sql, ensuring all
+    SQL always runs on the designated prod warehouse.
+
+    Raises:
+        RuntimeError: If DATABRICKS_WAREHOUSE_ID is not set.
+    """
+    wh = os.environ.get("DATABRICKS_WAREHOUSE_ID")
+    if not wh:
+        raise RuntimeError(
+            "DATABRICKS_WAREHOUSE_ID is not set.\n"
+            "Set it to the prod SQL warehouse ID in your .env file."
+        )
+    return wh
 
 
 # ---------------------------------------------------------------------------
@@ -203,10 +221,10 @@ def patch_sql_executor() -> None:
     """Patch SQLExecutor to enforce SP client and inject user identity tags.
 
     __init__ patch
-        Ignores whatever ``client`` argument is passed (including the one
-        from SQLParallelExecutor, which resolves get_workspace_client()
-        before creating its internal SQLExecutor).  Always substitutes the
-        governed SQL SP client.
+        Ignores both the ``warehouse_id`` and ``client`` arguments passed by
+        the caller.  Always substitutes the governed warehouse ID (from
+        DATABRICKS_WAREHOUSE_ID) and the governed SP client.  This ensures
+        the AI cannot direct SQL to an arbitrary warehouse.
 
     execute patch
         Appends "mcp_user:<identity>" to query_tags on every statement.
@@ -220,7 +238,7 @@ def patch_sql_executor() -> None:
 
     @wraps(_original_init)
     def _patched_init(self, warehouse_id: str, client=None) -> None:
-        _original_init(self, warehouse_id, client=get_sql_sp_client())
+        _original_init(self, get_sql_warehouse_id(), client=get_sql_sp_client())
 
     @wraps(_original_execute)
     def _patched_execute(
@@ -246,4 +264,8 @@ def patch_sql_executor() -> None:
 
     SQLExecutor.__init__ = _patched_init
     SQLExecutor.execute = _patched_execute
-    logger.info("SQLExecutor patched: SP client override + user identity tagging active")
+    logger.info(
+        "SQLExecutor patched: warehouse override (%s), SP client override, "
+        "user identity tagging active",
+        get_sql_warehouse_id(),
+    )

@@ -92,6 +92,55 @@ class TestGetMcpUserIdentity:
 # ---------------------------------------------------------------------------
 
 
+class TestPatchSqlExecutorWarehouseId:
+    @pytest.fixture(autouse=True)
+    def isolate(self):
+        orig = _save_executor_methods()
+        yield
+        _restore_executor_methods(*orig)
+        _reset_sp_client_cache()
+
+    def test_patched_init_uses_configured_warehouse(self):
+        """After patching, SQLExecutor always uses the configured warehouse ID."""
+        from databricks_tools_core.sql.sql_utils.executor import SQLExecutor
+        from noom_mcp.sql_executor_patch import patch_sql_executor
+
+        mock_sp = MagicMock()
+        with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=mock_sp), \
+             patch("noom_mcp.sql_executor_patch.get_sql_warehouse_id", return_value="wh-prod"):
+            patch_sql_executor()
+            executor = SQLExecutor.__new__(SQLExecutor)
+            SQLExecutor.__init__(executor, "wh-caller-supplied", client=None)
+            assert executor.warehouse_id == "wh-prod"
+
+    def test_patched_init_ignores_caller_supplied_warehouse(self):
+        """Configured warehouse overrides whatever warehouse the AI passes in."""
+        from databricks_tools_core.sql.sql_utils.executor import SQLExecutor
+        from noom_mcp.sql_executor_patch import patch_sql_executor
+
+        mock_sp = MagicMock()
+        with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=mock_sp), \
+             patch("noom_mcp.sql_executor_patch.get_sql_warehouse_id", return_value="wh-prod"):
+            patch_sql_executor()
+            executor = SQLExecutor.__new__(SQLExecutor)
+            SQLExecutor.__init__(executor, "wh-some-random-id", client=None)
+            assert executor.warehouse_id == "wh-prod"
+            assert executor.warehouse_id != "wh-some-random-id"
+
+    def test_get_sql_warehouse_id_reads_env(self, monkeypatch):
+        """get_sql_warehouse_id returns the env var value."""
+        monkeypatch.setenv("DATABRICKS_WAREHOUSE_ID", "wh-abc123")
+        from noom_mcp.sql_executor_patch import get_sql_warehouse_id
+        assert get_sql_warehouse_id() == "wh-abc123"
+
+    def test_get_sql_warehouse_id_raises_when_unset(self, monkeypatch):
+        """get_sql_warehouse_id raises RuntimeError when env var is missing."""
+        monkeypatch.delenv("DATABRICKS_WAREHOUSE_ID", raising=False)
+        from noom_mcp.sql_executor_patch import get_sql_warehouse_id
+        with pytest.raises(RuntimeError, match="DATABRICKS_WAREHOUSE_ID is not set"):
+            get_sql_warehouse_id()
+
+
 class TestPatchSqlExecutorSpClient:
     @pytest.fixture(autouse=True)
     def isolate(self):
@@ -106,7 +155,8 @@ class TestPatchSqlExecutorSpClient:
         from noom_mcp.sql_executor_patch import patch_sql_executor
 
         mock_sp = MagicMock()
-        with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=mock_sp):
+        with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=mock_sp), \
+             patch("noom_mcp.sql_executor_patch.get_sql_warehouse_id", return_value="wh-prod"):
             patch_sql_executor()
             executor = SQLExecutor.__new__(SQLExecutor)
             SQLExecutor.__init__(executor, "wh-123", client=None)
@@ -120,7 +170,8 @@ class TestPatchSqlExecutorSpClient:
         caller_client = MagicMock(name="caller_client")
         sp_client = MagicMock(name="sp_client")
 
-        with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=sp_client):
+        with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=sp_client), \
+             patch("noom_mcp.sql_executor_patch.get_sql_warehouse_id", return_value="wh-prod"):
             patch_sql_executor()
             executor = SQLExecutor.__new__(SQLExecutor)
             SQLExecutor.__init__(executor, "wh-123", client=caller_client)
@@ -187,6 +238,7 @@ class TestPatchSqlExecutorIdentityTagging:
         # Keep mocks active for the actual call — get_mcp_user_identity is
         # resolved at call time, not at patch-install time.
         with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=mock_sp), \
+             patch("noom_mcp.sql_executor_patch.get_sql_warehouse_id", return_value="wh-prod"), \
              patch("noom_mcp.sql_executor_patch.get_mcp_user_identity", return_value="bob@noom.com"):
             patch_sql_executor()
 
@@ -216,6 +268,7 @@ class TestPatchSqlExecutorIdentityTagging:
         SQLExecutor.execute = _spy
 
         with patch("noom_mcp.sql_executor_patch.get_sql_sp_client", return_value=mock_sp), \
+             patch("noom_mcp.sql_executor_patch.get_sql_warehouse_id", return_value="wh-prod"), \
              patch("noom_mcp.sql_executor_patch.get_mcp_user_identity", return_value="carol@noom.com"):
             patch_sql_executor()
 
@@ -242,7 +295,6 @@ class TestFetchSpCredentialsFromSecrets:
 
     def test_returns_decoded_credentials(self, monkeypatch):
         """Credentials are base64-decoded and returned as (client_id, secret)."""
-        monkeypatch.setenv("DATABRICKS_MCP_SECRET_SCOPE", "dbrix_mcp_secret")
 
         mock_client = MagicMock()
         mock_client.secrets.get_secret.side_effect = [
@@ -263,7 +315,6 @@ class TestFetchSpCredentialsFromSecrets:
 
     def test_uses_fixed_key_names(self, monkeypatch):
         """Fixed keys sql-sp-client-id and sql-sp-client-secret are always used."""
-        monkeypatch.setenv("DATABRICKS_MCP_SECRET_SCOPE", "dbrix_mcp_secret")
 
         mock_client = MagicMock()
         mock_client.secrets.get_secret.side_effect = [
@@ -285,7 +336,6 @@ class TestFetchSpCredentialsFromSecrets:
 
     def test_sdk_error_raises_runtime_error(self, monkeypatch):
         """SDK failure fetching a secret raises RuntimeError with context."""
-        monkeypatch.setenv("DATABRICKS_MCP_SECRET_SCOPE", "dbrix_mcp_secret")
 
         mock_client = MagicMock()
         mock_client.secrets.get_secret.side_effect = Exception("permission denied")
@@ -301,7 +351,6 @@ class TestFetchSpCredentialsFromSecrets:
 
     def test_empty_secret_raises_runtime_error(self, monkeypatch):
         """Empty secret value raises RuntimeError."""
-        monkeypatch.setenv("DATABRICKS_MCP_SECRET_SCOPE", "dbrix_mcp_secret")
 
         mock_client = MagicMock()
         empty = MagicMock()
@@ -329,11 +378,9 @@ class TestBuildSqlSpClient:
         yield
         _reset_sp_client_cache()
 
-    def test_prefers_secrets_over_env_vars(self, monkeypatch):
-        """Databricks Secrets path takes precedence when scope is set."""
-        monkeypatch.setenv("DATABRICKS_MCP_SECRET_SCOPE", "dbrix_mcp_secret")
-        monkeypatch.setenv("DATABRICKS_MCP_SQL_CLIENT_ID", "env-id")
-        monkeypatch.setenv("DATABRICKS_MCP_SQL_CLIENT_SECRET", "env-secret")
+    def test_uses_secrets_by_default(self, monkeypatch):
+        """Secrets are used when DATABRICKS_MCP_SQL_CLIENT_ID is not set."""
+        monkeypatch.delenv("DATABRICKS_MCP_SQL_CLIENT_ID", raising=False)
         monkeypatch.setenv("DATABRICKS_MCP_SQL_HOST", "https://noom-prod.cloud.databricks.com")
 
         with patch(
@@ -347,9 +394,8 @@ class TestBuildSqlSpClient:
             _build_sql_sp_client()
             mock_fetch.assert_called_once()
 
-    def test_falls_back_to_env_vars(self, monkeypatch):
-        """Env vars are used when no secret scope is configured."""
-        monkeypatch.delenv("DATABRICKS_MCP_SECRET_SCOPE", raising=False)
+    def test_env_vars_override_secrets(self, monkeypatch):
+        """Env vars are used as a dev/CI override when CLIENT_ID is set."""
         monkeypatch.setenv("DATABRICKS_MCP_SQL_CLIENT_ID", "env-id")
         monkeypatch.setenv("DATABRICKS_MCP_SQL_CLIENT_SECRET", "env-secret")
         monkeypatch.setenv("DATABRICKS_MCP_SQL_HOST", "https://noom-prod.cloud.databricks.com")
@@ -364,27 +410,22 @@ class TestBuildSqlSpClient:
             _build_sql_sp_client()
             mock_fetch.assert_not_called()
 
-    def test_raises_when_neither_configured(self, monkeypatch):
-        """RuntimeError with both options listed when nothing is configured."""
-        monkeypatch.delenv("DATABRICKS_MCP_SECRET_SCOPE", raising=False)
-        monkeypatch.delenv("DATABRICKS_MCP_SQL_CLIENT_ID", raising=False)
+    def test_raises_when_client_id_set_but_secret_missing(self, monkeypatch):
+        """RuntimeError when CLIENT_ID is set but CLIENT_SECRET is missing."""
+        monkeypatch.setenv("DATABRICKS_MCP_SQL_CLIENT_ID", "env-id")
         monkeypatch.delenv("DATABRICKS_MCP_SQL_CLIENT_SECRET", raising=False)
         monkeypatch.setenv("DATABRICKS_MCP_SQL_HOST", "https://noom-prod.cloud.databricks.com")
 
         from noom_mcp.sql_executor_patch import _build_sql_sp_client
 
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(RuntimeError, match="DATABRICKS_MCP_SQL_CLIENT_SECRET is missing"):
             _build_sql_sp_client()
-        msg = str(exc_info.value)
-        assert "Option 1" in msg
-        assert "Option 2" in msg
 
     def test_raises_when_host_not_configured(self, monkeypatch):
         """RuntimeError when DATABRICKS_MCP_SQL_HOST is not set."""
         monkeypatch.setenv("DATABRICKS_MCP_SQL_CLIENT_ID", "env-id")
         monkeypatch.setenv("DATABRICKS_MCP_SQL_CLIENT_SECRET", "env-secret")
         monkeypatch.delenv("DATABRICKS_MCP_SQL_HOST", raising=False)
-        monkeypatch.delenv("DATABRICKS_MCP_SECRET_SCOPE", raising=False)
 
         from noom_mcp.sql_executor_patch import _build_sql_sp_client
 

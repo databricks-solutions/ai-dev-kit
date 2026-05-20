@@ -28,6 +28,13 @@ databricks-tools-core = { path = "../databricks-tools-core", editable = true }
 where = ["."]
 include = ["noom_mcp*"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+markers = [
+    "integration: live Databricks integration test (requires --integration flag)",
+]
+
 [tool.ruff]
 line-length = 100
 
