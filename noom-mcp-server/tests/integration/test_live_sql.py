@@ -41,10 +41,18 @@ def test_sql_runs_as_sp_not_calling_user(patches_applied) -> None:
     from databricks_tools_core.auth import get_current_username
     from databricks_tools_core.sql.sql_utils.executor import SQLExecutor
 
+    # get_current_username() uses the end user's OAuth client (DATABRICKS_HOST),
+    # which the patch does NOT replace — it only overrides the client inside
+    # SQLExecutor.  So this returns the human user's identity (e.g. bei@noom.com).
     calling_user = get_current_username()
 
-    # warehouse_id is overridden by the patch — DATABRICKS_WAREHOUSE_ID is used.
+    # SQLExecutor.__init__ is patched to use the SP client and the configured
+    # warehouse — whatever arguments we pass here are overridden at runtime.
     executor = SQLExecutor(warehouse_id="any")
+
+    # current_user() in SQL reflects who executed the query on Databricks.
+    # If the SP override is in effect, this returns the SP's identity, not
+    # the calling user's — which is what the assertion below verifies.
     rows = executor.execute("SELECT current_user() AS running_as")
 
     assert rows, "Query returned no rows"
