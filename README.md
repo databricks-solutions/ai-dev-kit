@@ -6,17 +6,21 @@ This is Noom's **governed fork** of [databricks-solutions/ai-dev-kit](https://gi
 
 **→ Follow [`noom-mcp-server/README.md`](noom-mcp-server/README.md)**
 
-That's the only component Noom engineers need. It installs in under 5 minutes and includes MCP client config snippets for Claude Desktop, Cursor, and Claude Code.
+That's the only component Noom engineers need. It installs MCP client for Claude Desktop, Cursor, and Claude Code.
 
 ## Why a fork?
 
 Noom wraps the upstream MCP server with three SQL governance controls:
 
-- **PAT rejection** — OAuth only; personal access tokens are blocked at startup
+- **PAT rejection** — Enforce OAuth; personal access tokens are blocked at startup
 - **Service Principal execution** — all SQL runs as a governed SP, not your personal credentials
 - **Per-user query tagging** — every query is tagged `mcp_user:<email>` in `system.query.history` for audit and cost attribution
 
-These controls live entirely in [`noom-mcp-server/`](noom-mcp-server/) and do not modify any upstream file.
+## PII safety
+
+The governed Service Principal does not have access to PII columns in Unity Catalog. SQL results returned through this MCP are PII-free by construction, making it safe to use with AI coding tools.
+
+If your work genuinely requires querying PII data, reach out to the data platform team to discuss access options outside this MCP.
 
 ## What NOT to use
 
