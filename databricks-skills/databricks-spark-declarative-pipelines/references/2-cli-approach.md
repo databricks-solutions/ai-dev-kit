@@ -19,40 +19,25 @@ databricks workspace import-dir ./my_pipeline /Workspace/Users/user@example.com/
 
 ### Step 3: Create Pipeline
 
-```bash
-# libraries: "file" = single .sql/.py file; "glob" = directory of files.
-# A "file" pointing at a folder fails: "Paths must end with .py or .sql".
-# "notebook" is deprecated — use "file" or "glob".
-databricks pipelines create --json '{
-  "name": "my_orders_pipeline",
-  "catalog": "my_catalog",
-  "schema": "my_schema",
-  "serverless": true,
-  "libraries": [
-    {"glob": {"include": "/Workspace/Users/user@example.com/my_pipeline/**"}}
-  ],
-  "tags": {"aidevkit_project": "ai-dev-kit"},
-  "development": true
-}'
+Use the canonical `databricks pipelines create --json` shape from [SKILL.md](../SKILL.md#step-1-check-pipeline-execution-status). Notes specific to the `libraries` field:
 
-# Enumerate files instead of glob:
-# "libraries": [
-#   {"file": {"path": "/Workspace/.../bronze/ingest_orders.sql"}},
-#   {"file": {"path": "/Workspace/.../silver/clean_orders.sql"}}
-# ]
+- `"glob"` = directory of files (recommended for medallion folders).
+- `"file"` = single `.sql`/`.py` file. A `"file"` pointing at a folder fails with `Paths must end with .py or .sql`.
+- `"notebook"` is deprecated — don't use it.
+
+Enumerate files instead of glob when you need explicit ordering:
+```json
+"libraries": [
+  {"file": {"path": "/Workspace/.../bronze/ingest_orders.sql"}},
+  {"file": {"path": "/Workspace/.../silver/clean_orders.sql"}}
+]
 ```
 
 Save the returned `pipeline_id` for subsequent operations.
 
 ### Step 4: Run Pipeline
 
-```bash
-# Start a full refresh run (pipeline_id is a positional argument)
-databricks pipelines start-update <pipeline_id> --full-refresh
-
-# Check run status
-databricks pipelines get <pipeline_id>
-```
+Use the `start-update` + `get-update` polling pattern from [SKILL.md](../SKILL.md#step-1-check-pipeline-execution-status). Don't poll top-level `pipelines get` state — see the rationale there.
 
 ### Step 5: Validate Results
 
@@ -142,31 +127,33 @@ from databricks.sdk import WorkspaceClient
 
 w = WorkspaceClient()
 
-# Create pipeline - use "file" to include all .sql/.py files in a directory
+# Create pipeline — same shape as the CLI canonical example.
 pipeline = w.pipelines.create(
     name="my_orders_pipeline",
     catalog="my_catalog",
     schema="my_schema",
     serverless=True,
+    continuous=False,  # explicit — true auto-retries failed updates forever
     libraries=[
-        {"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}
+        {"glob": {"include": "/Workspace/Users/user@example.com/my_pipeline/**"}}
     ],
-    development=True
+    development=True,
 )
 print(f"Created pipeline: {pipeline.pipeline_id}")
 
-# Start update
+# Start update — capture update_id; poll THAT update, not pipeline-level state.
+# Pipeline state flips back to RUNNING on RETRY_ON_FAILURE, so a loop watching
+# the pipeline (or latest_updates[0]) can spin past a real FAILED update.
 update = w.pipelines.start_update(
     pipeline_id=pipeline.pipeline_id,
     full_refresh=True
 )
 
-# Poll for completion
 import time
 while True:
-    status = w.pipelines.get(pipeline_id=pipeline.pipeline_id)
-    if status.state in ["IDLE", "FAILED"]:
-        print(f"Pipeline state: {status.state}")
+    u = w.pipelines.get_update(pipeline_id=pipeline.pipeline_id, update_id=update.update_id).update
+    if str(u.state) in ("COMPLETED", "FAILED", "CANCELED"):
+        print(f"Update {u.update_id}: {u.state}")
         break
     time.sleep(10)
 ```

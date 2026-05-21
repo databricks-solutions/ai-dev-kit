@@ -283,20 +283,42 @@ After running a pipeline (via DAB or CLI), you **MUST** validate both the execut
 
 A freshly created pipeline has `state: IDLE` and `latest_updates: null` until you trigger the first run with `start-update`. `list-pipeline-events` returns a bare JSON array (not `{"events": [...]}`). For DAB runs, also check `databricks bundle run` output.
 
+**Create.** Always pass `"continuous": false` explicitly — a continuous pipeline auto-restarts failed updates forever (`cause: RETRY_ON_FAILURE`), burning serverless cost and trapping polling loops. Only set `true` if the user explicitly asks for an always-on streaming pipeline.
+
 ```bash
-# Kick off (or re-run) a pipeline. --full-refresh reprocesses everything
-# from scratch (destructive on streaming state); omit for incremental.
-databricks pipelines start-update <pipeline_id>
-databricks pipelines start-update <pipeline_id> --full-refresh
+databricks pipelines create --json '{
+  "name": "my_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": true,
+  "continuous": false,
+  "channel": "PREVIEW",
+  "libraries": [{"glob": {"include": "/Workspace/Users/me@example.com/my_pipeline/**"}}]
+}'
+```
 
-# Poll status. The (.latest_updates // [{}]) guard handles the null case
-# on a never-run pipeline so jq doesn't crash.
-databricks pipelines get <pipeline_id> \
-  | jq '{state, latest: (.latest_updates // [{}])[0] | {state, update_id, creation_time}}'
+For dev mode, dedicated clusters, notifications, autoscaling, event-log routing, restart windows, and Python dependencies, see [3-advanced-configuration.md](references/3-advanced-configuration.md).
 
-# Surface just failures from the event log
+**Start + poll.** Capture the `update_id` from `start-update` and poll *that* update — not `latest_updates[0]`, not top-level pipeline `state`. On FAILED, stop immediately and read the events log; do not wait for auto-retries to converge, since they will keep failing with the same root cause.
+
+```bash
+# --full-refresh reprocesses everything from scratch (destructive on streaming
+# state); omit for incremental.
+UPDATE_ID=$(databricks pipelines start-update <pipeline_id> | jq -r .update_id)
+# Same with full refresh:
+# UPDATE_ID=$(databricks pipelines start-update <pipeline_id> --full-refresh | jq -r .update_id)
+
+# Poll THAT update by id. Stop on the FIRST terminal state — including FAILED.
+while :; do
+  STATE=$(databricks pipelines get-update <pipeline_id> "$UPDATE_ID" | jq -r '.update.state')
+  echo "$(date +%H:%M:%S) update=$UPDATE_ID state=$STATE"
+  case "$STATE" in COMPLETED|FAILED|CANCELED) break;; esac
+  sleep 30
+done
+
+# On FAILED, surface the actual error — don't re-run.
 databricks pipelines list-pipeline-events <pipeline_id> \
-  | jq '[.[] | select(.level=="ERROR" or .level=="WARN") | {level, event_type, message: (.message // "")[0:200]}] | .[0:10]'
+  | jq '[.[] | select(.level=="ERROR") | {event_type, message: (.message // "")[0:300]}] | .[0:5]'
 ```
 
 If a pipeline is already RUNNING, `start-update` queues the new update; force-stop with `databricks pipelines stop <pipeline_id>` first if needed.

@@ -28,7 +28,7 @@ FROM STREAM read_files('/Volumes/my_catalog/my_schema/raw/events/', format => 'j
 
 **Key points:**
 - Use `STREAM` keyword with source for incremental processing
-- `CLUSTER BY` enables Liquid Clustering (recommended over PARTITION BY)
+- `CLUSTER BY` enables Liquid Clustering (recommended over PARTITION BY). Numeric / string / date / timestamp columns only — no BOOLEAN or complex types
 - Returns streaming DataFrame
 
 ### Materialized View

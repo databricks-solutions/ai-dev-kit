@@ -115,6 +115,8 @@ GROUP BY product_category, DATE_FORMAT(order_date, 'yyyy-MM');
 - Limit to 4 keys: Diminishing returns beyond 4
 - **Use AUTO if unsure**
 
+**Cluster keys must be numeric, string, date, or timestamp.** BOOLEAN, ARRAY, MAP, STRUCT, BINARY are rejected at runtime with `DELTA_CLUSTERING_COLUMNS_DATATYPE_NOT_SUPPORTED` (no data skipping stats). Low-cardinality flags don't benefit from clustering anyway — leave them out.
+
 ---
 
 ## Migration from Legacy PARTITION BY

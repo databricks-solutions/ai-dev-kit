@@ -42,7 +42,7 @@ def bronze_events():
 |-----------|------|-------------|
 | `name` | str | Table name. Can be unqualified (`my_table`), schema-qualified (`schema.table`), or fully qualified (`catalog.schema.table`). |
 | `comment` | str | Table description |
-| `cluster_by` | list | Columns for Liquid Clustering. Use `["AUTO"]` for automatic selection. |
+| `cluster_by` | list | Columns for Liquid Clustering. Use `["AUTO"]` for automatic selection. Numeric / string / date / timestamp only — no BOOLEAN or complex types. |
 | `table_properties` | dict | Delta table properties |
 | `schema` | str/StructType | Explicit schema (optional, usually inferred) |
 | `path` | str | External storage location (optional) |

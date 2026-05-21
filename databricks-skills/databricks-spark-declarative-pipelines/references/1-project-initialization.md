@@ -291,6 +291,7 @@ resources:
       catalog: ${var.catalog}
       schema: ${var.schema}
       serverless: true
+      continuous: false   # explicit — true auto-retries failed updates forever
       libraries:
         - file:
             path: ../src/pipelines/my_pipeline/
