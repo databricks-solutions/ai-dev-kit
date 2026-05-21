@@ -7,45 +7,11 @@ on:
 permissions:
   contents: read
 
+# This file is inherited from upstream (databricks-solutions/ai-dev-kit) and
+# kept as a no-op to avoid merge conflicts on upstream syncs.
+# Noom-owned CI lives in noom-mcp-server.yml.
 jobs:
-  lint:
-    name: Lint & Format
-    runs-on: linux-ubuntu-latest
+  noop:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          version: "0.11.4"
-
-      - name: Run ruff check
-        run: |
-          uvx ruff@0.11.0 check \
-            --select=E,F,B,PIE \
-            --ignore=E401,E402,F401,F403,B017,B904,ANN,TCH \
-            --line-length=120 \
-            --target-version=py311 \
-            databricks-tools-core/ databricks-mcp-server/ .test/src/
-
-      - name: Check formatting
-        run: |
-          uvx ruff@0.11.0 format --check \
-            --line-length=120 \
-            --target-version=py311 \
-            databricks-tools-core/ databricks-mcp-server/ .test/src/
-
-  validate-skills:
-    name: Validate Skills
-    runs-on: linux-ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install "pyyaml==6.0.3"
-
-      - name: Validate skill structure
-        run: python .github/scripts/validate_skills.py
+      - run: echo "upstream CI placeholder — Noom CI is in noom-mcp-server.yml"

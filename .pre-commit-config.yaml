@@ -1,0 +1,15 @@
+# Pre-commit hooks for Noom-owned code (noom-mcp-server/).
+# Upstream packages (databricks-mcp-server/, databricks-tools-core/) follow
+# their own conventions and are excluded here.
+#
+# Setup (one-time):
+#   pip install pre-commit
+#   pre-commit install
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.0
+    hooks:
+      - id: ruff
+        files: ^noom-mcp-server/
+      - id: ruff-format
+        files: ^noom-mcp-server/

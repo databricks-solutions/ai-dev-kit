@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "noom-mcp-server"
+version = "0.1.0"
+description = "Noom-governed MCP server — thin extension over databricks-mcp-server"
+requires-python = ">=3.10"
+dependencies = [
+    "databricks-mcp-server",
+    "databricks-tools-core",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyright>=1.1",
+    "pytest>=7.0",
+    "ruff>=0.4",
+]
+
+# uv resolves these from local paths instead of PyPI
+[tool.uv.sources]
+databricks-mcp-server = { path = "../databricks-mcp-server", editable = true }
+databricks-tools-core = { path = "../databricks-tools-core", editable = true }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["customization*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+markers = [
+    "integration: live Databricks integration test (requires --integration flag)",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "PIE"]

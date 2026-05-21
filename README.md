@@ -5,6 +5,12 @@
 </p>
 
 ---
+> **Noom engineers:** This is Noom's governed fork. Do **not** run `install.sh`, `install.ps1`, or `databricks-mcp-server/setup.sh` — they install the unpatched upstream server without SQL governance controls.
+>
+> Set up the Noom MCP server instead: **[`noom-mcp-server/README.md`](noom-mcp-server/README.md)**
+---
+
+---
 > 🔒 Proactive Dependency Security  
 > As part of our commitment to supply chain integrity, we continually monitor our dependency tree against known vulnerabilities and industry advisories. In response to a recently disclosed supply chain incident affecting litellm versions 1.82.7–1.82.8, we have audited our packages and removed the litellm dependency for most usage. It is solely used in the test directory for skills evaluation and optimization, and has been pinned to a safe version.  
 > For full third-party attribution, see NOTICE.txt.

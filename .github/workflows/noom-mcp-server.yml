@@ -1,0 +1,57 @@
+name: noom-mcp-server CI
+
+# Runs only when noom-mcp-server/ files change — upstream packages have their
+# own CI jobs in ci.yml and are not retested here.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "noom-mcp-server/**"
+
+# Least-privilege: read-only access to repository contents.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      # Pinned uv version — keep in sync with the root ci.yml.
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.4"
+
+      # Run ruff from the noom-mcp-server/ directory so it picks up the local
+      # pyproject.toml config (line-length = 100, not the upstream 120).
+      - name: Run ruff check
+        run: uvx ruff@0.11.0 check .
+        working-directory: noom-mcp-server
+
+      - name: Check formatting
+        run: uvx ruff@0.11.0 format --check .
+        working-directory: noom-mcp-server
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.4"
+
+      # Install noom-mcp-server and its local editable deps
+      # (databricks-mcp-server and databricks-tools-core from sibling directories).
+      - name: Install dependencies
+        run: uv sync --extra dev
+        working-directory: noom-mcp-server
+
+      # Integration tests require live Databricks credentials and are excluded.
+      # Run them manually via ./run_integration_tests.sh.
+      - name: Run unit tests
+        run: uv run pytest tests/ -v --ignore=tests/integration
+        working-directory: noom-mcp-server

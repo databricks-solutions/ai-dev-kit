@@ -1,5 +1,34 @@
 #!/bin/bash
 #
+# ─── Noom governance guard ─────────────────────────────────────────────────────
+# This repo is Noom's governed fork of databricks-solutions/ai-dev-kit.
+# Do NOT use this setup script — it installs the unpatched upstream MCP server
+# without Noom's SQL governance controls (SP execution, PAT rejection, query tagging).
+#
+# Use the Noom MCP server instead:
+#   cd noom-mcp-server
+#   cp .env.example .env   # fill in DATABRICKS_HOST, DATABRICKS_WAREHOUSE_ID
+#   uv sync
+#   uv run --env-file .env python run.py
+#
+# See noom-mcp-server/README.md for full setup instructions.
+# ───────────────────────────────────────────────────────────────────────────────
+echo "" >&2
+echo "ERROR: Do not run this setup script at Noom." >&2
+echo "" >&2
+echo "This repo is Noom's governed fork. This script installs the unpatched" >&2
+echo "upstream MCP server without SQL governance controls." >&2
+echo "" >&2
+echo "Use the Noom MCP server instead:" >&2
+echo "  cd noom-mcp-server" >&2
+echo "  cp .env.example .env  # fill in DATABRICKS_HOST, DATABRICKS_WAREHOUSE_ID" >&2
+echo "  uv sync && uv run --env-file .env python run.py" >&2
+echo "" >&2
+echo "See noom-mcp-server/README.md for setup instructions." >&2
+echo "" >&2
+exit 1
+
+#
 # Setup script for databricks-mcp-server
 # Creates virtual environment and installs dependencies
 #

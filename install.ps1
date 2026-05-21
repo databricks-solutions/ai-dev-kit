@@ -1,3 +1,31 @@
+# ─── Noom governance guard ─────────────────────────────────────────────────────
+# This repo is Noom's governed fork of databricks-solutions/ai-dev-kit.
+# Do NOT use this installer — it sets up the unpatched upstream MCP server
+# without Noom's SQL governance controls (SP execution, PAT rejection, query tagging).
+#
+# Use the Noom MCP server instead:
+#   cd noom-mcp-server
+#   cp .env.example .env   # fill in DATABRICKS_HOST, DATABRICKS_WAREHOUSE_ID
+#   uv sync
+#   uv run --env-file .env python run.py
+#
+# See noom-mcp-server/README.md for full setup instructions.
+# ───────────────────────────────────────────────────────────────────────────────
+Write-Error ""
+Write-Error "ERROR: Do not run this installer at Noom."
+Write-Error ""
+Write-Error "This repo is Noom's governed fork. The upstream installer sets up"
+Write-Error "the MCP server without SQL governance controls."
+Write-Error ""
+Write-Error "Use the Noom MCP server instead:"
+Write-Error "  cd noom-mcp-server"
+Write-Error "  cp .env.example .env  # fill in DATABRICKS_HOST, DATABRICKS_WAREHOUSE_ID"
+Write-Error "  uv sync && uv run --env-file .env python run.py"
+Write-Error ""
+Write-Error "See noom-mcp-server/README.md for setup instructions."
+Write-Error ""
+exit 1
+
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
