@@ -6,6 +6,94 @@ three SQL governance controls at startup — PAT rejection, Service Principal SQ
 execution, and per-user query tagging — **without modifying any upstream file**.
 See [DESIGN.md](DESIGN.md) for the full viability analysis and design rationale.
 
+## Quick Start (for engineers)
+
+> **Note:** Do **not** use `install.sh` or `setup.sh` from the repo root — those install the unpatched upstream server without Noom's governance controls.
+
+**1. Clone the repo**
+
+```bash
+git clone https://github.com/noom/databricks-ai-dev-kit.git
+cd databricks-ai-dev-kit/noom-mcp-server
+```
+
+**2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you don't have it**
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**3. Authenticate to Databricks with OAuth** (PAT tokens are rejected)
+
+```bash
+databricks auth login --host https://noom-prod.cloud.databricks.com
+```
+
+**4. Create your `.env` file**
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and set `DATABRICKS_WAREHOUSE_ID` to your SQL warehouse ID.
+(Find it in the Databricks UI under **SQL Warehouses → your warehouse → Overview**.)
+
+**5. Install dependencies**
+
+```bash
+uv sync
+```
+
+**6. Verify the server starts**
+
+```bash
+uv run --env-file .env python run.py
+```
+
+You should see the FastMCP server start without errors. Use `Ctrl-C` to stop it — your MCP client will manage the process from here.
+
+---
+
+## MCP Client Configuration
+
+Add the following to your MCP client config. Replace the path with the absolute path to where you cloned the repo.
+
+### Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`)
+
+```json
+{
+  "mcpServers": {
+    "noom-databricks": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory", "/absolute/path/to/databricks-ai-dev-kit/noom-mcp-server",
+        "--env-file", "/absolute/path/to/databricks-ai-dev-kit/noom-mcp-server/.env",
+        "python", "run.py"
+      ]
+    }
+  }
+}
+```
+
+### Cursor (`~/.cursor/mcp.json`)
+
+Same config as above — add it under `"mcpServers"`.
+
+### Claude Code (CLI)
+
+```bash
+claude mcp add noom-databricks \
+  -- uv run \
+  --directory /absolute/path/to/databricks-ai-dev-kit/noom-mcp-server \
+  --env-file /absolute/path/to/databricks-ai-dev-kit/noom-mcp-server/.env \
+  python run.py
+```
+
+After adding, restart your MCP client. The server will start automatically when needed.
+
+---
+
 ## Architecture
 
 ```
@@ -29,16 +117,14 @@ user's own credentials and are not affected by the patches.
 
 - Python ≥ 3.10
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- Databricks OAuth access (PAT tokens are rejected at startup)
+- Databricks OAuth session (`databricks auth login` — PAT tokens are rejected at startup)
 - READ permission on the `dbrix_mcp_secret` secret scope (provisioned by an admin)
 
 ## Environment variables
 
-Copy `.env.example` and fill in the values:
+See the [Quick Start](#quick-start-for-engineers) above for initial setup. Full variable reference:
 
-```bash
-cp .env.example .env
-```
+
 
 | Variable | Required | Description |
 |---|---|---|
@@ -77,6 +163,8 @@ databricks secrets put-acl    dbrix_mcp_secret <group-or-user> READ
 End users need READ access on the scope but never see the raw secret values.
 
 ## Running the server
+
+Your MCP client starts the server automatically once configured. To run it manually for debugging:
 
 ```bash
 cd noom-mcp-server
