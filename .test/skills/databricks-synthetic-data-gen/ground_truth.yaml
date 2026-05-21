@@ -1,327 +1,170 @@
+metadata:
+  skill_name: databricks-synthetic-data-gen
+  version: 1.0.0
+  created_at: '2026-05-21T00:00:00.000000'
+  description: |
+    Outcome-oriented tests for synthetic data generation. Each prompt asks the
+    agent to generate realistic, story-driven data (skewed distributions, valid
+    FKs, business signal) and persist to Unity Catalog. Tests verify the
+    resulting tables exist, have the expected schema and row counts, and that
+    the data isn't uniform/garbage (FKs match, distributions are skewed).
+
 test_cases:
+  # ============================================================================
+  # 1. Local-then-upload — small dataset, parquet → UC Volume
+  # ============================================================================
+  - id: synth_local_parquet_001
+    inputs:
+      prompt: |
+        Generate a small synthetic e-commerce dataset locally (this is a tiny
+        dev sample), then upload it to Unity Catalog.
 
-- id: grp_20260302_113344
-  inputs:
-    prompt: 'Generate synthetic e-commerce data locally then save it to Unity Catalog.
+        Two related tables with proper referential integrity:
+          • customers (5,000 rows): customer_id, name, email, tier
+            (Free/Pro/Enterprise weighted 60/30/10), region, created_at.
+          • orders (15,000 rows): order_id, customer_id (FK → customers.customer_id),
+            amount (log-normal), order_date, status.
 
-      Create 2 related tables with referential integrity:
+        Skewed signal: Enterprise tier customers must generate more orders on
+        average than Free tier. Amount must be log-normal (not uniform).
 
-      - customers (5,000 rows): customer_id, name, email, tier (Free/Pro/Enterprise
-      weighted 60/30/10), region, created_at
+        Save as Parquet then upload to a UC volume at
+        `/Volumes/ai_dev_kit_test/synth/devkit_gen1_test_small_parquet/`.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "Uses Polars + Mimesis (or pandas + Faker) locally since the dataset is <30K rows"
+        - "Writes as Parquet — `.to_parquet()` or `.write_parquet()`"
+        - "Asks the user for catalog/schema or confirms them; never silently defaults"
+        - "Tier distribution is weighted (60/30/10), NOT uniform"
+        - "Amount uses log-normal (`np.random.lognormal` / `random.lognormvariate`), NOT uniform"
+        - "orders.customer_id is drawn from customers.customer_id with higher weight for Enterprise — referential integrity holds for all 15,000 rows"
+        - "Uploads with `databricks fs cp -r --overwrite ./out dbfs:/Volumes/ai_dev_kit_test/synth/devkit_gen1_test_small_parquet/` (dbfs: prefix required)"
+        - "Verifies with `databricks fs ls dbfs:/Volumes/...`"
+      databricks_outcomes:
+        - kind: uc_volume_contains_files
+          path: "/Volumes/ai_dev_kit_test/synth/devkit_gen1_test_small_parquet/"
+          extension: ".parquet"
+          min_count: 2
+        - kind: synth_referential_integrity_holds
+          parent_table_path: "customers.parquet"
+          child_table_path: "orders.parquet"
+          fk_column: "customer_id"
+        - kind: synth_distribution_skewed
+          parquet: "orders.parquet"
+          column: "amount"
+          not_uniform: true
+    metadata:
+      category: happy_path
+      difficulty: easy
+      tags: [local, polars, parquet, volume, small-data]
 
-      - orders (15,000 rows): order_id, customer_id (FK to customers), amount, order_date,
-      status
+  # ============================================================================
+  # 2. Serverless → Delta — medium dataset, story-driven
+  # ============================================================================
+  - id: synth_serverless_delta_002
+    inputs:
+      prompt: |
+        Generate a synthetic SaaS subscription dataset on Databricks serverless
+        (use Spark + Faker + Pandas UDFs). Write the result to Delta tables in
+        UC under schema `ai_dev_kit_test.synth_saas`.
 
+        Three related tables:
+          • accounts (50,000 rows): account_id, company_name, industry (weighted),
+            seat_count (log-normal), signup_date, plan_tier (weighted Starter/
+            Growth/Enterprise).
+          • subscriptions (~50,000 rows, one per account): subscription_id,
+            account_id (FK), mrr_dollars (depends on plan_tier + seat_count),
+            status (Active/Cancelled, with a churn signal — Starter churns 5x
+            more than Enterprise).
+          • events (200,000 rows): event_id, account_id (FK), event_type
+            (weighted login/feature_use/api_call/...), event_ts.
 
-      Save as Parquet then upload to a Unity Catalog volume. Use schema name ''devkit_gen1_test_small_parquet''.
+        The story: a noticeable spike in Starter-tier churn in the last 30
+        days. Make the data show it.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "Runs on serverless compute (Databricks Connect serverless, NOT execute_code or local Python — required for this row count)"
+        - "Spark + Faker via Pandas UDFs for parallel generation; NO Python loops, NO .collect(), NO .cache()/.persist() (not supported on serverless)"
+        - "Creates the schema first if it doesn't exist: `CREATE SCHEMA IF NOT EXISTS ai_dev_kit_test.synth_saas`"
+        - "Writes parent tables (accounts) first, then children with valid FKs derived from the parent table"
+        - "All three tables saved as Delta via `.saveAsTable(\"ai_dev_kit_test.synth_saas.<table>\")` (or write.mode().format('delta'))"
+        - "Churn signal is in the data: `WHERE plan_tier = 'Starter' AND status = 'Cancelled' AND cancelled_at >= current_date() - 30` returns visibly more rows than the same query for Enterprise"
+        - "Distributions are weighted/skewed — verifies after write by sampling and showing the weight distribution per column"
+      databricks_outcomes:
+        - kind: uc_table_exists
+          name: "ai_dev_kit_test.synth_saas.accounts"
+        - kind: uc_table_exists
+          name: "ai_dev_kit_test.synth_saas.subscriptions"
+        - kind: uc_table_exists
+          name: "ai_dev_kit_test.synth_saas.events"
+        - kind: uc_table_row_count_at_least
+          name: "ai_dev_kit_test.synth_saas.accounts"
+          min: 45000
+        - kind: synth_referential_integrity_holds
+          parent_table: "ai_dev_kit_test.synth_saas.accounts"
+          child_table: "ai_dev_kit_test.synth_saas.subscriptions"
+          fk_column: "account_id"
+        - kind: synth_story_signal_present
+          query: |
+            SELECT plan_tier, COUNT(*) FROM ai_dev_kit_test.synth_saas.subscriptions
+            WHERE status='Cancelled' GROUP BY plan_tier
+          assertion: "Starter count > Enterprise count by at least 3x"
+    metadata:
+      category: happy_path
+      difficulty: hard
+      tags: [serverless, spark, faker, delta, multi-table, story-driven]
 
-      Enterprise customers should generate more orders than Free tier.'
-  outputs:
-    expected_response_file: expected_responses/grp_20260302_113344.txt
-    execution_success: true
-  expectations:
-    expected_facts:
-      - "parquet"
-      - "customer_id"
-      - "referential integrity"
-      - "weighted"
-      - "log-normal"
-    expected_patterns:
-      - pattern: "\\.write.*parquet"
-        min_count: 1
-        description: "Parquet output format"
-      - pattern: "customer_id"
-        min_count: 3
-        description: "Foreign key reference in multiple tables"
-      - pattern: "lognormal"
-        min_count: 1
-        description: "Log-normal distribution for amounts"
-    guidelines:
-      - "Orders table customer_id must only contain IDs from customers table"
-      - "Enterprise tier customers must have higher weight for order generation"
-      - "Amount distribution must use log-normal, not uniform"
-  metadata:
-    category: happy_path
-    source: interactive
-    created_at: '2026-03-02T11:33:44.621846'
-    execution_verified:
-      mode: local
-      verified_date: '2026-03-02'
+  # ============================================================================
+  # 3. Time-pattern data — sensor IoT with realistic temporal signal
+  # ============================================================================
+  - id: synth_iot_time_patterns_003
+    inputs:
+      prompt: |
+        Generate synthetic IoT sensor readings on Databricks serverless. Save
+        to `ai_dev_kit_test.synth_iot.sensor_readings` (Delta).
 
-- id: gen_serverless_job_catalog_json_002
-  inputs:
-    prompt: 'Generate synthetic product catalog data that will run as a serverless
-      Databricks job.
+        Schema: sensor_id, plant_id, reading_ts TIMESTAMP, temperature_c
+        DOUBLE, vibration_g DOUBLE, status STRING (NORMAL/WARNING/CRITICAL).
 
-      Create 2 related tables with referential integrity:
-
-      - products (3,000 rows): product_id, name, category (weighted), price (log-normal),
-      inventory_count
-
-      - sales (10,000 rows): sale_id, product_id (FK to products), quantity, sale_date,
-      discount_pct
-
-
-      Save as JSON files to a Unity Catalog volume. Use schema name ''devkit_gen2_test_small_json''.
-
-      Create a job definition with environments for dependencies (faker).
-
-      Popular product categories should have more sales (weighted sampling).
-
-      '
-  outputs:
-    expected_response_file: expected_responses/gen_serverless_job_catalog_json_002.txt
-  expectations:
-    expected_facts:
-    - serverless
-    - environments
-    - dependencies
-    - client
-    - json
-    - product_id
-    - weighted
-    - lognormal
-    - pandas_udf
-    expected_patterns:
-    - pattern: environment_key.*default
-      min_count: 1
-      description: Serverless job environment configuration
-    - pattern: client.*4
-      min_count: 1
-      description: Correct client version for serverless
-    - pattern: \.write.*json
-      min_count: 1
-      description: JSON output format
-    - pattern: product_id
-      min_count: 3
-      description: Foreign key reference in multiple places
-    - pattern: '@F\.pandas_udf|pandas_udf'
-      min_count: 1
-      description: Pandas UDF for Faker parallelism
-    - pattern: lognormal|log-normal|log_normal
-      min_count: 1
-      description: Log-normal distribution for prices
-    - pattern: CREATE SCHEMA IF NOT EXISTS|CREATE VOLUME IF NOT EXISTS
-      min_count: 1
-      description: Infrastructure creation in script
-    guidelines:
-    - Must create serverless job with environments parameter for dependencies
-    - 'Job spec must include client: 4 (not 1)'
-    - Must NOT use .cache() or .persist() (serverless incompatible)
-  metadata:
-    category: happy_path
-    difficulty: medium
-    source: interactive_execution
-    execution_date: '2026-02-26'
-    execution_verified: true
-    job_run_id: '560746964795126'
-    tags:
-    - serverless-job
-    - small
-    - json
-    - referential-integrity
-    - weighted-sampling
-    - executed
-
-- id: grp_20260302_retail_csv_3tables_003
-  inputs:
-    prompt: |
-      Generate synthetic retail order data using Databricks Connect with serverless.
-      Create 3 related tables with full referential integrity:
-      - customers (10,000 rows): customer_id, name, email, membership_level (Bronze/Silver/Gold/Platinum weighted 50/30/15/5), region
-      - orders (50,000 rows): order_id, customer_id (FK to customers), order_date, total_amount, status
-      - line_items (150,000 rows): line_item_id, order_id (FK to orders), product_name, quantity, unit_price
-
-      Save as CSV files with headers to Unity Catalog volume. Use schema name 'devkit_gen3_test_medium_csv'.
-      Create realistic product names.
-      Higher membership levels should have more orders.
-      Order total_amount should equal sum of line_items.
-  outputs:
-    expected_response_file: expected_responses/grp_20260302_retail_csv_3tables_003.txt
-    execution_success: true
-  expectations:
-    expected_facts:
-      - "DatabricksSession"
-      - "serverless"
-      - "CSV"
-      - "header"
-      - "customer_id"
-      - "order_id"
-      - "line_item"
-      - "Faker"
-      - "pandas_udf"
-      - "membership_level"
-      - "weighted"
-      - "total_amount"
-      - "lognormal"
-    expected_patterns:
-      - pattern: "DatabricksSession.*serverless.*True"
-        min_count: 1
-        description: "Databricks Connect serverless configuration"
-      - pattern: "DatabricksEnv.*withDependencies"
-        min_count: 1
-        description: "Managed dependencies for serverless"
-      - pattern: "@F\\.pandas_udf|pandas_udf"
-        min_count: 1
-        description: "Pandas UDF for Faker parallelism"
-      - pattern: "customer_id"
-        min_count: 5
-        description: "FK in customers and orders (multiple references)"
-      - pattern: "order_id"
-        min_count: 5
-        description: "FK in orders and line_items (multiple references)"
-      - pattern: "\\.option.*header.*true.*\\.csv|\\.write.*csv"
-        min_count: 1
-        description: "CSV with headers"
-      - pattern: "Bronze|Silver|Gold|Platinum"
-        min_count: 4
-        description: "All membership levels present"
-      - pattern: "lognormal"
-        min_count: 1
-        description: "Log-normal distribution for pricing"
-      - pattern: "CREATE SCHEMA IF NOT EXISTS"
-        min_count: 1
-        description: "Infrastructure creation in script"
-      - pattern: "CREATE VOLUME IF NOT EXISTS"
-        min_count: 1
-        description: "Volume creation for CSV output"
-      - pattern: "total_amount.*sum|sum.*line_total|computed_total"
-        min_count: 1
-        description: "Order total computed from line items"
-    guidelines:
-      - "Must use DatabricksSession.builder.serverless(True).getOrCreate()"
-      - "Must use Spark + Faker + Pandas UDFs approach"
-      - "line_items.order_id must reference valid orders"
-      - "Membership level must be weighted: Bronze 50%, Silver 30%, Gold 15%, Platinum 5%"
-      - "Higher membership levels must generate more orders per customer"
-  metadata:
-    category: happy_path
-    difficulty: hard
-    source: interactive_execution
-    execution_date: '2026-03-02'
-    execution_verified: true
-    verified_output:
-      customers_rows: 10000
-      orders_rows: 50000
-      line_items_rows: 150000
-      membership_distribution:
-        Bronze: 5069
-        Silver: 3957
-        Gold: 919
-        Platinum: 55
-      orders_per_tier:
-        Bronze: 18170
-        Silver: 23560
-        Gold: 7613
-        Platinum: 657
-      orphan_orders: 0
-      orphan_line_items: 0
-    tags:
-      - databricks-connect
-      - serverless
-      - medium
-      - csv
-      - 3-tables
-      - pandas-udf
-      - referential-integrity
-      - weighted-sampling
-      - computed-totals
-      - executed
-
-- id: grp_20260303_manufacturing_delta_streaming_004
-  inputs:
-    prompt: |
-      Generate manufacturing data that will run incrementally with Python 3.12 and Databricks Serverless.
-      Create 2 related tables with referential integrity.
-      Create a sensor reading table that generates 10,000 rows per batch and configure to run as a streaming job.
-      Create a lookup table for the sensor device which changes slowly.
-      Save as Delta tables registered in Unity Catalog. Use catalog 'ai_dev_kit'. Use schema name 'devkit_gen4_test_large_delta'.
-  outputs:
-    expected_response_file: expected_responses/grp_20260303_manufacturing_delta_streaming_004.txt
-    execution_success: true
-  expectations:
-    expected_facts:
-      - "DatabricksSession"
-      - "serverless"
-      - "Delta"
-      - "saveAsTable"
-      - "device_id"
-      - "sensor"
-      - "reading"
-      - "Faker"
-      - "pandas_udf"
-      - "streaming"
-      - "incremental"
-      - "batch"
-      - "slowly changing"
-      - "lognormal"
-    expected_patterns:
-      - pattern: "DatabricksSession.*serverless.*True"
-        min_count: 1
-        description: "Databricks Connect serverless configuration"
-      - pattern: "DatabricksEnv.*withDependencies"
-        min_count: 1
-        description: "Managed dependencies for serverless"
-      - pattern: "@F\\.pandas_udf|pandas_udf"
-        min_count: 1
-        description: "Pandas UDF for Faker parallelism"
-      - pattern: "device_id"
-        min_count: 3
-        description: "FK in devices and readings (multiple references)"
-      - pattern: "\\.write.*saveAsTable|saveAsTable"
-        min_count: 2
-        description: "Delta table output for both tables"
-      - pattern: "CREATE SCHEMA IF NOT EXISTS"
-        min_count: 1
-        description: "Infrastructure creation in script"
-      - pattern: "sensor_devices|sensor_readings"
-        min_count: 2
-        description: "Both sensor tables present"
-      - pattern: "temperature|pressure|vibration|humidity"
-        min_count: 4
-        description: "All device types present"
-      - pattern: "lognormal"
-        min_count: 1
-        description: "Log-normal distribution for vibration sensor values"
-      - pattern: "mode.*overwrite|mode.*append"
-        min_count: 1
-        description: "Write mode for streaming support"
-    guidelines:
-      - "Must use DatabricksSession.builder.serverless(True).getOrCreate()"
-      - "Must use Spark + Faker + Pandas UDFs approach"
-      - "Must maintain referential integrity between devices and readings"
-      - "Must use Delta tables (saveAsTable) not file formats"
-      - "sensor_readings should support incremental batch processing"
-      - "Vibration should use log-normal for occasional spikes"
-  metadata:
-    category: happy_path
-    difficulty: medium
-    source: interactive_execution
-    execution_date: '2026-03-03'
-    execution_verified: true
-    verified_output:
-      sensor_devices_rows: 500
-      sensor_readings_rows: 10013
-      device_type_distribution:
-        temperature: 147
-        pressure: 179
-        vibration: 140
-        humidity: 34
-      quality_flag_distribution:
-        good: 9008
-        warning: 979
-        error: 26
-      orphan_readings: 0
-    tags:
-      - databricks-connect
-      - serverless
-      - large
-      - delta
-      - 2-tables
-      - pandas-udf
-      - referential-integrity
-      - streaming
-      - incremental
-      - iot
-      - manufacturing
-      - executed
+        Requirements:
+          • 100 sensors across 5 plants, 30 days of data, one reading per
+            minute (so ~4.3M rows total).
+          • Realistic time patterns: weekday/weekend cycles (production
+            slows on weekends → lower vibration), daily diurnal temperature
+            swings, and 2-3 unusual events where one sensor drifts toward
+            CRITICAL over ~2 hours.
+          • status correlates with the underlying numeric values — when
+            vibration > some threshold, status flips to WARNING/CRITICAL.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "Generation runs on Databricks serverless (not local Python — 4M+ rows requires Spark)"
+        - "Time series generated with realistic cycles: weekday/weekend multiplier, diurnal sine wave, baseline + noise"
+        - "Anomaly events: 2-3 sensors have a temporary drift in vibration that resolves; NOT injected as a uniform random spike"
+        - "status is derived from numeric values (correlated), NOT generated independently"
+        - "Saved as a single Delta table with CLUSTER BY (reading_ts, sensor_id) or similar — agent picks reasonable layout for IoT time-series"
+        - "Verifies story signal: a SELECT showing weekend vibration < weekday vibration; a SELECT showing the CRITICAL events are clustered in time around the injected anomalies"
+      databricks_outcomes:
+        - kind: uc_table_exists
+          name: "ai_dev_kit_test.synth_iot.sensor_readings"
+        - kind: uc_table_row_count_at_least
+          name: "ai_dev_kit_test.synth_iot.sensor_readings"
+          min: 4000000
+        - kind: synth_time_pattern_present
+          query: |
+            SELECT dayofweek(reading_ts) AS dow, avg(vibration_g)
+            FROM ai_dev_kit_test.synth_iot.sensor_readings GROUP BY dow
+          assertion: "weekend (1,7) avg vibration_g visibly lower than weekday (2-6) avg"
+        - kind: synth_anomaly_clusters_in_time
+          name: "ai_dev_kit_test.synth_iot.sensor_readings"
+          status_column: "status"
+          ts_column: "reading_ts"
+    metadata:
+      category: happy_path
+      difficulty: hard
+      tags: [serverless, iot, time-series, anomaly, large-scale, delta]

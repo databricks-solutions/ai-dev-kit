@@ -21,6 +21,7 @@ scorers:
 
   # Guidelines apply to all tests unless overridden per-test.
   default_guidelines:
+    - "Must train on Databricks (serverless job or workspace notebook), NEVER in the local Python process the agent is running in. Fall back to local only if the user explicitly requests it."
     - "Must complete the end-to-end flow the user asked for (notebook → upload → submit serverless job → verify artifact)."
     - "Must register models to Unity Catalog (mlflow.set_registry_uri('databricks-uc')), not the deprecated workspace registry."
     - "Must promote model versions with UC aliases (set_registered_model_alias), not deprecated stages."

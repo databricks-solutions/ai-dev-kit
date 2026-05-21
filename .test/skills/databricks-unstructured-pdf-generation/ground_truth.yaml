@@ -1,271 +1,110 @@
 metadata:
   skill_name: databricks-unstructured-pdf-generation
-  version: 0.1.0
-  created_at: '2026-02-23T08:00:00.000000'
+  version: 1.0.0
+  created_at: '2026-05-21T00:00:00.000000'
+  description: |
+    Outcome-oriented tests for generating synthetic PDFs and uploading them to
+    Unity Catalog volumes. Each prompt asks for an end-to-end flow: write HTML,
+    convert via the skill's pdf_generator.py, upload to a UC volume, optionally
+    produce a doc_questions.json for RAG evaluation.
 
 test_cases:
-- id: pdf_gen_quick_start_001
-  inputs:
-    prompt: "How do I generate synthetic PDF documents for my RAG pipeline?"
-  outputs:
-    response: |
-      Use the `generate_pdf_documents` MCP tool:
+  # ============================================================================
+  # 1. Generate + upload a small PDF set
+  # ============================================================================
+  - id: pdf_basic_generate_upload_001
+    inputs:
+      prompt: |
+        Generate 3 short synthetic PDFs about cloud-storage best practices
+        and upload them to the Unity Catalog volume
+        `/Volumes/ai_dev_kit_test/rag/raw_pdfs/cloud_storage/`. Confirm the
+        files are present in the volume after upload.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "Writes the HTML source files under `./raw_data/html/...` (one HTML file per intended PDF)"
+        - "Runs the bundled `pdf_generator.py convert --input ./raw_data/html --output ./raw_data/pdf` (NOT a hallucinated `generate_pdf_documents` MCP tool)"
+        - "Uploads via `databricks fs cp -r --overwrite ./raw_data/pdf dbfs:/Volumes/ai_dev_kit_test/rag/raw_pdfs/cloud_storage/`"
+        - "`databricks fs ls dbfs:/Volumes/.../cloud_storage/` to confirm the 3 PDFs landed (requires `dbfs:` scheme prefix)"
+      databricks_outcomes:
+        - kind: uc_volume_contains_files
+          path: "/Volumes/ai_dev_kit_test/rag/raw_pdfs/cloud_storage/"
+          extension: ".pdf"
+          min_count: 3
+    metadata:
+      category: happy_path
+      difficulty: easy
+      tags: [generate, upload, volume]
 
-      ```
-      generate_pdf_documents(
-          catalog="my_catalog",
-          schema="my_schema",
-          volume="my_volume",
-          folder="hr_policies",
-          topic="HR policy documents for a mid-size technology company",
-          num_documents=15,
-          complexity="medium"
-      )
-      ```
+  # ============================================================================
+  # 2. Topic-targeted set for a RAG demo
+  # ============================================================================
+  - id: pdf_topic_set_002
+    inputs:
+      prompt: |
+        I'm building a RAG demo over HR policies. Generate ~8 PDF documents
+        covering: PTO policy, remote-work guidelines, benefits summary,
+        expense reimbursement, code of conduct, harassment-reporting
+        procedure, IT acceptable-use policy, and onboarding checklist.
 
-      This generates PDF files and corresponding JSON metadata files with questions and evaluation guidelines for RAG testing.
-    execution_success: true
-  expectations:
-    expected_facts:
-    - "generate_pdf_documents is an MCP tool for creating synthetic PDFs"
-    - "Documents are saved to a Unity Catalog Volume"
-    - "Both PDF files and JSON metadata files are generated"
-    expected_patterns:
-    - pattern: "generate_pdf_documents"
-      min_count: 1
-      description: "Uses the generate_pdf_documents MCP tool"
-    - pattern: "catalog"
-      min_count: 1
-      description: "Specifies target catalog"
-    - pattern: "schema"
-      min_count: 1
-      description: "Specifies target schema"
-    - pattern: "num_documents"
-      min_count: 1
-      description: "Specifies number of documents to generate"
-    guidelines:
-    - "Must show the generate_pdf_documents tool with key parameters"
-    - "Must mention that both PDFs and JSON metadata are generated"
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
+        Use subdirectories under html/ to organise them (e.g.
+        `policy/`, `benefits/`, `procedures/`). Upload everything to
+        `/Volumes/ai_dev_kit_test/rag/raw_pdfs/hr_policies/`, preserving the
+        subdirectory structure.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "HTML files organised under subdirectories — `pdf_generator.py convert` preserves the input directory structure in the output"
+        - "Each document has substantive content (not stub placeholders) covering the requested topic"
+        - "Upload preserves the subdirectory layout in the volume (subdir → subdir mapping)"
+        - "Final verification: `databricks fs ls -R` (or recursive walk) shows ~8 PDFs across the subdirectories"
+      databricks_outcomes:
+        - kind: uc_volume_contains_files
+          path: "/Volumes/ai_dev_kit_test/rag/raw_pdfs/hr_policies/"
+          extension: ".pdf"
+          min_count: 8
+        - kind: uc_volume_has_subdirectories
+          path: "/Volumes/ai_dev_kit_test/rag/raw_pdfs/hr_policies/"
+          min: 2
+    metadata:
+      category: happy_path
+      difficulty: medium
+      tags: [generate, multi-doc, subdirectories, hr-policies, rag]
 
-- id: pdf_gen_json_structure_002
-  inputs:
-    prompt: "What is the structure of the JSON metadata files generated alongside the PDFs?"
-  outputs:
-    response: |
-      Each PDF gets a corresponding JSON file with evaluation metadata:
+  # ============================================================================
+  # 3. RAG evaluation: PDFs + a doc_questions.json with test questions
+  # ============================================================================
+  - id: pdf_with_eval_questions_003
+    inputs:
+      prompt: |
+        Generate 5 synthetic technical-documentation PDFs (a fake product
+        called "Lumera DB"). For each PDF, also produce a `doc_questions.json`
+        entry containing 2-3 test questions whose answers are findable in
+        the document (for evaluating a retrieval system later).
 
-      ```json
-      {
-        "title": "API Authentication Guide",
-        "category": "Technical",
-        "pdf_path": "/Volumes/catalog/schema/volume/folder/doc_001.pdf",
-        "question": "What authentication methods are supported by the API?",
-        "guideline": "Answer should mention OAuth 2.0, API keys, and JWT tokens with their use cases."
-      }
-      ```
-
-      - `title`: Document title
-      - `category`: Document category
-      - `pdf_path`: Full Volume path to the generated PDF
-      - `question`: A test question whose answer is in the PDF
-      - `guideline`: Evaluation criteria for judging RAG responses
-    execution_success: true
-  expectations:
-    expected_facts:
-    - "Each PDF has a corresponding JSON metadata file"
-    - "JSON includes title, category, pdf_path, question, and guideline fields"
-    - "The question field contains a query answerable from the PDF content"
-    - "The guideline field provides evaluation criteria for RAG responses"
-    expected_patterns:
-    - pattern: "\"title\""
-      min_count: 1
-      description: "JSON includes title field"
-    - pattern: "\"question\""
-      min_count: 1
-      description: "JSON includes question field"
-    - pattern: "\"guideline\""
-      min_count: 1
-      description: "JSON includes guideline field"
-    - pattern: "\"pdf_path\""
-      min_count: 1
-      description: "JSON includes pdf_path field"
-    guidelines:
-    - "Must show the complete JSON structure with all fields"
-    - "Must explain the purpose of each field"
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
-
-- id: pdf_gen_rag_integration_003
-  inputs:
-    prompt: "How do I use the generated PDFs and JSON files to test my RAG pipeline?"
-  outputs:
-    response: |
-      ```python
-      # Load questions from JSON files
-      questions = load_json_files(f"/Volumes/{catalog}/{schema}/{volume}/{folder}/*.json")
-
-      for q in questions:
-          # 1. Ingest the PDF into your vector database
-          ingest_document(q["pdf_path"])
-
-          # 2. Query RAG system with the test question
-          response = rag_system.query(q["question"])
-
-          # 3. Evaluate using the guideline
-          is_correct = evaluate_response(response, q["guideline"])
-      ```
-
-      The workflow is: ingest PDFs as source documents, use `question` fields to query your RAG system, and use `guideline` fields to evaluate response quality.
-    execution_success: true
-  expectations:
-    expected_facts:
-    - "PDFs serve as source documents for the vector database"
-    - "Questions from JSON test retrieval accuracy"
-    - "Guidelines from JSON evaluate response quality"
-    expected_patterns:
-    - pattern: "question"
-      min_count: 2
-      description: "Uses question field for RAG queries"
-    - pattern: "guideline"
-      min_count: 2
-      description: "Uses guideline field for evaluation"
-    - pattern: "pdf_path"
-      min_count: 1
-      description: "References PDF path for ingestion"
-    guidelines:
-    - "Must show the three-step workflow: ingest, query, evaluate"
-    - "Must use both question and guideline fields from the JSON"
-  metadata:
-    category: happy_path
-    difficulty: medium
-    source: auto_generated
-
-- id: pdf_gen_hr_documents_004
-  inputs:
-    prompt: "Generate HR policy documents for testing a company knowledge base RAG system."
-  outputs:
-    response: |
-      ```
-      generate_pdf_documents(
-          catalog="ai_dev_kit",
-          schema="hr_demo",
-          volume="documents",
-          folder="hr_policies",
-          topic="HR policy documents for a mid-size technology company including PTO, benefits, code of conduct, and remote work policies",
-          num_documents=20,
-          complexity="medium"
-      )
-      ```
-
-      This generates 20 HR policy PDFs covering common topics like PTO, benefits enrollment, code of conduct, and remote work guidelines, along with JSON evaluation files.
-    execution_success: true
-  expectations:
-    expected_facts:
-    - "The topic parameter guides the content theme of generated documents"
-    - "num_documents controls how many PDFs are generated"
-    - "complexity affects the depth and length of generated content"
-    expected_patterns:
-    - pattern: "generate_pdf_documents"
-      min_count: 1
-      description: "Uses the generate_pdf_documents MCP tool"
-    - pattern: "topic="
-      min_count: 1
-      description: "Specifies document topic"
-    - pattern: "num_documents="
-      min_count: 1
-      description: "Specifies document count"
-    guidelines:
-    - "Must specify a descriptive topic parameter"
-    - "Must use realistic catalog/schema/volume names"
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
-
-- id: pdf_gen_tech_docs_005
-  inputs:
-    prompt: "Generate technical documentation PDFs for testing a developer documentation search system."
-  outputs:
-    response: |
-      ```
-      generate_pdf_documents(
-          catalog="ai_dev_kit",
-          schema="tech_docs",
-          volume="documents",
-          folder="api_docs",
-          topic="Technical API documentation including REST endpoints, authentication, SDK usage, error handling, and rate limiting",
-          num_documents=25,
-          complexity="high"
-      )
-      ```
-
-      Set complexity to "high" for technical documentation to generate detailed content with code examples, tables, and structured sections.
-    execution_success: true
-  expectations:
-    expected_facts:
-    - "complexity='high' generates more detailed content with code examples"
-    - "The topic parameter should describe the specific technical domain"
-    expected_patterns:
-    - pattern: "generate_pdf_documents"
-      min_count: 1
-      description: "Uses the generate_pdf_documents MCP tool"
-    - pattern: "complexity=\"high\""
-      min_count: 1
-      description: "Uses high complexity for technical docs"
-    - pattern: "topic="
-      min_count: 1
-      description: "Specifies technical topic"
-    guidelines:
-    - "Must use high complexity for technical documentation"
-    - "Topic must describe specific technical domains"
-  metadata:
-    category: happy_path
-    difficulty: medium
-    source: auto_generated
-
-- id: pdf_gen_financial_reports_006
-  inputs:
-    prompt: "Generate synthetic financial report PDFs for testing a compliance document search system."
-  outputs:
-    response: |
-      ```
-      generate_pdf_documents(
-          catalog="ai_dev_kit",
-          schema="finance_demo",
-          volume="documents",
-          folder="financial_reports",
-          topic="Corporate financial reports including quarterly earnings, annual reports, budget summaries, and audit findings",
-          num_documents=15,
-          complexity="high"
-      )
-      ```
-
-      Financial documents benefit from high complexity to include tables, figures, and structured financial data that tests RAG parsing capabilities.
-    execution_success: true
-  expectations:
-    expected_facts:
-    - "Financial documents should use high complexity for realistic structure"
-    - "Generated PDFs include tables and structured data"
-    expected_patterns:
-    - pattern: "generate_pdf_documents"
-      min_count: 1
-      description: "Uses the generate_pdf_documents MCP tool"
-    - pattern: "financial"
-      min_count: 1
-      description: "Topic relates to financial documents"
-    - pattern: "complexity=\"high\""
-      min_count: 1
-      description: "Uses high complexity"
-    guidelines:
-    - "Must use high complexity for financial documents"
-    - "Must specify financial-specific topics"
-  metadata:
-    category: happy_path
-    difficulty: medium
-    source: auto_generated
+        Upload PDFs and `doc_questions.json` to
+        `/Volumes/ai_dev_kit_test/rag/raw_pdfs/lumera_docs/`. Confirm both
+        the PDF count and that the JSON has questions for every document.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "5 HTML files → 5 PDFs via `pdf_generator.py convert`"
+        - "`doc_questions.json` produced with one entry per PDF (`doc_name`, `questions: [...]` with 2-3 questions each grounded in the PDF content)"
+        - "Both PDFs and `doc_questions.json` uploaded to the same volume path"
+        - "Verification: PDF count == 5 AND every PDF filename has a matching entry in doc_questions.json"
+      databricks_outcomes:
+        - kind: uc_volume_contains_files
+          path: "/Volumes/ai_dev_kit_test/rag/raw_pdfs/lumera_docs/"
+          extension: ".pdf"
+          min_count: 5
+        - kind: uc_volume_contains_file
+          path: "/Volumes/ai_dev_kit_test/rag/raw_pdfs/lumera_docs/doc_questions.json"
+        - kind: doc_questions_json_covers_all_pdfs
+          path: "/Volumes/ai_dev_kit_test/rag/raw_pdfs/lumera_docs/"
+    metadata:
+      category: happy_path
+      difficulty: hard
+      tags: [generate, rag-eval, doc-questions, json, retrieval]

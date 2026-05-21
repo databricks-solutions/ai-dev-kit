@@ -1,5 +1,5 @@
 skill_name: databricks-app-apx
-tool_modules: [apps, serving]
+tool_modules: []  # No MCP — agent uses Bash + Databricks CLI directly.
 description: Build full-stack Databricks applications using APX framework (FastAPI + React).
 scorers:
   enabled:

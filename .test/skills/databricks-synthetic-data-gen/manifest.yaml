@@ -1,37 +1,46 @@
 skill_name: databricks-synthetic-data-gen
-tool_modules: [sql, compute]
-description: Tests for Databricks synthetic data generation skill covering Spark + Faker + Pandas UDFs, execution methods, output formats, and referential integrity
+tool_modules: []   # No MCP — agent uses Bash + databricks-connect-serverless / local Python.
+description: |
+  Generate realistic, story-driven synthetic data using Spark + Faker + Pandas
+  UDFs (or local Polars + Mimesis for small sets), save to Delta tables or UC
+  volumes. Tests verify the actual workspace state after the agent runs the
+  prompt end-to-end: tables exist with the right schema/row counts, FKs are
+  valid, distributions are skewed (not uniform), and the story signal is
+  present in the data.
 version: 1.0.0
 
 scorers:
   enabled:
-    - python_syntax            # Check Python code blocks for syntax errors
-    - no_hallucinated_apis     # Detect deprecated/wrong APIs
-    - pattern_adherence        # Regex match against expected patterns
-    - expected_facts_present   # Check if required facts mentioned
+    - python_syntax
+    - no_hallucinated_apis
+    - expected_facts_present
 
   llm_scorers:
     - Safety
     - guidelines_from_expectations
 
   default_guidelines:
-    - "Response must generate complete, runnable Python code"
-    - "Code must use the execution method specified in the prompt"
-    - "Code must save data in the output format specified"
+    - "Must ask for or confirm catalog + schema — never silently default to a hard-coded value."
+    - "Must create the target schema if it doesn't exist before writing data."
+    - "Must NEVER use uniform distributions for categorical or numeric columns — weighted categoricals (60/30/10 etc.), log-normal amounts, 80/20 patterns. Flat data has no story."
+    - "Multi-table generation: parent tables first (write to Delta), then children with FKs drawn from the persisted parent IDs. Referential integrity must hold for every row in the child."
+    - "On serverless: NO Python loops over rows, NO `.collect()`, NO `.cache()` / `.persist()` (unsupported). Use Spark parallelism + Pandas UDFs."
+    - "Default execution: Databricks Connect serverless. Local Polars + Mimesis is acceptable only when the user explicitly asks for local OR the dataset is <30K rows."
+    - "Must verify post-write: row counts, sample of distribution per categorical column, FK integrity by joining parent and child. Don't claim success based on the write completing."
+
+  trace_expectations:
+    tool_limits:
+      Bash: 30
+      Read: 15
+    token_budget:
+      max_total: 150000
+    required_tools:
+      - Read
+      - Bash
+    banned_tools: []
 
 quality_gates:
-  syntax_valid: 1.0           # 100% - all Python syntax must be valid
-  pattern_adherence: 0.9      # 90% - follow expected patterns
-  execution_success: 0.8      # 80% - code execution success rate
-  no_hallucinations: 1.0      # 100% - no deprecated/invalid APIs
-
-trace_expectations:
-  tool_limits:
-    Bash: 10
-    Read: 20
-    Write: 15
-    Edit: 15
-  token_budget:
-    max_total: 200000
-  required_tools: []
-  banned_tools: []
+  python_syntax: 1.0
+  no_hallucinated_apis: 1.0
+  expected_facts_present: 0.85
+  execution_success: 1.0

@@ -1,170 +1,60 @@
 metadata:
   skill_name: databricks-docs
-  version: 0.1.0
-  created_at: '2026-02-23T08:00:00.000000'
+  version: 1.0.0
+  created_at: '2026-05-21T00:00:00.000000'
+  description: |
+    docs is a lookup/reference skill (WebFetch over `https://docs.databricks.com/llms.txt`),
+    not an action skill. Tests verify the agent uses the llms.txt index correctly
+    to find authoritative docs and apply them via the right action skill + CLI.
 
 test_cases:
-- id: databricks-docs_lookup_reference_001
-  inputs:
-    prompt: How do I look up Databricks documentation for a specific feature?
-  outputs:
-    response: |
-      Use the Databricks documentation index at `https://docs.databricks.com/llms.txt`.
+  # ============================================================================
+  # 1. Look up an unfamiliar feature via the docs index
+  # ============================================================================
+  - id: docs_lookup_unfamiliar_feature_001
+    inputs:
+      prompt: |
+        I'm reviewing a customer workspace and I keep seeing references to
+        "Lakeflow Connect" but I don't know what it is. Find the authoritative
+        Databricks documentation, summarize what it is in 2-3 sentences, and
+        cite the doc URL you used.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "WebFetch on https://docs.databricks.com/llms.txt to consult the index"
+        - "Follows a link from the index to a specific Lakeflow Connect doc page (does NOT hallucinate the feature)"
+        - "Summarises the feature based on the fetched page and cites the URL"
+      databricks_outcomes:
+        - kind: response_cites_databricks_doc_url
+        - kind: response_references_llms_txt
+    metadata:
+      category: happy_path
+      difficulty: easy
+      tags: [lookup, llms-txt, webfetch]
 
-      Fetch it with WebFetch, then search for relevant sections and links. The index is organized by category:
-      - Data Engineering (Lakeflow, Spark, Delta Lake, pipelines)
-      - SQL & Analytics (Warehouses, queries, dashboards)
-      - AI/ML (MLflow, model serving, GenAI)
-      - Governance (Unity Catalog, permissions, security)
-      - Developer Tools (SDKs, CLI, APIs, Terraform)
-    execution_success: true
-  expectations:
-    expected_facts:
-    - Use llms.txt documentation index
-    - Index is organized by categories
-    expected_patterns:
-    - pattern: docs\.databricks\.com
-      min_count: 1
-      description: Must reference Databricks docs URL
-    - pattern: llms\.txt
-      min_count: 1
-      description: Must reference the llms.txt index
-    guidelines:
-    - Must reference the llms.txt documentation index URL
-    - Should explain the documentation structure
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
-
-- id: databricks-docs_reference_role_002
-  inputs:
-    prompt: What is the role of the databricks-docs skill?
-  outputs:
-    response: |
-      This is a reference skill, not an action skill. Use it to:
-      - Look up documentation when other skills don't cover a topic
-      - Get authoritative guidance on Databricks concepts and APIs
-      - Find detailed information to inform how you use MCP tools
-      - Discover features and capabilities
-
-      Always prefer using MCP tools for actions and load specific skills for workflows.
-    execution_success: true
-  expectations:
-    expected_facts:
-    - Is a reference skill, not an action skill
-    - Supplements other skills and MCP tools
-    expected_patterns:
-    - pattern: reference
-      min_count: 1
-      description: Must identify as reference skill
-    guidelines:
-    - Must clarify this is a reference skill, not an action skill
-    - Must recommend MCP tools for actual actions
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
-
-- id: databricks-docs_complement_skills_003
-  inputs:
-    prompt: How do I use databricks-docs alongside other skills?
-  outputs:
-    response: |
-      The docs skill complements other skills:
-
-      1. Load the specific skill for workflow patterns (e.g., databricks-spark-declarative-pipelines)
-      2. Use databricks-docs to fetch docs if you need clarification on specific features
-      3. Use MCP tools to actually perform the action (e.g., create_or_update_pipeline)
-
-      Example: User wants to create a Delta Live Tables pipeline
-      - Load `databricks-spark-declarative-pipelines` for workflow patterns
-      - Fetch docs via llms.txt if you need clarification on DLT features
-      - Use `create_or_update_pipeline` MCP tool to create the pipeline
-    execution_success: true
-  expectations:
-    expected_facts:
-    - Load specific skills for workflows
-    - Use docs for clarification
-    - Use MCP tools for actions
-    expected_patterns:
-    - pattern: MCP
-      min_count: 1
-      description: Must mention MCP tools for actions
-    - pattern: WebFetch|llms\.txt|docs
-      min_count: 1
-      description: Must reference docs lookup method
-    guidelines:
-    - Must explain the three-step pattern (skill + docs + MCP tools)
-  metadata:
-    category: happy_path
-    difficulty: medium
-    source: auto_generated
-
-- id: databricks-docs_fetch_docs_004
-  inputs:
-    prompt: How do I fetch and search the Databricks documentation?
-  outputs:
-    response: |
-      Fetch the llms.txt documentation index:
-
-      URL: `https://docs.databricks.com/llms.txt`
-
-      Use WebFetch to retrieve this index, then:
-      1. Search for relevant sections/links
-      2. Fetch specific documentation pages for detailed guidance
-      3. Apply what you learn using the appropriate MCP tools
-    execution_success: true
-  expectations:
-    expected_facts:
-    - Fetch llms.txt with WebFetch
-    - Search for relevant sections
-    - Fetch specific pages for details
-    expected_patterns:
-    - pattern: WebFetch
-      min_count: 1
-      description: Must use WebFetch to retrieve docs
-    - pattern: llms\.txt
-      min_count: 1
-      description: Must reference the llms.txt index
-    guidelines:
-    - Must describe the WebFetch workflow for docs
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
-
-- id: databricks-docs_unfamiliar_feature_005
-  inputs:
-    prompt: I want to learn about an unfamiliar Databricks feature, how should I approach it?
-  outputs:
-    response: |
-      When encountering an unfamiliar Databricks feature:
-
-      1. Fetch `https://docs.databricks.com/llms.txt` to find relevant documentation
-      2. Read the specific docs to understand the feature
-      3. Determine which skill/tools apply, then use them
-
-      The documentation is organized by category:
-      - Overview & Getting Started
-      - Data Engineering
-      - SQL & Analytics
-      - AI/ML
-      - Governance
-      - Developer Tools
-    execution_success: true
-  expectations:
-    expected_facts:
-    - Start with llms.txt documentation index
-    - Read specific docs for the feature
-    - Determine which skills/tools to use
-    expected_patterns:
-    - pattern: llms\.txt
-      min_count: 1
-      description: Must reference llms.txt
-    guidelines:
-    - Must outline a systematic approach to learning new features
-  metadata:
-    category: happy_path
-    difficulty: easy
-    source: auto_generated
+  # ============================================================================
+  # 2. Complement another skill — find docs + apply via CLI
+  # ============================================================================
+  - id: docs_complement_action_skill_002
+    inputs:
+      prompt: |
+        I need to enable predictive optimization on a Delta table but I can't
+        remember the exact SQL syntax. Look up the current docs, then give me
+        the working SQL statement and the `databricks` CLI command that would
+        execute it against a SQL warehouse.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "WebFetch llms.txt index, then a specific predictive optimization doc page (no syntax guessing)"
+        - "Returns the SQL `ALTER TABLE ... SET TBLPROPERTIES ('delta.predictiveOptimization' = 'enable')` or the equivalent ALTER current at the time"
+        - "Provides a `databricks experimental aitools tools query --warehouse <WH> \"...\"` CLI invocation (or equivalent) to execute it"
+        - "Cites the doc page URL it pulled the syntax from"
+      databricks_outcomes:
+        - kind: response_cites_databricks_doc_url
+        - kind: response_includes_runnable_cli_command
+    metadata:
+      category: happy_path
+      difficulty: medium
+      tags: [lookup, complement, sql, predictive-optimization]

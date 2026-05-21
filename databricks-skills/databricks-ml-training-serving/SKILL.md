@@ -7,6 +7,8 @@ description: "Classical ML and custom-agent model training, registration, and in
 
 Train with MLflow → register to Unity Catalog → consume the **same artifact** as either a batch Spark UDF over Delta or a real-time REST endpoint (~5–15 min cold start, quota-bound — only when the user asks for per-request low-latency scoring).
 
+> **Always train on Databricks** (serverless job or notebook), never in the local Python process the agent is running in. Local training has no access to the silver tables, no MLflow tracking server, no UC registry path, and dies if the chat session drops — submit `databricks jobs submit --no-wait` (see "Train + deploy as a serverless job" below). Only fall back to local execution if the user explicitly asks for it.
+
 | Consumption | When | How |
 |---|---|---|
 | **Batch UDF** | Dashboards, daily/hourly scores, precomputed ~daily predictions, read by Genie/Dashboards, or app (typically synched to a lakebase table) | `mlflow.pyfunc.spark_udf(...)` → `INSERT INTO gold_predictions` |

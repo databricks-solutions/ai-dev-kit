@@ -1,5 +1,5 @@
 skill_name: databricks-dbsql
-tool_modules: [sql]
+tool_modules: []  # No MCP — agent uses Bash + Databricks CLI directly.
 description: 'Databricks SQL (DBSQL) advanced features and SQL warehouse capabilities. This skill MUST be invoked when the
   user mentions: "DBSQL", "Databricks SQL", "SQL warehouse", "SQL scripting", "stored procedure", "CALL procedure", "materialized
   view", "CREATE MATERIALIZED VIEW", "pipe syntax", "|>", "geospatial", "H3", "ST_", "spatial SQL", "collation", "COLLATE",

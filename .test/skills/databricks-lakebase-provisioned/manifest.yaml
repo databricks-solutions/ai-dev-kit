@@ -1,5 +1,5 @@
 skill_name: databricks-lakebase-provisioned
-tool_modules: [lakebase, sql]
+tool_modules: []  # No MCP — agent uses Bash + Databricks CLI directly.
 description: Patterns and best practices for using Lakebase Provisioned (Databricks managed PostgreSQL) for OLTP workloads.
 scorers:
   enabled:

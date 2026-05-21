@@ -1,38 +1,47 @@
-skill:
-  name: "databricks-spark-declarative-pipelines"
-  source_path: "databricks-skills/databricks-spark-declarative-pipelines"
-  description: "Streaming tables, CDC, medallion architecture"
+---
+skill_name: databricks-spark-declarative-pipelines
+tool_modules: []   # No MCP — agent uses Bash + native `databricks pipelines` CLI.
+description: |
+  Lakeflow Spark Declarative Pipelines (SDP) — bronze/silver/gold with
+  streaming tables, materialized views, AUTO CDC / SCD2, Auto Loader.
+  Tests verify the actual outcome: pipeline created with serverless +
+  continuous:false, update completes successfully, target UC tables
+  populated with the expected schema.
 
-tool_modules: [pipelines, compute]
-
-evaluation:
-  datasets:
-    - path: ground_truth.yaml
-      type: yaml
-
-# Scorer configuration
 scorers:
-  # Built-in deterministic scorers to enable
   enabled:
-    - python_syntax
     - sql_syntax
-    - pattern_adherence
+    - python_syntax
     - no_hallucinated_apis
     - expected_facts_present
 
-  # LLM-based scorers
   llm_scorers:
     - Safety
-    - guidelines_from_expectations  # Dynamic from YAML expectations.guidelines
+    - guidelines_from_expectations
 
-  # Default guidelines (used when test case has no guidelines)
   default_guidelines:
-    - "Response must address the user's request completely"
-    - "Code examples must follow documented best practices"
-    - "Response must use modern APIs (not deprecated ones)"
-    - "Must use SDP syntax (CREATE OR REFRESH STREAMING TABLE)"
+    - "Must use `CREATE OR REFRESH STREAMING TABLE` / `CREATE OR REFRESH MATERIALIZED VIEW` — never `CREATE OR REPLACE` (that's standard SQL, not SDP)."
+    - "Must default to serverless (`serverless: true`) and triggered (`continuous: false`) — explicitly set both. Continuous pipelines auto-retry failed updates forever and trap polling loops."
+    - "Pipeline runs must capture the update_id from `start-update` and poll `get-update <pid> <UPDATE_ID>` to a terminal state (COMPLETED|FAILED|CANCELED) — never poll top-level pipeline `state` (state flips back to RUNNING on auto-retry)."
+    - "On FAILED update: surface the error via `pipelines list-pipeline-events` and STOP. Do not silently retry, do not assume the failure was transient."
+    - "Use `CLUSTER BY` (Liquid Clustering), not `PARTITION BY` + `Z-ORDER`. CLUSTER BY only accepts numeric / string / date / timestamp columns — no BOOLEAN or complex types."
+    - "Pipeline source files are raw `.sql`/`.py` (upload with `--format SOURCE --language SQL|PYTHON` for notebooks or `--format RAW --overwrite` for raw files). Notebooks for pipelines are deprecated."
+    - "Must verify table population after the update completes (warehouse query for row count + column presence), not assume success from update state alone."
+
+  trace_expectations:
+    tool_limits:
+      Bash: 50
+      Read: 25
+    token_budget:
+      max_total: 200000
+    required_tools:
+      - Read
+      - Bash
+    banned_tools: []
 
 quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-  execution_success: 0.8
+  sql_syntax: 1.0
+  python_syntax: 1.0
+  no_hallucinated_apis: 1.0
+  expected_facts_present: 0.85
+  execution_success: 1.0

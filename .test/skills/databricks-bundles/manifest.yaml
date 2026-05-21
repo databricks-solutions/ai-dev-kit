@@ -3,7 +3,7 @@ skill:
   source_path: "databricks-skills/databricks-bundles"
   description: "Create and configure Declarative Automation Bundles (formerly Asset Bundles) for multi-environment deployments"
 
-tool_modules: [jobs, pipelines]
+tool_modules: []  # No MCP — agent uses Bash + Databricks CLI directly.
 
 evaluation:
   datasets:
