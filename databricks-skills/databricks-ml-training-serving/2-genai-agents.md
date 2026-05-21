@@ -203,7 +203,7 @@ dbutils.notebook.exit(json.dumps({
 }))
 ```
 
-Submit via `databricks jobs submit --no-wait --json '{...}'`; full job pattern (including the `spec.client: "4"` requirement and the TASK-run-id vs submit-run-id trap on `get-run-output`) is in [databricks-jobs](../databricks-jobs/SKILL.md).
+Submit via the same `jobs submit --no-wait` pattern shown in [SKILL.md](SKILL.md#train--deploy-as-a-serverless-job) — same script, just `deploy_agent.py` as the notebook.
 
 ## Query
 
@@ -228,18 +228,10 @@ client.chat.completions.create(
 )
 ```
 
-## Iteration loop
+## Iteration
 
-Once `agent.py` is uploaded to the workspace, rerunning is fast:
-
-```bash
-databricks workspace import-dir ./my_agent /Workspace/Users/$USER/my_agent --overwrite
-# Then re-run log_model.py via jobs submit (~30s), and only re-deploy if you
-# want a new endpoint version (~15min). Most iterations don't need re-deploy —
-# `agents.deploy()` with a new version updates the existing endpoint in place.
-```
+`databricks workspace import-dir ./my_agent ... --overwrite` then re-run `log_model.py`. `agents.deploy()` with a new version **updates the existing endpoint in place** — no need to recreate. Re-deploy only when changing endpoint config (workload size, route splits).
 
 ## Packages
 
-- DBR 16.1+ has `mlflow` 3.x, `langchain`, `pydantic`, `databricks-sdk` pre-installed. You usually only need `%pip install -q databricks-langchain langgraph databricks-agents`.
-- Pin `mlflow`, `langgraph`, and `databricks-agents` exactly in `pip_requirements` — version drift between training notebook and endpoint env is the #1 cause of "model loaded fine locally but the endpoint crashes at startup".
+DBR 16.1+ has `mlflow` 3.x, `langchain`, `pydantic`, `databricks-sdk` pre-installed. Typically only need `%pip install -q databricks-langchain langgraph databricks-agents`.

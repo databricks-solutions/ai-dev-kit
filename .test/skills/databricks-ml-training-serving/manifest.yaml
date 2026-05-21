@@ -1,50 +1,50 @@
 ---
 skill_name: databricks-ml-training-serving
-tool_modules: [serving, compute]
-description: "Deploy and query Databricks Model Serving endpoints"
+tool_modules: []   # No MCP tooling — agent uses Bash + Databricks CLI directly.
+description: |
+  ML training, UC registration, and inference on Databricks. Three end-to-end
+  outcome-oriented tests covering the batch path (train → register → spark_udf
+  → gold table), the real-time path (train → register → serving endpoint),
+  and the custom-agent path (ResponsesAgent + UC tools → log → deploy).
 
 scorers:
-  # Deterministic scorers
+  # Deterministic checks on the agent's response text.
   enabled:
     - python_syntax
-    - pattern_adherence
     - no_hallucinated_apis
+    - expected_facts_present
 
-  # LLM-based scorers with guidelines
+  # LLM-judged scorers against the guidelines below.
   llm_scorers:
     - Safety
     - guidelines_from_expectations
 
-  # Default evaluation guidelines
+  # Guidelines apply to all tests unless overridden per-test.
   default_guidelines:
-    - "Response must address the user's request completely"
-    - "Code examples must follow documented best practices"
-    - "Must use mlflow.pyfunc.log_model or mlflow.<flavor>.log_model for model logging"
-    - "Agent deployments must use ResponsesAgent pattern with proper output formatting"
-    - "Must use self.create_text_output_item() for agent responses, not raw dicts"
-    - "Job-based deployment pattern should be recommended for endpoints to avoid timeouts"
-    - "Must specify correct DBR version requirements (16.1+ for GenAI agents)"
-    - "Unity Catalog paths must follow catalog.schema.model_name format"
+    - "Must complete the end-to-end flow the user asked for (notebook → upload → submit serverless job → verify artifact)."
+    - "Must register models to Unity Catalog (mlflow.set_registry_uri('databricks-uc')), not the deprecated workspace registry."
+    - "Must promote model versions with UC aliases (set_registered_model_alias), not deprecated stages."
+    - "Must use `databricks jobs submit --no-wait` for long-running training, poll get-run to a terminal state, and extract the TASK run_id (.tasks[0].run_id) before calling get-run-output."
+    - "Must specify `spec.client: '4'` in environments[].spec so dependencies actually install on serverless."
+    - "Must terminate notebooks with dbutils.notebook.exit(json.dumps({...})) so structured results are retrievable from get-run-output."
+    - "When deploying a real-time endpoint: scale_to_zero_enabled=True, tags top-level (not inside config), poll BOTH state.ready and state.config_update before querying."
+    - "Resources are workspace state; if asked to verify a result, the agent must query the workspace (UC table, model version, endpoint readiness), not assume success from a job completion alone."
 
-  # Trace expectations for session evaluation
+  # Trace-level expectations on agent behavior during the run.
   trace_expectations:
     tool_limits:
-      Bash: 20
-      mcp__databricks__execute_databricks_command: 15
-      mcp__databricks__run_python_file_on_databricks: 10
-      mcp__databricks__upload_to_workspace: 5
-      mcp__databricks__query_serving_endpoint: 10
-      mcp__databricks__get_serving_endpoint_status: 10
+      Bash: 60               # CLI-heavy workflows are expected.
+      Read: 30
     token_budget:
-      max_total: 150000
+      max_total: 200000
     required_tools:
-      - Read  # Should read skill documentation
-    banned_patterns:
-      - "synchronous endpoint deployment"  # Should use job-based deployment
-      - "raw dict in ResponsesAgentResponse"  # Should use helper methods
+      - Read                 # Must consult the skill.
+      - Bash                 # CLI is the primary surface.
+    banned_tools: []         # No MCP tools to ban; the framework is unrestricted.
 
+# Pass/fail thresholds aggregated across the 3 tests.
 quality_gates:
-  syntax_valid: 1.0  # 100% - all code must be syntactically valid
-  pattern_adherence: 0.90  # 90% - follow documented patterns
-  no_hallucinated_apis: 1.0  # 100% - no made-up APIs
-  execution_success: 0.80  # 80% - code should execute successfully
+  syntax_valid: 1.0          # 100% — every Python block must parse.
+  no_hallucinated_apis: 1.0  # 100% — no invented function names.
+  expected_facts_present: 0.85  # 85% of expected_facts surfaced per test on average.
+  execution_success: 1.0     # 100% — all 3 runs must reach a terminal SUCCESS state.

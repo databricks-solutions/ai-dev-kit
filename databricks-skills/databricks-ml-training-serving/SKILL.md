@@ -1,27 +1,23 @@
 ---
 name: databricks-ml-training-serving
-description: "ML training + Unity Catalog model registry + batch and real-time serving. Use when training classical ML (sklearn/XGBoost/LightGBM/PyTorch) with MLflow tracking, registering to UC, batch-scoring over Delta via spark_udf, or deploying real-time serving endpoints. For GenAI agents see [3-genai-agents.md](3-genai-agents.md); for pre-built no-code agents see databricks-agent-bricks."
+description: "Classical ML and custom-agent model training, registration, and inference on Databricks. Use when: user ask to train models on Databricks, with MLflow tracking or autolog (sklearn, XGBoost, LightGBM, PyTorch, custom pyfunc etc); registering models to Unity Catalog; MLOPS, promoting versions with `@prod` / `@challenger` aliases; loading a registered model for batch scoring via `mlflow.pyfunc.spark_udf`; creating, updating, querying, or version-swapping a Databricks Model Serving endpoint; calling Foundation Model API endpoints (Claude / GPT / Llama / Gemini / embeddings); writing a custom MLflow `ResponsesAgent` (LangGraph, OpenAI-compatible chat) with UC Function or Vector Search tools. NOT for: no-code Knowledge Assistants or Supervisor Agents (use databricks-agent-bricks); MLflow evaluation / scorers (use databricks-mlflow-evaluation)."
 ---
 
 # ML Training & Serving on Databricks
 
-End-to-end ML lifecycle: train with MLflow tracking → register to Unity Catalog → consume either as **cheap batch inference** over Delta or as a **real-time REST endpoint**. Same artifact, two consumption patterns. Pick batch by default; switch to a serving endpoint only when the app needs per-request latency.
-
-## Decision: batch vs serving
+Train with MLflow → register to Unity Catalog → consume the **same artifact** as either a batch Spark UDF over Delta or a real-time REST endpoint (~5–15 min cold start, quota-bound — only when the user asks for per-request low-latency scoring).
 
 | Consumption | When | How |
 |---|---|---|
-| **Batch UDF over Delta** | Dashboards, daily/hourly scores, precomputed predictions table read by apps/Genie | `mlflow.pyfunc.spark_udf(...)` → `MERGE INTO gold_predictions` |
-| **Real-time serving endpoint** | App needs to score on a user action (fraud at authorization, recommendation at page load) — sub-100ms | `agents.deploy()` or `mlflow.deployments.get_deploy_client()` |
-
-Serving endpoints take ~5–15 min to come online for the first deploy and consume quota. **Don't deploy one for batch use cases.**
+| **Batch UDF** | Dashboards, daily/hourly scores, precomputed ~daily predictions, read by Genie/Dashboards, or app (typically synched to a lakebase table) | `mlflow.pyfunc.spark_udf(...)` → `INSERT INTO gold_predictions` |
+| **Real-time endpoint** | Score on a user action (fraud at authorization, rec at page load) — sub-100ms | `mlflow.deployments.get_deploy_client()` (classical) / `agents.deploy()` (agents) |
 
 ## Canonical flow
 
 ```
 silver_<features>  +  silver_<labels>
         ▼
-   nightly serverless job:
+   notebook (as a serverless job):
    ├── train with mlflow.autolog (XGBoost / sklearn / etc.)
    ├── mlflow.register_model → UC: {catalog}.{schema}.{model}
    ├── set_registered_model_alias(name, "prod", version)
@@ -30,45 +26,59 @@ silver_<features>  +  silver_<labels>
 gold_<entity>_predictions   ◄── dashboards, apps, Genie read this
 ```
 
-One notebook, one artifact. Re-running = retraining. Gold is where truth lives — read paths never call the model directly. See **[1-batch-scoring-pattern.md](1-batch-scoring-pattern.md)** for the full notebook.
+One notebook, one artifact. Re-running = retraining. Gold is where truth lives — read paths never call the model directly. Keep label-window logic (`failure occurred within 7 days`) in the notebook during dev; once stable, promote to a silver materialized view in SDP.
 
 ---
 
 ## Train and register (the 90% case)
 
-`mlflow.autolog()` captures params, metrics, code, and the model artifact for every run; `registered_model_name=...` auto-registers the best run to UC. Auto-incremented version. **Always `mlflow.set_registry_uri("databricks-uc")`** — without it, models land in the deprecated workspace registry.
+`mlflow.autolog()` captures params, metrics, code, and the model artifact for every run; `registered_model_name=...` auto-registers the best run to UC (auto-incremented version). Wrap training with **Optuna** so each trial is a child run and the best one is what gets registered.
+
+**Always `mlflow.set_registry_uri("databricks-uc")`** — without it, models land in the deprecated workspace registry. **The experiment's parent folder must exist** — `set_experiment` does NOT auto-create it (fails with `NOT_FOUND: Parent directory does not exist`). Pre-create it once with `databricks workspace mkdirs` before the job runs.
+
+```bash
+# Once per project — create the parent folder for the MLflow experiment.
+databricks workspace mkdirs /Users/me@example.com/turbine_project
+```
 
 ```python
-import mlflow
-import mlflow.xgboost
+import mlflow, mlflow.xgboost, optuna
 from mlflow.tracking import MlflowClient
 from xgboost import XGBClassifier
+from sklearn.metrics import roc_auc_score
 
 mlflow.set_registry_uri("databricks-uc")
-mlflow.set_experiment("/Users/me@example.com/turbine_failure")
+mlflow.set_experiment("/Users/me@example.com/turbine_project/mlflow_experiment")
 
 CATALOG, SCHEMA, NAME = "ai_demo_gen", "wind_farm", "turbine_failure"
 FULL_NAME = f"{CATALOG}.{SCHEMA}.{NAME}"
 
 mlflow.xgboost.autolog(log_input_examples=True, registered_model_name=FULL_NAME)
 
-with mlflow.start_run() as run:
-    model = XGBClassifier(n_estimators=200, max_depth=6).fit(X_train, y_train)
-    auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
-    mlflow.log_metric("test_auc", auc)
+# For imbalanced labels: stratify the split, set scale_pos_weight = neg/pos.
+def objective(trial):
+    params = {
+        "n_estimators":  trial.suggest_int("n_estimators", 100, 400),
+        "max_depth":     trial.suggest_int("max_depth", 3, 10),
+        "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+    }
+    with mlflow.start_run(nested=True):
+        m = XGBClassifier(**params).fit(X_train, y_train)
+        return roc_auc_score(y_test, m.predict_proba(X_test)[:, 1])
 
-# Move @prod alias to this version — stages are deprecated, aliases only.
+with mlflow.start_run(run_name="hpo"):
+    optuna.create_study(direction="maximize").optimize(objective, n_trials=20)
+
+# Move @prod alias to the just-registered version. Stages are deprecated — aliases only.
 client = MlflowClient(registry_uri="databricks-uc")
-latest = client.get_model_version_by_alias(FULL_NAME, "latest") if False else \
-         max(client.search_model_versions(f"name='{FULL_NAME}'"), key=lambda v: int(v.version))
+latest = max(client.search_model_versions(f"name='{FULL_NAME}'"),
+             key=lambda v: int(v.version))
 client.set_registered_model_alias(FULL_NAME, "prod", latest.version)
 ```
 
-**Framework autolog table**: `mlflow.{sklearn,xgboost,lightgbm,pytorch,tensorflow,spark}.autolog()`.
+**Framework autolog**: `mlflow.{sklearn,xgboost,lightgbm,pytorch,tensorflow,spark}.autolog()`.
 
-**HPO**: wrap with Optuna; pass `mlflow.xgboost.autolog()` and each trial becomes a child run. The best trial's model is the one auto-registered.
-
-**Aliases, not stages**: UC dropped `Staging`/`Production` stages. Use movable aliases: `@prod`, `@challenger`. Load with `models:/{full_name}@prod` — promoting a new version is one `set_registered_model_alias` call.
+**Aliases, not stages**: UC dropped `Staging`/`Production`. Use movable `@prod`/`@challenger`; load with `models:/{full_name}@prod`. Promoting a new version is one `set_registered_model_alias` call.
 
 ---
 
@@ -80,7 +90,7 @@ The cheap, default path. Load the registered model as a Spark UDF and score a De
 import mlflow
 
 # env_manager rules:
-#   "local"     → same runtime as training (same notebook/job). Fastest.
+#   "local"     → same runtime as training (same notebook/job). Fastest for the demo, keep that.
 #   "virtualenv"→ different runtime than training; rebuilds the model's env.
 #   "uv"        → same as virtualenv but faster (MLflow ≥ 2.22).
 predict = mlflow.pyfunc.spark_udf(
@@ -101,9 +111,9 @@ For incremental scoring with history, MERGE into the predictions table instead o
 
 ---
 
-## Consume: real-time serving endpoint
+## Consume: real-time serving endpoint (only when required)
 
-Use the MLflow Deployments client. `workload_size: "Small"` + `scale_to_zero_enabled: true` is the default for demos and dev. First deploy takes ~5 min for classical ML, ~15 min for agents.
+Use the MLflow Deployments client. `workload_size: "Small"` + `scale_to_zero_enabled: true` is the default for demos and dev. First deploy can take ~5 min for classical ML
 
 ```python
 from mlflow.deployments import get_deploy_client
@@ -116,7 +126,7 @@ client.create_endpoint(
             "entity_name": FULL_NAME,
             "entity_version": latest.version,
             "workload_size": "Small",
-            "scale_to_zero_enabled": True,
+            "scale_to_zero_enabled": True, # Always
         }],
         # served_model_name = "<model>-<version>"; the API auto-derives it but
         # you reference this exact string in traffic_config.
@@ -124,6 +134,9 @@ client.create_endpoint(
             {"served_model_name": f"{NAME}-{latest.version}", "traffic_percentage": 100}
         ]},
     },
+    # Tags are TOP-LEVEL — NOT inside `config`. Same {key, value} shape used
+    # by `serving-endpoints patch --add-tags`. Tag every demo resource for cleanup.
+    tags=[{"key": "aidevkit_project", "value": "ai-dev-kit"}],
 )
 ```
 
@@ -175,26 +188,66 @@ A loop watching only `state.ready` will say "ready" mid version-swap while the o
 ```bash
 databricks serving-endpoints get turbine-risk-endpoint \
   | jq '{ready: .state.ready, config_update: .state.config_update}'
-# Done when ready=READY AND config_update=NOT_UPDATING
 ```
 
 ---
 
-## Deploy as an async job (long-running deploys)
+## Train + deploy as a serverless job
 
-Classical ML deploys are usually fast enough to wait for inline. Agents and large models take 10–15 min — run from a serverless job so the CLI doesn't block on you.
+Training notebooks run a few minutes (Optuna + UC register; endpoint warmup adds 5–15 min if you also deploy). Submit as a serverless one-time run so the CLI doesn't block. The notebook ends with `dbutils.notebook.exit(json.dumps({...}))` so the structured result (`model_version`, `val_auc`, `endpoint_name`) reaches `.notebook_output.result`.
 
-The full pattern (`--no-wait`, polling, `get-run-output`, and the **TASK run_id vs submit run_id** trap) is in **[databricks-jobs](../databricks-jobs/SKILL.md)**. Three specifics for model deploys:
+```bash
+# 1. Upload the training notebook
+databricks workspace import /Workspace/Users/me@example.com/turbine_project/train \
+  --file ./train_notebook.py --format SOURCE --language PYTHON --overwrite
 
-- **`spec.client: "4"`** is required for the `environments[].spec.dependencies` list to actually install. `"1"` silently ignores it.
-- **`print()` is unreliable on serverless**; end the notebook with `dbutils.notebook.exit(json.dumps({...}))` so the structured result (model version, endpoint name, AUC) shows up in `.notebook_output.result`.
-- The `databricks serving-endpoints` UI page defaults to **Owned by me** — if the deploy job ran as a service principal, switch to **All** to see the endpoint, or list via `databricks serving-endpoints list`.
+# 2. Submit as serverless one-time run (returns {"run_id": N} immediately with --no-wait)
+RUN_ID=$(databricks jobs submit --no-wait --json '{
+  "run_name": "turbine-train-and-deploy",
+  "tasks": [{
+    "task_key": "train",
+    "notebook_task": {"notebook_path": "/Workspace/Users/me@example.com/turbine_project/train"},
+    "environment_key": "ml_env"
+  }],
+  "environments": [{
+    "environment_key": "ml_env",
+    "spec": {
+      "client": "4",
+      "dependencies": ["mlflow==2.22.0", "xgboost==2.1.3", "optuna==4.1.0", "scikit-learn==1.5.2"]
+    }
+  }]
+}' | jq -r .run_id)
+
+# 3. Poll until a terminal life_cycle_state.
+for _ in $(seq 60); do
+  STATE=$(databricks jobs get-run "$RUN_ID" | jq -r '.state.life_cycle_state // "UNKNOWN"')
+  echo "$(date +%H:%M:%S) $STATE"
+  [[ "$STATE" =~ ^(TERMINATED|SKIPPED|INTERNAL_ERROR)$ ]] && break
+  sleep 30
+done
+[[ "$STATE" =~ ^(TERMINATED|SKIPPED|INTERNAL_ERROR)$ ]] || { databricks jobs cancel-run "$RUN_ID"; exit 1; }
+
+# life_cycle_state TERMINATED only means "the run ended" — check result_state
+# (SUCCESS / FAILED / TIMEDOUT / CANCELED / SUCCESS_WITH_FAILURES / …) for outcome.
+RESULT=$(databricks jobs get-run "$RUN_ID" | jq -r '.state.result_state // "UNKNOWN"')
+echo "result_state=$RESULT"
+[[ "$RESULT" == "SUCCESS" ]] || { echo "Run did not succeed"; exit 1; }
+
+# 4. Pull structured output via the TASK run_id (NOT the submit run_id).
+TASK_RUN_ID=$(databricks jobs get-run "$RUN_ID" | jq -r '.tasks[0].run_id')
+databricks jobs get-run-output "$TASK_RUN_ID" | jq '.notebook_output.result'
+# → '{"model_version":"3","val_auc":0.91,"rows_scored":124,"endpoint":"turbine-risk-endpoint"}'
+```
+
+**Serving UI hides SP-owned endpoints by default.** If the deploy ran as a service principal, the Serving page won't show the new endpoint until you switch from "Owned by me" to "All". Or just `databricks serving-endpoints list`.
+
+For the four `jobs submit` traps (`spec.client: "4"` requirement, TASK-vs-submit run_id, `print()` unreliable, tags rejected) and full debugging flow, see **[databricks-jobs](../databricks-jobs/SKILL.md#one-time-runs-jobs-submit--async-pattern-for-notebooks)**.
 
 ---
 
 ## Custom pyfunc
 
-When sklearn/XGBoost autolog isn't enough — custom preprocessing, multiple sub-models, external API calls, ensemble logic. See **[2-custom-pyfunc.md](2-custom-pyfunc.md)** for a full worked example. Two non-obvious things:
+When sklearn/XGBoost autolog isn't enough — custom preprocessing, multiple sub-models, external API calls, ensemble logic. See **[1-custom-pyfunc.md](1-custom-pyfunc.md)** for a full worked example. Two non-obvious things:
 
 - **`python_model="path/to/file.py"`** (file path, not class instance) + `mlflow.models.set_model(MyModel())` at the end of that file. This is the "Models from Code" pattern — the file is logged verbatim, no pickling of the class.
 - **`mlflow.models.predict(model_uri=..., input_data=..., env_manager="uv")`** before deploying. Catches missing deps before the endpoint does.
@@ -215,15 +268,7 @@ databricks serving-endpoints list \
   | sort
 ```
 
-**Naming conventions to recognize** (so you can pick a sensible default without listing every time):
-- `databricks-claude-{opus,sonnet,haiku}-N-M` — Anthropic; opus = most capable, haiku = fastest/cheapest.
-- `databricks-gpt-N(-mini|-nano|-codex-max|-codex-mini)` — OpenAI; `-mini`/`-nano` cheaper, `-codex-*` code-specialized.
-- `databricks-gemini-N-M(-pro|-flash|-flash-lite)` — Google; `-pro` most capable, `-flash` fast.
-- `databricks-meta-llama-N-M-...-instruct` — Meta open-weight.
-- `databricks-gpt-oss-{20b,120b}`, `databricks-qwen*`, `databricks-gemma-*` — open-weight.
-- `databricks-{gte,bge,qwen3}-...-en` / `databricks-*-embedding-*` — embedding models (task `llm/v1/embeddings`).
-
-**Defaults when the user doesn't specify**: pick the highest-numbered Sonnet for agents (e.g. `databricks-claude-sonnet-4-6`), highest-numbered codex-max for code, `databricks-gte-large-en` for embeddings. Resolve the actual name from the live list above.
+**Defaults when the user doesn't specify**: pick the highest-numbered Claude Sonnet for agents, the highest-numbered `-codex-max` for code, `databricks-gte-large-en` for embeddings — resolve actual names from the live list above.
 
 ---
 
@@ -232,7 +277,7 @@ databricks serving-endpoints list \
 | Trap | Fix |
 |---|---|
 | Model lands in workspace registry, not UC | `mlflow.set_registry_uri("databricks-uc")` *before* logging |
-| Endpoint returns PERMISSION_DENIED at first query | Pass `resources=[DatabricksServingEndpoint(...), DatabricksFunction(...), DatabricksVectorSearchIndex(...), DatabricksLakebase(...)]` to `log_model` — without it, the endpoint has no creds for its dependencies |
+| Endpoint returns PERMISSION_DENIED at first query | Pass `resources=[...]` to `log_model` (covers UC functions, VS indexes, other endpoints, Lakebase) — see [2-genai-agents.md](2-genai-agents.md#resources-that-need-passthrough-auth) for the full list |
 | Used `transition_model_version_stage` | Stages are deprecated in UC. Use `client.set_registered_model_alias(name, "prod", version)` |
 | `spark_udf` rebuilds a virtualenv on every call | Pass `env_manager="local"` when training+scoring share a runtime |
 | Endpoint version swap says "ready" but old version still serving | Poll **both** `state.ready` AND `state.config_update` — see "Readiness has TWO state fields" |
@@ -246,9 +291,8 @@ databricks serving-endpoints list \
 
 | File | Contents |
 |---|---|
-| [1-batch-scoring-pattern.md](1-batch-scoring-pattern.md) | Full nightly train + spark_udf + MERGE-to-gold notebook example. The canonical demo flow. |
-| [2-custom-pyfunc.md](2-custom-pyfunc.md) | Single end-to-end custom pyfunc example: artifacts, signature, code_paths, log → register → deploy → query. |
-| [3-genai-agents.md](3-genai-agents.md) | Edge case: deploying a LangGraph `ResponsesAgent` with UC Function + Vector Search tools. For supervised multi-agent tiles, use **databricks-agent-bricks** instead. |
+| [1-custom-pyfunc.md](1-custom-pyfunc.md) | Single end-to-end custom pyfunc example: artifacts, signature, code_paths, log → register → deploy → query. |
+| [2-genai-agents.md](2-genai-agents.md) | Edge case: deploying a LangGraph `ResponsesAgent` with UC Function + Vector Search tools. For supervised multi-agent tiles, use **databricks-agent-bricks** instead. |
 
 ## Related skills
 

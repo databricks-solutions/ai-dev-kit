@@ -124,7 +124,7 @@ get_skill_extra_files() {
         "databricks-unity-catalog") echo "5-system-tables.md" ;;
         "databricks-lakebase-autoscale") echo "projects.md branches.md computes.md connection-patterns.md reverse-etl.md" ;;
         "databricks-metric-views") echo "yaml-reference.md patterns.md" ;;
-        "databricks-ml-training-serving") echo "1-batch-scoring-pattern.md 2-custom-pyfunc.md 3-genai-agents.md" ;;
+        "databricks-ml-training-serving") echo "1-custom-pyfunc.md 2-genai-agents.md" ;;
         "databricks-mlflow-evaluation") echo "references/CRITICAL-interfaces.md references/GOTCHAS.md references/patterns-context-optimization.md references/patterns-datasets.md references/patterns-evaluation.md references/patterns-scorers.md references/patterns-trace-analysis.md references/user-journeys.md" ;;
         "databricks-spark-declarative-pipelines") echo "1-ingestion-patterns.md 2-streaming-patterns.md 3-scd-patterns.md 4-performance-tuning.md 5-python-api.md 6-dlt-migration.md 7-advanced-configuration.md 8-project-initialization.md" ;;
         "databricks-spark-structured-streaming") echo "checkpoint-best-practices.md kafka-streaming.md merge-operations.md multi-sink-writes.md stateful-operations.md stream-static-joins.md stream-stream-joins.md streaming-best-practices.md trigger-and-cost-optimization.md" ;;

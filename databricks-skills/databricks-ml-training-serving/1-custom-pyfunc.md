@@ -89,11 +89,7 @@ v = max(client.search_model_versions(f"name='{FULL_NAME}'"), key=lambda x: int(x
 client.set_registered_model_alias(FULL_NAME, "prod", v)
 ```
 
-## Why file-based (`python_model="model.py"`)
-
-- **No class pickling**: the file is logged verbatim. Avoids the "I trained on Python 3.10 but the endpoint runs 3.11 and unpickling crashes" class of bugs.
-- **Lets `code_paths=[...]`** ship companion modules the file imports.
-- **`mlflow.models.set_model(instance)`** at the bottom of the file is the contract — exactly one call, exactly one instance.
+**Why `python_model="model.py"`**: file logged verbatim, no class pickling — avoids Python-version unpickle crashes between training and serving runtimes. Pair with `code_paths=[...]` to ship companion modules; `mlflow.models.set_model(instance)` at end of file is the contract (exactly one call).
 
 ## Consume
 
