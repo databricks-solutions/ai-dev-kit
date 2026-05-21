@@ -620,6 +620,6 @@ If I'm unsure about a method, I should:
 - **[databricks-bundles](../databricks-bundles/SKILL.md)** - deploying resources via DABs
 - **[databricks-jobs](../databricks-jobs/SKILL.md)** - job orchestration patterns
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - catalog governance
-- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving endpoint management
+- **[databricks-ml-training-serving](../databricks-ml-training-serving/SKILL.md)** - serving endpoint management
 - **[databricks-vector-search](../databricks-vector-search/SKILL.md)** - vector index operations
 - **[databricks-lakebase-autoscale](../databricks-lakebase-autoscale/SKILL.md)** - managed PostgreSQL with autoscaling + branching

@@ -75,7 +75,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-ai-functions** - Built-in AI Functions (ai_classify, ai_extract, ai_summarize, ai_query, ai_forecast, ai_parse_document, and more) with SQL and PySpark patterns, function selection guidance, document processing pipelines, and custom RAG (parse → chunk → index → query)
 - **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
 - **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
-- **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints
+- **databricks-ml-training-serving** - Train classical ML with MLflow, register to UC, batch-score over Delta or deploy real-time serving endpoints
 - **databricks-unstructured-pdf-generation** - Generate synthetic PDFs for RAG
 - **databricks-vector-search** - Vector similarity search for RAG and semantic search
 

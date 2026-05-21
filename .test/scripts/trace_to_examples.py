@@ -13,7 +13,7 @@ Usage:
     # --- From local session.jsonl ---
     uv run python .test/scripts/trace_to_examples.py \
       --trace ~/.claude/projects/.../session.jsonl \
-      --skill databricks-model-serving
+      --skill databricks-ml-training-serving
 
     # --- From MLflow experiment (browse traces, pick best ones) ---
     # List recent traces in an experiment
@@ -23,33 +23,33 @@ Usage:
     # Extract from all recent traces in an experiment
     uv run python .test/scripts/trace_to_examples.py \
       --experiment-id 2452310130108632 \
-      --skill databricks-model-serving
+      --skill databricks-ml-training-serving
 
     # Extract from a specific MLflow run
     uv run python .test/scripts/trace_to_examples.py \
       --run-id abc123def456 \
-      --skill databricks-model-serving
+      --skill databricks-ml-training-serving
 
     # Extract from a specific MLflow trace ID
     uv run python .test/scripts/trace_to_examples.py \
       --trace-id tr-d416fccdab46e2dea6bad1d0bd8aaaa8 \
-      --skill databricks-model-serving
+      --skill databricks-ml-training-serving
 
     # --- Common options ---
     # With LLM refinement of expectations
     uv run python .test/scripts/trace_to_examples.py \
       --experiment-id 2452310130108632 \
-      --skill databricks-model-serving --refine
+      --skill databricks-ml-training-serving --refine
 
     # Auto-append to ground_truth.yaml (skip manual review)
     uv run python .test/scripts/trace_to_examples.py \
       --experiment-id 2452310130108632 \
-      --skill databricks-model-serving --trust
+      --skill databricks-ml-training-serving --trust
 
     # Limit number of traces to process from an experiment
     uv run python .test/scripts/trace_to_examples.py \
       --experiment-id 2452310130108632 \
-      --skill databricks-model-serving --limit 5
+      --skill databricks-ml-training-serving --limit 5
 """
 
 import argparse
@@ -619,7 +619,7 @@ def main():
     parser.add_argument(
         "--skill", "-s",
         default=None,
-        help="Skill name to tag examples with (e.g., databricks-model-serving)",
+        help="Skill name to tag examples with (e.g., databricks-ml-training-serving)",
     )
     parser.add_argument(
         "--refine",

@@ -22,7 +22,7 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
   'databricks-aibi-dashboards': ['manage_dashboard'],
   'databricks-genie': ['manage_genie', 'ask_genie'],
   'databricks-spark-declarative-pipelines': ['manage_pipeline', 'manage_pipeline_run'],
-  'databricks-model-serving': ['manage_serving_endpoint'],
+  'databricks-ml-training-serving': ['manage_serving_endpoint'],
   'databricks-jobs': ['manage_jobs', 'manage_job_runs'],
   'databricks-unity-catalog': [
     'manage_uc_objects', 'manage_uc_grants', 'manage_uc_storage',

@@ -3,17 +3,17 @@
 
 Usage:
     # Interactive mode — prompts for each field
-    uv run python .test/scripts/add_example.py databricks-model-serving
+    uv run python .test/scripts/add_example.py databricks-ml-training-serving
 
     # Inline mode — provide prompt and response directly
-    uv run python .test/scripts/add_example.py databricks-model-serving \
+    uv run python .test/scripts/add_example.py databricks-ml-training-serving \
       --prompt "Create a ChatAgent with tool calling" \
       --response-file /path/to/response.md \
       --facts "Uses ChatAgent class" "Implements predict method" \
       --patterns "ChatAgent" "def predict"
 
     # From clipboard
-    uv run python .test/scripts/add_example.py databricks-model-serving --from-clipboard
+    uv run python .test/scripts/add_example.py databricks-ml-training-serving --from-clipboard
 """
 
 import argparse
@@ -93,7 +93,7 @@ def main():
     )
     parser.add_argument(
         "skill_name",
-        help="Name of the skill (e.g., databricks-model-serving)",
+        help="Name of the skill (e.g., databricks-ml-training-serving)",
     )
     parser.add_argument(
         "--prompt", "-p",

@@ -86,7 +86,7 @@ $script:Skills = @(
     "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-apps-python",
     "databricks-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
     "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
-    "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-ai-functions",
+    "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-ml-training-serving", "databricks-ai-functions",
     "databricks-python-sdk", "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
     "databricks-synthetic-data-gen", "databricks-unity-catalog", "databricks-unstructured-pdf-generation",
     "databricks-vector-search", "databricks-zerobus-ingest", "spark-python-data-source"
@@ -122,7 +122,7 @@ $script:ProfileAnalyst = @(
     "databricks-aibi-dashboards", "databricks-dbsql", "databricks-genie", "databricks-metric-views"
 )
 $script:ProfileAiMlEngineer = @(
-    "databricks-agent-bricks", "databricks-vector-search", "databricks-model-serving",
+    "databricks-agent-bricks", "databricks-vector-search", "databricks-ml-training-serving",
     "databricks-genie", "databricks-ai-functions", "databricks-unstructured-pdf-generation",
     "databricks-mlflow-evaluation", "databricks-synthetic-data-gen", "databricks-jobs"
 )
@@ -133,7 +133,7 @@ $script:ProfileAiMlMlflow = @(
 )
 $script:ProfileAppDeveloper = @(
     "databricks-apps-python", "databricks-app-apx", "databricks-lakebase-autoscale",
-    "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
+    "databricks-lakebase-provisioned", "databricks-ml-training-serving", "databricks-dbsql",
     "databricks-jobs", "databricks-bundles"
 )
 $script:ProfileAppDeveloperAgent = @("databricks-core:databricks", "databricks-apps", "databricks-lakebase")
@@ -1205,7 +1205,7 @@ function Invoke-PromptCustomSkills {
         @{ Label = "Genie";                Value = "databricks-genie";                       State = ($preselected -contains "databricks-genie");                       Hint = "Natural language SQL" }
         @{ Label = "Agent Bricks";         Value = "databricks-agent-bricks";                State = ($preselected -contains "databricks-agent-bricks");                Hint = "Build AI agents" }
         @{ Label = "Vector Search";        Value = "databricks-vector-search";               State = ($preselected -contains "databricks-vector-search");               Hint = "Similarity search" }
-        @{ Label = "Model Serving";        Value = "databricks-model-serving";               State = ($preselected -contains "databricks-model-serving");               Hint = "Deploy models/agents" }
+        @{ Label = "ML Training & Serving"; Value = "databricks-ml-training-serving";              State = ($preselected -contains "databricks-ml-training-serving");              Hint = "Train, register, batch-score, serve" }
         @{ Label = "MLflow Evaluation";    Value = "databricks-mlflow-evaluation";           State = ($preselected -contains "databricks-mlflow-evaluation");           Hint = "Model evaluation" }
         @{ Label = "AI Functions";          Value = "databricks-ai-functions";                State = ($preselected -contains "databricks-ai-functions");                Hint = "AI Functions, document parsing & RAG" }
         @{ Label = "Unstructured PDF";     Value = "databricks-unstructured-pdf-generation"; State = ($preselected -contains "databricks-unstructured-pdf-generation"); Hint = "Synthetic PDFs for RAG" }

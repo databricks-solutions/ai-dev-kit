@@ -44,7 +44,7 @@ def main():
     parser.add_argument(
         "skill_name",
         nargs="?",
-        help="Name of the skill to optimize (e.g., databricks-model-serving)",
+        help="Name of the skill to optimize (e.g., databricks-ml-training-serving)",
     )
     parser.add_argument(
         "--all",

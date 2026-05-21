@@ -45,7 +45,7 @@ def manage_serving_endpoint(
       max_tokens, temperature: Optional for chat endpoints.
       Returns: {choices: [...]} for chat or {predictions: [...]} for ML.
 
-    See databricks-model-serving skill for endpoint configuration."""
+    See databricks-ml-training-serving skill for endpoint configuration."""
     act = action.lower()
 
     if act == "get":

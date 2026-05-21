@@ -1,5 +1,5 @@
 ---
-skill_name: databricks-model-serving
+skill_name: databricks-ml-training-serving
 tool_modules: [serving, compute]
 description: "Deploy and query Databricks Model Serving endpoints"
 

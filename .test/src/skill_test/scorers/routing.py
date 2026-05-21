@@ -74,7 +74,7 @@ SKILL_TRIGGERS = {
         "supervisor",
     ],
     "databricks-lakebase-provisioned": ["lakebase", "postgresql", "postgres"],
-    "databricks-model-serving": ["model serving", "serving endpoint", "inference endpoint"],
+    "databricks-ml-training-serving": ["model serving", "serving endpoint", "inference endpoint"],
 }
 
 
