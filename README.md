@@ -131,6 +131,14 @@ _Note: Project configuration files can be re-used in other projects. You find th
 bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
 ```
 
+> **macOS note:** If the process-substitution form above is killed by the shell (e.g. `zsh: killed bash`), download the script first and then run it:
+>
+> ```bash
+> curl -L https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh -o install.sh
+> chmod +x install.sh
+> ./install.sh
+> ```
+
 <details>
 <summary><strong>Advanced Options</strong> (click to expand)</summary>
 
