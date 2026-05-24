@@ -96,8 +96,7 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
 | [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
-| [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
-| [**Genie Code Skills**](databricks-skills/install_skills.sh) | Install skills into your workspace for Genie Code (`--install-to-genie`) | [Genie Code skills (install)](#genie-code-skills) |
+| [**Skills**](https://github.com/databricks/databricks-agent-skills) | Databricks patterns + best practices for coding agents (now distributed via the Databricks CLI) | `databricks aitools install [name] [--experimental]` |
 | [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
 ---
 
@@ -238,42 +237,19 @@ results = execute_sql("SELECT * FROM my_catalog.schema.table LIMIT 10")
 Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databricks-tools-core/](databricks-tools-core/) for details.
 
 ---
-## Genie Code Skills
+## Skills
 
-Install skills into `./.claude/skills` (relative to the directory where you run the script), then upload them to your workspace at `/Workspace/Users/<you>/.assistant/skills` so Genie Code can use them in the UI. Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for your workspace.
-
-**Always run from the project directory** where you want `.claude/skills` created (for example your repo root or `ai-dev-kit`).
-
-**From this repo (recommended if you have a clone):**
+Databricks skills are distributed via the Databricks CLI from [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills):
 
 ```bash
-# Databricks skills from this checkout + upload (DEFAULT CLI profile)
-./databricks-skills/install_skills.sh --local --install-to-genie
-
-# Download all skills from GitHub, then upload
-./databricks-skills/install_skills.sh --install-to-genie
-
-# Explicit Databricks CLI profile
-./databricks-skills/install_skills.sh --install-to-genie --profile YOUR_PROFILE
+databricks aitools install                  # all stable skills
+databricks aitools install --experimental   # stable + experimental
+databricks aitools install <name> [--experimental]
 ```
 
-**Without cloning** (run from the directory that should contain `.claude/skills`):
+The CLI detects which coding agents are installed (Claude Code, Cursor, Codex CLI, OpenCode, GitHub Copilot, Antigravity) and writes skills into the right per-agent directory. For Genie Code workflows, the same CLI command installs into the user's workspace assistant directory.
 
-```bash
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie
-```
-
-Combine `--profile`, `--local`, specific skill names, `--mlflow-version`, etc. as needed; see `./databricks-skills/install_skills.sh --help` or [databricks-skills/README.md](databricks-skills/README.md).
-
-**From a Databricks notebook** (no local terminal needed):
-
-Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py) into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them to your workspace using the Databricks SDK. This works on any compute, including serverless.
-
-**Skill modification or Custom Skill**
-
-After the script successfully installs the skills to your workspace, you may find the skills under `/Workspace/Users/<your_user_name>/.assistant/skills`.
-
-This directory is customizable if you wish to only use certain skills or even create custom skills that are related to your organization to make Genie Code even better.  You can modify/remove existing skills or create new skills folders that Genie Code will automatically use in any session.
+The `databricks-skills/` directory in this repo retains tombstone redirects so existing links continue to work; new skill content lands in `databricks-agent-skills` directly. See [`databricks-skills/README.md`](databricks-skills/README.md) for the per-skill redirect table.
 
 ## Architecture
 

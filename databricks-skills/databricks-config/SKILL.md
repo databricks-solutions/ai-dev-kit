@@ -1,22 +1,16 @@
 ---
 name: databricks-config
-description: "Manage Databricks workspace connections: check current workspace, switch profiles, list available workspaces, or authenticate to a new workspace. Use when the user mentions \"switch workspace\", \"which workspace\", \"current profile\", \"databrickscfg\", \"connect to workspace\", or \"databricks auth\"."
+description: "Moved to databricks-agent-skills. Install via `databricks aitools install databricks-core`."
 ---
 
-Use the `manage_workspace` MCP tool for all workspace operations. Do NOT edit `~/.databrickscfg`, use Bash, or use the Databricks CLI.
+# databricks-config — moved
 
-## Steps
+This skill has moved to [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills).
 
-1. Call `ToolSearch` with query `select:mcp__databricks__manage_workspace` to load the tool.
+Install the latest version via the Databricks CLI:
 
-2. Map user intent to action:
-   - status / which workspace / current → `action="status"`
-   - list / available workspaces → `action="list"`
-   - switch to X → call `list` first to find the profile name, then `action="switch", profile="<name>"` (or `host="<url>"` if a URL was given)
-   - login / connect / authenticate → `action="login", host="<url>"`
+```bash
+databricks aitools install databricks-core
+```
 
-3. Call `mcp__databricks__manage_workspace` with the action and any parameters.
-
-4. Present the result. For `status`/`switch`/`login`: show host, profile, username. For `list`: formatted table with the active profile marked.
-
-> **Note:** The switch is session-scoped — it resets on MCP server restart. For permanent profile setup, use `databricks auth login -p <profile>` and update `~/.databrickscfg` with `cluster_id` or `serverless_compute_id = auto`.
+The skill content here is no longer maintained. File issues and PRs against [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills).
