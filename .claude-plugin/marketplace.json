@@ -5,14 +5,52 @@
   },
   "metadata": {
     "description": "Official Databricks AI Dev Kit plugin marketplace",
-    "version": "1.1.9"
+    "version": "1.2.0"
   },
   "plugins": [
     {
       "name": "databricks-ai-dev-kit",
       "source": "./",
-      "description": "Databricks development toolkit with 19 skills and MCP tools for direct Databricks operations",
-      "version": "1.1.9"
+      "description": "Databricks development toolkit with skills for data engineering, ML, and AI agents plus MCP tools for direct Databricks operations",
+      "version": "1.2.0",
+      "category": "development",
+      "keywords": ["databricks", "spark", "mlflow", "data-engineering", "ai-agents", "mcp"]
+    },
+    {
+      "name": "databricks-agent-skills-stable",
+      "source": {
+        "source": "github",
+        "repo": "databricks/databricks-agent-skills"
+      },
+      "skills": "./skills/",
+      "strict": false,
+      "description": "Stable, curated Databricks skills published by Databricks (skills/ directory of databricks/databricks-agent-skills)",
+      "version": "0.1.0",
+      "category": "development",
+      "keywords": ["databricks", "skills", "stable"],
+      "author": {
+        "name": "Databricks"
+      },
+      "homepage": "https://github.com/databricks/databricks-agent-skills",
+      "repository": "https://github.com/databricks/databricks-agent-skills"
+    },
+    {
+      "name": "databricks-agent-skills-experimental",
+      "source": {
+        "source": "github",
+        "repo": "databricks/databricks-agent-skills"
+      },
+      "skills": "./experimental/",
+      "strict": false,
+      "description": "Experimental Databricks skills (experimental/ directory of databricks/databricks-agent-skills) — broader coverage, less stable",
+      "version": "0.1.0",
+      "category": "development",
+      "keywords": ["databricks", "skills", "experimental"],
+      "author": {
+        "name": "Databricks"
+      },
+      "homepage": "https://github.com/databricks/databricks-agent-skills",
+      "repository": "https://github.com/databricks/databricks-agent-skills"
     }
   ]
 }
