@@ -5,24 +5,25 @@
   },
   "metadata": {
     "description": "Official Databricks AI Dev Kit plugin marketplace",
-    "version": "1.2.0"
+    "version": "1.2.1"
   },
   "plugins": [
     {
       "name": "databricks-ai-dev-kit",
       "source": "./",
       "description": "Databricks development toolkit with skills for data engineering, ML, and AI agents plus MCP tools for direct Databricks operations",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "category": "development",
       "keywords": ["databricks", "spark", "mlflow", "data-engineering", "ai-agents", "mcp"]
     },
     {
       "name": "databricks-agent-skills-stable",
       "source": {
-        "source": "github",
-        "repo": "databricks/databricks-agent-skills"
+        "source": "git-subdir",
+        "url": "https://github.com/databricks/databricks-agent-skills.git",
+        "path": "skills"
       },
-      "skills": "./skills/",
+      "skills": "./",
       "strict": false,
       "description": "Stable, curated Databricks skills published by Databricks (skills/ directory of databricks/databricks-agent-skills)",
       "version": "0.1.0",
@@ -37,10 +38,11 @@
     {
       "name": "databricks-agent-skills-experimental",
       "source": {
-        "source": "github",
-        "repo": "databricks/databricks-agent-skills"
+        "source": "git-subdir",
+        "url": "https://github.com/databricks/databricks-agent-skills.git",
+        "path": "experimental"
       },
-      "skills": "./experimental/",
+      "skills": "./",
       "strict": false,
       "description": "Experimental Databricks skills (experimental/ directory of databricks/databricks-agent-skills) — broader coverage, less stable",
       "version": "0.1.0",
