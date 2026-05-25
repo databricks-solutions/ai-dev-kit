@@ -1261,11 +1261,13 @@ check_cli_version() {
 
     if version_gte "$cli_version" "$MIN_CLI_VERSION"; then
         PREREQS+=("Databricks CLI v${cli_version}")
-        return 0
     else
-        PREREQ_WARNINGS+=("Databricks CLI v${cli_version} outdated (min: v${MIN_CLI_VERSION}). Upgrade: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh")
-        return 1
+        PREREQ_WARNINGS+=("Databricks CLI v${cli_version} is older than required v${MIN_CLI_VERSION}. Upgrade:\n     • macOS / Linux (Homebrew):  ${B}brew upgrade databricks${N}\n     • macOS / Linux (installer):  ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}\n     • Windows (WinGet):           ${B}winget install Databricks.DatabricksCLI${N}\n     • Docs: ${BL}https://docs.databricks.com/aws/en/dev-tools/cli/install${N}")
     fi
+    # Always return 0 — version mismatch is a soft warning, not a hard fail.
+    # Returning 1 under `set -e` from inside check_deps's `if then` branch
+    # aborts the installer right after the banner prints, with no error.
+    return 0
 }
 
 # Check prerequisites (prints inline)
@@ -1303,6 +1305,12 @@ check_deps() {
     for w in "${PREREQ_WARNINGS[@]}"; do
         warn "$w"
     done
+
+    # Explicit success — without this, an outdated-CLI warning from
+    # check_cli_version (return 1) bubbles up as the function's return
+    # value and `set -e` aborts the installer silently after only the
+    # banner is printed.
+    return 0
 }
 
 # Setup MCP server
