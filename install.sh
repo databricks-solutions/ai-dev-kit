@@ -56,6 +56,7 @@ USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
 CHANNEL="${DEVKIT_CHANNEL:-stable}"  # stable or experimental
+IGNORE_CLI_VERSION="${DEVKIT_IGNORE_CLI_VERSION:-false}"
 
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
@@ -158,6 +159,7 @@ while [ $# -gt 0 ]; do
         --mcp)            INSTALL_MCP=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --experimental)   CHANNEL="experimental"; shift ;;
+        --ignore-cli-version) IGNORE_CLI_VERSION=true; shift ;;
         -f|--force)       FORCE=true; FORCE_EXPLICIT=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
@@ -177,6 +179,7 @@ while [ $# -gt 0 ]; do
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
             echo "  --experimental        Install from experimental branch (early access features)"
+            echo "  --ignore-cli-version  Skip the Databricks CLI version check (install anyway)"
             echo "  --mcp                 Install deprecated MCP server (default: no)"
             echo "  --mcp-path PATH       MCP server install path (default: ~/.ai-dev-kit)"
             echo "  -f, --force           Force reinstall"
@@ -193,6 +196,7 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
             echo "  DEVKIT_CHANNEL        'stable' (default) or 'experimental'"
+            echo "  DEVKIT_IGNORE_CLI_VERSION  Set to 'true' to skip the CLI version check"
             echo "  DEVKIT_INSTALL_MCP    Set to 'true' to install MCP server"
             echo "  DEVKIT_MCP_PATH       MCP server install path"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
@@ -1249,20 +1253,38 @@ version_gte() {
     printf '%s\n%s' "$2" "$1" | sort -V -C
 }
 
-# Check Databricks CLI version meets minimum requirement
+# Upgrade-instruction block reused by every CLI-related fail/warn path.
+# Keeps the macOS/Linux/Windows + docs URL formatting in one place.
+cli_upgrade_instructions() {
+    cat <<EOF
+     • macOS / Linux (Homebrew):  ${B}brew upgrade databricks${N}
+     • macOS / Linux (installer): ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}
+     • Windows (WinGet):          ${B}winget install Databricks.DatabricksCLI${N}
+     • Docs: ${BL}https://docs.databricks.com/aws/en/dev-tools/cli/install${N}
+
+  Re-run with ${B}--ignore-cli-version${N} to install anyway (some skills will not work).
+EOF
+}
+
+# Check Databricks CLI version meets minimum requirement.
+# Sets CLI_VERSION_OK=false on mismatch — the actual die() happens later in
+# check_deps so the user sees the full prereq summary before we abort.
+CLI_VERSION_OK=true
 check_cli_version() {
     local cli_version
     cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 
     if [ -z "$cli_version" ]; then
         PREREQ_WARNINGS+=("Could not determine Databricks CLI version")
-        return 1
+        CLI_VERSION_OK=false
+        return 0
     fi
 
     if version_gte "$cli_version" "$MIN_CLI_VERSION"; then
         PREREQS+=("Databricks CLI v${cli_version}")
     else
-        PREREQ_WARNINGS+=("Databricks CLI v${cli_version} is older than required v${MIN_CLI_VERSION}. Upgrade:\n     • macOS / Linux (Homebrew):  ${B}brew upgrade databricks${N}\n     • macOS / Linux (installer):  ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}\n     • Windows (WinGet):           ${B}winget install Databricks.DatabricksCLI${N}\n     • Docs: ${BL}https://docs.databricks.com/aws/en/dev-tools/cli/install${N}")
+        PREREQ_WARNINGS+=("Databricks CLI v${cli_version} is older than required v${MIN_CLI_VERSION}. Upgrade:\n$(cli_upgrade_instructions)")
+        CLI_VERSION_OK=false
     fi
     # Always return 0 — version mismatch is a soft warning, not a hard fail.
     # Returning 1 under `set -e` from inside check_deps's `if then` branch
@@ -1274,6 +1296,7 @@ check_cli_version() {
 check_deps() {
     PREREQS=()
     PREREQ_WARNINGS=()
+    CLI_VERSION_OK=true
 
     command -v git >/dev/null 2>&1 || die "git required"
     PREREQS+=("git")
@@ -1281,7 +1304,8 @@ check_deps() {
     if command -v databricks >/dev/null 2>&1; then
         check_cli_version
     else
-        PREREQ_WARNINGS+=("Databricks CLI not found. Install: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh")
+        PREREQ_WARNINGS+=("Databricks CLI not found. Install:\n$(cli_upgrade_instructions)")
+        CLI_VERSION_OK=false
     fi
 
     if [ "$INSTALL_MCP" = true ]; then
@@ -1305,6 +1329,14 @@ check_deps() {
     for w in "${PREREQ_WARNINGS[@]}"; do
         warn "$w"
     done
+
+    # Hard-fail on missing or outdated CLI unless the user explicitly opted out.
+    # We die AFTER printing all prereqs/warnings so the user sees the full
+    # picture (and the upgrade instructions were already printed via the warning).
+    if [ "$CLI_VERSION_OK" = false ] && [ "$IGNORE_CLI_VERSION" != true ]; then
+        die "Databricks CLI prerequisite not met. Install / upgrade per the instructions above, then re-run.
+       To bypass this check (some skills won't work), re-run with ${B}--ignore-cli-version${N}."
+    fi
 
     # Explicit success — without this, an outdated-CLI warning from
     # check_cli_version (return 1) bubbles up as the function's return
