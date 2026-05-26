@@ -10,6 +10,6 @@ results_summary:
   status: RUNNING
   success: true
 run_id: 1fb85925959b453090dce7d3317559cf
-skill_name: databricks-app-python
+skill_name: databricks-apps-python
 test_count: 1
 timestamp: '2026-02-12T20:17:59Z'

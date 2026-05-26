@@ -11,6 +11,7 @@ import glob as glob_module
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -681,10 +682,20 @@ def get_volume_file_metadata(volume_path: str) -> VolumeFileInfo:
     w = get_workspace_client()
     metadata = w.files.get_metadata(volume_path)
 
+    # files.get_metadata() returns last_modified as an HTTP-date (RFC 7231) string,
+    # e.g. "Wed, 21 Oct 2015 07:28:00 GMT". Normalize to ISO 8601 for parity with
+    # list_volume_files. Fall back to the raw value if the SDK ever changes shape.
+    last_modified: Optional[str] = None
+    if metadata.last_modified is not None:
+        try:
+            last_modified = parsedate_to_datetime(metadata.last_modified).isoformat()
+        except (TypeError, ValueError):
+            last_modified = str(metadata.last_modified)
+
     return VolumeFileInfo(
         name=Path(volume_path).name,
         path=volume_path,
         is_directory=False,
         file_size=metadata.content_length,
-        last_modified=metadata.last_modified.isoformat() if metadata.last_modified else None,
+        last_modified=last_modified,
     )

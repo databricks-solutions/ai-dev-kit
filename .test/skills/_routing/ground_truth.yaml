@@ -148,7 +148,7 @@ test_cases:
     inputs:
       prompt: "Create a Streamlit app that shows sales data"
     expectations:
-      expected_skills: ["databricks-app-python"]
+      expected_skills: ["databricks-apps-python"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -159,7 +159,7 @@ test_cases:
     inputs:
       prompt: "Build a Dash app with interactive charts"
     expectations:
-      expected_skills: ["databricks-app-python"]
+      expected_skills: ["databricks-apps-python"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -170,7 +170,7 @@ test_cases:
     inputs:
       prompt: "Create a Gradio app for testing my ML model"
     expectations:
-      expected_skills: ["databricks-app-python"]
+      expected_skills: ["databricks-apps-python"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -181,7 +181,7 @@ test_cases:
     inputs:
       prompt: "Build a FastAPI app that serves data from a warehouse"
     expectations:
-      expected_skills: ["databricks-app-python"]
+      expected_skills: ["databricks-apps-python"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -192,7 +192,7 @@ test_cases:
     inputs:
       prompt: "Create a Reflex app for managing inventory"
     expectations:
-      expected_skills: ["databricks-app-python"]
+      expected_skills: ["databricks-apps-python"]
       is_multi_skill: false
     metadata:
       category: "single_skill"
@@ -205,7 +205,7 @@ test_cases:
       prompt: "Build a Dash app and deploy it using DABs"
     expectations:
       expected_skills:
-        - "databricks-app-python"
+        - "databricks-apps-python"
         - "databricks-bundles"
       is_multi_skill: true
     metadata:
@@ -218,7 +218,7 @@ test_cases:
       prompt: "Create a Streamlit app that stores data in Lakebase"
     expectations:
       expected_skills:
-        - "databricks-app-python"
+        - "databricks-apps-python"
         - "databricks-lakebase-provisioned"
       is_multi_skill: true
     metadata:
@@ -231,7 +231,7 @@ test_cases:
       prompt: "Build a Gradio app that queries a model serving endpoint"
     expectations:
       expected_skills:
-        - "databricks-app-python"
+        - "databricks-apps-python"
         - "model-serving"
       is_multi_skill: true
     metadata:
@@ -246,7 +246,7 @@ test_cases:
     expectations:
       expected_skills:
         - "databricks-app-apx"
-        - "databricks-app-python"
+        - "databricks-apps-python"
       is_multi_skill: true
     metadata:
       category: "multi_skill"
