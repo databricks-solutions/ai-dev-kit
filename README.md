@@ -92,12 +92,33 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
 
 | Adventure                        | Best For | Start Here |
 |----------------------------------|----------|------------|
-| :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | [Quick Start (install)](#install-in-existing-project)
+| :star: [**Skills**](#skills) | **Start here!** Databricks patterns + best practices for coding agents — fastest path to value | `databricks aitools install` |
+| [**Install AI Dev Kit (skills + MCP server)**](#install-in-existing-project) | Skills + the MCP server with 75+ executable Databricks tools in one go | [Quick Start (install)](#install-in-existing-project) |
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
 | [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
-| [**Skills**](https://github.com/databricks/databricks-agent-skills) | Databricks patterns + best practices for coding agents (now distributed via the Databricks CLI) | `databricks aitools install [name] [--experimental]` |
 | [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
+---
+
+## Skills
+
+Databricks skills are distributed via the Databricks CLI from [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills) — install them directly, no clone of this repo required:
+
+```bash
+# All stable skills
+databricks aitools install
+
+# All stable + experimental skills
+databricks aitools install --experimental
+
+# One specific skill (stable or experimental)
+databricks aitools install <name> [--experimental]
+```
+
+Requires **Databricks CLI v1.0.0+**. The CLI detects which coding agents are installed (Claude Code, Cursor, Codex CLI, OpenCode, GitHub Copilot, Antigravity) and writes skills into the right per-agent directory. For Genie Code workflows, the same command installs into the user's workspace assistant directory.
+
+File issues and PRs against [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills). The `databricks-skills/` directory in this repo contains tombstone redirects so old links still resolve; see [`databricks-skills/README.md`](databricks-skills/README.md) for the per-skill mapping.
+
 ---
 
 ## Quick Start
@@ -105,7 +126,7 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
 ### Prerequisites
 
 - [uv](https://github.com/astral-sh/uv) - Python package manager
-- [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) - Command line interface for Databricks
+- [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) **v1.0.0+** — skills install via `databricks aitools install`, which requires v1.0.0 or newer
 - AI coding environment (one or more):
   - [Claude Code](https://claude.ai/code)
   - [Cursor](https://cursor.com)
@@ -237,20 +258,6 @@ results = execute_sql("SELECT * FROM my_catalog.schema.table LIMIT 10")
 Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databricks-tools-core/](databricks-tools-core/) for details.
 
 ---
-## Skills
-
-Databricks skills are distributed via the Databricks CLI from [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills):
-
-```bash
-databricks aitools install                  # all stable skills
-databricks aitools install --experimental   # stable + experimental
-databricks aitools install <name> [--experimental]
-```
-
-The CLI detects which coding agents are installed (Claude Code, Cursor, Codex CLI, OpenCode, GitHub Copilot, Antigravity) and writes skills into the right per-agent directory. For Genie Code workflows, the same CLI command installs into the user's workspace assistant directory.
-
-The `databricks-skills/` directory in this repo retains tombstone redirects so existing links continue to work; new skill content lands in `databricks-agent-skills` directly. See [`databricks-skills/README.md`](databricks-skills/README.md) for the per-skill redirect table.
-
 ## Architecture
 
 The AI Dev Kit ships as four composable pieces — install the whole kit, or pick just the parts you need.
@@ -265,7 +272,7 @@ The AI Dev Kit ships as four composable pieces — install the whole kit, or pic
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 20 markdown skills teaching Databricks patterns |
+| `databricks aitools install` | Databricks skills (patterns + best practices) — now distributed by the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) from [`databricks/databricks-agent-skills`](https://github.com/databricks/databricks-agent-skills). The `databricks-skills/` directory here is tombstones. |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 
 ---

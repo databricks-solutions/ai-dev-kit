@@ -57,7 +57,9 @@ $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $McpEntry  = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
 
 # Minimum required versions
-$MinCliVersion = "0.278.0"
+# CLI 1.0.0+ ships the top-level `databricks aitools install` command that this
+# installer delegates to for all Databricks skills.
+$MinCliVersion = "1.0.0"
 $MinSdkVersion = "0.85.0"
 
 # ─── Defaults ─────────────────────────────────────────────────
@@ -78,68 +80,60 @@ $script:UserSkills   = ""
 $script:ListSkills   = $false
 $script:Channel      = if ($env:DEVKIT_CHANNEL) { $env:DEVKIT_CHANNEL } else { "stable" }  # stable or experimental
 
-# Databricks skills (bundled in repo)
-$script:Skills = @(
-    "databricks-agent-bricks", "databricks-aibi-dashboards", "databricks-apps-python",
-    "databricks-bundles", "databricks-config", "databricks-dbsql", "databricks-docs", "databricks-genie",
-    "databricks-iceberg", "databricks-jobs", "databricks-lakebase-autoscale", "databricks-lakebase-provisioned",
-    "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving", "databricks-ai-functions",
-    "databricks-python-sdk", "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
-    "databricks-synthetic-data-gen", "databricks-unity-catalog", "databricks-unstructured-pdf-generation",
-    "databricks-vector-search", "databricks-zerobus-ingest", "spark-python-data-source"
+# Databricks skills are installed via `databricks aitools install` (CLI 1.0.0+).
+# The names below are d-a-s install-names that profile selection passes through
+# to the CLI as positional arguments. The local databricks-skills/<name>/
+# directories in this repo are tombstones kept only for link-redirects.
+#
+# The installer no longer fetches or copies skill content itself — everything
+# (Databricks skills, agent dir detection, channel selection) is delegated to
+# the CLI. MLflow and APX skills, previously bundled here, are out of scope for
+# this installer: install them separately if you need them.
+$script:DbxSkills = @(
+    "databricks-agent-bricks", "databricks-ai-functions", "databricks-aibi-dashboards",
+    "databricks-apps", "databricks-apps-python", "databricks-core", "databricks-dabs",
+    "databricks-dbsql", "databricks-docs", "databricks-execution-compute",
+    "databricks-iceberg", "databricks-jobs", "databricks-lakebase",
+    "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-model-serving",
+    "databricks-pipelines", "databricks-python-sdk", "databricks-spark-structured-streaming",
+    "databricks-synthetic-data-gen", "databricks-unity-catalog",
+    "databricks-unstructured-pdf-generation", "databricks-vector-search",
+    "databricks-zerobus-ingest", "spark-python-data-source"
 )
-
-# MLflow skills (fetched from mlflow/skills repo)
-$script:MlflowSkills = @(
-    "agent-evaluation", "analyze-mlflow-chat-session", "analyze-mlflow-trace",
-    "instrumenting-with-mlflow-tracing", "mlflow-onboarding", "querying-mlflow-metrics",
-    "retrieving-mlflow-traces", "searching-mlflow-docs"
-)
-$MlflowRawUrl = "https://raw.githubusercontent.com/mlflow/skills/main"
-
-# APX skills (fetched from databricks-solutions/apx repo)
-$script:ApxSkills = @("databricks-app-apx")
-$ApxRawUrl = "https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
-
-# Agent skills (fetched from databricks/databricks-agent-skills repo)
-$script:AgentSkills = @("databricks-core:databricks", "databricks-apps", "databricks-lakebase")
-$AgentSkillsRawUrl = "https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
-$AgentSkillsApiUrl = "https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
 
 # ─── Skill profiles ──────────────────────────────────────────
-$script:CoreSkills = @("databricks-config", "databricks-docs", "databricks-python-sdk", "databricks-unity-catalog")
+# Names below are d-a-s install-names (post-migration). Renames applied:
+#   bundles                          -> databricks-dabs
+#   config                           -> databricks-core
+#   lakebase-autoscale/provisioned   -> databricks-lakebase
+#   spark-declarative-pipelines      -> databricks-pipelines
+# databricks-genie is omitted — deferred during the migration (see d-a-s PR
+# https://github.com/databricks/databricks-agent-skills/pull/73), will return
+# in a future d-a-s release.
+
+$script:CoreSkills = @("databricks-core", "databricks-docs", "databricks-python-sdk", "databricks-unity-catalog")
 
 $script:ProfileDataEngineer = @(
-    "databricks-spark-declarative-pipelines", "databricks-spark-structured-streaming",
-    "databricks-jobs", "databricks-bundles", "databricks-dbsql", "databricks-iceberg",
+    "databricks-pipelines", "databricks-spark-structured-streaming",
+    "databricks-jobs", "databricks-dabs", "databricks-dbsql", "databricks-iceberg",
     "databricks-zerobus-ingest", "spark-python-data-source", "databricks-metric-views",
     "databricks-synthetic-data-gen"
 )
 $script:ProfileAnalyst = @(
-    "databricks-aibi-dashboards", "databricks-dbsql", "databricks-genie", "databricks-metric-views"
+    "databricks-aibi-dashboards", "databricks-dbsql", "databricks-metric-views"
 )
 $script:ProfileAiMlEngineer = @(
     "databricks-agent-bricks", "databricks-vector-search", "databricks-model-serving",
-    "databricks-genie", "databricks-ai-functions", "databricks-unstructured-pdf-generation",
+    "databricks-ai-functions", "databricks-unstructured-pdf-generation",
     "databricks-mlflow-evaluation", "databricks-synthetic-data-gen", "databricks-jobs"
 )
-$script:ProfileAiMlMlflow = @(
-    "agent-evaluation", "analyze-mlflow-chat-session", "analyze-mlflow-trace",
-    "instrumenting-with-mlflow-tracing", "mlflow-onboarding", "querying-mlflow-metrics",
-    "retrieving-mlflow-traces", "searching-mlflow-docs"
-)
 $script:ProfileAppDeveloper = @(
-    "databricks-apps-python", "databricks-app-apx", "databricks-lakebase-autoscale",
-    "databricks-lakebase-provisioned", "databricks-model-serving", "databricks-dbsql",
-    "databricks-jobs", "databricks-bundles"
+    "databricks-apps", "databricks-apps-python", "databricks-lakebase",
+    "databricks-model-serving", "databricks-dbsql", "databricks-jobs", "databricks-dabs"
 )
-$script:ProfileAppDeveloperAgent = @("databricks-core:databricks", "databricks-apps", "databricks-lakebase")
 
-# Selected skills (populated during profile selection)
-$script:SelectedSkills = @()
-$script:SelectedMlflowSkills = @()
-$script:SelectedApxSkills = @()
-$script:SelectedAgentSkills = @()
+# Selected skills (populated during profile selection — passed to CLI)
+$script:SelectedDbxSkills = @()
 
 # ─── --list-skills handler ────────────────────────────────────
 if ($script:ListSkills) {
@@ -147,11 +141,11 @@ if ($script:ListSkills) {
     Write-Host "Available Skill Profiles" -ForegroundColor White
     Write-Host "--------------------------------"
     Write-Host ""
-    Write-Host "  all              " -ForegroundColor White -NoNewline; Write-Host "All 34 skills (default)"
-    Write-Host "  data-engineer    " -ForegroundColor White -NoNewline; Write-Host "Pipelines, Spark, Jobs, Streaming (14 skills)"
-    Write-Host "  analyst          " -ForegroundColor White -NoNewline; Write-Host "Dashboards, SQL, Genie, Metrics (8 skills)"
-    Write-Host "  ai-ml-engineer   " -ForegroundColor White -NoNewline; Write-Host "Agents, RAG, Vector Search, MLflow (17 skills)"
-    Write-Host "  app-developer    " -ForegroundColor White -NoNewline; Write-Host "Apps, Lakebase, Deployment (10 skills)"
+    Write-Host "  all              " -ForegroundColor White -NoNewline; Write-Host "All Databricks + MLflow + APX skills (default)"
+    Write-Host "  data-engineer    " -ForegroundColor White -NoNewline; Write-Host "Pipelines, Spark, Jobs, Streaming"
+    Write-Host "  analyst          " -ForegroundColor White -NoNewline; Write-Host "Dashboards, SQL, Metrics"
+    Write-Host "  ai-ml-engineer   " -ForegroundColor White -NoNewline; Write-Host "Agents, RAG, Vector Search, MLflow"
+    Write-Host "  app-developer    " -ForegroundColor White -NoNewline; Write-Host "Apps, Lakebase, Deployment"
     Write-Host ""
     Write-Host "Core Skills (always installed)" -ForegroundColor White
     Write-Host "--------------------------------"
@@ -168,27 +162,21 @@ if ($script:ListSkills) {
     Write-Host "AI/ML Engineer" -ForegroundColor White
     Write-Host "--------------------------------"
     foreach ($s in $script:ProfileAiMlEngineer) { Write-Host "    $s" }
-    Write-Host "  + MLflow skills:" -ForegroundColor DarkGray
-    foreach ($s in $script:ProfileAiMlMlflow) { Write-Host "    $s" }
     Write-Host ""
     Write-Host "App Developer" -ForegroundColor White
     Write-Host "--------------------------------"
     foreach ($s in $script:ProfileAppDeveloper) { Write-Host "    $s" }
     Write-Host ""
-    Write-Host "MLflow Skills (from mlflow/skills repo)" -ForegroundColor White
+    Write-Host "All Databricks Skills (installed via `databricks aitools install`)" -ForegroundColor White
     Write-Host "--------------------------------"
-    foreach ($s in $script:MlflowSkills) { Write-Host "    $s" }
+    foreach ($s in $script:DbxSkills) { Write-Host "    $s" }
     Write-Host ""
-    Write-Host "APX Skills (from databricks-solutions/apx repo)" -ForegroundColor White
-    Write-Host "--------------------------------"
-    foreach ($s in $script:ApxSkills) { Write-Host "    $s" }
-    Write-Host ""
-    Write-Host "Agent Skills (from databricks/databricks-agent-skills repo)" -ForegroundColor White
-    Write-Host "--------------------------------"
-    foreach ($s in $script:AgentSkills) { Write-Host "    $($s -replace '^.*:', '')" }
+    Write-Msg "For the authoritative, up-to-date list run: databricks aitools list"
     Write-Host ""
     Write-Host "Usage: .\install.ps1 --skills-profile data-engineer,ai-ml-engineer" -ForegroundColor DarkGray
     Write-Host "       .\install.ps1 --skills databricks-jobs,databricks-dbsql" -ForegroundColor DarkGray
+    Write-Host "Or skip this installer and go straight to the CLI:" -ForegroundColor DarkGray
+    Write-Host "       databricks aitools install [--experimental] [name]" -ForegroundColor DarkGray
     Write-Host ""
     return
 }
@@ -248,7 +236,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --silent              Silent mode (no output except errors)"
             Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
-            Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
+            Write-Host "  --skills LIST         Comma-separated d-a-s skill names (overrides profile; passed to 'databricks aitools install')"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
             Write-Host "  --experimental        Install from experimental branch (early access features)"
             Write-Host "  -f, --force           Force reinstall"
@@ -716,7 +704,8 @@ function Test-Dependencies {
     }
     Write-Ok "git"
 
-    # Databricks CLI
+    # Databricks CLI is mandatory: `databricks aitools install` is the skill
+    # install path. Skipping it would leave the user without any skills.
     if (Get-Command databricks -ErrorAction SilentlyContinue) {
         try {
             $cliOutput = & databricks --version 2>&1
@@ -725,18 +714,16 @@ function Test-Dependencies {
                 if ([version]$cliVersion -ge [version]$MinCliVersion) {
                     Write-Ok "Databricks CLI v$cliVersion"
                 } else {
-                    Write-Warn "Databricks CLI v$cliVersion is outdated (minimum: v$MinCliVersion)"
-                    Write-Msg "  Upgrade: winget upgrade Databricks.DatabricksCLI"
+                    Write-Err "Databricks CLI v$cliVersion is outdated. Skills install via 'databricks aitools install' which requires v$MinCliVersion+.`n   Upgrade: winget upgrade Databricks.DatabricksCLI"
                 }
             } else {
-                Write-Warn "Could not determine Databricks CLI version"
+                Write-Err "Could not determine Databricks CLI version -- install v$MinCliVersion+: winget install Databricks.DatabricksCLI"
             }
         } catch {
-            Write-Warn "Could not determine Databricks CLI version"
+            Write-Err "Could not determine Databricks CLI version -- install v$MinCliVersion+: winget install Databricks.DatabricksCLI"
         }
     } else {
-        Write-Warn "Databricks CLI not found. Install: winget install Databricks.DatabricksCLI"
-        Write-Msg "You can still install, but authentication will require the CLI later."
+        Write-Err "Databricks CLI is required (v$MinCliVersion+).`n   Install: winget install Databricks.DatabricksCLI`n   Then re-run this installer."
     }
 
     # Python package manager
@@ -868,77 +855,44 @@ function Install-McpServer {
 }
 
 # ─── Skill profile selection ──────────────────────────────────
+# Resolve selected d-a-s skill names from profile names or explicit skill
+# list. The result is passed as positional args to `databricks aitools install`.
 function Resolve-Skills {
     # Priority 1: Explicit --skills flag
     if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
-        $userList = $script:UserSkills -split ','
-        $dbSkills = @() + $script:CoreSkills
-        $mlflowSkills = @()
-        $apxSkills = @()
-        $agentSkills = @()
-        foreach ($skill in $userList) {
-            $skill = $skill.Trim()
-            if ($script:MlflowSkills -contains $skill) {
-                $mlflowSkills += $skill
-            } elseif ($script:ApxSkills -contains $skill) {
-                $apxSkills += $skill
-            } elseif ($script:AgentSkills | ForEach-Object { $_ -replace '^.*:', '' } | Where-Object { $_ -eq $skill }) {
-                $agentSkills += ($script:AgentSkills | Where-Object { ($_ -replace '^.*:', '') -eq $skill })
-            } else {
-                $dbSkills += $skill
-            }
-        }
-        $script:SelectedSkills = $dbSkills | Select-Object -Unique
-        $script:SelectedMlflowSkills = $mlflowSkills | Select-Object -Unique
-        $script:SelectedApxSkills = $apxSkills | Select-Object -Unique
-        $script:SelectedAgentSkills = $agentSkills | Select-Object -Unique
+        # All names assumed to be d-a-s skill names -- handed straight to the
+        # CLI, which is the authority on validity.
+        $script:SelectedDbxSkills = ($script:UserSkills -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -Unique)
         return
     }
 
     # Priority 2: --skills-profile flag or interactive selection
     if ([string]::IsNullOrWhiteSpace($script:SkillsProfile) -or $script:SkillsProfile -eq "all") {
-        $script:SelectedSkills = $script:Skills
-        $script:SelectedMlflowSkills = $script:MlflowSkills
-        $script:SelectedApxSkills = $script:ApxSkills
-        $script:SelectedAgentSkills = $script:AgentSkills
+        # "all" -- empty SelectedDbxSkills signals `databricks aitools install`
+        # invocation with no positional args, which installs every skill.
+        $script:SelectedDbxSkills = @()
         return
     }
 
     # Build union of selected profiles
-    $dbSkills = @() + $script:CoreSkills
-    $mlflowSkills = @()
-    $apxSkills = @()
-    $agentSkills = @()
+    $dbxSkills = @() + $script:CoreSkills
 
     foreach ($profile in ($script:SkillsProfile -split ',')) {
         $profile = $profile.Trim()
         switch ($profile) {
             "all" {
-                $script:SelectedSkills = $script:Skills
-                $script:SelectedMlflowSkills = $script:MlflowSkills
-                $script:SelectedApxSkills = $script:ApxSkills
-                $script:SelectedAgentSkills = $script:AgentSkills
+                $script:SelectedDbxSkills = @()
                 return
             }
-            "data-engineer"  { $dbSkills += $script:ProfileDataEngineer }
-            "analyst"        { $dbSkills += $script:ProfileAnalyst }
-            "ai-ml-engineer" {
-                $dbSkills += $script:ProfileAiMlEngineer
-                $mlflowSkills += $script:ProfileAiMlMlflow
-            }
-            "app-developer" {
-                $dbSkills += $script:ProfileAppDeveloper
-                $apxSkills += $script:ApxSkills
-                $agentSkills += $script:ProfileAppDeveloperAgent
-            }
+            "data-engineer"  { $dbxSkills += $script:ProfileDataEngineer }
+            "analyst"        { $dbxSkills += $script:ProfileAnalyst }
+            "ai-ml-engineer" { $dbxSkills += $script:ProfileAiMlEngineer }
+            "app-developer"  { $dbxSkills += $script:ProfileAppDeveloper }
             default { Write-Warn "Unknown skill profile: $profile (ignored)" }
         }
     }
 
-    $script:SelectedSkills = $dbSkills | Select-Object -Unique
-    $script:SelectedMlflowSkills = $mlflowSkills | Select-Object -Unique
-    $script:SelectedApxSkills = $apxSkills | Select-Object -Unique
-    $script:SelectedAgentSkills = $agentSkills | Select-Object -Unique
+    $script:SelectedDbxSkills = $dbxSkills | Select-Object -Unique
 }
 
 function Invoke-PromptSkillsProfile {
@@ -977,7 +931,7 @@ function Invoke-PromptSkillsProfile {
     # Custom checkbox with mutual exclusion: "All" deselects others, others deselect "All"
     $pLabels = @("All Skills", "Data Engineer", "Business Analyst", "AI/ML Engineer", "App Developer", "Custom")
     $pValues = @("all", "data-engineer", "analyst", "ai-ml-engineer", "app-developer", "custom")
-    $pHints  = @("Install everything (34 skills)", "Pipelines, Spark, Jobs, Streaming (14 skills)", "Dashboards, SQL, Genie, Metrics (8 skills)", "Agents, RAG, Vector Search, MLflow (17 skills)", "Apps, Lakebase, Deployment (10 skills)", "Pick individual skills")
+    $pHints  = @("Every Databricks skill", "Pipelines, Spark, Jobs, Streaming", "Dashboards, SQL, Metrics", "Agents, RAG, Vector Search, MLflow", "Apps, Lakebase, Deployment", "Pick individual skills")
     $pStates = @($true, $false, $false, $false, $false, $false)
     $pCount  = 6
     $pCursor = 0
@@ -1128,52 +1082,37 @@ function Invoke-PromptCustomSkills {
         switch ($profile) {
             "data-engineer"  { $preselected += $script:ProfileDataEngineer }
             "analyst"        { $preselected += $script:ProfileAnalyst }
-            "ai-ml-engineer" { $preselected += $script:ProfileAiMlEngineer + $script:ProfileAiMlMlflow }
-            "app-developer"  { $preselected += $script:ProfileAppDeveloper + $script:ApxSkills + $script:ProfileAppDeveloperAgent }
+            "ai-ml-engineer" { $preselected += $script:ProfileAiMlEngineer }
+            "app-developer"  { $preselected += $script:ProfileAppDeveloper }
         }
     }
-    # Normalize "source:install-name" entries (e.g. "databricks-core:databricks") to install-name only,
-    # so `-contains` exact-equality checks below match against the same names used in the menu.
-    $preselected = @($preselected | ForEach-Object { $_ -replace '^[^:]+:', '' })
 
     Write-Host ""
     Write-Host "  Select individual skills" -ForegroundColor White
-    Write-Host "  Core skills (config, docs, python-sdk, unity-catalog) are always installed" -ForegroundColor DarkGray
+    Write-Host "  Core skills (databricks-core, databricks-docs, databricks-python-sdk, databricks-unity-catalog) are always installed" -ForegroundColor DarkGray
 
     $items = @(
-        @{ Label = "Spark Pipelines";      Value = "databricks-spark-declarative-pipelines"; State = ($preselected -contains "databricks-spark-declarative-pipelines"); Hint = "SDP/LDP, CDC, SCD Type 2" }
-        @{ Label = "Streaming";            Value = "databricks-spark-structured-streaming";  State = ($preselected -contains "databricks-spark-structured-streaming");  Hint = "Real-time streaming" }
-        @{ Label = "Jobs & Workflows";     Value = "databricks-jobs";                        State = ($preselected -contains "databricks-jobs");                        Hint = "Multi-task orchestration" }
-        @{ Label = "Asset Bundles";        Value = "databricks-bundles";               State = ($preselected -contains "databricks-bundles");               Hint = "DABs deployment" }
-        @{ Label = "Databricks SQL";       Value = "databricks-dbsql";                       State = ($preselected -contains "databricks-dbsql");                       Hint = "SQL warehouse queries" }
-        @{ Label = "Iceberg";              Value = "databricks-iceberg";                     State = ($preselected -contains "databricks-iceberg");                     Hint = "Apache Iceberg tables" }
-        @{ Label = "Zerobus Ingest";       Value = "databricks-zerobus-ingest";              State = ($preselected -contains "databricks-zerobus-ingest");              Hint = "Streaming ingestion" }
-        @{ Label = "Python Data Src";      Value = "spark-python-data-source";               State = ($preselected -contains "spark-python-data-source");               Hint = "Custom Spark data sources" }
-        @{ Label = "Metric Views";         Value = "databricks-metric-views";                State = ($preselected -contains "databricks-metric-views");                Hint = "Metric definitions" }
-        @{ Label = "AI/BI Dashboards";     Value = "databricks-aibi-dashboards";             State = ($preselected -contains "databricks-aibi-dashboards");             Hint = "Dashboard creation" }
-        @{ Label = "Genie";                Value = "databricks-genie";                       State = ($preselected -contains "databricks-genie");                       Hint = "Natural language SQL" }
-        @{ Label = "Agent Bricks";         Value = "databricks-agent-bricks";                State = ($preselected -contains "databricks-agent-bricks");                Hint = "Build AI agents" }
-        @{ Label = "Vector Search";        Value = "databricks-vector-search";               State = ($preselected -contains "databricks-vector-search");               Hint = "Similarity search" }
-        @{ Label = "Model Serving";        Value = "databricks-model-serving";               State = ($preselected -contains "databricks-model-serving");               Hint = "Deploy models/agents" }
-        @{ Label = "MLflow Evaluation";    Value = "databricks-mlflow-evaluation";           State = ($preselected -contains "databricks-mlflow-evaluation");           Hint = "Model evaluation" }
+        @{ Label = "Pipelines";             Value = "databricks-pipelines";                   State = ($preselected -contains "databricks-pipelines");                   Hint = "SDP/LDP, CDC, SCD Type 2" }
+        @{ Label = "Streaming";             Value = "databricks-spark-structured-streaming";  State = ($preselected -contains "databricks-spark-structured-streaming");  Hint = "Real-time streaming" }
+        @{ Label = "Jobs & Workflows";      Value = "databricks-jobs";                        State = ($preselected -contains "databricks-jobs");                        Hint = "Multi-task orchestration" }
+        @{ Label = "Asset Bundles (DABs)";  Value = "databricks-dabs";                        State = ($preselected -contains "databricks-dabs");                        Hint = "DABs deployment" }
+        @{ Label = "Databricks SQL";        Value = "databricks-dbsql";                       State = ($preselected -contains "databricks-dbsql");                       Hint = "SQL warehouse queries" }
+        @{ Label = "Iceberg";               Value = "databricks-iceberg";                     State = ($preselected -contains "databricks-iceberg");                     Hint = "Apache Iceberg tables" }
+        @{ Label = "Zerobus Ingest";        Value = "databricks-zerobus-ingest";              State = ($preselected -contains "databricks-zerobus-ingest");              Hint = "Streaming ingestion" }
+        @{ Label = "Python Data Src";       Value = "spark-python-data-source";               State = ($preselected -contains "spark-python-data-source");               Hint = "Custom Spark data sources" }
+        @{ Label = "Metric Views";          Value = "databricks-metric-views";                State = ($preselected -contains "databricks-metric-views");                Hint = "Metric definitions" }
+        @{ Label = "AI/BI Dashboards";      Value = "databricks-aibi-dashboards";             State = ($preselected -contains "databricks-aibi-dashboards");             Hint = "Dashboard creation" }
+        @{ Label = "Agent Bricks";          Value = "databricks-agent-bricks";                State = ($preselected -contains "databricks-agent-bricks");                Hint = "Build AI agents" }
+        @{ Label = "Vector Search";         Value = "databricks-vector-search";               State = ($preselected -contains "databricks-vector-search");               Hint = "Similarity search" }
+        @{ Label = "Model Serving";         Value = "databricks-model-serving";               State = ($preselected -contains "databricks-model-serving");               Hint = "Deploy models/agents" }
+        @{ Label = "MLflow Evaluation";     Value = "databricks-mlflow-evaluation";           State = ($preselected -contains "databricks-mlflow-evaluation");           Hint = "Model evaluation" }
         @{ Label = "AI Functions";          Value = "databricks-ai-functions";                State = ($preselected -contains "databricks-ai-functions");                Hint = "AI Functions, document parsing & RAG" }
-        @{ Label = "Unstructured PDF";     Value = "databricks-unstructured-pdf-generation"; State = ($preselected -contains "databricks-unstructured-pdf-generation"); Hint = "Synthetic PDFs for RAG" }
-        @{ Label = "Synthetic Data";       Value = "databricks-synthetic-data-gen";          State = ($preselected -contains "databricks-synthetic-data-gen");          Hint = "Generate test data" }
-        @{ Label = "Lakebase Autoscale";   Value = "databricks-lakebase-autoscale";          State = ($preselected -contains "databricks-lakebase-autoscale");          Hint = "Managed PostgreSQL" }
-        @{ Label = "Lakebase Provisioned"; Value = "databricks-lakebase-provisioned";        State = ($preselected -contains "databricks-lakebase-provisioned");        Hint = "Provisioned PostgreSQL" }
-        @{ Label = "App (AppKit + Python)"; Value = "databricks-apps-python";                 State = ($preselected -contains "databricks-apps-python");                 Hint = "AppKit, Dash, Streamlit, Flask" }
-        @{ Label = "App APX";              Value = "databricks-app-apx";                     State = ($preselected -contains "databricks-app-apx");                     Hint = "FastAPI + React" }
-        @{ Label = "Agent: Databricks";    Value = "databricks";                             State = ($preselected -contains "databricks");                             Hint = "CLI auth, data exploration" }
-        @{ Label = "Agent: Apps";          Value = "databricks-apps";                        State = ($preselected -contains "databricks-apps");                        Hint = "AppKit + all frameworks" }
-        @{ Label = "Agent: Lakebase";      Value = "databricks-lakebase";                    State = ($preselected -contains "databricks-lakebase");                    Hint = "Lakebase OLTP" }
-        @{ Label = "MLflow Onboarding";    Value = "mlflow-onboarding";                      State = ($preselected -contains "mlflow-onboarding");                      Hint = "Getting started" }
-        @{ Label = "Agent Evaluation";     Value = "agent-evaluation";                       State = ($preselected -contains "agent-evaluation");                       Hint = "Evaluate AI agents" }
-        @{ Label = "MLflow Tracing";       Value = "instrumenting-with-mlflow-tracing";      State = ($preselected -contains "instrumenting-with-mlflow-tracing");      Hint = "Instrument with tracing" }
-        @{ Label = "Analyze Traces";       Value = "analyze-mlflow-trace";                   State = ($preselected -contains "analyze-mlflow-trace");                   Hint = "Analyze trace data" }
-        @{ Label = "Retrieve Traces";      Value = "retrieving-mlflow-traces";               State = ($preselected -contains "retrieving-mlflow-traces");               Hint = "Search & retrieve traces" }
-        @{ Label = "Analyze Chat";         Value = "analyze-mlflow-chat-session";            State = ($preselected -contains "analyze-mlflow-chat-session");            Hint = "Chat session analysis" }
-        @{ Label = "Query Metrics";        Value = "querying-mlflow-metrics";                State = ($preselected -contains "querying-mlflow-metrics");                Hint = "MLflow metrics queries" }
-        @{ Label = "Search MLflow Docs";   Value = "searching-mlflow-docs";                  State = ($preselected -contains "searching-mlflow-docs");                  Hint = "MLflow documentation" }
+        @{ Label = "Unstructured PDF";      Value = "databricks-unstructured-pdf-generation"; State = ($preselected -contains "databricks-unstructured-pdf-generation"); Hint = "Synthetic PDFs for RAG" }
+        @{ Label = "Synthetic Data";        Value = "databricks-synthetic-data-gen";          State = ($preselected -contains "databricks-synthetic-data-gen");          Hint = "Generate test data" }
+        @{ Label = "Lakebase";              Value = "databricks-lakebase";                    State = ($preselected -contains "databricks-lakebase");                    Hint = "Managed/provisioned PostgreSQL" }
+        @{ Label = "Apps";                  Value = "databricks-apps";                        State = ($preselected -contains "databricks-apps");                        Hint = "Databricks Apps (AppKit + frameworks)" }
+        @{ Label = "Apps (Python)";         Value = "databricks-apps-python";                 State = ($preselected -contains "databricks-apps-python");                 Hint = "AppKit, Dash, Streamlit, Flask" }
+        @{ Label = "Execution Compute";     Value = "databricks-execution-compute";           State = ($preselected -contains "databricks-execution-compute");           Hint = "Compute selection / databricks-connect" }
     )
 
     $selected = Select-Checkbox -Items $items
@@ -1182,240 +1121,58 @@ function Invoke-PromptCustomSkills {
 
 # ─── Install skills ──────────────────────────────────────────
 function Install-Skills {
-    param([string]$BaseDir)
+    Write-Step "Installing skills via Databricks CLI"
 
-    Write-Step "Installing skills"
-
-    $dirs = @()
-    foreach ($tool in ($script:Tools -split ' ')) {
-        switch ($tool) {
-            "claude" { $dirs += Join-Path $BaseDir ".claude\skills" }
-            "cursor" {
-                if ($script:Tools -notmatch 'claude') {
-                    $dirs += Join-Path $BaseDir ".cursor\skills"
-                }
-            }
-            "copilot" { $dirs += Join-Path $BaseDir ".github\skills" }
-            "codex"   { $dirs += Join-Path $BaseDir ".agents\skills" }
-            "gemini"  { $dirs += Join-Path $BaseDir ".gemini\skills" }
-            "antigravity" {
-                if ($script:Scope -eq "global") {
-                    $dirs += Join-Path $env:USERPROFILE ".gemini\antigravity\skills"
-                } else {
-                    $dirs += Join-Path $BaseDir ".agents\skills"
-                }
-            }
-            "windsurf" {
-                if ($script:Scope -eq "global") {
-                    $dirs += Join-Path $env:USERPROFILE ".codeium\windsurf\skills"
-                } else {
-                    $dirs += Join-Path $BaseDir ".windsurf\skills"
-                }
-            }
-            "opencode" {
-                if ($script:Scope -eq "global") {
-                    $dirs += Join-Path $env:USERPROFILE ".config\opencode\skills"
-                } else {
-                    $dirs += Join-Path $BaseDir ".opencode\skills"
-                }
-            }
-            "kiro" {
-                if ($script:Scope -eq "global") {
-                    $dirs += Join-Path $env:USERPROFILE ".kiro\skills"
-                } else {
-                    $dirs += Join-Path $BaseDir ".kiro\skills"
-                }
-            }
-        }
-    }
-    $dirs = $dirs | Select-Object -Unique
-
-    # Count selected skills for display
-    $dbCount = $script:SelectedSkills.Count
-    $mlflowCount = $script:SelectedMlflowSkills.Count
-    $apxCount = $script:SelectedApxSkills.Count
-    $agentCount = $script:SelectedAgentSkills.Count
-    $totalCount = $dbCount + $mlflowCount + $apxCount + $agentCount
-    Write-Msg "Installing $totalCount skills"
-
-    # Build set of all skills being installed now
-    $allNewSkills = @()
-    $allNewSkills += $script:SelectedSkills
-    $allNewSkills += $script:SelectedMlflowSkills
-    $allNewSkills += $script:SelectedApxSkills
-    $allNewSkills += $script:SelectedAgentSkills | ForEach-Object { $_ -replace '^.*:', '' }
-
-    # Clean up previously installed skills that are no longer selected
-    # Check scope-local manifest first, fall back to global for upgrades from older versions
+    # ─── Step 1: clean up legacy per-agent skill directories ───
+    # Older install.ps1 runs copied a-d-k's databricks-skills\<name>\ into each
+    # tool's per-agent directory. The CLI now owns these and writes to its own
+    # canonical location, so the old per-agent copies must be removed or they
+    # will shadow the CLI install.
     $manifest = Join-Path $script:StateDir ".installed-skills"
     if (-not (Test-Path $manifest) -and $script:Scope -eq "project" -and (Test-Path (Join-Path $script:InstallDir ".installed-skills"))) {
         $manifest = Join-Path $script:InstallDir ".installed-skills"
     }
     if (Test-Path $manifest) {
+        $removedCount = 0
         foreach ($line in (Get-Content $manifest)) {
             if ([string]::IsNullOrWhiteSpace($line)) { continue }
             $parts = $line -split '\|', 2
             if ($parts.Count -ne 2) { continue }
-            $prevDir = $parts[0]
-            $prevSkill = $parts[1]
-            # Skip if this skill is still selected
-            if ($allNewSkills -contains $prevSkill) { continue }
-            # Only remove if the directory exists
-            $prevPath = Join-Path $prevDir $prevSkill
+            $prevPath = Join-Path $parts[0] $parts[1]
             if (Test-Path $prevPath) {
                 Remove-Item -Recurse -Force $prevPath
-                Write-Msg "Removed deselected skill: $prevSkill"
+                $removedCount++
             }
         }
+        if ($removedCount -gt 0) {
+            Write-Msg "Cleaned up $removedCount legacy a-d-k skill director(ies); the CLI now manages them."
+        }
+        # The manifest's purpose was tracking files this installer wrote. The
+        # CLI keeps its own state, so we no longer need this file.
+        Remove-Item -Force $manifest -ErrorAction SilentlyContinue
     }
 
-    # Start fresh manifest
-    $manifestEntries = @()
-
-    foreach ($dir in $dirs) {
-        if (-not (Test-Path $dir)) {
-            New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        }
-        # Install Databricks skills from repo
-        foreach ($skill in $script:SelectedSkills) {
-            $src = Join-Path $script:RepoDir "databricks-skills\$skill"
-            if (-not (Test-Path $src)) { continue }
-            $dest = Join-Path $dir $skill
-            if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
-            Copy-Item -Recurse $src $dest
-            $manifestEntries += "$dir|$skill"
-        }
-        $shortDir = $dir -replace [regex]::Escape($env:USERPROFILE), '~'
-        Write-Ok "Databricks skills ($dbCount) -> $shortDir"
-
-        # Install MLflow skills from mlflow/skills repo
-        if ($script:SelectedMlflowSkills.Count -gt 0) {
-            $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            foreach ($skill in $script:SelectedMlflowSkills) {
-                $destDir = Join-Path $dir $skill
-                if (-not (Test-Path $destDir)) {
-                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-                }
-                $url = "$MlflowRawUrl/$skill/SKILL.md"
-                try {
-                    Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
-                    foreach ($ref in @("reference.md", "examples.md", "api.md")) {
-                        try {
-                            Invoke-WebRequest -Uri "$MlflowRawUrl/$skill/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
-                        } catch {}
-                    }
-                    $manifestEntries += "$dir|$skill"
-                } catch {
-                    Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
-                }
-            }
-            $ErrorActionPreference = $prevEAP
-            Write-Ok "MLflow skills ($mlflowCount) -> $shortDir"
-        }
-
-        # Install APX skills from databricks-solutions/apx repo
-        if ($script:SelectedApxSkills.Count -gt 0) {
-            $prevEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            foreach ($skill in $script:SelectedApxSkills) {
-                $destDir = Join-Path $dir $skill
-                if (-not (Test-Path $destDir)) {
-                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-                }
-                $url = "$ApxRawUrl/SKILL.md"
-                try {
-                    Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
-                    foreach ($ref in @("backend-patterns.md", "frontend-patterns.md")) {
-                        try {
-                            Invoke-WebRequest -Uri "$ApxRawUrl/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
-                        } catch {}
-                    }
-                    $manifestEntries += "$dir|$skill"
-                } catch {
-                    Remove-Item $destDir -ErrorAction SilentlyContinue
-                    Write-Warning "Could not install APX skill '$skill' - consider removing $destDir if it is no longer needed"
-                }
-            }
-            $ErrorActionPreference = $prevEAP2
-            Write-Ok "APX skills ($apxCount) -> $shortDir"
-        }
-
-        # Install Agent skills from databricks/databricks-agent-skills repo
-        if ($script:SelectedAgentSkills.Count -gt 0) {
-            # Fetch the full repo tree once (single API call) for all skills.
-            # Collapse pretty-printed JSON whitespace so the path/mode/type fields
-            # land adjacent for the per-entry regex below.
-            $agentTree = $null
-            $agentSuccess = 0
-            try {
-                $rawTree = Invoke-WebRequest -Uri $AgentSkillsApiUrl -UseBasicParsing -ErrorAction Stop | Select-Object -ExpandProperty Content
-                $agentTree = ($rawTree -replace '\s+', ' ')
-            } catch {
-                Write-Warn "Could not fetch agent skills tree from GitHub API"
-            }
-            if ($agentTree) {
-                $prevEAP3 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-                foreach ($entry in $script:SelectedAgentSkills) {
-                    $srcName = ($entry -split ':')[0]
-                    $installName = ($entry -replace '^.*:', '')
-                    $destDir = Join-Path $dir $installName
-                    # Wipe any prior install so upstream-deleted files don't persist
-                    if (Test-Path $destDir) {
-                        Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
-                    }
-                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-                    # Extract file paths under skills/<srcName>/ — match only entries whose
-                    # next JSON fields are `"mode": "...", "type": "blob"`, so directory
-                    # entries (type=tree) are skipped. agentTree has been whitespace-collapsed
-                    # above; the GitHub tree API returns fields in order path → mode → type.
-                    $filePaths = [regex]::Matches($agentTree, '"path": *"(skills/' + [regex]::Escape($srcName) + '/[^"]+)", *"mode": *"[^"]+", *"type": *"blob"') |
-                        ForEach-Object { $_.Groups[1].Value }
-                    if (-not $filePaths) {
-                        Remove-Item $destDir -ErrorAction SilentlyContinue
-                        Write-Warn "Could not fetch agent skill '$srcName'"
-                        continue
-                    }
-                    $okFlag = $true
-                    foreach ($filePath in $filePaths) {
-                        $rel = $filePath.Substring("skills/$srcName/".Length)
-                        $dest = Join-Path $destDir ($rel -replace '/', '\')
-                        $destParent = Split-Path $dest -Parent
-                        if (-not (Test-Path $destParent)) {
-                            New-Item -ItemType Directory -Path $destParent -Force | Out-Null
-                        }
-                        try {
-                            Invoke-WebRequest -Uri "$AgentSkillsRawUrl/$srcName/$rel" -OutFile $dest -UseBasicParsing -ErrorAction Stop
-                        } catch {
-                            $okFlag = $false
-                        }
-                    }
-                    if ($okFlag) {
-                        $manifestEntries += "$dir|$installName"
-                        $agentSuccess++
-                    } else {
-                        Remove-Item -Recurse -Force $destDir -ErrorAction SilentlyContinue
-                        Write-Warn "Could not install agent skill '$srcName'"
-                    }
-                }
-                $ErrorActionPreference = $prevEAP3
-            }
-            if ($agentSuccess -eq $agentCount) {
-                Write-Ok "Agent skills ($agentCount) -> $shortDir"
-            } elseif ($agentSuccess -gt 0) {
-                Write-Warn "Agent skills (only $agentSuccess of $agentCount installed) -> $shortDir"
-            } else {
-                Write-Warn "Agent skills (0 of $agentCount installed) -> $shortDir"
-            }
-        }
+    # ─── Step 2: install via CLI ───
+    Write-Msg "Installing Databricks skills via 'databricks aitools install'"
+    # Always pass --experimental: install.ps1's profile system mixes stable
+    # and experimental d-a-s skills (e.g. data-engineer pulls in iceberg,
+    # which is experimental). Without the flag the CLI refuses to install
+    # experimental skills.
+    $cliArgs = @("aitools", "install", "--profile", $script:Profile_, "--experimental")
+    if ($script:SelectedDbxSkills.Count -gt 0) {
+        $cliArgs += $script:SelectedDbxSkills
     }
+    # Surface CLI output verbatim -- it prints its own per-skill progress.
+    & databricks @cliArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "databricks aitools install failed -- see CLI output above"
+    }
+    Write-Ok "Databricks skills installed via CLI"
 
-    # Save manifest and profile to scope-local state directory
+    # Save selected profile for future reinstalls (scope-local)
     if (-not (Test-Path $script:StateDir)) {
         New-Item -ItemType Directory -Path $script:StateDir -Force | Out-Null
     }
-    $manifest = Join-Path $script:StateDir ".installed-skills"
-    Set-Content -Path $manifest -Value ($manifestEntries -join "`n") -Encoding UTF8
-
-    # Save selected profile for future reinstalls
     if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
         Set-Content -Path (Join-Path $script:StateDir ".skills-profile") -Value "custom:$($script:UserSkills)" -Encoding UTF8
     } else {
@@ -2138,12 +1895,14 @@ function Invoke-Main {
         Write-Step "Skill profiles"
         Invoke-PromptSkillsProfile
         Resolve-Skills
-        $skCount = $script:SelectedSkills.Count + $script:SelectedMlflowSkills.Count + $script:SelectedApxSkills.Count
+        # SelectedDbxSkills is empty when the user picked "all" -- the CLI
+        # knows the canonical count, so just say "all" rather than 0.
         if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
-            Write-Ok "Custom selection ($skCount skills)"
+            Write-Ok "Custom selection ($($script:SelectedDbxSkills.Count) skills)"
+        } elseif ($script:SelectedDbxSkills.Count -eq 0) {
+            Write-Ok "Profile: all (every Databricks skill via CLI)"
         } else {
-            $profileDisplay = if ([string]::IsNullOrWhiteSpace($script:SkillsProfile)) { "all" } else { $script:SkillsProfile }
-            Write-Ok "Profile: $profileDisplay ($skCount skills)"
+            Write-Ok "Profile: $($script:SkillsProfile) ($($script:SelectedDbxSkills.Count) skills)"
         }
     }
 
@@ -2168,16 +1927,18 @@ function Invoke-Main {
             Write-Host "  MCP server:  " -NoNewline; Write-Host $script:InstallDir -ForegroundColor Green
         }
         if ($script:InstallSkills) {
-            $skTotal = $script:SelectedSkills.Count + $script:SelectedMlflowSkills.Count + $script:SelectedApxSkills.Count + $script:SelectedAgentSkills.Count
             if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
                 Write-Host "  Skills:      " -NoNewline
-                Write-Host "custom selection ($skTotal skills)" -ForegroundColor Green -NoNewline
-                Write-Host " (will be overwritten, backup your changes first)" -ForegroundColor Yellow
-            } else {
-                $profileDisplay = if ([string]::IsNullOrWhiteSpace($script:SkillsProfile)) { "all" } else { $script:SkillsProfile }
+                Write-Host "custom selection ($($script:SelectedDbxSkills.Count) skills)" -ForegroundColor Green -NoNewline
+                Write-Host " (via databricks aitools install)" -ForegroundColor DarkGray
+            } elseif ($script:SelectedDbxSkills.Count -eq 0) {
                 Write-Host "  Skills:      " -NoNewline
-                Write-Host "$profileDisplay ($skTotal skills)" -ForegroundColor Green -NoNewline
-                Write-Host " (will be overwritten, backup your changes first)" -ForegroundColor Yellow
+                Write-Host "all" -ForegroundColor Green -NoNewline
+                Write-Host " (every d-a-s skill via databricks aitools install)" -ForegroundColor DarkGray
+            } else {
+                Write-Host "  Skills:      " -NoNewline
+                Write-Host "$($script:SkillsProfile) ($($script:SelectedDbxSkills.Count) skills)" -ForegroundColor Green -NoNewline
+                Write-Host " (via databricks aitools install)" -ForegroundColor DarkGray
             }
         }
         if ($script:InstallMcp) {
@@ -2221,7 +1982,7 @@ function Invoke-Main {
 
     # Install skills
     if ($script:InstallSkills) {
-        Install-Skills -BaseDir $baseDir
+        Install-Skills
     }
 
     # Write GEMINI.md if gemini is selected

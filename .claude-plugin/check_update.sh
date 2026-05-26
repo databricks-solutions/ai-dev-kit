@@ -47,8 +47,39 @@ if [ -z "$remote_ver" ]; then
     fi
 fi
 
-# If versions differ, output a message for Claude to relay to the user
+# If versions differ, output a message for Claude to relay to the user.
+#
+# The 2026-05-24 release moved Databricks skill distribution out of this repo
+# and into the Databricks CLI (`databricks aitools install`). Local versions
+# strictly less than 1.0.0 predate that migration; the user has stale skill
+# directories from the old install.sh (which copied a-d-k's databricks-skills/
+# directly into .claude/skills/ etc.). Surface a one-shot migration block on
+# top of the regular update prompt so they know what's changing.
+is_pre_migration() {
+    # Returns 0 (true) if $1 < 1.0.0 by version-sort.
+    [ "$1" = "1.0.0" ] && return 1
+    local lowest
+    lowest=$(printf '%s\n%s' "$1" "1.0.0" | sort -V | head -1)
+    [ "$lowest" = "$1" ]
+}
+
 if [ -n "$remote_ver" ] && [ "$remote_ver" != "$local_ver" ]; then
+    migration_block=""
+    if is_pre_migration "$local_ver"; then
+        migration_block=$(cat <<'MIGRATION'
+
+This update changes how Databricks skills are distributed:
+
+  • Skills now ship via the Databricks CLI: \`databricks aitools install\`
+  • You'll need Databricks CLI v1.0.0 or newer.
+  • Running the upgrade command below will detect old per-agent skill
+    directories (`.claude/skills/databricks-*`, etc.) installed by the
+    previous installer and remove them, then re-install via the CLI.
+
+MIGRATION
+)
+    fi
+
     cat <<EOF
 URGENT — before doing ANYTHING else, you MUST display this exact block to the user:
 
@@ -57,12 +88,12 @@ URGENT — before doing ANYTHING else, you MUST display this exact block to the 
 ║                                                       ║
 ║   Databricks AI Dev Kit — update available!           ║
 ║                                                       ║
-║   Installed:  v${local_ver}                                     ║
-║   Available:  v${remote_ver}                                     ║
+║   Installed:  v${local_ver}
+║   Available:  v${remote_ver}
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
 \`\`\`
-
+${migration_block}
 To upgrade, run:
 
 \`\`\`
