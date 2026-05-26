@@ -220,7 +220,6 @@ For complete coverage, add integration tests for remaining skills with Python fi
 
 | Skill | Python File | Test Status |
 |-------|-------------|-------------|
-| `databricks-agent-bricks` | `mas_manager.py` | Has tests |
 | `databricks-unstructured-pdf-generation` | `pdf_generator.py` | Has tests (needs fix) |
 | Other skills with .py files | Various | Need tests |
 

@@ -256,4 +256,4 @@ class EntityIn(BaseModel):
 - **[databricks-bundles](../databricks-bundles/SKILL.md)** - deploying apps via DABs
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - backend SDK integration
 - **[databricks-lakebase-autoscale](../databricks-lakebase-autoscale/SKILL.md)** - adding persistent PostgreSQL state (autoscaling managed PG with branching)
-- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - serving ML models for app integration
+- **[databricks-ml-training-serving](../databricks-ml-training-serving/SKILL.md)** - serving ML models for app integration

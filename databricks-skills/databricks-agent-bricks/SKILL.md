@@ -54,48 +54,82 @@ databricks knowledge-assistants delete-knowledge-assistant "knowledge-assistants
 
 ## Supervisor Agent
 
-**No CLI** — use `mas_manager.py` from this skill's `scripts/` folder. All `<SKILL_ROOT>/...` paths below are relative to the directory containing this SKILL.md (resolve to the absolute path in your install location).
+Native CLI: `databricks supervisor-agents` (Beta, requires CLI ≥ 0.299.2). Resource paths look like `supervisor-agents/{id}` — every command takes either that full path or a `PARENT` of that shape. `list-supervisor-agents` and `list-examples`/`list-tools` return bare JSON arrays.
 
 ```bash
-# Create MAS
-python <SKILL_ROOT>/scripts/mas_manager.py create_mas "My Supervisor" '{
-    "description": "Routes queries to specialized agents",
-    "instructions": "Route data questions to analyst, document questions to docs_agent.",
-    "agents": [
-        {"name": "analyst", "genie_space_id": "01abc...", "description": "SQL analytics"},
-        {"name": "docs_agent", "ka_tile_id": "dab408a2-...", "description": "Answers from documents"}
-    ]
-}'
+# Create the supervisor agent (display name positional, description/instructions as flags)
+databricks supervisor-agents create-supervisor-agent "My Supervisor" \
+    --description "Routes queries to specialized agents" \
+    --instructions "Route data questions to analyst, document questions to docs_agent."
+# → returns {name: "supervisor-agents/<uuid>", endpoint_name: "mas-<short>-endpoint", ...}
 
-# Check status and manage. list_mas enumerates every MAS you can access
-# and returns {tile_id, name, endpoint_status, agents_count} — use it to
-# find a tile_id / see which MAS are ONLINE before operations.
-python <SKILL_ROOT>/scripts/mas_manager.py list_mas
-python <SKILL_ROOT>/scripts/mas_manager.py get_mas TILE_ID
-python <SKILL_ROOT>/scripts/mas_manager.py update_mas TILE_ID '{"agents": [...]}'
-python <SKILL_ROOT>/scripts/mas_manager.py delete_mas TILE_ID
+# List / get / find by name
+databricks supervisor-agents list-supervisor-agents
+databricks supervisor-agents get-supervisor-agent supervisor-agents/<id>
+databricks supervisor-agents list-supervisor-agents | jq '.[] | select(.display_name == "My Supervisor")'
 
-# Add examples — requires endpoint_status=ONLINE. After create_mas the MAS is
-# NOT_READY and takes up to ~10 min to reach ONLINE. Without --wait, this
-# fails fast if not ONLINE yet. With --wait, it blocks until ONLINE then adds.
-python <SKILL_ROOT>/scripts/mas_manager.py add_examples TILE_ID '[{"question": "...", "guideline": "..."}]' [--wait]
+# Update — UPDATE_MASK + new DISPLAY_NAME are positional; description/instructions optional flags
+databricks supervisor-agents update-supervisor-agent supervisor-agents/<id> \
+    "display_name,description,instructions" "My Supervisor (v2)" \
+    --description "..." --instructions "..."
 
-# Find IDs
-databricks knowledge-assistants list-knowledge-assistants --output json | jq '.[].id'
-databricks genie list-spaces --output json | jq '.[].space_id'
+# Delete
+databricks supervisor-agents delete-supervisor-agent supervisor-agents/<id>
 ```
 
-**Agent types** (use exactly ONE per agent):
+### Tools (the agents the supervisor routes to)
 
-| Field | Type |
-|-------|------|
-| `ka_tile_id` | Knowledge Assistant |
-| `genie_space_id` | Genie Space |
-| `endpoint_name` | Model serving endpoint |
-| `uc_function_name` | UC function (`catalog.schema.func`) |
-| `connection_name` | MCP server (UC HTTP Connection) |
+Each tool wires the supervisor to a downstream resource. `tool_type` lives in `--json` (the CLI rejects it as a positional when `--json` is used). Each type has a type-specific block (`genie_space`, `knowledge_assistant`, etc.) whose identifier field differs by type — see the table below.
 
-**Status:** `NOT_READY` (up to ~10 min after create/big update) → `ONLINE` → `OFFLINE`
+```bash
+# Attach a Genie space — find its space_id with `databricks genie list-spaces`
+databricks supervisor-agents create-tool supervisor-agents/<id> analyst --json '{
+    "tool_type": "genie_space",
+    "description": "SQL analytics on the analytics warehouse",
+    "genie_space": {"id": "<genie_space_id>"}
+}'
+
+# Attach a Knowledge Assistant — find ka_id with `databricks knowledge-assistants list-knowledge-assistants`
+databricks supervisor-agents create-tool supervisor-agents/<id> docs_agent --json '{
+    "tool_type": "knowledge_assistant",
+    "description": "Answers from product documentation",
+    "knowledge_assistant": {"knowledge_assistant_id": "<ka_id>"}
+}'
+
+# List / get / delete tools
+databricks supervisor-agents list-tools supervisor-agents/<id>
+databricks supervisor-agents get-tool supervisor-agents/<id>/tools/<tool_id>
+databricks supervisor-agents delete-tool supervisor-agents/<id>/tools/<tool_id>
+```
+
+**Tool types** (`tool_type` value → type-specific block):
+
+| `tool_type` | Block | Use for |
+|---|---|---|
+| `genie_space` | `{"id": "<space_id>"}` | Natural language → SQL via Genie |
+| `knowledge_assistant` | `{"knowledge_assistant_id": "<ka_id>"}` | Document Q&A via a KA |
+| `uc_function` | `{"name": "catalog.schema.func"}` | UC SQL/Python function |
+| `uc_connection` | `{"name": "<connection_name>"}` | External MCP server via UC HTTP Connection |
+| `volume` | `{"name": "<full_volume_name>"}` | UC Volume browsing |
+| `app` | `{"name": "<app_name>"}` | Databricks App |
+| Other types (`serving_endpoint`, `lakeview_dashboard`, `supervisor_agent`, `uc_table`, `vector_search_index`, `catalog`, `schema`, `web_search`) | Block name and field shape vary | Run `databricks supervisor-agents create-tool --help` and probe — these were not verified end-to-end here. |
+
+### Examples (training the supervisor)
+
+Examples must use `--json` — the positional `GUIDELINES` arg doesn't accept any encoding because guidelines is a `repeated string`.
+
+```bash
+databricks supervisor-agents create-example supervisor-agents/<id> --json '{
+    "question": "What were Q4 revenue numbers?",
+    "guidelines": ["Route to analyst Genie space", "Always group by region"]
+}'
+
+databricks supervisor-agents list-examples supervisor-agents/<id>
+databricks supervisor-agents get-example supervisor-agents/<id>/examples/<ex_id>
+databricks supervisor-agents delete-example supervisor-agents/<id>/examples/<ex_id>
+```
+
+**Endpoint readiness:** after `create-supervisor-agent`, the serving endpoint takes up to ~10 minutes to come online before it can answer queries. `get-supervisor-agent` returns the endpoint name immediately, but querying it is gated on the endpoint's own readiness — check via `databricks serving-endpoints get <endpoint_name>`.
 
 ---
 

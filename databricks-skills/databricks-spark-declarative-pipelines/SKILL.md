@@ -283,20 +283,61 @@ After running a pipeline (via DAB or CLI), you **MUST** validate both the execut
 
 A freshly created pipeline has `state: IDLE` and `latest_updates: null` until you trigger the first run with `start-update`. `list-pipeline-events` returns a bare JSON array (not `{"events": [...]}`). For DAB runs, also check `databricks bundle run` output.
 
+**Create.** For dev/demo, always pass:
+- `"continuous": false` — triggered runs, not always-on.
+- `"development": true` — faster startup, no retry-on-failure.
+- `"pipelines.numUpdateRetryAttempts": "0"` + `"pipelines.maxFlowRetryAttempts": "0"` — belt-and-suspenders: even with development mode, some configs still retry. Setting both to `"0"` makes a doomed update fail once (in ~30s) instead of retrying 5+ times over 10 min with the same root cause. Defaults (5 / 2) are correct for production, NOT for iteration.
+
 ```bash
-# Kick off (or re-run) a pipeline. --full-refresh reprocesses everything
-# from scratch (destructive on streaming state); omit for incremental.
-databricks pipelines start-update <pipeline_id>
-databricks pipelines start-update <pipeline_id> --full-refresh
+databricks pipelines create --json '{
+  "name": "my_pipeline",
+  "catalog": "my_catalog",
+  "schema": "my_schema",
+  "serverless": true,
+  "continuous": false,
+  "development": true,
+  "channel": "PREVIEW",
+  "configuration": {
+    "pipelines.numUpdateRetryAttempts": "0",
+    "pipelines.maxFlowRetryAttempts": "0"
+  },
+  "libraries": [{"glob": {"include": "/Workspace/Users/me@example.com/my_pipeline/**"}}]
+}'
+```
 
-# Poll status. The (.latest_updates // [{}]) guard handles the null case
-# on a never-run pipeline so jq doesn't crash.
-databricks pipelines get <pipeline_id> \
-  | jq '{state, latest: (.latest_updates // [{}])[0] | {state, update_id, creation_time}}'
+For production pipelines, drop `development` and the retry overrides — defaults exist to absorb transient infra failures.
 
-# Surface just failures from the event log
+For dedicated clusters, notifications, autoscaling, event-log routing, restart windows, and Python dependencies, see [3-advanced-configuration.md](references/3-advanced-configuration.md).
+
+**Before submitting**, verify `CLUSTER BY` columns are numeric / string / date / timestamp by `DESCRIBE`-ing each source. SDP doesn't pre-validate this — the pipeline runs, then fails on first write with `DELTA_CLUSTERING_COLUMNS_DATATYPE_NOT_SUPPORTED` (BOOLEAN / ARRAY / MAP / STRUCT / BINARY are not data-skipping types).
+
+**Start + poll.** Capture the `update_id` from `start-update` and poll *that* update — not `latest_updates[0]`, not top-level pipeline `state`. On FAILED, stop immediately and read the events log.
+
+```bash
+# --full-refresh reprocesses everything from scratch (destructive on streaming
+# state); omit for incremental.
+UPDATE_ID=$(databricks pipelines start-update <pipeline_id> | jq -r .update_id)
+# Same with full refresh:
+# UPDATE_ID=$(databricks pipelines start-update <pipeline_id> --full-refresh | jq -r .update_id)
+
+# Poll THAT update by id. Stop on the FIRST terminal state — including FAILED.
+while :; do
+  STATE=$(databricks pipelines get-update <pipeline_id> "$UPDATE_ID" | jq -r '.update.state')
+  echo "$(date +%H:%M:%S) update=$UPDATE_ID state=$STATE"
+  case "$STATE" in COMPLETED|FAILED|CANCELED) break;; esac
+  sleep 30
+done
+
+# On FAILED, surface the ACTUAL error message. The top-level event `message`
+# field is just "Update X is FAILED" — useless. The real cause lives in
+# `error.exceptions[0].message`. If you only see "Update X is FAILED", you're
+# querying wrong — re-run with the exception body extracted (below).
 databricks pipelines list-pipeline-events <pipeline_id> \
-  | jq '[.[] | select(.level=="ERROR" or .level=="WARN") | {level, event_type, message: (.message // "")[0:200]}] | .[0:10]'
+  | jq '[.[] | select(.level=="ERROR") | {
+      event_type,
+      summary: (.message // "")[0:200],
+      exception: ((.error.exceptions[0].message // "no exception body") | .[0:800])
+    }] | .[0:5]'
 ```
 
 If a pipeline is already RUNNING, `start-update` queues the new update; force-stop with `databricks pipelines stop <pipeline_id>` first if needed.

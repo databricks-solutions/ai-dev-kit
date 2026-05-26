@@ -3,7 +3,7 @@ skill:
   source_path: "databricks-skills/databricks-apps-python"
   description: "Python Databricks Apps: Dash, Streamlit, Gradio, Flask, FastAPI, Reflex"
 
-tool_modules: [apps, serving]
+tool_modules: []  # No MCP — agent uses Bash + Databricks CLI directly.
 
 evaluation:
   datasets:

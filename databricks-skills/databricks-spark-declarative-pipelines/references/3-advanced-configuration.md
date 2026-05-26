@@ -157,161 +157,89 @@ Install pip dependencies for serverless pipelines:
 | Change Data Capture (CDC) | No | No | Yes |
 | SCD Type 1/2 | No | No | Yes |
 
-## Configuration Examples
+## Configuration Variants
 
-All examples use `databricks pipelines create --json '{...}'`. For updates, use `databricks pipelines update <pipeline_id> --json '{...}'`.
+Start from the canonical `databricks pipelines create --json '{...}'` in [SKILL.md](../SKILL.md#step-1-check-pipeline-execution-status). The variants below show only the **deltas** to add or change — don't re-paste the whole JSON.
 
 > **Tagging**: By default, add `"tags": {"aidevkit_project": "ai-dev-kit"}` to track resources created with this skill.
 
-### Development Mode Pipeline
-
-```bash
-databricks pipelines create --json '{
-  "name": "my_dev_pipeline",
-  "catalog": "dev_catalog",
-  "schema": "dev_schema",
-  "serverless": true,
-  "development": true,
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
-  "tags": {"environment": "development", "owner": "data-team"}
-}'
+**Development mode** — add:
+```json
+"development": true,
+"tags": {"environment": "development", "owner": "data-team"}
 ```
 
-### Non-Serverless with Dedicated Cluster
-
-```bash
-databricks pipelines create --json '{
-  "name": "my_pipeline",
-  "catalog": "my_catalog",
-  "schema": "my_schema",
-  "serverless": false,
-  "photon": true,
-  "edition": "ADVANCED",
-  "clusters": [{
-    "label": "default",
-    "num_workers": 4,
-    "node_type_id": "i3.xlarge",
-    "custom_tags": {"cost_center": "analytics"}
-  }],
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}]
-}'
+**Non-serverless / dedicated cluster** — replace `"serverless": true` with:
+```json
+"serverless": false,
+"photon": true,
+"edition": "ADVANCED",
+"clusters": [{
+  "label": "default",
+  "num_workers": 4,
+  "node_type_id": "i3.xlarge",
+  "custom_tags": {"cost_center": "analytics"}
+}]
 ```
 
-### Continuous Streaming Pipeline
-
-```bash
-databricks pipelines create --json '{
-  "name": "my_streaming_pipeline",
-  "catalog": "my_catalog",
-  "schema": "my_schema",
-  "serverless": true,
-  "continuous": true,
-  "configuration": {"spark.sql.shuffle.partitions": "auto"},
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}]
-}'
+**Continuous streaming** — set when the user explicitly asks for always-on:
+```json
+"continuous": true,
+"configuration": {"spark.sql.shuffle.partitions": "auto"}
 ```
 
-### Pipeline with Email Notifications
-
-```bash
-databricks pipelines create --json '{
-  "name": "my_pipeline",
-  "catalog": "my_catalog",
-  "schema": "my_schema",
-  "serverless": true,
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
-  "notifications": [{
-    "email_recipients": ["team@example.com", "oncall@example.com"],
-    "alerts": ["on-update-failure", "on-update-fatal-failure", "on-flow-failure"]
-  }]
-}'
+**Email notifications** — add:
+```json
+"notifications": [{
+  "email_recipients": ["team@example.com", "oncall@example.com"],
+  "alerts": ["on-update-failure", "on-update-fatal-failure", "on-flow-failure"]
+}]
 ```
 
-### Production Pipeline with Autoscaling
-
-```bash
-databricks pipelines create --json '{
-  "name": "prod_pipeline",
-  "catalog": "prod_catalog",
-  "schema": "prod_schema",
-  "serverless": false,
-  "development": false,
-  "photon": true,
-  "edition": "ADVANCED",
-  "clusters": [{
-    "label": "default",
-    "autoscale": {"min_workers": 2, "max_workers": 8, "mode": "ENHANCED"},
-    "node_type_id": "i3.xlarge",
-    "spark_conf": {"spark.sql.adaptive.enabled": "true"},
-    "custom_tags": {"environment": "production"}
-  }],
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
-  "notifications": [{"email_recipients": ["data-team@example.com"], "alerts": ["on-update-failure"]}]
-}'
+**Production autoscaling cluster** — replace the `clusters` block from the non-serverless variant with:
+```json
+"clusters": [{
+  "label": "default",
+  "autoscale": {"min_workers": 2, "max_workers": 8, "mode": "ENHANCED"},
+  "node_type_id": "i3.xlarge",
+  "spark_conf": {"spark.sql.adaptive.enabled": "true"},
+  "custom_tags": {"environment": "production"}
+}]
 ```
 
-### Serverless with Python Dependencies
-
-```bash
-databricks pipelines create --json '{
-  "name": "ml_pipeline",
-  "catalog": "my_catalog",
-  "schema": "my_schema",
-  "serverless": true,
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
-  "environment": {
-    "dependencies": ["scikit-learn==1.3.0", "pandas>=2.0.0", "requests"]
-  }
-}'
+**Serverless Python dependencies** — add:
+```json
+"environment": {
+  "dependencies": ["scikit-learn==1.3.0", "pandas>=2.0.0", "requests"]
+}
 ```
 
-### Continuous Pipeline with Restart Window
-
-```bash
-databricks pipelines create --json '{
-  "name": "realtime_pipeline",
-  "catalog": "my_catalog",
-  "schema": "my_schema",
-  "serverless": true,
-  "continuous": true,
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
-  "restart_window": {
-    "start_hour": 2,
-    "days_of_week": ["SATURDAY", "SUNDAY"],
-    "time_zone_id": "America/Los_Angeles"
-  }
-}'
+**Continuous with restart window** — combine `"continuous": true` with:
+```json
+"restart_window": {
+  "start_hour": 2,
+  "days_of_week": ["SATURDAY", "SUNDAY"],
+  "time_zone_id": "America/Los_Angeles"
+}
 ```
 
-### Custom Event Log Location
-
-```bash
-databricks pipelines create --json '{
-  "name": "my_pipeline",
-  "catalog": "my_catalog",
-  "schema": "my_schema",
-  "serverless": true,
-  "libraries": [{"file": {"path": "/Workspace/Users/user@example.com/my_pipeline"}}],
-  "event_log": {
-    "catalog": "audit_catalog",
-    "schema": "pipeline_logs",
-    "name": "my_pipeline_events"
-  }
-}'
+**Custom event-log location** — add:
+```json
+"event_log": {
+  "catalog": "audit_catalog",
+  "schema": "pipeline_logs",
+  "name": "my_pipeline_events"
+}
 ```
 
-### Update Existing Pipeline
-
+**Update an existing pipeline** — `update` takes the same shape as `create`:
 ```bash
-# Update pipeline configuration
 databricks pipelines update <pipeline_id> --json '{
   "name": "updated_pipeline_name",
   "development": false,
   "notifications": [{"email_recipients": ["team@example.com"], "alerts": ["on-update-failure"]}]
 }'
-
-# Then run it
-databricks pipelines start-update <pipeline_id> --full-refresh
+# Then re-run with: databricks pipelines start-update <pipeline_id> [--full-refresh]
 ```
 
 ---

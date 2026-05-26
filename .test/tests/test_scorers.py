@@ -124,10 +124,10 @@ class TestDetectSkillsFromPrompt:
         assert "databricks-lakebase-provisioned" in skills
 
     def test_detect_model_serving(self):
-        """Test detection of databricks-model-serving skill."""
+        """Test detection of databricks-ml-training-serving skill."""
         prompt = "Query a model serving endpoint"
         skills = detect_skills_from_prompt(prompt)
-        assert "databricks-model-serving" in skills
+        assert "databricks-ml-training-serving" in skills
 
     def test_detect_multi_skill(self):
         """Test detection of multiple skills."""
@@ -148,7 +148,7 @@ class TestDetectSkillsFromPrompt:
         prompt = "Build a Gradio app that queries a model serving endpoint"
         skills = detect_skills_from_prompt(prompt)
         assert "databricks-apps-python" in skills
-        assert "databricks-model-serving" in skills
+        assert "databricks-ml-training-serving" in skills
 
     def test_detect_no_match(self):
         """Test no skills detected for unrelated prompt."""
@@ -179,7 +179,7 @@ class TestSkillTriggers:
             "databricks-mlflow-evaluation",
             "databricks-agent-bricks",
             "databricks-lakebase-provisioned",
-            "databricks-model-serving",
+            "databricks-ml-training-serving",
         ]
         for skill in expected_skills:
             assert skill in SKILL_TRIGGERS

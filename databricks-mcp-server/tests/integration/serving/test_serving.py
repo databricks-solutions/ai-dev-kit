@@ -6,7 +6,7 @@ Tests:
 
 Note: The manage_serving_endpoint tool only supports read-only operations.
 Creating/updating/deleting serving endpoints requires a separate skill
-(databricks-model-serving) or direct SDK usage.
+(databricks-ml-training-serving) or direct SDK usage.
 """
 
 import logging

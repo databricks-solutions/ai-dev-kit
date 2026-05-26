@@ -275,6 +275,58 @@ databricks jobs cancel-run 67890
 databricks jobs delete 12345
 ```
 
+### One-time Runs (`jobs submit`) — async pattern for notebooks
+
+For ad-hoc work (ML training, deploys, demos) where you don't need a persisted job in the UI, `jobs submit` queues a one-shot run on serverless. Returns `{"run_id": N}` immediately with `--no-wait`; you poll yourself.
+
+```bash
+# 1. Submit (returns {"run_id": N} immediately with --no-wait)
+RUN_ID=$(databricks jobs submit --no-wait --json '{
+  "run_name": "train-and-deploy",
+  "tasks": [{
+    "task_key": "train",
+    "notebook_task": {"notebook_path": "/Workspace/Users/me@example.com/proj/train"},
+    "environment_key": "ml_env"
+  }],
+  "environments": [{
+    "environment_key": "ml_env",
+    "spec": {
+      "client": "4",
+      "dependencies": ["mlflow==2.22.0", "xgboost==2.1.3", "optuna==4.1.0"]
+    }
+  }]
+}' | jq -r .run_id)
+
+# 2. Poll until a terminal life_cycle_state. Bounded — size iterations to workload
+#    (90 × 30s = 45min for ML training; bump for longer ETL).
+#    Terminal states (per SDK): TERMINATED, SKIPPED, INTERNAL_ERROR.
+#    Non-terminal: QUEUED, PENDING, RUNNING, TERMINATING, BLOCKED, WAITING_FOR_RETRY.
+for _ in $(seq 90); do
+  STATE=$(databricks jobs get-run "$RUN_ID" | jq -r '.state.life_cycle_state // "UNKNOWN"')
+  echo "$(date +%H:%M:%S) $STATE"
+  [[ "$STATE" =~ ^(TERMINATED|SKIPPED|INTERNAL_ERROR)$ ]] && break
+  sleep 30
+done
+[[ "$STATE" =~ ^(TERMINATED|SKIPPED|INTERNAL_ERROR)$ ]] || { databricks jobs cancel-run "$RUN_ID"; exit 1; }
+
+# life_cycle_state TERMINATED only means "the run ended". Check result_state for
+# success: SUCCESS / FAILED / TIMEDOUT / CANCELED / SUCCESS_WITH_FAILURES / …
+RESULT=$(databricks jobs get-run "$RUN_ID" | jq -r '.state.result_state // "UNKNOWN"')
+echo "result_state=$RESULT"
+[[ "$RESULT" == "SUCCESS" ]] || { echo "Run did not succeed"; exit 1; }
+
+# 3. Pull notebook output — pass the TASK run_id, NOT the submit run_id.
+TASK_RUN_ID=$(databricks jobs get-run "$RUN_ID" | jq -r '.tasks[0].run_id')
+databricks jobs get-run-output "$TASK_RUN_ID" | jq '.notebook_output.result'
+```
+
+**Four traps specific to `jobs submit`:**
+
+1. **`get-run-output` takes the TASK run_id, not the submit-level run_id.** They're different IDs — both are integers, both look the same in CLI output. The top-level `run_id` returned by `jobs submit` is for `get-run` (state polling); extract `.tasks[0].run_id` from that response and use it for `get-run-output`. Passing the submit-level id returns an empty/incorrect payload without a helpful error.
+2. **`spec.client: "4"`** is required for `environments[].spec.dependencies` to actually install on serverless. `"1"` silently ignores the list, the notebook runs without your deps, and import errors surface mid-run. Keep a `%pip install ...` cell at the top of the notebook as a backstop.
+3. **`print()` is unreliable on serverless.** End the notebook with `dbutils.notebook.exit(json.dumps({...}))` so the structured result reaches `.notebook_output.result`. Anything `print`ed may not make it back.
+4. **`jobs submit` does NOT accept top-level `tags`** (warns `unknown field: tags`). Submitted runs are ephemeral and don't persist as jobs, so tagging is meaningless. If you need tagged tracking for cleanup, use `jobs create` (which accepts `"tags": {"key": "value"}`) + `jobs run-now` instead.
+
 ### Asset Bundle Operations
 
 ```bash

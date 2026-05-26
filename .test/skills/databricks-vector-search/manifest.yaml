@@ -1,32 +1,43 @@
+---
 skill_name: databricks-vector-search
-tool_modules: [vector_search]
-description: 'Patterns for Databricks Vector Search: create endpoints and indexes, query with filters, manage embeddings.
-  Use when building RAG applications, semantic search, or similarity matching. Covers both storage-optimized and standard
-  endpoints.'
+tool_modules: []   # No MCP — agent uses Bash + databricks-vectorsearch Python SDK or CLI.
+description: |
+  Databricks Vector Search — create endpoints + indexes (Delta-sync or Direct
+  Access), query with filters, manage embeddings. Tests verify the workspace
+  state after the agent runs the prompt: endpoint ONLINE, index synced, query
+  returns relevant filtered results.
+
 scorers:
   enabled:
-  - python_syntax
-  - pattern_adherence
-  - no_hallucinated_apis
-  - expected_facts_present
+    - python_syntax
+    - no_hallucinated_apis
+    - expected_facts_present
+
   llm_scorers:
-  - Safety
-  - guidelines_from_expectations
+    - Safety
+    - guidelines_from_expectations
+
   default_guidelines:
-  - Response must address the user's request completely
-  - Code examples must follow documented best practices
-  - Response must use modern APIs (not deprecated ones)
+    - "Delta-sync indexes require Change Data Feed on the source table (`TBLPROPERTIES (delta.enableChangeDataFeed = true)`). Must enable / verify before creating the index, not after the inevitable failure."
+    - "Must poll endpoint state until READY/ONLINE before creating the index; must poll the index state until its initial sync is done before querying. Don't assume readiness."
+    - "Managed embeddings: `embedding_source_columns=[{source_column, embedding_model_endpoint_name}]` + `query_text` at query time. Self-managed: `embedding_vector_column` + `embedding_dimension` + `query_vector` at query time. Don't mix the two paths."
+    - "Filters at query time are JSON: `filters={'category': ['a', 'b']}` — NOT a SQL WHERE string."
+    - "Direct Access indexes require an explicit `schema` definition and use `upsert()` / `delete()` for data — there's no source Delta table."
+    - "Must verify the query actually returned results (and that filters / deletes took effect) — don't assume."
+
   trace_expectations:
     tool_limits:
-      Bash: 10
+      Bash: 30
       Read: 20
     token_budget:
-      max_total: 100000
+      max_total: 120000
     required_tools:
-    - Read
+      - Read
+      - Bash
     banned_tools: []
-    expected_files: []
+
 quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-  execution_success: 0.8
+  python_syntax: 1.0
+  no_hallucinated_apis: 1.0
+  expected_facts_present: 0.85
+  execution_success: 1.0

@@ -1,0 +1,154 @@
+metadata:
+  skill_name: databricks-ml-training-serving
+  version: 1.0.0
+  created_at: '2026-05-21T00:00:00.000000'
+  description: |
+    High-level outcome-oriented prompts. Each test asks the agent to deliver
+    an end-to-end flow (notebook → submit job → verify artifact) using the
+    skill. We score the *outcome* (right model registered, right table written,
+    right endpoint READY) and key concepts in the response, NOT tool names or
+    specific helper functions used along the way.
+
+test_cases:
+  # ============================================================================
+  # 1. Batch path — train + register + score to a gold table
+  # ============================================================================
+  - id: ml_batch_train_and_score_001
+    inputs:
+      prompt: |
+        I have two Delta tables in Unity Catalog:
+          • ai_dev_kit_test.ml.silver_customer_features  (one row per customer with numeric features)
+          • ai_dev_kit_test.ml.silver_churn_events       (events where customers churned)
+
+        Build a churn-prediction pipeline that:
+        1. Joins the two tables to build a labeled training set (label = 1 if
+           the customer churned within 30 days of the feature snapshot, else 0).
+        2. Trains an XGBoost classifier with MLflow tracking and Optuna HPO.
+        3. Registers the best model to Unity Catalog at
+           `ai_dev_kit_test.ml.churn_predictor` and promotes it to @prod.
+        4. Batch-scores the latest features and writes the predictions to
+           `ai_dev_kit_test.ml.gold_churn_predictions` (one row per customer:
+           customer_id, churn_probability, scored_at, model_version).
+
+        Run the whole thing as a serverless one-time job. Wait for it to
+        finish and confirm the gold table was written.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "MLflow tracking with autolog and registered_model_name"
+        - "mlflow.set_registry_uri('databricks-uc')"
+        - "set_registered_model_alias for @prod promotion"
+        - "Optuna with nested mlflow runs per trial"
+        - "mlflow.pyfunc.spark_udf with models:/...@prod URI for batch scoring"
+        - "databricks workspace mkdirs before mlflow.set_experiment"
+        - "databricks jobs submit --no-wait then poll get-run"
+        - "Use TASK run_id (.tasks[0].run_id) for get-run-output, not the submit run_id"
+        - "spec.client '4' (not '1') for environments[].spec.dependencies to install"
+        - "gold_churn_predictions table is written and contains rows"
+      databricks_outcomes:
+        # Future scorer hook — verify workspace state directly.
+        # Until that scorer exists these are inspected manually.
+        - kind: uc_model_exists
+          name: "ai_dev_kit_test.ml.churn_predictor"
+        - kind: uc_model_alias
+          name: "ai_dev_kit_test.ml.churn_predictor"
+          alias: "prod"
+        - kind: uc_table_nonempty
+          name: "ai_dev_kit_test.ml.gold_churn_predictions"
+          required_columns: ["customer_id", "churn_probability", "scored_at", "model_version"]
+        - kind: job_run_succeeded
+    metadata:
+      category: happy_path
+      difficulty: medium
+      tags: [batch, training, mlflow, uc-registry, spark-udf]
+
+  # ============================================================================
+  # 2. Real-time path — train, register, deploy a serving endpoint, query it
+  # ============================================================================
+  - id: ml_realtime_endpoint_001
+    inputs:
+      prompt: |
+        Train a fraud-detection model on `ai_dev_kit_test.ml.silver_transactions`
+        (features + `is_fraud` label), register it to Unity Catalog at
+        `ai_dev_kit_test.ml.fraud_detector`, and deploy it as a real-time
+        Databricks Model Serving endpoint named `fraud-detector-endpoint`.
+
+        I need per-request scoring from an app, so the endpoint must be
+        scale-to-zero, tagged with `aidevkit_project=ai-dev-kit`, and queryable
+        with a single record returning a fraud probability.
+
+        Wait until the endpoint is fully READY and then query it once with a
+        sample record to verify it responds.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "Model registered to Unity Catalog under ai_dev_kit_test.ml.fraud_detector"
+        - "set_registered_model_alias to @prod before endpoint deploy"
+        - "mlflow.deployments.get_deploy_client('databricks').create_endpoint(...)"
+        - "served_entities with workload_size 'Small' and scale_to_zero_enabled True"
+        - "tags={'aidevkit_project': 'ai-dev-kit'} TOP-LEVEL on create_endpoint, not inside config"
+        - "Poll BOTH state.ready=READY AND state.config_update=NOT_UPDATING before querying"
+        - "Query with databricks serving-endpoints query ... --json with dataframe_records"
+        - "Endpoint cold-start window is ~5-15 minutes; do not assume immediate availability"
+      databricks_outcomes:
+        - kind: uc_model_exists
+          name: "ai_dev_kit_test.ml.fraud_detector"
+        - kind: uc_model_alias
+          name: "ai_dev_kit_test.ml.fraud_detector"
+          alias: "prod"
+        - kind: serving_endpoint_ready
+          name: "fraud-detector-endpoint"
+        - kind: serving_endpoint_has_tag
+          name: "fraud-detector-endpoint"
+          key: "aidevkit_project"
+          value: "ai-dev-kit"
+        - kind: serving_endpoint_query_returns_prediction
+          name: "fraud-detector-endpoint"
+    metadata:
+      category: happy_path
+      difficulty: medium
+      tags: [serving, real-time, endpoint, deploy, version-swap]
+
+  # ============================================================================
+  # 3. Custom GenAI agent — ResponsesAgent + UC tools + log to UC
+  # ============================================================================
+  - id: ml_genai_agent_001
+    inputs:
+      prompt: |
+        Build a custom GenAI agent (MLflow ResponsesAgent) for a turbine ops
+        assistant. The agent should:
+          • Use a Databricks Foundation Model API endpoint (pick a reasonable
+            current Claude Sonnet by listing available endpoints at runtime).
+          • Use a UC Function `ai_dev_kit_test.ml.lookup_turbine_history` as
+            a tool for hardware history queries.
+          • Use a Vector Search index `ai_dev_kit_test.ml.docs_index` as a
+            retriever tool for procedure questions.
+
+        Log it to Unity Catalog at `ai_dev_kit_test.ml.turbine_agent`, deploy
+        it as a serving endpoint, and verify a sample query returns a non-empty
+        response without PERMISSION_DENIED.
+    outputs:
+      execution_success: true
+    expectations:
+      expected_facts:
+        - "ResponsesAgent class with predict and predict_stream"
+        - "Output items via self.create_text_output_item — NEVER raw dicts"
+        - "python_model='agent.py' file-based (Models from Code), not class instance"
+        - "mlflow.models.set_model(agent) at the bottom of agent.py"
+        - "resources=[DatabricksServingEndpoint, DatabricksFunction, DatabricksVectorSearchIndex] passed to log_model for auto-passthrough auth"
+        - "Foundation Model endpoint resolved via `databricks serving-endpoints list` filtered to system.ai.*, not hard-coded"
+        - "databricks.agents.deploy(...) run as a serverless job because it blocks ~15 minutes"
+        - "Sample query returns a response and does NOT fail with PERMISSION_DENIED"
+      databricks_outcomes:
+        - kind: uc_model_exists
+          name: "ai_dev_kit_test.ml.turbine_agent"
+        - kind: serving_endpoint_ready
+          name_pattern: "turbine_agent|turbine-agent"
+        - kind: serving_endpoint_query_returns_non_empty
+          name_pattern: "turbine_agent|turbine-agent"
+    metadata:
+      category: happy_path
+      difficulty: hard
+      tags: [genai, responses-agent, uc-tools, vector-search, async-deploy]

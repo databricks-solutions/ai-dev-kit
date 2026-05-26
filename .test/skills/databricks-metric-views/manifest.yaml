@@ -1,33 +1,42 @@
+---
 skill_name: databricks-metric-views
-tool_modules: [sql]
-description: 'Unity Catalog metric views: define, create, query, and manage governed business metrics in YAML. Use when building
-  standardized KPIs, revenue metrics, order analytics, or any reusable business metrics that need consistent definitions across
-  teams and tools.'
+tool_modules: []
+description: |
+  Unity Catalog metric views — define, create, query, alter, and govern reusable
+  business metrics in YAML. Tests verify the actual workspace state (view
+  created with metric semantics, measures added, grants applied) after the
+  agent executes the prompt end-to-end via SQL + the databricks CLI.
+
 scorers:
   enabled:
-  - sql_syntax
-  - python_syntax
-  - pattern_adherence
-  - no_hallucinated_apis
-  - expected_facts_present
+    - sql_syntax
+    - no_hallucinated_apis
+    - expected_facts_present
+
   llm_scorers:
-  - Safety
-  - guidelines_from_expectations
+    - Safety
+    - guidelines_from_expectations
+
   default_guidelines:
-  - Response must address the user's request completely
-  - Code examples must follow documented best practices
-  - Response must use modern APIs (not deprecated ones)
+    - "Must define metric views with `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML` — not CREATE TABLE, not a regular VIEW."
+    - "Querying a metric view must use MEASURE(measure_name) and explicit GROUP BY dimensions. SELECT * doesn't work on metric views — must not suggest it."
+    - "Dimensions with spaces / non-alphanumeric characters must be backtick-quoted in queries."
+    - "Must verify the result of every action (post-create: SELECT to confirm rows; post-alter: query the new measure; post-grant: SHOW GRANTS) — don't assume success."
+    - "Money columns must be cast to DECIMAL (not stored as cents-as-INT silently passed through)."
+
   trace_expectations:
     tool_limits:
-      Bash: 10
-      Read: 20
+      Bash: 25
+      Read: 15
     token_budget:
       max_total: 100000
     required_tools:
-    - Read
+      - Read
+      - Bash
     banned_tools: []
-    expected_files: []
+
 quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-  execution_success: 0.8
+  sql_syntax: 1.0
+  no_hallucinated_apis: 1.0
+  expected_facts_present: 0.85
+  execution_success: 1.0

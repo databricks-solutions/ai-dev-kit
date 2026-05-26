@@ -56,6 +56,7 @@ USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
 CHANNEL="${DEVKIT_CHANNEL:-stable}"  # stable or experimental
+IGNORE_CLI_VERSION="${DEVKIT_IGNORE_CLI_VERSION:-false}"
 
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
@@ -95,14 +96,14 @@ USE_PREVIOUS_CONFIG=false
 HAS_PREVIOUS_CONFIG=false  # True if previous config exists (for pre-selecting defaults)
 
 # Minimum required versions
-MIN_CLI_VERSION="0.299.0"
+MIN_CLI_VERSION="0.299.2"
 MIN_SDK_VERSION="0.85.0"
 
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
 # Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-ml-training-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -124,9 +125,9 @@ CORE_SKILLS="databricks-config databricks-docs databricks-python-sdk databricks-
 # Profile definitions (non-core skills only — core skills are always added)
 PROFILE_DATA_ENGINEER="databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-jobs databricks-bundles databricks-dbsql databricks-iceberg databricks-zerobus-ingest spark-python-data-source databricks-metric-views databricks-synthetic-data-gen"
 PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie databricks-metric-views"
-PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-model-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
+PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-ml-training-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
-PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-bundles"
+PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-ml-training-serving databricks-dbsql databricks-jobs databricks-bundles"
 PROFILE_APP_DEVELOPER_AGENT="databricks-core:databricks databricks-apps databricks-lakebase"
 
 # Selected skills (populated during profile selection)
@@ -158,6 +159,7 @@ while [ $# -gt 0 ]; do
         --mcp)            INSTALL_MCP=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --experimental)   CHANNEL="experimental"; shift ;;
+        --ignore-cli-version) IGNORE_CLI_VERSION=true; shift ;;
         -f|--force)       FORCE=true; FORCE_EXPLICIT=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
@@ -177,6 +179,7 @@ while [ $# -gt 0 ]; do
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
             echo "  --experimental        Install from experimental branch (early access features)"
+            echo "  --ignore-cli-version  Skip the Databricks CLI version check (install anyway)"
             echo "  --mcp                 Install deprecated MCP server (default: no)"
             echo "  --mcp-path PATH       MCP server install path (default: ~/.ai-dev-kit)"
             echo "  -f, --force           Force reinstall"
@@ -193,6 +196,7 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
             echo "  DEVKIT_CHANNEL        'stable' (default) or 'experimental'"
+            echo "  DEVKIT_IGNORE_CLI_VERSION  Set to 'true' to skip the CLI version check"
             echo "  DEVKIT_INSTALL_MCP    Set to 'true' to install MCP server"
             echo "  DEVKIT_MCP_PATH       MCP server install path"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
@@ -1173,7 +1177,7 @@ prompt_custom_skills() {
         "Genie|databricks-genie|$(_is_preselected databricks-genie)|Natural language SQL" \
         "Agent Bricks|databricks-agent-bricks|$(_is_preselected databricks-agent-bricks)|Build AI agents" \
         "Vector Search|databricks-vector-search|$(_is_preselected databricks-vector-search)|Similarity search" \
-        "Model Serving|databricks-model-serving|$(_is_preselected databricks-model-serving)|Deploy models/agents" \
+        "ML Training & Serving|databricks-ml-training-serving|$(_is_preselected databricks-ml-training-serving)|Train, register, batch-score, serve" \
         "MLflow Evaluation|databricks-mlflow-evaluation|$(_is_preselected databricks-mlflow-evaluation)|Model evaluation" \
         "AI Functions|databricks-ai-functions|$(_is_preselected databricks-ai-functions)|AI Functions, document parsing & RAG" \
         "Unstructured PDF|databricks-unstructured-pdf-generation|$(_is_preselected databricks-unstructured-pdf-generation)|Synthetic PDFs for RAG" \
@@ -1249,29 +1253,50 @@ version_gte() {
     printf '%s\n%s' "$2" "$1" | sort -V -C
 }
 
-# Check Databricks CLI version meets minimum requirement
+# Upgrade-instruction block reused by every CLI-related fail/warn path.
+# Keeps the macOS/Linux/Windows + docs URL formatting in one place.
+cli_upgrade_instructions() {
+    cat <<EOF
+     • macOS / Linux (Homebrew):  ${B}brew upgrade databricks${N}
+     • macOS / Linux (installer): ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}
+     • Windows (WinGet):          ${B}winget install Databricks.DatabricksCLI${N}
+     • Docs: ${BL}https://docs.databricks.com/aws/en/dev-tools/cli/install${N}
+
+  Re-run with ${B}--ignore-cli-version${N} to install anyway (some skills will not work).
+EOF
+}
+
+# Check Databricks CLI version meets minimum requirement.
+# Sets CLI_VERSION_OK=false on mismatch — the actual die() happens later in
+# check_deps so the user sees the full prereq summary before we abort.
+CLI_VERSION_OK=true
 check_cli_version() {
     local cli_version
     cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 
     if [ -z "$cli_version" ]; then
         PREREQ_WARNINGS+=("Could not determine Databricks CLI version")
-        return 1
+        CLI_VERSION_OK=false
+        return 0
     fi
 
     if version_gte "$cli_version" "$MIN_CLI_VERSION"; then
         PREREQS+=("Databricks CLI v${cli_version}")
-        return 0
     else
-        PREREQ_WARNINGS+=("Databricks CLI v${cli_version} outdated (min: v${MIN_CLI_VERSION}). Upgrade: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh")
-        return 1
+        PREREQ_WARNINGS+=("Databricks CLI v${cli_version} is older than required v${MIN_CLI_VERSION}. Upgrade:\n$(cli_upgrade_instructions)")
+        CLI_VERSION_OK=false
     fi
+    # Always return 0 — version mismatch is a soft warning, not a hard fail.
+    # Returning 1 under `set -e` from inside check_deps's `if then` branch
+    # aborts the installer right after the banner prints, with no error.
+    return 0
 }
 
 # Check prerequisites (prints inline)
 check_deps() {
     PREREQS=()
     PREREQ_WARNINGS=()
+    CLI_VERSION_OK=true
 
     command -v git >/dev/null 2>&1 || die "git required"
     PREREQS+=("git")
@@ -1279,7 +1304,8 @@ check_deps() {
     if command -v databricks >/dev/null 2>&1; then
         check_cli_version
     else
-        PREREQ_WARNINGS+=("Databricks CLI not found. Install: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh")
+        PREREQ_WARNINGS+=("Databricks CLI not found. Install:\n$(cli_upgrade_instructions)")
+        CLI_VERSION_OK=false
     fi
 
     if [ "$INSTALL_MCP" = true ]; then
@@ -1303,22 +1329,40 @@ check_deps() {
     for w in "${PREREQ_WARNINGS[@]}"; do
         warn "$w"
     done
+
+    # Hard-fail on missing or outdated CLI unless the user explicitly opted out.
+    # We die AFTER printing all prereqs/warnings so the user sees the full
+    # picture (and the upgrade instructions were already printed via the warning).
+    if [ "$CLI_VERSION_OK" = false ] && [ "$IGNORE_CLI_VERSION" != true ]; then
+        die "Databricks CLI prerequisite not met. Install / upgrade per the instructions above, then re-run.
+       To bypass this check (some skills won't work), re-run with ${B}--ignore-cli-version${N}."
+    fi
+
+    # Explicit success — without this, an outdated-CLI warning from
+    # check_cli_version (return 1) bubbles up as the function's return
+    # value and `set -e` aborts the installer silently after only the
+    # banner is printed.
+    return 0
 }
 
 # Setup MCP server
 setup_mcp() {
     step "Setting up MCP server"
     
-    # Clone or update repo
+    # Clone or update repo. Fallback clones must `|| die` — a silent failure
+    # leaves $REPO_DIR missing and downstream `uv pip install -e "$REPO_DIR/..."`
+    # explodes with an unrelated error.
     if [ -d "$REPO_DIR/.git" ]; then
         git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
         git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+                || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
         }
     else
         mkdir -p "$INSTALL_DIR"
-        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+            || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
     fi
     ok "Repository cloned ($BRANCH)"
     
@@ -2110,8 +2154,15 @@ prompt_channel() {
         [ "$INSTALL_SKILLS" = false ] && args="$args --mcp-only"
         [ "$BRANCH_EXPLICIT" = true ] && args="$args --branch $BRANCH"
 
-        # Download and execute the experimental installer
-        exec bash <(curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh") $args
+        # Download and execute the experimental installer.
+        # Download to a tmp file first so a curl failure (network/404/5xx) surfaces
+        # — `exec bash <(curl ...)` would silently exec an empty script otherwise.
+        local exp_installer
+        exp_installer=$(mktemp -t ai-dev-kit-exp-installer.XXXXXX) || die "Could not create temp file for experimental installer"
+        curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh" -o "$exp_installer" \
+            || die "Could not download experimental installer from GitHub. Check your network connection, then retry."
+        [ -s "$exp_installer" ] || die "Downloaded experimental installer is empty — GitHub may be having issues. Retry in a moment."
+        exec bash "$exp_installer" $args
     fi
 }
 
@@ -2305,14 +2356,16 @@ main() {
             git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
             git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
                 rm -rf "$REPO_DIR"
-                git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+                git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+                    || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
             }
             ok "Repository refreshed ($BRANCH)"
         fi
     else
         step "Downloading sources"
         mkdir -p "$INSTALL_DIR"
-        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+            || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
         ok "Repository cloned ($BRANCH)"
     fi
     

@@ -1,31 +1,41 @@
+---
 skill_name: databricks-unstructured-pdf-generation
-tool_modules: [volume_files]
-description: Generate synthetic PDF documents for RAG and unstructured data use cases. Use when creating test PDFs, demo documents,
-  or evaluation datasets for retrieval systems.
+tool_modules: []   # No MCP — agent uses Bash + the skill's bundled pdf_generator.py.
+description: |
+  Generate synthetic PDF documents (HTML → PDF via the skill's pdf_generator.py)
+  and upload them to Unity Catalog volumes for RAG / unstructured demos.
+  Tests verify the actual volume contents after the agent runs the end-to-end
+  flow.
+
 scorers:
   enabled:
-  - python_syntax
-  - pattern_adherence
-  - no_hallucinated_apis
-  - expected_facts_present
+    - no_hallucinated_apis
+    - expected_facts_present
+
   llm_scorers:
-  - Safety
-  - guidelines_from_expectations
+    - Safety
+    - guidelines_from_expectations
+
   default_guidelines:
-  - Response must address the user's request completely
-  - Code examples must follow documented best practices
-  - Response must use modern APIs (not deprecated ones)
+    - "Must use the skill's bundled `pdf_generator.py convert --input ... --output ...` script (NOT a hallucinated `generate_pdf_documents` MCP tool — no such tool exists)."
+    - "HTML files go under `./raw_data/html/` (subdirectories preserved through conversion); PDFs land under `./raw_data/pdf/`."
+    - "Upload to UC volumes uses `databricks fs cp -r --overwrite ./raw_data/pdf dbfs:/Volumes/...` — the `dbfs:` prefix is REQUIRED on Volume paths or the CLI treats it as local fs."
+    - "After upload, must verify the volume contents with `databricks fs ls dbfs:/Volumes/...` — not assume the cp succeeded."
+    - "When generating eval datasets, must produce `doc_questions.json` with one entry per PDF, each with substantive questions grounded in the document content."
+
   trace_expectations:
     tool_limits:
-      Bash: 10
-      Read: 20
+      Bash: 30
+      Read: 15
+      Write: 30          # HTML/JSON files
     token_budget:
-      max_total: 100000
+      max_total: 120000
     required_tools:
-    - Read
+      - Read
+      - Bash
     banned_tools: []
-    expected_files: []
+
 quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-  execution_success: 0.8
+  no_hallucinated_apis: 1.0
+  expected_facts_present: 0.85
+  execution_success: 1.0

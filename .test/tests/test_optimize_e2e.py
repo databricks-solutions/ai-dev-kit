@@ -57,7 +57,7 @@ class TestTokenEfficiency:
 class TestSplitter:
     def test_model_serving_has_split(self):
         try:
-            train, val = create_gepa_datasets("databricks-model-serving")
+            train, val = create_gepa_datasets("databricks-ml-training-serving")
             assert len(train) > 0
             if len(train) + (len(val) if val else 0) >= 5:
                 assert val is not None
@@ -66,15 +66,15 @@ class TestSplitter:
 
     def test_reproducible_splits(self):
         try:
-            t1, v1 = create_gepa_datasets("databricks-model-serving", seed=42)
-            t2, v2 = create_gepa_datasets("databricks-model-serving", seed=42)
+            t1, v1 = create_gepa_datasets("databricks-ml-training-serving", seed=42)
+            t2, v2 = create_gepa_datasets("databricks-ml-training-serving", seed=42)
             assert [t["id"] for t in t1] == [t["id"] for t in t2]
         except FileNotFoundError:
             pytest.skip("No ground_truth.yaml")
 
     def test_tasks_have_correct_keys(self):
         try:
-            train, _ = create_gepa_datasets("databricks-model-serving")
+            train, _ = create_gepa_datasets("databricks-ml-training-serving")
             for task in train:
                 assert "id" in task
                 assert "input" in task
@@ -85,7 +85,7 @@ class TestSplitter:
 
     def test_to_gepa_instances(self):
         try:
-            train, _ = create_gepa_datasets("databricks-model-serving")
+            train, _ = create_gepa_datasets("databricks-ml-training-serving")
             instances = to_gepa_instances(train)
             assert len(instances) == len(train)
             for inst in instances:
@@ -97,7 +97,7 @@ class TestSplitter:
             pytest.skip("No ground_truth.yaml")
 
     def test_bootstrap_tasks_generated(self):
-        tasks = generate_bootstrap_tasks("databricks-model-serving")
+        tasks = generate_bootstrap_tasks("databricks-ml-training-serving")
         assert len(tasks) > 0
         for task in tasks:
             assert "id" in task
@@ -155,7 +155,7 @@ class TestBootstrapMode:
         assert tasks == []
 
     def test_bootstrap_has_gepa_format(self):
-        tasks = generate_bootstrap_tasks("databricks-model-serving")
+        tasks = generate_bootstrap_tasks("databricks-ml-training-serving")
         if not tasks:
             pytest.skip("No SKILL.md found")
         instances = to_gepa_instances(tasks)
@@ -185,7 +185,7 @@ class TestDryRun:
     def test_dry_run_skill_only(self):
         from skill_test.optimize.runner import optimize_skill
         try:
-            result = optimize_skill("databricks-model-serving", preset="quick", dry_run=True)
+            result = optimize_skill("databricks-ml-training-serving", preset="quick", dry_run=True)
             assert result.improvement == 0.0
             assert result.original_content == result.optimized_content
             assert result.gepa_result is None
@@ -197,7 +197,7 @@ class TestDryRun:
         from skill_test.optimize.runner import optimize_skill
         try:
             result = optimize_skill(
-                "databricks-model-serving", preset="quick", dry_run=True,
+                "databricks-ml-training-serving", preset="quick", dry_run=True,
                 include_tools=True, tool_modules=["serving"],
             )
             assert SKILL_KEY in result.components

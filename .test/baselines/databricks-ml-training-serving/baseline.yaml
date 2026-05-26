@@ -1,0 +1,22 @@
+# Baseline pending recapture against the new 3-test outcome-oriented ground_truth.yaml.
+#
+# Previous baseline (2026-02-09) was captured against an 8-test MCP-encoded ground
+# truth that has been deleted. Those numbers do NOT apply here and have been removed
+# to avoid false-positive "regression" signals on the next eval run.
+#
+# To regenerate after the next clean run:
+#   1. Run the evaluator against the 3 tests in ground_truth.yaml on a workspace.
+#   2. Capture per-test scores + mlflow_run_id and write them under `metrics:` /
+#      `test_results:` below.
+#   3. Re-set quality_gates from manifest.yaml.
+
+metadata:
+  skill_name: "databricks-ml-training-serving"
+  status: "pending_recapture"
+  ground_truth_version: "1.0.0"
+  notes: "3 outcome-oriented tests: batch train+score, real-time endpoint, custom GenAI agent."
+
+metrics: {}
+test_results: []
+quality_gates: {}
+overall_status: "pending"

@@ -1,32 +1,42 @@
+---
 skill_name: databricks-unity-catalog
-tool_modules: [unity_catalog, sql]
-description: Unity Catalog system tables and volumes. Use when querying system tables (audit, lineage, billing) or working
-  with volume file operations (upload, download, list files in /Volumes/).
+tool_modules: []   # No MCP — agent uses Bash + `databricks fs` and `databricks experimental aitools tools query`.
+description: |
+  Unity Catalog — system table queries (lineage, audit, billing, compute, jobs)
+  and volume file operations (upload, download, list, mkdir). Tests verify the
+  actual workspace state after the agent runs the prompt via the databricks
+  CLI (no MCP tools).
+
 scorers:
   enabled:
-  - sql_syntax
-  - python_syntax
-  - pattern_adherence
-  - no_hallucinated_apis
-  - expected_facts_present
+    - sql_syntax
+    - no_hallucinated_apis
+    - expected_facts_present
+
   llm_scorers:
-  - Safety
-  - guidelines_from_expectations
+    - Safety
+    - guidelines_from_expectations
+
   default_guidelines:
-  - Response must address the user's request completely
-  - Code examples must follow documented best practices
-  - Response must use modern APIs (not deprecated ones)
+    - "Volume file operations use `databricks fs` (cp, ls, mkdirs, rm). The `dbfs:` URI prefix is REQUIRED on UC Volume paths — without it the CLI treats the path as local filesystem and errors with 'no such directory'."
+    - "System table queries run via `databricks experimental aitools tools query --warehouse <WH> \"...\"` — NOT a hallucinated `mcp__databricks__execute_sql` (no MCP tooling installed). Resolve the warehouse ID at runtime (`databricks warehouses list`) rather than asking the user."
+    - "System tables must be queried with date filters (they're enormous): `event_date >= current_date() - N` or `event_time >= current_timestamp() - INTERVAL N DAYS`."
+    - "Must verify the result (post-upload: ls; post-query: surface the actual rows) — don't assume success."
+    - "When `system.*` access fails, must explain the required grants (`USE CATALOG ON system`, `USE SCHEMA ON system.access`, `SELECT ON SCHEMA system.access`) — don't silently swallow the error."
+
   trace_expectations:
     tool_limits:
-      Bash: 10
-      Read: 20
+      Bash: 25
+      Read: 15
     token_budget:
       max_total: 100000
     required_tools:
-    - Read
+      - Read
+      - Bash
     banned_tools: []
-    expected_files: []
+
 quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-  execution_success: 0.8
+  sql_syntax: 1.0
+  no_hallucinated_apis: 1.0
+  expected_facts_present: 0.85
+  execution_success: 1.0

@@ -1,0 +1,51 @@
+---
+skill_name: databricks-ml-training-serving
+tool_modules: []   # No MCP tooling — agent uses Bash + Databricks CLI directly.
+description: |
+  ML training, UC registration, and inference on Databricks. Three end-to-end
+  outcome-oriented tests covering the batch path (train → register → spark_udf
+  → gold table), the real-time path (train → register → serving endpoint),
+  and the custom-agent path (ResponsesAgent + UC tools → log → deploy).
+
+scorers:
+  # Deterministic checks on the agent's response text.
+  enabled:
+    - python_syntax
+    - no_hallucinated_apis
+    - expected_facts_present
+
+  # LLM-judged scorers against the guidelines below.
+  llm_scorers:
+    - Safety
+    - guidelines_from_expectations
+
+  # Guidelines apply to all tests unless overridden per-test.
+  default_guidelines:
+    - "Must train on Databricks (serverless job or workspace notebook), NEVER in the local Python process the agent is running in. Fall back to local only if the user explicitly requests it."
+    - "Must complete the end-to-end flow the user asked for (notebook → upload → submit serverless job → verify artifact)."
+    - "Must register models to Unity Catalog (mlflow.set_registry_uri('databricks-uc')), not the deprecated workspace registry."
+    - "Must promote model versions with UC aliases (set_registered_model_alias), not deprecated stages."
+    - "Must use `databricks jobs submit --no-wait` for long-running training, poll get-run to a terminal state, and extract the TASK run_id (.tasks[0].run_id) before calling get-run-output."
+    - "Must specify `spec.client: '4'` in environments[].spec so dependencies actually install on serverless."
+    - "Must terminate notebooks with dbutils.notebook.exit(json.dumps({...})) so structured results are retrievable from get-run-output."
+    - "When deploying a real-time endpoint: scale_to_zero_enabled=True, tags top-level (not inside config), poll BOTH state.ready and state.config_update before querying."
+    - "Resources are workspace state; if asked to verify a result, the agent must query the workspace (UC table, model version, endpoint readiness), not assume success from a job completion alone."
+
+  # Trace-level expectations on agent behavior during the run.
+  trace_expectations:
+    tool_limits:
+      Bash: 60               # CLI-heavy workflows are expected.
+      Read: 30
+    token_budget:
+      max_total: 200000
+    required_tools:
+      - Read                 # Must consult the skill.
+      - Bash                 # CLI is the primary surface.
+    banned_tools: []         # No MCP tools to ban; the framework is unrestricted.
+
+# Pass/fail thresholds aggregated across the 3 tests.
+quality_gates:
+  syntax_valid: 1.0          # 100% — every Python block must parse.
+  no_hallucinated_apis: 1.0  # 100% — no invented function names.
+  expected_facts_present: 0.85  # 85% of expected_facts surfaced per test on average.
+  execution_success: 1.0     # 100% — all 3 runs must reach a terminal SUCCESS state.

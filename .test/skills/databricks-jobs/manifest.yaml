@@ -1,5 +1,5 @@
 skill_name: databricks-jobs
-tool_modules: [jobs, compute]
+tool_modules: []  # No MCP — agent uses Bash + Databricks CLI directly.
 description: 'Use this skill proactively for ANY Databricks Jobs task - creating, listing, running, updating, or deleting
   jobs. Triggers include: (1) ''create a job'' or ''new job'', (2) ''list jobs'' or ''show jobs'', (3) ''run job'' or''trigger
   job'',(4) ''job status'' or ''check job'', (5) scheduling with cron or triggers, (6) configuring notifications/monitoring,

@@ -1,5 +1,5 @@
 skill_name: databricks-lakebase-autoscale
-tool_modules: [lakebase, sql]
+tool_modules: []  # No MCP — agent uses Bash + Databricks CLI directly.
 description: Patterns and best practices for using Lakebase Autoscaling (next-gen managed PostgreSQL) with autoscaling, branching,
   scale-to-zero, and instant restore.
 scorers:

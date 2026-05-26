@@ -28,7 +28,7 @@ FROM STREAM read_files('/Volumes/my_catalog/my_schema/raw/events/', format => 'j
 
 **Key points:**
 - Use `STREAM` keyword with source for incremental processing
-- `CLUSTER BY` enables Liquid Clustering (recommended over PARTITION BY)
+- `CLUSTER BY` enables Liquid Clustering (recommended over PARTITION BY). Numeric / string / date / timestamp columns only — no BOOLEAN or complex types
 - Returns streaming DataFrame
 
 ### Materialized View
@@ -241,3 +241,4 @@ configuration:
 | Parameter not resolved | Check `${var}` syntax and pipeline configuration |
 | Using legacy `LIVE` keyword | Use `CREATE OR REFRESH STREAMING TABLE` \| `MATERIALIZED VIEW`, not `CREATE LIVE TABLE` \| `STREAMING LIVE TABLE` |
 | Using `input_file_name()` | Use `_metadata.file_path` |
+| `AGGREGATE_FUNCTION_WITH_NONDETERMINISTIC_EXPRESSION` (SQLSTATE 42845) | Non-deterministic functions (e.g. `ai_classify`, `rand()`, `uuid()`) can't appear inside aggregates — compute them in a CTE first, then aggregate the resulting column. |

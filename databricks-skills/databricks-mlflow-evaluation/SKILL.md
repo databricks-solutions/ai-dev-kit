@@ -142,7 +142,7 @@ See `GOTCHAS.md` for complete list.
 ## Related Skills
 
 - **[databricks-docs](../databricks-docs/SKILL.md)** - General Databricks documentation reference
-- **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploying models and agents to serving endpoints
+- **[databricks-ml-training-serving](../databricks-ml-training-serving/SKILL.md)** - Deploying models and agents to serving endpoints
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Building agents that can be evaluated with this skill
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK patterns used alongside MLflow APIs
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Unity Catalog tables for managed evaluation datasets

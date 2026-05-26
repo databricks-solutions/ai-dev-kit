@@ -15,7 +15,7 @@ Features:
 Local Development:
     export DATABRICKS_TOKEN="dapi..."
     export DATABRICKS_SERVING_BASE_URL="https://<workspace>/serving-endpoints"
-    export DATABRICKS_MODEL="<endpoint-name>"  # See databricks-model-serving
+    export DATABRICKS_MODEL="<endpoint-name>"  # See databricks-ml-training-serving
     streamlit run fm-minimal-chat.py
 
 Databricks Apps Deployment:
@@ -25,7 +25,7 @@ Databricks Apps Deployment:
          - name: DATABRICKS_SERVING_BASE_URL
            value: "https://<workspace>/serving-endpoints"
          - name: DATABRICKS_MODEL
-           value: "<endpoint-name>"  # See databricks-model-serving
+           value: "<endpoint-name>"  # See databricks-ml-training-serving
 
     2. Create requirements.txt:
        streamlit>=1.38,<2.0

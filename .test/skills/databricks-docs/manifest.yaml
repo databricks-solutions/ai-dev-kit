@@ -1,30 +1,39 @@
+---
 skill_name: databricks-docs
 tool_modules: []
-description: Databricks documentation reference. Use as a lookup resource alongside other skills and MCP tools for comprehensive
-  guidance.
+description: |
+  Databricks documentation lookup via the llms.txt index. Reference skill —
+  agent uses WebFetch to consult docs, then applies findings through the
+  appropriate action skill + CLI. Tests verify the agent actually fetches
+  authoritative docs (not hallucinated guesses) and cites them.
+
 scorers:
   enabled:
-  - pattern_adherence
-  - no_hallucinated_apis
-  - expected_facts_present
+    - no_hallucinated_apis
+    - expected_facts_present
+
   llm_scorers:
-  - Safety
-  - guidelines_from_expectations
+    - Safety
+    - guidelines_from_expectations
+
   default_guidelines:
-  - Response must address the user's request completely
-  - Code examples must follow documented best practices
-  - Response must use modern APIs (not deprecated ones)
+    - "Must use WebFetch on `https://docs.databricks.com/llms.txt` (or a page linked from it) to find authoritative docs, NOT guess feature behavior from training-time knowledge."
+    - "Must cite the specific docs.databricks.com URL the answer came from."
+    - "When the docs lookup informs an action, must apply it via the appropriate action skill / CLI command — not via MCP tooling (none installed) and not via hand-waving 'use the API'."
+    - "Should explicitly note this is a reference skill, not an action skill: load the matching action skill for the actual workflow."
+
   trace_expectations:
     tool_limits:
-      Bash: 10
-      Read: 20
+      WebFetch: 8
+      Read: 15
+      Bash: 5
     token_budget:
-      max_total: 100000
+      max_total: 80000
     required_tools:
-    - Read
+      - WebFetch     # The whole point of this skill
     banned_tools: []
-    expected_files: []
+
 quality_gates:
-  syntax_valid: 1.0
-  pattern_adherence: 0.9
-  execution_success: 0.8
+  no_hallucinated_apis: 1.0
+  expected_facts_present: 0.85
+  execution_success: 1.0
