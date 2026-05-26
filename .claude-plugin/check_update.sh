@@ -49,12 +49,20 @@ fi
 
 # If versions differ, output a message for Claude to relay to the user.
 #
-# The 2026-05-24 release moved Databricks skill distribution out of this repo
-# and into the Databricks CLI (`databricks aitools install`). Local versions
-# strictly less than 1.0.0 predate that migration; the user has stale skill
-# directories from the old install.sh (which copied a-d-k's databricks-skills/
-# directly into .claude/skills/ etc.). Surface a one-shot migration block on
-# top of the regular update prompt so they know what's changing.
+# The migration to v1.0.0+ moved Databricks skill distribution out of this
+# repo and into:
+#   1. The Databricks CLI (`databricks aitools install`) — canonical install
+#      path, supports both stable and --experimental skills.
+#   2. The `databricks/databricks-agent-skills` Claude Code plugin
+#      marketplace — installs the stable skill set directly from inside
+#      Claude Code, no shell required.
+#
+# Local versions strictly less than 1.0.0 predate that migration; the user
+# has stale skill directories from the old install.sh (which copied a-d-k's
+# databricks-skills/<name>/ into .claude/skills/ etc.) and/or the now-
+# deprecated `databricks-solutions/ai-dev-kit` plugin marketplace. Surface a
+# one-shot migration block on top of the regular update prompt so they know
+# what's changing, with both follow-up paths.
 is_pre_migration() {
     # Returns 0 (true) if $1 < 1.0.0 by version-sort.
     [ "$1" = "1.0.0" ] && return 1
@@ -72,9 +80,26 @@ This update changes how Databricks skills are distributed:
 
   • Skills now ship via the Databricks CLI: \`databricks aitools install\`
   • You'll need Databricks CLI v1.0.0 or newer.
-  • Running the upgrade command below will detect old per-agent skill
-    directories (`.claude/skills/databricks-*`, etc.) installed by the
-    previous installer and remove them, then re-install via the CLI.
+
+Two ways to get the new install:
+
+  (A) Inside Claude Code — switch to the new plugin marketplace:
+
+      /plugin marketplace add databricks/databricks-agent-skills
+      /plugin install databricks-skills
+      /plugin marketplace remove databricks-solutions/ai-dev-kit
+
+      This installs the stable skill set directly. For experimental
+      skills, use path (B) — the Claude Code plugin only ships stable.
+
+  (B) Outside Claude Code — re-run the AI Dev Kit installer:
+
+      bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+
+      This detects the old per-agent skill directories
+      (\`.claude/skills/databricks-*\`, etc.) installed by the previous
+      installer, removes them, and re-installs via the CLI (supports
+      \`--experimental\` and per-skill selection).
 
 MIGRATION
 )
