@@ -241,3 +241,4 @@ configuration:
 | Parameter not resolved | Check `${var}` syntax and pipeline configuration |
 | Using legacy `LIVE` keyword | Use `CREATE OR REFRESH STREAMING TABLE` \| `MATERIALIZED VIEW`, not `CREATE LIVE TABLE` \| `STREAMING LIVE TABLE` |
 | Using `input_file_name()` | Use `_metadata.file_path` |
+| `AGGREGATE_FUNCTION_WITH_NONDETERMINISTIC_EXPRESSION` (SQLSTATE 42845) | Non-deterministic functions (e.g. `ai_classify`, `rand()`, `uuid()`) can't appear inside aggregates — compute them in a CTE first, then aggregate the resulting column. |
