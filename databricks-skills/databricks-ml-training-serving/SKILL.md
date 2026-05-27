@@ -34,6 +34,7 @@ One notebook, one artifact. Re-running = retraining. Gold is where truth lives â
 
 ## Train and register (the 90% case)
 
+
 `mlflow.autolog()` captures params, metrics, code, and the model artifact for every run; `registered_model_name=...` auto-registers the best run to UC (auto-incremented version). Wrap training with **Optuna** so each trial is a child run and the best one is what gets registered.
 
 **Always `mlflow.set_registry_uri("databricks-uc")`** â€” without it, models land in the deprecated workspace registry. **The experiment's parent folder must exist** â€” `set_experiment` does NOT auto-create it (fails with `NOT_FOUND: Parent directory does not exist`). Pre-create it once with `databricks workspace mkdirs` before the job runs.
@@ -43,7 +44,26 @@ One notebook, one artifact. Re-running = retraining. Gold is where truth lives â
 databricks workspace mkdirs /Users/me@example.com/turbine_project
 ```
 
+Create a Databricks Notebook (follow the databricks syntax to create md cells) typically:
+
 ```python
+# Databricks notebook source
+# MAGIC %md
+# MAGIC # Notebook title
+# MAGIC
+# MAGIC <Business description of what we're doing in this notebook>
+# MAGIC ## Data exploration and analysis
+
+# COMMAND ----------
+
+<Some basic data exploration in python, typicall to show existing class>
+
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ## Training the model
+
+# COMMAND ----------
+
 import mlflow, mlflow.xgboost, optuna
 from mlflow.tracking import MlflowClient
 from xgboost import XGBClassifier
@@ -71,6 +91,11 @@ def objective(trial):
 with mlflow.start_run(run_name="hpo"):
     optuna.create_study(direction="maximize").optimize(objective, n_trials=20)
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ## Deploy the model to UC
+
+# COMMAND ----------
 # Move @prod alias to the just-registered version. Stages are deprecated â€” aliases only.
 client = MlflowClient(registry_uri="databricks-uc")
 latest = max(client.search_model_versions(f"name='{FULL_NAME}'"),
@@ -89,6 +114,11 @@ client.set_registered_model_alias(FULL_NAME, "prod", latest.version)
 The cheap, default path. Load the registered model as a Spark UDF and score a Delta table; write predictions to a gold table that downstream consumers read.
 
 ```python
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ## Running the inferences and saving them as a gold table
+
+# COMMAND ----------
 import mlflow
 
 # env_manager rules:
@@ -118,6 +148,11 @@ For incremental scoring with history, MERGE into the predictions table instead o
 Use the MLflow Deployments client. `workload_size: "Small"` + `scale_to_zero_enabled: true` is the default for demos and dev. First deploy can take ~5 min for classical ML
 
 ```python
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ## Deploying our model behind a real-time serving endpoint
+
+# COMMAND ----------
 from mlflow.deployments import get_deploy_client
 
 client = get_deploy_client("databricks")
