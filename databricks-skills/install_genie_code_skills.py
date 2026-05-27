@@ -49,6 +49,15 @@ from databricks.sdk.service.workspace import ImportFormat
 # Skills are auto-discovered: any subdirectory containing SKILL.md is a skill.
 
 SKILL_SOURCES = [
+    # databricks-agent-skills (DAS) is the canonical upstream. `skills/` holds
+    # stable, reviewed skills (including AppKit-aware `databricks-apps`);
+    # `experimental/` holds the verbatim a-d-k snapshot. Listed first so that on
+    # name collision DAS wins over the (deprecated) a-d-k source below.
+    {"owner": "databricks",           "repo": "databricks-agent-skills", "path": "skills"},
+    {"owner": "databricks",           "repo": "databricks-agent-skills", "path": "experimental"},
+    # ai-dev-kit is deprecated; DAS `experimental/` is a snapshot of this tree.
+    # Kept here until DAS-sync is verified end-to-end against Genie Code, then
+    # this entry can be removed.
     {"owner": "databricks-solutions", "repo": "ai-dev-kit", "path": "databricks-skills",
      "skip": {"TEMPLATE"}},
     {"owner": "mlflow",               "repo": "skills",      "path": ""},
