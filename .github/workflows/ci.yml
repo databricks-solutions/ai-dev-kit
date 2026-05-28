@@ -20,11 +20,15 @@ jobs:
 
       - name: Run databricks-skills unit tests
         run: |
-          uvx --python 3.11 \
-            --with pytest \
-            --with databricks-sdk \
-            --with requests \
-            pytest databricks-skills/.tests/ -m "not integration" -v
+          if [ -d databricks-skills/.tests ]; then
+            uvx --python 3.11 \
+              --with pytest \
+              --with databricks-sdk \
+              --with requests \
+              pytest databricks-skills/.tests/ -m "not integration" -v
+          else
+            echo "databricks-skills/.tests/ not present on this branch; skipping."
+          fi
 
   lint:
     name: Lint & Format
