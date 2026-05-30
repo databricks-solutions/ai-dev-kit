@@ -94,6 +94,7 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 - **databricks-unity-catalog** - System tables for lineage, audit, billing
 
 ### 🔧 Data Engineering
+- **databricks-dqx** - Data quality framework (DQX): profiling, rule generation (AI-assisted), quality checks, quarantining, dashboards
 - **databricks-iceberg** - Apache Iceberg tables (Managed/Foreign), UniForm, Iceberg REST Catalog, Iceberg Clients Interoperability
 - **databricks-spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
 - **databricks-jobs** - Multi-task workflows, triggers, schedules
