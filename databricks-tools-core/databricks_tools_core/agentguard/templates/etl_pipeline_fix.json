@@ -1,0 +1,49 @@
+{
+  "_description": "Scope for fixing an ETL pipeline. Agent can read production source tables, write to staging temp tables, and modify the target pipeline/job. All other resources are denied.",
+  "_variables": ["catalog", "target_table"],
+  "_example_usage": "agentguard_start(mode='enforce', scope_template='etl_pipeline_fix', scope_variables={'catalog': 'main', 'target_table': 'customer_orders'})",
+
+  "tables": {
+    "read": [
+      "${catalog}.production.${target_table}",
+      "${catalog}.production.${target_table}_*",
+      "${catalog}.staging.*"
+    ],
+    "write": [
+      "${catalog}.staging.${target_table}_*",
+      "${catalog}.staging.temp_*"
+    ],
+    "ddl": [
+      "${catalog}.staging.temp_*"
+    ],
+    "delete": []
+  },
+  "jobs": {
+    "read": ["*"],
+    "write": ["*${target_table}*", "*etl*"],
+    "ddl": [],
+    "delete": []
+  },
+  "pipelines": {
+    "read": ["*"],
+    "write": ["*${target_table}*", "*etl*"],
+    "ddl": [],
+    "delete": []
+  },
+  "clusters": {
+    "read": ["*"],
+    "write": [],
+    "ddl": [],
+    "delete": []
+  },
+  "files": {
+    "read": ["*/staging/*", "*/etl_configs/*"],
+    "write": ["*/staging/*"],
+    "ddl": [],
+    "delete": []
+  },
+
+  "default_deny": true,
+  "max_actions": 100,
+  "max_write_actions": 20
+}
