@@ -1,6 +1,6 @@
 ---
 name: databricks-lakebase-autoscale
-description: "Patterns and best practices for Lakebase Autoscaling (next-gen managed PostgreSQL). Use when creating or managing Lakebase Autoscaling projects, configuring autoscaling compute or scale-to-zero, working with database branching for dev/test workflows, implementing reverse ETL via synced tables, or connecting applications to Lakebase with OAuth credentials."
+description: "Patterns and best practices for Lakebase Autoscaling (next-gen managed PostgreSQL). Use when creating or managing Lakebase Autoscaling projects, configuring autoscaling compute or scale-to-zero, working with database branching for dev/test workflows, implementing reverse ETL via synced tables, connecting applications to Lakebase with OAuth credentials, or migrating an existing Lakebase Provisioned database to Autoscaling via pg_dump/pg_restore."
 ---
 
 # Lakebase Autoscaling
@@ -112,6 +112,7 @@ Most create/update/delete calls return long-running operations; call `.wait()`.
 - `connections.md` — app/notebook connection patterns and credential rotation.
 - `operations.md` — project, branch, endpoint/compute, scale-to-zero, limits, MCP mapping.
 - `reverse-etl.md` — synced tables from Delta Lake to Lakebase.
+- `references/migration.md` — migrating an existing Lakebase Provisioned database to Autoscaling via `pg_dump`/`pg_restore` (the five field-discovered gotchas + step-by-step runbook).
 
 ## SDK / package versions
 
@@ -130,4 +131,4 @@ Not yet supported or not equivalent to Provisioned:
 - Stateful AI-agent memory integrations.
 - Postgres-to-Delta sync.
 - Custom billing tags / serverless budget policies.
-- Direct migration from Lakebase Provisioned; use `pg_dump`/`pg_restore` or reverse ETL patterns where appropriate.
+- Direct in-place migration from Lakebase Provisioned. The snapshot path via `pg_dump`/`pg_restore` is documented in [`references/migration.md`](references/migration.md).
