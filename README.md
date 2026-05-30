@@ -134,6 +134,16 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 <details>
 <summary><strong>Advanced Options</strong> (click to expand)</summary>
 
+**macOS workaround if the install command is killed**
+
+If the process-substitution form above is killed by the shell (e.g. `zsh: killed bash`), download the script first and then run it:
+
+```bash
+curl -L https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+```
+
 **Global installation with force reinstall**
 
 ```bash
