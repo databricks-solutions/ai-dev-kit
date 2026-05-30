@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate skill structure and frontmatter.
 
-Checks:
+Checks (errors — block PRs):
 1. Every skill directory has a SKILL.md file
 2. SKILL.md has valid YAML frontmatter per best practices:
    - name: required, ≤64 chars, lowercase letters/numbers/hyphens only,
@@ -9,6 +9,12 @@ Checks:
    - description: required, non-empty, ≤1024 chars, no XML tags
 3. Local skill directories are registered in install_skills.sh
    (skill-list variables are auto-discovered, not hardcoded)
+
+Quality warnings (non-blocking):
+4. Description should contain "Use when" trigger phrases
+5. SKILL.md body should be under 500 lines (use reference files for overflow)
+6. Code blocks should have language tags
+7. Referenced files (markdown links) should exist
 """
 
 import re
@@ -24,6 +30,62 @@ SKIP_DIRS = {"TEMPLATE"}
 RESERVED_WORDS = {"anthropic", "claude"}
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 XML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+CODE_BLOCK_RE = re.compile(r"^```(\w*)$", re.MULTILINE)
+MD_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+MAX_BODY_LINES = 500
+
+
+def quality_warnings(skill_dir: Path, content: str, frontmatter: dict) -> list[str]:
+    """Run non-blocking quality checks and return warnings."""
+    warnings = []
+
+    # Check description contains "Use when" trigger phrases
+    desc = str(frontmatter.get("description", ""))
+    if desc and "use when" not in desc.lower():
+        warnings.append(
+            f'{skill_dir.name}: description lacks "Use when" trigger phrases '
+            f"(helps Claude decide when to activate the skill)"
+        )
+
+    # Check body length (lines below frontmatter)
+    body = re.sub(r"^---\n.+?\n---\n?", "", content, count=1, flags=re.DOTALL)
+    body_lines = len(body.strip().splitlines())
+    if body_lines > MAX_BODY_LINES:
+        warnings.append(
+            f"{skill_dir.name}: SKILL.md body is {body_lines} lines "
+            f"(>{MAX_BODY_LINES}). Consider moving content to reference files."
+        )
+
+    # Check code blocks have language tags
+    # Every pair of ``` markers forms a block; even-indexed matches (0,2,4..)
+    # are opening markers, odd-indexed are closing markers.
+    all_fences = list(CODE_BLOCK_RE.finditer(content))
+    opening_fences = [all_fences[i] for i in range(0, len(all_fences), 2)]
+    untagged = sum(1 for m in opening_fences if not m.group(1))
+    if untagged > 0:
+        warnings.append(
+            f"{skill_dir.name}: {untagged} code block(s) missing language tags "
+            f"(use ```python, ```sql, ```yaml, etc.)"
+        )
+
+    # Check referenced markdown files exist
+    for match in MD_LINK_RE.finditer(content):
+        link_target = match.group(2)
+        # Only check relative .md links (not URLs, not anchors)
+        if (
+            not link_target.startswith("http")
+            and not link_target.startswith("#")
+            and link_target.endswith(".md")
+        ):
+            ref_path = skill_dir / link_target
+            if not ref_path.exists():
+                warnings.append(
+                    f"{skill_dir.name}: referenced file '{link_target}' not found"
+                )
+
+    return warnings
 
 
 def parse_frontmatter(content: str) -> dict | None:
@@ -117,6 +179,7 @@ def get_local_skill_dirs() -> set[str]:
 
 def main() -> int:
     errors: list[str] = []
+    warnings: list[str] = []
     actual_skills = get_local_skill_dirs()
 
     # --- Validate each skill directory's SKILL.md and frontmatter ---
@@ -153,6 +216,10 @@ def main() -> int:
             for err in validate_description(str(frontmatter["description"])):
                 errors.append(f"{skill_dir.name}: {err}")
 
+        # Quality warnings (non-blocking)
+        for warn in quality_warnings(skill_dir, content, frontmatter):
+            warnings.append(warn)
+
     # --- Cross-reference with install_skills.sh ---
     install_content = INSTALL_SCRIPT.read_text()
     skill_vars, composite_vars = parse_skill_variables(install_content)
@@ -182,6 +249,13 @@ def main() -> int:
                 errors.append(f"Skills in {var_name} but no directory found: {sorted(missing)}")
 
     # --- Report ---
+    # Surface warnings (non-blocking) before errors
+    if warnings:
+        print(f"Quality warnings ({len(warnings)}):\n")
+        for warning in warnings:
+            print(f"::warning::{warning}")
+        print()
+
     if errors:
         print("Skill validation failed:\n")
         for error in errors:

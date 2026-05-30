@@ -90,15 +90,95 @@ Ensure your changes work with a live Databricks workspace.
 
 ## Adding New Skills
 
-When adding a new skill to `databricks-skills/`:
+### Recommended: Use the Authoring Skill
 
-1. Create a directory with a descriptive name
-2. Include a `SKILL.md` file that defines:
-   - Trigger conditions (when the skill activates)
-   - Core patterns and best practices
-   - Code examples
-3. Add supporting documentation files as needed
-4. Update the skills table in the main README.md
+The fastest way to create a high-quality skill is with the `skill-authoring` skill (available in `.claude/skills/skill-authoring/`). Ask Claude:
+
+> "Help me create a new skill for [Databricks feature]"
+
+This walks you through a structured workflow: interview, draft, test, validate, register.
+
+### Manual Workflow
+
+If you prefer to work manually:
+
+1. **Copy the template:**
+   ```bash
+   cp -r databricks-skills/TEMPLATE databricks-skills/your-skill-name
+   ```
+
+2. **Write SKILL.md** with valid frontmatter and content:
+   ```yaml
+   ---
+   name: your-skill-name
+   description: "What it does. Use when [scenario1], [scenario2], or when the user mentions [keywords]."
+   ---
+   ```
+
+3. **Generate test scaffolding:**
+   ```bash
+   /skill-test your-skill-name init
+   ```
+
+4. **Write test cases** in `.test/skills/your-skill-name/ground_truth.yaml` (minimum 3 cases)
+
+5. **Add routing tests** to `.test/skills/_routing/ground_truth.yaml` (minimum 3 positive, 2 negative)
+
+6. **Register the skill:**
+   - Add to `DATABRICKS_SKILLS` in `databricks-skills/install_skills.sh`
+   - Add to appropriate profile in `install.sh` and `install.ps1`
+   - Add to skills table in `databricks-skills/README.md`
+
+7. **Validate:**
+   ```bash
+   python .github/scripts/validate_skills.py
+   ```
+
+### Quality Checklist
+
+Before submitting a PR for a new skill, verify:
+
+- [ ] **Frontmatter**: `name` (kebab-case, <=64 chars) and `description` (<=1024 chars, includes "Use when" triggers)
+- [ ] **Description is assertive**: Uses "Use when" with specific triggers and domain keywords
+- [ ] **Body under 500 lines**: Reference files used for overflow content
+- [ ] **Code blocks have language tags**: ```python, ```sql, ```yaml, ```bash
+- [ ] **Code examples are current**: No deprecated APIs (`@dlt.table`, `PARTITION BY`, `mlflow.evaluate`)
+- [ ] **Quick Start is complete**: Copy-pasteable with imports and realistic values
+- [ ] **Common Issues documented**: Known gotchas with solutions
+- [ ] **Test scaffolding exists**: `.test/skills/your-skill-name/` with ground_truth.yaml and manifest.yaml
+- [ ] **Routing tests added**: At least 5 entries (3 positive, 2 negative) in `_routing/ground_truth.yaml`
+- [ ] **CI validation passes**: `python .github/scripts/validate_skills.py`
+- [ ] **Registered in install scripts**: `install_skills.sh`, `install.sh`, `install.ps1`
+- [ ] **README updated**: Skill added to `databricks-skills/README.md`
+
+### Skill Format Reference
+
+For detailed format specifications, see:
+- `.claude/skills/skill-authoring/references/skill-format.md` — Frontmatter rules, progressive disclosure, section conventions
+- `.claude/skills/skill-authoring/references/test-format.md` — ground_truth.yaml and manifest.yaml schemas
+
+### Evaluation & Optimization
+
+After creating a skill, measure and improve quality:
+
+```bash
+# Quick trigger smoke test
+uv run python .test/scripts/quick_trigger.py your-skill-name
+
+# Evaluation against ground truth
+uv run python .test/scripts/run_eval.py your-skill-name
+
+# Full MLflow evaluation with LLM judges
+uv run python .test/scripts/mlflow_eval.py your-skill-name
+
+# Description optimization (GEPA framework)
+uv run python .test/scripts/optimize.py your-skill-name --preset quick
+```
+
+Quality gates to meet:
+- **Tier 1** (syntax/patterns): 100% pass rate
+- **Tier 2** (execution): 80% pass rate
+- **Tier 3** (LLM judge): 85% pass rate
 
 ## Updating Existing Skills
 

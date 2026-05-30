@@ -2,6 +2,7 @@
 name: databricks-dbsql
 description: >-
   Databricks SQL (DBSQL) advanced features and SQL warehouse capabilities.
+  Use when writing SQL queries on Databricks, configuring SQL warehouses, or working with advanced SQL features.
   This skill MUST be invoked when the user mentions: "DBSQL", "Databricks SQL",
   "SQL warehouse", "SQL scripting", "stored procedure", "CALL procedure",
   "materialized view", "CREATE MATERIALIZED VIEW", "pipe syntax", "|>",
