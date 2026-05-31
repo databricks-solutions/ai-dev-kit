@@ -1,6 +1,6 @@
 skill:
-  name: "databricks-app-python"
-  source_path: "databricks-skills/databricks-app-python"
+  name: "databricks-apps-python"
+  source_path: "databricks-skills/databricks-apps-python"
   description: "Python Databricks Apps: Dash, Streamlit, Gradio, Flask, FastAPI, Reflex"
 
 tool_modules: [apps, serving]

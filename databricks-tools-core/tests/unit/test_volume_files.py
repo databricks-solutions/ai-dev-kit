@@ -9,6 +9,7 @@ import pytest
 from databricks_tools_core.unity_catalog.volume_files import (
     upload_to_volume,
     delete_from_volume,
+    get_volume_file_metadata,
     _collect_local_files,
     _collect_local_directories,
     VolumeUploadResult,
@@ -399,3 +400,58 @@ class TestDeleteFromVolume:
         result = delete_from_volume("/Volumes/catalog/schema/volume/file.csv/")
 
         assert result.volume_path == "/Volumes/catalog/schema/volume/file.csv"
+
+
+class TestGetVolumeFileMetadata:
+    """Tests for get_volume_file_metadata.
+
+    files.get_metadata() returns last_modified as an HTTP-date (RFC 7231) string,
+    not a datetime — see databricks.sdk.service.files.GetMetadataResponse.
+    Regression coverage for the AttributeError fixed in #536.
+    """
+
+    @mock.patch("databricks_tools_core.unity_catalog.volume_files.get_workspace_client")
+    def test_http_date_string_is_normalized_to_iso8601(self, mock_get_client):
+        """RFC 7231 string from the SDK should be converted to ISO 8601."""
+        mock_client = mock.Mock()
+        mock_client.files.get_metadata.return_value = mock.Mock(
+            content_length=1234,
+            last_modified="Wed, 21 Oct 2015 07:28:00 GMT",
+        )
+        mock_get_client.return_value = mock_client
+
+        info = get_volume_file_metadata("/Volumes/c/s/v/data.csv")
+
+        assert info.name == "data.csv"
+        assert info.path == "/Volumes/c/s/v/data.csv"
+        assert info.is_directory is False
+        assert info.file_size == 1234
+        assert info.last_modified == "2015-10-21T07:28:00+00:00"
+
+    @mock.patch("databricks_tools_core.unity_catalog.volume_files.get_workspace_client")
+    def test_none_last_modified_is_preserved(self, mock_get_client):
+        """None last_modified must not raise and must round-trip as None."""
+        mock_client = mock.Mock()
+        mock_client.files.get_metadata.return_value = mock.Mock(
+            content_length=0,
+            last_modified=None,
+        )
+        mock_get_client.return_value = mock_client
+
+        info = get_volume_file_metadata("/Volumes/c/s/v/empty")
+
+        assert info.last_modified is None
+
+    @mock.patch("databricks_tools_core.unity_catalog.volume_files.get_workspace_client")
+    def test_unparseable_string_falls_back_to_raw_value(self, mock_get_client):
+        """If the SDK ever returns an unexpected string, we keep the raw value rather than crashing."""
+        mock_client = mock.Mock()
+        mock_client.files.get_metadata.return_value = mock.Mock(
+            content_length=42,
+            last_modified="not-a-date",
+        )
+        mock_get_client.return_value = mock_client
+
+        info = get_volume_file_metadata("/Volumes/c/s/v/odd.bin")
+
+        assert info.last_modified == "not-a-date"

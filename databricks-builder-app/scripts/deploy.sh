@@ -177,6 +177,8 @@ echo -e "${YELLOW}[2/${TOTAL_STEPS}] Deploying Lakebase...${NC}"
 
 if [ "$SKIP_LAKEBASE" = true ]; then
   echo -e "  ${GREEN}✓${NC} Skipped (--skip-lakebase)"
+elif databricks postgres get-project "projects/${LAKEBASE_PROJECT_ID}" $CLI_ARGS &> /dev/null; then
+  echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' already exists — reusing"
 else
   cd "$PROJECT_DIR"
   BUNDLE_ARGS=""

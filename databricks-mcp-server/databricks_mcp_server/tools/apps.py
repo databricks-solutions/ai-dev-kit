@@ -81,7 +81,7 @@ def manage_app(
     - delete: Delete an app. Requires name.
       Returns: {name, status}.
 
-    See databricks-app-python skill for app development guidance."""
+    See databricks-apps-python skill for app development guidance."""
     act = action.lower()
 
     if act == "create_or_update":

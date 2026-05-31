@@ -48,7 +48,7 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
   # APX (FastAPI+React) and Python (Dash/Streamlit/etc.) share the same
   # app lifecycle tools — the skill content differs, not the MCP operations.
   'databricks-app-apx': ['manage_app'],
-  'databricks-app-python': ['manage_app'],
+  'databricks-apps-python': ['manage_app'],
 }
 
 

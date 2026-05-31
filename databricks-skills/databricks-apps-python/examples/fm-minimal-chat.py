@@ -16,11 +16,11 @@ Local Development:
     export DATABRICKS_TOKEN="dapi..."
     export DATABRICKS_SERVING_BASE_URL="https://<workspace>/serving-endpoints"
     export DATABRICKS_MODEL="<endpoint-name>"  # See databricks-model-serving
-    streamlit run 2-minimal-chat-app.py
+    streamlit run fm-minimal-chat.py
 
 Databricks Apps Deployment:
     1. Create app.yaml:
-       command: ["streamlit", "run", "2-minimal-chat-app.py"]
+       command: ["streamlit", "run", "fm-minimal-chat.py"]
        env:
          - name: DATABRICKS_SERVING_BASE_URL
            value: "https://<workspace>/serving-endpoints"
