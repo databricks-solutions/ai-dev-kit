@@ -106,6 +106,20 @@ from customization.tool_allowlist_patch import apply_tool_allowlist  # noqa: E40
 apply_tool_allowlist(mcp)
 
 # ---------------------------------------------------------------------------
+# Step 3b: Raise the SQL tool-call timeout ceiling.
+#
+# Upstream caps execute_sql / execute_sql_multi at a 60s wall-clock tool
+# timeout, which is too low for analytical queries and also caps the per-call
+# `timeout` argument. This raises only the ceiling; upstream's low per-call
+# default and the per-call knob are left as-is. Must run after the server
+# import (tools registered) and before mcp.run().
+# ---------------------------------------------------------------------------
+
+from customization.sql_timeout_patch import apply_sql_timeout_ceiling  # noqa: E402
+
+apply_sql_timeout_ceiling(mcp)
+
+# ---------------------------------------------------------------------------
 # Step 4: Run.
 # ---------------------------------------------------------------------------
 
