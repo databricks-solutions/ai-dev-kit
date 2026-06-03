@@ -23,34 +23,29 @@ cd databricks-ai-dev-kit/noom-mcp-server
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-**3. Authenticate to Databricks with OAuth** (PAT tokens are rejected)
-
-```bash
-databricks auth login --host https://noom-prod.cloud.databricks.com
-```
-
-**4. Create your `.env` file**
+**3. Create your `.env` file**
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and set `DATABRICKS_WAREHOUSE_ID` to your SQL warehouse ID.
-(Find it in the Databricks UI under **SQL Warehouses → your warehouse → Overview**.)
+The `.env` file ships with a default `DATABRICKS_WAREHOUSE_ID`. You can leave it as-is or override it with a different warehouse ID (find it in the Databricks UI under **SQL Warehouses → your warehouse → Overview**).
 
-**5. Install dependencies**
+**4. Install dependencies**
 
 ```bash
 uv sync
 ```
 
-**6. Verify the server starts**
+**5. Verify the server starts**
 
 ```bash
 uv run --env-file .env python run.py
 ```
 
-You should see the FastMCP server start without errors. Use `Ctrl-C` to stop it — your MCP client will manage the process from here.
+At startup the server checks for a cached Databricks OAuth token. If one exists the start is silent; if not, it opens a browser tab to complete the login flow. On headless machines where a browser can't open, run `databricks auth login --host https://noom-prod.cloud.databricks.com` in a terminal first.
+
+Use `Ctrl-C` to stop it — your MCP client will manage the process from here.
 
 ---
 
@@ -117,7 +112,7 @@ user's own credentials and are not affected by the patches.
 
 - Python ≥ 3.10
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- Databricks OAuth session (`databricks auth login` — PAT tokens are rejected at startup)
+- Databricks OAuth token (obtained automatically via browser on first start; PAT tokens are rejected)
 - READ permission on the `dbrix_mcp_secret` secret scope (provisioned by an admin)
 
 ## Environment variables
