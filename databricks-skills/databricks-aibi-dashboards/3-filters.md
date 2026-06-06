@@ -10,6 +10,7 @@
 - `filter-date-range-picker`: for DATE/TIMESTAMP fields (date range selection)
 - `filter-single-select`: categorical with single selection
 - `filter-multi-select`: categorical with multiple selections (preferred for drill-down)
+- `range-slider`: numeric range filter on a quantitative column (e.g., "resolution time hours", "order amount")
 
 > **Performance note**: Global filters automatically apply `WHERE` clauses to dataset queries at runtime. You don't need to pre-filter data in your SQL - the dashboard engine handles this efficiently.
 
@@ -232,6 +233,43 @@ When a filter should affect multiple datasets (e.g., "Region" filter for both sa
 ```
 
 Each `queryName` in `encodings.fields` binds the filter to that specific dataset. Datasets not bound will not be filtered.
+
+---
+
+## Range Slider (numeric range filter)
+
+For filtering on a numeric column where the user wants to drag a min/max slider — e.g., resolution-time hours, amount, age. Same structure as other filters; the bound field must be quantitative.
+
+```json
+{
+  "widget": {
+    "name": "time-to-resolution",
+    "queries": [{
+      "name": "ds_resolution",
+      "query": {
+        "datasetName": "ds_cases",
+        "fields": [
+          {"name": "time_to_resolution_hours", "expression": "`time_to_resolution_hours`"}
+        ],
+        "disaggregated": false
+      }
+    }],
+    "spec": {
+      "version": 2,
+      "widgetType": "range-slider",
+      "encodings": {
+        "fields": [
+          {"fieldName": "time_to_resolution_hours", "queryName": "ds_resolution"}
+        ]
+      },
+      "frame": {"showTitle": true, "title": "Resolution time (hours)"}
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 4, "height": 2}
+}
+```
+
+`range-slider` only works on numeric / temporal columns. On a categorical field it will fail at render. To filter a numeric field by an explicit min/max in SQL (rather than a UI-only WHERE), bind to a `:param.min`/`:param.max` parameter — same pattern as date-range, see "Date Range Filtering" above.
 
 ---
 

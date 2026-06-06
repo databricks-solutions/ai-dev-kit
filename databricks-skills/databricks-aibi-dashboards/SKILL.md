@@ -26,17 +26,31 @@ A dashboard should be showing something relevant for a human, typically some KPI
 
 ---
 
-## CRITICAL: Widget Version Requirements
+## Widget Index (Version + Where Documented)
 
 > **Wrong version = broken widget!** This is the #1 cause of dashboard errors.
 
-| Widget Type | Version | Notes |
-|-------------|---------|-------|
-| `counter` | **2** | KPI cards |
-| `table` | **2** | Data tables |
-| `bar`, `line`, `area`, `pie`, `scatter` | **3** | Charts |
-| `combo`, `choropleth-map` | **1** | Advanced charts |
-| `filter-*` | **2** | All filter types |
+| Widget Type | Version | Documented in |
+|-------------|---------|---------------|
+| `counter` (KPI + sparkline + comparison) | **2** | [1-widget-specifications.md](1-widget-specifications.md) |
+| `table` | **2** | [1-widget-specifications.md](1-widget-specifications.md) |
+| `bar`, `line`, `pie` | **3** | [1-widget-specifications.md](1-widget-specifications.md) |
+| text (markdown, no spec block) | N/A | [1-widget-specifications.md](1-widget-specifications.md) |
+| `area`, `scatter` | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `combo` (bar+line, dual-axis) | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `forecast-line` (with `AI_FORECAST` SQL) | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `pivot` (with conditional cell rules) | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `histogram` (with `bin(col, binWidth=N)`) | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `heatmap` | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `funnel` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `sankey` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `box` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `waterfall` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `choropleth-map` (regions colored by value) | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `symbol-map` (lat/lon point map) | **2** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
+| `filter-single-select`, `filter-multi-select`, `filter-date-range-picker`, `range-slider` | **2** | [3-filters.md](3-filters.md) |
+
+> Cohort retention charts are built as a `pivot` with a color-scale cell style — there is no `cohort` widget type. See pivot in [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
 
 ---
 
@@ -244,7 +258,10 @@ Apply unless user specifies otherwise:
 ### 1) DATASET ARCHITECTURE
 
 - **One dataset per domain** (e.g., orders, customers, products). Datasets shared across widgets benefit from the same filters.
-- **Exactly ONE valid SQL query per dataset** (no multiple queries separated by `;`)
+- **Two ways to define a dataset**:
+  - **SQL query**: `{"name": "ds_x", "displayName": "...", "queryLines": ["SELECT ...", "FROM table"]}` — full control, can include `WITH` / `JOIN` / `AI_FORECAST` / etc.
+  - **UC asset shorthand**: `{"name": "ds_x", "displayName": "...", "asset_name": "catalog.schema.table_or_view"}` — no SQL needed. Works for regular tables, views, and metric views.
+- **Exactly ONE valid SQL query per dataset** when using `queryLines` (no multiple queries separated by `;`)
 - **Queries must use bare table names only** — no catalog, no schema prefix. Example: `FROM orders`, never `FROM gold.orders` or `FROM main.gold.orders`. The catalog and schema come from the `--dataset-catalog` and `--dataset-schema` flags at creation time. These flags only fill in missing parts — they do NOT override any catalog/schema written in the query.
 - SELECT must include all dimensions needed by widgets and all derived columns via `AS` aliases
 - Put ALL business logic (CASE/WHEN, COALESCE, ratios) into the dataset SELECT with explicit aliases
@@ -253,6 +270,39 @@ Apply unless user specifies otherwise:
   - Time series: `ORDER BY date` for chronological display
   - Rankings/Top-N: `ORDER BY metric DESC LIMIT 10` for "Top 10" charts
   - Categorical charts: `ORDER BY metric DESC` to show largest values first
+
+#### Dataset-level measures + `MEASURE()`
+
+Widget expressions are usually inline aggregations (`{"name": "sum(x)", "expression": "SUM(\`x\`)"}`). But you can also **declare reusable measures on the dataset itself** and reference them by name — every widget that consumes the dataset can use the same metric without redefining it.
+
+Two ways to define measures:
+
+1. **Dashboard-level `columns`** (works on any dataset — SQL query or `asset_name`):
+   ```json
+   {
+     "name": "ds_support",
+     "queryLines": ["SELECT * FROM support_cases"],
+     "columns": [
+       {"displayName": "Total Cases",     "description": "Count of cases",
+        "expression": "COUNT(`case_id`)"},
+       {"displayName": "Reopen Rate %",   "description": "% of reopened cases",
+        "expression": "SUM(CASE WHEN `reopened_flag` THEN 1 ELSE 0 END) * 100.0 / COUNT(`case_id`)"},
+       {"displayName": "Priority Level",  "description": "Sorted priority label",
+        "expression": "CASE WHEN `priority`='Critical' THEN '1-Critical' ELSE '4-Low' END"}
+     ]
+   }
+   ```
+
+2. **Metric-view source** — if the dataset's `asset_name` (or `FROM` clause) is a UC metric view, its YAML-defined measures are already queryable. **Do not redeclare them** in `columns`. See [databricks-metric-views](../databricks-metric-views/SKILL.md).
+
+Either way, widgets reference the measure by name:
+
+```json
+"fields": [{"name": "measure(Total Cases)", "expression": "MEASURE(`Total Cases`)"}],
+"encodings": {"value": {"fieldName": "measure(Total Cases)", "displayName": "Total Cases"}}
+```
+
+`MEASURE(\`...\`)` works in counter, table, bar, line, pie, pivot — any widget that takes a field expression. Mix it with inline aggregations freely.
 
 ### 2) WIDGET FIELD EXPRESSIONS
 

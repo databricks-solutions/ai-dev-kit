@@ -151,6 +151,48 @@ Format types: `number`, `number-currency`, `number-percent`
 }
 ```
 
+> **`MEASURE()` works here too.** If the dataset defines measures via `dataset.columns[]` or is sourced from a metric view, use `{"expression": "MEASURE(\`Total Cases\`)"}` as the field expression — same pattern, no duplication. See SKILL.md "Dataset-level measures + MEASURE()".
+
+### Counter sparkline (background trend)
+
+Add a `period` encoding to draw a small time-series line behind the KPI value — gives context for whether the metric is rising or falling.
+
+```json
+"encodings": {
+  "value":  {"fieldName": "measure(Cases Open)", "displayName": "Total Cases"},
+  "period": {"fieldName": "weekly(opened_at)"}
+}
+```
+
+The `period` field must be a temporal expression also present in `query.fields` (e.g., `{"name": "weekly(opened_at)", "expression": "DATE_TRUNC(\"WEEK\", \`opened_at\`)"}`). Common granularities: `DATE_TRUNC("DAY"|"WEEK"|"MONTH", ...)`.
+
+### Counter comparison (delta vs previous period)
+
+Show the current value AND the change vs a previous period. Use a second field in `query.fields` whose expression filters/aggregates the comparison value, and reference it via the `target` encoding:
+
+```json
+"fields": [
+  {"name": "current",  "expression": "SUM(CASE WHEN week=:this_week THEN amount END)"},
+  {"name": "previous", "expression": "SUM(CASE WHEN week=:last_week THEN amount END)"}
+],
+"encodings": {
+  "value":  {"fieldName": "current",  "displayName": "This Week"},
+  "target": {"fieldName": "previous", "displayName": "vs Last Week"}
+}
+```
+
+### Counter format template (custom prefix/suffix text)
+
+Wrap the value with surrounding text. Use `{{@}}` for the raw value and `{{@formatted}}` for the formatted one. Reference other dataset fields with `{{FieldName}}`.
+
+```json
+"value": {
+  "fieldName": "sum(revenue)",
+  "format": {"type": "number-currency", "currencyCode": "USD", "abbreviation": "compact"},
+  "formatTemplate": "{{@formatted}} (in {{Region}})"
+}
+```
+
 ---
 
 ## Table
@@ -192,6 +234,40 @@ Format types: `number`, `number-currency`, `number-percent`
 }
 ```
 
+### Column-level options
+
+Each column object supports format, conditional styling, links, and tooltips. Common patterns:
+
+```json
+{
+  "fieldName": "amount",
+  "displayName": "Amount",
+  "format": {"type": "number-currency", "currencyCode": "USD",
+             "abbreviation": "compact", "decimalPlaces": {"type": "max", "places": 2}},
+
+  // Conditional background color (heat-map style)
+  "style": {
+    "type": "basic",
+    "rules": [
+      {"condition": {"operand": {"type": "data-value", "value": "10000"}, "operator": ">="},
+       "backgroundColor": {"themeColorType": "visualizationColors", "position": 4}},
+      {"condition": {"operand": {"type": "data-value", "value": "5000"},  "operator": ">="},
+       "backgroundColor": {"themeColorType": "visualizationColors", "position": 3}}
+    ]
+  },
+
+  // Make the cell a clickable link. {{@}} is the cell value, {{Field}} pulls another column.
+  "link": {"templatedURL": "/sql/dashboardsv3/{{@}}"},
+
+  // Hover tooltip
+  "tooltip": {"templatedText": "Customer ID: {{customer_id}}"}
+}
+```
+
+Other display types: `"image"` (renders base64 strings as images), `"html"` (sanitized HTML), `"json"` (collapsible JSON tree), `"color-scale"` (continuous color gradient on numeric values without explicit thresholds).
+
+> Same `style.rules` and `link`/`tooltip` patterns work on **pivot** cells — see pivot in [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
+
 ---
 
 ## Line / Bar Charts
@@ -227,6 +303,7 @@ Format types: `number`, `number-currency`, `number-percent`
 |------|---------------|
 | Stacked (default) | No `mark` field |
 | Grouped | `"mark": {"layout": "group"}` |
+| 100% stacked | `"mark": {"layout": "stack-100"}` |
 
 ### Horizontal Bar Chart
 
@@ -238,10 +315,66 @@ Swap `x` and `y` - put quantitative on `x`, categorical/temporal on `y`:
 }
 ```
 
-### Color Scale
+### Categorical sort with a custom order
 
-> **CRITICAL**: For bar/line/pie, color scale ONLY supports `type` and `sort`.
-> Do NOT use `scheme`, `colorRamp`, or `mappings` (only for choropleth-map).
+When the dimension has natural ordering that ASC/DESC won't capture (priority levels, weekdays, named tiers), pin the order explicitly:
+
+```json
+"x": {
+  "fieldName": "channel",
+  "scale": {
+    "type": "categorical",
+    "sort": {"by": "custom-order", "orderedValues": ["Chat", "Email", "In-App", "Phone"]}
+  }
+}
+```
+
+Other `sort.by` values: `"alphabetical"`, `"value"` (sort by the y measure), `"cell"` / `"cell-reversed"` (pivot only).
+
+### Color Scale + per-value mappings
+
+Default behaviour: theme colors are assigned to categories in order. To pin specific values (e.g., "Critical" must always be red), use `mappings`:
+
+```json
+"color": {
+  "fieldName": "Priority Level",
+  "scale": {
+    "type": "categorical",
+    "mappings": [
+      {"value": "1-Critical", "color": {"themeColorType": "visualizationColors", "position": 6}},
+      {"value": "4-Low",      "color": {"themeColorType": "visualizationColors", "position": 1}}
+    ]
+  }
+}
+```
+
+`themeColorType: "visualizationColors"` + `position: 1..N` selects from the dashboard's theme palette. For an exact hex, use `{"hex": "#FF0000"}` instead of `themeColorType`.
+
+> For continuous color ramps on quantitative encodings (e.g., choropleth, symbol-map, heatmap), use `colorRamp` — see [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
+
+### Annotations (event markers)
+
+Mark an event on a time-series chart — release, holiday, incident — with a vertical line. Works on `line`, `area`, `bar`, `combo`, and `forecast-line`.
+
+```json
+"spec": {
+  "version": 3,
+  "widgetType": "line",
+  "encodings": { /* ... x, y, color ... */ },
+  "annotations": [
+    {
+      "type": "vertical-line",
+      "encodings": {
+        "x":     {"dataValue": "2024-11-28T12:00:00.000", "dataType": "DATETIME"},
+        "label": {"value": "Thanksgiving"},
+        "color": {"value": {"themeColorType": "visualizationColors", "position": 3}}
+      }
+    }
+  ]
+}
+```
+
+Multiple annotations are allowed — add more objects to the array. For non-datetime axes, use `"dataType": "STRING"` or `"NUMBER"` and set `dataValue` accordingly.
 
 ---
 
