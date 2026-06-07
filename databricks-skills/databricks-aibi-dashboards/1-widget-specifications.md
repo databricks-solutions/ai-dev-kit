@@ -70,32 +70,71 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
 
 ## Counter (KPI)
 
-- `version`: **2** (NOT 3!)
+- `version`: **2** (current — confirmed against latest dashboard examples; NOT 3)
 - `widgetType`: "counter"
 - Percent values must be 0-1 in the data (not 0-100)
 
-### Number Formatting
+**Two strongly-recommended defaults:**
 
-```json
-"encodings": {
-  "value": {
-    "fieldName": "revenue",
-    "displayName": "Total Revenue",
-    "format": {
-      "type": "number-currency",
-      "currencyCode": "USD",
-      "abbreviation": "compact",
-      "decimalPlaces": {"type": "max", "places": 2}
-    }
-  }
-}
-```
-
-Format types: `number`, `number-currency`, `number-percent`
+1. **Add a sparkline** (`period` encoding) when the dataset has a temporal column. A bare number is context-free; the small trend line behind the value tells the user "rising / falling / flat" at a glance. Skip it only if the KPI is truly time-invariant (snapshot count with no historical column available).
+   > For the sparkline to render, the dataset query must **keep the temporal dimension** — i.e., return one row per period (`GROUP BY DATE_TRUNC(...)`), not a single fully-aggregated row. The counter's `value` then re-aggregates those rows; the `period` field drives the line behind it.
+2. **Set a `format`** when the value has a unit — dollars, percent, large counts. "Revenue: 1287394.55" without `number-currency` formatting reads as noise. The only counters where `format` is fine to omit are unit-less small counts (e.g., "Open Tickets: 12") where the raw integer is already legible. See "Value formatting" below.
 
 ### Counter Patterns
 
-**Pre-aggregated dataset (1 row)** - use `disaggregated: true`:
+**Multi-row dataset with aggregation — the recommended default (supports filters + sparkline)** — use `disaggregated: false`:
+- Dataset query returns one row per period (`GROUP BY DATE_TRUNC(...)`) — keeps the temporal dimension so the counter can both re-aggregate to the headline value AND render the sparkline.
+- **CRITICAL**: Field `name` MUST match `fieldName` exactly (e.g., `"sum(spend)"`).
+- Include the `period` field in `query.fields` AND the `period` encoding in the spec.
+
+```json
+{
+  "widget": {
+    "name": "weekly-spend",
+    "queries": [{
+      "name": "main_query",
+      "query": {
+        "datasetName": "spend_ds",
+        "fields": [
+          {"name": "sum(spend)",       "expression": "SUM(`spend`)"},
+          {"name": "weekly(spend_at)", "expression": "DATE_TRUNC(\"WEEK\", `spend_at`)"}
+        ],
+        "disaggregated": false
+      }
+    }],
+    "spec": {
+      "version": 2,
+      "widgetType": "counter",
+      "encodings": {
+        "value":  {
+          "fieldName": "sum(spend)",
+          "displayName": "Total Spend",
+          "format": {"type": "number-currency", "currencyCode": "USD",
+                     "abbreviation": "compact", "decimalPlaces": {"type": "max", "places": 2}}
+        },
+        "period": {"fieldName": "weekly(spend_at)"}
+      },
+      "frame": {"showTitle": true, "title": "Total Spend"}
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 4, "height": 3}
+}
+```
+
+Dataset SQL for the example above:
+
+```sql
+-- One row per week — the counter re-aggregates rows into the headline value
+-- AND uses the temporal column to draw the sparkline.
+SELECT DATE_TRUNC('WEEK', spend_at) AS spend_at, SUM(spend) AS spend
+FROM spend_table
+GROUP BY 1
+```
+
+> **`MEASURE()` works here too.** If the dataset defines measures via `dataset.columns[]` or is sourced from a metric view, use `{"expression": "MEASURE(\`Total Cases\`)"}` as the field expression — same pattern, no duplication. See SKILL.md "Dataset-level measures + MEASURE()".
+
+**Pre-aggregated dataset (1 row, no sparkline)** — use `disaggregated: true`. Fallback shape when the metric is truly time-invariant or the data is already collapsed and no temporal column is available:
+
 ```json
 {
   "widget": {
@@ -112,7 +151,12 @@ Format types: `number`, `number-currency`, `number-percent`
       "version": 2,
       "widgetType": "counter",
       "encodings": {
-        "value": {"fieldName": "revenue", "displayName": "Total Revenue"}
+        "value": {
+          "fieldName": "revenue",
+          "displayName": "Total Revenue",
+          "format": {"type": "number-currency", "currencyCode": "USD",
+                     "abbreviation": "compact", "decimalPlaces": {"type": "max", "places": 2}}
+        }
       },
       "frame": {"showTitle": true, "title": "Total Revenue"}
     }
@@ -121,50 +165,41 @@ Format types: `number`, `number-currency`, `number-percent`
 }
 ```
 
-**Multi-row dataset with aggregation (supports filters)** - use `disaggregated: false`:
-- Dataset returns multiple rows (e.g., grouped by a filter dimension)
-- Use `"disaggregated": false` and aggregation expression
-- **CRITICAL**: Field `name` MUST match `fieldName` exactly (e.g., `"sum(spend)"`)
+### Sparkline (period encoding)
+
+The `period` field must be a temporal expression also present in `query.fields` — typically a `DATE_TRUNC(...)` over the dataset's timestamp column. Granularity choices:
+
+| Use | Why |
+|---|---|
+| `DATE_TRUNC("DAY", col)` | Short window (1-4 weeks), high-frequency metric |
+| `DATE_TRUNC("WEEK", col)` | Standard default for ops metrics over a quarter |
+| `DATE_TRUNC("MONTH", col)` | Long window (>1 year) or low-volume metric |
+
+Match the sparkline grain to whatever the surrounding charts use — consistent grain across the page makes the dashboard easier to read.
+
+### Value formatting
+
+Format types: `number`, `number-currency`, `number-percent`.
+
+| Field type | Format | Why |
+|---|---|---|
+| Money | `number-currency` + `currencyCode` + `abbreviation: "compact"` | "$1.2M" is readable, "1287394.55" isn't |
+| Percentage | `number-percent` (data must be 0-1) | Renders "12.5%" from 0.125 |
+| Large count | `number` + `abbreviation: "compact"` | Renders "1.5K" / "2.3M" |
+| Small count (under ~1K) | `number` (no abbreviation) or omit `format` | Raw integer is fine |
 
 ```json
-{
-  "widget": {
-    "name": "total-spend",
-    "queries": [{
-      "name": "main_query",
-      "query": {
-        "datasetName": "by_category",
-        "fields": [{"name": "sum(spend)", "expression": "SUM(`spend`)"}],
-        "disaggregated": false
-      }
-    }],
-    "spec": {
-      "version": 2,
-      "widgetType": "counter",
-      "encodings": {
-        "value": {"fieldName": "sum(spend)", "displayName": "Total Spend"}
-      },
-      "frame": {"showTitle": true, "title": "Total Spend"}
-    }
-  },
-  "position": {"x": 0, "y": 0, "width": 4, "height": 3}
+"value": {
+  "fieldName": "revenue",
+  "displayName": "Total Revenue",
+  "format": {
+    "type": "number-currency",
+    "currencyCode": "USD",
+    "abbreviation": "compact",
+    "decimalPlaces": {"type": "max", "places": 2}
+  }
 }
 ```
-
-> **`MEASURE()` works here too.** If the dataset defines measures via `dataset.columns[]` or is sourced from a metric view, use `{"expression": "MEASURE(\`Total Cases\`)"}` as the field expression — same pattern, no duplication. See SKILL.md "Dataset-level measures + MEASURE()".
-
-### Counter sparkline (background trend)
-
-Add a `period` encoding to draw a small time-series line behind the KPI value — gives context for whether the metric is rising or falling.
-
-```json
-"encodings": {
-  "value":  {"fieldName": "measure(Cases Open)", "displayName": "Total Cases"},
-  "period": {"fieldName": "weekly(opened_at)"}
-}
-```
-
-The `period` field must be a temporal expression also present in `query.fields` (e.g., `{"name": "weekly(opened_at)", "expression": "DATE_TRUNC(\"WEEK\", \`opened_at\`)"}`). Common granularities: `DATE_TRUNC("DAY"|"WEEK"|"MONTH", ...)`.
 
 ### Counter comparison (delta vs previous period)
 
