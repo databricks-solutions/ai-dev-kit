@@ -472,9 +472,30 @@ y=14: Detail table (w=12, h=6)
         }
       ]
     }
-  ]
+  ],
+
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
+      "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},
+      "selectionColor":        {"light": "#2272B4", "dark": "#8ACAFF"},
+      "visualizationColors": [
+        "#3B82F6",
+        "#10B981",
+        "#F59E0B",
+        "#8B5CF6",
+        "#14B8A6",
+        "#EF4444",
+        "#6B7280"
+      ],
+      "widgetHeaderAlignment": "LEFT"
+    }
+  }
 }
 ```
+
+The palette puts the Critical-red at `position: 6` (`#EF4444`) and the warning-amber at `position: 3` (`#F59E0B`) — that's what the pivot conditional rules and the forecast annotation reference. Position 1 (blue) is the default for chart series that don't pin a value.
 
 ## What each widget demonstrates
 

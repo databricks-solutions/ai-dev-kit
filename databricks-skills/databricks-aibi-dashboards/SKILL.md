@@ -214,20 +214,46 @@ Every dashboard's `serialized_dashboard` content must follow this exact structur
 - `pageType`: Required on every page (`PAGE_TYPE_CANVAS` or `PAGE_TYPE_GLOBAL_FILTERS`)
 - Query binding: `query.fields[].name` must exactly match `encodings.*.fieldName`
 
-### Linking a Genie Space (Optional)
+### Dashboard Theme (Optional)
 
-To add an "Ask Genie" button to the dashboard, or to link a genie space/room with an ID, add `uiSettings.genieSpace` to the JSON:
+Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across every widget on the dashboard. Without it, the dashboard inherits the workspace default. With it, you get a consistent palette across all charts, plus the index that `{"themeColorType": "visualizationColors", "position": N}` in per-widget specs resolves against.
 
 ```json
 {
   "datasets": [...],
   "pages": [...],
   "uiSettings": {
-    "genieSpace": {
-      "isEnabled": true,
-      "overrideId": "your-genie-space-id-here",
-      "enablementMode": "ENABLED"
+    "theme": {
+      "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
+      "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},
+      "selectionColor":        {"light": "#2272B4", "dark": "#8ACAFF"},
+      "visualizationColors": [
+        "#FFA600", "#FF7054", "#DE5582", "#995495",
+        "#4E5185", "#1D425C", "#99DDB4"
+      ],
+      "widgetHeaderAlignment": "LEFT"
     }
+  }
+}
+```
+
+- `visualizationColors` is the **ordered palette** chart series and category mappings cycle through. `position: 1` is the first color (`#FFA600` above), `position: 6` is the 6th (`#1D425C`). Length is whatever you want — 5-8 colors is typical.
+- Background / font / selection colors take `light` + `dark` pairs; the dashboard automatically applies the right pair based on the viewer's mode.
+- `widgetHeaderAlignment`: `"LEFT"` (default), `"CENTER"`, or `"RIGHT"`.
+- Per-widget color references use `{"themeColorType": "visualizationColors", "position": N}` to pin a value to a specific slot in this palette (e.g., Critical → position 6 → always red, regardless of how the chart sorts). For an exact hex outside the palette, use `{"hex": "#FF0000"}` instead.
+
+### Linking a Genie Space (Optional)
+
+To add an "Ask Genie" button to the dashboard, or to link a genie space/room with an ID, add `uiSettings.genieSpace` to the JSON (alongside `theme` if you have one):
+
+```json
+"uiSettings": {
+  "theme": { /* ... */ },
+  "genieSpace": {
+    "isEnabled": true,
+    "overrideId": "your-genie-space-id-here",
+    "enablementMode": "ENABLED"
   }
 }
 ```
