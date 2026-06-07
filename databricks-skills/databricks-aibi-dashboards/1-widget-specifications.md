@@ -131,6 +131,8 @@ FROM spend_table
 GROUP BY 1
 ```
 
+In this example the headline number is the **total spend across the trend window** (the counter's `SUM(spend)` re-aggregates the weekly rows), and the sparkline shows the **per-week values** that make up that total. If you instead want the headline to be the **latest week's spend** (not the cumulative total), expose it as its own column in the dataset SQL (e.g., `MAX_BY(spend, spend_at) AS latest_weekly_spend`) and point `value.fieldName` at that column, while keeping the period rows for the sparkline.
+
 > **`MEASURE()` works here too.** If the dataset defines measures via `dataset.columns[]` or is sourced from a metric view, use `{"expression": "MEASURE(\`Total Cases\`)"}` as the field expression — same pattern, no duplication. See SKILL.md "Dataset-level measures + MEASURE()".
 
 **Pre-aggregated dataset (1 row, no sparkline)** — use `disaggregated: true`. Fallback shape when the metric is truly time-invariant or the data is already collapsed and no temporal column is available:
