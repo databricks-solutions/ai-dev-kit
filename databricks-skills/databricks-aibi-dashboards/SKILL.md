@@ -32,23 +32,26 @@ A dashboard should be showing something relevant for a human, typically some KPI
 
 | Widget Type | Version | Documented in |
 |-------------|---------|---------------|
-| `counter` (KPI + sparkline + comparison) | **2** | [1-widget-specifications.md](1-widget-specifications.md) |
-| `table` | **2** | [1-widget-specifications.md](1-widget-specifications.md) |
-| `bar`, `line`, `pie` | **3** | [1-widget-specifications.md](1-widget-specifications.md) |
-| text (markdown, no spec block) | N/A | [1-widget-specifications.md](1-widget-specifications.md) |
-| `area`, `scatter` | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `combo` (bar+line, dual-axis) | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `forecast-line` (with `AI_FORECAST` SQL) | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `pivot` (with conditional cell rules) | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `histogram` (with `bin(col, binWidth=N)`) | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `heatmap` | **3** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `funnel` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `sankey` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `box` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `waterfall` | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `choropleth-map` (regions colored by value) | **1** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `symbol-map` (lat/lon point map) | **2** | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
-| `filter-single-select`, `filter-multi-select`, `filter-date-range-picker`, `range-slider` | **2** | [3-filters.md](3-filters.md) |
+| `counter` (KPI + sparkline + comparison) | **2** | [1-widget-specifications.md#counter-kpi](1-widget-specifications.md#counter-kpi) (L71) |
+| `table` | **2** | [1-widget-specifications.md#table](1-widget-specifications.md#table) (L235) |
+| `bar`, `line` | **3** | [1-widget-specifications.md#line--bar-charts](1-widget-specifications.md#line--bar-charts) (L310) |
+| `pie` | **3** | [1-widget-specifications.md#pie-chart](1-widget-specifications.md#pie-chart) (L422) |
+| text (markdown, no spec block) | N/A | [1-widget-specifications.md#text-headersdescriptions](1-widget-specifications.md#text-headersdescriptions) (L33) |
+| `area` | **3** | [2-advanced-widget-specifications.md#area-chart](2-advanced-widget-specifications.md#area-chart) (L7) |
+| `scatter` | **3** | [2-advanced-widget-specifications.md#scatter-plot--bubble-chart](2-advanced-widget-specifications.md#scatter-plot--bubble-chart) (L34) |
+| `combo` (bar+line, dual-axis) | **1** | [2-advanced-widget-specifications.md#combo-chart-bar--line](2-advanced-widget-specifications.md#combo-chart-bar--line) (L57) |
+| `forecast-line` (with `AI_FORECAST` SQL) | **1** | [2-advanced-widget-specifications.md#forecast-line-with-ai_forecast](2-advanced-widget-specifications.md#forecast-line-with-ai_forecast) (L166) |
+| `pivot` (with conditional cell rules) | **3** | [2-advanced-widget-specifications.md#pivot](2-advanced-widget-specifications.md#pivot) (L241) |
+| `histogram` (with `bin(col, binWidth=N)`) | **3** | [2-advanced-widget-specifications.md#histogram](2-advanced-widget-specifications.md#histogram) (L302) |
+| `heatmap` | **3** | [2-advanced-widget-specifications.md#heatmap](2-advanced-widget-specifications.md#heatmap) (L398) |
+| `funnel` | **1** | [2-advanced-widget-specifications.md#funnel](2-advanced-widget-specifications.md#funnel) (L424) |
+| `sankey` | **1** | [2-advanced-widget-specifications.md#sankey](2-advanced-widget-specifications.md#sankey) (L338) |
+| `box` | **1** | [2-advanced-widget-specifications.md#box](2-advanced-widget-specifications.md#box) (L448) |
+| `waterfall` | **1** | [2-advanced-widget-specifications.md#waterfall](2-advanced-widget-specifications.md#waterfall) (L470) |
+| `choropleth-map` (regions colored by value) | **1** | [2-advanced-widget-specifications.md#choropleth-map](2-advanced-widget-specifications.md#choropleth-map) (L109) |
+| `symbol-map` (lat/lon point map) | **2** | [2-advanced-widget-specifications.md#symbol-map-point-map](2-advanced-widget-specifications.md#symbol-map-point-map) (L364) |
+| `filter-single-select`, `filter-multi-select`, `filter-date-range-picker` | **2** | [3-filters.md#filter-widget-structure](3-filters.md#filter-widget-structure) (L32) |
+| `range-slider` | **2** | [3-filters.md#range-slider-numeric-range-filter](3-filters.md#range-slider-numeric-range-filter) (L239) |
 
 > Cohort retention charts are built as a `pivot` with a color-scale cell style — there is no `cohort` widget type. See pivot in [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
 
