@@ -315,6 +315,10 @@ Other display types: `"image"` (renders base64 strings as images), `"html"` (san
 - `scale.type`: `"temporal"` (dates), `"quantitative"` (numbers), `"categorical"` (strings)
 - Use `"disaggregated": true` with pre-aggregated dataset data
 
+> **Two recommended defaults for time-series charts:**
+> - **Mark meaningful events with an annotation.** A single `vertical-line` for a product launch, incident, holiday, or campaign turns a generic trend into a readable story. See [Annotations](#annotations-event-markers) below.
+> - **For trend lines on time-series data, consider `forecast-line` with `AI_FORECAST`** instead of a plain `line`. Projects future values + confidence bands and makes a dashboard noticeably more compelling for demos. See [forecast-line in 2-advanced-widget-specifications.md](2-advanced-widget-specifications.md#forecast-line-with-ai_forecast).
+
 **Multiple series - two approaches:**
 
 1. **Multi-Y Fields** (different metrics):

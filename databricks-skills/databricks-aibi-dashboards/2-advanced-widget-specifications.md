@@ -10,6 +10,8 @@ Advanced visualization types for AI/BI dashboards. For core widgets (text, count
 - `widgetType`: "area"
 - Same structure as line chart - useful for showing cumulative values or emphasizing volume
 
+> Time-series area charts benefit from a `vertical-line` annotation marking a meaningful event (launch, incident, holiday) — turns a generic trend into a readable story. See [Annotations in 1-widget-specifications.md](1-widget-specifications.md#annotations-event-markers).
+
 ```json
 "spec": {
   "version": 3,
@@ -60,6 +62,8 @@ Combines bar and line visualizations on the same chart - useful for showing rela
 - `widgetType`: "combo"
 - `y.primary`: bar chart fields
 - `y.secondary`: line chart fields
+
+> Mark meaningful events with a `vertical-line` annotation when the x-axis is temporal. See [Annotations in 1-widget-specifications.md](1-widget-specifications.md#annotations-event-markers).
 
 ```json
 {
