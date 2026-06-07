@@ -122,8 +122,8 @@ If you change the chart's aggregation grain (weekly → monthly), update **both*
 
 ## Range-slider filter shows error or no min/max
 
-- The bound `fieldName` must be a numeric or temporal column. Categorical fields fail at render — use `filter-single-select` / `filter-multi-select` instead.
-- Query inside the filter widget must include the field as a plain expression (`{"name": "x", "expression": "\`x\`"}`), not pre-aggregated.
+- The filter's `query.fields[]` must expose `MIN(col)` and `MAX(col)` — the dashboard reads these to set the slider bounds. See [3-filters.md](3-filters.md#range-slider-numeric-range-filter).
+- Slider only works on numeric / temporal columns. Categorical fields fail at render — use `filter-single-select` / `filter-multi-select` instead.
 
 ## Symbol-map shows no points
 

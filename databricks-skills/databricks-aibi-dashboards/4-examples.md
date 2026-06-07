@@ -339,7 +339,7 @@ y=14: Detail table (w=12, h=6)
                 "datasetName": "ds_support",
                 "fields": [
                   {"name": "bin(time_to_resolution_hours, binWidth=2)",
-                   "expression": "bin(`time_to_resolution_hours`, binWidth=2)"},
+                   "expression": "BIN_FLOOR(`time_to_resolution_hours`, 2)"},
                   {"name": "count(*)", "expression": "COUNT(`*`)"}
                 ],
                 "disaggregated": false
@@ -455,7 +455,10 @@ y=14: Detail table (w=12, h=6)
               "name": "ds_resolution",
               "query": {
                 "datasetName": "ds_support",
-                "fields": [{"name": "time_to_resolution_hours", "expression": "`time_to_resolution_hours`"}],
+                "fields": [
+                  {"name": "min(time_to_resolution_hours)", "expression": "MIN(`time_to_resolution_hours`)"},
+                  {"name": "max(time_to_resolution_hours)", "expression": "MAX(`time_to_resolution_hours`)"}
+                ],
                 "disaggregated": false
               }
             }],

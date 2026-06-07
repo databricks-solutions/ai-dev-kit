@@ -238,7 +238,7 @@ Each `queryName` in `encodings.fields` binds the filter to that specific dataset
 
 ## Range Slider (numeric range filter)
 
-For filtering on a numeric column where the user wants to drag a min/max slider — e.g., resolution-time hours, amount, age. Same structure as other filters; the bound field must be quantitative.
+For filtering on a numeric column where the user wants to drag a min/max slider — e.g., resolution-time hours, amount, age. The query exposes `MIN(col)` and `MAX(col)` so the dashboard knows the slider bounds; `encodings.fields[].fieldName` is the underlying column name.
 
 ```json
 {
@@ -249,7 +249,8 @@ For filtering on a numeric column where the user wants to drag a min/max slider 
       "query": {
         "datasetName": "ds_cases",
         "fields": [
-          {"name": "time_to_resolution_hours", "expression": "`time_to_resolution_hours`"}
+          {"name": "min(time_to_resolution_hours)", "expression": "MIN(`time_to_resolution_hours`)"},
+          {"name": "max(time_to_resolution_hours)", "expression": "MAX(`time_to_resolution_hours`)"}
         ],
         "disaggregated": false
       }

@@ -313,7 +313,7 @@ Frequency distribution. The bin width is set in the **widget's field expression*
     "datasetName": "ds_cases",
     "fields": [
       {"name": "bin(time_to_resolution_hours, binWidth=2)",
-       "expression": "bin(`time_to_resolution_hours`, binWidth=2)"},
+       "expression": "BIN_FLOOR(`time_to_resolution_hours`, 2)"},
       {"name": "count(*)", "expression": "COUNT(`*`)"}
     ],
     "disaggregated": false
@@ -331,7 +331,7 @@ Frequency distribution. The bin width is set in the **widget's field expression*
 }
 ```
 
-`binWidth` is in the same units as the underlying column (hours, dollars, etc.). For a fixed bin count instead, use `bin(col, bins=N)`.
+The field `name` (and the widget's `fieldName`) is the readable `bin(col, binWidth=N)` label; the actual SQL expression is `BIN_FLOOR(\`col\`, N)`.
 
 ---
 
