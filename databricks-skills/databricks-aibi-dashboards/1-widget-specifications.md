@@ -70,7 +70,7 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
 
 ## Counter (KPI)
 
-- `version`: **2** (current — confirmed against latest dashboard examples; NOT 3)
+- `version`: **2** (NOT 3!)
 - `widgetType`: "counter"
 - Percent values must be 0-1 in the data (not 0-100)
 
