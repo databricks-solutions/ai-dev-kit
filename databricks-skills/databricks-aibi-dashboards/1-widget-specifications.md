@@ -423,9 +423,9 @@ Multiple annotations are allowed — add more objects to the array. For non-date
 
 - `version`: **3**
 - `widgetType`: "pie"
-- `angle`: quantitative field
-- `color`: categorical dimension
-- **Limit to 3-8 categories for readability**
+- **`angle` is REQUIRED** — quantitative field (the slice size). Omitting it produces an "Invalid widget definition" error; `color` alone is not enough.
+- **`color` is REQUIRED** — categorical dimension (the slice grouping).
+- **Limit to 3-8 categories for readability.**
 
 ```json
 "spec": {
