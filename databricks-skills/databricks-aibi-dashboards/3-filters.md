@@ -10,6 +10,7 @@
 - `filter-date-range-picker`: for DATE/TIMESTAMP fields (date range selection)
 - `filter-single-select`: categorical with single selection
 - `filter-multi-select`: categorical with multiple selections (preferred for drill-down)
+- `range-slider`: numeric range filter on a quantitative column (e.g., "resolution time hours", "order amount")
 
 > **Performance note**: Global filters automatically apply `WHERE` clauses to dataset queries at runtime. You don't need to pre-filter data in your SQL - the dashboard engine handles this efficiently.
 
@@ -232,6 +233,87 @@ When a filter should affect multiple datasets (e.g., "Region" filter for both sa
 ```
 
 Each `queryName` in `encodings.fields` binds the filter to that specific dataset. Datasets not bound will not be filtered.
+
+---
+
+## Multi-Select Parameters (`MULTI`)
+
+When the dataset **pre-aggregates** (`GROUP BY` in the SQL), uses a CTE, or wraps a table function (e.g. `AI_FORECAST`), a field-based filter can't auto-inject a `WHERE` — you must filter explicitly with a parameter. Same goes when you want the filter expressed in SQL for traceability.
+
+A `MULTI` parameter binds as a **SQL `ARRAY`**, not an `IN`-list. Two rules to filter correctly:
+
+```sql
+-- ❌ WRONG: a MULTI param is an ARRAY → DATATYPE_MISMATCH (STRING vs ARRAY<STRING>)
+WHERE category IN (:category_filter)
+
+-- ✅ RIGHT: array_contains, with size()=0 guard so an empty selection means "all"
+WHERE (size(:category_filter) = 0 OR array_contains(:category_filter, category))
+```
+
+The empty-selection default is an **empty array, not NULL** — without the `size()=0` guard, the dashboard loads showing zero rows.
+
+```json
+{
+  "name": "metric_by_category",
+  "queryLines": [
+    "SELECT category, SUM(revenue) AS total FROM orders ",
+    "WHERE (size(:category_filter) = 0 OR array_contains(:category_filter, category)) ",
+    "GROUP BY category"
+  ],
+  "parameters": [{
+    "keyword": "category_filter",
+    "dataType": "STRING",
+    "complexType": "MULTI",
+    "defaultSelection": {"values": {"dataType": "STRING", "values": []}}
+  }]
+}
+```
+
+The filter widget binds the parameter via `parameterName` (NOT `fieldName`), same shape as the date-range parameter example above:
+
+```json
+"encodings": {"fields": [{"parameterName": "category_filter", "queryName": "q_param"}]}
+```
+
+> **Parameters live on the dataset + the filter widget only.** Don't add `parameters` to a chart/counter widget's own query — the chart reads the dataset, which the filter has already parameterized. Adding parameters to the consuming widget makes it render blank with no error.
+
+---
+
+## Range Slider (numeric range filter)
+
+For filtering on a numeric column where the user wants to drag a min/max slider — e.g., resolution-time hours, amount, age. The query exposes `MIN(col)` and `MAX(col)` so the dashboard knows the slider bounds; `encodings.fields[].fieldName` is the underlying column name.
+
+```json
+{
+  "widget": {
+    "name": "time-to-resolution",
+    "queries": [{
+      "name": "ds_resolution",
+      "query": {
+        "datasetName": "ds_cases",
+        "fields": [
+          {"name": "min(time_to_resolution_hours)", "expression": "MIN(`time_to_resolution_hours`)"},
+          {"name": "max(time_to_resolution_hours)", "expression": "MAX(`time_to_resolution_hours`)"}
+        ],
+        "disaggregated": false
+      }
+    }],
+    "spec": {
+      "version": 2,
+      "widgetType": "range-slider",
+      "encodings": {
+        "fields": [
+          {"fieldName": "time_to_resolution_hours", "queryName": "ds_resolution"}
+        ]
+      },
+      "frame": {"showTitle": true, "title": "Resolution time (hours)"}
+    }
+  },
+  "position": {"x": 0, "y": 0, "width": 4, "height": 2}
+}
+```
+
+`range-slider` only works on numeric / temporal columns. On a categorical field it will fail at render. To filter a numeric field by an explicit min/max in SQL (rather than a UI-only WHERE), bind to a `:param.min`/`:param.max` parameter — same pattern as date-range, see "Date Range Filtering" above.
 
 ---
 

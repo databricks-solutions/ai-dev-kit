@@ -98,3 +98,41 @@ These errors occur when the JSON structure is wrong:
 - Use TOP-N + "Other" bucketing in dataset SQL
 - Aggregate to a higher level (region instead of store)
 - Use a table widget instead of a chart for high-cardinality data
+
+## `MEASURE()` errors
+
+- **"Cannot resolve `MEASURE(\`X\`)`"** — measure `X` is not defined on the dataset. Either add it to `dataset.columns[]` with `displayName: "X"`, or (if the source is a metric view) confirm the YAML defines a measure named `X`. Name matching is case-sensitive and backticks are required if the name has spaces.
+- **`MEASURE()` returns wrong number** — check that `query.disaggregated: false` is set on the widget. With `true`, the widget bypasses dataset measures and shows raw rows.
+
+## Forecast-line shows blank or partial line
+
+- Dataset must return both historical AND forecast columns, with historical rows having `NULL` in the forecast columns and forecast rows having `NULL` in the historical column. Use `UNION ALL` to glue them — see [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md#forecast-line-with-ai_forecast).
+- All four y-encoding fields (`original`, `prediction`, `predictionUpper`, `predictionLower`) must reference columns that exist in `query.fields`.
+- `AI_FORECAST` requires the time column to be sorted and have no gaps — pre-aggregate (e.g., `DATE_TRUNC('WEEK', ts)`) before passing to the table function.
+
+## Forecast-line dips right before the prediction starts
+
+The last historical bucket is the **current (partial) period** — e.g., aggregating weekly but today is Tuesday → "this week" bucket has only 2 days of data and looks like a cliff. Filter the partial bucket out in the dataset SQL with a cutoff using the **same `DATE_TRUNC` grain as the aggregation**:
+
+```sql
+WHERE DATE_TRUNC('WEEK', event_ts) < DATE_TRUNC('WEEK', current_date())
+```
+
+If you change the chart's aggregation grain (weekly → monthly), update **both** the `DATE_TRUNC` in `GROUP BY` and the one in the `WHERE`. Mismatched grains cause the same cliff.
+
+## Range-slider filter shows error or no min/max
+
+- The filter's `query.fields[]` must expose `MIN(col)` and `MAX(col)` — the dashboard reads these to set the slider bounds. See [3-filters.md](3-filters.md#range-slider-numeric-range-filter).
+- Slider only works on numeric / temporal columns. Categorical fields fail at render — use `filter-single-select` / `filter-multi-select` instead.
+
+## Symbol-map shows no points
+
+- Verify the dataset returns both `latitude` and `longitude` columns with valid floats (not strings, not nulls for all rows).
+- Lat values must be in [-90, 90], lon in [-180, 180]. Out-of-range rows are silently dropped.
+- For region-based maps (countries, states), use `choropleth-map`, not `symbol-map`.
+
+## Annotations not appearing on chart
+
+- `annotations` is a sibling of `encodings` inside `spec`, not nested inside it.
+- Each annotation needs `type: "vertical-line"`, `encodings.x.dataValue` matching the chart's x-axis type, and a matching `dataType` (`DATETIME` / `STRING` / `NUMBER`).
+- Annotations are only rendered on time-series chart types (`line`, `area`, `bar`, `combo`, `forecast-line`). Pie / pivot / map ignore them.
