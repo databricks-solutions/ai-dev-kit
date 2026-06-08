@@ -100,22 +100,26 @@ databricks genie update-space SPACE_ID --json "{\"serialized_space\": $(cat geni
 
 ## serialized_space Format
 
-The `serialized_space` field is a JSON string containing the full space configuration.
+The `serialized_space` field is a JSON string containing the full space configuration. Six constructs the schema supports, all optional except `version` and `data_sources.tables`:
 
-### Field Format Requirements
+| Construct | Location | Purpose |
+|---|---|---|
+| `version` | top-level | Integer **`2`** (not string `"2"`). |
+| `data_sources.tables[]` | top-level | UC tables (or metric views) the space queries. Each has `identifier`, plus optional `column_configs[]` for per-column behavior. |
+| `config.sample_questions[]` | top-level | Suggested starter questions shown in the UI. |
+| `instructions.example_question_sqls[]` | top-level | Trusted question↔SQL pairs ("when asked X, run this SQL"). |
+| `instructions.text_instructions[]` | top-level | Free-form rules ("for revenue questions use table Y", domain glossary, defaults). |
+| `instructions.sql_functions[]` | top-level | UC SQL functions the space can call as tools (identifier only). |
+| `benchmarks.questions[]` | top-level | Evaluation pairs (`question` + `answer` SQL) for accuracy testing. |
 
-**IMPORTANT:** All items in `sample_questions`, `example_question_sqls`, and `text_instructions` require a unique `id` field.
+### Field-shape rules
 
-| Field | Format |
-|-------|--------|
-| `config.sample_questions[]` | `{"id": "32hexchars", "question": ["..."]}` |
-| `instructions.example_question_sqls[]` | `{"id": "32hexchars", "question": ["..."], "sql": ["..."]}` |
-| `instructions.text_instructions[]` | `{"id": "32hexchars", "content": ["..."]}` |
-
-- **ID format:** 32-character lowercase hex, unique across **all three lists combined** (a duplicate between e.g. `text_instructions` and `example_question_sqls` is rejected).
-- **Text fields are arrays:** `question`, `sql`, and `content` are arrays of strings, not plain strings.
-- **Sort order matters:** `data_sources.tables` must be sorted by `identifier`; `example_question_sqls` and `text_instructions` must be sorted by `id`. (`sample_questions` is silently re-sorted server-side.)
-- **Simple ID scheme that satisfies both rules:** prefix per list + monotonic counter, total 32 hex chars — `1…0001`, `1…0002` for `sample_questions`; `2…0001`, `2…0002` for `example_question_sqls`; `3…0001` for `text_instructions`. Authoring order = sort order, no collisions.
+- **`version: 2`** — integer, not a string.
+- **All text fields are arrays of strings.** `question`, `content`, `sql`, and `answer[].content` are always lists, never bare strings. Single-element arrays are fine; the platform concatenates them.
+- **Every item needs a unique `id`** — 32-character lowercase hex. Uniqueness is enforced **across all lists combined** (a duplicate between e.g. `text_instructions` and `example_question_sqls` is rejected). The platform reassigns IDs server-side on create, so exact values don't matter for creation — only that they're present, 32 chars, and unique.
+- **Sort order matters:** `data_sources.tables` must be sorted by `identifier`; `example_question_sqls`, `text_instructions`, `sql_functions`, and `benchmarks.questions` must be sorted by `id`. (`sample_questions` is silently re-sorted server-side.)
+- **Omit empty sections entirely** rather than including `[]` — both work, but live exports omit them when empty.
+- **Author-time ID convention** (optional, recommended): prefix the 32 chars by section to keep them readable and sorted in authoring order — `1…0001` for sample_questions, `2…` for example_question_sqls, `3…` for text_instructions, `4…` for sql_functions, `5…` for benchmarks. The platform doesn't enforce this; it's just convenient.
 
 ### Text Instructions
 
@@ -126,45 +130,107 @@ The `serialized_space` field is a JSON string containing the full space configur
 
 Well-crafted instructions significantly improve answer accuracy.
 
-### Example
+### Complete example
 
-Top-level keys are `version`, `config`, `data_sources`, `instructions`. Every item in `sample_questions`, `example_question_sqls`, and `text_instructions` needs a unique 32-char hex `id` and all text fields are arrays:
+A populated space exercising every construct (`version`, `data_sources` with `column_configs`, `sample_questions`, `example_question_sqls`, `text_instructions`, `sql_functions`, `benchmarks`):
 
 ```json
 {
   "version": 2,
-  "config": {
-    "sample_questions": [
-      {"id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", "question": ["What is our current on-time performance?"]},...
-    ]
-  },
   "data_sources": {
     "tables": [
-      {"identifier": "catalog.ops.gold_otp_summary"},...
+      {
+        "identifier": "main.analytics.gold_customers",
+        "column_configs": [
+          {"column_name": "customer_segment", "enable_format_assistance": true, "enable_entity_matching": true},
+          {"column_name": "ltv_usd", "enable_format_assistance": true}
+        ]
+      },
+      {"identifier": "main.analytics.gold_daily_sales"},
+      {"identifier": "main.analytics.gold_product_perf"}
+    ]
+  },
+  "config": {
+    "sample_questions": [
+      {"id": "10000000000000000000000000000001", "question": ["What were total sales last month?"]},
+      {"id": "10000000000000000000000000000002", "question": ["Which 5 products had the highest revenue this quarter?"]},
+      {"id": "10000000000000000000000000000003", "question": ["Show weekly revenue trend with YoY comparison"]},
+      {"id": "10000000000000000000000000000004", "question": ["Which customers churned but had high LTV?"]}
     ]
   },
   "instructions": {
     "example_question_sqls": [
       {
-        "id": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
-        "question": ["What is our on-time performance?"],
-        "sql": ["SELECT flight_date, ROUND(SUM(on_time_count) * 100.0 / SUM(total_flights), 1) AS otp_pct\n", "FROM catalog.ops.gold_otp_summary\n", "WHERE flight_date >= date_sub(current_date(), 7)\n", "GROUP BY flight_date ORDER BY flight_date"]
+        "id": "20000000000000000000000000000001",
+        "question": ["What were total sales last month?"],
+        "sql": [
+          "SELECT SUM(total_revenue) AS revenue\n",
+          "FROM main.analytics.gold_daily_sales\n",
+          "WHERE sale_date >= date_trunc('MONTH', add_months(current_date(), -1))\n",
+          "  AND sale_date <  date_trunc('MONTH', current_date())"
+        ]
+      },
+      {
+        "id": "20000000000000000000000000000002",
+        "question": ["Show weekly revenue trend with YoY comparison"],
+        "sql": [
+          "SELECT date_trunc('WEEK', sale_date) AS week,\n",
+          "       SUM(CASE WHEN year(sale_date)=year(current_date())   THEN total_revenue END) AS revenue_this_yr,\n",
+          "       SUM(CASE WHEN year(sale_date)=year(current_date())-1 THEN total_revenue END) AS revenue_last_yr\n",
+          "FROM main.analytics.gold_daily_sales\n",
+          "WHERE sale_date >= add_months(current_date(), -12)\n",
+          "GROUP BY 1 ORDER BY 1"
+        ]
       }
     ],
     "text_instructions": [
       {
-        "id": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+        "id": "30000000000000000000000000000001",
         "content": [
-          "On-time performance (OTP) questions: Use gold_otp_summary table. OTP target is 85%.\n",
-          "Delay analysis questions: Use gold_delay_analysis table. Filter by delay_code for specific delay types.\n",
-          "When asked about 'this week' or 'recent': Use flight_date >= date_sub(current_date(), 7).\n",
-          "When comparing aircraft: Join with gold_aircraft_reliability on tail_number."
+          "Revenue / sales questions: use gold_daily_sales; sale_date is the grain, truncate to WEEK/MONTH/QUARTER as needed.\n",
+          "Product-level questions: use gold_product_perf.\n",
+          "Customer questions (churn, LTV, segmentation): use gold_customers."
         ]
+      },
+      {
+        "id": "30000000000000000000000000000002",
+        "content": [
+          "When asked 'last month' / 'this quarter', always anchor on current_date() — never hard-code dates.\n",
+          "Default LIMIT 100 on unbounded queries. Default 'top N' to 10 if unspecified.\n",
+          "Monetary values are USD. Round percentages to 1 decimal place."
+        ]
+      }
+    ],
+    "sql_functions": [
+      {"id": "40000000000000000000000000000001", "identifier": "main.analytics.format_currency"}
+    ]
+  },
+  "benchmarks": {
+    "questions": [
+      {
+        "id": "50000000000000000000000000000001",
+        "question": ["What was last month's total revenue?"],
+        "answer": [{
+          "format": "SQL",
+          "content": [
+            "SELECT SUM(total_revenue) AS revenue FROM main.analytics.gold_daily_sales ",
+            "WHERE sale_date >= date_trunc('MONTH', add_months(current_date(), -1)) ",
+            "  AND sale_date <  date_trunc('MONTH', current_date())"
+          ]
+        }]
       }
     ]
   }
 }
 ```
+
+Notes on the example:
+- `version` is the integer `2`.
+- `data_sources.tables` is sorted by `identifier`. First table shows the `column_configs` extension (per-column toggles for format assistance / entity matching); the other two use the minimal `{"identifier": ...}` form, which is also valid.
+- All text payloads (`question`, `content`, `sql`, `answer[].content`) are arrays.
+- IDs use the section-prefix scheme (1xxx/2xxx/3xxx/4xxx/5xxx); 32 chars each, unique across all lists.
+- `sql_functions[]` references a UC SQL/Python function by `identifier`; the function definition itself lives in UC, not here.
+- `benchmarks` is top-level (sibling of `instructions`), not nested under it. Each `answer` is a list of `{format, content}` objects — `"format": "SQL"` is the common case.
 
 
 ## Cross-Workspace Migration
