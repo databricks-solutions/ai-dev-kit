@@ -236,6 +236,49 @@ Each `queryName` in `encodings.fields` binds the filter to that specific dataset
 
 ---
 
+## Multi-Select Parameters (`MULTI`)
+
+When the dataset **pre-aggregates** (`GROUP BY` in the SQL), uses a CTE, or wraps a table function (e.g. `AI_FORECAST`), a field-based filter can't auto-inject a `WHERE` — you must filter explicitly with a parameter. Same goes when you want the filter expressed in SQL for traceability.
+
+A `MULTI` parameter binds as a **SQL `ARRAY`**, not an `IN`-list. Two rules to filter correctly:
+
+```sql
+-- ❌ WRONG: a MULTI param is an ARRAY → DATATYPE_MISMATCH (STRING vs ARRAY<STRING>)
+WHERE category IN (:category_filter)
+
+-- ✅ RIGHT: array_contains, with size()=0 guard so an empty selection means "all"
+WHERE (size(:category_filter) = 0 OR array_contains(:category_filter, category))
+```
+
+The empty-selection default is an **empty array, not NULL** — without the `size()=0` guard, the dashboard loads showing zero rows.
+
+```json
+{
+  "name": "metric_by_category",
+  "queryLines": [
+    "SELECT category, SUM(revenue) AS total FROM orders ",
+    "WHERE (size(:category_filter) = 0 OR array_contains(:category_filter, category)) ",
+    "GROUP BY category"
+  ],
+  "parameters": [{
+    "keyword": "category_filter",
+    "dataType": "STRING",
+    "complexType": "MULTI",
+    "defaultSelection": {"values": {"dataType": "STRING", "values": []}}
+  }]
+}
+```
+
+The filter widget binds the parameter via `parameterName` (NOT `fieldName`), same shape as the date-range parameter example above:
+
+```json
+"encodings": {"fields": [{"parameterName": "category_filter", "queryName": "q_param"}]}
+```
+
+> **Parameters live on the dataset + the filter widget only.** Don't add `parameters` to a chart/counter widget's own query — the chart reads the dataset, which the filter has already parameterized. Adding parameters to the consuming widget makes it render blank with no error.
+
+---
+
 ## Range Slider (numeric range filter)
 
 For filtering on a numeric column where the user wants to drag a min/max slider — e.g., resolution-time hours, amount, age. The query exposes `MIN(col)` and `MAX(col)` so the dashboard knows the slider bounds; `encodings.fields[].fieldName` is the underlying column name.

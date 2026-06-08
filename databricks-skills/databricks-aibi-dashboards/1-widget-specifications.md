@@ -487,7 +487,7 @@ Use `:param` syntax in SQL for dynamic filtering. Parameters can be bound to fil
 
 **Parameter types:**
 - Single value: `"dataType": "INTEGER"` / `"DECIMAL"` / `"STRING"`
-- Multi-select: Add `"complexType": "MULTI"`
+- Multi-select: `"complexType": "MULTI"` — binds as a SQL `ARRAY`, filter with `array_contains(:p, col)`, not `col IN (:p)`. Full pattern in [3-filters.md](3-filters.md#multi-select-parameters-multi).
 - Range: `"dataType": "DATE", "complexType": "RANGE"` - use `:param.min` / `:param.max`
 
 ---
