@@ -224,7 +224,7 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
   "pages": [...],
   "uiSettings": {
     "theme": {
-      "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
+      "canvasBackgroundColor": {"light": "#FFFFFF", "dark": "#1F272D"},
       "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
       "widgetBorderColor":     {"light": "#FFFFFF", "dark": "#11171C"},
       "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},

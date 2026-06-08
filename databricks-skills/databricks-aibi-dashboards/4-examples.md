@@ -475,7 +475,7 @@ y=14: Detail table (w=12, h=6)
 
   "uiSettings": {
     "theme": {
-      "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
+      "canvasBackgroundColor": {"light": "#FFFFFF", "dark": "#1F272D"},
       "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
       "widgetBorderColor":     {"light": "#FFFFFF", "dark": "#11171C"},
       "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},
