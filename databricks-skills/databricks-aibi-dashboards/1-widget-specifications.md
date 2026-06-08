@@ -423,7 +423,7 @@ Multiple annotations are allowed — add more objects to the array. For non-date
 
 - `version`: **3**
 - `widgetType`: "pie"
-- **`angle` is REQUIRED** — quantitative field (the slice size). Omitting it produces an "Invalid widget definition" error; `color` alone is not enough.
+- **`angle` is REQUIRED** — quantitative field (the slice size). Omitting it renders all slices the same size, which is meaningless: the pie no longer encodes any quantity.
 - **`color` is REQUIRED** — categorical dimension (the slice grouping).
 - **Limit to 3-8 categories for readability.**
 
