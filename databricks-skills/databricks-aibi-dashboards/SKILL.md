@@ -272,12 +272,14 @@ Apply unless user specifies otherwise:
 
 ## Reference Files
 
+> **Before generating any dashboard JSON, read [4-examples.md](4-examples.md) first.** It's a complete, validated, copy-pasteable dashboard exercising every construct (dataset measures + `MEASURE()`, sparkline counters, forecast-line with annotations, pivot with conditional cells, symbol-map, histogram, range-slider filter, theme). Starting from the working example and adapting is far more reliable than writing from scratch — most failure modes are subtle shape errors that are easy to copy correctly and hard to invent correctly.
+
 | What are you building? | Reference |
 |------------------------|-----------|
+| **Start here** — full working dashboard template | [4-examples.md](4-examples.md) |
 | Any widget (text, counter, table, chart) | [1-widget-specifications.md](1-widget-specifications.md) |
 | Advanced charts (area, scatter/Bubble, combo (Line+Bar), Choropleth map) | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
 | Dashboard with filters (global or page-level) | [3-filters.md](3-filters.md) |
-| Need a complete working template to adapt | [4-examples.md](4-examples.md) |
 | Debugging a broken dashboard | [5-troubleshooting.md](5-troubleshooting.md) |
 
 ---
