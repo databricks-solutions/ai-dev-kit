@@ -124,8 +124,7 @@ y=14: Detail table (w=12, h=6)
             "spec": {
               "version": 2, "widgetType": "counter",
               "encodings": {
-                "value": {"fieldName": "measure(Total Cases)", "displayName": "Total Cases",
-                          "format": {"type": "number", "abbreviation": "compact"}}
+                "value": {"fieldName": "measure(Total Cases)", "displayName": "Total Cases"}
               },
               "frame": {"title": "Total Cases", "showTitle": true}
             }
@@ -173,8 +172,7 @@ y=14: Detail table (w=12, h=6)
             "spec": {
               "version": 2, "widgetType": "counter",
               "encodings": {
-                "value": {"fieldName": "measure(Avg Resolution Hours)", "displayName": "Avg Hours",
-                          "format": {"type": "number", "decimalPlaces": {"type": "max", "places": 1}}}
+                "value": {"fieldName": "measure(Avg Resolution Hours)", "displayName": "Avg Hours"}
               },
               "frame": {"title": "Avg Resolution Time", "showTitle": true}
             }
@@ -196,8 +194,7 @@ y=14: Detail table (w=12, h=6)
             "spec": {
               "version": 2, "widgetType": "counter",
               "encodings": {
-                "value": {"fieldName": "measure(Reopen Rate %)", "displayName": "Reopen Rate",
-                          "format": {"type": "number", "decimalPlaces": {"type": "max", "places": 1}}}
+                "value": {"fieldName": "measure(Reopen Rate %)", "displayName": "Reopen Rate"}
               },
               "frame": {"title": "Reopen Rate (%)", "showTitle": true}
             }
