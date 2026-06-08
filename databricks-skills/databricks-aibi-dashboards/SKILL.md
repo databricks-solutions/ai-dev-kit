@@ -272,7 +272,7 @@ Apply unless user specifies otherwise:
 
 ## Reference Files
 
-> **Before generating any dashboard JSON, read [4-examples.md](4-examples.md) first.** It's a complete, validated, copy-pasteable dashboard exercising every construct (dataset measures + `MEASURE()`, sparkline counters, forecast-line with annotations, pivot with conditional cells, symbol-map, histogram, range-slider filter, theme). Starting from the working example and adapting is far more reliable than writing from scratch — most failure modes are subtle shape errors that are easy to copy correctly and hard to invent correctly.
+> **Before generating any dashboard JSON, read [4-examples.md](4-examples.md) first.** It's a complete reference dashboard exercising every construct (dataset measures + `MEASURE()`, sparkline counters, forecast-line with annotations, pivot with conditional cells, symbol-map, histogram, range-slider filter, theme). Use it to learn the JSON shape; then adapt to the user's data and demo story — keep the structure, swap the tables, metrics, palette, and narrative for the case you're building.
 
 | What are you building? | Reference |
 |------------------------|-----------|
