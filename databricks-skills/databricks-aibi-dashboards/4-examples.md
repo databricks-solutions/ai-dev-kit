@@ -75,21 +75,20 @@ y=14: Detail table (w=12, h=6)
       "name": "ds_forecast",
       "displayName": "Cases forecast",
       "queryLines": [
-        "WITH original AS (",
-        "  SELECT DATE_TRUNC('WEEK', opened_at) AS opened_at, COUNT(*) AS count",
-        "  FROM support_cases",
-        "  -- Drop the partial-elapsed week so the line doesn't dip right before the forecast.",
-        "  -- Cutoff grain MUST match the DATE_TRUNC grain above.",
-        "  WHERE DATE_TRUNC('WEEK', opened_at) < DATE_TRUNC('WEEK', current_date())",
-        "  GROUP BY 1",
-        "),",
-        "dates AS (SELECT MAX(opened_at) AS max_d, MIN(opened_at) AS min_d FROM original),",
-        "forecast AS (",
-        "  SELECT opened_at, count_forecast, count_upper, count_lower, NULL AS count",
-        "  FROM AI_FORECAST(TABLE(original),",
-        "    horizon  => (SELECT max_d + MAKE_DT_INTERVAL(CAST(FLOOR(DATEDIFF(max_d, min_d) * 0.5) AS INT), 0, 0, 0) FROM dates),",
-        "    time_col => 'opened_at', value_col => 'count')",
-        ")",
+        "WITH original AS (\n",
+        "  -- Cutoff grain MUST match the DATE_TRUNC grain to drop the partial week\n",
+        "  SELECT DATE_TRUNC('WEEK', opened_at) AS opened_at, COUNT(*) AS count\n",
+        "  FROM support_cases\n",
+        "  WHERE DATE_TRUNC('WEEK', opened_at) < DATE_TRUNC('WEEK', current_date())\n",
+        "  GROUP BY 1\n",
+        "),\n",
+        "dates AS (SELECT MAX(opened_at) AS max_d, MIN(opened_at) AS min_d FROM original),\n",
+        "forecast AS (\n",
+        "  SELECT opened_at, count_forecast, count_upper, count_lower, NULL AS count\n",
+        "  FROM AI_FORECAST(TABLE(original),\n",
+        "    horizon  => (SELECT max_d + MAKE_DT_INTERVAL(CAST(FLOOR(DATEDIFF(max_d, min_d) * 0.5) AS INT), 0, 0, 0) FROM dates),\n",
+        "    time_col => 'opened_at', value_col => 'count')\n",
+        ")\n",
         "SELECT * FROM forecast UNION ALL SELECT opened_at, NULL, NULL, NULL, count FROM original"
       ]
     }
@@ -478,6 +477,7 @@ y=14: Detail table (w=12, h=6)
     "theme": {
       "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
       "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "widgetBorderColor":     {"light": "#FFFFFF", "dark": "#11171C"},
       "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},
       "selectionColor":        {"light": "#2272B4", "dark": "#8ACAFF"},
       "visualizationColors": [

@@ -209,7 +209,7 @@ Every dashboard's `serialized_dashboard` content must follow this exact structur
 ```
 
 **Structural rules (violations cause "failed to parse serialized dashboard"):**
-- `queryLines`: Array of strings, NOT `"query": "string"`
+- `queryLines`: Array of strings, NOT `"query": "string"`. Elements are **joined verbatim** with no separator — end each line with `\n` (or strip `-- comments`). A line ending in `-- comment` with no newline swallows the next line.
 - Widgets: INLINE in `layout[].widget`, NOT a separate `"widgets"` array
 - `pageType`: Required on every page (`PAGE_TYPE_CANVAS` or `PAGE_TYPE_GLOBAL_FILTERS`)
 - Query binding: `query.fields[].name` must exactly match `encodings.*.fieldName`
@@ -226,6 +226,7 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
     "theme": {
       "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
       "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "widgetBorderColor":     {"light": "#FFFFFF", "dark": "#11171C"},
       "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},
       "selectionColor":        {"light": "#2272B4", "dark": "#8ACAFF"},
       "visualizationColors": [
@@ -240,6 +241,7 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
 
 - `visualizationColors` is the **ordered palette** chart series and category mappings cycle through. `position: 1` is the first color (`#FFA600` above), `position: 6` is the 6th (`#1D425C`). Length is whatever you want — 5-8 colors is typical.
 - Background / font / selection colors take `light` + `dark` pairs; the dashboard automatically applies the right pair based on the viewer's mode.
+- `widgetBorderColor`: set this to the **same value as `widgetBackgroundColor`** (as in the example) to hide widget borders — the default border looks busy in dense dashboards and most demos look cleaner without it.
 - `widgetHeaderAlignment`: `"LEFT"` (default), `"CENTER"`, or `"RIGHT"`.
 - Per-widget color references use `{"themeColorType": "visualizationColors", "position": N}` to pin a value to a specific slot in this palette (e.g., Critical → position 6 → always red, regardless of how the chart sorts). For an exact hex outside the palette, use `{"hex": "#FF0000"}` instead.
 
