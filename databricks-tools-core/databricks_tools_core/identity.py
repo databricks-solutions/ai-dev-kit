@@ -8,9 +8,26 @@ a config file or git, so all calls are attributable in the
 Resources created by the MCP server are also tagged with project metadata
 and any freeform tags defined in ``.databricks-ai-dev-kit.yaml``.
 
-Example user-agent string::
+The product name can be overridden via the ``DATABRICKS_MCP_CLIENT`` environment
+variable. This allows organisations running the MCP server from multiple AI
+clients (Claude Code, Codex, Cursor, etc.) to distinguish traffic in Databricks
+audit logs and SQL warehouse query history without maintaining a fork.
+
+Example user-agent strings::
 
     databricks-ai-dev-kit/0.1.0 databricks-sdk-py/0.73.0 python/3.11.13 os/darwin auth/pat project/my-repo
+    my-org-claude-code/0.1.0 databricks-sdk-py/0.73.0 python/3.11.13 os/darwin auth/pat project/my-repo
+
+Setting ``DATABRICKS_MCP_CLIENT`` per client:
+
+Claude Code (``~/.claude.json`` MCP server env block)::
+
+    "env": { "DATABRICKS_MCP_CLIENT": "my-org-claude-code" }
+
+Codex (``~/.codex/config.toml``)::
+
+    [mcp_servers.databricks.env]
+    DATABRICKS_MCP_CLIENT = "my-org-codex"
 
 Example config file (``.databricks-ai-dev-kit.yaml`` at repo root)::
 
@@ -32,7 +49,7 @@ from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
 
-PRODUCT_NAME = "databricks-ai-dev-kit"
+PRODUCT_NAME = os.environ.get("DATABRICKS_MCP_CLIENT", "databricks-ai-dev-kit")
 
 DESCRIPTION_FOOTER = "Built with Databricks AI Dev Kit"
 
