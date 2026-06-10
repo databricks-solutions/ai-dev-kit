@@ -214,9 +214,9 @@ Every dashboard's `serialized_dashboard` content must follow this exact structur
 - `pageType`: Required on every page (`PAGE_TYPE_CANVAS` or `PAGE_TYPE_GLOBAL_FILTERS`)
 - Query binding: `query.fields[].name` must exactly match `encodings.*.fieldName`
 
-### Dashboard Theme (Optional)
+### Theme & Color (always set this — it makes or breaks the dashboard)
 
-Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across every widget on the dashboard. Without it, the dashboard inherits the workspace default. With it, you get a consistent palette across all charts, plus the index that `{"themeColorType": "visualizationColors", "position": N}` in per-widget specs resolves against.
+Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across every widget on the dashboard. Without it, the dashboard inherits the workspace default and looks generic. **Set the full block on every dashboard you create** — a coherent palette is the single highest-impact polish item.
 
 ```json
 {
@@ -224,9 +224,8 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
   "pages": [...],
   "uiSettings": {
     "theme": {
-      "canvasBackgroundColor": {"light": "#FFFFFF", "dark": "#1F272D"},
+      "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
       "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
-      "widgetBorderColor":     {"light": "#FFFFFF", "dark": "#11171C"},
       "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},
       "selectionColor":        {"light": "#2272B4", "dark": "#8ACAFF"},
       "visualizationColors": [
@@ -239,11 +238,37 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
 }
 ```
 
-- `visualizationColors` is the **ordered palette** chart series and category mappings cycle through. `position: 1` is the first color (`#FFA600` above), `position: 6` is the 6th (`#1D425C`). Length is whatever you want — 5-8 colors is typical.
-- Background / font / selection colors take `light` + `dark` pairs; the dashboard automatically applies the right pair based on the viewer's mode.
-- `widgetBorderColor`: set this to the **same value as `widgetBackgroundColor`** (as in the example) to hide widget borders — the default border looks busy in dense dashboards and most demos look cleaner without it.
+**Theme keys** (mechanics):
+
+- `visualizationColors`: ordered palette every chart series and category mapping cycles through. **Positions are 0-indexed**: `position: 0` = first color (`#FFA600` above), `position: 6` = seventh (`#99DDB4`). Length 5–8 is typical.
+- Background / font / selection colors take `light` + `dark` pairs; the dashboard auto-selects based on viewer mode.
 - `widgetHeaderAlignment`: `"LEFT"` (default), `"CENTER"`, or `"RIGHT"`.
-- Per-widget color references use `{"themeColorType": "visualizationColors", "position": N}` to pin a value to a specific slot in this palette (e.g., Critical → position 6 → always red, regardless of how the chart sorts). For an exact hex outside the palette, use `{"hex": "#FF0000"}` instead.
+- Per-widget color references: `{"themeColorType": "visualizationColors", "position": N}` (0-indexed) to pin to a palette slot, or `{"hex": "#FF0000"}` for an exact color outside the palette.
+
+**Palette-design rules** (this is what separates a polished dashboard from a noisy one):
+
+1. **One coherent color family per dashboard — not random brand colors.** Pick a single progression that reads as a set (e.g., warm sunset: amber → coral → pink → purple → navy; or cool ocean: blue → teal → green). Order the stops light-to-dark along one or two adjacent hues. Each demo dashboard gets its own distinct family so the suite feels varied but each is internally unified.
+   - **Categorical palettes need real hue variation — not just one color faded toward white.** "Same color in 7 shades of light" (a single-hue lightness ramp like `#1A4D8C → #4A78B4 → #7AA3DC → #ABCCFF → ...`) reads as one color, not seven categories — a viewer can't tell which slice is which. Use that pattern only for **quantitative** ramps (heatmaps, choropleths, symbol-map intensity via `colorRamp.mode: "custom-sequential"`), never for `visualizationColors`. Categorical palettes must walk across hues (amber → coral → pink → purple → navy) so every category has its own identity.
+   - **Adjacent stops must stay visually distinct.** A coherent family is *not* an excuse for two near-identical hues — if a chart has multiple categories that land on adjacent palette positions, a viewer must be able to tell them apart at a glance. Step lightness or saturation noticeably between every consecutive stop (rule of thumb: if you squint and any two stops blur into one, push them further apart).
+2. **Reserve two semantic colors OUTSIDE the categorical palette** for "bad" (a warm coral, e.g. `#FF7E5C`) and "good" (a calm teal/green from the family, e.g. `#5FCFC6`). Pin these via `color.scale.mappings` with literal `{"hex": "..."}` — **not** `themeColorType: position`. Reason: the palette gets reordered/tweaked, but red=bad and green=good must always hold. Reuse the same good-teal that appears in the categorical palette so it never clashes (avoid two near-identical-but-different teals).
+3. **Color the non-categorical widgets explicitly so they join the family.**
+   - **Maps & heatmaps** (quantitative): use `colorRamp.mode: "custom-sequential"` with `{start, end}` from the family. If the metric has a direction, `start = bad color, end = good color` so weak values pop. Avoid the harsh `redyellowgreen` scheme.
+   - **Forecast-line / multi-series**: pin per-series colors via `color.scale.mappings` keyed on series `displayName` — actual = a solid family color, forecast = a contrast/alert color so it stands out, threshold/baseline = a muted family tone.
+   - **Sparkline counters**: set `value.color` to a family color so the mini-trend isn't grey.
+4. **"Lighter / more pastel" tweak**: nudge all stops up in lightness *together*; don't recolor individual ones. Re-sync the pinned semantic hex values to match — keep enough contrast on the bad/alert color that it still reads as a warning.
+
+**Starter palettes** (pick one and adapt — extend to 7-8 stops if needed; pin red-alert / green-good as literal hex outside the palette per rule 2):
+
+```
+#094074  #3C6997  #5ADBFF  #FFDD4A  #FE9000
+#003F5C  #594E90  #BC4C96  #FF5F66  #FFA600
+#4A8CC7  #F59770  #FFD84A  #F0E09E  #6DD980
+#440154  #3B528B  #21918C  #5EC962  #FDE725
+#4E79A7  #F28E2C  #E15759  #76B7B2  #59A14F
+#0072B2  #E69F00  #009E73  #CC79A7  #D55E00
+#0D0887  #7E03A8  #CC4778  #F89441  #F0F921
+#6929C4  #1192E8  #005D5D  #9F1853  #FA4D56
+```
 
 ### Linking a Genie Space (Optional)
 

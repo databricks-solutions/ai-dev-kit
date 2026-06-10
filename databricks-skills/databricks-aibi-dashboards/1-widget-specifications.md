@@ -7,6 +7,7 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
 - `widget.name`: alphanumeric + hyphens + underscores ONLY (max 60 characters)
 - `frame.title`: human-readable title (any characters allowed)
 - `frame.showTitle`: always set to `true` so users understand the widget
+- `frame.description` + `frame.showDescription: true`: optional subtext under the title (e.g., `"All-time; 0% before the 2025-06 launch"`) — useful for giving a KPI number context without cluttering the chart itself
 - `displayName`: use in encodings to label axes/values clearly (e.g., "Revenue ($)", "Growth Rate (%)")
 - `widget.queries[].name`: use `"main_query"` for chart/counter/table widgets. Filter widgets with multiple queries can use descriptive names (see [3-filters.md](3-filters.md))
 
@@ -181,14 +182,19 @@ Match the sparkline grain to whatever the surrounding charts use — consistent 
 
 ### Value formatting
 
-Format types: `number`, `number-currency`, `number-percent`.
+Format types: `number`, `number-plain`, `number-currency`, `number-percent`.
 
 | Field type | Format | Why |
 |---|---|---|
-| Money | `number-currency` + `currencyCode` + `abbreviation: "compact"` | "$1.2M" is readable, "1287394.55" isn't |
+| Money | `number-currency` + `currencyCode: "USD"` (or `EUR` etc.) + `abbreviation: "compact"` | "$1.2M" is readable, "1287394.55" isn't |
 | Percentage | `number-percent` (data must be 0-1) | Renders "12.5%" from 0.125 |
 | Large count | `number` + `abbreviation: "compact"` | Renders "1.5K" / "2.3M" |
 | Small count (under ~1K) | `number` (no abbreviation) or omit `format` | Raw integer is fine |
+| Value with custom unit (e.g., "8 hrs", "2 weeks") | `number-plain` + `formatTemplate: "{{ @formatted }} hrs"` | Append a unit cleanly without baking it into the dataset |
+
+Optional `format.suffix` (e.g., `"suffix": "h"`) appends a short unit directly after the number without a template — simpler than `formatTemplate` when you just need a single-char unit.
+
+> **Counters backed by `MEASURE()`**: omit `format` when `format.type` is plain `"number"` — the combination triggers an "automatically fixed" warning on the rendered widget. Use `number-plain`, `number-currency`, `number-percent`, or no format at all.
 
 ```json
 "value": {
@@ -287,9 +293,9 @@ Each column object supports format, conditional styling, links, and tooltips. Co
     "type": "basic",
     "rules": [
       {"condition": {"operand": {"type": "data-value", "value": "10000"}, "operator": ">="},
-       "backgroundColor": {"themeColorType": "visualizationColors", "position": 4}},
+       "backgroundColor": {"themeColorType": "visualizationColors", "position": 0}},
       {"condition": {"operand": {"type": "data-value", "value": "5000"},  "operator": ">="},
-       "backgroundColor": {"themeColorType": "visualizationColors", "position": 3}}
+       "backgroundColor": {"themeColorType": "visualizationColors", "position": 6}}
     ]
   },
 
@@ -382,14 +388,14 @@ Default behaviour: theme colors are assigned to categories in order. To pin spec
   "scale": {
     "type": "categorical",
     "mappings": [
-      {"value": "1-Critical", "color": {"themeColorType": "visualizationColors", "position": 6}},
-      {"value": "4-Low",      "color": {"themeColorType": "visualizationColors", "position": 1}}
+      {"value": "1-Critical", "color": {"hex": "#FF7E5C"}},
+      {"value": "4-Low",      "color": {"themeColorType": "visualizationColors", "position": 6}}
     ]
   }
 }
 ```
 
-`themeColorType: "visualizationColors"` + `position: 1..N` selects from the dashboard's theme palette. For an exact hex, use `{"hex": "#FF0000"}` instead of `themeColorType`.
+`themeColorType: "visualizationColors"` + `position: 0..N-1` (0-indexed) selects from the dashboard's theme palette. For semantic colors that must hold across palette changes (Critical → always red, OK → always green), pin a **literal hex** with `{"hex": "#FF0000"}` instead — palette reshuffles silently move palette-position colors.
 
 > For continuous color ramps on quantitative encodings (e.g., choropleth, symbol-map, heatmap), use `colorRamp` — see [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
 
@@ -433,7 +439,8 @@ Multiple annotations are allowed — add more objects to the array. For non-date
   "widgetType": "pie",
   "encodings": {
     "angle": {"fieldName": "revenue", "scale": {"type": "quantitative"}},
-    "color": {"fieldName": "category", "scale": {"type": "categorical"}}
+    "color": {"fieldName": "category", "scale": {"type": "categorical"}},
+    "label": {"show": true}
   }
 }
 ```

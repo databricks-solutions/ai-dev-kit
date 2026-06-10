@@ -1,49 +1,3 @@
-# Complete Dashboard Example
-
-A working dashboard JSON that exercises the new feature set:
-
-- **`dataset.columns[]` + `MEASURE()`** — reusable named measures across widgets.
-- **`forecast-line`** with `AI_FORECAST` SQL and a **vertical-line annotation** for a known event.
-- **`pivot`** with conditional cell coloring.
-- **`symbol-map`** (lat/lon) with a continuous color ramp.
-- **`range-slider`** filter on a numeric column.
-- **Counter sparkline** via the `period` encoding.
-
-**Adapt this to the user's actual data and story** — the structure and feature mix is what to copy, not the column names.
-
-## Key Patterns (read first)
-
-### Page types
-- `PAGE_TYPE_CANVAS` — content page with widgets.
-- `PAGE_TYPE_GLOBAL_FILTERS` — dedicated filter page, applies to all canvas pages whose datasets contain the filter field.
-
-### Widget versions used in this example
-
-| Widget | Version |
-|---|---|
-| `counter`, `table`, `filter-*`, `range-slider`, `symbol-map` | **2** |
-| `bar`, `line`, `area`, `pie`, `pivot`, `histogram`, `heatmap` | **3** |
-| `combo`, `choropleth-map`, `forecast-line`, `sankey`, `funnel`, `box`, `waterfall` | **1** |
-
-See [SKILL.md](SKILL.md#widget-index-version--where-documented) for the full version table.
-
-### Layout (12-col grid)
-
-```
-y=0:   Header (w=12, h=3)  ← story prose tying the dashboard together
-y=3:   KPI (w=3) | KPI w/ sparkline (w=3) | KPI (w=3) | KPI (w=3)  ← fills 12
-y=6:   Forecast w/ release annotation (w=8, h=6)  | Histogram (w=4, h=6)
-y=12:  Symbol map (w=8, h=5)                      | Pie by channel (w=4, h=5)
-y=17:  Detail table (w=8, h=6)                    | Heatmap (w=4, h=6)
-```
-
-The header carries the **narrative** — what to look at and why. The forecast widget anchors the story with a `vertical-line` annotation labeled "Product release 4.1", which is the inflection point every other widget reflects (volume up, resolution up, reopen up, satisfaction down on the affected metros).
-
----
-
-## Full Dashboard: Support Operations
-
-```json
 {
   "datasets": [
     {
@@ -988,22 +942,3 @@ The header carries the **narrative** — what to look at and why. The forecast w
     }
   }
 }
-```
-
-This is the "warm sunset" family used in the live Customer Support dashboard — amber → coral → pink → purple → navy, plus a mint-green at position 6 (0-indexed) for "good/safe" semantic use. The categorical palette covers chart series; **the alert/critical color (`#FF7E5C`) is pinned as a literal `hex` in the conditional-cell rules and the annotation** (NOT a palette position), so semantic meaning holds even if the palette is reshuffled later.
-
-## What each widget demonstrates
-
-| Widget | Feature shown |
-|---|---|
-| 4 KPI counters | `MEASURE()` referencing dataset-level `columns[]` |
-| `kpi-volume-trend` counter | `period` encoding (sparkline behind the value) |
-| `case-forecast` | `forecast-line` with `AI_FORECAST` SQL + `vertical-line` annotation |
-| `priority-by-channel` | `pivot` with conditional cell-color rules |
-| `customer-map` | `symbol-map` with continuous `colorRamp` |
-| `resolution-distribution` | `histogram` with `bin(col, binWidth=N)` |
-| `case-detail` table | per-column `format` + conditional `style.rules` for high-hour cells |
-| `filter-resolution-time` | `range-slider` filter on a numeric column |
-| Global filters page | Filters bound to one source dataset cascade to every widget that uses it |
-
-Adapt the table names, columns, story, and palette to your domain — the structure stays the same.
