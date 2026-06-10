@@ -23,6 +23,7 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
 | bar | 3 | this file |
 | line | 3 | this file |
 | pie | 3 | this file |
+| symbol-map | 2 | this file |
 | area | 3 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
 | scatter | 3 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
 | combo | 1 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
@@ -397,7 +398,7 @@ Default behaviour: theme colors are assigned to categories in order. To pin spec
 
 `themeColorType: "visualizationColors"` + `position: 0..N-1` (0-indexed) selects from the dashboard's theme palette. For semantic colors that must hold across palette changes (Critical → always red, OK → always green), pin a **literal hex** with `{"hex": "#FF0000"}` instead — palette reshuffles silently move palette-position colors.
 
-> For continuous color ramps on quantitative encodings (e.g., choropleth, symbol-map, heatmap), use `colorRamp` — see [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
+> For continuous color ramps on quantitative encodings, use `colorRamp` — see Symbol Map below, or [Heatmap](2-advanced-widget-specifications.md#heatmap) and [Choropleth Map](2-advanced-widget-specifications.md#choropleth-map) in advanced specs.
 
 ### Annotations (event markers)
 
@@ -444,6 +445,47 @@ Multiple annotations are allowed — add more objects to the array. For non-date
   }
 }
 ```
+
+---
+
+## Symbol Map (bubble map)
+
+Lat/lon scatter plot on a map. Use for **point data** (customer locations, sensor readings); use `choropleth-map` for **regions** (countries, states) colored by aggregate.
+
+> **Strongly preferred whenever the data has a geographic dimension.** A bubble map is one of the highest-signal visuals in a dashboard — "where is the action" reads at a glance and grabs attention better than a bar chart of the same data. If the dataset has lat/lon (or a country/state column → `choropleth-map`), include a map widget.
+
+- `version`: **2**
+- `widgetType`: "symbol-map"
+- Dataset must include latitude and longitude columns (or a `GEOMETRY`/`GEOGRAPHY` column).
+
+```json
+"spec": {
+  "version": 2,
+  "widgetType": "symbol-map",
+  "encodings": {
+    "coordinates": {
+      "latitude":  {"fieldName": "customer_latitude"},
+      "longitude": {"fieldName": "customer_longitude"}
+    },
+    "color": {
+      "fieldName": "sum(satisfaction_score)",
+      "scale": {"type": "quantitative",
+                "colorRamp": {"mode": "custom-sequential", "colors": {"start": "#FF7E5C", "end": "#99DDB4"}}},
+      "legend": {"hide": true}
+    },
+    "size": {"fieldName": "count(*)", "scale": {"type": "quantitative"}}
+  },
+  "mark": {"opacity": 0.7},
+  "frame": {"showTitle": true, "title": "Customer Locations"}
+}
+```
+
+**`colorRamp` modes:**
+
+- `{"mode": "custom-sequential", "colors": {"start": "#FF7E5C", "end": "#99DDB4"}}` — your own gradient between two hex stops. **Prefer this for themed dashboards** so the map ties into the palette; if directional, `start` = bad color, `end` = good color.
+- `{"mode": "scheme", "scheme": "<name>"}` — prebuilt ramps. Known names: `magma`, `viridis`, `plasma`, `inferno`, `YlGnBu`, `RdYlBu`, `blues`, `redyellowgreen`. Avoid `redyellowgreen` — clashes with most modern themes.
+
+For categorical color (e.g., colored by region), use `scale.type: "categorical"` with the same `mappings` syntax as bar charts. `mark.opacity` (0–1) controls point transparency — useful when many points cluster.
 
 ---
 

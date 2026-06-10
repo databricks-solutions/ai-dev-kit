@@ -380,49 +380,6 @@ Add more `stages` entries for multi-step flows (e.g., funnel-with-attribution: `
 
 ---
 
-## Symbol Map (point map)
-
-Lat/lon scatter plot on a map. Use this for **point data** (customer locations, sensor readings). Use `choropleth-map` for **regions** (countries, states) colored by aggregate.
-
-> **Strongly preferred whenever the data has a geographic dimension.** A bubble map is one of the highest-signal visuals in a dashboard — it makes "where is the action" obvious at a glance and grabs attention better than a bar chart of the same data. If your dataset has lat/lon (or a country/state column → use `choropleth-map`), include a map widget.
-
-- `version`: **2**
-- `widgetType`: "symbol-map"
-- Dataset must include latitude and longitude columns (or a `GEOMETRY`/`GEOGRAPHY` column).
-
-```json
-"spec": {
-  "version": 2,
-  "widgetType": "symbol-map",
-  "encodings": {
-    "coordinates": {
-      "latitude":  {"fieldName": "customer_latitude"},
-      "longitude": {"fieldName": "customer_longitude"}
-    },
-    "color": {
-      "fieldName": "sum(satisfaction_score)",
-      "scale": {"type": "quantitative",
-                "colorRamp": {"mode": "scheme", "scheme": "magma"}},
-      "legend": {"hide": true}
-    },
-    "size": {"fieldName": "count(*)", "scale": {"type": "quantitative"}}
-  },
-  "mark": {"opacity": 0.7},
-  "frame": {"showTitle": true, "title": "Customer Locations"}
-}
-```
-
-**`colorRamp` modes:**
-
-- `{"mode": "scheme", "scheme": "<name>"}` — prebuilt ramps. Known names: `magma`, `viridis`, `plasma`, `inferno`, `YlGnBu`, `RdYlBu`, `blues`, `redyellowgreen`.
-- `{"mode": "custom-sequential", "colors": {"start": "#EF4444", "end": "#3B82F6"}}` — your own gradient between two hex stops. **Prefer this for themed dashboards** so the map ties into the palette (e.g., `start` = bad/alert color, `end` = good color when the metric has a direction). Avoid `redyellowgreen` — it clashes with most modern themes.
-
-For categorical color (e.g., colored by region instead of by intensity), use `scale.type: "categorical"` with the same `mappings` syntax as bar charts.
-
-`mark.opacity` (0–1) controls point transparency — useful when many points cluster.
-
----
-
 ## Heatmap
 
 Color-intensity grid: x-axis categorical, y-axis categorical, color = numeric aggregate. Useful for "X by Y" matrices.

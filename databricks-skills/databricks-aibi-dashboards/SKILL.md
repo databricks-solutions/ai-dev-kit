@@ -49,7 +49,7 @@ A dashboard should be showing something relevant for a human, typically some KPI
 | `box` | **1** | [2-advanced-widget-specifications.md#box](2-advanced-widget-specifications.md#box) (L448) |
 | `waterfall` | **1** | [2-advanced-widget-specifications.md#waterfall](2-advanced-widget-specifications.md#waterfall) (L470) |
 | `choropleth-map` (regions colored by value) | **1** | [2-advanced-widget-specifications.md#choropleth-map](2-advanced-widget-specifications.md#choropleth-map) (L109) |
-| `symbol-map` (lat/lon point map) | **2** | [2-advanced-widget-specifications.md#symbol-map-point-map](2-advanced-widget-specifications.md#symbol-map-point-map) (L364) |
+| `symbol-map` (lat/lon point map) | **2** | [1-widget-specifications.md#symbol-map-bubble-map](1-widget-specifications.md#symbol-map-bubble-map) |
 | `filter-single-select`, `filter-multi-select`, `filter-date-range-picker` | **2** | [3-filters.md#filter-widget-structure](3-filters.md#filter-widget-structure) (L32) |
 | `range-slider` | **2** | [3-filters.md#range-slider-numeric-range-filter](3-filters.md#range-slider-numeric-range-filter) (L239) |
 
@@ -247,17 +247,12 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
 
 **Palette-design rules** (this is what separates a polished dashboard from a noisy one):
 
-1. **One coherent color family per dashboard — not random brand colors.** Pick a single progression that reads as a set (e.g., warm sunset: amber → coral → pink → purple → navy; or cool ocean: blue → teal → green). Order the stops light-to-dark along one or two adjacent hues. Each demo dashboard gets its own distinct family so the suite feels varied but each is internally unified.
-   - **Categorical palettes need real hue variation — not just one color faded toward white.** "Same color in 7 shades of light" (a single-hue lightness ramp like `#1A4D8C → #4A78B4 → #7AA3DC → #ABCCFF → ...`) reads as one color, not seven categories — a viewer can't tell which slice is which. Use that pattern only for **quantitative** ramps (heatmaps, choropleths, symbol-map intensity via `colorRamp.mode: "custom-sequential"`), never for `visualizationColors`. Categorical palettes must walk across hues (amber → coral → pink → purple → navy) so every category has its own identity.
-   - **Adjacent stops must stay visually distinct.** A coherent family is *not* an excuse for two near-identical hues — if a chart has multiple categories that land on adjacent palette positions, a viewer must be able to tell them apart at a glance. Step lightness or saturation noticeably between every consecutive stop (rule of thumb: if you squint and any two stops blur into one, push them further apart).
-2. **Reserve two semantic colors OUTSIDE the categorical palette** for "bad" (a warm coral, e.g. `#FF7E5C`) and "good" (a calm teal/green from the family, e.g. `#5FCFC6`). Pin these via `color.scale.mappings` with literal `{"hex": "..."}` — **not** `themeColorType: position`. Reason: the palette gets reordered/tweaked, but red=bad and green=good must always hold. Reuse the same good-teal that appears in the categorical palette so it never clashes (avoid two near-identical-but-different teals).
-3. **Color the non-categorical widgets explicitly so they join the family.**
-   - **Maps & heatmaps** (quantitative): use `colorRamp.mode: "custom-sequential"` with `{start, end}` from the family. If the metric has a direction, `start = bad color, end = good color` so weak values pop. Avoid the harsh `redyellowgreen` scheme.
-   - **Forecast-line / multi-series**: pin per-series colors via `color.scale.mappings` keyed on series `displayName` — actual = a solid family color, forecast = a contrast/alert color so it stands out, threshold/baseline = a muted family tone.
-   - **Sparkline counters**: set `value.color` to a family color so the mini-trend isn't grey.
-4. **"Lighter / more pastel" tweak**: nudge all stops up in lightness *together*; don't recolor individual ones. Re-sync the pinned semantic hex values to match — keep enough contrast on the bad/alert color that it still reads as a warning.
+1. **One coherent color family per dashboard, distinct across the suite.** Walk **across hues** (e.g., amber → coral → pink → purple → navy), not one color faded toward white — a single-hue lightness ramp reads as one color and the viewer can't tell categories apart. Adjacent stops must be visually distinct: if you squint and two blur into one, push them further apart. Single-hue ramps are for **quantitative** widgets only (`colorRamp.mode: "custom-sequential"`), never for `visualizationColors`.
+2. **Pin semantic colors as literal hex, outside the palette.** "Bad" = a warm coral (e.g. `#FF7E5C`), "good" = a calm teal/green. Use `color.scale.mappings` with `{"hex": "..."}` — **not** `themeColorType: position`, because palette reshuffles silently swap palette-position colors. Reuse the good-teal that's already in the palette so it never clashes.
+3. **Color non-categorical widgets explicitly so they join the family.** Maps & heatmaps: `colorRamp.mode: "custom-sequential"` with `{start, end}` from the family (if directional: `start` = bad color, `end` = good color). Forecast / multi-series: pin per-series via `color.scale.mappings` keyed on `displayName` (actual = solid family color, forecast = contrast/alert, threshold = muted tone). Sparkline counters: set `value.color` to a family color, not grey.
+4. **"Lighter / more pastel" tweak**: nudge all stops up in lightness *together*; don't recolor individual ones. Re-sync the pinned semantic hex values; keep enough contrast on the alert color that it still reads as a warning.
 
-**Starter palettes** (pick one and adapt — extend to 7-8 stops if needed; pin red-alert / green-good as literal hex outside the palette per rule 2):
+**Starter palettes** (pick one and adapt — extend to 7-8 stops if needed; semantic red/green stay as literal hex per rule 2):
 
 ```
 #094074  #3C6997  #5ADBFF  #FFDD4A  #FE9000
