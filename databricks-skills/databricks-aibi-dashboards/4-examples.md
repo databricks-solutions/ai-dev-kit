@@ -37,7 +37,7 @@ y=12:  Symbol map (w=8, h=5)                      | Pie by channel (w=4, h=5)
 y=17:  Detail table (w=8, h=6)                    | Heatmap (w=4, h=6)
 ```
 
-The header carries the **narrative** — what to look at and why. The forecast widget anchors the story with a `vertical-line` annotation labeled "Product release 4.1", which is the inflection point every other widget reflects (volume up, resolution up, reopen up, satisfaction down on the affected metros).
+This example's header carries a short narrative tying the widgets together, and the forecast widget uses a `vertical-line` annotation to mark a notable date. That's one way to structure a story — useful if there's a real inflection point in the data — but it's not required: a dashboard can also just present the metrics neutrally, or anchor the story on a different widget. Treat it as illustrative.
 
 ---
 
