@@ -702,7 +702,7 @@ This example's header carries a short narrative tying the widgets together, and 
                     "format": {
                       "type": "number",
                       "decimalPlaces": {
-                        "type": "max",
+                        "type": "exact",
                         "places": 1
                       }
                     },

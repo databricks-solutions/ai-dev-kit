@@ -652,7 +652,7 @@
                     "format": {
                       "type": "number",
                       "decimalPlaces": {
-                        "type": "max",
+                        "type": "exact",
                         "places": 1
                       }
                     },

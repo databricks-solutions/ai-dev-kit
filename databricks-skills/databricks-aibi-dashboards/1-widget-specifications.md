@@ -514,7 +514,7 @@ Add `format` to any encoding to display values appropriately:
 
 **Options:**
 - `abbreviation`: `"compact"` (K/M/B) or omit for full numbers
-- `decimalPlaces`: `{"type": "max", "places": N}` or `{"type": "fixed", "places": N}`
+- `decimalPlaces`: `{"type": "max", "places": N}` for "up to N decimals, trailing zeros suppressed" ($1.2M / $1.25M — casual headline), or `{"type": "exact", "places": N}` for "always exactly N decimals" ($1.20M — polished/financial)
 
 ---
 
