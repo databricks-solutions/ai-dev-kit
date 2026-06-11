@@ -54,10 +54,23 @@ USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
 CHANNEL="${DEVKIT_CHANNEL:-stable}"  # stable or experimental
+DRY_RUN="${DRY_RUN:-false}"
+
+# Raw-fetch ref overrides (see resolve_ref). SKILLS_CHANNEL=dev flips unset
+# refs to `main` for living-at-head testing.
+SKILLS_CHANNEL="${SKILLS_CHANNEL:-stable}"
+if [ "$SKILLS_CHANNEL" = "dev" ]; then
+    APX_REF="${APX_REF:-main}"
+else
+    APX_REF="${APX_REF:-latest}"
+fi
+MLFLOW_REF="${MLFLOW_REF:-main}"  # mlflow/skills is tagless — main is intentional
+INCLUDE_PRERELEASES="${INCLUDE_PRERELEASES:-0}"
 
 # Convert string booleans from env vars to actual booleans
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
 [ "$SILENT" = "true" ] || [ "$SILENT" = "1" ] && SILENT=true || SILENT=false
+[ "$DRY_RUN" = "true" ] || [ "$DRY_RUN" = "1" ] && DRY_RUN=true || DRY_RUN=false
 
 # Check if scope was explicitly set via env var
 [ -n "${DEVKIT_SCOPE:-}" ] && SCOPE_EXPLICIT=true
@@ -84,43 +97,58 @@ INSTALL_SKILLS=true
 # Minimum required versions
 MIN_CLI_VERSION="0.278.0"
 MIN_SDK_VERSION="0.85.0"
+# Agent skills are delegated to `databricks aitools`, which ships with CLI v1.0.0+
+MIN_AITOOLS_CLI_VERSION="1.0.0"
 
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
-# Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-model-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+# Databricks skills bundled in this repo (everything else moved to databricks/databricks-agent-skills)
+LOCAL_SKILLS="databricks-genie"
 
-# MLflow skills (fetched from mlflow/skills repo)
+# MLflow skills (fetched from mlflow/skills repo; MLFLOW_REF defaults to main — the repo is tagless)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
-MLFLOW_RAW_URL="https://raw.githubusercontent.com/mlflow/skills/main"
+MLFLOW_BASE_URL="https://raw.githubusercontent.com/mlflow/skills"
 
-# APX skills (fetched from databricks-solutions/apx repo)
+# APX skills (fetched from databricks-solutions/apx repo @ latest stable tag, see resolve_ref / APX_REF)
 APX_SKILLS="databricks-app-apx"
-APX_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/apx/main/skills/apx"
+APX_BASE_URL="https://raw.githubusercontent.com/databricks-solutions/apx"
 
-# Agent skills (fetched from databricks/databricks-agent-skills repo)
-AGENT_SKILLS="databricks-core:databricks databricks-apps databricks-lakebase"
-AGENT_SKILLS_RAW_URL="https://raw.githubusercontent.com/databricks/databricks-agent-skills/main/skills"
-AGENT_SKILLS_API_URL="https://api.github.com/repos/databricks/databricks-agent-skills/git/trees/main?recursive=1"
+# Agent skills (from databricks/databricks-agent-skills, installed and managed by
+# `databricks aitools`, which ships with the Databricks CLI v1.0.0+).
+# The live inventory is discovered at runtime via `databricks aitools list -o json`
+# (see fetch_agent_b_inventory); these lists are the fallback snapshot (v0.2.3).
+AGENT_B_STABLE_FALLBACK="databricks-apps databricks-core databricks-dabs databricks-jobs databricks-lakebase databricks-model-serving databricks-pipelines databricks-serverless-migration databricks-vector-search"
+AGENT_B_EXPERIMENTAL_FALLBACK="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-dbsql databricks-docs databricks-execution-compute databricks-iceberg databricks-lakeflow-connect databricks-metric-views databricks-mlflow-evaluation databricks-python-sdk databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-zerobus-ingest spark-python-data-source"
+# Skills never installed by default (excluded from "all" and profile selections;
+# still installable via an explicit --skills request)
+AGENT_B_EXCLUDED="databricks-execution-compute"
+# Populated by fetch_agent_b_inventory (live or fallback)
+AGENT_B_STABLE=""
+AGENT_B_EXPERIMENTAL=""
+AGENT_B_RELEASE=""
+
+# Old skill names → new names (breaking rename when sourcing moved to
+# databricks-agent-skills). Explicit requests for old names are migrated with a warning.
+RENAMED_SKILLS="databricks-bundles:databricks-dabs databricks-spark-declarative-pipelines:databricks-pipelines databricks-config:databricks-core databricks:databricks-core databricks-lakebase-autoscale:databricks-lakebase databricks-lakebase-provisioned:databricks-lakebase"
 
 # ─── Skill profiles ──────────────────────────────────────────
-# Core skills always installed regardless of profile selection
-CORE_SKILLS="databricks-config databricks-docs databricks-python-sdk databricks-unity-catalog"
+# Core skills always installed regardless of profile selection (all from databricks-agent-skills)
+CORE_SKILLS="databricks-core databricks-docs databricks-python-sdk databricks-unity-catalog"
 
-# Profile definitions (non-core skills only — core skills are always added)
-PROFILE_DATA_ENGINEER="databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-jobs databricks-bundles databricks-dbsql databricks-iceberg databricks-zerobus-ingest spark-python-data-source databricks-metric-views databricks-synthetic-data-gen"
+# Profile definitions (non-core skills only — core skills are always added).
+# Names may come from any source; resolve_skills buckets them.
+PROFILE_DATA_ENGINEER="databricks-pipelines databricks-spark-structured-streaming databricks-jobs databricks-dabs databricks-dbsql databricks-iceberg databricks-lakeflow-connect databricks-zerobus-ingest spark-python-data-source databricks-metric-views databricks-synthetic-data-gen"
 PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie databricks-metric-views"
 PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-model-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
-PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-model-serving databricks-dbsql databricks-jobs databricks-bundles"
-PROFILE_APP_DEVELOPER_AGENT="databricks-core:databricks databricks-apps databricks-lakebase"
+PROFILE_APP_DEVELOPER="databricks-apps databricks-apps-python databricks-app-apx databricks-lakebase databricks-model-serving databricks-dbsql databricks-jobs databricks-dabs"
 
 # Selected skills (populated during profile selection)
-SELECTED_SKILLS=""
+SELECTED_LOCAL_SKILLS=""
 SELECTED_MLFLOW_SKILLS=""
 SELECTED_APX_SKILLS=""
-SELECTED_AGENT_SKILLS=""
+SELECTED_AGENT_B_SKILLS=""
 
 # Output helpers
 msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
@@ -144,6 +172,7 @@ while [ $# -gt 0 ]; do
         --silent)         SILENT=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --experimental)   CHANNEL="experimental"; shift ;;
+        --dry-run)        DRY_RUN=true; shift ;;
         -f|--force)       FORCE=true; shift ;;
         -h|--help)        
             echo "Databricks AI Dev Kit Installer"
@@ -163,6 +192,7 @@ while [ $# -gt 0 ]; do
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
             echo "  --experimental        Install from experimental branch (early access features)"
+            echo "  --dry-run             Print what would be installed (resolved refs, aitools command) and exit"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
             echo ""
@@ -178,6 +208,19 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
             echo "  DEVKIT_CHANNEL        'stable' (default) or 'experimental'"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
+            echo "  APX_REF               Ref for APX skill fetch: 'latest' (default), a tag/SHA, or 'main'"
+            echo "  MLFLOW_REF            Ref for MLflow skills fetch (default: main)"
+            echo "  SKILLS_CHANNEL        'stable' (default) or 'dev' (unset raw-fetch refs follow main)"
+            echo "  INCLUDE_PRERELEASES   Set to '1' to allow -rc/-beta tags when resolving 'latest'"
+            echo "  DRY_RUN               Set to '1' to print the install plan and exit"
+            echo ""
+            echo "Notes:"
+            echo "  Most Databricks skills are installed via 'databricks aitools' (Databricks CLI v1.0.0+)"
+            echo "  and are updated/uninstalled with 'databricks aitools update|uninstall', not this script."
+            echo "  Renamed skills: databricks-bundles -> databricks-dabs,"
+            echo "  databricks-spark-declarative-pipelines -> databricks-pipelines."
+            echo "  Replaced skills: databricks-config -> databricks-core,"
+            echo "  databricks-lakebase-autoscale/provisioned -> databricks-lakebase."
             echo ""
             echo "Examples:"
             echo "  # Using environment variables"
@@ -189,16 +232,38 @@ while [ $# -gt 0 ]; do
 done
 
 # ─── --list-skills handler ─────────────────────────────────────
-if [ "${LIST_SKILLS:-false}" = true ]; then
+# (function — needs fetch_agent_b_inventory; invoked after function definitions below)
+_count() { echo $#; }
+
+# Number of skills the "all" profile installs (excluded agent skills omitted)
+_count_all_skills() {
+    local n skill
+    n=$(_count $LOCAL_SKILLS $MLFLOW_SKILLS $APX_SKILLS $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL)
+    for skill in $AGENT_B_EXCLUDED; do
+        _in_list "$skill" "$AGENT_B_STABLE $AGENT_B_EXPERIMENTAL" && n=$((n - 1))
+    done
+    echo "$n"
+}
+
+list_skills_and_exit() {
+    fetch_agent_b_inventory
+
+    local all_count de_count an_count ai_count ap_count
+    all_count=$(_count_all_skills)
+    de_count=$(_count $CORE_SKILLS $PROFILE_DATA_ENGINEER)
+    an_count=$(_count $CORE_SKILLS $PROFILE_ANALYST)
+    ai_count=$(_count $CORE_SKILLS $PROFILE_AIML_ENGINEER $PROFILE_AIML_MLFLOW)
+    ap_count=$(_count $CORE_SKILLS $PROFILE_APP_DEVELOPER)
+
     echo ""
     echo -e "${B}Available Skill Profiles${N}"
     echo "────────────────────────────────"
     echo ""
-    echo -e "  ${B}all${N}              All 37 skills (default)"
-    echo -e "  ${B}data-engineer${N}    Pipelines, Spark, Jobs, Streaming (14 skills)"
-    echo -e "  ${B}analyst${N}          Dashboards, SQL, Genie, Metrics (8 skills)"
-    echo -e "  ${B}ai-ml-engineer${N}   Agents, RAG, Vector Search, MLflow (17 skills)"
-    echo -e "  ${B}app-developer${N}    Apps, Lakebase, Deployment (10 skills)"
+    echo -e "  ${B}all${N}              All ${all_count} skills (default)"
+    echo -e "  ${B}data-engineer${N}    Pipelines, Spark, Jobs, Streaming (${de_count} skills)"
+    echo -e "  ${B}analyst${N}          Dashboards, SQL, Genie, Metrics (${an_count} skills)"
+    echo -e "  ${B}ai-ml-engineer${N}   Agents, RAG, Vector Search, MLflow (${ai_count} skills)"
+    echo -e "  ${B}app-developer${N}    Apps, Lakebase, Deployment (${ap_count} skills)"
     echo ""
     echo -e "${B}Core Skills${N} (always installed)"
     echo "────────────────────────────────"
@@ -234,29 +299,43 @@ if [ "${LIST_SKILLS:-false}" = true ]; then
         echo -e "    $skill"
     done
     echo ""
-    echo -e "${B}MLflow Skills${N} (from mlflow/skills repo)"
+    echo -e "${B}Bundled Skills${N} (from this repo)"
+    echo "────────────────────────────────"
+    for skill in $LOCAL_SKILLS; do
+        echo -e "    $skill"
+    done
+    echo ""
+    echo -e "${B}MLflow Skills${N} (from mlflow/skills repo @ ${MLFLOW_REF})"
     echo "────────────────────────────────"
     for skill in $MLFLOW_SKILLS; do
         echo -e "    $skill"
     done
     echo ""
-    echo -e "${B}APX Skills${N} (from databricks-solutions/apx repo)"
+    echo -e "${B}APX Skills${N} (from databricks-solutions/apx repo @ ${APX_REF})"
     echo "────────────────────────────────"
     for skill in $APX_SKILLS; do
         echo -e "    $skill"
     done
     echo ""
-    echo -e "${B}Agent Skills${N} (from databricks/databricks-agent-skills repo)"
+    echo -e "${B}Agent Skills${N} (from databricks/databricks-agent-skills${AGENT_B_RELEASE:+ @ $AGENT_B_RELEASE} — managed by ${B}databricks aitools${N})"
     echo "────────────────────────────────"
-    for entry in $AGENT_SKILLS; do
-        echo -e "    ${entry#*:}"
+    for skill in $AGENT_B_STABLE; do
+        echo -e "    $skill"
+    done
+    echo -e "  ${D}experimental:${N}"
+    for skill in $AGENT_B_EXPERIMENTAL; do
+        if echo "$AGENT_B_EXCLUDED" | tr ' ' '\n' | grep -Fxq "$skill"; then
+            echo -e "    ${D}$skill (excluded by default — request explicitly via --skills)${N}"
+        else
+            echo -e "    $skill"
+        fi
     done
     echo ""
     echo -e "${D}Usage: bash install.sh --skills-profile data-engineer,ai-ml-engineer${N}"
     echo -e "${D}       bash install.sh --skills databricks-jobs,databricks-dbsql${N}"
     echo ""
     exit 0
-fi
+}
 
 # Set configuration URLs after parsing branch argument
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
@@ -700,91 +779,118 @@ prompt_mcp_path() {
 }
 
 # ─── Skill profile selection ──────────────────────────────────
-# Resolve selected skills from profile names or explicit skill list
+# Exact-match membership test: _in_list <name> <space-separated list>
+# (`grep -w` is unsafe here — `-` is a word boundary, so `grep -w databricks`
+# would match `databricks-jobs` etc.)
+_in_list() { echo "$2" | tr ' ' '\n' | grep -Fxq "$1"; }
+
+# Map an old skill name to its replacement (prints the new name, or fails)
+migrate_renamed_skill() {
+    local entry
+    for entry in $RENAMED_SKILLS; do
+        if [ "${entry%%:*}" = "$1" ]; then
+            echo "${entry#*:}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Resolve selected skills from profile names or explicit skill list,
+# bucketing each name into its source (local repo / mlflow / apx / agent-skills).
 resolve_skills() {
-    local db_skills="" mlflow_skills="" apx_skills="" agent_skills=""
+    fetch_agent_b_inventory
+
+    local local_skills="" mlflow_skills="" apx_skills="" agent_b_skills=""
+
+    # Bucket one skill name into its source list (fails for unknown names)
+    _bucket() {
+        if _in_list "$1" "$LOCAL_SKILLS"; then
+            local_skills="${local_skills:+$local_skills }$1"
+        elif _in_list "$1" "$MLFLOW_SKILLS"; then
+            mlflow_skills="${mlflow_skills:+$mlflow_skills }$1"
+        elif _in_list "$1" "$APX_SKILLS"; then
+            apx_skills="${apx_skills:+$apx_skills }$1"
+        elif _in_list "$1" "$AGENT_B_STABLE $AGENT_B_EXPERIMENTAL"; then
+            agent_b_skills="${agent_b_skills:+$agent_b_skills }$1"
+        else
+            return 1
+        fi
+    }
+
+    # Dedupe + normalize whitespace (empty input stays truly empty so `[ -n ]` works)
+    _dedupe() { echo "$*" | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' ' | sed 's/[[:space:]]*$//'; }
+
+    _store_selection() {
+        SELECTED_LOCAL_SKILLS=$(_dedupe "$local_skills")
+        SELECTED_MLFLOW_SKILLS=$(_dedupe "$mlflow_skills")
+        SELECTED_APX_SKILLS=$(_dedupe "$apx_skills")
+        SELECTED_AGENT_B_SKILLS=$(_dedupe "$agent_b_skills")
+    }
+
+    # Agent skills selected by default: everything except the excluded list
+    _default_agent_b() {
+        local skill
+        for skill in $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL; do
+            _in_list "$skill" "$AGENT_B_EXCLUDED" && continue
+            agent_b_skills="${agent_b_skills:+$agent_b_skills }$skill"
+        done
+    }
 
     # Priority 1: Explicit --skills flag (comma-separated skill names)
     if [ -n "$USER_SKILLS" ]; then
-        local user_list
-        user_list=$(echo "$USER_SKILLS" | tr ',' ' ')
-        # Separate into DB, MLflow, APX, and Agent buckets
-        db_skills=""
-        for skill in $user_list; do
-            # Exact-match bucketing — `grep -w` treats `-` as a word boundary, so e.g.
-            # `grep -w databricks` would match `databricks-app-apx` and misclassify
-            # an agent install-name (`databricks`) as APX.
-            if echo "$MLFLOW_SKILLS" | tr ' ' '\n' | grep -Fxq "$skill"; then
-                mlflow_skills="${mlflow_skills:+$mlflow_skills }$skill"
-            elif echo "$APX_SKILLS" | tr ' ' '\n' | grep -Fxq "$skill"; then
-                apx_skills="${apx_skills:+$apx_skills }$skill"
-            elif echo "$AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | grep -Fxq "$skill"; then
-                # Look up the full source:install-name entry (or bare entry if no colon)
-                agent_skills="${agent_skills:+$agent_skills }$(echo "$AGENT_SKILLS" | tr ' ' '\n' | grep -E "^.*:${skill}$|^${skill}$")"
-            else
-                db_skills="${db_skills:+$db_skills }$skill"
+        local skill new_name
+        for skill in $(echo "$USER_SKILLS" | tr ',' ' '); do
+            if _bucket "$skill"; then
+                continue
             fi
+            if new_name=$(migrate_renamed_skill "$skill"); then
+                warn "Skill '$skill' was renamed/replaced by '$new_name' — installing '$new_name'"
+                _bucket "$new_name" && continue
+            fi
+            die "Unknown skill: '$skill' (run with --list-skills to see available skills)"
         done
-        # Deduplicate
-        SELECTED_SKILLS=$(echo "$db_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-        SELECTED_MLFLOW_SKILLS=$(echo "$mlflow_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-        SELECTED_APX_SKILLS=$(echo "$apx_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-        SELECTED_AGENT_SKILLS=$(echo "$agent_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+        _store_selection
         return
     fi
 
     # Priority 2: --skills-profile flag or interactive selection
     if [ -z "$SKILLS_PROFILE" ] || [ "$SKILLS_PROFILE" = "all" ]; then
-        SELECTED_SKILLS="$SKILLS"
-        SELECTED_MLFLOW_SKILLS="$MLFLOW_SKILLS"
-        SELECTED_APX_SKILLS="$APX_SKILLS"
-        SELECTED_AGENT_SKILLS="$AGENT_SKILLS"
+        local_skills="$LOCAL_SKILLS"
+        mlflow_skills="$MLFLOW_SKILLS"
+        apx_skills="$APX_SKILLS"
+        _default_agent_b
+        _store_selection
         return
     fi
 
     # Build union of selected profiles (comma-separated)
-    db_skills="$CORE_SKILLS"
-    mlflow_skills=""
-    apx_skills=""
-    agent_skills=""
-
-    local profiles
-    profiles=$(echo "$SKILLS_PROFILE" | tr ',' ' ')
-    for profile in $profiles; do
+    local names="$CORE_SKILLS"
+    local profile
+    for profile in $(echo "$SKILLS_PROFILE" | tr ',' ' '); do
         case $profile in
             all)
-                SELECTED_SKILLS="$SKILLS"
-                SELECTED_MLFLOW_SKILLS="$MLFLOW_SKILLS"
-                SELECTED_APX_SKILLS="$APX_SKILLS"
-                SELECTED_AGENT_SKILLS="$AGENT_SKILLS"
+                local_skills="$LOCAL_SKILLS"
+                mlflow_skills="$MLFLOW_SKILLS"
+                apx_skills="$APX_SKILLS"
+                agent_b_skills=""
+                _default_agent_b
+                _store_selection
                 return
                 ;;
-            data-engineer)
-                db_skills="$db_skills $PROFILE_DATA_ENGINEER"
-                ;;
-            analyst)
-                db_skills="$db_skills $PROFILE_ANALYST"
-                ;;
-            ai-ml-engineer)
-                db_skills="$db_skills $PROFILE_AIML_ENGINEER"
-                mlflow_skills="$mlflow_skills $PROFILE_AIML_MLFLOW"
-                ;;
-            app-developer)
-                db_skills="$db_skills $PROFILE_APP_DEVELOPER"
-                apx_skills="$apx_skills $APX_SKILLS"
-                agent_skills="$agent_skills $PROFILE_APP_DEVELOPER_AGENT"
-                ;;
-            *)
-                warn "Unknown skill profile: $profile (ignored)"
-                ;;
+            data-engineer)  names="$names $PROFILE_DATA_ENGINEER" ;;
+            analyst)        names="$names $PROFILE_ANALYST" ;;
+            ai-ml-engineer) names="$names $PROFILE_AIML_ENGINEER $PROFILE_AIML_MLFLOW" ;;
+            app-developer)  names="$names $PROFILE_APP_DEVELOPER" ;;
+            *)              warn "Unknown skill profile: $profile (ignored)" ;;
         esac
     done
 
-    # Deduplicate
-    SELECTED_SKILLS=$(echo "$db_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-    SELECTED_MLFLOW_SKILLS=$(echo "$mlflow_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-    SELECTED_APX_SKILLS=$(echo "$apx_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-    SELECTED_AGENT_SKILLS=$(echo "$agent_skills" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    local skill
+    for skill in $names; do
+        _bucket "$skill" || warn "Skill '$skill' not found in any source (skipped)"
+    done
+    _store_selection
 }
 
 # Interactive skill profile selection (multi-select)
@@ -823,9 +929,15 @@ prompt_skills_profile() {
     echo -e "  ${B}Select skill profile(s)${N}"
 
     # Custom checkbox with mutual exclusion: "All" deselects others, others deselect "All"
+    local all_count de_count an_count ai_count ap_count
+    all_count=$(_count_all_skills)
+    de_count=$(_count $CORE_SKILLS $PROFILE_DATA_ENGINEER)
+    an_count=$(_count $CORE_SKILLS $PROFILE_ANALYST)
+    ai_count=$(_count $CORE_SKILLS $PROFILE_AIML_ENGINEER $PROFILE_AIML_MLFLOW)
+    ap_count=$(_count $CORE_SKILLS $PROFILE_APP_DEVELOPER)
     local -a p_labels=("All Skills" "Data Engineer" "Business Analyst" "AI/ML Engineer" "App Developer" "Custom")
     local -a p_values=("all" "data-engineer" "analyst" "ai-ml-engineer" "app-developer" "custom")
-    local -a p_hints=("Install everything (34 skills)" "Pipelines, Spark, Jobs, Streaming (14 skills)" "Dashboards, SQL, Genie, Metrics (8 skills)" "Agents, RAG, Vector Search, MLflow (17 skills)" "Apps, Lakebase, Deployment (10 skills)" "Pick individual skills")
+    local -a p_hints=("Install everything (${all_count} skills)" "Pipelines, Spark, Jobs, Streaming (${de_count} skills)" "Dashboards, SQL, Genie, Metrics (${an_count} skills)" "Agents, RAG, Vector Search, MLflow (${ai_count} skills)" "Apps, Lakebase, Deployment (${ap_count} skills)" "Pick individual skills")
     local -a p_states=(1 0 0 0 0 0)  # "All" selected by default
     local p_count=6
     local p_cursor=0
@@ -936,35 +1048,38 @@ prompt_custom_skills() {
     local preselected_profiles="$1"
 
     # Build pre-selection set from any profiles that were also checked
-    local preselected=""
+    # (core skills start pre-selected — they are recommended for every profile)
+    local preselected="$CORE_SKILLS"
     for profile in $preselected_profiles; do
         case $profile in
             data-engineer) preselected="$preselected $PROFILE_DATA_ENGINEER" ;;
             analyst)       preselected="$preselected $PROFILE_ANALYST" ;;
             ai-ml-engineer) preselected="$preselected $PROFILE_AIML_ENGINEER $PROFILE_AIML_MLFLOW" ;;
-            app-developer) preselected="$preselected $PROFILE_APP_DEVELOPER $APX_SKILLS $PROFILE_APP_DEVELOPER_AGENT" ;;
+            app-developer) preselected="$preselected $PROFILE_APP_DEVELOPER" ;;
         esac
     done
 
     _is_preselected() {
-        # Strip "source:" prefix from each entry (e.g. "databricks-core:databricks" → "databricks"),
-        # then exact-match against $1. Plain `grep -w` is unsafe here because `-` is a non-word
-        # character — `grep -w databricks` would match `databricks-jobs`, `databricks-apps`, etc.
-        echo "$preselected" | tr ' ' '\n' | sed 's/.*://' | grep -Fxq "$1" && echo "on" || echo "off"
+        _in_list "$1" "$preselected" && echo "on" || echo "off"
     }
 
     echo ""
     echo -e "  ${B}Select individual skills${N}"
-    echo -e "  ${D}Core skills (config, docs, python-sdk, unity-catalog) are always installed${N}"
+    echo -e "  ${D}Core skills (core, docs, python-sdk, unity-catalog) are recommended for all profiles${N}"
 
     local selected
     selected=$(checkbox_select \
-        "Spark Pipelines|databricks-spark-declarative-pipelines|$(_is_preselected databricks-spark-declarative-pipelines)|SDP/LDP, CDC, SCD Type 2" \
+        "Core|databricks-core|$(_is_preselected databricks-core)|CLI auth, data exploration" \
+        "Docs|databricks-docs|$(_is_preselected databricks-docs)|Databricks documentation" \
+        "Python SDK|databricks-python-sdk|$(_is_preselected databricks-python-sdk)|SDK, Connect, REST API" \
+        "Unity Catalog|databricks-unity-catalog|$(_is_preselected databricks-unity-catalog)|System tables, volumes" \
+        "Spark Pipelines|databricks-pipelines|$(_is_preselected databricks-pipelines)|SDP/LDP, CDC, SCD Type 2" \
         "Structured Streaming|databricks-spark-structured-streaming|$(_is_preselected databricks-spark-structured-streaming)|Real-time streaming" \
         "Jobs & Workflows|databricks-jobs|$(_is_preselected databricks-jobs)|Multi-task orchestration" \
-        "Asset Bundles|databricks-bundles|$(_is_preselected databricks-bundles)|DABs deployment" \
+        "Asset Bundles|databricks-dabs|$(_is_preselected databricks-dabs)|DABs deployment" \
         "Databricks SQL|databricks-dbsql|$(_is_preselected databricks-dbsql)|SQL warehouse queries" \
         "Iceberg|databricks-iceberg|$(_is_preselected databricks-iceberg)|Apache Iceberg tables" \
+        "Lakeflow Connect|databricks-lakeflow-connect|$(_is_preselected databricks-lakeflow-connect)|Managed ingestion connectors" \
         "Zerobus Ingest|databricks-zerobus-ingest|$(_is_preselected databricks-zerobus-ingest)|Streaming ingestion" \
         "Python Data Source|spark-python-data-source|$(_is_preselected spark-python-data-source)|Custom Spark data sources" \
         "Metric Views|databricks-metric-views|$(_is_preselected databricks-metric-views)|Metric definitions" \
@@ -977,13 +1092,11 @@ prompt_custom_skills() {
         "AI Functions|databricks-ai-functions|$(_is_preselected databricks-ai-functions)|AI Functions, document parsing & RAG" \
         "Unstructured PDF|databricks-unstructured-pdf-generation|$(_is_preselected databricks-unstructured-pdf-generation)|Synthetic PDFs for RAG" \
         "Synthetic Data|databricks-synthetic-data-gen|$(_is_preselected databricks-synthetic-data-gen)|Generate test data" \
-        "Lakebase Autoscale|databricks-lakebase-autoscale|$(_is_preselected databricks-lakebase-autoscale)|Managed PostgreSQL" \
-        "Lakebase Provisioned|databricks-lakebase-provisioned|$(_is_preselected databricks-lakebase-provisioned)|Provisioned PostgreSQL" \
+        "Lakebase|databricks-lakebase|$(_is_preselected databricks-lakebase)|Managed PostgreSQL (OLTP)" \
+        "Serverless Migration|databricks-serverless-migration|$(_is_preselected databricks-serverless-migration)|Migrate to serverless compute" \
+        "Apps|databricks-apps|$(_is_preselected databricks-apps)|AppKit + all frameworks" \
         "App (AppKit + Python)|databricks-apps-python|$(_is_preselected databricks-apps-python)|AppKit, Dash, Streamlit, Flask" \
         "App APX|databricks-app-apx|$(_is_preselected databricks-app-apx)|FastAPI + React" \
-        "Agent: Databricks|databricks|$(_is_preselected databricks)|CLI auth, data exploration" \
-        "Agent: Apps|databricks-apps|$(_is_preselected databricks-apps)|AppKit + all frameworks" \
-        "Agent: Lakebase|databricks-lakebase|$(_is_preselected databricks-lakebase)|Lakebase OLTP" \
         "MLflow Onboarding|mlflow-onboarding|$(_is_preselected mlflow-onboarding)|Getting started" \
         "Agent Evaluation|agent-evaluation|$(_is_preselected agent-evaluation)|Evaluate AI agents" \
         "MLflow Tracing|instrumenting-with-mlflow-tracing|$(_is_preselected instrumenting-with-mlflow-tracing)|Instrument with tracing" \
@@ -1001,6 +1114,375 @@ prompt_custom_skills() {
 # Compare semantic versions (returns 0 if $1 >= $2)
 version_gte() {
     printf '%s\n%s' "$2" "$1" | sort -V -C
+}
+
+# ─── Agent skills (databricks/databricks-agent-skills via `databricks aitools`) ───
+
+# Discover the live skill inventory from `databricks aitools list -o json`.
+# Falls back to the hardcoded snapshot when the CLI is missing/old/offline.
+# Idempotent — only fetches once.
+fetch_agent_b_inventory() {
+    [ -n "$AGENT_B_STABLE" ] && return
+
+    local json=""
+    if command -v databricks >/dev/null 2>&1; then
+        json=$(databricks aitools list -o json 2>/dev/null) || json=""
+    fi
+
+    if [ -n "$json" ]; then
+        AGENT_B_RELEASE=$(echo "$json" | grep -m1 '"release"' | sed -E 's/.*"release": *"([^"]*)".*/\1/')
+        # Pair each "name" with the "experimental" flag that follows it
+        local parsed
+        parsed=$(echo "$json" | awk '
+            /"name":/         { gsub(/[",]/, "", $2); name=$2 }
+            /"experimental":/ { gsub(/[",]/, "", $2); if (name != "") { print $2, name; name="" } }')
+        AGENT_B_STABLE=$(echo "$parsed" | awk '$1=="false"{print $2}' | tr '\n' ' ')
+        AGENT_B_EXPERIMENTAL=$(echo "$parsed" | awk '$1=="true"{print $2}' | tr '\n' ' ')
+    fi
+
+    if [ -z "$AGENT_B_STABLE" ]; then
+        AGENT_B_STABLE="$AGENT_B_STABLE_FALLBACK"
+        AGENT_B_EXPERIMENTAL="$AGENT_B_EXPERIMENTAL_FALLBACK"
+        AGENT_B_RELEASE=""
+    fi
+}
+
+# Gate for `databricks aitools` (ships with the Databricks CLI v1.0.0+).
+# Interactive: offers to run the upgrade and re-checks in a loop.
+# Silent/non-interactive: dies with instructions.
+# Returns 1 if the user chose to skip agent skills.
+ensure_aitools_cli() {
+    local attempts=0
+    while true; do
+        local cli_version=""
+        if command -v databricks >/dev/null 2>&1; then
+            cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        fi
+        if [ -n "$cli_version" ] && version_gte "$cli_version" "$MIN_AITOOLS_CLI_VERSION"; then
+            return 0
+        fi
+
+        local found_msg="Databricks CLI not found."
+        [ -n "$cli_version" ] && found_msg="Databricks CLI v${cli_version} is too old."
+
+        if [ "$SILENT" = true ] || ! is_interactive; then
+            die "$found_msg Agent skills are installed via 'databricks aitools', which requires Databricks CLI v${MIN_AITOOLS_CLI_VERSION}+.
+   Upgrade: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}
+   Then re-run this installer. (Or pass --skills with only non-agent skills to skip this requirement.)"
+        fi
+
+        attempts=$((attempts + 1))
+        if [ "$attempts" -gt 5 ]; then
+            warn "Databricks CLI still not at v${MIN_AITOOLS_CLI_VERSION}+ after several attempts — skipping agent skills"
+            return 1
+        fi
+
+        warn "$found_msg Agent skills are installed via ${B}databricks aitools${N}, which requires Databricks CLI v${MIN_AITOOLS_CLI_VERSION}+."
+        msg "Upgrade command: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}"
+        echo ""
+        local choice
+        choice=$(prompt "Upgrade the Databricks CLI now? ${D}(y = run upgrade, r = re-check, s = skip agent skills, a = abort)${N}" "y")
+        case "$choice" in
+            y|Y|yes)
+                curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh || warn "CLI upgrade failed — you can retry or skip"
+                hash -r 2>/dev/null || true
+                ;;
+            r|R) hash -r 2>/dev/null || true ;;
+            s|S) return 1 ;;
+            a|A) die "Installation aborted (Databricks CLI v${MIN_AITOOLS_CLI_VERSION}+ required for agent skills)" ;;
+        esac
+    done
+}
+
+# Map selected $TOOLS to `aitools --agents` tokens; tools aitools cannot
+# target (gemini, windsurf, kiro) are collected separately.
+AITOOLS_AGENTS=""
+UNSUPPORTED_AGENT_TOOLS=""
+map_aitools_agents() {
+    AITOOLS_AGENTS=""
+    UNSUPPORTED_AGENT_TOOLS=""
+    local tool
+    for tool in $TOOLS; do
+        case $tool in
+            claude)      AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}claude-code" ;;
+            cursor)      AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}cursor" ;;
+            copilot)     AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}copilot" ;;
+            codex)       AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}codex" ;;
+            opencode)    AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}opencode" ;;
+            antigravity) AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}antigravity" ;;
+            gemini|windsurf|kiro) UNSUPPORTED_AGENT_TOOLS="${UNSUPPORTED_AGENT_TOOLS:+$UNSUPPORTED_AGENT_TOOLS }$tool" ;;
+        esac
+    done
+}
+
+# Skills dirs for tools aitools can't target (one per line, deduped)
+unsupported_skill_dirs() {
+    local base_dir=$1 tool
+    for tool in $UNSUPPORTED_AGENT_TOOLS; do
+        case $tool in
+            gemini)   echo "$base_dir/.gemini/skills" ;;
+            windsurf) [ "$SCOPE" = "global" ] && echo "$HOME/.codeium/windsurf/skills" || echo "$base_dir/.windsurf/skills" ;;
+            kiro)     [ "$SCOPE" = "global" ] && echo "$HOME/.kiro/skills" || echo "$base_dir/.kiro/skills" ;;
+        esac
+    done | sort -u
+}
+
+# True if any selected agent skill is experimental
+agent_b_needs_experimental() {
+    local skill
+    for skill in $SELECTED_AGENT_B_SKILLS; do
+        _in_list "$skill" "$AGENT_B_EXPERIMENTAL" && return 0
+    done
+    return 1
+}
+
+# Install agent skills by delegating to `databricks aitools install`.
+# aitools owns these skills afterwards (list/update/uninstall) — they are NOT
+# tracked in this installer's manifest, except for the symlinks/copies created
+# for tools aitools can't target.
+install_agent_b_skills() {
+    local base_dir=$1
+    local prev_file="$STATE_DIR/.agent-b-skills"
+    [ -z "$SELECTED_AGENT_B_SKILLS" ] && [ ! -f "$prev_file" ] && return
+
+    step "Installing agent skills (via databricks aitools)"
+
+    # Uninstall agent skills dropped since the previous run
+    if [ -f "$prev_file" ]; then
+        local dropped="" skill
+        for skill in $(cat "$prev_file"); do
+            _in_list "$skill" "$SELECTED_AGENT_B_SKILLS" || dropped="${dropped:+$dropped,}$skill"
+        done
+        if [ -n "$dropped" ] && command -v databricks >/dev/null 2>&1; then
+            if databricks aitools uninstall --scope "$SCOPE" --skills "$dropped" >/dev/null 2>&1; then
+                msg "${D}Removed deselected agent skills: ${dropped}${N}"
+            else
+                warn "Could not remove deselected agent skills — run: ${B}databricks aitools uninstall --skills $dropped${N}"
+            fi
+        fi
+    fi
+
+    if [ -z "$SELECTED_AGENT_B_SKILLS" ]; then
+        rm -f "$prev_file"
+        return
+    fi
+
+    if ! ensure_aitools_cli; then
+        warn "Agent skills skipped — install later with: ${B}databricks aitools install${N}"
+        return
+    fi
+
+    map_aitools_agents
+    local skills_csv exp_flag=""
+    skills_csv=$(echo "$SELECTED_AGENT_B_SKILLS" | tr -s ' ' ',' | sed 's/^,//;s/,$//')
+    agent_b_needs_experimental && exp_flag="--experimental"
+    local count
+    count=$(_count $SELECTED_AGENT_B_SKILLS)
+
+    if [ -n "$AITOOLS_AGENTS" ]; then
+        msg "Delegating ${B}${count}${N} agent skills to ${B}databricks aitools${N} (agents: ${AITOOLS_AGENTS})"
+        if [ "$SILENT" = true ]; then
+            databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" $exp_flag -p "$PROFILE" >/dev/null 2>&1 \
+                || die "databricks aitools install failed"
+        else
+            if ! databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" $exp_flag -p "$PROFILE"; then
+                warn "databricks aitools install failed — agent skills not installed"
+                return
+            fi
+        fi
+        ok "Agent skills ($count) installed — manage with ${B}databricks aitools list|update|uninstall${N}"
+    fi
+
+    # Tools aitools can't target: link/copy the skills from the canonical store
+    if [ -n "$UNSUPPORTED_AGENT_TOOLS" ]; then
+        install_agent_b_unsupported "$base_dir" "$skills_csv" "$exp_flag"
+    fi
+
+    # Record the selection so a future profile change can uninstall dropped skills
+    mkdir -p "$STATE_DIR"
+    echo "$SELECTED_AGENT_B_SKILLS" | tr ' ' '\n' | sed '/^$/d' > "$prev_file"
+}
+
+# Deliver agent skills to Gemini CLI / Windsurf / Kiro.
+# If aitools ran for at least one supported agent, symlink each skill from the
+# canonical store (kept fresh by `databricks aitools update`). Otherwise stage a
+# throwaway project-scope install in a temp dir and copy real files from it.
+install_agent_b_unsupported() {
+    local base_dir=$1 skills_csv=$2 exp_flag=$3
+    local manifest="$STATE_DIR/.installed-skills"
+
+    local mode="link" store tmp_dir=""
+    if [ "$SCOPE" = "global" ]; then
+        store="$HOME/.databricks/aitools/skills"
+    else
+        store="$base_dir/.databricks/aitools/skills"
+    fi
+
+    if [ -z "$AITOOLS_AGENTS" ]; then
+        mode="copy"
+        tmp_dir=$(mktemp -d)
+        if ! (cd "$tmp_dir" && databricks aitools install --scope project --agents claude-code --skills "$skills_csv" $exp_flag >/dev/null 2>&1); then
+            rm -rf "$tmp_dir"
+            warn "Could not stage agent skills for: $(echo "$UNSUPPORTED_AGENT_TOOLS" | tr ' ' ',')"
+            return
+        fi
+        store="$tmp_dir/.databricks/aitools/skills"
+    fi
+
+    local dir skill target count
+    count=$(_count $SELECTED_AGENT_B_SKILLS)
+    while IFS= read -r dir; do
+        [ -z "$dir" ] && continue
+        mkdir -p "$dir"
+        for skill in $SELECTED_AGENT_B_SKILLS; do
+            if [ ! -d "$store/$skill" ]; then
+                warn "Agent skill '$skill' missing from aitools store — skipped"
+                continue
+            fi
+            rm -rf "$dir/$skill"
+            if [ "$mode" = "link" ]; then
+                # Project-scope dirs are all <base>/.<tool>/skills (2 levels deep),
+                # so a relative link survives moving the project directory.
+                target="$store/$skill"
+                [ "$SCOPE" = "project" ] && target="../../.databricks/aitools/skills/$skill"
+                ln -s "$target" "$dir/$skill"
+            else
+                cp -R "$store/$skill" "$dir/$skill"
+            fi
+            echo "$dir|$skill" >> "$manifest"
+        done
+        ok "Agent skills ($count, $mode) → ${dir#$HOME/}"
+    done < <(unsupported_skill_dirs "$base_dir")
+
+    [ -n "$tmp_dir" ] && rm -rf "$tmp_dir"
+    return 0
+}
+
+# ─── Raw-fetch ref resolution (apx, mlflow) ───────────────────
+
+# resolve_ref <owner/repo> <requested>
+#   ""/"latest" → highest stable semver tag (prereleases excluded unless
+#                 INCLUDE_PRERELEASES=1; falls back to main if no tags).
+#   main/master → passed through.
+#   anything else → verified to exist as a tag/branch/SHA (fails loud).
+# Uses `git ls-remote` (no API rate limits; git is a hard prerequisite) and
+# `sort -V` (GNU coreutils; available in macOS bash environments).
+resolve_ref() {
+    local repo=$1 requested=$2
+    local git_url="https://github.com/${repo}.git"
+    case "$requested" in
+        ""|latest)
+            local tags pattern best
+            tags=$(git ls-remote --tags --refs "$git_url" 2>/dev/null | sed 's|.*refs/tags/||')
+            pattern='^v?[0-9]+\.[0-9]+\.[0-9]+$'
+            [ "$INCLUDE_PRERELEASES" = "1" ] && pattern='^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$'
+            best=$(echo "$tags" | grep -E "$pattern" | sort -V | tail -1)
+            if [ -n "$best" ]; then
+                echo "$best"
+            else
+                warn "Could not resolve latest tag for ${repo} — falling back to main" >&2
+                echo "main"
+            fi
+            ;;
+        main|master)
+            echo "$requested"
+            ;;
+        *)
+            if git ls-remote "$git_url" "refs/tags/${requested}" "refs/heads/${requested}" 2>/dev/null | grep -q .; then
+                echo "$requested"
+            elif curl -fsSL -o /dev/null "https://api.github.com/repos/${repo}/commits/${requested}" 2>/dev/null; then
+                echo "$requested"  # bare commit SHA (not addressable via ls-remote)
+            else
+                die "Ref '${requested}' not found in ${repo}"
+            fi
+            ;;
+    esac
+}
+
+# Resolve refs for all selected raw-fetch sources (records globals for the
+# fetch URLs, summary, dry run, and lockfile)
+MLFLOW_RESOLVED_REF=""
+APX_RESOLVED_REF=""
+resolve_fetch_refs() {
+    [ -n "$SELECTED_MLFLOW_SKILLS" ] && MLFLOW_RESOLVED_REF=$(resolve_ref "mlflow/skills" "$MLFLOW_REF")
+    [ -n "$SELECTED_APX_SKILLS" ] && APX_RESOLVED_REF=$(resolve_ref "databricks-solutions/apx" "$APX_REF")
+    return 0
+}
+
+# Best-effort commit SHA for a ref (empty on failure). Prefers the peeled
+# tag object (^{}) so annotated tags resolve to the commit they point at.
+github_sha() {
+    local out sha
+    out=$(git ls-remote "https://github.com/$1.git" "refs/tags/$2^{}" "refs/tags/$2" "refs/heads/$2" 2>/dev/null)
+    sha=$(echo "$out" | grep '\^{}' | head -1 | cut -f1)
+    [ -z "$sha" ] && sha=$(echo "$out" | head -1 | cut -f1)
+    if [ -z "$sha" ]; then
+        sha=$(curl -fsSL "https://api.github.com/repos/$1/commits/$2" 2>/dev/null \
+            | grep -m1 '"sha":' | sed -E 's/.*"sha": *"([^"]+)".*/\1/')
+    fi
+    echo "$sha"
+}
+
+# Record what was installed and from where (skills.lock in the scope-local state dir)
+write_lockfile() {
+    local lock="$STATE_DIR/skills.lock"
+    mkdir -p "$STATE_DIR"
+    local now entries="" sha kind
+    now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    if [ -n "$SELECTED_MLFLOW_SKILLS" ]; then
+        sha=$(github_sha "mlflow/skills" "$MLFLOW_RESOLVED_REF")
+        entries="    \"mlflow/skills\": {\"requested_ref\": \"${MLFLOW_REF}\", \"resolved_kind\": \"branch\", \"resolved_ref\": \"${MLFLOW_RESOLVED_REF}\", \"resolved_sha\": \"${sha}\", \"fetched_at\": \"${now}\"}"
+    fi
+    if [ -n "$SELECTED_APX_SKILLS" ]; then
+        kind="release_tag"
+        case "$APX_RESOLVED_REF" in main|master) kind="branch" ;; esac
+        sha=$(github_sha "databricks-solutions/apx" "$APX_RESOLVED_REF")
+        entries="${entries:+$entries,
+}    \"databricks-solutions/apx\": {\"requested_ref\": \"${APX_REF}\", \"resolved_kind\": \"${kind}\", \"resolved_ref\": \"${APX_RESOLVED_REF}\", \"resolved_sha\": \"${sha}\", \"fetched_at\": \"${now}\"}"
+    fi
+    if [ -n "$SELECTED_AGENT_B_SKILLS" ]; then
+        local cli_version
+        cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        entries="${entries:+$entries,
+}    \"databricks/databricks-agent-skills\": {\"install_method\": \"databricks-aitools\", \"cli_version\": \"${cli_version}\", \"skills_release\": \"${AGENT_B_RELEASE}\", \"fetched_at\": \"${now}\"}"
+    fi
+
+    [ -z "$entries" ] && return 0
+    printf '{\n  "sources": {\n%s\n  }\n}\n' "$entries" > "$lock"
+}
+
+# ─── Dry run ──────────────────────────────────────────────────
+dry_run_report() {
+    map_aitools_agents
+    echo ""
+    echo -e "${B}Dry run — nothing was installed${N}"
+    echo "────────────────────────────────"
+    msg "Bundled skills (this repo):  ${SELECTED_LOCAL_SKILLS:-<none>}"
+    msg "MLflow skills @ ${MLFLOW_RESOLVED_REF:-n/a}: ${SELECTED_MLFLOW_SKILLS:-<none>}"
+    msg "APX skills @ ${APX_RESOLVED_REF:-n/a}: ${SELECTED_APX_SKILLS:-<none>}"
+    if [ -n "$SELECTED_AGENT_B_SKILLS" ]; then
+        local skills_csv exp_flag=""
+        skills_csv=$(echo "$SELECTED_AGENT_B_SKILLS" | tr -s ' ' ',' | sed 's/^,//;s/,$//')
+        agent_b_needs_experimental && exp_flag=" --experimental"
+        msg "Agent skills (databricks-agent-skills${AGENT_B_RELEASE:+ @ $AGENT_B_RELEASE}): ${SELECTED_AGENT_B_SKILLS}"
+        if [ -n "$AITOOLS_AGENTS" ]; then
+            msg "Would run: ${B}databricks aitools install --scope ${SCOPE} --agents ${AITOOLS_AGENTS} --skills ${skills_csv}${exp_flag} -p ${PROFILE}${N}"
+        fi
+        if [ -n "$UNSUPPORTED_AGENT_TOOLS" ]; then
+            local mode="symlink from the aitools canonical store"
+            [ -z "$AITOOLS_AGENTS" ] && mode="copy via a temp-dir aitools install"
+            msg "Would deliver agent skills to $(echo "$UNSUPPORTED_AGENT_TOOLS" | tr ' ' ',') ($mode):"
+            local dir base_dir
+            [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+            while IFS= read -r dir; do
+                [ -n "$dir" ] && msg "  → $dir"
+            done < <(unsupported_skill_dirs "$base_dir")
+        fi
+    else
+        msg "Agent skills: <none>"
+    fi
+    echo ""
 }
 
 # Check Databricks CLI version meets minimum requirement
@@ -1188,34 +1670,35 @@ install_skills() {
     dirs=("${unique[@]}")
 
     # Count selected skills for display
-    local db_count=0 mlflow_count=0 apx_count=0 agent_count=0
-    for _ in $SELECTED_SKILLS; do db_count=$((db_count + 1)); done
-    for _ in $SELECTED_MLFLOW_SKILLS; do mlflow_count=$((mlflow_count + 1)); done
-    for _ in $SELECTED_APX_SKILLS; do apx_count=$((apx_count + 1)); done
-    for _ in $SELECTED_AGENT_SKILLS; do agent_count=$((agent_count + 1)); done
-    local total_count=$((db_count + mlflow_count + apx_count + agent_count))
-    msg "Installing ${B}${total_count}${N} skills"
+    local local_count mlflow_count apx_count
+    local_count=$(_count $SELECTED_LOCAL_SKILLS)
+    mlflow_count=$(_count $SELECTED_MLFLOW_SKILLS)
+    apx_count=$(_count $SELECTED_APX_SKILLS)
+    local total_count=$((local_count + mlflow_count + apx_count))
+    msg "Installing ${B}${total_count}${N} skills (agent skills are installed separately via databricks aitools)"
 
-    # Build set of all skills being installed now
-    local agent_install_names
-    agent_install_names=$(echo "$SELECTED_AGENT_SKILLS" | tr ' ' '\n' | sed 's/.*://' | tr '\n' ' ')
-    local all_new_skills="$SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $agent_install_names"
+    # Skills this installer manages directly. Agent skills are deliberately NOT
+    # in this set: any same-named entry from an older install is a stale real
+    # copy that must be removed — `databricks aitools` will not overwrite an
+    # existing real directory, so leaving it would shadow the new install.
+    # (Symlinks for tools aitools can't target are re-created each run.)
+    local all_new_skills="$SELECTED_LOCAL_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS"
 
-    # Clean up previously installed skills that are no longer selected
+    # Clean up previously installed skills that are no longer managed here
     # Check scope-local manifest first, fall back to global for upgrades from older versions
     local manifest="$STATE_DIR/.installed-skills"
     [ ! -f "$manifest" ] && [ "$SCOPE" = "project" ] && [ -f "$INSTALL_DIR/.installed-skills" ] && manifest="$INSTALL_DIR/.installed-skills"
     if [ -f "$manifest" ]; then
         while IFS='|' read -r prev_dir prev_skill; do
             [ -z "$prev_skill" ] && continue
-            # Skip if this skill is still selected (exact match — see _is_preselected for why)
-            if echo "$all_new_skills" | tr ' ' '\n' | grep -Fxq "$prev_skill"; then
+            # Skip if this skill is still selected (exact match — see _in_list for why)
+            if _in_list "$prev_skill" "$all_new_skills"; then
                 continue
             fi
-            # Only remove if the directory exists
-            if [ -d "$prev_dir/$prev_skill" ]; then
+            # Remove real dirs and symlinks alike (rm -rf on a symlink removes the link)
+            if [ -d "$prev_dir/$prev_skill" ] || [ -L "$prev_dir/$prev_skill" ]; then
                 rm -rf "$prev_dir/$prev_skill"
-                msg "${D}Removed deselected skill: $prev_skill${N}"
+                msg "${D}Removed previously installed skill: $prev_skill${N}"
             fi
         done < "$manifest"
     fi
@@ -1225,35 +1708,38 @@ install_skills() {
     mkdir -p "$STATE_DIR"
     : > "$manifest.tmp"
 
+    local mlflow_raw_url="$MLFLOW_BASE_URL/${MLFLOW_RESOLVED_REF:-main}"
+    local apx_raw_url="$APX_BASE_URL/${APX_RESOLVED_REF:-main}/skills/apx"
+
     for dir in "${dirs[@]}"; do
         mkdir -p "$dir"
-        # Install Databricks skills from repo
-        for skill in $SELECTED_SKILLS; do
+        # Install bundled Databricks skills from this repo
+        for skill in $SELECTED_LOCAL_SKILLS; do
             local src="$REPO_DIR/databricks-skills/$skill"
             [ ! -d "$src" ] && continue
             rm -rf "$dir/$skill"
             cp -r "$src" "$dir/$skill"
             echo "$dir|$skill" >> "$manifest.tmp"
         done
-        ok "Databricks skills ($db_count) → ${dir#$HOME/}"
+        ok "Databricks skills ($local_count) → ${dir#$HOME/}"
 
         # Install MLflow skills from mlflow/skills repo
         if [ -n "$SELECTED_MLFLOW_SKILLS" ]; then
             for skill in $SELECTED_MLFLOW_SKILLS; do
                 local dest_dir="$dir/$skill"
                 mkdir -p "$dest_dir"
-                local url="$MLFLOW_RAW_URL/$skill/SKILL.md"
+                local url="$mlflow_raw_url/$skill/SKILL.md"
                 if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
                     # Try to fetch optional reference files
                     for ref in reference.md examples.md api.md; do
-                        curl -fsSL "$MLFLOW_RAW_URL/$skill/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
+                        curl -fsSL "$mlflow_raw_url/$skill/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
                     done
                     echo "$dir|$skill" >> "$manifest.tmp"
                 else
                     rm -rf "$dest_dir"
                 fi
             done
-            ok "MLflow skills ($mlflow_count) → ${dir#$HOME/}"
+            ok "MLflow skills ($mlflow_count, @ ${MLFLOW_RESOLVED_REF}) → ${dir#$HOME/}"
         fi
 
         # Install APX skills from databricks-solutions/apx repo
@@ -1261,74 +1747,18 @@ install_skills() {
             for skill in $SELECTED_APX_SKILLS; do
                 local dest_dir="$dir/$skill"
                 mkdir -p "$dest_dir"
-                local url="$APX_RAW_URL/SKILL.md"
+                local url="$apx_raw_url/SKILL.md"
                 if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
                     # Try to fetch optional reference files
                     for ref in backend-patterns.md frontend-patterns.md; do
-                        curl -fsSL "$APX_RAW_URL/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
+                        curl -fsSL "$apx_raw_url/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
                     done
                     echo "$dir|$skill" >> "$manifest.tmp"
                 else
                     rmdir "$dest_dir" 2>/dev/null || warn "Could not install APX skill '$skill' — consider removing $dest_dir if it is no longer needed"
                 fi
             done
-            ok "APX skills ($apx_count) → ${dir#$HOME/}"
-        fi
-
-        # Install Agent skills from databricks/databricks-agent-skills repo
-        if [ -n "$SELECTED_AGENT_SKILLS" ]; then
-            # Fetch the full repo tree once (single API call) for all skills.
-            # Collapse pretty-printed JSON to a single line + squeeze whitespace so the
-            # path/mode/type fields land adjacent for the per-entry regex below.
-            local agent_tree agent_success=0
-            agent_tree=$(curl -fsSL "$AGENT_SKILLS_API_URL" 2>/dev/null | tr -d '\n' | tr -s ' ')
-            for entry in $SELECTED_AGENT_SKILLS; do
-                local src_name="${entry%%:*}"
-                local install_name="${entry#*:}"
-                local dest_dir="$dir/$install_name"
-                # Wipe any prior install so upstream-deleted files don't persist
-                rm -rf "$dest_dir"
-                mkdir -p "$dest_dir"
-                # Extract file paths under skills/<src_name>/ — match only entries whose
-                # next JSON fields are `"mode": "...", "type": "blob"`, so directory
-                # entries (type=tree) are skipped. Note the agent_tree has been
-                # whitespace-collapsed above; the GitHub tree API returns fields in
-                # the order path → mode → type → sha → size → url, so this pattern
-                # matches each blob exactly once.
-                local files
-                files=$(echo "$agent_tree" \
-                    | grep -oE '"path": *"skills/'"$src_name"'/[^"]+", *"mode": *"[^"]+", *"type": *"blob"' \
-                    | sed 's/.*"path": *"\([^"]*\)".*/\1/')
-                if [ -z "$files" ]; then
-                    rmdir "$dest_dir" 2>/dev/null || true
-                    warn "Could not fetch agent skill '$src_name'"
-                    continue
-                fi
-                local ok_flag=1
-                while IFS= read -r filepath; do
-                    [ -z "$filepath" ] && continue
-                    local rel="${filepath#skills/$src_name/}"
-                    local dest="$dest_dir/$rel"
-                    mkdir -p "$(dirname "$dest")"
-                    if ! curl -fsSL "$AGENT_SKILLS_RAW_URL/$src_name/${rel}" -o "$dest" 2>/dev/null; then
-                        ok_flag=0
-                    fi
-                done <<< "$files"
-                if [ "$ok_flag" -eq 1 ]; then
-                    echo "$dir|$install_name" >> "$manifest.tmp"
-                    agent_success=$((agent_success + 1))
-                else
-                    rm -rf "$dest_dir"
-                    warn "Could not install agent skill '$src_name'"
-                fi
-            done
-            if [ "$agent_success" -eq "$agent_count" ]; then
-                ok "Agent skills ($agent_count) → ${dir#$HOME/}"
-            elif [ "$agent_success" -gt 0 ]; then
-                warn "Agent skills (only $agent_success of $agent_count installed) → ${dir#$HOME/}"
-            else
-                warn "Agent skills (0 of $agent_count installed) → ${dir#$HOME/}"
-            fi
+            ok "APX skills ($apx_count, @ ${APX_RESOLVED_REF}) → ${dir#$HOME/}"
         fi
     done
 
@@ -1727,6 +2157,9 @@ summary() {
         msg "Location: $INSTALL_DIR"
         msg "Scope:    $SCOPE"
         msg "Tools:    $(echo "$TOOLS" | tr ' ' ', ')"
+        if [ -n "$SELECTED_AGENT_B_SKILLS" ]; then
+            msg "Agent skills are managed by ${B}databricks aitools${N} — update with ${B}databricks aitools update${N}"
+        fi
         echo ""
         msg "${B}Next steps:${N}"
         local step=1
@@ -1951,18 +2384,24 @@ prompt_auth() {
 
 # Main
 main() {
+    # --list-skills exits early (uses the live aitools inventory when available)
+    [ "${LIST_SKILLS:-false}" = true ] && list_skills_and_exit
+
     if [ "$SILENT" = false ]; then
         echo ""
         echo -e "${B}Databricks AI Dev Kit Installer${N}"
         echo "────────────────────────────────"
     fi
-    
+
     # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
     prompt_channel
 
     # Check dependencies
     step "Checking prerequisites"
     check_deps
+
+    # Discover the agent-skills inventory (live via `databricks aitools list`, or fallback)
+    fetch_agent_b_inventory
 
     # ── Step 2: Interactive tool selection ──
     step "Selecting tools"
@@ -1992,9 +2431,10 @@ main() {
         step "Skill profiles"
         prompt_skills_profile
         resolve_skills
+        resolve_fetch_refs
         # Count for display
-        local sk_count=0
-        for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS; do sk_count=$((sk_count + 1)); done
+        local sk_count
+        sk_count=$(_count $SELECTED_LOCAL_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_B_SKILLS)
         if [ -n "$USER_SKILLS" ]; then
             ok "Custom selection ($sk_count skills)"
         else
@@ -2022,13 +2462,21 @@ main() {
             if [ -n "$USER_SKILLS" ]; then
                 echo -e "  Skills:      ${G}custom selection${N} ${Y}(will be overwritten, backup your changes first)${N}"
             else
-                local sk_total=0
-                for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_SKILLS; do sk_total=$((sk_total + 1)); done
+                local sk_total
+                sk_total=$(_count $SELECTED_LOCAL_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_B_SKILLS)
                 echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N} ${Y}(will be overwritten, backup your changes first)${N}"
             fi
+            [ -n "$SELECTED_AGENT_B_SKILLS" ] && echo -e "  Agent skills: ${G}via databricks aitools${N} ${D}(requires Databricks CLI v${MIN_AITOOLS_CLI_VERSION}+)${N}"
+            [ -n "$SELECTED_APX_SKILLS" ] && [ -n "$APX_RESOLVED_REF" ] && echo -e "  APX ref:     ${G}${APX_RESOLVED_REF}${N}"
         fi
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
         echo ""
+    fi
+
+    # ── Dry run: report the plan and exit before any changes ──
+    if [ "$DRY_RUN" = true ]; then
+        dry_run_report
+        exit 0
     fi
 
     if [ "$SILENT" = false ] && is_interactive; then
@@ -2058,8 +2506,14 @@ main() {
         ok "Repository cloned ($BRANCH)"
     fi
     
-    # Install skills
+    # Install skills managed by this installer (bundled + mlflow + apx)
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
+
+    # Install agent skills (delegated to `databricks aitools`)
+    [ "$INSTALL_SKILLS" = true ] && install_agent_b_skills "$base_dir"
+
+    # Record resolved sources
+    [ "$INSTALL_SKILLS" = true ] && write_lockfile
 
     # Write GEMINI.md if gemini is selected
     if echo "$TOOLS" | grep -q gemini; then
