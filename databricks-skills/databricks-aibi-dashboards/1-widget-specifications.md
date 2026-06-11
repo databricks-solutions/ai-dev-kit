@@ -7,6 +7,7 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
 - `widget.name`: alphanumeric + hyphens + underscores ONLY (max 60 characters)
 - `frame.title`: human-readable title (any characters allowed)
 - `frame.showTitle`: always set to `true` so users understand the widget
+- `frame.description` + `frame.showDescription: true`: optional subtext under the title (e.g., `"All-time; 0% before the 2025-06 launch"`) — useful for giving a KPI number context without cluttering the chart itself
 - `displayName`: use in encodings to label axes/values clearly (e.g., "Revenue ($)", "Growth Rate (%)")
 - `widget.queries[].name`: use `"main_query"` for chart/counter/table widgets. Filter widgets with multiple queries can use descriptive names (see [3-filters.md](3-filters.md))
 
@@ -22,6 +23,7 @@ Core widget types for AI/BI dashboards. For advanced visualizations (area, scatt
 | bar | 3 | this file |
 | line | 3 | this file |
 | pie | 3 | this file |
+| symbol-map | 2 | this file |
 | area | 3 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
 | scatter | 3 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
 | combo | 1 | [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md) |
@@ -181,14 +183,19 @@ Match the sparkline grain to whatever the surrounding charts use — consistent 
 
 ### Value formatting
 
-Format types: `number`, `number-currency`, `number-percent`.
+Format types: `number`, `number-plain`, `number-currency`, `number-percent`.
 
 | Field type | Format | Why |
 |---|---|---|
-| Money | `number-currency` + `currencyCode` + `abbreviation: "compact"` | "$1.2M" is readable, "1287394.55" isn't |
+| Money | `number-currency` + `currencyCode: "USD"` (or `EUR` etc.) + `abbreviation: "compact"` | "$1.2M" is readable, "1287394.55" isn't |
 | Percentage | `number-percent` (data must be 0-1) | Renders "12.5%" from 0.125 |
 | Large count | `number` + `abbreviation: "compact"` | Renders "1.5K" / "2.3M" |
 | Small count (under ~1K) | `number` (no abbreviation) or omit `format` | Raw integer is fine |
+| Value with custom unit (e.g., "8 hrs", "2 weeks") | `number-plain` + `formatTemplate: "{{ @formatted }} hrs"` | Append a unit cleanly without baking it into the dataset |
+
+Optional `format.suffix` (e.g., `"suffix": "h"`) appends a short unit directly after the number without a template — simpler than `formatTemplate` when you just need a single-char unit.
+
+> **Counters backed by `MEASURE()`**: omit `format` when `format.type` is plain `"number"` — the combination triggers an "automatically fixed" warning on the rendered widget. Use `number-plain`, `number-currency`, `number-percent`, or no format at all.
 
 ```json
 "value": {
@@ -287,9 +294,9 @@ Each column object supports format, conditional styling, links, and tooltips. Co
     "type": "basic",
     "rules": [
       {"condition": {"operand": {"type": "data-value", "value": "10000"}, "operator": ">="},
-       "backgroundColor": {"themeColorType": "visualizationColors", "position": 4}},
+       "backgroundColor": {"themeColorType": "visualizationColors", "position": 0}},
       {"condition": {"operand": {"type": "data-value", "value": "5000"},  "operator": ">="},
-       "backgroundColor": {"themeColorType": "visualizationColors", "position": 3}}
+       "backgroundColor": {"themeColorType": "visualizationColors", "position": 6}}
     ]
   },
 
@@ -382,16 +389,16 @@ Default behaviour: theme colors are assigned to categories in order. To pin spec
   "scale": {
     "type": "categorical",
     "mappings": [
-      {"value": "1-Critical", "color": {"themeColorType": "visualizationColors", "position": 6}},
-      {"value": "4-Low",      "color": {"themeColorType": "visualizationColors", "position": 1}}
+      {"value": "1-Critical", "color": "#FF7E5C"},
+      {"value": "4-Low",      "color": "#99DDB4"}
     ]
   }
 }
 ```
 
-`themeColorType: "visualizationColors"` + `position: 1..N` selects from the dashboard's theme palette. For an exact hex, use `{"hex": "#FF0000"}` instead of `themeColorType`.
+Inside `mappings[].color`, use a **bare hex string** (`"#FF0000"`) — that's the form chart widgets honor. Palette-position references (`themeColorType` / `position`) and the wrapped `{"hex": "..."}` object form are silently dropped on `mappings[].color`, so semantic pins must always be bare hex.
 
-> For continuous color ramps on quantitative encodings (e.g., choropleth, symbol-map, heatmap), use `colorRamp` — see [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
+> For continuous color ramps on quantitative encodings, use `colorRamp` — see Symbol Map below, or [Heatmap](2-advanced-widget-specifications.md#heatmap) and [Choropleth Map](2-advanced-widget-specifications.md#choropleth-map) in advanced specs.
 
 ### Annotations (event markers)
 
@@ -433,10 +440,52 @@ Multiple annotations are allowed — add more objects to the array. For non-date
   "widgetType": "pie",
   "encodings": {
     "angle": {"fieldName": "revenue", "scale": {"type": "quantitative"}},
-    "color": {"fieldName": "category", "scale": {"type": "categorical"}}
+    "color": {"fieldName": "category", "scale": {"type": "categorical"}},
+    "label": {"show": true}
   }
 }
 ```
+
+---
+
+## Symbol Map (bubble map)
+
+Lat/lon scatter plot on a map. Use for **point data** (customer locations, sensor readings); use `choropleth-map` for **regions** (countries, states) colored by aggregate.
+
+> **Strongly preferred whenever the data has a geographic dimension.** A bubble map is one of the highest-signal visuals in a dashboard — "where is the action" reads at a glance and grabs attention better than a bar chart of the same data. If the dataset has lat/lon (or a country/state column → `choropleth-map`), include a map widget.
+
+- `version`: **2**
+- `widgetType`: "symbol-map"
+- Dataset must include latitude and longitude columns (or a `GEOMETRY`/`GEOGRAPHY` column).
+
+```json
+"spec": {
+  "version": 2,
+  "widgetType": "symbol-map",
+  "encodings": {
+    "coordinates": {
+      "latitude":  {"fieldName": "customer_latitude"},
+      "longitude": {"fieldName": "customer_longitude"}
+    },
+    "color": {
+      "fieldName": "sum(satisfaction_score)",
+      "scale": {"type": "quantitative",
+                "colorRamp": {"mode": "custom-sequential", "colors": {"start": "#FF7E5C", "end": "#99DDB4"}}},
+      "legend": {"hide": true}
+    },
+    "size": {"fieldName": "count(*)", "scale": {"type": "quantitative"}}
+  },
+  "mark": {"opacity": 0.7},
+  "frame": {"showTitle": true, "title": "Customer Locations"}
+}
+```
+
+**`colorRamp` modes:**
+
+- `{"mode": "custom-sequential", "colors": {"start": "#FF7E5C", "end": "#99DDB4"}}` — your own gradient between two hex stops. **Prefer this for themed dashboards** so the map ties into the palette; if directional, `start` = bad color, `end` = good color.
+- `{"mode": "scheme", "scheme": "<name>"}` — prebuilt ramps. Known names: `magma`, `viridis`, `plasma`, `inferno`, `YlGnBu`, `RdYlBu`, `blues`, `redyellowgreen`. Avoid `redyellowgreen` — clashes with most modern themes.
+
+For categorical color (e.g., colored by region), use `scale.type: "categorical"` with the same `mappings` syntax as bar charts. `mark.opacity` (0–1) controls point transparency — useful when many points cluster.
 
 ---
 
@@ -465,7 +514,7 @@ Add `format` to any encoding to display values appropriately:
 
 **Options:**
 - `abbreviation`: `"compact"` (K/M/B) or omit for full numbers
-- `decimalPlaces`: `{"type": "max", "places": N}` or `{"type": "fixed", "places": N}`
+- `decimalPlaces`: `{"type": "max", "places": N}` for "up to N decimals, trailing zeros suppressed" ($1.2M / $1.25M — casual headline), or `{"type": "exact", "places": N}` for "always exactly N decimals" ($1.20M — polished/financial)
 
 ---
 

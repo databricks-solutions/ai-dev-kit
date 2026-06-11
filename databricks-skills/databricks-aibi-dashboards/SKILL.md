@@ -32,26 +32,26 @@ A dashboard should be showing something relevant for a human, typically some KPI
 
 | Widget Type | Version | Documented in |
 |-------------|---------|---------------|
-| `counter` (KPI + sparkline + comparison) | **2** | [1-widget-specifications.md#counter-kpi](1-widget-specifications.md#counter-kpi) (L71) |
-| `table` | **2** | [1-widget-specifications.md#table](1-widget-specifications.md#table) (L235) |
-| `bar`, `line` | **3** | [1-widget-specifications.md#line--bar-charts](1-widget-specifications.md#line--bar-charts) (L310) |
-| `pie` | **3** | [1-widget-specifications.md#pie-chart](1-widget-specifications.md#pie-chart) (L422) |
-| text (markdown, no spec block) | N/A | [1-widget-specifications.md#text-headersdescriptions](1-widget-specifications.md#text-headersdescriptions) (L33) |
-| `area` | **3** | [2-advanced-widget-specifications.md#area-chart](2-advanced-widget-specifications.md#area-chart) (L7) |
-| `scatter` | **3** | [2-advanced-widget-specifications.md#scatter-plot--bubble-chart](2-advanced-widget-specifications.md#scatter-plot--bubble-chart) (L34) |
-| `combo` (bar+line, dual-axis) | **1** | [2-advanced-widget-specifications.md#combo-chart-bar--line](2-advanced-widget-specifications.md#combo-chart-bar--line) (L57) |
-| `forecast-line` (with `AI_FORECAST` SQL) | **1** | [2-advanced-widget-specifications.md#forecast-line-with-ai_forecast](2-advanced-widget-specifications.md#forecast-line-with-ai_forecast) (L166) |
-| `pivot` (with conditional cell rules) | **3** | [2-advanced-widget-specifications.md#pivot](2-advanced-widget-specifications.md#pivot) (L241) |
-| `histogram` (with `bin(col, binWidth=N)`) | **3** | [2-advanced-widget-specifications.md#histogram](2-advanced-widget-specifications.md#histogram) (L302) |
-| `heatmap` | **3** | [2-advanced-widget-specifications.md#heatmap](2-advanced-widget-specifications.md#heatmap) (L398) |
-| `funnel` | **1** | [2-advanced-widget-specifications.md#funnel](2-advanced-widget-specifications.md#funnel) (L424) |
-| `sankey` | **1** | [2-advanced-widget-specifications.md#sankey](2-advanced-widget-specifications.md#sankey) (L338) |
-| `box` | **1** | [2-advanced-widget-specifications.md#box](2-advanced-widget-specifications.md#box) (L448) |
-| `waterfall` | **1** | [2-advanced-widget-specifications.md#waterfall](2-advanced-widget-specifications.md#waterfall) (L470) |
-| `choropleth-map` (regions colored by value) | **1** | [2-advanced-widget-specifications.md#choropleth-map](2-advanced-widget-specifications.md#choropleth-map) (L109) |
-| `symbol-map` (lat/lon point map) | **2** | [2-advanced-widget-specifications.md#symbol-map-point-map](2-advanced-widget-specifications.md#symbol-map-point-map) (L364) |
-| `filter-single-select`, `filter-multi-select`, `filter-date-range-picker` | **2** | [3-filters.md#filter-widget-structure](3-filters.md#filter-widget-structure) (L32) |
-| `range-slider` | **2** | [3-filters.md#range-slider-numeric-range-filter](3-filters.md#range-slider-numeric-range-filter) (L239) |
+| text (markdown, no spec block) | N/A | [1-widget-specifications.md#text-headersdescriptions](1-widget-specifications.md#text-headersdescriptions) |
+| `counter` (KPI + sparkline + comparison) | **2** | [1-widget-specifications.md#counter-kpi](1-widget-specifications.md#counter-kpi) |
+| `table` | **2** | [1-widget-specifications.md#table](1-widget-specifications.md#table) |
+| `bar`, `line` | **3** | [1-widget-specifications.md#line--bar-charts](1-widget-specifications.md#line--bar-charts) |
+| `pie` | **3** | [1-widget-specifications.md#pie-chart](1-widget-specifications.md#pie-chart) |
+| `symbol-map` (lat/lon point map) | **2** | [1-widget-specifications.md#symbol-map-bubble-map](1-widget-specifications.md#symbol-map-bubble-map) |
+| `area` | **3** | [2-advanced-widget-specifications.md#area-chart](2-advanced-widget-specifications.md#area-chart) |
+| `scatter` | **3** | [2-advanced-widget-specifications.md#scatter-plot--bubble-chart](2-advanced-widget-specifications.md#scatter-plot--bubble-chart) |
+| `combo` (bar+line, dual-axis) | **1** | [2-advanced-widget-specifications.md#combo-chart-bar--line](2-advanced-widget-specifications.md#combo-chart-bar--line) |
+| `choropleth-map` (regions colored by value) | **1** | [2-advanced-widget-specifications.md#choropleth-map](2-advanced-widget-specifications.md#choropleth-map) |
+| `forecast-line` (with `AI_FORECAST` SQL) | **1** | [2-advanced-widget-specifications.md#forecast-line-with-ai_forecast](2-advanced-widget-specifications.md#forecast-line-with-ai_forecast) |
+| `pivot` (with conditional cell rules) | **3** | [2-advanced-widget-specifications.md#pivot](2-advanced-widget-specifications.md#pivot) |
+| `histogram` (with `bin(col, binWidth=N)`) | **3** | [2-advanced-widget-specifications.md#histogram](2-advanced-widget-specifications.md#histogram) |
+| `sankey` | **1** | [2-advanced-widget-specifications.md#sankey](2-advanced-widget-specifications.md#sankey) |
+| `heatmap` | **3** | [2-advanced-widget-specifications.md#heatmap](2-advanced-widget-specifications.md#heatmap) |
+| `funnel` | **1** | [2-advanced-widget-specifications.md#funnel](2-advanced-widget-specifications.md#funnel) |
+| `box` | **1** | [2-advanced-widget-specifications.md#box](2-advanced-widget-specifications.md#box) |
+| `waterfall` | **1** | [2-advanced-widget-specifications.md#waterfall](2-advanced-widget-specifications.md#waterfall) |
+| `filter-single-select`, `filter-multi-select`, `filter-date-range-picker` | **2** | [3-filters.md#filter-widget-structure](3-filters.md#filter-widget-structure) |
+| `range-slider` | **2** | [3-filters.md#range-slider-numeric-range-filter](3-filters.md#range-slider-numeric-range-filter) |
 
 > Cohort retention charts are built as a `pivot` with a color-scale cell style — there is no `cohort` widget type. See pivot in [2-advanced-widget-specifications.md](2-advanced-widget-specifications.md).
 
@@ -214,9 +214,11 @@ Every dashboard's `serialized_dashboard` content must follow this exact structur
 - `pageType`: Required on every page (`PAGE_TYPE_CANVAS` or `PAGE_TYPE_GLOBAL_FILTERS`)
 - Query binding: `query.fields[].name` must exactly match `encodings.*.fieldName`
 
-### Dashboard Theme (Optional)
+### Theme & Color (always set this — it makes or breaks the dashboard)
 
-Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across every widget on the dashboard. Without it, the dashboard inherits the workspace default. With it, you get a consistent palette across all charts, plus the index that `{"themeColorType": "visualizationColors", "position": N}` in per-widget specs resolves against.
+Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across every widget on the dashboard. Without it, the dashboard inherits the workspace default and looks generic. **Set the full block on every dashboard you create** — a coherent palette is the single highest-impact polish item.
+
+Mental model — **60/30/10 rule** mapped to theme keys: **60% neutral** = canvas/widget/border backgrounds (set `widgetBorderColor = widgetBackgroundColor` to hide borders); **30% secondary** = `fontColor` + `visualizationColors` (the content weight); **10% accent** = `selectionColor` for filters / tabs / active selections — pick something distinct from text and palette; a safe-blue around `#2272B4` matches the hyperlink convention and works as a default.
 
 ```json
 {
@@ -224,9 +226,8 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
   "pages": [...],
   "uiSettings": {
     "theme": {
-      "canvasBackgroundColor": {"light": "#FFFFFF", "dark": "#1F272D"},
+      "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
       "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
-      "widgetBorderColor":     {"light": "#FFFFFF", "dark": "#11171C"},
       "fontColor":             {"light": "#11171C", "dark": "#E8ECF0"},
       "selectionColor":        {"light": "#2272B4", "dark": "#8ACAFF"},
       "visualizationColors": [
@@ -239,11 +240,34 @@ Top-level `uiSettings.theme` controls colors, fonts, and widget chrome across ev
 }
 ```
 
-- `visualizationColors` is the **ordered palette** chart series and category mappings cycle through. `position: 1` is the first color (`#FFA600` above), `position: 6` is the 6th (`#1D425C`). Length is whatever you want — 5-8 colors is typical.
-- Background / font / selection colors take `light` + `dark` pairs; the dashboard automatically applies the right pair based on the viewer's mode.
-- `widgetBorderColor`: set this to the **same value as `widgetBackgroundColor`** (as in the example) to hide widget borders — the default border looks busy in dense dashboards and most demos look cleaner without it.
+**Theme keys** (mechanics):
+
+- `visualizationColors`: ordered palette every chart series and category mapping cycles through. **Positions are 0-indexed**: `position: 0` = first color (`#FFA600` above), `position: 6` = seventh (`#99DDB4`). Length 5–8 is typical.
+- Background / font / selection colors take `light` + `dark` pairs; the dashboard auto-selects based on viewer mode.
 - `widgetHeaderAlignment`: `"LEFT"` (default), `"CENTER"`, or `"RIGHT"`.
-- Per-widget color references use `{"themeColorType": "visualizationColors", "position": N}` to pin a value to a specific slot in this palette (e.g., Critical → position 6 → always red, regardless of how the chart sorts). For an exact hex outside the palette, use `{"hex": "#FF0000"}` instead.
+- Per-widget color references: `{"themeColorType": "visualizationColors", "position": N}` (0-indexed) to pin to a palette slot, or `{"hex": "#FF0000"}` for an exact color outside the palette.
+
+**Palette-design rules** (this is what separates a polished dashboard from a noisy one):
+
+1. **One coherent color family per dashboard, distinct across the suite.** Walk **across hues** (e.g., amber → coral → pink → purple → navy), not one color faded toward white — a single-hue lightness ramp reads as one color and the viewer can't tell categories apart. Adjacent stops must be visually distinct: if you squint and two blur into one, push them further apart. Single-hue ramps are for **quantitative** widgets only (`colorRamp.mode: "custom-sequential"`), never for `visualizationColors`.
+2. **Pin semantic colors as literal hex, outside the palette.** "Bad" = a warm coral (e.g. `#FF7E5C`), "good" = a calm teal/green. Use `color.scale.mappings` with a bare hex string — `{"value": "Critical", "color": "#FF7E5C"}` — **not** `{"hex": "..."}` or `themeColorType: position` (both are silently dropped on chart widgets). Reuse the good-teal that's already in the palette so it never clashes.
+3. **Color non-categorical widgets explicitly so they join the family.** Maps & heatmaps: `colorRamp.mode: "custom-sequential"` with `{start, end}` from the family (if directional: `start` = bad color, `end` = good color). Forecast / multi-series: pin per-series via `color.scale.mappings` keyed on `displayName` (actual = solid family color, forecast = contrast/alert, threshold = muted tone). Sparkline counters: set `value.color` to a family color, not grey.
+4. **"Lighter / more pastel" tweak**: nudge all stops up in lightness *together*; don't recolor individual ones. Re-sync the pinned semantic hex values; keep enough contrast on the alert color that it still reads as a warning.
+
+**Starter palettes** (pick one and adapt — extend to 7-8 stops if needed; semantic red/green stay as literal hex per rule 2):
+
+```
+#094074  #3C6997  #5ADBFF  #FFDD4A  #FE9000
+#003F5C  #594E90  #BC4C96  #FF5F66  #FFA600
+#4A8CC7  #F59770  #FFD84A  #F0E09E  #6DD980
+#440154  #3B528B  #21918C  #5EC962  #FDE725
+#4E79A7  #F28E2C  #E15759  #76B7B2  #59A14F
+#0072B2  #E69F00  #009E73  #CC79A7  #D55E00
+#0D0887  #7E03A8  #CC4778  #F89441  #F0F921
+#6929C4  #1192E8  #005D5D  #9F1853  #FA4D56
+```
+
+~4-5% of viewers have color blindness (mostly red/green). Rows 4 and 6 above (viridis, Okabe-Ito) are CB-safe by design; verify customized palettes via simulator (Adobe Color, `colorbrewer2.org`). Don't put red and green adjacent, and rely on lightness contrast — not hue alone — between adjacent stops.
 
 ### Linking a Genie Space (Optional)
 
@@ -393,7 +417,9 @@ If you need conditional logic or multi-field formulas, compute a derived column 
 
 Each widget has a position: `{"x": 0, "y": 0, "width": 4, "height": 4}`
 
-**CRITICAL**: Each row must fill width=12 exactly. No gaps allowed.
+**Pick the subdivision based on the audience.** The 12-column grid divides cleanly into 3, 4, or 6 columns: a 3-column layout (each widget `width: 4`) reduces cognitive load and fits an executive overview; a 4-column (`width: 3`) is the all-rounder; a 6-column (`width: 2`) packs the most density for technical / operations dashboards where the reader is hunting through many metrics at once.
+
+**Default rule**: each row should fill width=12 exactly — no gaps. Once you're confident with the grid, you can stagger heights across columns (a tall widget on the left paired with several shorter ones on the right) so the two halves don't share row boundaries — see [4-examples.md](4-examples.md#layout-12-col-grid) for the pattern. Start with strict rows; relax only when the stagger reads better visually.
 
 ```
 CORRECT:                            WRONG:
