@@ -78,8 +78,10 @@ INCLUDE_PRERELEASES="${INCLUDE_PRERELEASES:-0}"
 OWNER="databricks-solutions"
 REPO="ai-dev-kit"
 
-if [ -n "${DEVKIT_BRANCH:-}" ]; then
-  BRANCH="$DEVKIT_BRANCH"
+# Branch/tag override. DEVKIT_BRANCH is canonical; AIDEVKIT_BRANCH is accepted
+# as an alias so the bash and PowerShell installers honor the same env var.
+if [ -n "${DEVKIT_BRANCH:-${AIDEVKIT_BRANCH:-}}" ]; then
+  BRANCH="${DEVKIT_BRANCH:-$AIDEVKIT_BRANCH}"
 else
   BRANCH="$(
     curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" \
@@ -90,13 +92,17 @@ else
   [ -z "$BRANCH" ] && BRANCH="main"
 fi
 
-# Installation mode defaults
-INSTALL_MCP=true
+# Installation mode defaults. The MCP server is deprecated/optional — skills
+# now work directly via the Databricks CLI, so MCP defaults OFF and is opt-in
+# (--mcp / --mcp-path / DEVKIT_INSTALL_MCP=true). When opted in, the venv build
+# is delegated to databricks-mcp-server/setup.sh.
 INSTALL_SKILLS=true
+INSTALL_MCP="${DEVKIT_INSTALL_MCP:-false}"
+[ "$INSTALL_MCP" = "true" ] || [ "$INSTALL_MCP" = "1" ] && INSTALL_MCP=true || INSTALL_MCP=false
 
 # Minimum required versions
 MIN_CLI_VERSION="0.278.0"
-MIN_SDK_VERSION="0.85.0"
+# (MCP server SDK minimum is enforced by databricks-mcp-server/setup.sh)
 # Agent skills are delegated to `databricks aitools`, which ships with CLI v1.0.0+
 MIN_AITOOLS_CLI_VERSION="1.0.0"
 
@@ -164,8 +170,9 @@ while [ $# -gt 0 ]; do
         -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
         -b|--branch)      BRANCH="$2"; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
-        --mcp-only)       INSTALL_SKILLS=false; shift ;;
-        --mcp-path)       USER_MCP_PATH="$2"; shift 2 ;;
+        --mcp-only)       INSTALL_SKILLS=false; INSTALL_MCP=true; shift ;;
+        --mcp)            INSTALL_MCP=true; shift ;;
+        --mcp-path)       USER_MCP_PATH="$2"; INSTALL_MCP=true; shift 2 ;;
         --skills-profile) SKILLS_PROFILE="$2"; shift 2 ;;
         --skills)         USER_SKILLS="$2"; shift 2 ;;
         --list-skills)    LIST_SKILLS=true; shift ;;
@@ -183,9 +190,10 @@ while [ $# -gt 0 ]; do
             echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
             echo "  -b, --branch NAME     Git branch/tag to install (default: latest release)"
             echo "  -g, --global          Install globally for all projects"
-            echo "  --skills-only         Skip MCP server setup"
-            echo "  --mcp-only            Skip skills installation"
-            echo "  --mcp-path PATH       Path to MCP server installation (default: ~/.ai-dev-kit)"
+            echo "  --skills-only         Install skills only (default; MCP server is opt-in)"
+            echo "  --mcp                 Install the deprecated MCP server (default: no)"
+            echo "  --mcp-only            Install the MCP server only, skip skills"
+            echo "  --mcp-path PATH       MCP server install path (implies --mcp; default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
             echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
@@ -198,7 +206,8 @@ while [ $# -gt 0 ]; do
             echo ""
             echo "Environment Variables (alternative to flags):"
             echo "  DEVKIT_PROFILE        Databricks config profile"
-            echo "  DEVKIT_BRANCH         Git branch/tag to install (default: latest release)"
+            echo "  DEVKIT_BRANCH         Git branch/tag to install (alias: AIDEVKIT_BRANCH; default: latest release)"
+            echo "  DEVKIT_INSTALL_MCP    Set to 'true' to install the deprecated MCP server (default: false)"
             echo "  DEVKIT_SCOPE          'project' or 'global'"
             echo "  DEVKIT_TOOLS          Comma-separated list of tools"
             echo "  DEVKIT_FORCE          Set to 'true' to force reinstall"
@@ -217,6 +226,7 @@ while [ $# -gt 0 ]; do
             echo "Notes:"
             echo "  Most Databricks skills are installed via 'databricks aitools' (Databricks CLI v1.0.0+)"
             echo "  and are updated/uninstalled with 'databricks aitools update|uninstall', not this script."
+            echo "  The MCP server is deprecated/optional — skills work without it. Opt in with --mcp."
             echo "  Renamed skills: databricks-bundles -> databricks-dabs,"
             echo "  databricks-spark-declarative-pipelines -> databricks-pipelines."
             echo "  Replaced skills: databricks-config -> databricks-core,"
@@ -752,6 +762,31 @@ prompt_profile() {
     fi
 }
 
+# ─── MCP server installation prompt (deprecated/optional) ──────
+# Skills work via the Databricks CLI, so MCP is opt-in. Matches the radio-style
+# prompt used on the experimental branch and defaults to "Do not install".
+prompt_mcp_install() {
+    # Already opted in via --mcp / --mcp-path / --mcp-only / env var
+    [ "$INSTALL_MCP" = true ] && return
+    # Silent or non-interactive runs leave MCP off
+    if [ "$SILENT" = true ] || ! is_interactive; then
+        return
+    fi
+
+    echo ""
+    echo -e "  ${B}Deprecated MCP Server${N}"
+    echo -e "  ${D}Skills now work via the Databricks CLI for better performance. The MCP"
+    echo -e "  server is optional and only needed for backwards compatibility.${N}"
+
+    local selected
+    selected=$(radio_select \
+        "Do not install|no|on|Recommended — skills work without MCP" \
+        "Install MCP server|yes|off|Legacy — requires a Python venv (uv)" \
+    )
+
+    [ "$selected" = "yes" ] && INSTALL_MCP=true
+}
+
 # ─── MCP path selection ────────────────────────────────────────
 prompt_mcp_path() {
     # If provided via --mcp-path flag, skip prompt
@@ -1044,6 +1079,52 @@ prompt_skills_profile() {
 }
 
 # Custom individual skill picker
+# Display "Label|hint" for a skill name. Known skills get a friendly label and
+# hint; unknown/new ones fall back to the bare name so they still show up in the
+# picker as the upstream inventory grows. (case-based — no associative arrays,
+# so this stays compatible with the bash 3.2 that ships on macOS.)
+_skill_meta() {
+    case "$1" in
+        databricks-core)                       echo "Core|CLI auth, data exploration" ;;
+        databricks-docs)                       echo "Docs|Databricks documentation" ;;
+        databricks-python-sdk)                 echo "Python SDK|SDK, Connect, REST API" ;;
+        databricks-unity-catalog)              echo "Unity Catalog|System tables, volumes" ;;
+        databricks-pipelines)                  echo "Spark Pipelines|SDP/LDP, CDC, SCD Type 2" ;;
+        databricks-spark-structured-streaming) echo "Structured Streaming|Real-time streaming" ;;
+        databricks-jobs)                       echo "Jobs & Workflows|Multi-task orchestration" ;;
+        databricks-dabs)                       echo "Asset Bundles|DABs deployment" ;;
+        databricks-dbsql)                      echo "Databricks SQL|SQL warehouse queries" ;;
+        databricks-iceberg)                    echo "Iceberg|Apache Iceberg tables" ;;
+        databricks-lakeflow-connect)           echo "Lakeflow Connect|Managed ingestion connectors" ;;
+        databricks-zerobus-ingest)             echo "Zerobus Ingest|Streaming ingestion" ;;
+        spark-python-data-source)              echo "Python Data Source|Custom Spark data sources" ;;
+        databricks-metric-views)               echo "Metric Views|Metric definitions" ;;
+        databricks-aibi-dashboards)            echo "AI/BI Dashboards|Dashboard creation" ;;
+        databricks-genie)                      echo "Genie|Natural language SQL" ;;
+        databricks-agent-bricks)               echo "Agent Bricks|Build AI agents" ;;
+        databricks-vector-search)              echo "Vector Search|Similarity search" ;;
+        databricks-model-serving)              echo "Model Serving|Deploy models/agents" ;;
+        databricks-mlflow-evaluation)          echo "MLflow Evaluation|Model evaluation" ;;
+        databricks-ai-functions)               echo "AI Functions|AI Functions, document parsing & RAG" ;;
+        databricks-unstructured-pdf-generation) echo "Unstructured PDF|Synthetic PDFs for RAG" ;;
+        databricks-synthetic-data-gen)         echo "Synthetic Data|Generate test data" ;;
+        databricks-lakebase)                   echo "Lakebase|Managed PostgreSQL (OLTP)" ;;
+        databricks-serverless-migration)       echo "Serverless Migration|Migrate to serverless compute" ;;
+        databricks-apps)                       echo "Apps|AppKit + all frameworks" ;;
+        databricks-apps-python)                echo "App (AppKit + Python)|AppKit, Dash, Streamlit, Flask" ;;
+        databricks-app-apx)                    echo "App APX|FastAPI + React" ;;
+        mlflow-onboarding)                     echo "MLflow Onboarding|Getting started" ;;
+        agent-evaluation)                      echo "Agent Evaluation|Evaluate AI agents" ;;
+        instrumenting-with-mlflow-tracing)     echo "MLflow Tracing|Instrument with tracing" ;;
+        analyze-mlflow-trace)                  echo "Analyze Traces|Analyze trace data" ;;
+        retrieving-mlflow-traces)              echo "Retrieve Traces|Search & retrieve traces" ;;
+        analyze-mlflow-chat-session)           echo "Analyze Chat Session|Chat session analysis" ;;
+        querying-mlflow-metrics)               echo "Query Metrics|MLflow metrics queries" ;;
+        searching-mlflow-docs)                 echo "Search MLflow Docs|MLflow documentation" ;;
+        *)                                     echo "$1|" ;;
+    esac
+}
+
 prompt_custom_skills() {
     local preselected_profiles="$1"
 
@@ -1059,53 +1140,27 @@ prompt_custom_skills() {
         esac
     done
 
-    _is_preselected() {
-        _in_list "$1" "$preselected" && echo "on" || echo "off"
-    }
-
     echo ""
     echo -e "  ${B}Select individual skills${N}"
     echo -e "  ${D}Core skills (core, docs, python-sdk, unity-catalog) are recommended for all profiles${N}"
 
+    # Build the picker from the live inventory so new upstream skills appear
+    # automatically. Order: agent skills (stable, then experimental), then
+    # bundled, MLflow, and APX skills.
+    local -a items=()
+    local seen="" skill meta label hint state
+    for skill in $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL $LOCAL_SKILLS $MLFLOW_SKILLS $APX_SKILLS; do
+        _in_list "$skill" "$seen" && continue
+        seen="${seen:+$seen }$skill"
+        meta=$(_skill_meta "$skill")
+        label="${meta%%|*}"
+        hint="${meta#*|}"
+        state="off"; _in_list "$skill" "$preselected" && state="on"
+        items+=("${label}|${skill}|${state}|${hint}")
+    done
+
     local selected
-    selected=$(checkbox_select \
-        "Core|databricks-core|$(_is_preselected databricks-core)|CLI auth, data exploration" \
-        "Docs|databricks-docs|$(_is_preselected databricks-docs)|Databricks documentation" \
-        "Python SDK|databricks-python-sdk|$(_is_preselected databricks-python-sdk)|SDK, Connect, REST API" \
-        "Unity Catalog|databricks-unity-catalog|$(_is_preselected databricks-unity-catalog)|System tables, volumes" \
-        "Spark Pipelines|databricks-pipelines|$(_is_preselected databricks-pipelines)|SDP/LDP, CDC, SCD Type 2" \
-        "Structured Streaming|databricks-spark-structured-streaming|$(_is_preselected databricks-spark-structured-streaming)|Real-time streaming" \
-        "Jobs & Workflows|databricks-jobs|$(_is_preselected databricks-jobs)|Multi-task orchestration" \
-        "Asset Bundles|databricks-dabs|$(_is_preselected databricks-dabs)|DABs deployment" \
-        "Databricks SQL|databricks-dbsql|$(_is_preselected databricks-dbsql)|SQL warehouse queries" \
-        "Iceberg|databricks-iceberg|$(_is_preselected databricks-iceberg)|Apache Iceberg tables" \
-        "Lakeflow Connect|databricks-lakeflow-connect|$(_is_preselected databricks-lakeflow-connect)|Managed ingestion connectors" \
-        "Zerobus Ingest|databricks-zerobus-ingest|$(_is_preselected databricks-zerobus-ingest)|Streaming ingestion" \
-        "Python Data Source|spark-python-data-source|$(_is_preselected spark-python-data-source)|Custom Spark data sources" \
-        "Metric Views|databricks-metric-views|$(_is_preselected databricks-metric-views)|Metric definitions" \
-        "AI/BI Dashboards|databricks-aibi-dashboards|$(_is_preselected databricks-aibi-dashboards)|Dashboard creation" \
-        "Genie|databricks-genie|$(_is_preselected databricks-genie)|Natural language SQL" \
-        "Agent Bricks|databricks-agent-bricks|$(_is_preselected databricks-agent-bricks)|Build AI agents" \
-        "Vector Search|databricks-vector-search|$(_is_preselected databricks-vector-search)|Similarity search" \
-        "Model Serving|databricks-model-serving|$(_is_preselected databricks-model-serving)|Deploy models/agents" \
-        "MLflow Evaluation|databricks-mlflow-evaluation|$(_is_preselected databricks-mlflow-evaluation)|Model evaluation" \
-        "AI Functions|databricks-ai-functions|$(_is_preselected databricks-ai-functions)|AI Functions, document parsing & RAG" \
-        "Unstructured PDF|databricks-unstructured-pdf-generation|$(_is_preselected databricks-unstructured-pdf-generation)|Synthetic PDFs for RAG" \
-        "Synthetic Data|databricks-synthetic-data-gen|$(_is_preselected databricks-synthetic-data-gen)|Generate test data" \
-        "Lakebase|databricks-lakebase|$(_is_preselected databricks-lakebase)|Managed PostgreSQL (OLTP)" \
-        "Serverless Migration|databricks-serverless-migration|$(_is_preselected databricks-serverless-migration)|Migrate to serverless compute" \
-        "Apps|databricks-apps|$(_is_preselected databricks-apps)|AppKit + all frameworks" \
-        "App (AppKit + Python)|databricks-apps-python|$(_is_preselected databricks-apps-python)|AppKit, Dash, Streamlit, Flask" \
-        "App APX|databricks-app-apx|$(_is_preselected databricks-app-apx)|FastAPI + React" \
-        "MLflow Onboarding|mlflow-onboarding|$(_is_preselected mlflow-onboarding)|Getting started" \
-        "Agent Evaluation|agent-evaluation|$(_is_preselected agent-evaluation)|Evaluate AI agents" \
-        "MLflow Tracing|instrumenting-with-mlflow-tracing|$(_is_preselected instrumenting-with-mlflow-tracing)|Instrument with tracing" \
-        "Analyze Traces|analyze-mlflow-trace|$(_is_preselected analyze-mlflow-trace)|Analyze trace data" \
-        "Retrieve Traces|retrieving-mlflow-traces|$(_is_preselected retrieving-mlflow-traces)|Search & retrieve traces" \
-        "Analyze Chat Session|analyze-mlflow-chat-session|$(_is_preselected analyze-mlflow-chat-session)|Chat session analysis" \
-        "Query Metrics|querying-mlflow-metrics|$(_is_preselected querying-mlflow-metrics)|MLflow metrics queries" \
-        "Search MLflow Docs|searching-mlflow-docs|$(_is_preselected searching-mlflow-docs)|MLflow documentation" \
-    )
+    selected=$(checkbox_select "${items[@]}")
 
     # Use explicit skills list — set USER_SKILLS so resolve_skills handles it
     USER_SKILLS=$(echo "$selected" | tr ' ' ',')
@@ -1503,24 +1558,6 @@ check_cli_version() {
     fi
 }
 
-# Check Databricks SDK version in the MCP venv
-check_sdk_version() {
-    local sdk_version
-    sdk_version=$("$VENV_PYTHON" -c "from databricks.sdk.version import __version__; print(__version__)" 2>/dev/null)
-
-    if [ -z "$sdk_version" ]; then
-        warn "Could not determine Databricks SDK version"
-        return
-    fi
-
-    if version_gte "$sdk_version" "$MIN_SDK_VERSION"; then
-        ok "Databricks SDK v${sdk_version}"
-    else
-        warn "Databricks SDK v${sdk_version} is outdated (minimum: v${MIN_SDK_VERSION})"
-        msg "  ${B}Upgrade:${N} $VENV_PYTHON -m pip install --upgrade databricks-sdk"
-    fi
-}
-
 # Check prerequisites
 check_deps() {
     command -v git >/dev/null 2>&1 || die "git required"
@@ -1580,39 +1617,38 @@ check_version() {
     fi
 }
 
-# Setup MCP server
-setup_mcp() {
-    step "Setting up MCP server"
-    
-    # Clone or update repo
+# Clone or update the repo sources into $REPO_DIR (needed for bundled skills
+# and the MCP server setup script). Idempotent.
+clone_repo() {
     if [ -d "$REPO_DIR/.git" ]; then
         git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
         git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
             rm -rf "$REPO_DIR"
-            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+                || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
         }
     else
         mkdir -p "$INSTALL_DIR"
-        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
+            || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
     fi
     ok "Repository cloned ($BRANCH)"
-    
-    # Create venv and install
-    # On Apple Silicon under Rosetta, force arm64 to avoid architecture mismatch
-    # with universal2 Python binaries (see: github.com/databricks-solutions/ai-dev-kit/issues/115)
-    local arch_prefix=""
-    if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] && [ "$(uname -m)" = "x86_64" ]; then
-        if arch -arm64 python3 -c "pass" 2>/dev/null; then
-            arch_prefix="arch -arm64"
-            warn "Rosetta detected on Apple Silicon — forcing arm64 for Python"
-        fi
-    fi
+}
 
-    msg "Installing Python dependencies..."
-    $arch_prefix uv venv --python 3.11 --allow-existing "$VENV_DIR" -q 2>/dev/null || $arch_prefix uv venv --allow-existing "$VENV_DIR" -q
-    $arch_prefix uv pip install --python "$VENV_PYTHON" -e "$REPO_DIR/databricks-tools-core" -e "$REPO_DIR/databricks-mcp-server" -q
+# Setup the (deprecated, opt-in) MCP server by delegating the venv build to
+# databricks-mcp-server/setup.sh — that script is the single source of truth for
+# the Python environment, so the installer doesn't duplicate venv/pip logic here.
+setup_mcp() {
+    step "Setting up MCP server"
+    clone_repo
 
-    "$VENV_PYTHON" -c "import databricks_mcp_server" 2>/dev/null || die "MCP server install failed"
+    local setup_script="$REPO_DIR/databricks-mcp-server/setup.sh"
+    [ -f "$setup_script" ] || die "MCP setup script not found at $setup_script"
+
+    msg "Building MCP server environment (databricks-mcp-server/setup.sh)..."
+    local quiet_flag=""
+    [ "$SILENT" = true ] && quiet_flag="--quiet"
+    bash "$setup_script" --venv-dir "$VENV_DIR" $quiet_flag || die "MCP server setup failed"
     ok "MCP server ready"
 }
 
@@ -1774,8 +1810,15 @@ install_skills() {
 }
 
 # Write MCP configs
-write_mcp_json() {
-    local path=$1
+# Write/merge an MCP server entry into a JSON config.
+#   $1 path        target config file
+#   $2 root_key    top-level key: "mcpServers" (Claude/Cursor/Gemini/Windsurf/Kiro)
+#                  or "servers" (Copilot)
+#   $3 defer       "true" to include Claude's defer_loading hint, else "false"
+# Replaces the old write_mcp_json / write_copilot_mcp_json / write_gemini_mcp_json
+# trio, which differed only in those two parameters.
+write_mcp_json_config() {
+    local path=$1 root_key=$2 defer=$3
     mkdir -p "$(dirname "$path")"
 
     # Backup existing file before any modifications
@@ -1784,13 +1827,20 @@ write_mcp_json() {
         msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
     fi
 
+    local defer_py="" defer_json=""
+    if [ "$defer" = "true" ]; then
+        defer_py="'defer_loading': True, "
+        defer_json='
+      "defer_loading": true,'
+    fi
+
     if [ -f "$VENV_PYTHON" ]; then
         "$VENV_PYTHON" -c "
-import json, sys
+import json
 try:
     with open('$path') as f: cfg = json.load(f)
 except: cfg = {}
-cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'defer_loading': True, 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
+cfg.setdefault('$root_key', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], ${defer_py}'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
 with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 " 2>/dev/null && return
     fi
@@ -1804,45 +1854,10 @@ with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 
     cat > "$path" << EOF
 {
-  "mcpServers": {
+  "$root_key": {
     "databricks": {
       "command": "$VENV_PYTHON",
-      "args": ["$MCP_ENTRY"],
-      "defer_loading": true,
-      "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
-    }
-  }
-}
-EOF
-}
-
-write_copilot_mcp_json() {
-    local path=$1
-    mkdir -p "$(dirname "$path")"
-
-    # Backup existing file before any modifications
-    if [ -f "$path" ]; then
-        cp "$path" "${path}.bak"
-        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
-    fi
-
-    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
-        "$VENV_PYTHON" -c "
-import json, sys
-try:
-    with open('$path') as f: cfg = json.load(f)
-except: cfg = {}
-cfg.setdefault('servers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
-with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
-" 2>/dev/null && return
-    fi
-
-    cat > "$path" << EOF
-{
-  "servers": {
-    "databricks": {
-      "command": "$VENV_PYTHON",
-      "args": ["$MCP_ENTRY"],
+      "args": ["$MCP_ENTRY"],${defer_json}
       "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
     }
   }
@@ -1863,40 +1878,6 @@ write_mcp_toml() {
 [mcp_servers.databricks]
 command = "$VENV_PYTHON"
 args = ["$MCP_ENTRY"]
-EOF
-}
-
-write_gemini_mcp_json() {
-    local path=$1
-    mkdir -p "$(dirname "$path")"
-
-    # Backup existing file before any modifications
-    if [ -f "$path" ]; then
-        cp "$path" "${path}.bak"
-        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
-    fi
-
-    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
-        "$VENV_PYTHON" -c "
-import json, sys
-try:
-    with open('$path') as f: cfg = json.load(f)
-except: cfg = {}
-cfg.setdefault('mcpServers', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], 'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
-with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
-" 2>/dev/null && return
-    fi
-
-    cat > "$path" << EOF
-{
-  "mcpServers": {
-    "databricks": {
-      "command": "$VENV_PYTHON",
-      "args": ["$MCP_ENTRY"],
-      "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
-    }
-  }
-}
 EOF
 }
 
@@ -2040,7 +2021,7 @@ write_mcp_configs() {
     for tool in $TOOLS; do
         case $tool in
             claude)
-                [ "$SCOPE" = "global" ] && write_mcp_json "$HOME/.claude.json" || write_mcp_json "$base_dir/.mcp.json"
+                [ "$SCOPE" = "global" ] && write_mcp_json_config "$HOME/.claude.json" mcpServers true || write_mcp_json_config "$base_dir/.mcp.json" mcpServers true
                 ok "Claude MCP config"
                 # Add version check hook to Claude settings
                 local check_script="$REPO_DIR/.claude-plugin/check_update.sh"
@@ -2067,7 +2048,7 @@ write_mcp_configs() {
                     msg "       }"
                     msg "     }"
                 else
-                    write_mcp_json "$base_dir/.cursor/mcp.json"
+                    write_mcp_json_config "$base_dir/.cursor/mcp.json" mcpServers true
                     ok "Cursor MCP config"
                 fi
                 warn "Cursor: MCP servers are disabled by default."
@@ -2078,7 +2059,7 @@ write_mcp_configs() {
                     warn "Copilot global: configure MCP in VS Code settings (Ctrl+Shift+P → 'MCP: Open User Configuration')"
                     msg "  Command: $VENV_PYTHON | Args: $MCP_ENTRY"
                 else
-                    write_copilot_mcp_json "$base_dir/.vscode/mcp.json"
+                    write_mcp_json_config "$base_dir/.vscode/mcp.json" servers false
                     ok "Copilot MCP config (.vscode/mcp.json)"
                 fi
                 warn "Copilot: MCP servers must be enabled manually."
@@ -2090,9 +2071,9 @@ write_mcp_configs() {
                 ;;
             gemini)
                 if [ "$SCOPE" = "global" ]; then
-                    write_gemini_mcp_json "$HOME/.gemini/settings.json"
+                    write_mcp_json_config "$HOME/.gemini/settings.json" mcpServers false
                 else
-                    write_gemini_mcp_json "$base_dir/.gemini/settings.json"
+                    write_mcp_json_config "$base_dir/.gemini/settings.json" mcpServers false
                 fi
                 ok "Gemini CLI MCP config"
                 ;;
@@ -2101,7 +2082,7 @@ write_mcp_configs() {
                     warn "Antigravity only supports global MCP configuration."
                     msg "  Config written to ${B}~/.gemini/antigravity/mcp_config.json${N}"
                 fi
-                write_gemini_mcp_json "$HOME/.gemini/antigravity/mcp_config.json"
+                write_mcp_json_config "$HOME/.gemini/antigravity/mcp_config.json" mcpServers false
                 ok "Antigravity MCP config"
                 ;;
             windsurf)
@@ -2109,7 +2090,7 @@ write_mcp_configs() {
                     warn "Windsurf only supports global MCP configuration."
                     msg "  Config written to ${B}~/.codeium/windsurf/mcp_config.json${N}"
                 fi
-                write_mcp_json "$HOME/.codeium/windsurf/mcp_config.json"
+                write_mcp_json_config "$HOME/.codeium/windsurf/mcp_config.json" mcpServers true
                 ok "Windsurf MCP config"
                 ;;
             opencode)
@@ -2123,10 +2104,10 @@ write_mcp_configs() {
             kiro)
                 if [ "$SCOPE" = "global" ]; then
                     mkdir -p "$HOME/.kiro/settings"
-                    write_mcp_json "$HOME/.kiro/settings/mcp.json"
+                    write_mcp_json_config "$HOME/.kiro/settings/mcp.json" mcpServers true
                 else
                     mkdir -p "$base_dir/.kiro/settings"
-                    write_mcp_json "$base_dir/.kiro/settings/mcp.json"
+                    write_mcp_json_config "$base_dir/.kiro/settings/mcp.json" mcpServers true
                 fi
                 ok "Kiro MCP config"
                 ;;
@@ -2217,65 +2198,11 @@ prompt_scope() {
 
     echo ""
     echo -e "  ${B}Select installation scope${N}"
-    
-    # Simple radio selector without Confirm button
-    local -a labels=("Project" "Global")
-    local -a values=("project" "global")
-    local -a hints=("Install in current directory (.cursor/, .claude/, .gemini/)" "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
-    local count=2
-    local selected=0
-    local cursor=0
-    
-    _scope_draw() {
-        for i in 0 1; do
-            local dot="○"
-            local dot_color="\033[2m"
-            [ "$i" = "$selected" ] && dot="●" && dot_color="\033[0;32m"
-            local arrow="  "
-            [ "$i" = "$cursor" ] && arrow="\033[0;34m❯\033[0m "
-            local hint_style="\033[2m"
-            [ "$i" = "$selected" ] && hint_style="\033[0;32m"
-            printf "\033[2K  %b%b%b %-20s %b%s\033[0m\n" "$arrow" "$dot_color" "$dot" "${labels[$i]}" "$hint_style" "${hints[$i]}" > /dev/tty
-        done
-    }
-    
-    printf "\n  \033[2m↑/↓ navigate · enter select\033[0m\n\n" > /dev/tty
-    printf "\033[?25l" > /dev/tty
-    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
-    
-    _scope_draw
-    
-    while true; do
-        printf "\033[%dA" "$count" > /dev/tty
-        _scope_draw
-        
-        local key=""
-        IFS= read -rsn1 key < /dev/tty 2>/dev/null
-        
-        if [ "$key" = $'\x1b' ]; then
-            local s1="" s2=""
-            read -rsn1 s1 < /dev/tty 2>/dev/null
-            read -rsn1 s2 < /dev/tty 2>/dev/null
-            if [ "$s1" = "[" ]; then
-                case "$s2" in
-                    A) [ "$cursor" -gt 0 ] && cursor=$((cursor - 1)) ;;
-                    B) [ "$cursor" -lt 1 ] && cursor=$((cursor + 1)) ;;
-                esac
-            fi
-        elif [ "$key" = "" ]; then
-            selected=$cursor
-            printf "\033[%dA" "$count" > /dev/tty
-            _scope_draw
-            break
-        elif [ "$key" = " " ]; then
-            selected=$cursor
-        fi
-    done
-    
-    printf "\033[?25h" > /dev/tty
-    trap - EXIT
-    
-    SCOPE="${values[$selected]}"
+
+    SCOPE=$(radio_select \
+        "Project|project|on|Install in current directory (.cursor/, .claude/, .gemini/)" \
+        "Global|global|off|Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)" \
+    )
 }
 
 # Prompt for release channel (stable vs experimental)
@@ -2286,7 +2213,7 @@ prompt_channel() {
     fi
 
     # Skip in silent mode or non-interactive
-    if [ "$SILENT" = true ] || [ ! -e /dev/tty ]; then
+    if [ "$SILENT" = true ] || ! is_interactive; then
         return
     fi
 
@@ -2442,6 +2369,9 @@ main() {
         fi
     fi
 
+    # ── Step 4.5: MCP server opt-in (deprecated) ──
+    prompt_mcp_install
+
     # ── Step 5: Interactive MCP path ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
@@ -2496,14 +2426,12 @@ main() {
     local base_dir
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
     
-    # Setup MCP server
+    # Setup MCP server (opt-in). Otherwise clone sources only if needed for bundled skills.
     if [ "$INSTALL_MCP" = true ]; then
         setup_mcp
-    elif [ ! -d "$REPO_DIR" ]; then
+    elif [ ! -d "$REPO_DIR" ] && [ -n "$SELECTED_LOCAL_SKILLS" ]; then
         step "Downloading sources"
-        mkdir -p "$INSTALL_DIR"
-        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
-        ok "Repository cloned ($BRANCH)"
+        clone_repo
     fi
     
     # Install skills managed by this installer (bundled + mlflow + apx)
