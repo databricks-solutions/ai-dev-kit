@@ -720,6 +720,7 @@
               "frame": {
                 "showTitle": true,
                 "title": "Cases by channel",
+                "showDescription": true,
                 "description": "Distribution of support cases across intake channels."
               },
               "widgetType": "pie",

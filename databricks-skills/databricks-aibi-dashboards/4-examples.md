@@ -770,6 +770,7 @@ This example's header carries a short narrative tying the widgets together, and 
               "frame": {
                 "showTitle": true,
                 "title": "Cases by channel",
+                "showDescription": true,
                 "description": "Distribution of support cases across intake channels."
               },
               "widgetType": "pie",
