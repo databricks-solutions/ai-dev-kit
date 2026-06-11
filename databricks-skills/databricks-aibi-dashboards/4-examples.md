@@ -32,10 +32,14 @@ See [SKILL.md](SKILL.md#widget-index-version--where-documented) for the full ver
 ```
 y=0:   Header (w=12, h=3)  ← story prose tying the dashboard together
 y=3:   KPI (w=3) | KPI w/ sparkline (w=3) | KPI (w=3) | KPI (w=3)  ← fills 12
-y=6:   Forecast w/ release annotation (w=8, h=6)  | Histogram (w=4, h=6)
-y=12:  Symbol map (w=8, h=5)                      | Pie by channel (w=4, h=5)
-y=17:  Detail table (w=8, h=6)                    | Heatmap (w=4, h=6)
+y=6:   Forecast w/ release annotation (w=8, h=6)  | Histogram (w=4, h=8)
+y=12:  Symbol map (w=8, h=5)                      |
+y=14:                                             | Pie by channel (w=4, h=4)
+y=17:  Detail table (w=8, h=7)                    |
+y=18:                                             | Heatmap (w=4, h=6)
 ```
+
+The right-hand column uses **staggered heights** — the histogram extends past the forecast, the pie sits in the middle, the heatmap aligns to the bottom of the detail table. The widgets on the left and right don't share row boundaries; the engine tolerates this as long as the canvas reads naturally. Pair tall widgets on one side with several shorter ones on the other to vary the rhythm rather than forcing strict row alignment.
 
 This example's header carries a short narrative tying the widgets together, and the forecast widget uses a `vertical-line` annotation to mark a notable date. That's one way to structure a story — useful if there's a real inflection point in the data — but it's not required: a dashboard can also just present the metrics neutrally, or anchor the story on a different widget. Treat it as illustrative.
 
@@ -121,7 +125,9 @@ This example's header carries a short narrative tying the widgets together, and 
             "name": "header",
             "multilineTextboxSpec": {
               "lines": [
-                "# Support Operations \u2014 Post-Release Surge (4.1)\n\n**The story this week:** a clear volume spike in mid-February \u2014 the date the new Product 4.1 release went out (marked on the forecast chart). The release introduced a regression that drove a wave of Critical/High cases over the following 6 weeks: case volume jumps, average resolution time creeps up, reopen rate climbs, and customer satisfaction dips on the affected metros \u2014 visible on the satisfaction map as warmer (lower) scores. The forecast extends the trend forward so the team can size the cleanup ahead. Use the filters page to slice by region or resolution-time bucket to localize the impact."
+                "# Support Operations \u2014 Post-Release Surge (4.1)\n",
+                "\n",
+                "**The story this week:** a clear volume spike in mid-February \u2014 the date the new Product 4.1 release went out (marked on the forecast chart). The release introduced a regression that drove a wave of Critical/High cases over the following 6 weeks: case volume jumps, average resolution time creeps up, reopen rate climbs, and customer satisfaction dips on the affected metros \u2014 visible on the satisfaction map as warmer (lower) scores. The forecast extends the trend forward so the team can size the cleanup ahead. Use the filters page to slice by region or resolution-time bucket to localize the impact."
               ]
             }
           },
@@ -477,7 +483,7 @@ This example's header carries a short narrative tying the widgets together, and 
           },
           "position": {
             "x": 8,
-            "y": 17,
+            "y": 18,
             "width": 4,
             "height": 6
           }
@@ -628,7 +634,7 @@ This example's header carries a short narrative tying the widgets together, and 
             "x": 8,
             "y": 6,
             "width": 4,
-            "height": 6
+            "height": 8
           }
         },
         {
@@ -734,7 +740,7 @@ This example's header carries a short narrative tying the widgets together, and 
             "x": 0,
             "y": 17,
             "width": 8,
-            "height": 6
+            "height": 7
           }
         },
         {
@@ -808,9 +814,9 @@ This example's header carries a short narrative tying the widgets together, and 
           },
           "position": {
             "x": 8,
-            "y": 12,
+            "y": 14,
             "width": 4,
-            "height": 5
+            "height": 4
           }
         }
       ],
@@ -964,6 +970,10 @@ This example's header carries a short narrative tying the widgets together, and 
         "dark": "#1F272D"
       },
       "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#11171C"
+      },
+      "widgetBorderColor": {
         "light": "#FFFFFF",
         "dark": "#11171C"
       },

@@ -75,7 +75,9 @@
             "name": "header",
             "multilineTextboxSpec": {
               "lines": [
-                "# Support Operations \u2014 Post-Release Surge (4.1)\n\n**The story this week:** a clear volume spike in mid-February \u2014 the date the new Product 4.1 release went out (marked on the forecast chart). The release introduced a regression that drove a wave of Critical/High cases over the following 6 weeks: case volume jumps, average resolution time creeps up, reopen rate climbs, and customer satisfaction dips on the affected metros \u2014 visible on the satisfaction map as warmer (lower) scores. The forecast extends the trend forward so the team can size the cleanup ahead. Use the filters page to slice by region or resolution-time bucket to localize the impact."
+                "# Support Operations \u2014 Post-Release Surge (4.1)\n",
+                "\n",
+                "**The story this week:** a clear volume spike in mid-February \u2014 the date the new Product 4.1 release went out (marked on the forecast chart). The release introduced a regression that drove a wave of Critical/High cases over the following 6 weeks: case volume jumps, average resolution time creeps up, reopen rate climbs, and customer satisfaction dips on the affected metros \u2014 visible on the satisfaction map as warmer (lower) scores. The forecast extends the trend forward so the team can size the cleanup ahead. Use the filters page to slice by region or resolution-time bucket to localize the impact."
               ]
             }
           },
@@ -431,7 +433,7 @@
           },
           "position": {
             "x": 8,
-            "y": 17,
+            "y": 18,
             "width": 4,
             "height": 6
           }
@@ -582,7 +584,7 @@
             "x": 8,
             "y": 6,
             "width": 4,
-            "height": 6
+            "height": 8
           }
         },
         {
@@ -688,7 +690,7 @@
             "x": 0,
             "y": 17,
             "width": 8,
-            "height": 6
+            "height": 7
           }
         },
         {
@@ -762,9 +764,9 @@
           },
           "position": {
             "x": 8,
-            "y": 12,
+            "y": 14,
             "width": 4,
-            "height": 5
+            "height": 4
           }
         }
       ],
@@ -918,6 +920,10 @@
         "dark": "#1F272D"
       },
       "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#11171C"
+      },
+      "widgetBorderColor": {
         "light": "#FFFFFF",
         "dark": "#11171C"
       },

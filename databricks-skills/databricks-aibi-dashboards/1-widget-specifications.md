@@ -389,14 +389,14 @@ Default behaviour: theme colors are assigned to categories in order. To pin spec
   "scale": {
     "type": "categorical",
     "mappings": [
-      {"value": "1-Critical", "color": {"hex": "#FF7E5C"}},
-      {"value": "4-Low",      "color": {"themeColorType": "visualizationColors", "position": 6}}
+      {"value": "1-Critical", "color": "#FF7E5C"},
+      {"value": "4-Low",      "color": "#99DDB4"}
     ]
   }
 }
 ```
 
-`themeColorType: "visualizationColors"` + `position: 0..N-1` (0-indexed) selects from the dashboard's theme palette. For semantic colors that must hold across palette changes (Critical → always red, OK → always green), pin a **literal hex** with `{"hex": "#FF0000"}` instead — palette reshuffles silently move palette-position colors.
+Inside `mappings[].color`, use a **bare hex string** (`"#FF0000"`) — that's the form chart widgets honor. Palette-position references (`themeColorType` / `position`) and the wrapped `{"hex": "..."}` object form are silently dropped on `mappings[].color`, so semantic pins must always be bare hex.
 
 > For continuous color ramps on quantitative encodings, use `colorRamp` — see Symbol Map below, or [Heatmap](2-advanced-widget-specifications.md#heatmap) and [Choropleth Map](2-advanced-widget-specifications.md#choropleth-map) in advanced specs.
 
