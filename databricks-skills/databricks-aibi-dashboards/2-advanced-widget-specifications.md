@@ -350,7 +350,7 @@ Frequency distribution. The bin width is set in the **widget's field expression*
 }
 ```
 
-The field `name` (and the widget's `fieldName`) is the readable `bin(col, binWidth=N)` label; the actual SQL expression is `BIN_FLOOR(\`col\`, N)`.
+The field `name` (and the widget's `fieldName`) is the readable `bin(col, binWidth=N)` label; the underlying `expression` uses `BIN_FLOOR(\`col\`, N)` — a Lakeview field-expression, not raw SQL.
 
 ---
 
@@ -485,4 +485,4 @@ Dataset typically returns one row per period with signed values (positive contri
 | `word-cloud` | Word/category frequency from a text field. |
 | `sunburst`   | Hierarchical data in nested rings (org chart, taxonomy). |
 
-These follow the same `version`/`widgetType`/`encodings` pattern — see the [official docs](https://docs.databricks.com/aws/en/dashboards/manage/visualizations/types) for spec details.
+These follow the same `version`/`widgetType`/`encodings` pattern — see the [official docs](https://docs.databricks.com/dashboards/manage/visualizations/types) for spec details.
