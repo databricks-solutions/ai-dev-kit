@@ -1259,13 +1259,12 @@ ensure_aitools_cli() {
     done
 }
 
-# Map selected $TOOLS to `aitools --agents` tokens; tools aitools cannot
-# target (gemini, windsurf, kiro) are collected separately.
+# Map selected $TOOLS to `aitools --agents` tokens. Tools aitools doesn't
+# install for are handled by deliver_agent_skills (which links every selected
+# tool's dir from the canonical store).
 AITOOLS_AGENTS=""
-UNSUPPORTED_AGENT_TOOLS=""
 map_aitools_agents() {
     AITOOLS_AGENTS=""
-    UNSUPPORTED_AGENT_TOOLS=""
     local tool
     for tool in $TOOLS; do
         case $tool in
@@ -1275,18 +1274,25 @@ map_aitools_agents() {
             codex)       AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}codex" ;;
             opencode)    AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}opencode" ;;
             antigravity) AITOOLS_AGENTS="${AITOOLS_AGENTS:+$AITOOLS_AGENTS,}antigravity" ;;
-            gemini|windsurf|kiro) UNSUPPORTED_AGENT_TOOLS="${UNSUPPORTED_AGENT_TOOLS:+$UNSUPPORTED_AGENT_TOOLS }$tool" ;;
         esac
     done
 }
 
-# Skills dirs for tools aitools can't target (one per line, deduped)
-unsupported_skill_dirs() {
+# Skills dir for every selected tool (one per line, deduped). `aitools` only
+# fans out to some agents (e.g. project scope: just Claude Code + Cursor), so we
+# link the canonical store into every selected tool's dir ourselves.
+agent_skill_target_dirs() {
     local base_dir=$1 tool
-    for tool in $UNSUPPORTED_AGENT_TOOLS; do
+    for tool in $TOOLS; do
         case $tool in
+            claude)   echo "$base_dir/.claude/skills" ;;
+            cursor)   echo "$base_dir/.cursor/skills" ;;
+            copilot)  echo "$base_dir/.github/skills" ;;
+            codex)    echo "$base_dir/.agents/skills" ;;
             gemini)   echo "$base_dir/.gemini/skills" ;;
+            antigravity) [ "$SCOPE" = "global" ] && echo "$HOME/.gemini/antigravity/skills" || echo "$base_dir/.agents/skills" ;;
             windsurf) [ "$SCOPE" = "global" ] && echo "$HOME/.codeium/windsurf/skills" || echo "$base_dir/.windsurf/skills" ;;
+            opencode) [ "$SCOPE" = "global" ] && echo "$HOME/.config/opencode/skills" || echo "$base_dir/.opencode/skills" ;;
             kiro)     [ "$SCOPE" = "global" ] && echo "$HOME/.kiro/skills" || echo "$base_dir/.kiro/skills" ;;
         esac
     done | sort -u
@@ -1358,21 +1364,22 @@ install_agent_b_skills() {
         ok "Agent skills ($count) installed — manage with ${B}databricks aitools list|update|uninstall${N}"
     fi
 
-    # Tools aitools can't target: link/copy the skills from the canonical store
-    if [ -n "$UNSUPPORTED_AGENT_TOOLS" ]; then
-        install_agent_b_unsupported "$base_dir" "$skills_csv" "$exp_flag"
-    fi
+    # aitools only installs for some agents (project scope: just Claude Code +
+    # Cursor). Link the canonical store into every other selected tool's dir.
+    deliver_agent_skills "$base_dir" "$skills_csv" "$exp_flag"
 
     # Record the selection so a future profile change can uninstall dropped skills
     mkdir -p "$STATE_DIR"
     echo "$SELECTED_AGENT_B_SKILLS" | tr ' ' '\n' | sed '/^$/d' > "$prev_file"
 }
 
-# Deliver agent skills to Gemini CLI / Windsurf / Kiro.
-# If aitools ran for at least one supported agent, symlink each skill from the
-# canonical store (kept fresh by `databricks aitools update`). Otherwise stage a
-# throwaway project-scope install in a temp dir and copy real files from it.
-install_agent_b_unsupported() {
+# Link the agent skills into every selected tool's skills dir from the canonical
+# store, so tools aitools doesn't install for (project scope: everything except
+# Claude Code + Cursor; plus Gemini/Windsurf/Kiro, which aitools never targets)
+# still get the skills. Entries aitools already created are left to aitools.
+# If no aitools-supported agent was selected there is no persistent store, so we
+# stage a throwaway install in a temp dir and copy real files from it.
+deliver_agent_skills() {
     local base_dir=$1 skills_csv=$2 exp_flag=$3
     local manifest="$STATE_DIR/.installed-skills"
 
@@ -1388,20 +1395,25 @@ install_agent_b_unsupported() {
         tmp_dir=$(mktemp -d)
         if ! (cd "$tmp_dir" && databricks aitools install --scope project --agents claude-code --skills "$skills_csv" $exp_flag >/dev/null 2>&1); then
             rm -rf "$tmp_dir"
-            warn "Could not stage agent skills for: $(echo "$UNSUPPORTED_AGENT_TOOLS" | tr ' ' ',')"
+            warn "Could not stage agent skills for: $(echo "$TOOLS" | tr ' ' ',')"
             return
         fi
         store="$tmp_dir/.databricks/aitools/skills"
     fi
 
-    local dir skill target count
-    count=$(_count $SELECTED_AGENT_B_SKILLS)
+    local dir skill target made
     while IFS= read -r dir; do
         [ -z "$dir" ] && continue
         mkdir -p "$dir"
+        made=0
         for skill in $SELECTED_AGENT_B_SKILLS; do
             if [ ! -d "$store/$skill" ]; then
                 warn "Agent skill '$skill' missing from aitools store — skipped"
+                continue
+            fi
+            # In link mode, leave anything aitools already placed (e.g. Claude
+            # Code / Cursor) to aitools — it owns and updates those.
+            if [ "$mode" = "link" ] && { [ -e "$dir/$skill" ] || [ -L "$dir/$skill" ]; }; then
                 continue
             fi
             rm -rf "$dir/$skill"
@@ -1415,9 +1427,10 @@ install_agent_b_unsupported() {
                 cp -R "$store/$skill" "$dir/$skill"
             fi
             echo "$dir|$skill" >> "$manifest"
+            made=$((made + 1))
         done
-        ok "Agent skills ($count, $mode) → ${dir#$HOME/}"
-    done < <(unsupported_skill_dirs "$base_dir")
+        [ "$made" -gt 0 ] && ok "Agent skills ($made, $mode) → ${dir#$HOME/}"
+    done < <(agent_skill_target_dirs "$base_dir")
 
     [ -n "$tmp_dir" ] && rm -rf "$tmp_dir"
     return 0
@@ -1534,16 +1547,14 @@ dry_run_report() {
         if [ -n "$AITOOLS_AGENTS" ]; then
             msg "Would run: ${B}databricks aitools install --scope ${SCOPE} --agents ${AITOOLS_AGENTS} --skills ${skills_csv}${exp_flag} -p ${PROFILE}${N}"
         fi
-        if [ -n "$UNSUPPORTED_AGENT_TOOLS" ]; then
-            local mode="symlink from the aitools canonical store"
-            [ -z "$AITOOLS_AGENTS" ] && mode="copy via a temp-dir aitools install"
-            msg "Would deliver agent skills to $(echo "$UNSUPPORTED_AGENT_TOOLS" | tr ' ' ',') ($mode):"
-            local dir base_dir
-            [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
-            while IFS= read -r dir; do
-                [ -n "$dir" ] && msg "  → $dir"
-            done < <(unsupported_skill_dirs "$base_dir")
-        fi
+        local mode="symlink from the aitools canonical store"
+        [ -z "$AITOOLS_AGENTS" ] && mode="copy via a temp-dir aitools install"
+        msg "Would deliver agent skills to every selected tool ($mode); entries aitools creates are left to aitools:"
+        local dir base_dir
+        [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+        while IFS= read -r dir; do
+            [ -n "$dir" ] && msg "  → $dir"
+        done < <(agent_skill_target_dirs "$base_dir")
     else
         msg "Agent skills: <none>"
     fi

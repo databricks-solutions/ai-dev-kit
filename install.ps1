@@ -189,7 +189,6 @@ $script:ApxResolvedRef = ""
 
 # aitools agent mapping (populated by Resolve-AitoolsAgents)
 $script:AitoolsAgents = ""
-$script:UnsupportedAgentTools = @()
 
 # ─── --list-skills handler ────────────────────────────────────
 # (function -- needs Get-AgentBInventory; invoked from Invoke-Main)
@@ -1426,11 +1425,10 @@ function Confirm-AitoolsCli {
     }
 }
 
-# Map selected tools to `aitools --agents` tokens; tools aitools cannot
-# target (gemini, windsurf, kiro) are collected separately.
+# Map selected tools to `aitools --agents` tokens. Tools aitools doesn't install
+# for are handled by Send-AgentSkills (which links every selected tool's dir).
 function Resolve-AitoolsAgents {
     $agents = @()
-    $unsupported = @()
     foreach ($tool in ($script:Tools -split ' ')) {
         switch ($tool) {
             "claude"      { $agents += "claude-code" }
@@ -1439,33 +1437,39 @@ function Resolve-AitoolsAgents {
             "codex"       { $agents += "codex" }
             "opencode"    { $agents += "opencode" }
             "antigravity" { $agents += "antigravity" }
-            { $_ -in "gemini", "windsurf", "kiro" } { $unsupported += $tool }
         }
     }
     $script:AitoolsAgents = ($agents -join ',')
-    $script:UnsupportedAgentTools = @($unsupported)
 }
 
-# Skills dirs for tools aitools can't target (deduped)
-function Get-UnsupportedSkillDirs {
+# Skills dir for every selected tool (deduped). aitools only fans out to some
+# agents (e.g. project scope: just Claude Code + Cursor), so we link the
+# canonical store into every selected tool's dir ourselves.
+function Get-AgentSkillTargetDirs {
     param([string]$BaseDir)
     $dirs = @()
-    foreach ($tool in $script:UnsupportedAgentTools) {
+    foreach ($tool in ($script:Tools -split ' ')) {
         switch ($tool) {
-            "gemini" { $dirs += Join-Path $BaseDir ".gemini\skills" }
+            "claude"   { $dirs += Join-Path $BaseDir ".claude\skills" }
+            "cursor"   { $dirs += Join-Path $BaseDir ".cursor\skills" }
+            "copilot"  { $dirs += Join-Path $BaseDir ".github\skills" }
+            "codex"    { $dirs += Join-Path $BaseDir ".agents\skills" }
+            "gemini"   { $dirs += Join-Path $BaseDir ".gemini\skills" }
+            "antigravity" {
+                if ($script:Scope -eq "global") { $dirs += Join-Path $env:USERPROFILE ".gemini\antigravity\skills" }
+                else { $dirs += Join-Path $BaseDir ".agents\skills" }
+            }
             "windsurf" {
-                if ($script:Scope -eq "global") {
-                    $dirs += Join-Path $env:USERPROFILE ".codeium\windsurf\skills"
-                } else {
-                    $dirs += Join-Path $BaseDir ".windsurf\skills"
-                }
+                if ($script:Scope -eq "global") { $dirs += Join-Path $env:USERPROFILE ".codeium\windsurf\skills" }
+                else { $dirs += Join-Path $BaseDir ".windsurf\skills" }
+            }
+            "opencode" {
+                if ($script:Scope -eq "global") { $dirs += Join-Path $env:USERPROFILE ".config\opencode\skills" }
+                else { $dirs += Join-Path $BaseDir ".opencode\skills" }
             }
             "kiro" {
-                if ($script:Scope -eq "global") {
-                    $dirs += Join-Path $env:USERPROFILE ".kiro\skills"
-                } else {
-                    $dirs += Join-Path $BaseDir ".kiro\skills"
-                }
+                if ($script:Scope -eq "global") { $dirs += Join-Path $env:USERPROFILE ".kiro\skills" }
+                else { $dirs += Join-Path $BaseDir ".kiro\skills" }
             }
         }
     }
@@ -1550,10 +1554,9 @@ function Install-AgentBSkills {
         Write-Ok "Agent skills ($count) installed -- manage with databricks aitools list|update|uninstall"
     }
 
-    # Tools aitools can't target: link/copy the skills from the canonical store
-    if ($script:UnsupportedAgentTools.Count -gt 0) {
-        Install-AgentBUnsupported -BaseDir $BaseDir -SkillsCsv $skillsCsv -NeedsExperimental $needsExperimental
-    }
+    # aitools only installs for some agents (project scope: just Claude Code +
+    # Cursor). Link the canonical store into every other selected tool's dir.
+    Send-AgentSkills -BaseDir $BaseDir -SkillsCsv $skillsCsv -NeedsExperimental $needsExperimental
 
     # Record the selection so a future profile change can uninstall dropped skills
     if (-not (Test-Path $script:StateDir)) {
@@ -1562,13 +1565,14 @@ function Install-AgentBSkills {
     Set-Content -Path $prevFile -Value ($script:SelectedAgentBSkills -join "`n") -Encoding UTF8
 }
 
-# Deliver agent skills to Gemini CLI / Windsurf / Kiro.
-# If aitools ran for at least one supported agent, symlink each skill from the
-# canonical store (kept fresh by `databricks aitools update`); symlink creation
-# can require elevated privileges on Windows, so fall back to copying. If no
-# supported agent was selected, stage a throwaway project-scope install in a
-# temp dir and copy real files from it.
-function Install-AgentBUnsupported {
+# Link the agent skills into every selected tool's skills dir from the canonical
+# store, so tools aitools doesn't install for (project scope: everything except
+# Claude Code + Cursor; plus Gemini/Windsurf/Kiro, which aitools never targets)
+# still get the skills. Entries aitools already created are left to aitools.
+# Symlink creation can require elevated privileges on Windows, so fall back to
+# copying. If no aitools-supported agent was selected there is no persistent
+# store, so stage a throwaway install in a temp dir and copy real files from it.
+function Send-AgentSkills {
     param([string]$BaseDir, [string]$SkillsCsv, [bool]$NeedsExperimental)
 
     $manifest = Join-Path $script:StateDir ".installed-skills"
@@ -1598,28 +1602,30 @@ function Install-AgentBUnsupported {
         $ErrorActionPreference = $prevEAP
         if (-not $stageOk) {
             Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
-            Write-Warn "Could not stage agent skills for: $($script:UnsupportedAgentTools -join ',')"
+            Write-Warn "Could not stage agent skills for: $(($script:Tools -split ' ') -join ',')"
             return
         }
         $store = Join-Path $tmpDir ".databricks\aitools\skills"
     }
 
-    $count = $script:SelectedAgentBSkills.Count
-    foreach ($dir in (Get-UnsupportedSkillDirs -BaseDir $BaseDir)) {
+    foreach ($dir in (Get-AgentSkillTargetDirs -BaseDir $BaseDir)) {
         if ([string]::IsNullOrWhiteSpace($dir)) { continue }
         if (-not (Test-Path $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
         $usedMode = $mode
+        $made = 0
         foreach ($skill in $script:SelectedAgentBSkills) {
             $srcPath = Join-Path $store $skill
             if (-not (Test-Path $srcPath)) {
                 Write-Warn "Agent skill '$skill' missing from aitools store -- skipped"
                 continue
             }
-            # Remove real dirs and symlinks alike before re-creating
             $destPath = Join-Path $dir $skill
             $destItem = Get-Item -LiteralPath $destPath -Force -ErrorAction SilentlyContinue
+            # In link mode, leave anything aitools already placed (e.g. Claude
+            # Code / Cursor) to aitools -- it owns and updates those.
+            if ($mode -eq "link" -and $destItem) { continue }
             if ($destItem) {
                 if ($destItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
                     $destItem.Delete()
@@ -1643,9 +1649,12 @@ function Install-AgentBUnsupported {
                 Copy-Item -Recurse $srcPath $destPath
             }
             Add-Content -Path $manifest -Value "$dir|$skill" -Encoding UTF8
+            $made++
         }
-        $shortDir = $dir -replace [regex]::Escape($env:USERPROFILE), '~'
-        Write-Ok "Agent skills ($count, $usedMode) -> $shortDir"
+        if ($made -gt 0) {
+            $shortDir = $dir -replace [regex]::Escape($env:USERPROFILE), '~'
+            Write-Ok "Agent skills ($made, $usedMode) -> $shortDir"
+        }
     }
 
     if ($tmpDir) { Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue }
@@ -1803,13 +1812,11 @@ function Show-DryRunReport {
         if ($script:AitoolsAgents) {
             Write-Msg "Would run: databricks aitools install --scope $($script:Scope) --agents $($script:AitoolsAgents) --skills $skillsCsv$expFlag -p $($script:Profile_)"
         }
-        if ($script:UnsupportedAgentTools.Count -gt 0) {
-            $mode = if ($script:AitoolsAgents) { "symlink from the aitools canonical store" } else { "copy via a temp-dir aitools install" }
-            Write-Msg "Would deliver agent skills to $($script:UnsupportedAgentTools -join ',') ($mode):"
-            $dryBaseDir = if ($script:Scope -eq "global") { $env:USERPROFILE } else { (Get-Location).Path }
-            foreach ($dir in (Get-UnsupportedSkillDirs -BaseDir $dryBaseDir)) {
-                Write-Msg "  -> $dir"
-            }
+        $mode = if ($script:AitoolsAgents) { "symlink from the aitools canonical store" } else { "copy via a temp-dir aitools install" }
+        Write-Msg "Would deliver agent skills to every selected tool ($mode); entries aitools creates are left to aitools:"
+        $dryBaseDir = if ($script:Scope -eq "global") { $env:USERPROFILE } else { (Get-Location).Path }
+        foreach ($dir in (Get-AgentSkillTargetDirs -BaseDir $dryBaseDir)) {
+            Write-Msg "  -> $dir"
         }
     } else {
         Write-Msg "Agent skills: <none>"
