@@ -784,7 +784,11 @@ prompt_mcp_install() {
         "Install MCP server|yes|off|Legacy — requires a Python venv (uv)" \
     )
 
-    [ "$selected" = "yes" ] && INSTALL_MCP=true
+    # Note: an `&& INSTALL_MCP=true` one-liner here would return 1 when the user
+    # picks "no", and `set -e` would abort the installer. Use an if-block.
+    if [ "$selected" = "yes" ]; then
+        INSTALL_MCP=true
+    fi
 }
 
 # ─── MCP path selection ────────────────────────────────────────
