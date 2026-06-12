@@ -54,6 +54,10 @@ USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
 DRY_RUN="${DRY_RUN:-false}"
+# Include experimental agent skills in profile/"all" selections (default: true).
+# Pass --experimental false (or DEVKIT_EXPERIMENTAL=false) to install only stable
+# skills. Explicit --skills requests are always honored as named.
+INSTALL_EXPERIMENTAL="${DEVKIT_EXPERIMENTAL:-true}"
 
 # Raw-fetch ref overrides (see resolve_ref). SKILLS_CHANNEL=dev flips unset
 # refs to `main` for living-at-head testing.
@@ -70,6 +74,8 @@ INCLUDE_PRERELEASES="${INCLUDE_PRERELEASES:-0}"
 [ "$FORCE" = "true" ] || [ "$FORCE" = "1" ] && FORCE=true || FORCE=false
 [ "$SILENT" = "true" ] || [ "$SILENT" = "1" ] && SILENT=true || SILENT=false
 [ "$DRY_RUN" = "true" ] || [ "$DRY_RUN" = "1" ] && DRY_RUN=true || DRY_RUN=false
+# Experimental defaults to true; only "false"/"0" turn it off
+[ "$INSTALL_EXPERIMENTAL" = "false" ] || [ "$INSTALL_EXPERIMENTAL" = "0" ] && INSTALL_EXPERIMENTAL=false || INSTALL_EXPERIMENTAL=true
 
 # Check if scope was explicitly set via env var
 [ -n "${DEVKIT_SCOPE:-}" ] && SCOPE_EXPLICIT=true
@@ -175,6 +181,12 @@ while [ $# -gt 0 ]; do
         --skills-profile) SKILLS_PROFILE="$2"; shift 2 ;;
         --skills)         USER_SKILLS="$2"; shift 2 ;;
         --list-skills)    LIST_SKILLS=true; shift ;;
+        --experimental)
+            case "$2" in
+                false|0) INSTALL_EXPERIMENTAL=false; shift 2 ;;
+                true|1)  INSTALL_EXPERIMENTAL=true; shift 2 ;;
+                *)       INSTALL_EXPERIMENTAL=true; shift ;;
+            esac ;;
         --silent)         SILENT=true; shift ;;
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --dry-run)        DRY_RUN=true; shift ;;
@@ -197,6 +209,7 @@ while [ $# -gt 0 ]; do
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             echo "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             echo "  --list-skills         List available skills and profiles, then exit"
+            echo "  --experimental BOOL   Include experimental agent skills (default: true; 'false' = stable only)"
             echo "  --dry-run             Print what would be installed (resolved refs, aitools command) and exit"
             echo "  -f, --force           Force reinstall"
             echo "  -h, --help            Show this help"
@@ -212,6 +225,7 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SKILLS_PROFILE Comma-separated skill profiles"
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
+            echo "  DEVKIT_EXPERIMENTAL   'true' (default) or 'false' to skip experimental agent skills"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             echo "  APX_REF               Ref for APX skill fetch: 'latest' (default), a tag/SHA, or 'main'"
             echo "  MLFLOW_REF            Ref for MLflow skills fetch (default: main)"
@@ -867,11 +881,13 @@ resolve_skills() {
         SELECTED_AGENT_B_SKILLS=$(_dedupe "$agent_b_skills")
     }
 
-    # Agent skills selected by default: everything except the excluded list
+    # Agent skills selected by default: everything except the excluded list (and
+    # experimental skills when --experimental false)
     _default_agent_b() {
         local skill
         for skill in $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL; do
             _in_list "$skill" "$AGENT_B_EXCLUDED" && continue
+            [ "$INSTALL_EXPERIMENTAL" = false ] && _in_list "$skill" "$AGENT_B_EXPERIMENTAL" && continue
             agent_b_skills="${agent_b_skills:+$agent_b_skills }$skill"
         done
     }
@@ -927,6 +943,10 @@ resolve_skills() {
 
     local skill
     for skill in $names; do
+        # Drop experimental agent skills from profiles when --experimental false
+        if [ "$INSTALL_EXPERIMENTAL" = false ] && _in_list "$skill" "$AGENT_B_EXPERIMENTAL"; then
+            continue
+        fi
         _bucket "$skill" || warn "Skill '$skill' not found in any source (skipped)"
     done
     _store_selection
@@ -2345,6 +2365,7 @@ main() {
                 echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N} ${Y}(will be overwritten, backup your changes first)${N}"
             fi
             [ -n "$SELECTED_AGENT_B_SKILLS" ] && echo -e "  Agent skills: ${G}via databricks aitools${N} ${D}(requires Databricks CLI v${MIN_AITOOLS_CLI_VERSION}+)${N}"
+            [ "$INSTALL_EXPERIMENTAL" = false ] && echo -e "  Experimental: ${Y}excluded${N} ${D}(--experimental false)${N}"
             [ -n "$SELECTED_APX_SKILLS" ] && [ -n "$APX_RESOLVED_REF" ] && echo -e "  APX ref:     ${G}${APX_RESOLVED_REF}${N}"
         fi
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"

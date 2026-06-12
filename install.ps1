@@ -83,6 +83,10 @@ $script:SkillsProfile = if ($env:DEVKIT_SKILLS_PROFILE) { $env:DEVKIT_SKILLS_PRO
 $script:UserSkills   = if ($env:DEVKIT_SKILLS) { $env:DEVKIT_SKILLS } else { "" }
 $script:ListSkills   = $false
 $script:DryRun       = ($env:DRY_RUN -in @("true", "1"))
+# Include experimental agent skills in profile/"all" selections (default: true).
+# Pass --experimental false (or DEVKIT_EXPERIMENTAL=false) for stable only.
+# Explicit --skills requests are always honored as named.
+$script:InstallExperimental = ($env:DEVKIT_EXPERIMENTAL -notin @("false", "0"))
 
 # -McpPath / DEVKIT_MCP_PATH implies opting into the MCP server
 if ($script:UserMcpPath) { $script:InstallMcp = $true }
@@ -312,6 +316,13 @@ while ($i -lt $args.Count) {
         { $_ -in "--skills-profile", "-SkillsProfile" } { $script:SkillsProfile = $args[$i + 1]; $i += 2 }
         { $_ -in "--skills", "-Skills" }       { $script:UserSkills = $args[$i + 1]; $i += 2 }
         { $_ -in "--list-skills", "-ListSkills" } { $script:ListSkills = $true; $i++ }
+        { $_ -in "--experimental", "-Experimental" } {
+            switch ("$($args[$i + 1])".ToLower()) {
+                { $_ -in "false", "0" } { $script:InstallExperimental = $false; $i += 2 }
+                { $_ -in "true", "1" }  { $script:InstallExperimental = $true; $i += 2 }
+                default                 { $script:InstallExperimental = $true; $i++ }
+            }
+        }
         { $_ -in "--dry-run", "-DryRun" }      { $script:DryRun = $true; $i++ }
         { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
@@ -332,6 +343,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
             Write-Host "  --skills LIST         Comma-separated skill names to install (overrides profile)"
             Write-Host "  --list-skills         List available skills and profiles, then exit"
+            Write-Host "  --experimental BOOL   Include experimental agent skills (default: true; 'false' = stable only)"
             Write-Host "  --dry-run             Print what would be installed (resolved refs, aitools command) and exit"
             Write-Host "  -f, --force           Force reinstall"
             Write-Host "  -h, --help            Show this help"
@@ -341,6 +353,7 @@ while ($i -lt $args.Count) {
             Write-Host "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
             Write-Host "  DEVKIT_INSTALL_MCP    Set to 'true' to install the deprecated MCP server (default: false)"
             Write-Host "  DEVKIT_PROFILE/SCOPE/TOOLS/SKILLS/SKILLS_PROFILE/MCP_PATH/FORCE/SILENT  (mirror the bash installer)"
+            Write-Host "  DEVKIT_EXPERIMENTAL   'true' (default) or 'false' to skip experimental agent skills"
             Write-Host "  APX_REF               Ref for APX skill fetch: 'latest' (default), a tag/SHA, or 'main'"
             Write-Host "  MLFLOW_REF            Ref for MLflow skills fetch (default: main)"
             Write-Host "  SKILLS_CHANNEL        'stable' (default) or 'dev' (unset raw-fetch refs follow main)"
@@ -989,10 +1002,12 @@ function Resolve-Skills {
     $apxSkills = @()
     $agentBSkills = @()
 
-    # Agent skills selected by default: everything except the excluded list
+    # Agent skills selected by default: everything except the excluded list (and
+    # experimental skills when --experimental false)
     $defaultAgentB = @()
     foreach ($skill in ($script:AgentBStable + $script:AgentBExperimental)) {
         if ($script:AgentBExcluded -contains $skill) { continue }
+        if (-not $script:InstallExperimental -and ($script:AgentBExperimental -contains $skill)) { continue }
         $defaultAgentB += $skill
     }
 
@@ -1046,6 +1061,8 @@ function Resolve-Skills {
     }
 
     foreach ($skill in $names) {
+        # Drop experimental agent skills from profiles when --experimental false
+        if (-not $script:InstallExperimental -and ($script:AgentBExperimental -contains $skill)) { continue }
         switch (Get-SkillBucket -Name $skill) {
             "local"  { $localSkills += $skill }
             "mlflow" { $mlflowSkills += $skill }
@@ -2562,6 +2579,11 @@ function Invoke-Main {
                 Write-Host "  Agent skills: " -NoNewline
                 Write-Host "via databricks aitools" -ForegroundColor Green -NoNewline
                 Write-Host " (requires Databricks CLI v$MinAitoolsCliVersion+)" -ForegroundColor DarkGray
+            }
+            if (-not $script:InstallExperimental) {
+                Write-Host "  Experimental: " -NoNewline
+                Write-Host "excluded" -ForegroundColor Yellow -NoNewline
+                Write-Host " (--experimental false)" -ForegroundColor DarkGray
             }
             if ($script:SelectedApxSkills.Count -gt 0 -and $script:ApxResolvedRef) {
                 Write-Host "  APX ref:     " -NoNewline; Write-Host $script:ApxResolvedRef -ForegroundColor Green
