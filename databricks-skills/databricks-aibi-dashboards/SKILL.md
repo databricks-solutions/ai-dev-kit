@@ -244,7 +244,7 @@ Mental model — **60/30/10 rule** mapped to theme keys: **60% neutral** = canva
 
 - `visualizationColors`: ordered palette every chart series and category mapping cycles through. **Positions are 0-indexed**: `position: 0` = first color (`#FFA600` above), `position: 6` = seventh (`#99DDB4`). Length 5–8 is typical.
 - Background / font / selection colors take `light` + `dark` pairs; the dashboard auto-selects based on viewer mode.
-- `widgetHeaderAlignment`: `"LEFT"` (default), `"CENTER"`, or `"RIGHT"`.
+- `widgetHeaderAlignment`: `"LEFT"` (default), `"CENTER"`, or `"RIGHT"`. Optional top-level: `fontFamily` (e.g. `"Space Grotesk"`, `"Inter"` — sans-serif keeps dense data readable; don't override per widget) and `widgetCornerRadius` (integer px, e.g. `12` for rounded corners; `0` or omit = square).
 - Per-widget color references: `{"themeColorType": "visualizationColors", "position": N}` (0-indexed) to pin to a palette slot, or `{"hex": "#FF0000"}` for an exact color outside the palette.
 
 **Palette-design rules** (this is what separates a polished dashboard from a noisy one):
@@ -317,7 +317,7 @@ Apply unless user specifies otherwise:
 - **Fewer datasets is better — aim for one dataset that backs as many widgets as possible.** Clicking a value on a chart (e.g., a bar, a slice) acts as a filter on **that dataset**, and every other widget sharing the same dataset re-renders with the click applied. Splitting widgets across many narrow datasets breaks this cross-filtering and forces users to set explicit filter widgets for what should "just work". Prefer one wide dataset per domain (orders, cases, customers); only split when a widget genuinely needs different grain, pre-aggregation, or a parameter the others can't tolerate.
 - **Two ways to define a dataset**:
   - **SQL query**: `{"name": "ds_x", "displayName": "...", "queryLines": ["SELECT ...", "FROM table"]}` — full control, can include `WITH` / `JOIN` / `AI_FORECAST` / etc.
-  - **UC asset shorthand**: `{"name": "ds_x", "displayName": "...", "asset_name": "catalog.schema.table_or_view"}` — no SQL needed. Works for regular tables, views, and metric views.
+  - **UC asset shorthand**: `{"name": "ds_x", "asset_name": "catalog.schema.table_or_view"}` — no SQL needed. Works for tables, views, and metric views. You can still stack `columns` (measures + derived dimensions) on top: `{"name": "ds_x", "asset_name": "...", "columns": [{"displayName": "Total Revenue", "expression": "SUM(\`amount_usd\`)"}]}` — same `MEASURE()` pattern.
 - **Exactly ONE valid SQL query per dataset** when using `queryLines` (no multiple queries separated by `;`)
 - **Queries must use bare table names only** — no catalog, no schema prefix. Example: `FROM orders`, never `FROM gold.orders` or `FROM main.gold.orders`. The catalog and schema come from the `--dataset-catalog` and `--dataset-schema` flags at creation time. These flags only fill in missing parts — they do NOT override any catalog/schema written in the query.
 - SELECT must include all dimensions needed by widgets and all derived columns via `AS` aliases

@@ -422,7 +422,7 @@ Mark an event on a time-series chart — release, holiday, incident — with a v
 }
 ```
 
-Multiple annotations are allowed — add more objects to the array. For non-datetime axes, use `"dataType": "STRING"` or `"NUMBER"` and set `dataValue` accordingly.
+Multiple annotations are allowed. For non-datetime axes: `"dataType": "STRING"` for categorical, `"INTEGER"` / `"DECIMAL"` for numeric (NOT `"NUMBER"` — silently dropped). `dataValue` is always a **string**, even for numeric types: `{"dataValue": "48", "dataType": "INTEGER"}`.
 
 ---
 
