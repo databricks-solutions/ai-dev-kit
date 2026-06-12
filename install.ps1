@@ -479,10 +479,16 @@ function Select-Checkbox {
             }
             $padLabel = $Items[$j].Label.PadRight(16)
             Write-Host " $padLabel " -NoNewline
+            # Truncate the hint so the line can't wrap past the window width
+            # (a wrapped line would desync the cursor-relative redraw).
+            $hint = $Items[$j].Hint
+            $avail = [Console]::WindowWidth - [Console]::CursorLeft - 1
+            if ($avail -lt 0) { $avail = 0 }
+            if ($hint.Length -gt $avail) { $hint = $hint.Substring(0, $avail) }
             if ($states[$j]) {
-                Write-Host $Items[$j].Hint -ForegroundColor Green -NoNewline
+                Write-Host $hint -ForegroundColor Green -NoNewline
             } else {
-                Write-Host $Items[$j].Hint -ForegroundColor DarkGray -NoNewline
+                Write-Host $hint -ForegroundColor DarkGray -NoNewline
             }
             # Clear rest of line
             $pos = [Console]::CursorLeft
@@ -615,10 +621,16 @@ function Select-Radio {
             }
             $padLabel = $Items[$j].Label.PadRight(20)
             Write-Host " $padLabel " -NoNewline
+            # Truncate the hint so the line can't wrap past the window width
+            # (a wrapped line would desync the cursor-relative redraw).
+            $hint = $Items[$j].Hint
+            $avail = [Console]::WindowWidth - [Console]::CursorLeft - 1
+            if ($avail -lt 0) { $avail = 0 }
+            if ($hint.Length -gt $avail) { $hint = $hint.Substring(0, $avail) }
             if ($j -eq $selected) {
-                Write-Host $Items[$j].Hint -ForegroundColor Green -NoNewline
+                Write-Host $hint -ForegroundColor Green -NoNewline
             } else {
-                Write-Host $Items[$j].Hint -ForegroundColor DarkGray -NoNewline
+                Write-Host $hint -ForegroundColor DarkGray -NoNewline
             }
             $pos = [Console]::CursorLeft
             $remaining = [Console]::WindowWidth - $pos - 1
@@ -1143,10 +1155,16 @@ function Invoke-PromptSkillsProfile {
                 }
                 $padLabel = $pLabels[$j].PadRight(20)
                 Write-Host " $padLabel " -NoNewline
+                # Truncate the hint so the line can't wrap past the window width
+                # (a wrapped line would desync the cursor-relative redraw).
+                $hint = $pHints[$j]
+                $avail = [Console]::WindowWidth - [Console]::CursorLeft - 1
+                if ($avail -lt 0) { $avail = 0 }
+                if ($hint.Length -gt $avail) { $hint = $hint.Substring(0, $avail) }
                 if ($pStates[$j]) {
-                    Write-Host $pHints[$j] -ForegroundColor Green -NoNewline
+                    Write-Host $hint -ForegroundColor Green -NoNewline
                 } else {
-                    Write-Host $pHints[$j] -ForegroundColor DarkGray -NoNewline
+                    Write-Host $hint -ForegroundColor DarkGray -NoNewline
                 }
                 $pos = [Console]::CursorLeft
                 $remaining = [Console]::WindowWidth - $pos - 1

@@ -451,10 +451,12 @@ checkbox_select() {
     printf "\n  \033[2m↑/↓ navigate · space/enter select · enter on Confirm to finish\033[0m\n\n" > /dev/tty
 
     # Hide cursor
-    printf "\033[?25l" > /dev/tty
+    # Hide cursor and disable line wrap (DECAWM). With wrap off the terminal
+    # clips overlong lines to one row, so the cursor-up redraw can't desync.
+    printf "\033[?25l\033[?7l" > /dev/tty
 
     # Restore cursor on exit (Ctrl+C safety)
-    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+    trap 'printf "\033[?25h\033[?7h" > /dev/tty 2>/dev/null' EXIT
 
     # Initial draw
     _checkbox_draw
@@ -498,7 +500,7 @@ checkbox_select() {
     done
 
     # Show cursor again
-    printf "\033[?25h" > /dev/tty
+    printf "\033[?25h\033[?7h" > /dev/tty
     trap - EXIT
 
     # Build result
@@ -556,8 +558,10 @@ radio_select() {
     }
 
     printf "\n  \033[2m↑/↓ navigate · enter confirm · space preview\033[0m\n\n" > /dev/tty
-    printf "\033[?25l" > /dev/tty
-    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+    # Hide cursor and disable line wrap (DECAWM). With wrap off the terminal
+    # clips overlong lines to one row, so the cursor-up redraw can't desync.
+    printf "\033[?25l\033[?7l" > /dev/tty
+    trap 'printf "\033[?25h\033[?7h" > /dev/tty 2>/dev/null' EXIT
 
     _radio_draw
 
@@ -594,7 +598,7 @@ radio_select() {
         fi
     done
 
-    printf "\033[?25h" > /dev/tty
+    printf "\033[?25h\033[?7h" > /dev/tty
     trap - EXIT
 
     echo "${values[$selected]}"
@@ -1002,8 +1006,10 @@ prompt_skills_profile() {
     }
 
     printf "\n  \033[2m↑/↓ navigate · space/enter select · enter on Confirm to finish\033[0m\n\n" > /dev/tty
-    printf "\033[?25l" > /dev/tty
-    trap 'printf "\033[?25h" > /dev/tty 2>/dev/null' EXIT
+    # Hide cursor and disable line wrap (DECAWM). With wrap off the terminal
+    # clips overlong lines to one row, so the cursor-up redraw can't desync.
+    printf "\033[?25l\033[?7l" > /dev/tty
+    trap 'printf "\033[?25h\033[?7h" > /dev/tty 2>/dev/null' EXIT
 
     _profile_draw
 
@@ -1049,7 +1055,7 @@ prompt_skills_profile() {
         fi
     done
 
-    printf "\033[?25h" > /dev/tty
+    printf "\033[?25h\033[?7h" > /dev/tty
     trap - EXIT
 
     # Build result
