@@ -2411,9 +2411,11 @@ function Invoke-PromptScope {
     Write-Host ""
     Write-Host "  Select installation scope" -ForegroundColor White
 
+    # Keep hints short — long ones wrap past the window width and break the
+    # cursor repositioning in Select-Radio (each arrow press would stack a copy).
     $items = @(
-        @{ Label = "Project"; Value = "project"; Selected = $true;  Hint = "Install in current directory (.cursor/, .claude/, .gemini/)" }
-        @{ Label = "Global";  Value = "global";  Selected = $false; Hint = "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)" }
+        @{ Label = "Project"; Value = "project"; Selected = $true;  Hint = "Current directory (.claude/, etc.)" }
+        @{ Label = "Global";  Value = "global";  Selected = $false; Hint = "Home directory (~/.claude/, etc.)" }
     )
     $script:Scope = Select-Radio -Items $items
 }

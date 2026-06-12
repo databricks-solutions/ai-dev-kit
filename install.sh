@@ -2203,9 +2203,11 @@ prompt_scope() {
     echo ""
     echo -e "  ${B}Select installation scope${N}"
 
+    # Keep hints short — long ones wrap past the terminal width and break the
+    # cursor-up redraw in radio_select (each arrow press would stack a copy).
     SCOPE=$(radio_select \
-        "Project|project|on|Install in current directory (.cursor/, .claude/, .gemini/)" \
-        "Global|global|off|Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)" \
+        "Project|project|on|Current directory (.claude/, etc.)" \
+        "Global|global|off|Home directory (~/.claude/, etc.)" \
     )
 }
 
