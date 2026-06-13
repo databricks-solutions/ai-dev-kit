@@ -2432,7 +2432,7 @@ function Show-Summary {
     }
     Write-Msg "$step. Open your project in your tool of choice"
     $step++
-    Write-Msg "$step. Try: `"List my SQL warehouses`""
+    Write-Msg "$step. Start prompting your AI assistant to interact with Databricks"
     Write-Host ""
 }
 

@@ -2219,7 +2219,7 @@ summary() {
         fi
         msg "${step}. Open your project in your tool of choice"
         step=$((step + 1))
-        msg "${step}. Try: \"List my SQL warehouses\""
+        msg "${step}. Start prompting your AI assistant to interact with Databricks"
         echo ""
     fi
 }
