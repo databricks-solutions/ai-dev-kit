@@ -2398,14 +2398,16 @@ function Show-Summary {
     Write-Host ""
     Write-Msg "Next steps:"
     $step = 1
-    if ($script:Tools -match 'cursor') {
+    if ($script:InstallMcp -and ($script:Tools -match 'cursor')) {
         Write-Msg "$step. Enable MCP in Cursor: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
         $step++
     }
     if ($script:Tools -match 'copilot') {
-        Write-Msg "$step. In Copilot Chat, click 'Configure Tools' (tool icon, bottom-right) and enable 'databricks'"
-        $step++
-        Write-Msg "$step. Use Copilot in Agent mode to access Databricks skills and MCP tools"
+        if ($script:InstallMcp) {
+            Write-Msg "$step. In Copilot Chat, click 'Configure Tools' (tool icon, bottom-right) and enable 'databricks'"
+            $step++
+        }
+        Write-Msg "$step. Use Copilot in Agent mode to access Databricks skills"
         $step++
     }
     if ($script:Tools -match 'gemini') {
@@ -2416,7 +2418,7 @@ function Show-Summary {
         Write-Msg "$step. Open your project in Antigravity to use Databricks skills and MCP tools"
         $step++
     }
-    if ($script:Tools -match 'windsurf') {
+    if ($script:InstallMcp -and ($script:Tools -match 'windsurf')) {
         Write-Msg "$step. Restart Windsurf to pick up the databricks MCP server (Windsurf -> Settings -> Windsurf Settings -> MCP)"
         $step++
     }

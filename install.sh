@@ -2185,14 +2185,16 @@ summary() {
         echo ""
         msg "${B}Next steps:${N}"
         local step=1
-        if echo "$TOOLS" | grep -q cursor; then
+        if [ "$INSTALL_MCP" = true ] && echo "$TOOLS" | grep -q cursor; then
             msg "${R}${step}. Enable MCP in Cursor: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
             step=$((step + 1))
         fi
         if echo "$TOOLS" | grep -q copilot; then
-            msg "${step}. In Copilot Chat, click ${B}Configure Tools${N} (tool icon, bottom-right) and enable ${B}databricks${N}"
-            step=$((step + 1))
-            msg "${step}. Use Copilot in ${B}Agent mode${N} to access Databricks skills and MCP tools"
+            if [ "$INSTALL_MCP" = true ]; then
+                msg "${step}. In Copilot Chat, click ${B}Configure Tools${N} (tool icon, bottom-right) and enable ${B}databricks${N}"
+                step=$((step + 1))
+            fi
+            msg "${step}. Use Copilot in ${B}Agent mode${N} to access Databricks skills"
             step=$((step + 1))
         fi
         if echo "$TOOLS" | grep -q gemini; then
@@ -2203,7 +2205,7 @@ summary() {
             msg "${step}. Open your project in Antigravity to use Databricks skills and MCP tools"
             step=$((step + 1))
         fi
-        if echo "$TOOLS" | grep -q windsurf; then
+        if [ "$INSTALL_MCP" = true ] && echo "$TOOLS" | grep -q windsurf; then
             msg "${step}. Restart Windsurf to pick up the ${B}databricks${N} MCP server (Windsurf → Settings → Windsurf Settings → MCP)"
             step=$((step + 1))
         fi
