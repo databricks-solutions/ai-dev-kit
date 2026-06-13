@@ -1555,7 +1555,11 @@ function Install-AgentBSkills {
         if ($script:Silent) {
             & databricks @aitoolsArgs 2>&1 | Out-Null
         } else {
-            & databricks @aitoolsArgs
+            # Drop aitools' "Skipped <agent>: does not support project-scoped
+            # skills" notices -- we deliver to those tools ourselves.
+            & databricks @aitoolsArgs 2>&1 |
+                Where-Object { "$_" -notmatch 'does not support project-scoped skills' } |
+                ForEach-Object { Write-Host "$_" }
         }
         $installOk = ($LASTEXITCODE -eq 0)
         $ErrorActionPreference = $prevEAP

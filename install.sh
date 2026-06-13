@@ -1372,7 +1372,12 @@ install_agent_b_skills() {
             databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" $exp_flag -p "$PROFILE" >/dev/null 2>&1 \
                 || die "databricks aitools install failed"
         else
-            if ! databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" $exp_flag -p "$PROFILE"; then
+            # Capture so we can drop aitools' "Skipped <agent>: does not support
+            # project-scoped skills" notices — we deliver to those tools ourselves.
+            local aitools_out aitools_rc
+            aitools_out=$(databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" $exp_flag -p "$PROFILE" 2>&1) && aitools_rc=0 || aitools_rc=$?
+            [ -n "$aitools_out" ] && echo "$aitools_out" | grep -v 'does not support project-scoped skills' || true
+            if [ "$aitools_rc" -ne 0 ]; then
                 warn "databricks aitools install failed — agent skills not installed"
                 return
             fi
