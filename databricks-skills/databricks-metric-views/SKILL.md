@@ -118,6 +118,41 @@ AS $$
 $$;
 ```
 
+### Update an Existing Metric View
+
+Metric views do **not** support `ALTER VIEW … ADD MEASURE` syntax — there's no in-place way to append a single dimension or measure. To update one, re-issue `CREATE OR REPLACE VIEW` with the **complete** updated YAML (every existing dimension/measure plus the new one). Omitting an existing entry deletes it.
+
+Adding a new measure `Average Order Value` to the `orders_metrics` view above:
+
+```sql
+CREATE OR REPLACE VIEW catalog.schema.orders_metrics
+WITH METRICS
+LANGUAGE YAML
+AS $$
+  version: 1.1
+  comment: "Orders KPIs for sales analysis"
+  source: catalog.schema.orders
+  filter: order_date > '2020-01-01'
+  dimensions:                          # ← unchanged, repeated verbatim
+    - name: Order Month
+      expr: DATE_TRUNC('MONTH', order_date)
+      comment: "Month of order"
+    - name: Order Status
+      expr: status
+  measures:
+    - name: Order Count                # ← unchanged
+      expr: COUNT(1)
+    - name: Total Revenue              # ← unchanged
+      expr: SUM(total_price)
+      comment: "Sum of total price"
+    - name: Average Order Value        # ← new
+      expr: SUM(total_price) / COUNT(1)
+      comment: "Revenue divided by order count"
+$$;
+```
+
+To get the current definition before editing (so you don't accidentally drop entries), run `SHOW CREATE TABLE catalog.schema.orders_metrics` — see [Describe Metric View](#describe-metric-view) below.
+
 ### Query Metric View
 
 ```sql
@@ -277,6 +312,7 @@ materialization:                # Optional (experimental)
 | **MEASURE() required** | All measure references must be wrapped: `MEASURE(\`name\`)` |
 | **DBR version error** | Requires Runtime 17.2+ for YAML v1.1, or 16.4+ for v0.1 |
 | **Materialization not working** | Requires serverless compute enabled; currently experimental |
+| **Python UDFs in measure expressions** | Not supported. Measure `expr` must use built-in SQL aggregates (`SUM`, `COUNT`, `AVG`, etc.) or SQL UDFs — Python UDFs (`@udf`, `pandas_udf`) are rejected. For custom logic, push the transformation into the source table or wrap in a SQL UDF defined separately in UC. |
 
 ## Integrations
 
