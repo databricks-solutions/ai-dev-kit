@@ -1341,7 +1341,19 @@ function Invoke-PromptCustomSkills {
     }
 
     $selected = Select-Checkbox -Items $items
-    $script:UserSkills = ($selected -split ' ') -join ','
+    $picked = @($selected -split ' ' | Where-Object { $_ })
+
+    # databricks-core is always required. This also guarantees a non-empty
+    # selection -- otherwise UserSkills would be empty and Resolve-Skills would
+    # fall back to installing ALL skills.
+    if ($picked -notcontains "databricks-core") {
+        $picked = @("databricks-core") + $picked
+    }
+    if (@($picked | Where-Object { $_ -ne "databricks-core" }).Count -eq 0) {
+        Write-Warn "Only databricks-core selected -- installing it alone (no other skills)"
+    }
+
+    $script:UserSkills = ($picked -join ',')
 }
 
 # ─── Agent skills (databricks/databricks-agent-skills via `databricks aitools`) ───

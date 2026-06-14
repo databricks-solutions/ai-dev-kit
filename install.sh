@@ -1188,8 +1188,18 @@ prompt_custom_skills() {
     local selected
     selected=$(checkbox_select "${items[@]}")
 
+    # databricks-core is always required. This also guarantees a non-empty
+    # selection — otherwise USER_SKILLS would be empty and resolve_skills would
+    # fall back to installing ALL skills.
+    _in_list "databricks-core" "$selected" || selected="databricks-core${selected:+ $selected}"
+
+    # Warn if nothing beyond core was picked
+    local rest
+    rest=$(echo "$selected" | tr ' ' '\n' | sed '/^$/d' | grep -vx "databricks-core" || true)
+    [ -z "$rest" ] && warn "Only databricks-core selected — installing it alone (no other skills)"
+
     # Use explicit skills list — set USER_SKILLS so resolve_skills handles it
-    USER_SKILLS=$(echo "$selected" | tr ' ' ',')
+    USER_SKILLS=$(echo "$selected" | tr ' ' ',' | sed 's/^,//;s/,$//')
 }
 
 # Compare semantic versions (returns 0 if $1 >= $2)
