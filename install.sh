@@ -410,24 +410,28 @@ prompt() {
 
 # Interactive checkbox selector using arrow keys + space/enter + "Done" button
 # Outputs space-separated selected values to stdout
-# Args: "Label|value|on_or_off|hint" ...
+# Args: "Label|value|on_or_off|hint[|lock]" ...
+#   A 5th "lock" field marks the item as always-on and non-toggleable.
 checkbox_select() {
     # Parse items
     local -a labels=()
     local -a values=()
     local -a states=()
     local -a hints=()
+    local -a locked=()
     local count=0
 
     for item in "$@"; do
-        IFS='|' read -r label value state hint <<< "$item"
+        IFS='|' read -r label value state hint lock <<< "$item"
         labels+=("$label")
         values+=("$value")
         hints+=("$hint")
-        if [ "$state" = "on" ]; then
-            states+=(1)
+        if [ "$lock" = "lock" ]; then
+            locked+=(1)
+            states+=(1)  # locked items are always selected
         else
-            states+=(0)
+            locked+=(0)
+            [ "$state" = "on" ] && states+=(1) || states+=(0)
         fi
         count=$((count + 1))
     done
@@ -494,8 +498,10 @@ checkbox_select() {
         elif [ "$key" = " " ] || [ "$key" = "" ]; then
             # Space or Enter
             if [ "$cursor" -lt "$count" ]; then
-                # On a checkbox item — toggle it
-                if [ "${states[$cursor]}" = "1" ]; then
+                # On a checkbox item — toggle it (locked items can't be changed)
+                if [ "${locked[$cursor]}" = "1" ]; then
+                    :  # required item — ignore toggle
+                elif [ "${states[$cursor]}" = "1" ]; then
                     states[$cursor]=0
                 else
                     states[$cursor]=1
@@ -1175,7 +1181,7 @@ prompt_custom_skills() {
     # automatically. Order: agent skills (stable, then experimental), then
     # bundled, MLflow, and APX skills.
     local -a items=()
-    local seen="" skill meta label hint state
+    local seen="" skill meta label hint state lock
     for skill in $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL $LOCAL_SKILLS $MLFLOW_SKILLS $APX_SKILLS; do
         _in_list "$skill" "$seen" && continue
         seen="${seen:+$seen }$skill"
@@ -1183,7 +1189,12 @@ prompt_custom_skills() {
         label="${meta%%|*}"
         hint="${meta#*|}"
         state="off"; _in_list "$skill" "$preselected" && state="on"
-        items+=("${label}|${skill}|${state}|${hint}")
+        # databricks-core is required — show it locked on (can't be deselected)
+        lock=""
+        if [ "$skill" = "databricks-core" ]; then
+            lock="lock"; hint="${hint:+$hint }(required)"
+        fi
+        items+=("${label}|${skill}|${state}|${hint}|${lock}")
     done
 
     local selected

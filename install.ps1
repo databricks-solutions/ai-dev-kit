@@ -417,14 +417,21 @@ function Read-Prompt {
 # Returns space-separated selected values
 function Select-Checkbox {
     param(
-        [array]$Items  # Each: @{ Label; Value; State; Hint }
+        [array]$Items  # Each: @{ Label; Value; State; Hint; Locked }
     )
 
     $count  = $Items.Count
     $cursor = 0
     $states = @()
+    $locked = @()
     foreach ($item in $Items) {
-        $states += $item.State
+        if ($item.Locked) {
+            $locked += $true
+            $states += $true   # locked items are always selected
+        } else {
+            $locked += $false
+            $states += [bool]$item.State
+        }
     }
 
     $isInteractive = Test-Interactive
@@ -449,6 +456,8 @@ function Select-Checkbox {
                 if ($idx -ge 0 -and $idx -lt $count) { $states[$idx] = $true }
             }
         }
+        # Locked items are always selected
+        for ($j = 0; $j -lt $count; $j++) { if ($locked[$j]) { $states[$j] = $true } }
         $selected = @()
         for ($j = 0; $j -lt $count; $j++) {
             if ($states[$j]) { $selected += $Items[$j].Value }
@@ -538,13 +547,13 @@ function Select-Checkbox {
                 if ($cursor -lt $count) { $cursor++ }
             }
             32 { # Space
-                if ($cursor -lt $count) {
+                if ($cursor -lt $count -and -not $locked[$cursor]) {
                     $states[$cursor] = -not $states[$cursor]
                 }
             }
             13 { # Enter
                 if ($cursor -lt $count) {
-                    $states[$cursor] = -not $states[$cursor]
+                    if (-not $locked[$cursor]) { $states[$cursor] = -not $states[$cursor] }
                 } else {
                     # On Confirm — done
                     & $drawCheckbox
@@ -1339,7 +1348,12 @@ function Invoke-PromptCustomSkills {
         $seen += $skill
         $label = if ($meta.ContainsKey($skill)) { $meta[$skill][0] } else { $skill }
         $hint  = if ($meta.ContainsKey($skill)) { $meta[$skill][1] } else { "" }
-        $items += @{ Label = $label; Value = $skill; State = ($preselected -contains $skill); Hint = $hint }
+        # databricks-core is required -- show it locked on (can't be deselected)
+        if ($skill -eq "databricks-core") {
+            $items += @{ Label = $label; Value = $skill; State = $true; Hint = "$hint (required)".Trim(); Locked = $true }
+        } else {
+            $items += @{ Label = $label; Value = $skill; State = ($preselected -contains $skill); Hint = $hint }
+        }
     }
 
     $selected = Select-Checkbox -Items $items
