@@ -1082,9 +1082,10 @@ prompt_skills_profile() {
         fi
     done
 
-    # Handle empty selection — default to all
+    # Nothing selected — drop into the individual skill picker (custom) rather
+    # than silently installing everything.
     if [ -z "$selected" ]; then
-        SKILLS_PROFILE="all"
+        prompt_custom_skills ""
         return
     fi
 

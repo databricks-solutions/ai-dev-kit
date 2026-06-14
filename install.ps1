@@ -1249,8 +1249,10 @@ function Invoke-PromptSkillsProfile {
     }
     $selected = $selectedProfiles -join ' '
 
+    # Nothing selected -- drop into the individual skill picker (custom) rather
+    # than silently installing everything.
     if ([string]::IsNullOrWhiteSpace($selected)) {
-        $script:SkillsProfile = "all"
+        Invoke-PromptCustomSkills -PreselectedProfiles ""
         return
     }
 
