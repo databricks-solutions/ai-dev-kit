@@ -14,11 +14,11 @@ cd ai-dev-kit
 ### Step 2: Install the packages
 
 ```bash
-# Install the core library
-uv pip install -e ./databricks-tools-core
+# Create a virtual environment
+uv venv .venv
 
-# Install the MCP server
-uv pip install -e ./databricks-mcp-server
+# Install the core library and MCP server into it
+uv pip install --python .venv/bin/python -e ./databricks-tools-core -e ./databricks-mcp-server
 ```
 
 ### Step 3: Configure Databricks authentication
@@ -41,8 +41,8 @@ For Cursor, add to your project's `.cursor/mcp.json` (create the file if it does
 {
   "mcpServers": {
     "databricks": {
-      "command": "uv",
-      "args": ["run",  "--directory", "/path/to/ai-dev-kit", "python", "databricks-mcp-server/run_server.py"],
+      "command": "/path/to/ai-dev-kit/.venv/bin/python",
+      "args": ["/path/to/ai-dev-kit/databricks-mcp-server/run_server.py"],
       "defer_loading": true
     }
   }
