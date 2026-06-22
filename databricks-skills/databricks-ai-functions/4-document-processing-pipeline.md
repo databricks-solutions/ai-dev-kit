@@ -13,6 +13,7 @@ When processing documents with AI Functions, apply this order of preference for 
 | Stage | Preferred function | Use `ai_query` when... |
 |---|---|---|
 | Parse binary docs (PDF, DOCX, images) | `ai_parse_document` | Need image-level reasoning |
+| Prepare parsed docs for Vector Search | `ai_prep_search` (DBR 18.2+) | Need a custom chunking strategy or DBR < 18.2 |
 | Extract fields from text (flat or nested) | `ai_extract` | Schema exceeds 128 fields or 7 nesting levels |
 | Classify document type or status | `ai_classify` | More than 20 categories |
 | Score item similarity / matching | `ai_similarity` | Need cross-document reasoning |
@@ -263,37 +264,39 @@ def processing_errors():
 
 ---
 
-## Custom RAG Pipeline — Parse → Chunk → Index → Query
+## Custom RAG Pipeline — Parse → Prep → Index → Query
 
-When the goal is retrieval-augmented generation rather than field extraction, use this pipeline to parse documents, chunk them into a Delta table, and index with Vector Search.
+When the goal is retrieval-augmented generation rather than field extraction, use this pipeline: `ai_parse_document` to read binary files, `ai_prep_search` to chunk and enrich, then a Vector Search Delta Sync index over the result.
 
-### Step 1 — Parse and Chunk into a Delta Table
+**Requires DBR 18.2+** (for `ai_prep_search`). On older runtimes, see the legacy manual-chunking fallback at the end of this section.
 
-`ai_parse_document` returns a VARIANT. Use `variant_get` with an explicit `ARRAY<VARIANT>` cast before calling `explode`, since `explode()` does not accept raw VARIANT values.
+### Step 1 — Parse and Prep into a Delta Table
+
+`ai_prep_search` takes the VARIANT output of `ai_parse_document` and returns RAG-ready chunks (`chunk_id`, `chunk_position`, `chunk_to_retrieve`, `chunk_to_embed`). The `chunk_to_embed` column is enriched with document title, section headers, page numbers, and captions — Vector Search will match on that context, not just chunk text.
 
 ```sql
 CREATE OR REPLACE TABLE catalog.schema.parsed_chunks AS
 WITH parsed AS (
   SELECT
-    path,
-    ai_parse_document(content) AS doc
+    path AS source_path,
+    ai_parse_document(content) AS parsed
   FROM read_files('/Volumes/catalog/schema/volume/docs/', format => 'binaryFile')
 ),
-elements AS (
+prepped AS (
   SELECT
-    path,
-    explode(variant_get(doc, '$.document.elements', 'ARRAY<VARIANT>')) AS element
+    source_path,
+    ai_prep_search(parsed) AS prep
   FROM parsed
 )
 SELECT
-  md5(concat(path, variant_get(element, '$.content', 'STRING'))) AS chunk_id,
-  path AS source_path,
-  variant_get(element, '$.content', 'STRING') AS content,
-  variant_get(element, '$.type', 'STRING') AS element_type,
-  current_timestamp() AS parsed_at
-FROM elements
-WHERE variant_get(element, '$.content', 'STRING') IS NOT NULL
-  AND length(trim(variant_get(element, '$.content', 'STRING'))) > 10;
+  variant_get(chunk, '$.chunk_id',          'STRING') AS chunk_id,
+  variant_get(chunk, '$.chunk_position',    'INT')    AS chunk_position,
+  variant_get(chunk, '$.chunk_to_retrieve', 'STRING') AS chunk_to_retrieve,
+  variant_get(chunk, '$.chunk_to_embed',    'STRING') AS chunk_to_embed,
+  source_path,
+  current_timestamp() AS prepped_at
+FROM prepped
+LATERAL VIEW explode(variant_get(prep, '$.chunks', 'ARRAY<VARIANT>')) c AS chunk;
 ```
 
 ### Step 1a (Production) — Incremental Parsing with Structured Streaming
@@ -310,7 +313,7 @@ from pyspark.sql.functions import col, current_timestamp, expr
 
 files_df = (
     spark.readStream.format("binaryFile")
-    .option("pathGlobFilter", "*.{pdf,jpg,jpeg,png}")
+    .option("pathGlobFilter", "*.{pdf,jpg,jpeg,png,tif,tiff,docx,pptx}")
     .option("recursiveFileLookup", "true")
     .load("/Volumes/catalog/schema/volume/docs/")
 )
@@ -338,49 +341,46 @@ parsed_df = (
 )
 ```
 
-**Stage 2 — Extract text from parsed VARIANT (streaming):**
+**Stage 2 — Prep chunks for Vector Search (streaming):**
 
-Uses `transform()` to extract element content from the VARIANT array, and `try_cast` for safe access. Error rows are preserved but flagged.
+`ai_prep_search` handles semantic chunking + context enrichment in one call. Skip rows that hit parse errors.
 
 ```python
-from pyspark.sql.functions import col, concat_ws, expr, lit, when
+from pyspark.sql.functions import col, expr, lit, when
 
 parsed_stream = spark.readStream.format("delta").table("catalog.schema.parsed_documents_raw")
 
-text_df = (
+prepped_df = (
     parsed_stream
-    .withColumn("text",
-        when(
-            expr("try_cast(parsed:error_status AS STRING)").isNotNull(), lit(None)
-        ).otherwise(
-            concat_ws("\n\n", expr("""
-                transform(
-                    try_cast(parsed:document:elements AS ARRAY),
-                    element -> try_cast(element:content AS STRING)
-                )
-            """))
-        )
+    .filter(expr("try_cast(parsed:error_status AS STRING) IS NULL"))
+    .withColumn("prep", expr("ai_prep_search(parsed)"))
+    .withColumn("chunk", expr("explode(variant_get(prep, '$.chunks', 'ARRAY<VARIANT>'))"))
+    .selectExpr(
+        "variant_get(chunk, '$.chunk_id',          'STRING') AS chunk_id",
+        "variant_get(chunk, '$.chunk_position',    'INT')    AS chunk_position",
+        "variant_get(chunk, '$.chunk_to_retrieve', 'STRING') AS chunk_to_retrieve",
+        "variant_get(chunk, '$.chunk_to_embed',    'STRING') AS chunk_to_embed",
+        "path AS source_path",
+        "parsed_at",
     )
-    .withColumn("error_status", expr("try_cast(parsed:error_status AS STRING)"))
-    .select("path", "text", "error_status", "parsed_at")
 )
 
 (
-    text_df.writeStream.format("delta")
+    prepped_df.writeStream.format("delta")
     .outputMode("append")
-    .option("checkpointLocation", "/Volumes/catalog/schema/checkpoints/02_text")
+    .option("checkpointLocation", "/Volumes/catalog/schema/checkpoints/02_prep")
     .option("mergeSchema", "true")
     .trigger(availableNow=True)
-    .toTable("catalog.schema.parsed_documents_text")
+    .toTable("catalog.schema.parsed_chunks")
 )
 ```
 
 Key techniques:
 - **`repartition` by file hash** — parallelizes `ai_parse_document` across workers
 - **`trigger(availableNow=True)`** — processes all pending files then stops (batch-like)
-- **Checkpoints** — exactly-once guarantee; no re-parsing on re-runs
-- **`transform()` + `try_cast`** — safer than `explode` + `variant_get` for text extraction
-- **Separate stages with independent checkpoints** — parse and text extraction can fail/retry independently
+- **Checkpoints** — exactly-once guarantee; no re-parsing or re-prepping on re-runs
+- **`ai_prep_search`** — handles semantic chunking + context enrichment; no manual `transform()` + length filters needed
+- **Separate stages with independent checkpoints** — parse and prep can fail/retry independently
 
 ### Step 1b — Enable Change Data Feed
 
@@ -393,16 +393,47 @@ SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
 
 ### Step 2 — Create a Vector Search Index and Query It
 
-Use the **[databricks-vector-search](../databricks-vector-search/SKILL.md)** skill to create a Delta Sync index on the chunked table and query it. Ensure CDF is enabled first (Step 1b above).
+Use the **[databricks-vector-search](../databricks-vector-search/SKILL.md)** skill to create a Delta Sync index on `catalog.schema.parsed_chunks`:
+- **Primary key:** `chunk_id`
+- **Embedding source column:** `chunk_to_embed` (context-enriched text — do not embed `chunk_to_retrieve`)
+- **Return column at query time:** `chunk_to_retrieve` (raw chunk text for the LLM)
+
+Ensure CDF is enabled first (Step 1b above).
 
 ### RAG-Specific Issues
 
 | Issue | Solution |
 |-------|----------|
-| `explode()` fails with VARIANT | `explode()` requires ARRAY, not VARIANT. Use `variant_get(doc, '$.document.elements', 'ARRAY<VARIANT>')` to cast before exploding |
-| Short/noisy chunks | Filter with `length(trim(...)) > 10` — parsing produces tiny fragments (page numbers, headers) that pollute the index |
-| Re-parsing unchanged documents | Use Structured Streaming with checkpoints — see Step 1a above |
-| Region not supported | US/EU regions only, or enable cross-geography routing |
+| `ai_prep_search` not found | Requires DBR **18.2+** (serverless env v3+). Use the legacy manual-chunking fallback below on older runtimes. |
+| Embedding the wrong column | Embed `chunk_to_embed` (enriched with doc title/headers/page), **not** `chunk_to_retrieve`. Return `chunk_to_retrieve` to the LLM. |
+| `explode()` fails with VARIANT | `explode()` requires ARRAY, not VARIANT. Cast first: `explode(variant_get(prep, '$.chunks', 'ARRAY<VARIANT>'))` |
+| Region not supported | `ai_parse_document` / `ai_prep_search` are region-restricted. Check feature availability or enable cross-geography routing. |
+
+### Legacy fallback — DBR < 18.2 (no `ai_prep_search`)
+
+If `ai_prep_search` is unavailable, fall back to manual chunking on `ai_parse_document` element output. Filter out short/noisy fragments (page numbers, headers) that pollute the index:
+
+```sql
+CREATE OR REPLACE TABLE catalog.schema.parsed_chunks AS
+WITH parsed AS (
+  SELECT path, ai_parse_document(content) AS doc
+  FROM read_files('/Volumes/catalog/schema/volume/docs/', format => 'binaryFile')
+),
+elements AS (
+  SELECT path, explode(variant_get(doc, '$.document.elements', 'ARRAY<VARIANT>')) AS element
+  FROM parsed
+)
+SELECT
+  md5(concat(path, variant_get(element, '$.content', 'STRING'))) AS chunk_id,
+  path AS source_path,
+  variant_get(element, '$.content', 'STRING') AS chunk_to_retrieve,
+  variant_get(element, '$.content', 'STRING') AS chunk_to_embed,  -- no enrichment
+  variant_get(element, '$.type', 'STRING') AS element_type,
+  current_timestamp() AS parsed_at
+FROM elements
+WHERE variant_get(element, '$.content', 'STRING') IS NOT NULL
+  AND length(trim(variant_get(element, '$.content', 'STRING'))) > 10;
+```
 
 ---
 
@@ -497,7 +528,7 @@ with mlflow.start_run():
 
 ## Tips
 
-1. **Parse first, enrich second** — always run `ai_parse_document` as the first stage. Feed its text output to task-specific functions; never pass raw binary to `ai_query`.
+1. **Parse → prep → enrich** — run `ai_parse_document` first. For RAG, pipe its VARIANT into `ai_prep_search` (DBR 18.2+) for chunking + context enrichment. For extraction, feed its text output to task-specific functions. Never pass raw binary to `ai_query`.
 2. **Flat or nested fields → `ai_extract`; deeply nested JSON exceeding 7 levels → `ai_query`** — pass `MAP('version', '2.0')` and access results through `:response`.
 3. **`failOnError => false` is mandatory in batch** — write errors to a sidecar `_errors` table rather than crashing the pipeline.
 4. **Truncate before sending to `ai_query`** — use `LEFT(text, 6000)` or chunk long documents to stay within context window limits.
