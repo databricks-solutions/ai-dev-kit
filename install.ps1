@@ -2539,6 +2539,15 @@ function Invoke-BranchHandoff {
     if ($env:DEVKIT_BOOTSTRAPPED) { return }
 
     $url = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch/install.ps1"
+
+    # Silent/automated runs can't be handed off interactively -- fail loudly
+    # (non-zero, message on stderr) so callers don't mistake it for success.
+    if ($script:Silent) {
+        [Console]::Error.WriteLine("Cannot install --branch ${Branch}: run that version's own installer (set DEVKIT_BOOTSTRAPPED=1 to bypass).")
+        [Console]::Error.WriteLine("  `$env:DEVKIT_BOOTSTRAPPED='1'; `$env:AIDEVKIT_BRANCH='${Branch}'; irm $url -OutFile install.ps1; .\install.ps1 --silent")
+        exit 1
+    }
+
     Write-Host ""
     Write-Host "Install a specific version ($Branch)" -ForegroundColor White
     Write-Host "--------------------------------"

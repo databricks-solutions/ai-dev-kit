@@ -2324,6 +2324,14 @@ handoff_to_branch() {
     [ -n "${DEVKIT_BOOTSTRAPPED:-}" ] && return 0
 
     local url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/install.sh"
+
+    # Silent/automated runs can't be handed off interactively — fail loudly
+    # (non-zero, message on stderr) so callers don't mistake it for success.
+    if [ "$SILENT" = true ]; then
+        die "Cannot install --branch ${BRANCH}: run that version's own installer (set DEVKIT_BOOTSTRAPPED=1 to bypass).
+   DEVKIT_BOOTSTRAPPED=1 bash <(curl -sL ${url}) -b ${BRANCH} --silent"
+    fi
+
     echo ""
     echo -e "${B}Install a specific version (${BRANCH})${N}"
     echo "────────────────────────────────"
