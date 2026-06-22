@@ -85,8 +85,12 @@ REPO="ai-dev-kit"
 
 # Branch/tag override. DEVKIT_BRANCH is canonical; AIDEVKIT_BRANCH is accepted
 # as an alias so the bash and PowerShell installers honor the same env var.
+# BRANCH_EXPLICIT tracks whether the user asked for a specific ref (vs the
+# auto-resolved latest release) — an explicit ref triggers the branch hand-off.
+BRANCH_EXPLICIT=false
 if [ -n "${DEVKIT_BRANCH:-${AIDEVKIT_BRANCH:-}}" ]; then
   BRANCH="${DEVKIT_BRANCH:-$AIDEVKIT_BRANCH}"
+  BRANCH_EXPLICIT=true
 else
   BRANCH="$(
     curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases/latest" \
@@ -173,7 +177,7 @@ while [ $# -gt 0 ]; do
     case $1 in
         -p|--profile)     PROFILE="$2"; shift 2 ;;
         -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
-        -b|--branch)      BRANCH="$2"; shift 2 ;;
+        -b|--branch)      BRANCH="$2"; BRANCH_EXPLICIT=true; shift 2 ;;
         --skills-only)    INSTALL_MCP=false; shift ;;
         --mcp-only)       INSTALL_SKILLS=false; INSTALL_MCP=true; shift ;;
         --mcp)            INSTALL_MCP=true; shift ;;
@@ -198,7 +202,7 @@ while [ $# -gt 0 ]; do
             echo ""
             echo "Options:"
             echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
-            echo "  -b, --branch NAME     Git branch/tag to install (default: latest release)"
+            echo "  -b, --branch NAME     Install a specific release/branch (runs that version's own installer)"
             echo "  -g, --global          Install globally for all projects"
             echo "  --skills-only         Install skills only (default; MCP server is opt-in)"
             echo "  --mcp                 Install the deprecated MCP server (default: no)"
@@ -2310,8 +2314,35 @@ prompt_auth() {
     fi
 }
 
+# When a branch/tag is explicitly requested, hand off to THAT branch's own
+# installer so its real install steps run — this script only knows the current
+# version's steps. Prints the command and exits without installing.
+# DEVKIT_BOOTSTRAPPED (set in the printed command) suppresses the hand-off so
+# the target installer proceeds normally.
+handoff_to_branch() {
+    [ "$BRANCH_EXPLICIT" = true ] || return 0
+    [ -n "${DEVKIT_BOOTSTRAPPED:-}" ] && return 0
+
+    local url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/install.sh"
+    echo ""
+    echo -e "${B}Install a specific version (${BRANCH})${N}"
+    echo "────────────────────────────────"
+    echo -e "  This script runs the ${B}current${N} version's install steps. To install"
+    echo -e "  ${B}${BRANCH}${N} using ${B}its own${N} installer, run:"
+    echo ""
+    echo -e "    ${G}DEVKIT_BOOTSTRAPPED=1 bash <(curl -sL ${url}) -b ${BRANCH}${N}"
+    echo ""
+    echo -e "  ${D}Append any options that version supports (add --help to see them).${N}"
+    echo -e "  ${D}Nothing was installed.${N}"
+    echo ""
+    exit 0
+}
+
 # Main
 main() {
+    # An explicit --branch hands off to that version's own installer
+    handoff_to_branch
+
     # --list-skills exits early (uses the live aitools inventory when available)
     [ "${LIST_SKILLS:-false}" = true ] && list_skills_and_exit
 

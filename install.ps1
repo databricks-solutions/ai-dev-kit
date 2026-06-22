@@ -37,6 +37,9 @@ $Repo  = "ai-dev-kit"
 
 # Determine branch/tag to use. AIDEVKIT_BRANCH is canonical here; DEVKIT_BRANCH
 # is accepted as an alias so the bash and PowerShell installers honor the same var.
+# $script:BranchExplicit tracks whether the user asked for a specific ref (vs the
+# auto-resolved latest release) — an explicit ref triggers the branch hand-off.
+$script:BranchExplicit = [bool]($env:AIDEVKIT_BRANCH -or $env:DEVKIT_BRANCH)
 if ($env:AIDEVKIT_BRANCH -or $env:DEVKIT_BRANCH) {
     $Branch = if ($env:AIDEVKIT_BRANCH) { $env:AIDEVKIT_BRANCH } else { $env:DEVKIT_BRANCH }
 } else {
@@ -305,6 +308,7 @@ function Write-Step { param([string]$Text) if (-not $script:Silent) { Write-Host
 $i = 0
 while ($i -lt $args.Count) {
     switch ($args[$i]) {
+        { $_ -in "-b", "--branch", "-Branch" } { $Branch = $args[$i + 1]; $script:BranchExplicit = $true; $RawUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"; $i += 2 }
         { $_ -in "-p", "--profile" }  { $script:Profile_ = $args[$i + 1]; $script:ProfileProvided = $true; $i += 2 }
         { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $script:ScopeExplicit = $true; $i++ }
         { $_ -in "--skills-only", "-SkillsOnly" } { $script:InstallMcp = $false; $i++ }
@@ -332,6 +336,7 @@ while ($i -lt $args.Count) {
             Write-Host "       .\install.ps1 [OPTIONS]"
             Write-Host ""
             Write-Host "Options:"
+            Write-Host "  -b, --branch NAME     Install a specific release/branch (runs that version's own installer)"
             Write-Host "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
             Write-Host "  -g, --global          Install globally for all projects"
             Write-Host "  --skills-only         Install skills only (default; MCP server is opt-in)"
@@ -2524,7 +2529,37 @@ function Invoke-PromptAuth {
 }
 
 # ─── Main ─────────────────────────────────────────────────────
+# When a branch/tag is explicitly requested, hand off to THAT branch's own
+# installer so its real install steps run -- this script only knows the current
+# version's steps. Prints the command and exits without installing.
+# DEVKIT_BOOTSTRAPPED (set in the printed command) suppresses the hand-off so
+# the target installer proceeds normally.
+function Invoke-BranchHandoff {
+    if (-not $script:BranchExplicit) { return }
+    if ($env:DEVKIT_BOOTSTRAPPED) { return }
+
+    $url = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch/install.ps1"
+    Write-Host ""
+    Write-Host "Install a specific version ($Branch)" -ForegroundColor White
+    Write-Host "--------------------------------"
+    Write-Host "  This script runs the current version's install steps. To install"
+    Write-Host "  $Branch using its own installer, run:"
+    Write-Host ""
+    Write-Host "    `$env:DEVKIT_BOOTSTRAPPED = '1'" -ForegroundColor Green
+    Write-Host "    `$env:AIDEVKIT_BRANCH = '$Branch'" -ForegroundColor Green
+    Write-Host "    irm $url -OutFile install.ps1" -ForegroundColor Green
+    Write-Host "    .\install.ps1" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Append any options that version supports (use --help to see them)." -ForegroundColor DarkGray
+    Write-Host "  Nothing was installed." -ForegroundColor DarkGray
+    Write-Host ""
+    exit 0
+}
+
 function Invoke-Main {
+    # An explicit --branch hands off to that version's own installer
+    Invoke-BranchHandoff
+
     # --list-skills exits early (uses the live aitools inventory when available)
     if ($script:ListSkills) { Show-SkillsList; return }
 
