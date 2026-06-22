@@ -103,7 +103,7 @@ MIN_SDK_VERSION="0.85.0"
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
 # Databricks skills (bundled in repo)
-SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views databricks-mlflow-evaluation databricks-ml-training-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
+SKILLS="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-bundles databricks-config databricks-dbsql databricks-docs databricks-genie databricks-iceberg databricks-jobs databricks-lakebase-autoscale databricks-metric-views databricks-mlflow-evaluation databricks-ml-training-serving databricks-python-sdk databricks-spark-declarative-pipelines databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search databricks-zerobus-ingest spark-python-data-source"
 
 # MLflow skills (fetched from mlflow/skills repo)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
@@ -127,7 +127,7 @@ PROFILE_DATA_ENGINEER="databricks-spark-declarative-pipelines databricks-spark-s
 PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie databricks-metric-views"
 PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-ml-training-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
-PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-ml-training-serving databricks-dbsql databricks-jobs databricks-bundles"
+PROFILE_APP_DEVELOPER="databricks-apps-python databricks-app-apx databricks-lakebase-autoscale databricks-ml-training-serving databricks-dbsql databricks-jobs databricks-bundles"
 PROFILE_APP_DEVELOPER_AGENT="databricks-core:databricks databricks-apps databricks-lakebase"
 
 # Selected skills (populated during profile selection)
@@ -1183,7 +1183,6 @@ prompt_custom_skills() {
         "Unstructured PDF|databricks-unstructured-pdf-generation|$(_is_preselected databricks-unstructured-pdf-generation)|Synthetic PDFs for RAG" \
         "Synthetic Data|databricks-synthetic-data-gen|$(_is_preselected databricks-synthetic-data-gen)|Generate test data" \
         "Lakebase Autoscale|databricks-lakebase-autoscale|$(_is_preselected databricks-lakebase-autoscale)|Managed PostgreSQL" \
-        "Lakebase Provisioned|databricks-lakebase-provisioned|$(_is_preselected databricks-lakebase-provisioned)|Provisioned PostgreSQL" \
         "App (AppKit + Python)|databricks-apps-python|$(_is_preselected databricks-apps-python)|AppKit, Dash, Streamlit, Flask" \
         "App APX|databricks-app-apx|$(_is_preselected databricks-app-apx)|FastAPI + React" \
         "Agent: Databricks|databricks|$(_is_preselected databricks)|CLI auth, data exploration" \
@@ -2139,20 +2138,21 @@ prompt_channel() {
         echo -e "  Discussions:   ${BL}https://github.com/databricks-solutions/ai-dev-kit/discussions${N}"
         echo ""
         echo -e "  ${D}Downloading installer from experimental branch...${N}"
+        echo ""
 
-        # Build the command with all current flags preserved
-        local args="--experimental"
-        [ "$FORCE" = true ] && args="$args --force"
-        [ "$SILENT" = true ] && args="$args --silent"
-        [ -n "$USER_TOOLS" ] && args="$args --tools $USER_TOOLS"
-        [ -n "$USER_MCP_PATH" ] && args="$args --mcp-path $USER_MCP_PATH"
-        [ -n "$SKILLS_PROFILE" ] && args="$args --skills-profile $SKILLS_PROFILE"
-        [ -n "$USER_SKILLS" ] && args="$args --skills $USER_SKILLS"
-        [ "$SCOPE_EXPLICIT" = true ] && [ "$SCOPE" = "global" ] && args="$args --global"
-        [ "$PROFILE" != "DEFAULT" ] && args="$args --profile $PROFILE"
-        [ "$INSTALL_MCP" = false ] && args="$args --skills-only"
-        [ "$INSTALL_SKILLS" = false ] && args="$args --mcp-only"
-        [ "$BRANCH_EXPLICIT" = true ] && args="$args --branch $BRANCH"
+        # Build the command with all current flags preserved (array preserves quoting)
+        local args=("--experimental")
+        [ "$FORCE" = true ] && args+=("--force")
+        [ "$SILENT" = true ] && args+=("--silent")
+        [ -n "$USER_TOOLS" ] && args+=("--tools" "$USER_TOOLS")
+        [ -n "$USER_MCP_PATH" ] && args+=("--mcp-path" "$USER_MCP_PATH")
+        [ -n "$SKILLS_PROFILE" ] && args+=("--skills-profile" "$SKILLS_PROFILE")
+        [ -n "$USER_SKILLS" ] && args+=("--skills" "$USER_SKILLS")
+        [ "$SCOPE_EXPLICIT" = true ] && [ "$SCOPE" = "global" ] && args+=("--global")
+        [ "$PROFILE" != "DEFAULT" ] && args+=("--profile" "$PROFILE")
+        [ "$INSTALL_MCP" = false ] && args+=("--skills-only")
+        [ "$INSTALL_SKILLS" = false ] && args+=("--mcp-only")
+        [ "$BRANCH_EXPLICIT" = true ] && args+=("--branch" "$BRANCH")
 
         # Download and execute the experimental installer.
         # Download to a tmp file first so a curl failure (network/404/5xx) surfaces
@@ -2162,7 +2162,7 @@ prompt_channel() {
         curl -fsSL "https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/experimental/install.sh" -o "$exp_installer" \
             || die "Could not download experimental installer from GitHub. Check your network connection, then retry."
         [ -s "$exp_installer" ] || die "Downloaded experimental installer is empty — GitHub may be having issues. Retry in a moment."
-        exec bash "$exp_installer" $args
+        exec bash "$exp_installer" "${args[@]}"
     fi
 }
 
@@ -2220,7 +2220,11 @@ prompt_auth() {
 
 # Main
 main() {
-    [ "$SILENT" = false ] && echo -e "\n${B}Databricks AI Dev Kit Installer${N}"
+    if [ "$SILENT" = false ]; then
+        echo ""
+        echo -e "${B}Databricks AI Dev Kit Installer${N}"
+        echo "────────────────────────────────"
+    fi
 
     # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
     prompt_channel
@@ -2317,11 +2321,11 @@ main() {
         echo "$TOOLS" | grep -qw "claude" && [ "$SCOPE" != "global" ] && echo -e "  Profile:     ${G}${PROFILE}${N}"
         if [ "$INSTALL_SKILLS" = true ]; then
             if [ -n "$USER_SKILLS" ]; then
-                echo -e "  Skills:      ${G}custom selection${N}"
+                echo -e "  Skills:      ${G}custom selection${N} ${Y}(will be overwritten, backup your changes first)${N}"
             else
                 local sk_total=0
                 for _ in $SELECTED_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_SKILLS; do sk_total=$((sk_total + 1)); done
-                echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N}"
+                echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N} ${Y}(will be overwritten, backup your changes first)${N}"
             fi
         fi
         if [ "$INSTALL_MCP" = true ]; then

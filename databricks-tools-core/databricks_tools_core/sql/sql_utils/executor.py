@@ -107,11 +107,19 @@ class SQLExecutor:
         statement_id = response.statement_id
         logger.debug(f"Statement submitted with ID: {statement_id}")
 
-        # Poll for completion
+        # Poll for completion.
+        #
+        # Use time.monotonic() for the timeout boundary instead of incrementing
+        # a counter by poll_interval each iteration. The counter approach
+        # tracks only sleep time and ignores how long each get_statement RPC
+        # takes — under warehouse load, get_statement can take several seconds
+        # per call, so the counter undercounts wall clock and the configured
+        # timeout fires much later than intended (or, for very slow RPCs,
+        # never fires before the statement completes naturally).
         poll_interval = 2
-        elapsed = 0
+        start_time = time.monotonic()
 
-        while elapsed < timeout:
+        while time.monotonic() - start_time < timeout:
             try:
                 status = self.client.statement_execution.get_statement(statement_id=statement_id)
             except Exception as e:
@@ -136,12 +144,12 @@ class SQLExecutor:
 
             # Still running, wait and poll again
             time.sleep(poll_interval)
-            elapsed += poll_interval
 
         # Timeout reached - cancel the statement
         self._cancel_statement(statement_id)
+        elapsed_wall = time.monotonic() - start_time
         raise SQLExecutionError(
-            f"SQL query timed out after {timeout} seconds and was canceled. "
+            f"SQL query timed out after {elapsed_wall:.1f} seconds (limit: {timeout}s) and was canceled. "
             f"Consider increasing the timeout or optimizing the query. "
             f"Statement ID: {statement_id}"
         )

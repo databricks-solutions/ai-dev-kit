@@ -551,7 +551,6 @@ MISSING_SKILLS = [
     "databricks-docs",
     "databricks-jobs",
     "databricks-lakebase-autoscale",
-    "databricks-lakebase-provisioned",
     "databricks-metric-views",
     "databricks-mlflow-evaluation",
     "databricks-python-sdk",
