@@ -65,6 +65,12 @@ Tables join on customer_id and product_id.""",
 )
 ```
 
+> **Want a production-grade space?** The `create_or_update` call above sets only the
+> basics (name, tables, description, sample questions). High-quality spaces also curate
+> column synonyms, structured instructions, certified example SQL, join specs, reusable
+> measures/filters, and benchmarks via a full `serialized_space` payload. See
+> [authoring.md](authoring.md) for the data-grounded authoring playbook.
+
 ## Why This Workflow Matters
 
 **Sample questions that reference actual column names** help Genie:
@@ -368,7 +374,8 @@ To push a serialized config to an already-existing space (rather than creating a
 - Use descriptive column names
 - Add table and column comments
 - Include sample questions that demonstrate the vocabulary
-- Add instructions via the Databricks Genie UI
+- Add column synonyms, structured instructions, certified example SQL, and join specs by authoring a full `serialized_space` — see [authoring.md](authoring.md). (These can also be set in the Databricks Genie UI.)
+- Ground all example SQL and filters in the table's **real** values (query `SELECT DISTINCT ...` first) — invented status/category values are a common cause of wrong answers
 
 ### `manage_genie(action="export")` returns empty `serialized_space`
 
