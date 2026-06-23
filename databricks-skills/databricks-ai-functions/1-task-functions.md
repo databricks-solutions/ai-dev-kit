@@ -1,12 +1,10 @@
 # Task-Specific AI Functions — Full Reference
 
-These functions require no model endpoint selection. They call pre-configured Foundation Model APIs optimized for each task. All require DBR 15.1+ (15.4 ML LTS for batch); `ai_parse_document` requires DBR 17.3+; `ai_prep_search` requires DBR 18.2+ (serverless env v3+).
+Deep reference for each task-specific function: full options, schemas, and non-trivial examples. For the at-a-glance signature/input/output/prereqs index, see the function table in [SKILL.md](SKILL.md#overview). These functions need no model endpoint selection — they call pre-configured Foundation Model APIs optimized for each task.
 
 ---
 
 ## `ai_analyze_sentiment`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_analyze_sentiment
 
 Returns one of: `positive`, `negative`, `neutral`, `mixed`, or `NULL`.
 
@@ -24,8 +22,6 @@ df.withColumn("sentiment", expr("ai_analyze_sentiment(review_text)")).display()
 ---
 
 ## `ai_classify`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_classify
 
 **Syntax:** `ai_classify(content, labels [, options])`
 - `content`: VARIANT | STRING — raw text, or VARIANT from `ai_parse_document` / `ai_extract`
@@ -78,8 +74,6 @@ df.withColumn(
 ---
 
 ## `ai_extract`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_extract
 
 **Syntax:** `ai_extract(content, schema [, options])`
 - `content`: VARIANT | STRING — raw text, or VARIANT from `ai_parse_document`
@@ -165,8 +159,6 @@ FROM extracted_invoices;
 
 ## `ai_fix_grammar`
 
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_fix_grammar
-
 **Syntax:** `ai_fix_grammar(content)` — Returns corrected STRING.
 
 Optimized for English. Useful for cleaning user-generated content before downstream processing.
@@ -184,8 +176,6 @@ df.withColumn("corrected", expr("ai_fix_grammar(user_comment)")).display()
 ---
 
 ## `ai_gen`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_gen
 
 **Syntax:** `ai_gen(prompt)` — Returns a generated STRING.
 
@@ -209,8 +199,6 @@ df.withColumn(
 ---
 
 ## `ai_mask`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_mask
 
 **Syntax:** `ai_mask(content, labels)`
 - `content`: STRING — text with sensitive data
@@ -241,8 +229,6 @@ df.withColumn(
 
 ## `ai_similarity`
 
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_similarity
-
 **Syntax:** `ai_similarity(expr1, expr2)` — Returns a FLOAT between 0.0 and 1.0.
 
 Use for fuzzy deduplication, search result ranking, or item matching across datasets.
@@ -270,8 +256,6 @@ df.withColumn(
 
 ## `ai_summarize`
 
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_summarize
-
 **Syntax:** `ai_summarize(content [, max_words])`
 - `content`: STRING — text to summarize
 - `max_words`: INTEGER (optional) — word limit; default 50; use `0` for uncapped
@@ -294,8 +278,6 @@ df.withColumn("summary", expr("ai_summarize(article_body, 30)")).display()
 ---
 
 ## `ai_translate`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_translate
 
 **Syntax:** `ai_translate(content, to_lang)`
 - `content`: STRING — source text
@@ -329,8 +311,6 @@ df.withColumn(
 ---
 
 ## `ai_parse_document`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_parse_document
 
 **Requires:** DBR 17.3+ (serverless env v3+ for VARIANT). Region-restricted — check feature availability.
 
@@ -374,8 +354,8 @@ error_status[]       -- {error_message, page_id} per page (if any)
 -- Parse and extract text blocks
 SELECT
     path,
-    parsed:pages[*].elements[*].content AS text_blocks,
-    parsed:error AS parse_error
+    concat_ws('\n', transform(parsed:document:elements, e -> e:content::STRING)) AS text_blocks,
+    parsed:error_status AS parse_error
 FROM (
     SELECT path, ai_parse_document(content) AS parsed
     FROM read_files('/Volumes/catalog/schema/landing/docs/', format => 'binaryFile')
@@ -409,8 +389,8 @@ df = (
     .withColumn("parsed", expr("ai_parse_document(content)"))
     .selectExpr(
         "path",
-        "parsed:pages[*].elements[*].content AS text_blocks",
-        "parsed:error AS parse_error",
+        "concat_ws('\\n', transform(parsed:document:elements, e -> e:content::STRING)) AS text_blocks",
+        "parsed:error_status AS parse_error",
     )
     .filter("parse_error IS NULL")
 )
@@ -418,8 +398,8 @@ df = (
 # Chain with task-specific functions on the extracted text
 df = (
     df.withColumn("summary",  expr("ai_summarize(text_blocks, 50)"))
-      .withColumn("entities", expr("ai_extract(text_blocks, array('date', 'amount', 'vendor'))"))
-      .withColumn("category", expr("ai_classify(text_blocks, array('invoice', 'contract', 'report'))"))
+      .withColumn("entities", expr("ai_extract(text_blocks, '[\"date\",\"amount\",\"vendor\"]', map('version','2.0'))"))
+      .withColumn("category", expr("ai_classify(text_blocks, '[\"invoice\",\"contract\",\"report\"]', map('version','2.0'))"))
 )
 df.display()
 ```
@@ -433,8 +413,6 @@ df.display()
 ---
 
 ## `ai_prep_search`
-
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_prep_search
 
 **Requires:** DBR **18.2+** (serverless env v3+ for VARIANT support).
 
