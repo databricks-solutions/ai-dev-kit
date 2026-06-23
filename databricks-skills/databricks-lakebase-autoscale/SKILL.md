@@ -187,21 +187,6 @@ Enable CDF on the source for TRIGGERED/CONTINUOUS: `ALTER TABLE ... SET TBLPROPE
 
 → Mode comparison, type mapping (UC → Postgres), capacity planning, schema evolution rules, SDK equivalents: [reverse-etl.md](references/reverse-etl.md).
 
----
-
-## Lakebase Autoscaling vs Provisioned
-
-| Aspect | Provisioned | Autoscaling |
-|---|---|---|
-| SDK module | `w.database` | `w.postgres` |
-| Top-level resource | Instance | Project |
-| Capacity | fixed CU tiers, ~16 GB/CU | 0.5–112 CU, ~2 GB/CU |
-| Branching | no | yes |
-| Scale-to-zero | no | yes |
-| Operations | mostly synchronous | LROs; CLI blocks until complete |
-| Reverse ETL | synced tables | synced tables |
-| Read replicas | readable secondaries | dedicated read-only endpoints |
-
 ## Common Issues
 
 | Issue | Solution |
