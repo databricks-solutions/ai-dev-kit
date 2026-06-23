@@ -106,7 +106,7 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
 ### Prerequisites
 
 - [uv](https://github.com/astral-sh/uv) - Python package manager
-- [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) - Command line interface for Databricks
+- [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) **v1.0.0+** - Command line interface for Databricks (v1.0.0+ ships `databricks aitools`, which installs most skills)
 - AI coding environment (one or more):
   - [Claude Code](https://claude.ai/code)
   - [Cursor](https://cursor.com)
@@ -197,6 +197,37 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 **Next steps:** Respond to interactive prompts and follow the on-screen instructions.
 - Note: Cursor and Copilot require updating settings manually after install.
 
+### Where Skills Come From
+
+The installer assembles skills from four sources:
+
+| Source | Skills | Mechanism |
+|--------|--------|-----------|
+| [databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) | Most Databricks skills (jobs, pipelines, DABs, SQL, Unity Catalog, apps, …) | Delegated to `databricks aitools install` — requires **Databricks CLI v1.0.0+** |
+| This repo | `databricks-genie` | Bundled copy |
+| [mlflow/skills](https://github.com/mlflow/skills) | 8 MLflow skills | Fetched from `main` (override with `MLFLOW_REF`) |
+| [databricks-solutions/apx](https://github.com/databricks-solutions/apx) | `databricks-app-apx` | Fetched from the latest stable tag (override with `APX_REF`) |
+
+Skills installed via `databricks aitools` are managed by the CLI afterwards — update them with `databricks aitools update` and remove them with `databricks aitools uninstall`. For tools the CLI can't target yet (Gemini CLI, Windsurf, Kiro), the installer links the same skills into each tool's skills directory.
+
+Use `--list-skills` to see every skill and profile, and `--dry-run` to preview exactly what an install would do (resolved refs and the `aitools` command) without changing anything.
+
+> **Breaking change:** skills now use the `databricks-agent-skills` names. `databricks-bundles` → `databricks-dabs`, `databricks-spark-declarative-pipelines` → `databricks-pipelines`; `databricks-config` is replaced by `databricks-core`, and `databricks-lakebase-autoscale`/`databricks-lakebase-provisioned` by `databricks-lakebase`. Explicit `--skills` requests for old names are migrated with a warning.
+
+<details>
+<summary><strong>Installer environment variables</strong> (click to expand)</summary>
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `APX_REF` | `latest` | Ref for the APX skill fetch: `latest` (highest stable tag), a tag/SHA, or `main` |
+| `MLFLOW_REF` | `main` | Ref for the MLflow skills fetch (the repo is tagless) |
+| `SKILLS_CHANNEL` | `stable` | Set to `dev` to make unset raw-fetch refs follow `main` |
+| `INCLUDE_PRERELEASES` | `0` | Set to `1` to allow `-rc`/`-beta` tags when resolving `latest` |
+| `DRY_RUN` | `false` | Set to `1` to print the install plan and exit |
+
+The installer also records what it installed (resolved refs, commit SHAs, `aitools` release) in `skills.lock` inside the scope-local `.ai-dev-kit/` state directory.
+
+</details>
 
 ### Visual Builder App
 
