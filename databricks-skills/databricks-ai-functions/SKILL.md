@@ -150,7 +150,7 @@ Then enable CDF (`ALTER TABLE parsed_chunks SET TBLPROPERTIES (delta.enableChang
 
 **Beyond batch:**
 - **Ask questions over the output** — point a Genie space at the resulting Delta table for natural-language querying instead of hand-written SQL; see the **[databricks-genie](../databricks-genie/SKILL.md)** skill.
-- **Low-latency / serving** — to expose this as a real-time, governed endpoint (e.g. register a model to Unity Catalog and serve it), use the **[databricks-model-serving](../databricks-model-serving/SKILL.md)** skill.
+- **Low-latency / serving** — to expose this as a real-time, governed endpoint (e.g. register a model to Unity Catalog and serve it), use the **[databricks-ml-training-serving](../databricks-ml-training-serving/SKILL.md)** skill.
 - **Production incremental ingestion** — for a runnable end-to-end streaming `ai_parse_document` job (checkpoints, `trigger(availableNow=True)`), see [databricks/bundle-examples · job_with_ai_parse_document](https://github.com/databricks/bundle-examples/tree/main/contrib/job_with_ai_parse_document).
 
 ## Reference Files

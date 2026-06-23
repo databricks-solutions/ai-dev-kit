@@ -169,7 +169,7 @@ Overlays a model prediction on top of historical data — historical line contin
 
 - `version`: **1**
 - `widgetType`: "forecast-line"
-- The dataset SQL produces the original series **plus** three forecast columns: a point forecast, upper band, lower band. Spark's built-in `AI_FORECAST` table function generates them.
+- The dataset SQL produces the original series **plus** three forecast columns: a point forecast, upper band, lower band. Spark's built-in `AI_FORECAST` table function generates them. Full `AI_FORECAST` params (grouping, intervals, `global_floor`/`global_cap`, seasonality) → [databricks-ai-functions / 3-ai-forecast.md](../databricks-ai-functions/3-ai-forecast.md).
 
 ### Dataset SQL pattern
 
@@ -191,10 +191,11 @@ forecast AS (
   SELECT opened_at, count_forecast, count_upper, count_lower, CAST(NULL AS BIGINT) AS count
   FROM AI_FORECAST(
     TABLE(actuals),
-    horizon   => (SELECT max_d + MAKE_DT_INTERVAL(
+    horizon    => (SELECT max_d + MAKE_DT_INTERVAL(
                     CAST(FLOOR(DATEDIFF(max_d, min_d) * 0.5) AS INT), 0, 0, 0) FROM dates),
-    time_col  => 'opened_at',
-    value_col => 'count'
+    time_col   => 'opened_at',
+    value_col  => 'count',
+    parameters => '{"global_floor": 0}'   -- counts can't go negative; clamps the forecast + lower band at 0
   )
 ),
 bridge AS (

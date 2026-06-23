@@ -53,7 +53,7 @@
         "  SELECT opened_at, count_forecast, count_upper, count_lower, CAST(NULL AS BIGINT) AS count\n",
         "  FROM AI_FORECAST(TABLE(actuals),\n",
         "    horizon  => (SELECT max_d + MAKE_DT_INTERVAL(CAST(FLOOR(DATEDIFF(max_d, min_d) * 0.5) AS INT), 0, 0, 0) FROM dates),\n",
-        "    time_col => 'opened_at', value_col => 'count')\n",
+        "    time_col => 'opened_at', value_col => 'count', parameters => '{\"global_floor\": 0}')\n",
         "),\n",
         "bridge AS (\n",
         "  SELECT a.opened_at, a.count AS count_forecast, a.count AS count_upper, a.count AS count_lower, a.count\n",
