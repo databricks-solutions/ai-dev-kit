@@ -1,162 +1,65 @@
 # `ai_forecast` — Full Reference
 
-**Docs:** https://docs.databricks.com/aws/en/sql/language-manual/functions/ai_forecast
-
-> `ai_forecast` is a **table-valued function** — it returns a table of rows, not a scalar. Call it with `SELECT * FROM ai_forecast(...)`.
-
-## Requirements
-
-- **Pro or Serverless SQL warehouse** — not available on Classic or Starter
-- Input data must have a DATE or TIMESTAMP time column and at least one numeric value column
-
-## Syntax
-
-```sql
-SELECT *
-FROM ai_forecast(
-    observed                   => TABLE(...) or query,
-    horizon                    => 'YYYY-MM-DD' or TIMESTAMP,
-    time_col                   => 'column_name',
-    value_col                  => 'column_name',
-    [group_col                 => 'column_name'],
-    [prediction_interval_width => 0.95]
-)
-```
+**Table-valued function** — returns rows, not a scalar. Call with `SELECT * FROM ai_forecast(...)`; from PySpark it must go through `spark.sql()`. Needs a **Pro or Serverless** SQL warehouse. See the [Overview table](SKILL.md#overview) for the signature summary.
 
 ## Parameters
 
 | Parameter | Type | Description |
 |---|---|---|
-| `observed` | TABLE reference or subquery | Training data with time + value columns |
-| `horizon` | DATE, TIMESTAMP, or STRING | End date/time for the forecast period |
-| `time_col` | STRING | Name of the DATE or TIMESTAMP column in `observed` |
-| `value_col` | STRING | One or more numeric columns to forecast (up to 100 per group) |
-| `group_col` | STRING (optional) | Column to partition forecasts by — produces one forecast series per group value |
-| `prediction_interval_width` | DOUBLE (optional, default 0.95) | Confidence interval width between 0 and 1 |
+| `observed` | TABLE / subquery | Training data; filter or join inside the subquery as needed |
+| `horizon` | DATE / TIMESTAMP / STRING | End of the forecast period |
+| `time_col` | STRING | DATE or TIMESTAMP column in `observed` (output preserves its type) |
+| `value_col` | STRING | One column, or comma-separated for several (≤100 per group); always DOUBLE in output |
+| `group_col` | STRING (optional) | Partition into one forecast series per group value |
+| `prediction_interval_width` | DOUBLE (optional, default 0.95) | Confidence interval width, 0–1 (narrower = less conservative) |
+| `frequency` | STRING (optional) | Forecast step, e.g. `'D'`, `'W'`, `'MS'` (pandas offset alias) — inferred if omitted |
+| `seed` | number (optional) | Seed for reproducible forecasts |
+| `parameters` | JSON string (optional) | Model hyperparameters — see keys below; any unspecified key is auto-tuned |
 
-## Output Columns
+**`parameters` JSON keys** (all optional, auto-determined if omitted):
 
-For each `value_col` named `metric`, the output includes:
+| Key | Meaning |
+|---|---|
+| `global_floor` | Hard lower bound on forecasts — e.g. `0` so a declining series never predicts negative values (units sold, counts, revenue) |
+| `global_cap` | Hard upper bound on forecasts (saturation ceiling) |
+| `daily_order` | Fourier order of the daily seasonality component |
+| `weekly_order` | Fourier order of the weekly seasonality component |
 
-| Column | Type | Description |
-|---|---|---|
-| time_col | DATE or TIMESTAMP | The forecast timestamp (same type as input) |
-| `metric_forecast` | DOUBLE | Point forecast |
-| `metric_upper` | DOUBLE | Upper confidence bound |
-| `metric_lower` | DOUBLE | Lower confidence bound |
-| group_col | original type | Present when `group_col` is specified |
+**Output:** the `time_col` (+ `group_col` if given), then per value column `{metric}_forecast`, `{metric}_upper`, `{metric}_lower` (all DOUBLE).
 
 ## Patterns
 
-### Single Metric Forecast
-
 ```sql
+-- Grouped, multi-metric, custom interval, filtered input — all params in one call
 SELECT *
 FROM ai_forecast(
-    observed  => TABLE(SELECT order_date, revenue FROM daily_revenue),
-    horizon   => '2026-12-31',
-    time_col  => 'order_date',
-    value_col => 'revenue'
-);
--- Returns: order_date, revenue_forecast, revenue_upper, revenue_lower
-```
-
-### Multi-Group Forecast
-
-Produces one forecast series per distinct value of `group_col`:
-
-```sql
-SELECT *
-FROM ai_forecast(
-    observed  => TABLE(SELECT date, region, sales FROM regional_sales),
-    horizon   => '2026-12-31',
-    time_col  => 'date',
-    value_col => 'sales',
-    group_col => 'region'
-);
--- Returns: date, region, sales_forecast, sales_upper, sales_lower
--- One row per date per region
-```
-
-### Multiple Value Columns
-
-```sql
-SELECT *
-FROM ai_forecast(
-    observed  => TABLE(SELECT date, units, revenue FROM daily_kpis),
-    horizon   => '2026-06-30',
-    time_col  => 'date',
-    value_col => 'units,revenue'   -- comma-separated
-);
--- Returns: date, units_forecast, units_upper, units_lower,
---                revenue_forecast, revenue_upper, revenue_lower
-```
-
-### Custom Confidence Interval
-
-```sql
-SELECT *
-FROM ai_forecast(
-    observed                   => TABLE(SELECT ts, sensor_value FROM iot_readings),
-    horizon                    => '2026-03-31',
-    time_col                   => 'ts',
-    value_col                  => 'sensor_value',
-    prediction_interval_width  => 0.80   -- narrower interval = less conservative
-);
-```
-
-### Filtering Input Data (Subquery)
-
-```sql
-SELECT *
-FROM ai_forecast(
-    observed  => TABLE(
-        SELECT date, sales
-        FROM daily_sales
-        WHERE region = 'BR' AND date >= '2024-01-01'
+    observed => TABLE(
+        SELECT date, region, units, revenue
+        FROM daily_kpis
+        WHERE date >= '2024-01-01'           -- filter/join inside the subquery
     ),
-    horizon   => '2026-12-31',
-    time_col  => 'date',
-    value_col => 'sales'
+    horizon                   => '2026-12-31',
+    time_col                  => 'date',
+    value_col                 => 'units,revenue',   -- comma-separated for multiple
+    group_col                 => 'region',          -- one series per region
+    prediction_interval_width => 0.80,
+    parameters                => '{"global_floor": 0}'  -- never forecast below 0 (units/revenue can't be negative)
 );
+-- Returns per (date, region): units_forecast/_upper/_lower, revenue_forecast/_upper/_lower
 ```
 
-### PySpark — Use `spark.sql()`
-
-`ai_forecast` is a table-valued function and must be called through `spark.sql()`:
+`global_floor`/`global_cap` clamp every forecast (point + interval bounds) to a business-valid range — without them a declining series can predict negative values.
 
 ```python
+# PySpark: table-valued, so call via spark.sql() (no DataFrame API form)
 result = spark.sql("""
-    SELECT *
-    FROM ai_forecast(
+    SELECT * FROM ai_forecast(
         observed  => TABLE(SELECT date, sales FROM catalog.schema.daily_sales),
-        horizon   => '2026-12-31',
-        time_col  => 'date',
-        value_col => 'sales'
-    )
+        horizon   => '2026-12-31', time_col => 'date', value_col => 'sales')
 """)
-result.display()
-```
-
-### Save Forecast to Delta Table
-
-```python
-result = spark.sql("""
-    SELECT *
-    FROM ai_forecast(
-        observed  => TABLE(SELECT date, region, revenue FROM catalog.schema.sales),
-        horizon   => '2026-12-31',
-        time_col  => 'date',
-        value_col => 'revenue',
-        group_col => 'region'
-    )
-""")
-result.write.format("delta").mode("overwrite").saveAsTable("catalog.schema.revenue_forecast")
 ```
 
 ## Notes
 
-- The underlying model is a **prophet-like piecewise linear + seasonality model** — suitable for business time series with trend and weekly/yearly seasonality
-- Handles "any number of groups" but up to **100 metrics per group**
-- Output time column preserves the input type (DATE stays DATE, TIMESTAMP stays TIMESTAMP)
-- Value columns are always cast to DOUBLE in output regardless of input type
+- Model is **prophet-like** (piecewise-linear trend + weekly/yearly seasonality) — suited to business series with trend and seasonality.
+- Any number of groups; ≤100 metrics per group.
