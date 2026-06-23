@@ -224,42 +224,44 @@ if __name__ == "__main__":
     time_saved = (total_latency / 1000) - total_time
     print(f"\n{'='*60}")
     print(f"Time saved vs serial execution: {time_saved:.2f}s")
-    print(f"Speedup: {(total_latency/1000) / total_time:.1f}×")
+    if total_time > 0:
+        print(f"Speedup: {(total_latency/1000) / total_time:.1f}×")
+    else:
+        print("Speedup: N/A (total_time below resolution)")
     print(f"{'='*60}")
 
 
 # =============================================================================
 # Production Best Practices
 # =============================================================================
-"""
-Best practices from databricksters-check-and-pub:
-
-1. Configurable concurrency
-   - Use LLM_MAX_CONCURRENCY env var (default: 5 in the production app)
-   - Balance throughput vs rate limits
-   - Too high = rate limit errors
-   - Too low = underutilized resources
-
-2. Error handling
-   - Capture exceptions per job
-   - Return None for failed jobs
-   - Collect error messages for debugging
-   - Continue execution even if some jobs fail
-
-3. Bounded execution
-   - Only parallelize independent checks
-   - Cap concurrency with an env var rather than firing unlimited requests
-   - Keep the job contract simple: name -> (callable, args, kwargs)
-
-4. When to use parallel calls
-   - Multiple independent evaluations of same content
-   - Batch processing multiple documents
-   - A/B testing different prompts
-   - Multi-aspect analysis
-
-5. When NOT to use parallel calls
-   - Dependent/sequential operations
-   - Single evaluation needed
-   - Rate limits are very strict
-   - Debugging (use serial for easier troubleshooting)
-"""
+#
+# Best practices from databricksters-check-and-pub:
+#
+# 1. Configurable concurrency
+#    - Use LLM_MAX_CONCURRENCY env var (default: 5 in the production app)
+#    - Balance throughput vs rate limits
+#    - Too high = rate limit errors
+#    - Too low = underutilized resources
+#
+# 2. Error handling
+#    - Capture exceptions per job
+#    - Return None for failed jobs
+#    - Collect error messages for debugging
+#    - Continue execution even if some jobs fail
+#
+# 3. Bounded execution
+#    - Only parallelize independent checks
+#    - Cap concurrency with an env var rather than firing unlimited requests
+#    - Keep the job contract simple: name -> (callable, args, kwargs)
+#
+# 4. When to use parallel calls
+#    - Multiple independent evaluations of same content
+#    - Batch processing multiple documents
+#    - A/B testing different prompts
+#    - Multi-aspect analysis
+#
+# 5. When NOT to use parallel calls
+#    - Dependent/sequential operations
+#    - Single evaluation needed
+#    - Rate limits are very strict
+#    - Debugging (use serial for easier troubleshooting)

@@ -9,6 +9,7 @@ execution continues in background and returns an operation ID for polling.
 """
 
 import asyncio
+import inspect
 import json
 import logging
 import threading
@@ -16,11 +17,11 @@ import time
 from contextvars import copy_context
 from typing import Any
 
-from claude_agent_sdk import tool, create_sdk_mcp_server
+from claude_agent_sdk import create_sdk_mcp_server, tool
 
 from .operation_tracker import (
-    create_operation,
     complete_operation,
+    create_operation,
     get_operation,
     list_operations,
 )
@@ -67,7 +68,7 @@ def _get_all_sdk_tools():
 
     # Import triggers @mcp.tool registration
     from databricks_mcp_server.server import mcp
-    from databricks_mcp_server.tools import sql, compute, file, pipelines  # noqa: F401
+    from databricks_mcp_server.tools import compute, file, pipelines, sql  # noqa: F401
 
     sdk_tools = []
     tool_names = []
@@ -267,9 +268,9 @@ def _make_wrapper(name: str, description: str, schema: dict, fn):
 
     @tool(name, description, schema)
     async def wrapper(args: dict[str, Any]) -> dict[str, Any]:
+        import concurrent.futures
         import sys
         import traceback
-        import concurrent.futures
 
         start_time = time.time()
         print(f'[MCP TOOL] {name} called with args: {args}', file=sys.stderr, flush=True)
@@ -296,8 +297,20 @@ def _make_wrapper(name: str, description: str, schema: dict, fn):
             ctx = copy_context()
 
             def run_in_context():
-                """Run the tool function within the copied context."""
-                return ctx.run(fn, **parsed_args)
+                """Run the tool function within the copied context.
+
+                Some FastMCP versions expose tool callables as async coroutines
+                (esp. via list_tools() in deployed environments), even when the
+                underlying function is defined sync. Detect a returned coroutine
+                and run it to completion so we don't hand a coroutine object back
+                as the tool result.
+                """
+                def _call():
+                    result = fn(**parsed_args)
+                    if inspect.iscoroutine(result):
+                        return asyncio.run(result)
+                    return result
+                return ctx.run(_call)
 
             # Run tool in executor so we can poll for completion with heartbeat
             # Use executor.submit() to get a concurrent.futures.Future (thread-safe)

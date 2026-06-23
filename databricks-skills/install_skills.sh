@@ -112,8 +112,8 @@ get_skill_description() {
 get_skill_extra_files() {
     case "$1" in
         "databricks-agent-bricks") echo "1-knowledge-assistants.md 2-supervisor-agents.md" ;;
-        "databricks-ai-functions") echo "1-task-functions.md 2-ai-query.md 3-ai-forecast.md 4-document-processing-pipeline.md" ;;
-        "databricks-aibi-dashboards") echo "widget-reference.md sql-patterns.md" ;;
+        "databricks-ai-functions") echo "1-task-functions.md 2-ai-query.md 3-ai-forecast.md" ;;
+        "databricks-aibi-dashboards") echo "1-widget-specifications.md 2-advanced-widget-specifications.md 3-filters.md 4-examples.md 5-troubleshooting.md" ;;
         "databricks-genie") echo "spaces.md conversation.md" ;;
         "databricks-bundles") echo "alerts_guidance.md SDP_guidance.md" ;;
         "databricks-iceberg") echo "1-managed-iceberg-tables.md 2-uniform-and-compatibility.md 3-iceberg-rest-catalog.md 4-snowflake-interop.md 5-external-engine-interop.md" ;;

@@ -187,8 +187,6 @@ Enable CDF on the source for TRIGGERED/CONTINUOUS: `ALTER TABLE ... SET TBLPROPE
 
 → Mode comparison, type mapping (UC → Postgres), capacity planning, schema evolution rules, SDK equivalents: [reverse-etl.md](references/reverse-etl.md).
 
----
-
 ## Common Issues
 
 | Issue | Solution |

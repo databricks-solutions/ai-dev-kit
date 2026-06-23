@@ -8,7 +8,7 @@ An endpoint is a Postgres server instance attached to one branch. Each branch ha
 
 ## Compute Units
 
-1 CU ≈ 2 GB RAM (vs ~16 GB/CU on Lakebase Provisioned — the autoscaling tier trades per-unit RAM for finer scaling granularity).
+1 CU ≈ 2 GB RAM — the autoscaling tier favors finer scaling granularity over large per-unit RAM.
 
 | CU | RAM | Max connections |
 |----|-----|-----------------|
