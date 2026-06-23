@@ -94,15 +94,9 @@ $script:InstallExperimental = ($env:DEVKIT_EXPERIMENTAL -notin @("false", "0"))
 # -McpPath / DEVKIT_MCP_PATH implies opting into the MCP server
 if ($script:UserMcpPath) { $script:InstallMcp = $true }
 
-# Raw-fetch ref overrides (see Resolve-Ref). SKILLS_CHANNEL=dev flips unset
-# refs to `main` for living-at-head testing.
-$script:SkillsChannel = if ($env:SKILLS_CHANNEL) { $env:SKILLS_CHANNEL } else { "stable" }
-$script:ApxRef = if ($env:APX_REF) { $env:APX_REF } elseif ($script:SkillsChannel -eq "dev") { "main" } else { "latest" }
-$script:MlflowRef = if ($env:MLFLOW_REF) { $env:MLFLOW_REF } else { "main" }  # mlflow/skills is tagless -- main is intentional
+# Raw-fetch ref override for MLflow skills (mlflow/skills is tagless -- main is intentional)
+$script:MlflowRef = if ($env:MLFLOW_REF) { $env:MLFLOW_REF } else { "main" }
 $script:IncludePrereleases = ($env:INCLUDE_PRERELEASES -in @("true", "1"))
-
-# Databricks skills bundled in this repo (everything else moved to databricks/databricks-agent-skills)
-$script:LocalSkills = @("databricks-genie")
 
 # MLflow skills (fetched from mlflow/skills repo; MLFLOW_REF defaults to main -- the repo is tagless)
 $script:MlflowSkills = @(
@@ -111,10 +105,6 @@ $script:MlflowSkills = @(
     "retrieving-mlflow-traces", "searching-mlflow-docs"
 )
 $MlflowBaseUrl = "https://raw.githubusercontent.com/mlflow/skills"
-
-# APX skills (fetched from databricks-solutions/apx repo @ latest stable tag, see Resolve-Ref / APX_REF)
-$script:ApxSkills = @("databricks-app-apx")
-$ApxBaseUrl = "https://raw.githubusercontent.com/databricks-solutions/apx"
 
 # Agent skills (from databricks/databricks-agent-skills, installed and managed by
 # `databricks aitools`, which ships with the Databricks CLI v1.0.0+).
@@ -128,7 +118,7 @@ $script:AgentBStableFallback = @(
 $script:AgentBExperimentalFallback = @(
     "databricks-agent-bricks", "databricks-ai-functions", "databricks-aibi-dashboards",
     "databricks-apps-python", "databricks-dbsql", "databricks-docs",
-    "databricks-execution-compute", "databricks-iceberg", "databricks-lakeflow-connect",
+    "databricks-execution-compute", "databricks-genie", "databricks-iceberg", "databricks-lakeflow-connect",
     "databricks-metric-views", "databricks-mlflow-evaluation", "databricks-python-sdk",
     "databricks-spark-structured-streaming", "databricks-synthetic-data-gen",
     "databricks-unity-catalog", "databricks-unstructured-pdf-generation",
@@ -179,19 +169,16 @@ $script:ProfileAiMlMlflow = @(
     "retrieving-mlflow-traces", "searching-mlflow-docs"
 )
 $script:ProfileAppDeveloper = @(
-    "databricks-apps", "databricks-apps-python", "databricks-app-apx", "databricks-lakebase",
+    "databricks-apps", "databricks-apps-python", "databricks-lakebase",
     "databricks-model-serving", "databricks-dbsql", "databricks-jobs", "databricks-dabs"
 )
 
 # Selected skills (populated during profile selection)
-$script:SelectedLocalSkills = @()
 $script:SelectedMlflowSkills = @()
-$script:SelectedApxSkills = @()
 $script:SelectedAgentBSkills = @()
 
 # Resolved raw-fetch refs (populated by Resolve-FetchRefs)
 $script:MlflowResolvedRef = ""
-$script:ApxResolvedRef = ""
 
 # aitools agent mapping (populated by Resolve-AitoolsAgents)
 $script:AitoolsAgents = ""
@@ -201,7 +188,7 @@ $script:AitoolsAgents = ""
 
 # Number of skills the "all" profile installs (excluded agent skills omitted)
 function Get-AllSkillsCount {
-    $n = $script:LocalSkills.Count + $script:MlflowSkills.Count + $script:ApxSkills.Count +
+    $n = $script:MlflowSkills.Count +
          $script:AgentBStable.Count + $script:AgentBExperimental.Count
     foreach ($skill in $script:AgentBExcluded) {
         if (($script:AgentBStable -contains $skill) -or ($script:AgentBExperimental -contains $skill)) { $n-- }
@@ -250,17 +237,9 @@ function Show-SkillsList {
     Write-Host "--------------------------------"
     foreach ($s in $script:ProfileAppDeveloper) { Write-Host "    $s" }
     Write-Host ""
-    Write-Host "Bundled Skills (from this repo)" -ForegroundColor White
-    Write-Host "--------------------------------"
-    foreach ($s in $script:LocalSkills) { Write-Host "    $s" }
-    Write-Host ""
     Write-Host "MLflow Skills (from mlflow/skills repo @ $($script:MlflowRef))" -ForegroundColor White
     Write-Host "--------------------------------"
     foreach ($s in $script:MlflowSkills) { Write-Host "    $s" }
-    Write-Host ""
-    Write-Host "APX Skills (from databricks-solutions/apx repo @ $($script:ApxRef))" -ForegroundColor White
-    Write-Host "--------------------------------"
-    foreach ($s in $script:ApxSkills) { Write-Host "    $s" }
     Write-Host ""
     $releaseSuffix = if ($script:AgentBRelease) { " @ $($script:AgentBRelease)" } else { "" }
     Write-Host "Agent Skills (from databricks/databricks-agent-skills$releaseSuffix -- managed by databricks aitools)" -ForegroundColor White
@@ -359,10 +338,7 @@ while ($i -lt $args.Count) {
             Write-Host "  DEVKIT_INSTALL_MCP    Set to 'true' to install the deprecated MCP server (default: false)"
             Write-Host "  DEVKIT_PROFILE/SCOPE/TOOLS/SKILLS/SKILLS_PROFILE/MCP_PATH/FORCE/SILENT  (mirror the bash installer)"
             Write-Host "  DEVKIT_EXPERIMENTAL   'true' (default) or 'false' to skip experimental agent skills"
-            Write-Host "  APX_REF               Ref for APX skill fetch: 'latest' (default), a tag/SHA, or 'main'"
             Write-Host "  MLFLOW_REF            Ref for MLflow skills fetch (default: main)"
-            Write-Host "  SKILLS_CHANNEL        'stable' (default) or 'dev' (unset raw-fetch refs follow main)"
-            Write-Host "  INCLUDE_PRERELEASES   Set to '1' to allow -rc/-beta tags when resolving 'latest'"
             Write-Host "  DRY_RUN               Set to '1' to print the install plan and exit"
             Write-Host ""
             Write-Host "Notes:"
@@ -996,24 +972,20 @@ function Install-McpServer {
 
 # ─── Skill profile selection ──────────────────────────────────
 
-# Bucket one skill name into its source (returns "local"/"mlflow"/"apx"/"agentb", or "" for unknown)
+# Bucket one skill name into its source (returns "mlflow"/"agentb", or "" for unknown)
 function Get-SkillBucket {
     param([string]$Name)
-    if ($script:LocalSkills -contains $Name) { return "local" }
     if ($script:MlflowSkills -contains $Name) { return "mlflow" }
-    if ($script:ApxSkills -contains $Name) { return "apx" }
     if (($script:AgentBStable -contains $Name) -or ($script:AgentBExperimental -contains $Name)) { return "agentb" }
     return ""
 }
 
 # Resolve selected skills from profile names or explicit skill list,
-# bucketing each name into its source (local repo / mlflow / apx / agent-skills).
+# bucketing each name into its source (mlflow / agent-skills).
 function Resolve-Skills {
     Get-AgentBInventory
 
-    $localSkills = @()
     $mlflowSkills = @()
-    $apxSkills = @()
     $agentBSkills = @()
 
     # Agent skills selected by default: everything except the excluded list (and
@@ -1038,25 +1010,19 @@ function Resolve-Skills {
                 $bucket = Get-SkillBucket -Name $skill
             }
             switch ($bucket) {
-                "local"  { $localSkills += $skill }
                 "mlflow" { $mlflowSkills += $skill }
-                "apx"    { $apxSkills += $skill }
                 "agentb" { $agentBSkills += $skill }
                 default  { Write-Err "Unknown skill: '$skill' (run with --list-skills to see available skills)" }
             }
         }
-        $script:SelectedLocalSkills  = @($localSkills  | Select-Object -Unique)
         $script:SelectedMlflowSkills = @($mlflowSkills | Select-Object -Unique)
-        $script:SelectedApxSkills    = @($apxSkills    | Select-Object -Unique)
         $script:SelectedAgentBSkills = @($agentBSkills | Select-Object -Unique)
         return
     }
 
     # Priority 2: --skills-profile flag or interactive selection
     if ([string]::IsNullOrWhiteSpace($script:SkillsProfile) -or $script:SkillsProfile -eq "all" -or ($script:SkillsProfile -split ',' | ForEach-Object { $_.Trim() }) -contains "all") {
-        $script:SelectedLocalSkills  = @($script:LocalSkills)
         $script:SelectedMlflowSkills = @($script:MlflowSkills)
-        $script:SelectedApxSkills    = @($script:ApxSkills)
         $script:SelectedAgentBSkills = @($defaultAgentB)
         return
     }
@@ -1078,17 +1044,13 @@ function Resolve-Skills {
         # Drop experimental agent skills from profiles when --experimental false
         if (-not $script:InstallExperimental -and ($script:AgentBExperimental -contains $skill)) { continue }
         switch (Get-SkillBucket -Name $skill) {
-            "local"  { $localSkills += $skill }
             "mlflow" { $mlflowSkills += $skill }
-            "apx"    { $apxSkills += $skill }
             "agentb" { $agentBSkills += $skill }
             default  { Write-Warn "Skill '$skill' not found in any source (skipped)" }
         }
     }
 
-    $script:SelectedLocalSkills  = @($localSkills  | Select-Object -Unique)
     $script:SelectedMlflowSkills = @($mlflowSkills | Select-Object -Unique)
-    $script:SelectedApxSkills    = @($apxSkills    | Select-Object -Unique)
     $script:SelectedAgentBSkills = @($agentBSkills | Select-Object -Unique)
 }
 
@@ -1332,7 +1294,6 @@ function Invoke-PromptCustomSkills {
         "databricks-serverless-migration"       = @("Serverless Migration", "Migrate to serverless compute")
         "databricks-apps"                       = @("Apps", "AppKit + all frameworks")
         "databricks-apps-python"                = @("App (AppKit + Python)", "AppKit, Dash, Streamlit, Flask")
-        "databricks-app-apx"                    = @("App APX", "FastAPI + React")
         "mlflow-onboarding"                     = @("MLflow Onboarding", "Getting started")
         "agent-evaluation"                      = @("Agent Evaluation", "Evaluate AI agents")
         "instrumenting-with-mlflow-tracing"     = @("MLflow Tracing", "Instrument with tracing")
@@ -1344,11 +1305,10 @@ function Invoke-PromptCustomSkills {
     }
 
     # Build the picker from the live inventory so new upstream skills appear
-    # automatically. Order: agent skills (stable, then experimental), then
-    # bundled, MLflow, and APX skills.
+    # automatically. Order: agent skills (stable, then experimental), then MLflow.
     $items = @()
     $seen = @()
-    foreach ($skill in ($script:AgentBStable + $script:AgentBExperimental + $script:LocalSkills + $script:MlflowSkills + $script:ApxSkills)) {
+    foreach ($skill in ($script:AgentBStable + $script:AgentBExperimental + $script:MlflowSkills)) {
         if ($seen -contains $skill) { continue }
         $seen += $skill
         $label = if ($meta.ContainsKey($skill)) { $meta[$skill][0] } else { $skill }
@@ -1710,7 +1670,7 @@ function Send-AgentSkills {
     if ($tmpDir) { Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue }
 }
 
-# ─── Raw-fetch ref resolution (apx, mlflow) ───────────────────
+# ─── Raw-fetch ref resolution (mlflow) ───────────────────────
 
 # Resolve-Ref -Repo <owner/repo> -Requested <ref>
 #   ""/"latest" -> highest stable semver tag (prereleases excluded unless
@@ -1762,9 +1722,6 @@ function Resolve-FetchRefs {
     if ($script:SelectedMlflowSkills.Count -gt 0) {
         $script:MlflowResolvedRef = Resolve-Ref -Repo "mlflow/skills" -Requested $script:MlflowRef
     }
-    if ($script:SelectedApxSkills.Count -gt 0) {
-        $script:ApxResolvedRef = Resolve-Ref -Repo "databricks-solutions/apx" -Requested $script:ApxRef
-    }
 }
 
 # Best-effort commit SHA for a ref (empty on failure). Prefers the peeled
@@ -1809,17 +1766,6 @@ function Write-Lockfile {
             fetched_at    = $now
         }
     }
-    if ($script:SelectedApxSkills.Count -gt 0) {
-        $kind = if ($script:ApxResolvedRef -in @("main", "master")) { "branch" } else { "release_tag" }
-        $sha = Get-GitHubSha -Repo "databricks-solutions/apx" -Ref $script:ApxResolvedRef
-        $sources["databricks-solutions/apx"] = [ordered]@{
-            requested_ref = $script:ApxRef
-            resolved_kind = $kind
-            resolved_ref  = $script:ApxResolvedRef
-            resolved_sha  = "$sha"
-            fetched_at    = $now
-        }
-    }
     if ($script:SelectedAgentBSkills.Count -gt 0) {
         $cliVersion = ""
         if (Get-Command databricks -ErrorAction SilentlyContinue) {
@@ -1846,14 +1792,9 @@ function Show-DryRunReport {
     Write-Host ""
     Write-Host "Dry run -- nothing was installed" -ForegroundColor White
     Write-Host "--------------------------------"
-    $localList  = if ($script:SelectedLocalSkills.Count -gt 0)  { $script:SelectedLocalSkills -join ' ' }  else { "<none>" }
     $mlflowList = if ($script:SelectedMlflowSkills.Count -gt 0) { $script:SelectedMlflowSkills -join ' ' } else { "<none>" }
-    $apxList    = if ($script:SelectedApxSkills.Count -gt 0)    { $script:SelectedApxSkills -join ' ' }    else { "<none>" }
     $mlflowRefDisplay = if ($script:MlflowResolvedRef) { $script:MlflowResolvedRef } else { "n/a" }
-    $apxRefDisplay    = if ($script:ApxResolvedRef)    { $script:ApxResolvedRef }    else { "n/a" }
-    Write-Msg "Bundled skills (this repo):  $localList"
     Write-Msg "MLflow skills @ ${mlflowRefDisplay}: $mlflowList"
-    Write-Msg "APX skills @ ${apxRefDisplay}: $apxList"
     if ($script:SelectedAgentBSkills.Count -gt 0) {
         $skillsCsv = $script:SelectedAgentBSkills -join ','
         $expFlag = if (Test-AgentBNeedsExperimental) { " --experimental" } else { "" }
@@ -1925,21 +1866,16 @@ function Install-Skills {
     $dirs = $dirs | Select-Object -Unique
 
     # Count selected skills for display
-    $localCount = $script:SelectedLocalSkills.Count
     $mlflowCount = $script:SelectedMlflowSkills.Count
-    $apxCount = $script:SelectedApxSkills.Count
-    $totalCount = $localCount + $mlflowCount + $apxCount
-    Write-Msg "Installing $totalCount skills (agent skills are installed separately via databricks aitools)"
+    Write-Msg "Installing $mlflowCount MLflow skills (Databricks skills are installed separately via databricks aitools)"
 
-    # Skills this installer manages directly. Agent skills are deliberately NOT
-    # in this set: any same-named entry from an older install is a stale real
-    # copy that must be removed -- `databricks aitools` will not overwrite an
-    # existing real directory, so leaving it would shadow the new install.
-    # (Symlinks for tools aitools can't target are re-created each run.)
+    # Skills this installer manages directly (MLflow). Agent skills are
+    # deliberately NOT in this set: any same-named entry from an older install is
+    # a stale real copy that must be removed -- `databricks aitools` will not
+    # overwrite an existing real directory, so leaving it would shadow the new
+    # install. (Symlinks for tools aitools can't target are re-created each run.)
     $allNewSkills = @()
-    $allNewSkills += $script:SelectedLocalSkills
     $allNewSkills += $script:SelectedMlflowSkills
-    $allNewSkills += $script:SelectedApxSkills
 
     # Clean up previously installed skills that are no longer selected
     # Check scope-local manifest first, fall back to global for upgrades from older versions
@@ -1973,27 +1909,15 @@ function Install-Skills {
     # Start fresh manifest
     $manifestEntries = @()
 
-    # Raw-fetch URLs pinned to the resolved refs
+    # Raw-fetch URL pinned to the resolved ref
     $mlflowRef = if ($script:MlflowResolvedRef) { $script:MlflowResolvedRef } else { "main" }
-    $apxRef = if ($script:ApxResolvedRef) { $script:ApxResolvedRef } else { "main" }
     $mlflowRawUrl = "$MlflowBaseUrl/$mlflowRef"
-    $apxRawUrl = "$ApxBaseUrl/$apxRef/skills/apx"
 
     foreach ($dir in $dirs) {
         if (-not (Test-Path $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
-        # Install bundled Databricks skills from this repo
-        foreach ($skill in $script:SelectedLocalSkills) {
-            $src = Join-Path $script:RepoDir "databricks-skills\$skill"
-            if (-not (Test-Path $src)) { continue }
-            $dest = Join-Path $dir $skill
-            if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
-            Copy-Item -Recurse $src $dest
-            $manifestEntries += "$dir|$skill"
-        }
         $shortDir = $dir -replace [regex]::Escape($env:USERPROFILE), '~'
-        Write-Ok "Databricks skills ($localCount) -> $shortDir"
 
         # Install MLflow skills from mlflow/skills repo
         if ($script:SelectedMlflowSkills.Count -gt 0) {
@@ -2018,32 +1942,6 @@ function Install-Skills {
             }
             $ErrorActionPreference = $prevEAP
             Write-Ok "MLflow skills ($mlflowCount, @ $mlflowRef) -> $shortDir"
-        }
-
-        # Install APX skills from databricks-solutions/apx repo
-        if ($script:SelectedApxSkills.Count -gt 0) {
-            $prevEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-            foreach ($skill in $script:SelectedApxSkills) {
-                $destDir = Join-Path $dir $skill
-                if (-not (Test-Path $destDir)) {
-                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-                }
-                $url = "$apxRawUrl/SKILL.md"
-                try {
-                    Invoke-WebRequest -Uri $url -OutFile (Join-Path $destDir "SKILL.md") -UseBasicParsing -ErrorAction Stop
-                    foreach ($ref in @("backend-patterns.md", "frontend-patterns.md")) {
-                        try {
-                            Invoke-WebRequest -Uri "$apxRawUrl/$ref" -OutFile (Join-Path $destDir $ref) -UseBasicParsing -ErrorAction Stop
-                        } catch {}
-                    }
-                    $manifestEntries += "$dir|$skill"
-                } catch {
-                    Remove-Item $destDir -ErrorAction SilentlyContinue
-                    Write-Warning "Could not install APX skill '$skill' - consider removing $destDir if it is no longer needed"
-                }
-            }
-            $ErrorActionPreference = $prevEAP2
-            Write-Ok "APX skills ($apxCount, @ $apxRef) -> $shortDir"
         }
     }
 
@@ -2236,7 +2134,7 @@ Skills are installed in ``.gemini/skills/`` and provide patterns and best practi
 - Unity Catalog, SQL, Genie
 - MLflow evaluation and tracing
 - Model Serving, Vector Search
-- Databricks Apps (Python and APX)
+- Databricks Apps
 - And more
 
 ## Getting Started
@@ -2614,7 +2512,7 @@ function Invoke-Main {
         Invoke-PromptSkillsProfile
         Resolve-Skills
         Resolve-FetchRefs
-        $skCount = $script:SelectedLocalSkills.Count + $script:SelectedMlflowSkills.Count + $script:SelectedApxSkills.Count + $script:SelectedAgentBSkills.Count
+        $skCount = $script:SelectedMlflowSkills.Count + $script:SelectedAgentBSkills.Count
         if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
             Write-Ok "Custom selection ($skCount skills)"
         } else {
@@ -2642,7 +2540,7 @@ function Invoke-Main {
             Write-Host "  MCP server:  " -NoNewline; Write-Host $script:InstallDir -ForegroundColor Green
         }
         if ($script:InstallSkills) {
-            $skTotal = $script:SelectedLocalSkills.Count + $script:SelectedMlflowSkills.Count + $script:SelectedApxSkills.Count + $script:SelectedAgentBSkills.Count
+            $skTotal = $script:SelectedMlflowSkills.Count + $script:SelectedAgentBSkills.Count
             if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
                 Write-Host "  Skills:      " -NoNewline
                 Write-Host "custom selection ($skTotal skills)" -ForegroundColor Green -NoNewline
@@ -2662,9 +2560,6 @@ function Invoke-Main {
                 Write-Host "  Experimental: " -NoNewline
                 Write-Host "excluded" -ForegroundColor Yellow -NoNewline
                 Write-Host " (--experimental false)" -ForegroundColor DarkGray
-            }
-            if ($script:SelectedApxSkills.Count -gt 0 -and $script:ApxResolvedRef) {
-                Write-Host "  APX ref:     " -NoNewline; Write-Host $script:ApxResolvedRef -ForegroundColor Green
             }
         }
         if ($script:InstallMcp) {
@@ -2698,15 +2593,12 @@ function Invoke-Main {
         $baseDir = (Get-Location).Path
     }
 
-    # Setup MCP server (opt-in). Otherwise clone sources only if needed for bundled skills.
+    # Setup MCP server (opt-in). The repo is only needed for the MCP server now.
     if ($script:InstallMcp) {
         Install-McpServer
-    } elseif ((-not (Test-Path $script:RepoDir)) -and ($script:SelectedLocalSkills.Count -gt 0)) {
-        Write-Step "Downloading sources"
-        Get-RepoSources
     }
 
-    # Install skills managed by this installer (bundled + mlflow + apx)
+    # Install skills managed by this installer (MLflow)
     if ($script:InstallSkills) {
         Install-Skills -BaseDir $baseDir
 

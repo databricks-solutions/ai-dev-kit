@@ -59,15 +59,8 @@ DRY_RUN="${DRY_RUN:-false}"
 # skills. Explicit --skills requests are always honored as named.
 INSTALL_EXPERIMENTAL="${DEVKIT_EXPERIMENTAL:-true}"
 
-# Raw-fetch ref overrides (see resolve_ref). SKILLS_CHANNEL=dev flips unset
-# refs to `main` for living-at-head testing.
-SKILLS_CHANNEL="${SKILLS_CHANNEL:-stable}"
-if [ "$SKILLS_CHANNEL" = "dev" ]; then
-    APX_REF="${APX_REF:-main}"
-else
-    APX_REF="${APX_REF:-latest}"
-fi
-MLFLOW_REF="${MLFLOW_REF:-main}"  # mlflow/skills is tagless — main is intentional
+# Raw-fetch ref override for MLflow skills (mlflow/skills is tagless — main is intentional)
+MLFLOW_REF="${MLFLOW_REF:-main}"
 INCLUDE_PRERELEASES="${INCLUDE_PRERELEASES:-0}"
 
 # Convert string booleans from env vars to actual booleans
@@ -118,23 +111,16 @@ MIN_AITOOLS_CLI_VERSION="1.0.0"
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' BL='\033[0;34m' B='\033[1m' D='\033[2m' N='\033[0m'
 
-# Databricks skills bundled in this repo (everything else moved to databricks/databricks-agent-skills)
-LOCAL_SKILLS="databricks-genie"
-
 # MLflow skills (fetched from mlflow/skills repo; MLFLOW_REF defaults to main — the repo is tagless)
 MLFLOW_SKILLS="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
 MLFLOW_BASE_URL="https://raw.githubusercontent.com/mlflow/skills"
-
-# APX skills (fetched from databricks-solutions/apx repo @ latest stable tag, see resolve_ref / APX_REF)
-APX_SKILLS="databricks-app-apx"
-APX_BASE_URL="https://raw.githubusercontent.com/databricks-solutions/apx"
 
 # Agent skills (from databricks/databricks-agent-skills, installed and managed by
 # `databricks aitools`, which ships with the Databricks CLI v1.0.0+).
 # The live inventory is discovered at runtime via `databricks aitools list -o json`
 # (see fetch_agent_b_inventory); these lists are the fallback snapshot (v0.2.3).
 AGENT_B_STABLE_FALLBACK="databricks-apps databricks-core databricks-dabs databricks-jobs databricks-lakebase databricks-model-serving databricks-pipelines databricks-serverless-migration databricks-vector-search"
-AGENT_B_EXPERIMENTAL_FALLBACK="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-dbsql databricks-docs databricks-execution-compute databricks-iceberg databricks-lakeflow-connect databricks-metric-views databricks-mlflow-evaluation databricks-python-sdk databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-zerobus-ingest spark-python-data-source"
+AGENT_B_EXPERIMENTAL_FALLBACK="databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards databricks-apps-python databricks-dbsql databricks-docs databricks-execution-compute databricks-genie databricks-iceberg databricks-lakeflow-connect databricks-metric-views databricks-mlflow-evaluation databricks-python-sdk databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-unity-catalog databricks-unstructured-pdf-generation databricks-zerobus-ingest spark-python-data-source"
 # Skills never installed by default (excluded from "all" and profile selections;
 # still installable via an explicit --skills request)
 AGENT_B_EXCLUDED="databricks-execution-compute"
@@ -157,12 +143,10 @@ PROFILE_DATA_ENGINEER="databricks-pipelines databricks-spark-structured-streamin
 PROFILE_ANALYST="databricks-aibi-dashboards databricks-dbsql databricks-genie databricks-metric-views"
 PROFILE_AIML_ENGINEER="databricks-agent-bricks databricks-ai-functions databricks-vector-search databricks-model-serving databricks-genie databricks-unstructured-pdf-generation databricks-mlflow-evaluation databricks-synthetic-data-gen databricks-jobs"
 PROFILE_AIML_MLFLOW="agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics retrieving-mlflow-traces searching-mlflow-docs"
-PROFILE_APP_DEVELOPER="databricks-apps databricks-apps-python databricks-app-apx databricks-lakebase databricks-model-serving databricks-dbsql databricks-jobs databricks-dabs"
+PROFILE_APP_DEVELOPER="databricks-apps databricks-apps-python databricks-lakebase databricks-model-serving databricks-dbsql databricks-jobs databricks-dabs"
 
 # Selected skills (populated during profile selection)
-SELECTED_LOCAL_SKILLS=""
 SELECTED_MLFLOW_SKILLS=""
-SELECTED_APX_SKILLS=""
 SELECTED_AGENT_B_SKILLS=""
 
 # Output helpers
@@ -231,10 +215,7 @@ while [ $# -gt 0 ]; do
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
             echo "  DEVKIT_EXPERIMENTAL   'true' (default) or 'false' to skip experimental agent skills"
             echo "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
-            echo "  APX_REF               Ref for APX skill fetch: 'latest' (default), a tag/SHA, or 'main'"
             echo "  MLFLOW_REF            Ref for MLflow skills fetch (default: main)"
-            echo "  SKILLS_CHANNEL        'stable' (default) or 'dev' (unset raw-fetch refs follow main)"
-            echo "  INCLUDE_PRERELEASES   Set to '1' to allow -rc/-beta tags when resolving 'latest'"
             echo "  DRY_RUN               Set to '1' to print the install plan and exit"
             echo ""
             echo "Notes:"
@@ -262,7 +243,7 @@ _count() { echo $#; }
 # Number of skills the "all" profile installs (excluded agent skills omitted)
 _count_all_skills() {
     local n skill
-    n=$(_count $LOCAL_SKILLS $MLFLOW_SKILLS $APX_SKILLS $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL)
+    n=$(_count $MLFLOW_SKILLS $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL)
     for skill in $AGENT_B_EXCLUDED; do
         _in_list "$skill" "$AGENT_B_STABLE $AGENT_B_EXPERIMENTAL" && n=$((n - 1))
     done
@@ -323,21 +304,9 @@ list_skills_and_exit() {
         echo -e "    $skill"
     done
     echo ""
-    echo -e "${B}Bundled Skills${N} (from this repo)"
-    echo "────────────────────────────────"
-    for skill in $LOCAL_SKILLS; do
-        echo -e "    $skill"
-    done
-    echo ""
     echo -e "${B}MLflow Skills${N} (from mlflow/skills repo @ ${MLFLOW_REF})"
     echo "────────────────────────────────"
     for skill in $MLFLOW_SKILLS; do
-        echo -e "    $skill"
-    done
-    echo ""
-    echo -e "${B}APX Skills${N} (from databricks-solutions/apx repo @ ${APX_REF})"
-    echo "────────────────────────────────"
-    for skill in $APX_SKILLS; do
         echo -e "    $skill"
     done
     echo ""
@@ -860,20 +829,16 @@ migrate_renamed_skill() {
 }
 
 # Resolve selected skills from profile names or explicit skill list,
-# bucketing each name into its source (local repo / mlflow / apx / agent-skills).
+# bucketing each name into its source (mlflow / agent-skills).
 resolve_skills() {
     fetch_agent_b_inventory
 
-    local local_skills="" mlflow_skills="" apx_skills="" agent_b_skills=""
+    local mlflow_skills="" agent_b_skills=""
 
     # Bucket one skill name into its source list (fails for unknown names)
     _bucket() {
-        if _in_list "$1" "$LOCAL_SKILLS"; then
-            local_skills="${local_skills:+$local_skills }$1"
-        elif _in_list "$1" "$MLFLOW_SKILLS"; then
+        if _in_list "$1" "$MLFLOW_SKILLS"; then
             mlflow_skills="${mlflow_skills:+$mlflow_skills }$1"
-        elif _in_list "$1" "$APX_SKILLS"; then
-            apx_skills="${apx_skills:+$apx_skills }$1"
         elif _in_list "$1" "$AGENT_B_STABLE $AGENT_B_EXPERIMENTAL"; then
             agent_b_skills="${agent_b_skills:+$agent_b_skills }$1"
         else
@@ -885,9 +850,7 @@ resolve_skills() {
     _dedupe() { echo "$*" | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' ' | sed 's/[[:space:]]*$//'; }
 
     _store_selection() {
-        SELECTED_LOCAL_SKILLS=$(_dedupe "$local_skills")
         SELECTED_MLFLOW_SKILLS=$(_dedupe "$mlflow_skills")
-        SELECTED_APX_SKILLS=$(_dedupe "$apx_skills")
         SELECTED_AGENT_B_SKILLS=$(_dedupe "$agent_b_skills")
     }
 
@@ -921,9 +884,7 @@ resolve_skills() {
 
     # Priority 2: --skills-profile flag or interactive selection
     if [ -z "$SKILLS_PROFILE" ] || [ "$SKILLS_PROFILE" = "all" ]; then
-        local_skills="$LOCAL_SKILLS"
         mlflow_skills="$MLFLOW_SKILLS"
-        apx_skills="$APX_SKILLS"
         _default_agent_b
         _store_selection
         return
@@ -935,9 +896,7 @@ resolve_skills() {
     for profile in $(echo "$SKILLS_PROFILE" | tr ',' ' '); do
         case $profile in
             all)
-                local_skills="$LOCAL_SKILLS"
                 mlflow_skills="$MLFLOW_SKILLS"
-                apx_skills="$APX_SKILLS"
                 agent_b_skills=""
                 _default_agent_b
                 _store_selection
@@ -1149,7 +1108,6 @@ _skill_meta() {
         databricks-serverless-migration)       echo "Serverless Migration|Migrate to serverless compute" ;;
         databricks-apps)                       echo "Apps|AppKit + all frameworks" ;;
         databricks-apps-python)                echo "App (AppKit + Python)|AppKit, Dash, Streamlit, Flask" ;;
-        databricks-app-apx)                    echo "App APX|FastAPI + React" ;;
         mlflow-onboarding)                     echo "MLflow Onboarding|Getting started" ;;
         agent-evaluation)                      echo "Agent Evaluation|Evaluate AI agents" ;;
         instrumenting-with-mlflow-tracing)     echo "MLflow Tracing|Instrument with tracing" ;;
@@ -1182,11 +1140,10 @@ prompt_custom_skills() {
     echo -e "  ${D}Core skills (core, docs, python-sdk, unity-catalog) are recommended for all profiles${N}"
 
     # Build the picker from the live inventory so new upstream skills appear
-    # automatically. Order: agent skills (stable, then experimental), then
-    # bundled, MLflow, and APX skills.
+    # automatically. Order: agent skills (stable, then experimental), then MLflow.
     local -a items=()
     local seen="" skill meta label hint state lock
-    for skill in $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL $LOCAL_SKILLS $MLFLOW_SKILLS $APX_SKILLS; do
+    for skill in $AGENT_B_STABLE $AGENT_B_EXPERIMENTAL $MLFLOW_SKILLS; do
         _in_list "$skill" "$seen" && continue
         seen="${seen:+$seen }$skill"
         meta=$(_skill_meta "$skill")
@@ -1483,7 +1440,7 @@ deliver_agent_skills() {
     return 0
 }
 
-# ─── Raw-fetch ref resolution (apx, mlflow) ───────────────────
+# ─── Raw-fetch ref resolution (mlflow) ───────────────────────
 
 # resolve_ref <owner/repo> <requested>
 #   ""/"latest" → highest stable semver tag (prereleases excluded unless
@@ -1527,10 +1484,8 @@ resolve_ref() {
 # Resolve refs for all selected raw-fetch sources (records globals for the
 # fetch URLs, summary, dry run, and lockfile)
 MLFLOW_RESOLVED_REF=""
-APX_RESOLVED_REF=""
 resolve_fetch_refs() {
     [ -n "$SELECTED_MLFLOW_SKILLS" ] && MLFLOW_RESOLVED_REF=$(resolve_ref "mlflow/skills" "$MLFLOW_REF")
-    [ -n "$SELECTED_APX_SKILLS" ] && APX_RESOLVED_REF=$(resolve_ref "databricks-solutions/apx" "$APX_REF")
     return 0
 }
 
@@ -1559,13 +1514,6 @@ write_lockfile() {
         sha=$(github_sha "mlflow/skills" "$MLFLOW_RESOLVED_REF")
         entries="    \"mlflow/skills\": {\"requested_ref\": \"${MLFLOW_REF}\", \"resolved_kind\": \"branch\", \"resolved_ref\": \"${MLFLOW_RESOLVED_REF}\", \"resolved_sha\": \"${sha}\", \"fetched_at\": \"${now}\"}"
     fi
-    if [ -n "$SELECTED_APX_SKILLS" ]; then
-        kind="release_tag"
-        case "$APX_RESOLVED_REF" in main|master) kind="branch" ;; esac
-        sha=$(github_sha "databricks-solutions/apx" "$APX_RESOLVED_REF")
-        entries="${entries:+$entries,
-}    \"databricks-solutions/apx\": {\"requested_ref\": \"${APX_REF}\", \"resolved_kind\": \"${kind}\", \"resolved_ref\": \"${APX_RESOLVED_REF}\", \"resolved_sha\": \"${sha}\", \"fetched_at\": \"${now}\"}"
-    fi
     if [ -n "$SELECTED_AGENT_B_SKILLS" ]; then
         local cli_version
         cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
@@ -1583,9 +1531,7 @@ dry_run_report() {
     echo ""
     echo -e "${B}Dry run — nothing was installed${N}"
     echo "────────────────────────────────"
-    msg "Bundled skills (this repo):  ${SELECTED_LOCAL_SKILLS:-<none>}"
     msg "MLflow skills @ ${MLFLOW_RESOLVED_REF:-n/a}: ${SELECTED_MLFLOW_SKILLS:-<none>}"
-    msg "APX skills @ ${APX_RESOLVED_REF:-n/a}: ${SELECTED_APX_SKILLS:-<none>}"
     if [ -n "$SELECTED_AGENT_B_SKILLS" ]; then
         local skills_csv exp_flag=""
         skills_csv=$(echo "$SELECTED_AGENT_B_SKILLS" | tr -s ' ' ',' | sed 's/^,//;s/,$//')
@@ -1774,19 +1720,16 @@ install_skills() {
     dirs=("${unique[@]}")
 
     # Count selected skills for display
-    local local_count mlflow_count apx_count
-    local_count=$(_count $SELECTED_LOCAL_SKILLS)
+    local mlflow_count
     mlflow_count=$(_count $SELECTED_MLFLOW_SKILLS)
-    apx_count=$(_count $SELECTED_APX_SKILLS)
-    local total_count=$((local_count + mlflow_count + apx_count))
-    msg "Installing ${B}${total_count}${N} skills (agent skills are installed separately via databricks aitools)"
+    msg "Installing ${B}${mlflow_count}${N} MLflow skills (Databricks skills are installed separately via databricks aitools)"
 
-    # Skills this installer manages directly. Agent skills are deliberately NOT
-    # in this set: any same-named entry from an older install is a stale real
-    # copy that must be removed — `databricks aitools` will not overwrite an
-    # existing real directory, so leaving it would shadow the new install.
-    # (Symlinks for tools aitools can't target are re-created each run.)
-    local all_new_skills="$SELECTED_LOCAL_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS"
+    # Skills this installer manages directly (MLflow). Agent skills are
+    # deliberately NOT in this set: any same-named entry from an older install is
+    # a stale real copy that must be removed — `databricks aitools` will not
+    # overwrite an existing real directory, so leaving it would shadow the new
+    # install. (Symlinks for tools aitools can't target are re-created each run.)
+    local all_new_skills="$SELECTED_MLFLOW_SKILLS"
 
     # Clean up previously installed skills that are no longer managed here
     # Check scope-local manifest first, fall back to global for upgrades from older versions
@@ -1813,20 +1756,9 @@ install_skills() {
     : > "$manifest.tmp"
 
     local mlflow_raw_url="$MLFLOW_BASE_URL/${MLFLOW_RESOLVED_REF:-main}"
-    local apx_raw_url="$APX_BASE_URL/${APX_RESOLVED_REF:-main}/skills/apx"
 
     for dir in "${dirs[@]}"; do
         mkdir -p "$dir"
-        # Install bundled Databricks skills from this repo
-        for skill in $SELECTED_LOCAL_SKILLS; do
-            local src="$REPO_DIR/databricks-skills/$skill"
-            [ ! -d "$src" ] && continue
-            rm -rf "$dir/$skill"
-            cp -r "$src" "$dir/$skill"
-            echo "$dir|$skill" >> "$manifest.tmp"
-        done
-        ok "Databricks skills ($local_count) → ${dir#$HOME/}"
-
         # Install MLflow skills from mlflow/skills repo
         if [ -n "$SELECTED_MLFLOW_SKILLS" ]; then
             for skill in $SELECTED_MLFLOW_SKILLS; do
@@ -1844,25 +1776,6 @@ install_skills() {
                 fi
             done
             ok "MLflow skills ($mlflow_count, @ ${MLFLOW_RESOLVED_REF}) → ${dir#$HOME/}"
-        fi
-
-        # Install APX skills from databricks-solutions/apx repo
-        if [ -n "$SELECTED_APX_SKILLS" ]; then
-            for skill in $SELECTED_APX_SKILLS; do
-                local dest_dir="$dir/$skill"
-                mkdir -p "$dest_dir"
-                local url="$apx_raw_url/SKILL.md"
-                if curl -fsSL "$url" -o "$dest_dir/SKILL.md" 2>/dev/null; then
-                    # Try to fetch optional reference files
-                    for ref in backend-patterns.md frontend-patterns.md; do
-                        curl -fsSL "$apx_raw_url/$ref" -o "$dest_dir/$ref" 2>/dev/null || true
-                    done
-                    echo "$dir|$skill" >> "$manifest.tmp"
-                else
-                    rmdir "$dest_dir" 2>/dev/null || warn "Could not install APX skill '$skill' — consider removing $dest_dir if it is no longer needed"
-                fi
-            done
-            ok "APX skills ($apx_count, @ ${APX_RESOLVED_REF}) → ${dir#$HOME/}"
         fi
     done
 
@@ -2023,7 +1936,7 @@ Skills are installed in `.gemini/skills/` and provide patterns and best practice
 - Unity Catalog, SQL, Genie
 - MLflow evaluation and tracing
 - Model Serving, Vector Search
-- Databricks Apps (Python and APX)
+- Databricks Apps
 - And more
 
 ## Getting Started
@@ -2398,7 +2311,7 @@ main() {
         resolve_fetch_refs
         # Count for display
         local sk_count
-        sk_count=$(_count $SELECTED_LOCAL_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_B_SKILLS)
+        sk_count=$(_count $SELECTED_MLFLOW_SKILLS $SELECTED_AGENT_B_SKILLS)
         if [ -n "$USER_SKILLS" ]; then
             ok "Custom selection ($sk_count skills)"
         else
@@ -2429,12 +2342,11 @@ main() {
                 echo -e "  Skills:      ${G}custom selection${N} ${Y}(will be overwritten, backup your changes first)${N}"
             else
                 local sk_total
-                sk_total=$(_count $SELECTED_LOCAL_SKILLS $SELECTED_MLFLOW_SKILLS $SELECTED_APX_SKILLS $SELECTED_AGENT_B_SKILLS)
+                sk_total=$(_count $SELECTED_MLFLOW_SKILLS $SELECTED_AGENT_B_SKILLS)
                 echo -e "  Skills:      ${G}${SKILLS_PROFILE:-all} ($sk_total skills)${N} ${Y}(will be overwritten, backup your changes first)${N}"
             fi
             [ -n "$SELECTED_AGENT_B_SKILLS" ] && echo -e "  Agent skills: ${G}via databricks aitools${N} ${D}(requires Databricks CLI v${MIN_AITOOLS_CLI_VERSION}+)${N}"
             [ "$INSTALL_EXPERIMENTAL" = false ] && echo -e "  Experimental: ${Y}excluded${N} ${D}(--experimental false)${N}"
-            [ -n "$SELECTED_APX_SKILLS" ] && [ -n "$APX_RESOLVED_REF" ] && echo -e "  APX ref:     ${G}${APX_RESOLVED_REF}${N}"
         fi
         [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
         echo ""
@@ -2463,15 +2375,12 @@ main() {
     local base_dir
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
     
-    # Setup MCP server (opt-in). Otherwise clone sources only if needed for bundled skills.
+    # Setup MCP server (opt-in). The repo is only needed for the MCP server now.
     if [ "$INSTALL_MCP" = true ]; then
         setup_mcp
-    elif [ ! -d "$REPO_DIR" ] && [ -n "$SELECTED_LOCAL_SKILLS" ]; then
-        step "Downloading sources"
-        clone_repo
     fi
-    
-    # Install skills managed by this installer (bundled + mlflow + apx)
+
+    # Install skills managed by this installer (MLflow)
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
 
     # Install agent skills (delegated to `databricks aitools`)
