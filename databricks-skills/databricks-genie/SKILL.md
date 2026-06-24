@@ -235,10 +235,12 @@ Notes on the example:
 
 ## Cross-Workspace Migration
 
-When migrating between workspaces, catalog names often differ. Export the space, remap with `sed`, then import:
+When migrating between workspaces, catalog names often differ. Export the space, remap, then import. Use `jq` to rewrite identifiers — it's portable across macOS/Linux (unlike `sed -i`, whose in-place flag differs between BSD and GNU) and operates on JSON values directly:
 
 ```bash
-sed -i '' 's/source_catalog/target_catalog/g' genie_space.json
+jq --arg src source_catalog --arg dst target_catalog \
+   '(.. | strings) |= gsub($src; $dst)' genie_space.json \
+   > genie_space.tmp && mv genie_space.tmp genie_space.json
 ```
 
 Use `DATABRICKS_CONFIG_PROFILE=profile_name` to target different workspaces.
