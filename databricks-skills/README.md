@@ -102,7 +102,8 @@ cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
 ### 🚀 Development & Deployment
 - **databricks-bundles** - DABs for multi-environment deployments
 - **databricks-app-apx** - Full-stack apps (FastAPI + React)
-- **databricks-apps-python** - Python web apps (Dash, Streamlit, Flask) with foundation model integration
+- **databricks-app-python** - Python web apps (Dash, Streamlit, Flask) with foundation model integration
+- **databricks-custom-mcp-server** - Build, deploy, and govern custom MCP servers on Databricks Apps (FastMCP + UC Connection + Supervisor Agent attachment)
 - **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
 - **databricks-config** - Profile authentication setup
 - **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
