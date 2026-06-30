@@ -1,11 +1,11 @@
 ---
 name: databricks-vector-search
-description: "Patterns for Databricks Vector Search: create endpoints and indexes, query with filters, manage embeddings. Use when building RAG applications, semantic search, or similarity matching. Covers both storage-optimized and standard endpoints."
+description: "Patterns for Databricks AI Search (formerly Vector Search): create endpoints and indexes, query with filters, manage embeddings. Use when building RAG applications, semantic search, or similarity matching. Covers both storage-optimized and standard endpoints."
 ---
 
-# Databricks Vector Search
+# Databricks AI Search
 
-Patterns for creating, managing, and querying vector search indexes for RAG and semantic search applications.
+Patterns for creating, managing, and querying AI Search indexes for RAG and semantic search applications. Databricks AI Search was formerly known as Databricks Vector Search.
 
 ## When to Use
 
@@ -18,7 +18,7 @@ Use this skill when:
 
 ## Overview
 
-Databricks Vector Search provides managed vector similarity search with automatic embedding generation and Delta Lake integration.
+Databricks AI Search provides managed vector similarity search with automatic embedding generation and Delta Lake integration.
 
 | Component | Description |
 |-----------|-------------|
@@ -44,56 +44,54 @@ Databricks Vector Search provides managed vector similarity search with automati
 
 ## Quick Start
 
+### Installation
+
+```python
+%pip install databricks-ai-search
+dbutils.library.restartPython()
+from databricks.ai_search.client import AISearchClient
+```
+
 ### Create Endpoint
 
 ```python
-from databricks.sdk import WorkspaceClient
+client = AISearchClient()
 
-w = WorkspaceClient()
-
-# Create a standard endpoint
-endpoint = w.vector_search_endpoints.create_endpoint(
+client.create_endpoint(
     name="my-vs-endpoint",
     endpoint_type="STANDARD"  # or "STORAGE_OPTIMIZED"
 )
-# Note: Endpoint creation is asynchronous; check status with get_endpoint()
+# Note: Endpoint creation is asynchronous; check status with client.get_endpoint()
 ```
 
 ### Create Delta Sync Index (Managed Embeddings)
 
 ```python
 # Source table must have: primary key column + text column
-index = w.vector_search_indexes.create_index(
-    name="catalog.schema.my_index",
+index = client.create_delta_sync_index(
     endpoint_name="my-vs-endpoint",
+    source_table_name="catalog.schema.documents",
+    index_name="catalog.schema.my_index",
+    pipeline_type="TRIGGERED",  # or "CONTINUOUS"
     primary_key="id",
-    index_type="DELTA_SYNC",
-    delta_sync_index_spec={
-        "source_table": "catalog.schema.documents",
-        "embedding_source_columns": [
-            {
-                "name": "content",  # Text column to embed
-                "embedding_model_endpoint_name": "databricks-gte-large-en"
-            }
-        ],
-        "pipeline_type": "TRIGGERED"  # or "CONTINUOUS"
-    }
+    embedding_source_column="content",
+    embedding_model_endpoint_name="databricks-gte-large-en"
 )
 ```
 
 ### Query Index
 
 ```python
-results = w.vector_search_indexes.query_index(
-    index_name="catalog.schema.my_index",
-    columns=["id", "content", "metadata"],
-    query_text="What is machine learning?",
-    num_results=5
+index = client.get_index(
+    endpoint_name="my-vs-endpoint",
+    index_name="catalog.schema.my_index"
 )
 
-for doc in results.result.data_array:
-    score = doc[-1]  # Similarity score is last column
-    print(f"Score: {score}, Content: {doc[1][:100]}...")
+results = index.similarity_search(
+    query_text="What is machine learning?",
+    columns=["id", "content", "metadata"],
+    num_results=5
+)
 ```
 
 ## Common Patterns
@@ -102,7 +100,7 @@ for doc in results.result.data_array:
 
 ```python
 # For large-scale, cost-effective deployments
-endpoint = w.vector_search_endpoints.create_endpoint(
+client.create_endpoint(
     name="my-storage-endpoint",
     endpoint_type="STORAGE_OPTIMIZED"
 )
@@ -112,72 +110,57 @@ endpoint = w.vector_search_endpoints.create_endpoint(
 
 ```python
 # Source table must have: primary key + embedding vector column
-index = w.vector_search_indexes.create_index(
-    name="catalog.schema.my_index",
+index = client.create_delta_sync_index(
     endpoint_name="my-vs-endpoint",
+    source_table_name="catalog.schema.documents",
+    index_name="catalog.schema.my_index",
+    pipeline_type="TRIGGERED",
     primary_key="id",
-    index_type="DELTA_SYNC",
-    delta_sync_index_spec={
-        "source_table": "catalog.schema.documents",
-        "embedding_vector_columns": [
-            {
-                "name": "embedding",  # Pre-computed embedding column
-                "embedding_dimension": 768
-            }
-        ],
-        "pipeline_type": "TRIGGERED"
-    }
+    embedding_dimension=768,
+    embedding_vector_column="embedding"
 )
 ```
 
 ### Direct Access Index
 
 ```python
-import json
-
 # Create index for manual CRUD
-index = w.vector_search_indexes.create_index(
-    name="catalog.schema.direct_index",
+index = client.create_direct_access_index(
     endpoint_name="my-vs-endpoint",
+    index_name="catalog.schema.direct_index",
     primary_key="id",
-    index_type="DIRECT_ACCESS",
-    direct_access_index_spec={
-        "embedding_vector_columns": [
-            {"name": "embedding", "embedding_dimension": 768}
-        ],
-        "schema_json": json.dumps({
-            "id": "string",
-            "text": "string",
-            "embedding": "array<float>",
-            "metadata": "string"
-        })
+    embedding_dimension=768,
+    embedding_vector_column="embedding",
+    schema={
+        "id": "string",
+        "text": "string",
+        "embedding": "array<float>",
+        "metadata": "string"
     }
 )
 
 # Upsert data
-w.vector_search_indexes.upsert_data_vector_index(
-    index_name="catalog.schema.direct_index",
-    inputs_json=json.dumps([
-        {"id": "1", "text": "Hello", "embedding": [0.1, 0.2, ...], "metadata": "doc1"},
-        {"id": "2", "text": "World", "embedding": [0.3, 0.4, ...], "metadata": "doc2"},
-    ])
-)
+index.upsert([
+    {"id": "1", "text": "Hello", "embedding": [0.1, 0.2, ...], "metadata": "doc1"},
+    {"id": "2", "text": "World", "embedding": [0.3, 0.4, ...], "metadata": "doc2"},
+])
 
 # Delete data
-w.vector_search_indexes.delete_data_vector_index(
-    index_name="catalog.schema.direct_index",
-    primary_keys=["1", "2"]
-)
+index.delete(primary_keys=["1", "2"])
 ```
 
 ### Query with Embedding Vector
 
 ```python
-# When you have pre-computed query embedding
-results = w.vector_search_indexes.query_index(
-    index_name="catalog.schema.my_index",
-    columns=["id", "text"],
+index = client.get_index(
+    endpoint_name="my-vs-endpoint",
+    index_name="catalog.schema.my_index"
+)
+
+# When you have a pre-computed query embedding
+results = index.similarity_search(
     query_vector=[0.1, 0.2, 0.3, ...],  # Your 768-dim vector
+    columns=["id", "text"],
     num_results=10
 )
 ```
@@ -188,11 +171,10 @@ Hybrid search combines vector similarity (ANN) with BM25 keyword scoring. Use it
 
 ```python
 # Combines vector similarity with keyword matching
-results = w.vector_search_indexes.query_index(
-    index_name="catalog.schema.my_index",
-    columns=["id", "content"],
+results = index.similarity_search(
     query_text="SPARK-12345 executor memory error",
-    query_type="HYBRID",
+    query_type="hybrid",
+    columns=["id", "content"],
     num_results=10
 )
 ```
@@ -202,57 +184,53 @@ results = w.vector_search_indexes.query_index(
 ### Standard Endpoint Filters (Dictionary)
 
 ```python
-# filters_json uses dictionary format
-results = w.vector_search_indexes.query_index(
-    index_name="catalog.schema.my_index",
-    columns=["id", "content"],
+# filters accepts a dict for standard endpoints
+results = index.similarity_search(
     query_text="machine learning",
+    columns=["id", "content"],
     num_results=10,
-    filters_json='{"category": "ai", "status": ["active", "pending"]}'
+    filters={"category": "ai", "status": ["active", "pending"]}
 )
 ```
 
 ### Storage-Optimized Filters (SQL-like)
 
-Storage-Optimized endpoints use SQL-like filter syntax via the `databricks-vectorsearch` package's `filters` parameter (accepts a string):
+Storage-Optimized endpoints use SQL-like filter syntax passed as a string to the `filters` parameter:
 
 ```python
-from databricks.vector_search.client import VectorSearchClient
+index = client.get_index(
+    endpoint_name="my-storage-endpoint",
+    index_name="catalog.schema.my_index"
+)
 
-vsc = VectorSearchClient()
-index = vsc.get_index(endpoint_name="my-storage-endpoint", index_name="catalog.schema.my_index")
-
-# SQL-like filter syntax for storage-optimized endpoints
 results = index.similarity_search(
     query_text="machine learning",
     columns=["id", "content"],
     num_results=10,
     filters="category = 'ai' AND status IN ('active', 'pending')"
 )
-
-# More filter examples
-# filters="price > 100 AND price < 500"
-# filters="department LIKE 'eng%'"
-# filters="created_at >= '2024-01-01'"
 ```
+
+See [filtering.md](filtering.md) for a full reference of operators, data types, and limitations per endpoint type.
 
 ### Trigger Index Sync
 
 ```python
-# For TRIGGERED pipeline type, manually sync
-w.vector_search_indexes.sync_index(
+index = client.get_index(
+    endpoint_name="my-vs-endpoint",
     index_name="catalog.schema.my_index"
 )
+index.sync()
 ```
 
 ### Scan All Index Entries
 
 ```python
-# Retrieve all vectors (for debugging/export)
-scan_result = w.vector_search_indexes.scan_index(
-    index_name="catalog.schema.my_index",
-    num_results=100
+index = client.get_index(
+    endpoint_name="my-vs-endpoint",
+    index_name="catalog.schema.my_index"
 )
+scan_result = index.scan(num_results=100)
 ```
 
 ## Reference Files
@@ -261,7 +239,8 @@ scan_result = w.vector_search_indexes.scan_index(
 |-------|------|-------------|
 | Index Types | [index-types.md](index-types.md) | Detailed comparison of Delta Sync (managed/self-managed) vs Direct Access |
 | End-to-End RAG | [end-to-end-rag.md](end-to-end-rag.md) | Complete walkthrough: source table → endpoint → index → query → agent integration |
-| Search Modes | [search-modes.md](search-modes.md) | When to use semantic (ANN) vs hybrid search, decision guide |
+| Search Modes | [search-modes.md](search-modes.md) | When to use semantic (ANN) vs hybrid search, reranker, decision guide |
+| Filtering | [filtering.md](filtering.md) | Filter operators by data type for Standard and Storage-Optimized endpoints |
 | Operations | [troubleshooting-and-operations.md](troubleshooting-and-operations.md) | Monitoring, cost optimization, capacity planning, migration |
 
 ## CLI Quick Reference
@@ -298,9 +277,9 @@ databricks vector-search indexes delete-index \
 |-------|----------|
 | **Index sync slow** | Use Storage-Optimized endpoints (20x faster indexing) |
 | **Query latency high** | Use Standard endpoint for <100ms latency |
-| **filters_json not working** | Storage-Optimized uses SQL-like string filters via `databricks-vectorsearch` package's `filters` parameter |
+| **Filters not working** | Standard endpoints use a dict: `filters={"col": "val"}`. Storage-Optimized use a SQL string: `filters="col = 'val'"`. See [filtering.md](filtering.md) |
 | **Embedding dimension mismatch** | Ensure query and index dimensions match |
-| **Index not updating** | Check pipeline_type; use sync_index() for TRIGGERED |
+| **Index not updating** | Check pipeline_type; call `index.sync()` for TRIGGERED |
 | **Out of capacity** | Upgrade to Storage-Optimized (1B+ vectors) |
 | **`query_vector` truncated by MCP tool** | MCP tool calls serialize arrays as JSON and can truncate large vectors (e.g. 1024-dim). Use `query_text` instead (for managed embedding indexes), or use the Databricks SDK/CLI to pass raw vectors |
 
@@ -315,17 +294,16 @@ Databricks provides built-in embedding models:
 
 ```python
 # Use with managed embeddings
-embedding_source_columns=[
-    {
-        "name": "content",
-        "embedding_model_endpoint_name": "databricks-gte-large-en"
-    }
-]
+index = client.create_delta_sync_index(
+    ...
+    embedding_source_column="content",
+    embedding_model_endpoint_name="databricks-gte-large-en"
+)
 ```
 
 ## MCP Tools
 
-The following MCP tools are available for managing Vector Search infrastructure. For a full end-to-end walkthrough, see [end-to-end-rag.md](end-to-end-rag.md).
+The following MCP tools are available for managing AI Search infrastructure. For a full end-to-end walkthrough, see [end-to-end-rag.md](end-to-end-rag.md).
 
 ### manage_vs_endpoint - Endpoint Management
 
@@ -384,7 +362,7 @@ all_indexes = manage_vs_index(action="list")
 
 ### query_vs_index - Query (Hot Path)
 
-Query index with `query_text`, `query_vector`, or hybrid (`query_type="HYBRID"`). Prefer `query_text` over `query_vector` — MCP tool calls can truncate large embedding arrays (1024-dim).
+Query index with `query_text`, `query_vector`, or hybrid (`query_type="hybrid"`). Prefer `query_text` over `query_vector` — MCP tool calls can truncate large embedding arrays (1024-dim).
 
 ```python
 # Query an index
@@ -400,7 +378,7 @@ results = query_vs_index(
     index_name="catalog.schema.my_index",
     columns=["id", "content"],
     query_text="SPARK-12345 memory error",
-    query_type="HYBRID",
+    query_type="hybrid",
     num_results=10
 )
 ```
@@ -435,13 +413,13 @@ manage_vs_data(action="scan", index_name="catalog.schema.my_index", num_results=
 - **Delta Sync recommended** — easier than Direct Access for most scenarios
 - **Hybrid search** — available for both Delta Sync and Direct Access indexes
 - **`columns_to_sync` matters** — only synced columns are available in query results; include all columns you need
-- **Filter syntax differs by endpoint** — Standard uses dict-format filters, Storage-Optimized uses SQL-like string filters. Use the `databricks-vectorsearch` package's `filters` parameter which accepts both formats
-- **Management vs runtime** — MCP tools above handle lifecycle management; for agent tool-calling at runtime, use `VectorSearchRetrieverTool` or the Databricks managed Vector Search MCP server
+- **Filter syntax differs by endpoint** — Standard uses dict-format `filters`, Storage-Optimized uses SQL-like string `filters`. See [filtering.md](filtering.md)
+- **Management vs runtime** — MCP tools above handle lifecycle management; for agent tool-calling at runtime, use `VectorSearchRetrieverTool` or the Databricks managed AI Search MCP server
 
 ## Related Skills
 
 - **[databricks-model-serving](../databricks-model-serving/SKILL.md)** - Deploy agents that use VectorSearchRetrieverTool
 - **[databricks-agent-bricks](../databricks-agent-bricks/SKILL.md)** - Knowledge Assistants use RAG over indexed documents
-- **[databricks-unstructured-pdf-generation](../databricks-unstructured-pdf-generation/SKILL.md)** - Generate documents to index in Vector Search
+- **[databricks-unstructured-pdf-generation](../databricks-unstructured-pdf-generation/SKILL.md)** - Generate documents to index in AI Search
 - **[databricks-unity-catalog](../databricks-unity-catalog/SKILL.md)** - Manage the catalogs and tables that back Delta Sync indexes
-- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build Delta tables used as Vector Search sources
+- **[databricks-spark-declarative-pipelines](../databricks-spark-declarative-pipelines/SKILL.md)** - Build Delta tables used as AI Search sources
