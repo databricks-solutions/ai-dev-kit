@@ -1,4 +1,4 @@
-# Vector Search Index Types
+# AI Search Index Types
 
 ## Comparison Matrix
 
@@ -24,26 +24,19 @@ Databricks automatically computes embeddings from your text column.
 ### Create Index
 
 ```python
-from databricks.sdk import WorkspaceClient
+from databricks.ai_search.client import AISearchClient
 
-w = WorkspaceClient()
+client = AISearchClient()
 
-index = w.vector_search_indexes.create_index(
-    name="catalog.schema.docs_index",
+index = client.create_delta_sync_index(
     endpoint_name="my-vs-endpoint",
+    source_table_name="catalog.schema.documents",
+    index_name="catalog.schema.docs_index",
+    pipeline_type="TRIGGERED",  # or "CONTINUOUS"
     primary_key="doc_id",
-    index_type="DELTA_SYNC",
-    delta_sync_index_spec={
-        "source_table": "catalog.schema.documents",
-        "embedding_source_columns": [
-            {
-                "name": "content",
-                "embedding_model_endpoint_name": "databricks-gte-large-en"
-            }
-        ],
-        "pipeline_type": "TRIGGERED",  # or "CONTINUOUS"
-        "columns_to_sync": ["doc_id", "content", "title", "category"]
-    }
+    embedding_source_column="content",
+    embedding_model_endpoint_name="databricks-gte-large-en",
+    columns_to_sync=["doc_id", "content", "title", "category"]
 )
 ```
 
@@ -51,7 +44,7 @@ index = w.vector_search_indexes.create_index(
 
 | Type | Behavior | Cost | Use Case |
 |------|----------|------|----------|
-| `TRIGGERED` | Manual sync via API | Lower | Batch updates |
+| `TRIGGERED` | Manual sync via `index.sync()` | Lower | Batch updates |
 | `CONTINUOUS` | Auto-sync on changes | Higher | Real-time sync |
 
 ### Source Table Example
@@ -79,21 +72,14 @@ You pre-compute embeddings and store them in the source table.
 ### Create Index
 
 ```python
-index = w.vector_search_indexes.create_index(
-    name="catalog.schema.custom_index",
+index = client.create_delta_sync_index(
     endpoint_name="my-vs-endpoint",
+    source_table_name="catalog.schema.embedded_docs",
+    index_name="catalog.schema.custom_index",
+    pipeline_type="TRIGGERED",
     primary_key="id",
-    index_type="DELTA_SYNC",
-    delta_sync_index_spec={
-        "source_table": "catalog.schema.embedded_docs",
-        "embedding_vector_columns": [
-            {
-                "name": "embedding",
-                "embedding_dimension": 768
-            }
-        ],
-        "pipeline_type": "TRIGGERED"
-    }
+    embedding_dimension=768,
+    embedding_vector_column="embedding"
 )
 ```
 
@@ -146,24 +132,22 @@ Full control over vector data via CRUD API. No Delta table sync.
 ### Create Index
 
 ```python
-import json
+from databricks.ai_search.client import AISearchClient
 
-index = w.vector_search_indexes.create_index(
-    name="catalog.schema.realtime_index",
+client = AISearchClient()
+
+index = client.create_direct_access_index(
     endpoint_name="my-vs-endpoint",
+    index_name="catalog.schema.realtime_index",
     primary_key="id",
-    index_type="DIRECT_ACCESS",
-    direct_access_index_spec={
-        "embedding_vector_columns": [
-            {"name": "embedding", "embedding_dimension": 768}
-        ],
-        "schema_json": json.dumps({
-            "id": "string",
-            "text": "string",
-            "embedding": "array<float>",
-            "category": "string",
-            "score": "float"
-        })
+    embedding_dimension=768,
+    embedding_vector_column="embedding",
+    schema={
+        "id": "string",
+        "text": "string",
+        "embedding": "array<float>",
+        "category": "string",
+        "score": "float"
     }
 )
 ```
@@ -171,57 +155,44 @@ index = w.vector_search_indexes.create_index(
 ### Upsert Data
 
 ```python
-import json
-
 # Insert or update vectors
-w.vector_search_indexes.upsert_data_vector_index(
-    index_name="catalog.schema.realtime_index",
-    inputs_json=json.dumps([
-        {
-            "id": "doc-001",
-            "text": "Machine learning basics",
-            "embedding": [0.1, 0.2, 0.3, ...],  # 768 floats
-            "category": "ml",
-            "score": 0.95
-        },
-        {
-            "id": "doc-002",
-            "text": "Deep learning overview",
-            "embedding": [0.4, 0.5, 0.6, ...],
-            "category": "dl",
-            "score": 0.88
-        }
-    ])
-)
+index.upsert([
+    {
+        "id": "doc-001",
+        "text": "Machine learning basics",
+        "embedding": [0.1, 0.2, 0.3, ...],  # 768 floats
+        "category": "ml",
+        "score": 0.95
+    },
+    {
+        "id": "doc-002",
+        "text": "Deep learning overview",
+        "embedding": [0.4, 0.5, 0.6, ...],
+        "category": "dl",
+        "score": 0.88
+    }
+])
 ```
 
 ### Delete Data
 
 ```python
-w.vector_search_indexes.delete_data_vector_index(
-    index_name="catalog.schema.realtime_index",
-    primary_keys=["doc-001", "doc-002"]
-)
+index.delete(primary_keys=["doc-001", "doc-002"])
 ```
 
 ### Attach Embedding Model (Optional)
 
-For Direct Access with text queries:
+For Direct Access indexes that need to support `query_text` (rather than `query_vector`), specify an embedding model at creation time:
 
 ```python
-# Create index with embedding model for query-time embedding
-index = w.vector_search_indexes.create_index(
-    name="catalog.schema.hybrid_index",
+index = client.create_direct_access_index(
     endpoint_name="my-vs-endpoint",
+    index_name="catalog.schema.hybrid_index",
     primary_key="id",
-    index_type="DIRECT_ACCESS",
-    direct_access_index_spec={
-        "embedding_vector_columns": [
-            {"name": "embedding", "embedding_dimension": 768}
-        ],
-        "embedding_model_endpoint_name": "databricks-gte-large-en",  # For query_text
-        "schema_json": json.dumps({...})
-    }
+    embedding_dimension=768,
+    embedding_vector_column="embedding",
+    embedding_model_endpoint_name="databricks-gte-large-en",  # Enables query_text
+    schema={...}
 )
 ```
 
