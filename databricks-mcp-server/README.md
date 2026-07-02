@@ -1,6 +1,21 @@
 # Databricks MCP Server
 
-A simple [FastMCP](https://github.com/jlowin/fastmcp) server that exposes Databricks operations as MCP tools for AI assistants like Claude Code.
+A simple [FastMCP](https://github.com/jlowin/fastmcp) server that exposes Databricks operations as MCP tools for AI assistants like Claude Code, Cursor, and Genie Code.
+
+This server is a **self-contained install**. It has no dependency on Databricks skills — follow the steps below and the server runs on its own. (If you *also* want skills, see the optional section at the end.)
+
+## Prerequisites
+
+- **[uv](https://docs.astral.sh/uv/)** — used to create the virtual environment and install the packages:
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
+- **Python 3.9+** (uv can install one for you with `uv venv --python 3.11`).
+- **[Databricks CLI](https://docs.databricks.com/dev-tools/cli/install.html)** with a configured auth profile, so the server can reach your workspace. Verify with:
+  ```bash
+  databricks auth profiles
+  ```
+  If you have none, create one with `databricks auth login --host https://your-workspace.cloud.databricks.com`.
 
 ## Quick Start
 
@@ -11,68 +26,86 @@ git clone https://github.com/databricks-solutions/ai-dev-kit.git
 cd ai-dev-kit
 ```
 
-### Step 2: Install the packages
+### Step 2: Install the server
+
+The MCP server depends on the `databricks-tools-core` library, which also lives in this repo. Install both as editable packages into a virtual environment.
+
+You can do this in one shot with the setup script, which creates a `.venv`, installs both packages, verifies the import, and prints ready-to-paste client config:
 
 ```bash
-# Install the core library
-uv pip install -e ./databricks-tools-core
-
-# Install the MCP server
-uv pip install -e ./databricks-mcp-server
+./databricks-mcp-server/setup.sh
 ```
 
-### Step 3: Configure Databricks authentication
+Or run the steps manually:
 
 ```bash
-# Option 1: Environment variables
-export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
-export DATABRICKS_TOKEN="your-token"
+# Create and activate a virtual environment
+uv venv --python 3.11
+source .venv/bin/activate
 
-# Option 2: Use a profile from ~/.databrickscfg
-export DATABRICKS_CONFIG_PROFILE="your-profile"
+# Install the core library, then the MCP server (both editable, from this repo)
+uv pip install -e ./databricks-tools-core -e ./databricks-mcp-server
 ```
 
-### Step 4: Add MCP server to Claude Code
+Verify the server imports cleanly:
 
-For Claude Code, add to your project's `.mcp.json` (create the file if it doesn't exist).
-For Cursor, add to your project's `.cursor/mcp.json` (create the file if it doesn't exist).
+```bash
+python -c "import databricks_mcp_server; print('OK')"
+```
+
+### Step 3: Configure your MCP client
+
+Point your MCP client at the server's `run_server.py`. Use the Python interpreter from the `.venv` you just created (replace `/path/to/ai-dev-kit` with the absolute path where you cloned the repo).
+
+**Claude Code** — add to your project's `.mcp.json` (create the file if it doesn't exist):
 
 ```json
 {
   "mcpServers": {
     "databricks": {
-      "command": "uv",
-      "args": ["run",  "--directory", "/path/to/ai-dev-kit", "python", "databricks-mcp-server/run_server.py"],
+      "command": "/path/to/ai-dev-kit/.venv/bin/python",
+      "args": ["/path/to/ai-dev-kit/databricks-mcp-server/run_server.py"],
       "defer_loading": true
     }
   }
 }
 ```
 
-**Replace `/path/to/ai-dev-kit`** with the actual path where you cloned the repo.
+Or register it from the CLI:
+
+```bash
+claude mcp add-json databricks '{"command":"/path/to/ai-dev-kit/.venv/bin/python","args":["/path/to/ai-dev-kit/databricks-mcp-server/run_server.py"]}'
+```
+
+**Cursor / Genie Code** — use the same JSON in your client's MCP config (e.g. Cursor's `.cursor/mcp.json`).
 
 **Note:** `"defer_loading": true` improves startup time by not loading all tools upfront.
 
-### Step 5 (Recommended): Install Databricks skills
+### Step 4: Authenticate
 
-The MCP server works best with **Databricks skills** that teach Claude best practices:
-
-```bash
-# In your project directory (not ai-dev-kit)
-cd /path/to/your/project
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
-```
-
-### Step 6: Start Claude Code
+The server uses the Databricks Unified Authentication chain, so it picks up whatever the Databricks CLI/SDK already uses. Choose a profile in one of these ways:
 
 ```bash
-cd /path/to/your/project
-claude
+# Option 1: Named profile from ~/.databrickscfg (recommended)
+export DATABRICKS_CONFIG_PROFILE="your-profile"
+
+# Option 2: Explicit host + token
+export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
+export DATABRICKS_TOKEN="your-token"
 ```
 
-Claude now has both:
-- **Skills** (knowledge) - patterns and best practices in `.claude/skills/`
-- **MCP Tools** (actions) - Databricks operations via the MCP server
+To make a profile available to a GUI MCP client, add it to the `env` block of the server config, e.g. `"env": {"DATABRICKS_CONFIG_PROFILE": "your-profile"}`.
+
+### Step 5: Smoke test
+
+Confirm the server starts and can reach your workspace:
+
+```bash
+# The server speaks MCP over stdio; it should start without errors, then Ctrl-C to exit.
+.venv/bin/python databricks-mcp-server/run_server.py
+```
+
+Then in your MCP client, ask it to run a lightweight tool such as `list_warehouses` or `get_current_user`. A successful response confirms the server is installed, launched, and authenticated.
 
 ## Available Tools
 
@@ -169,13 +202,10 @@ Claude now has both:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Claude Code                             │
+│              MCP Client (Claude Code / Cursor / …)          │
 │                                                             │
-│  Skills (knowledge)          MCP Tools (actions)            │
-│  └── .claude/skills/         └── .claude/mcp.json           │
-│      ├── sdp-writer              └── databricks server      │
-│      ├── databricks-bundles                          │
-│      └── ...                                                │
+│  MCP Tools (actions)                                        │
+│  └── .mcp.json ──► databricks server                        │
 └──────────────────────────────┬──────────────────────────────┘
                                │ MCP Protocol (stdio)
                                ▼
@@ -263,6 +293,17 @@ databricks-ai-dev-kit/0.1.0 databricks-sdk-py/... project/<auto-detected-repo-na
 The project name is auto-detected from the git remote URL (no configuration needed). This makes every call filterable in the `system.access.audit` system table.
 
 > **Note:** Audit log entries may take 2–10 minutes to appear. The workspace must have Unity Catalog enabled to query `system.access.audit`.
+
+## Optional: If you also want Databricks skills
+
+This MCP server runs completely on its own — you do **not** need skills for any of the steps above. Skills are a *separate*, optional add-on that give AI assistants written guidance (patterns and best practices) to complement the executable tools this server provides.
+
+If you want them, install them separately — do not combine the two installs:
+
+- **Databricks CLI (recommended):** `databricks aitools install` (requires Databricks CLI v1.0.0+). This is the supported way to get the latest skills.
+- **AI Dev Kit installer:** run the repo's top-level `install.sh` and choose the skills option.
+
+See the [ai-dev-kit README](../README.md) for details. Skills are installed into your own project (e.g. `.claude/skills/`) and are picked up independently of this server.
 
 ## License
 
