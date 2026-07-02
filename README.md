@@ -39,7 +39,7 @@ Built into every Databricks workspace at no extra cost, with deep native product
 
 **Databricks expertise, in the editor you already use**
 
-Curated by Databricks field experts. Brings the patterns, skills, and 75+ executable tools your AI assistant needs to build on Databricks — wherever you're already coding.
+Curated by Databricks field experts. Brings the patterns, skills, and 40+ executable tools your AI assistant needs to build on Databricks — wherever you're already coding.
 
 <br>
 
@@ -240,7 +240,7 @@ cd ai-dev-kit/databricks-builder-app
 ./scripts/deploy.sh mcp-builder-app --enable-mcp --profile <your-profile>
 ```
 
-With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing the Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
+With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing the 40+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
 
 > **Current dependencies (to be removed later):** the Builder App currently relies on the in-repo MCP server (`databricks-mcp-server` + `databricks-tools-core`) and a bundled, frozen skills snapshot under [`databricks-skills/deprecated/`](databricks-skills/deprecated/). Both are temporary couplings scheduled to be decoupled from the kit.
 
@@ -329,7 +329,7 @@ The AI Dev Kit ships as four composable pieces — install the whole kit, or pic
 | Component | Description |
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
-| [`databricks-mcp-server/`](databricks-mcp-server/) | Standalone MCP server exposing 50+ Databricks tools for AI assistants (installs independently of skills) |
+| [`databricks-mcp-server/`](databricks-mcp-server/) | Standalone MCP server exposing 40+ Databricks tools for AI assistants (installs independently of skills) |
 | [`databricks-skills/`](databricks-skills/) | Skills that teach Databricks patterns (installed via `databricks aitools`; bundled copies are deprecated) |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 

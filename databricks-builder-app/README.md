@@ -4,7 +4,7 @@
 
 A web application that provides a Claude Code agent interface with integrated Databricks tools. Users interact with Claude through a chat interface, and the agent can execute SQL queries, manage pipelines, upload files, and more on their Databricks workspace.
 
-Optionally, the app can also serve as an **MCP server** for [Genie Code](https://docs.databricks.com/en/genie/genie-code.html) and other MCP clients, exposing all 75+ Databricks tools via the MCP protocol at `/mcp`.
+Optionally, the app can also serve as an **MCP server** for [Genie Code](https://docs.databricks.com/en/genie/genie-code.html) and other MCP clients, exposing all 40+ Databricks tools via the MCP protocol at `/mcp`.
 
 > **✅ Event Loop Fix Implemented**
 >
@@ -594,7 +594,7 @@ databricks bundle destroy --profile <profile>
 
 ### MCP Gateway for Genie Code
 
-The Builder App can optionally serve as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. This turns the app into a dual-purpose deployment: **visual builder UI** at `/` and **MCP server** at `/mcp`.
+The Builder App can optionally serve as an **MCP server** at `/mcp`, exposing all 40+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. This turns the app into a dual-purpose deployment: **visual builder UI** at `/` and **MCP server** at `/mcp`.
 
 #### How It Works
 
