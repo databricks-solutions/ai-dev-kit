@@ -1,4 +1,11 @@
 #!/bin/bash
+# ============================================================
+# DEPRECATED: The databricks-ai-dev-kit Claude Code plugin is no longer
+# published (see .claude-plugin/DEPRECATED.md). Install skills via
+#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+# or `databricks aitools install`. This script is kept for reference and still
+# runs if invoked directly.
+# ============================================================
 # Post-install setup for databricks-ai-dev-kit plugin
 # Creates virtual environment and installs MCP server dependencies
 # ============================================================
