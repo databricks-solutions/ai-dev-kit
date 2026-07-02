@@ -19,7 +19,10 @@ import yaml
 
 SKILLS_DIR = Path("databricks-skills")
 INSTALL_SCRIPT = SKILLS_DIR / "install_skills.sh"
-SKIP_DIRS = {"TEMPLATE"}
+# The bundled skill copies are frozen/deprecated and now live under
+# databricks-skills/deprecated/. Fall back to the top-level dir for older checkouts.
+SKILL_DIRS_ROOT = SKILLS_DIR / "deprecated" if (SKILLS_DIR / "deprecated").is_dir() else SKILLS_DIR
+SKIP_DIRS = {"TEMPLATE", "deprecated"}
 
 RESERVED_WORDS = {"anthropic", "claude"}
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -111,7 +114,7 @@ def parse_skill_variables(
 def get_local_skill_dirs() -> set[str]:
     """Get actual skill directories on the filesystem."""
     return {
-        d.name for d in SKILLS_DIR.iterdir() if d.is_dir() and d.name not in SKIP_DIRS and not d.name.startswith(".")
+        d.name for d in SKILL_DIRS_ROOT.iterdir() if d.is_dir() and d.name not in SKIP_DIRS and not d.name.startswith(".")
     }
 
 
@@ -120,7 +123,7 @@ def main() -> int:
     actual_skills = get_local_skill_dirs()
 
     # --- Validate each skill directory's SKILL.md and frontmatter ---
-    for skill_dir in sorted(SKILLS_DIR.iterdir()):
+    for skill_dir in sorted(SKILL_DIRS_ROOT.iterdir()):
         if not skill_dir.is_dir():
             continue
         if skill_dir.name in SKIP_DIRS or skill_dir.name.startswith("."):

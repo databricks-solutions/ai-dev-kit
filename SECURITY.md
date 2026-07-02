@@ -8,6 +8,12 @@ Please email bugbounty@databricks.com to report any security vulnerabilities. We
 
 ## Plugin Trust Model
 
+> **Deprecated:** The Databricks AI Dev Kit is no longer published as a Claude Code plugin (see
+> [.claude-plugin/DEPRECATED.md](.claude-plugin/DEPRECATED.md)). Install via the installer
+> (`bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)`)
+> or `databricks aitools install` instead. The section below is retained only to describe the retired
+> plugin's behavior for anyone who still has it installed.
+
 This section describes what code executes when you install the Databricks AI Dev Kit as a Claude Code plugin.
 
 ### What Runs Automatically
