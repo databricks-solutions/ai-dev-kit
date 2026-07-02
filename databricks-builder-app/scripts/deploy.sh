@@ -18,6 +18,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(dirname "$PROJECT_DIR")"
 
+# Repo-local bundled (frozen) Databricks skills snapshot.  The bundled skill
+# copies moved under databricks-skills/deprecated/; older checkouts still keep
+# them directly under databricks-skills/.  Prefer deprecated/, fall back to the
+# legacy location so this works before and after the move.
+SKILLS_SNAPSHOT_DIR="$REPO_ROOT/databricks-skills/deprecated"
+if [ ! -d "$SKILLS_SNAPSHOT_DIR" ]; then
+  SKILLS_SNAPSHOT_DIR="$REPO_ROOT/databricks-skills"
+fi
+
+# install_skills.sh (adds MLflow skills fetched from github.com/mlflow/skills).
+INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/deprecated/install_skills.sh"
+if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
+  INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
+fi
+
 APP_NAME="${APP_NAME:-}"
 PROFILE="${PROFILE:-}"
 STAGING_DIR=""
@@ -237,27 +252,52 @@ if [ "$SKIP_SKILLS" = true ] && [ -d "$SKILLS_CACHE_DIR" ] && [ "$(ls -A "$SKILL
   echo -e "  ${GREEN}✓${NC} Reusing cached skills from ${SKILLS_CACHE_DIR} (--skip-skills)"
   cp -r "$SKILLS_CACHE_DIR"/* "$STAGING_DIR/skills/"
 else
-  echo "  Installing skills via install_skills.sh..."
-INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
-if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then echo -e "${RED}Error: install_skills.sh not found${NC}"; exit 1; fi
+  mkdir -p "$STAGING_DIR/skills"
 
-SKILLS_TEMP_DIR=$(mktemp -d)
-trap "rm -rf '$SKILLS_TEMP_DIR'" EXIT
-touch "$SKILLS_TEMP_DIR/databricks.yml"
-(cd "$SKILLS_TEMP_DIR" && bash "$INSTALL_SKILLS_SCRIPT")
-
-mkdir -p "$STAGING_DIR/skills"
-INSTALLED_SKILLS_DIR="$SKILLS_TEMP_DIR/.claude/skills"
-if [ -d "$INSTALLED_SKILLS_DIR" ]; then
-  for skill_dir in "$INSTALLED_SKILLS_DIR"/*/; do
-    [ -d "$skill_dir" ] || continue
-    skill_name=$(basename "$skill_dir")
-    if [ -f "$skill_dir/SKILL.md" ]; then
+  # 1. Ship the bundled (frozen) Databricks skills snapshot.  These copies live
+  #    in-repo and work fully offline, so they are the authoritative source for
+  #    Databricks skills regardless of network access.
+  if [ -d "$SKILLS_SNAPSHOT_DIR" ]; then
+    echo "  Bundling frozen skills snapshot from ${SKILLS_SNAPSHOT_DIR}..."
+    for skill_dir in "$SKILLS_SNAPSHOT_DIR"/*/; do
+      [ -d "$skill_dir" ] || continue
+      [ -f "$skill_dir/SKILL.md" ] || continue
+      skill_name=$(basename "$skill_dir")
+      # Skip non-skill scaffolding (template, the deprecated/ container).
+      case "$skill_name" in TEMPLATE|deprecated|.*) continue ;; esac
       mkdir -p "$STAGING_DIR/skills/$skill_name"
       cp -r "$skill_dir"* "$STAGING_DIR/skills/$skill_name/"
+    done
+  else
+    echo -e "  ${YELLOW}⚠${NC} Skills snapshot not found at ${SKILLS_SNAPSHOT_DIR}"
+  fi
+
+  # 2. Supplement with install_skills.sh (adds MLflow skills fetched from
+  #    github.com/mlflow/skills, plus any skill not already in the snapshot).
+  #    Best-effort: if it is missing or fails, the frozen snapshot still ships.
+  if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
+    echo -e "  ${YELLOW}⚠${NC} install_skills.sh not found — shipping snapshot skills only"
+  else
+    echo "  Adding external skills via install_skills.sh..."
+    SKILLS_TEMP_DIR=$(mktemp -d)
+    trap "rm -rf '$SKILLS_TEMP_DIR'" EXIT
+    touch "$SKILLS_TEMP_DIR/databricks.yml"
+    (cd "$SKILLS_TEMP_DIR" && bash "$INSTALL_SKILLS_SCRIPT") \
+      || echo -e "  ${YELLOW}⚠${NC} install_skills.sh failed — shipping snapshot skills only"
+
+    INSTALLED_SKILLS_DIR="$SKILLS_TEMP_DIR/.claude/skills"
+    if [ -d "$INSTALLED_SKILLS_DIR" ]; then
+      for skill_dir in "$INSTALLED_SKILLS_DIR"/*/; do
+        [ -d "$skill_dir" ] || continue
+        skill_name=$(basename "$skill_dir")
+        # Snapshot wins: only add skills not already bundled.
+        if [ -f "$skill_dir/SKILL.md" ] && [ ! -d "$STAGING_DIR/skills/$skill_name" ]; then
+          mkdir -p "$STAGING_DIR/skills/$skill_name"
+          cp -r "$skill_dir"* "$STAGING_DIR/skills/$skill_name/"
+        fi
+      done
     fi
-  done
-fi
+  fi
 
   # Cache skills for --skip-skills on next run
   rm -rf "$SKILLS_CACHE_DIR"

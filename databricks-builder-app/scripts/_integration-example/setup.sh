@@ -44,8 +44,13 @@ echo "Installing all skills..."
 SKILLS_DIR="$SCRIPT_DIR/.claude/skills"
 mkdir -p "$SKILLS_DIR"
 
-# Copy all skills from databricks-skills (excluding non-skill directories)
-SKILLS_SRC="$SCRIPT_DIR/../../../databricks-skills"
+# Copy all skills from the bundled skills snapshot (excluding non-skill dirs).
+# The bundled skill copies moved under databricks-skills/deprecated/; prefer
+# that snapshot and fall back to the legacy databricks-skills/ location.
+SKILLS_SRC="$SCRIPT_DIR/../../../databricks-skills/deprecated"
+if [ ! -d "$SKILLS_SRC" ]; then
+    SKILLS_SRC="$SCRIPT_DIR/../../../databricks-skills"
+fi
 if [ -d "$SKILLS_SRC" ]; then
     # Find all directories containing SKILL.md (these are actual skills)
     for skill_dir in "$SKILLS_SRC"/*/; do
