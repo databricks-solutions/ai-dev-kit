@@ -208,6 +208,22 @@ function Write-Err  {
 }
 function Write-Step { param([string]$Text) if (-not $script:Silent) { Write-Host ""; Write-Host "$Text" -ForegroundColor White } }
 
+# Deprecation notice - shown on every install/upgrade while skills still ship
+# from this repo. The next major release installs skills via the Databricks CLI
+# from the official databricks/databricks-agent-skills set.
+function Show-DeprecationNotice {
+    if ($script:Silent) { return }
+    $bar = "  ------------------------------------------------------------"
+    Write-Host ""
+    Write-Host $bar -ForegroundColor Yellow
+    Write-Host "  !  Heads up: skills are moving" -ForegroundColor Yellow
+    Write-Host "  In the next release, the skills for AI Dev Kit will be" -ForegroundColor DarkGray
+    Write-Host "  promoted to a shared, engineering-supported repository." -ForegroundColor DarkGray
+    Write-Host "  In future releases, this installer will set up skills" -ForegroundColor DarkGray
+    Write-Host "  using the Databricks CLI." -ForegroundColor DarkGray
+    Write-Host $bar -ForegroundColor Yellow
+}
+
 # ─── Parse arguments ─────────────────────────────────────────
 $i = 0
 while ($i -lt $args.Count) {
@@ -2055,6 +2071,10 @@ function Invoke-Main {
         Write-Host "Databricks AI Dev Kit Installer" -ForegroundColor White
         Write-Host "--------------------------------"
     }
+
+    # Deprecation notice: this is the last line of releases that installs skills
+    # from this repo's skill files. Shown on every install and upgrade.
+    Show-DeprecationNotice
 
     # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
     Invoke-PromptChannel
