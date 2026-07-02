@@ -1,163 +1,67 @@
-# Databricks Skills for Claude Code
+# Databricks Skills
 
-Skills that teach Claude Code how to work effectively with Databricks - providing patterns, best practices, and code examples that work with Databricks MCP tools.
+Skills teach your AI coding assistant how to work effectively with Databricks — patterns, best
+practices, and code examples — and pair well with the Databricks MCP tools.
 
-## Installation
+## Install skills (supported path)
 
-Run from your **project root** (the directory where you want `.claude/skills` created).
-
-### From this repository (local script)
-
-If you already have the repo (fork or clone), use the script on disk:
+Skills are installed and maintained through the Databricks CLI:
 
 ```bash
-# Install all skills (Databricks + MLflow + APX) — downloads from GitHub by default
-./databricks-skills/install_skills.sh
-
-# Install Databricks skills only from this checkout (no network for those skills)
-./databricks-skills/install_skills.sh --local
-
-# Install specific skills
-./databricks-skills/install_skills.sh databricks-bundles agent-evaluation
-
-# Pin MLflow / APX versions
-./databricks-skills/install_skills.sh --mlflow-version v1.0.0
-
-# List available skills
-./databricks-skills/install_skills.sh --list
-
-# Install + upload to workspace for Genie Code (/Workspace/Users/<you>/.assistant/skills)
-./databricks-skills/install_skills.sh --install-to-genie
-
-./databricks-skills/install_skills.sh --install-to-genie --profile prod
-
-# Local Databricks skills + Genie upload
-./databricks-skills/install_skills.sh --local --install-to-genie
+databricks aitools install
 ```
 
-Paths assume you are at the **ai-dev-kit** repo root. From another project, copy or symlink the script, or use the `curl` flow below.
+Requires Databricks CLI **v1.0.0+**. Skills come from
+[github.com/databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills)
+and stay up to date — no manual copying.
 
-### Without cloning (curl)
-
-Use this when you only want the installer and not the full repo:
+The AI Dev Kit installer already delegates to this, so a normal install gets you the skills too:
 
 ```bash
-# Install all skills
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash
-
-# Install specific skills (pass args after bash -s --)
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- databricks-bundles agent-evaluation
-
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --mlflow-version v1.0.0
-
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --list
-
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie
-
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie --profile prod
+# From the directory where you want skills configured
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
 ```
 
-`--install-to-genie` uploads the tree under `./.claude/skills` to the workspace (requires the `databricks` CLI).
+See the root [README](../README.md) for installer options.
 
-This creates `.claude/skills/` and downloads all skills. Claude Code loads them automatically.
-- **Databricks skills** are downloaded from this repository
-- **MLflow skills** are fetched dynamically from [github.com/mlflow/skills](https://github.com/mlflow/skills)
+## Genie Code (upload skills to a workspace)
 
-**Manual install:**
+To use skills inside **Genie Code** in a Databricks workspace, upload them to
+`/Workspace/Users/<you>/.assistant/skills`. `databricks aitools install` does not cover this, so use
+one of the fallbacks below.
+
+**Recommended — notebook uploader (no local clone):**
+Import [`install_genie_code_skills.py`](install_genie_code_skills.py) into your workspace as a
+notebook and run it. It downloads skills from GitHub and uploads them via the Databricks SDK. Works
+on any compute, including serverless.
+
+**Fallback — shell script from a local checkout:**
+
 ```bash
-mkdir -p .claude/skills
-cp -r ai-dev-kit/databricks-skills/databricks-agent-bricks .claude/skills/
+# Run from the directory where you want ./.claude/skills created
+./install_skills.sh --local --install-to-genie                 # source frozen local copies, then upload
+./install_skills.sh --install-to-genie --profile YOUR_PROFILE  # download (pinned to v0.1.12), then upload
 ```
 
-## Available Skills
+Run `./install_skills.sh --help` for all options.
 
-### 🤖 AI & Agents
-- **databricks-ai-functions** - Built-in AI Functions (ai_classify, ai_extract, ai_summarize, ai_query, ai_forecast, ai_parse_document, and more) with SQL and PySpark patterns, function selection guidance, document processing pipelines, and custom RAG (parse → chunk → index → query)
-- **databricks-agent-bricks** - Knowledge Assistants, Genie Spaces, Supervisor Agents
-- **databricks-genie** - Genie Spaces: create, curate, and query via Conversation API
-- **databricks-model-serving** - Deploy MLflow models and AI agents to endpoints
-- **databricks-unstructured-pdf-generation** - Generate synthetic PDFs for RAG
-- **databricks-vector-search** - Vector similarity search for RAG and semantic search
+## Deprecated: bundled skill copies
 
-### 📊 MLflow (from [mlflow/skills](https://github.com/mlflow/skills))
-- **agent-evaluation** - End-to-end agent evaluation workflow
-- **analyze-mlflow-chat-session** - Debug multi-turn conversations
-- **analyze-mlflow-trace** - Debug traces, spans, and assessments
-- **instrumenting-with-mlflow-tracing** - Add MLflow tracing to Python/TypeScript
-- **mlflow-onboarding** - MLflow setup guide for new users
-- **querying-mlflow-metrics** - Aggregated metrics and time-series analysis
-- **retrieving-mlflow-traces** - Trace search and filtering
-- **searching-mlflow-docs** - Search MLflow documentation
+The skill folders that used to live here are frozen legacy copies under
+[`deprecated/`](deprecated/). They are **no longer maintained** and exist only so older tooling keeps
+working. Prefer `databricks aitools install`. If you need the exact historical files, use git tag
+`v0.1.12`. See [`deprecated/README.md`](deprecated/README.md) for migration guidance (skill renames
+are documented in the root README "breaking change" note).
 
-### 📊 Analytics & Dashboards
-- **databricks-aibi-dashboards** - Databricks AI/BI dashboards (with SQL validation workflow)
-- **databricks-unity-catalog** - System tables for lineage, audit, billing
+## Custom / Genie Code skills
 
-### 🔧 Data Engineering
-- **databricks-iceberg** - Apache Iceberg tables (Managed/Foreign), UniForm, Iceberg REST Catalog, Iceberg Clients Interoperability
-- **databricks-spark-declarative-pipelines** - SDP (formerly DLT) in SQL/Python
-- **databricks-jobs** - Multi-task workflows, triggers, schedules
-- **databricks-synthetic-data-gen** - Realistic test data with Faker
-
-### 🚀 Development & Deployment
-- **databricks-bundles** - DABs for multi-environment deployments
-- **databricks-app-apx** - Full-stack apps (FastAPI + React)
-- **databricks-apps-python** - Python web apps (Dash, Streamlit, Flask) with foundation model integration
-- **databricks-python-sdk** - Python SDK, Connect, CLI, REST API
-- **databricks-config** - Profile authentication setup
-- **databricks-lakebase-provisioned** - Managed PostgreSQL for OLTP workloads
-
-### 📚 Reference
-- **databricks-docs** - Documentation index via llms.txt
-
-## How It Works
-
-```
-┌────────────────────────────────────────────────┐
-│  .claude/skills/     +    .claude/mcp.json     │
-│  (Knowledge)               (Actions)           │
-│                                                │
-│  Skills teach HOW    +    MCP does it          │
-│  ↓                        ↓                    │
-│  Claude Code learns patterns and executes      │
-└────────────────────────────────────────────────┘
-```
-
-**Example:** User says "Create a sales dashboard"
-1. Claude loads `databricks-aibi-dashboards` skill → learns validation workflow
-2. Calls `get_table_stats_and_schema()` → gets schemas
-3. Calls `execute_sql()` → tests queries
-4. Calls `manage_dashboard(action="create_or_update")` → deploys
-5. Returns working dashboard URL
-
-## Custom Skills
-
-Create your own in `.claude/skills/my-skill/SKILL.md`:
-
-```markdown
----
-name: my-skill
-description: "What this teaches"
----
-
-# My Skill
-
-## When to Use
-...
-
-## Patterns
-...
-```
-
-## Troubleshooting
-
-**Skills not loading?** Check `.claude/skills/` exists and each skill has `SKILL.md`
-
-**Install fails?** Run `bash install_skills.sh` or check write permissions
+After uploading, skills live at `/Workspace/Users/<you>/.assistant/skills`. You can edit or remove
+skills there, or add your own skill folders (each with a `SKILL.md`) — Genie Code picks them up
+automatically. Use [`TEMPLATE/`](TEMPLATE/) as a starting point for authoring a new skill.
 
 ## Related
 
-- [databricks-tools-core](../databricks-tools-core/) - Python library
-- [databricks-mcp-server](../databricks-mcp-server/) - MCP server
-- [Databricks Docs](https://docs.databricks.com/) - Official documentation
-- [MLflow Skills](https://github.com/mlflow/skills) - Upstream MLflow skills repository
+- [databricks-tools-core](../databricks-tools-core/) — Python library
+- [databricks-mcp-server](../databricks-mcp-server/) — MCP server
+- [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) — upstream skills source
+- [MLflow Skills](https://github.com/mlflow/skills) — upstream MLflow skills

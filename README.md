@@ -96,8 +96,8 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
 | [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
 | [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
-| [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
-| [**Genie Code Skills**](databricks-skills/install_skills.sh) | Install skills into your workspace for Genie Code (`--install-to-genie`) | [Genie Code skills (install)](#genie-code-skills) |
+| [**Skills Only**](databricks-skills/) | Databricks patterns and best practices (without MCP functions) | `databricks aitools install` |
+| [**Genie Code Skills**](databricks-skills/) | Upload skills into your workspace for Genie Code | [Genie Code skills (install)](#genie-code-skills) |
 | [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
 ---
 
@@ -269,42 +269,61 @@ results = execute_sql("SELECT * FROM my_catalog.schema.table LIMIT 10")
 Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databricks-tools-core/](databricks-tools-core/) for details.
 
 ---
-## Genie Code Skills
+## Skills
 
-Install skills into `./.claude/skills` (relative to the directory where you run the script), then upload them to your workspace at `/Workspace/Users/<you>/.assistant/skills` so Genie Code can use them in the UI. Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for your workspace.
-
-**Always run from the project directory** where you want `.claude/skills` created (for example your repo root or `ai-dev-kit`).
-
-**From this repo (recommended if you have a clone):**
+Skills teach your AI assistant Databricks patterns and best practices. For your **editor**, they are
+installed and kept up to date by the Databricks CLI (v1.0.0+), which the AI Dev Kit installer already
+delegates to:
 
 ```bash
-# Databricks skills from this checkout + upload (DEFAULT CLI profile)
+databricks aitools install
+```
+
+Skills come from [github.com/databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills).
+The skill copies that used to be bundled in this repo are deprecated and frozen under
+[`databricks-skills/deprecated/`](databricks-skills/deprecated/); if you need the exact historical
+files, use git tag `v0.1.12`. Some skills were renamed in the move — see the breaking-change note
+below. (APX and Genie-specific skills are no longer bundled here; they live in their own repos.)
+
+### Genie Code Skills
+
+To use skills inside **Genie Code** in a Databricks workspace, upload them to
+`/Workspace/Users/<you>/.assistant/skills`. `databricks aitools install` does not cover this yet, so
+use one of these:
+
+**From a Databricks notebook (recommended — no local clone):**
+Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py)
+into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them via the
+Databricks SDK. Works on any compute, including serverless.
+
+**From a local checkout (deprecated fallback):** the
+[`databricks-skills/install_skills.sh`](databricks-skills/install_skills.sh) script still supports the
+upload flow. It sources the frozen legacy skill copies (from `databricks-skills/deprecated/` with
+`--local`, or a `v0.1.12`-pinned download otherwise). Requires the
+[Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for your workspace.
+
+```bash
+# Run from the directory where you want ./.claude/skills created
 ./databricks-skills/install_skills.sh --local --install-to-genie
-
-# Download all skills from GitHub, then upload
-./databricks-skills/install_skills.sh --install-to-genie
-
-# Explicit Databricks CLI profile
 ./databricks-skills/install_skills.sh --install-to-genie --profile YOUR_PROFILE
 ```
 
-**Without cloning** (run from the directory that should contain `.claude/skills`):
+See [databricks-skills/README.md](databricks-skills/README.md) for details.
 
-```bash
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie
-```
+**Customizing skills:** after upload, skills live under
+`/Workspace/Users/<your_user_name>/.assistant/skills`. You can modify or remove skills there, or add
+your own skill folders (each with a `SKILL.md`) that Genie Code will use automatically in any session.
 
-Combine `--profile`, `--local`, specific skill names, `--mlflow-version`, etc. as needed; see `./databricks-skills/install_skills.sh --help` or [databricks-skills/README.md](databricks-skills/README.md).
+### Breaking change: skill sources and names
 
-**From a Databricks notebook** (no local terminal needed):
-
-Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py) into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them to your workspace using the Databricks SDK. This works on any compute, including serverless.
-
-**Skill modification or Custom Skill**
-
-After the script successfully installs the skills to your workspace, you may find the skills under `/Workspace/Users/<your_user_name>/.assistant/skills`.
-
-This directory is customizable if you wish to only use certain skills or even create custom skills that are related to your organization to make Genie Code even better.  You can modify/remove existing skills or create new skills folders that Genie Code will automatically use in any session.
+Skills are no longer bundled in this repository. They now come from
+[databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) via
+`databricks aitools install`, and some skills were **renamed or consolidated** in the move (for
+example, several core skills are now installed together under `databricks-core`). To see the current
+skill names, run `databricks aitools list` (CLI v1.0.0+) or browse the
+[databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) repo. To reproduce
+the old bundled layout and names exactly, use git tag `v0.1.12` (the frozen copies also remain under
+[`databricks-skills/deprecated/`](databricks-skills/deprecated/)).
 
 ## Architecture
 
@@ -320,7 +339,7 @@ The AI Dev Kit ships as four composable pieces — install the whole kit, or pic
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
 | [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 20 markdown skills teaching Databricks patterns |
+| [`databricks-skills/`](databricks-skills/) | Skills that teach Databricks patterns (installed via `databricks aitools`; bundled copies are deprecated) |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 
 ---

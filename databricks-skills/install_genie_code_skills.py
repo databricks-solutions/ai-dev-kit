@@ -9,6 +9,13 @@
 # MAGIC **How to use:** Run all cells top to bottom. Edit the configuration cell below if you want to install a subset of skills.
 # MAGIC
 # MAGIC Skills are auto-discovered from GitHub — no hardcoded lists to maintain.
+# MAGIC
+# MAGIC > **Note (deprecated bundled tree):** The Databricks skills bundled in this repo have been
+# MAGIC > frozen and superseded by `databricks aitools install` (Databricks CLI v1.0.0+, backed by
+# MAGIC > github.com/databricks/databricks-agent-skills). This notebook remains the simplest way to
+# MAGIC > upload skills to a workspace for **Genie Code**, which the CLI does not cover. Because the
+# MAGIC > bundled tree was removed from `main`, the AI Dev Kit source below is pinned to the last
+# MAGIC > release that shipped it (tag `v0.1.12`); MLflow skills still track `main`.
 
 # COMMAND ----------
 
@@ -28,7 +35,9 @@ INSTALL_SKILLS = "all"
 # INSTALL_SKILLS = ["databricks-dbsql", "databricks-jobs", "databricks-unity-catalog"]
 # INSTALL_SKILLS = ["databricks-agent-bricks", "agent-evaluation"]
 
-# Source branch or tag (change to pin a specific release)
+# Default source branch or tag. Used for any source that does not set its own "ref".
+# The AI Dev Kit source pins to v0.1.12 (see SKILL_SOURCES) because the bundled skill
+# tree was removed from `main`; MLflow skills still track `main`.
 GITHUB_REF = "main"
 
 # COMMAND ----------
@@ -49,8 +58,10 @@ from databricks.sdk.service.workspace import ImportFormat
 # Skills are auto-discovered: any subdirectory containing SKILL.md is a skill.
 
 SKILL_SOURCES = [
+    # AI Dev Kit skills are frozen; pin to the last release that bundled the tree
+    # at databricks-skills/<name>/ (v0.1.12). `main` no longer contains it.
     {"owner": "databricks-solutions", "repo": "ai-dev-kit", "path": "databricks-skills",
-     "skip": {"TEMPLATE"}},
+     "ref": "v0.1.12", "skip": {"TEMPLATE", "deprecated"}},
     {"owner": "mlflow",               "repo": "skills",      "path": ""},
     {"owner": "databricks-solutions", "repo": "apx",         "path": "skills",
      "name_overrides": {"apx": "databricks-app-apx"}},
@@ -171,8 +182,9 @@ print()
 print("Discovering skills from GitHub...")
 all_skills = []
 for source in SKILL_SOURCES:
-    discovered = _discover_from_source(source, GITHUB_REF)
-    label = f"{source['owner']}/{source['repo']}"
+    ref = source.get("ref", GITHUB_REF)
+    discovered = _discover_from_source(source, ref)
+    label = f"{source['owner']}/{source['repo']}@{ref}"
     print(f"  {label}: {len(discovered)} skills")
     all_skills.extend(discovered)
 
