@@ -124,6 +124,21 @@ warn() { [ "$SILENT" = true ] || echo -e "  ${Y}!${N} $*"; }
 die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
 step() { [ "$SILENT" = true ] || echo -e "\n${B}$*${N}"; }
 
+# Deprecation notice — shown on every install/upgrade while skills still ship
+# from this repo. The next major release installs skills via the Databricks CLI
+# from the official databricks/databricks-agent-skills set.
+deprecation_notice() {
+    [ "$SILENT" = true ] && return
+    echo ""
+    echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+    echo -e "  ${Y}${B}⚠  Heads up: skills are moving${N}"
+    echo -e "  ${D}In the next release, the skills for AI Dev Kit will be${N}"
+    echo -e "  ${D}promoted to a shared, engineering-supported repository.${N}"
+    echo -e "  ${D}In future releases, this installer will set up skills${N}"
+    echo -e "  ${D}using the Databricks CLI.${N}"
+    echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+}
+
 # Parse arguments
 while [ $# -gt 0 ]; do
     case $1 in
@@ -1916,7 +1931,11 @@ main() {
         echo -e "${B}Databricks AI Dev Kit Installer${N}"
         echo "────────────────────────────────"
     fi
-    
+
+    # Deprecation notice: this is the last line of releases that installs skills
+    # from this repo's skill files. Shown on every install and upgrade.
+    deprecation_notice
+
     # ── Step 1: Release channel selection (may re-exec from experimental branch) ──
     prompt_channel
 

@@ -5,6 +5,35 @@
 </p>
 
 ---
+> 📣 **Heads up: a major evolution is coming**
+>
+> This will be the **last release where AI Dev Kit skills are installed from the skill files in this
+> repository.** AI Dev Kit skills are becoming part of the official, engineering-supported Databricks
+> skills set, and the skill files in this repo will soon be deprecated. In the next release you'll
+> install these skills directly from the official Databricks set — either straight from the CLI, or
+> through the AI Dev Kit installer, which will continue to guide you through the process.
+>
+>
+> **What stays:** The MCP server and Builder App will remain in this repository. The Builder App will
+> keep being developed and improved, and the MCP server will be maintained and updated on a
+> best-effort basis as GitHub issues are filed.
+>
+>
+> **What's next:** AI Dev Kit will continue to guide you through setting up your AI coding
+> environment and be a place to find experimental tools developed by Field Engineering. Beyond the
+> skills installs, we plan to add several tutorials to help you get started using coding agents for
+> building on Databricks, including getting started with Genie Code or Omnigent.
+>
+> **A few skills will be renamed or merged** in the official install. Most names are unchanged; the
+> exceptions are:
+>
+> | Today (AI Dev Kit) | Official Databricks skills |
+> |---|---|
+> | `databricks-bundles` | `databricks-dabs` |
+> | `databricks-spark-declarative-pipelines` | `databricks-pipelines` |
+> | `databricks-lakebase-autoscale`, `databricks-lakebase-provisioned` | `databricks-lakebase` (merged) |
+> | `databricks-config` | folded into `databricks-core` |
+---
 > 🔒 Proactive Dependency Security  
 > As part of our commitment to supply chain integrity, we continually monitor our dependency tree against known vulnerabilities and industry advisories. In response to a recently disclosed supply chain incident affecting litellm versions 1.82.7–1.82.8, we have audited our packages and removed the litellm dependency for most usage. It is solely used in the test directory for skills evaluation and optimization, and has been pinned to a safe version.  
 > For full third-party attribution, see NOTICE.txt.
