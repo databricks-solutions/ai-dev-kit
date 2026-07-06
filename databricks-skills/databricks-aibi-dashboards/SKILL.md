@@ -114,7 +114,9 @@ If values don't match expectations, ensure the query is correct, fix the data if
 
 Before writing JSON, plan your dashboard:
 
-1. You must know the expected specific JSON structure. For this, **Read reference files**: [1-widget-specifications.md](1-widget-specifications.md), [3-filters.md](3-filters.md), [4-examples.md](4-examples.md)
+1. You must know the expected specific JSON structure. For this, **Read reference files**: [1-widget-specifications.md](1-widget-specifications.md), [3-filters.md](3-filters.md).
+
+Always make sure you read an entire example to understand the structure, like [4-examples.md](4-examples.md).
 
 2. Think: **What widgets?** Map each visualization to a dataset:
    | Widget | Type | Dataset | Has filter field? |
@@ -185,6 +187,8 @@ databricks workspace-entity-tag-assignments create-tag-assignment \
 ## JSON Structure (Required Skeleton)
 
 Every dashboard's `serialized_dashboard` content must follow this exact structure:
+
+Important: ALWAYS add a space at the end of each `queryLines` value as they are concatenated to create the dataset.
 
 ```json
 {
