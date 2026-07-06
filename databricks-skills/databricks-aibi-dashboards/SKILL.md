@@ -188,7 +188,7 @@ databricks workspace-entity-tag-assignments create-tag-assignment \
 
 Every dashboard's `serialized_dashboard` content must follow this exact structure:
 
-Important: ALWAYS add a space at the end of each `queryLines` value as they are concatenated to create the dataset.
+Important: ALWAYS add a space or `\n` at the end of each `queryLines` value as they are concatenated to create the dataset.
 
 ```json
 {
@@ -213,7 +213,7 @@ Important: ALWAYS add a space at the end of each `queryLines` value as they are 
 ```
 
 **Structural rules (violations cause "failed to parse serialized dashboard"):**
-- `queryLines`: Array of strings, NOT `"query": "string"`. Elements are **joined verbatim** with no separator — end each line with `\n` (or strip `-- comments`). A line ending in `-- comment` with no newline swallows the next line.
+- `queryLines`: Array of strings, NOT `"query": "string"`. Elements are **joined verbatim** with no separator — end each line with ` ` or `\n` (or strip `-- comments`). A line ending in `-- comment` with no newline swallows the next line.
 - Widgets: INLINE in `layout[].widget`, NOT a separate `"widgets"` array
 - `pageType`: Required on every page (`PAGE_TYPE_CANVAS` or `PAGE_TYPE_GLOBAL_FILTERS`)
 - Query binding: `query.fields[].name` must exactly match `encodings.*.fieldName`
