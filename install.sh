@@ -47,6 +47,9 @@ SCOPE="${DEVKIT_SCOPE:-project}"
 SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
 FORCE="${DEVKIT_FORCE:-false}"
 IS_UPDATE=false
+UNINSTALL=false
+DRY_RUN=false
+ASSUME_YES=false
 SILENT="${DEVKIT_SILENT:-false}"
 TOOLS="${DEVKIT_TOOLS:-}"
 USER_TOOLS=""
@@ -145,7 +148,10 @@ while [ $# -gt 0 ]; do
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --experimental)   CHANNEL="experimental"; shift ;;
         -f|--force)       FORCE=true; shift ;;
-        -h|--help)        
+        --uninstall)      UNINSTALL=true; shift ;;
+        --dry-run)        DRY_RUN=true; shift ;;
+        -y|--yes)         ASSUME_YES=true; shift ;;
+        -h|--help)
             echo "Databricks AI Dev Kit Installer"
             echo ""
             echo "Usage: bash <(curl -sL .../install.sh) [OPTIONS]"
@@ -164,6 +170,9 @@ while [ $# -gt 0 ]; do
             echo "  --list-skills         List available skills and profiles, then exit"
             echo "  --experimental        Install from experimental branch (early access features)"
             echo "  -f, --force           Force reinstall"
+            echo "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, and MCP config"
+            echo "  --dry-run             With --uninstall: print what would be removed, change nothing"
+            echo "  -y, --yes             With --uninstall: skip the confirmation prompt"
             echo "  -h, --help            Show this help"
             echo ""
             echo "Environment Variables (alternative to flags):"
@@ -256,6 +265,229 @@ if [ "${LIST_SKILLS:-false}" = true ]; then
     echo -e "${D}       bash install.sh --skills databricks-jobs,databricks-dbsql${N}"
     echo ""
     exit 0
+fi
+
+# ─── --uninstall handler ───────────────────────────────────────
+# All skill directory names the installer has EVER shipped (current + historical
+# renames/removals). Uninstall sweeps this union so old installs — e.g. the
+# removed databricks-lakebase-provisioned or the renamed databricks-app-python —
+# are cleaned up, not just whatever the current release ships.
+UNINSTALL_SKILL_NAMES="
+databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards
+databricks-bundles databricks-asset-bundles databricks-apps-python databricks-app-python
+databricks-app-apx databricks-config databricks-dbsql databricks-docs
+databricks-execution-compute databricks-genie databricks-iceberg databricks-jobs
+databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views
+databricks-ml-training-serving databricks-model-serving databricks-mlflow-evaluation
+databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines
+databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-synthetic-data-generation
+databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search
+databricks-zerobus-ingest spark-python-data-source
+databricks databricks-apps databricks-lakebase
+agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace
+instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics
+retrieving-mlflow-traces searching-mlflow-docs
+"
+
+# Remove the 'databricks' MCP server entry from a JSON config, preserving all
+# other servers and settings. $2 is the top-level key ('mcpServers' or 'servers').
+uninstall_remove_json_key() {
+    local path=$1 top=$2
+    [ -f "$path" ] || return 1
+    grep -q '"databricks"' "$path" 2>/dev/null || return 1
+    if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
+    local py=""
+    command -v python3 >/dev/null 2>&1 && py=python3
+    [ -z "$py" ] && [ -f "$VENV_PYTHON" ] && py="$VENV_PYTHON"
+    if [ -z "$py" ]; then warn "No Python to edit $path — remove the 'databricks' entry manually."; return 1; fi
+    cp "$path" "${path}.bak"
+    "$py" - "$path" "$top" <<'PYEOF'
+import json, sys
+path, top = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as f: cfg = json.load(f)
+except Exception: sys.exit(0)
+if isinstance(cfg.get(top), dict):
+    cfg[top].pop('databricks', None)
+    if not cfg[top]: cfg.pop(top, None)
+with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+PYEOF
+    return 0
+}
+
+# Remove the [mcp_servers.databricks] block from a Codex TOML config.
+uninstall_remove_toml_block() {
+    local path=$1
+    [ -f "$path" ] || return 1
+    grep -q 'mcp_servers.databricks' "$path" 2>/dev/null || return 1
+    if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
+    cp "$path" "${path}.bak"
+    # Delete the [mcp_servers.databricks] header through the line before the next
+    # [section] header (or EOF). awk keeps everything outside that block.
+    awk '
+        /^\[mcp_servers\.databricks\]/ { skip=1; next }
+        /^\[/ && skip { skip=0 }
+        !skip { print }
+    ' "${path}.bak" > "$path"
+    return 0
+}
+
+# Remove the AI Dev Kit SessionStart hook (identified by check_update.sh) from a
+# Claude settings.json, leaving other hooks intact.
+uninstall_remove_claude_hook() {
+    local path=$1
+    [ -f "$path" ] || return 1
+    grep -q 'check_update.sh' "$path" 2>/dev/null || return 1
+    if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
+    local py=""
+    command -v python3 >/dev/null 2>&1 && py=python3
+    [ -z "$py" ] && [ -f "$VENV_PYTHON" ] && py="$VENV_PYTHON"
+    [ -z "$py" ] && { warn "No Python to edit $path — remove the check_update.sh hook manually."; return 1; }
+    cp "$path" "${path}.bak"
+    "$py" - "$path" <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f: cfg = json.load(f)
+except Exception: sys.exit(0)
+sh = cfg.get('hooks', {}).get('SessionStart')
+if isinstance(sh, list):
+    for group in sh:
+        group['hooks'] = [h for h in group.get('hooks', []) if 'check_update.sh' not in h.get('command', '')]
+    sh[:] = [g for g in sh if g.get('hooks')]
+    if not sh: cfg['hooks'].pop('SessionStart', None)
+    if not cfg.get('hooks'): cfg.pop('hooks', None)
+with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+PYEOF
+    return 0
+}
+
+run_uninstall() {
+    local base_dir install_dir state_dir
+    [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+    install_dir="${USER_MCP_PATH:-${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}}"
+    [ "$SCOPE" = "global" ] && state_dir="$install_dir" || state_dir="$base_dir/.ai-dev-kit"
+    VENV_PYTHON="$install_dir/.venv/bin/python"
+
+    # Scope strictly gates locations. The installer writes project artifacts under
+    # the project dir and global artifacts under $HOME; a project uninstall must
+    # never touch $HOME configs (and vice-versa), or it would clobber the other
+    # scope's install. The few tools that always use $HOME even for project scope
+    # (antigravity/windsurf/opencode/kiro) are therefore only cleaned in --global.
+    local skill_roots mcp_targets hook_targets
+    if [ "$SCOPE" = "global" ]; then
+        skill_roots=(
+            "$HOME/.claude/skills" "$HOME/.cursor/skills" "$HOME/.github/skills"
+            "$HOME/.agents/skills" "$HOME/.gemini/skills"
+            "$HOME/.gemini/antigravity/skills" "$HOME/.codeium/windsurf/skills"
+            "$HOME/.config/opencode/skills" "$HOME/.kiro/skills"
+        )
+        mcp_targets=(
+            "$HOME/.claude.json|json:mcpServers"
+            "$HOME/.codex/config.toml|toml"
+            "$HOME/.gemini/settings.json|json:mcpServers"
+            "$HOME/.gemini/antigravity/mcp_config.json|json:mcpServers"
+            "$HOME/.codeium/windsurf/mcp_config.json|json:mcpServers"
+            "$HOME/.kiro/settings/mcp.json|json:mcpServers"
+        )
+        hook_targets=("$HOME/.claude/settings.json")
+    else
+        skill_roots=(
+            "$base_dir/.claude/skills" "$base_dir/.cursor/skills" "$base_dir/.github/skills"
+            "$base_dir/.agents/skills" "$base_dir/.gemini/skills" "$base_dir/.windsurf/skills"
+            "$base_dir/.opencode/skills" "$base_dir/.kiro/skills"
+        )
+        mcp_targets=(
+            "$base_dir/.mcp.json|json:mcpServers"
+            "$base_dir/.cursor/mcp.json|json:mcpServers" "$base_dir/.vscode/mcp.json|json:servers"
+            "$base_dir/.codex/config.toml|toml"
+            "$base_dir/.gemini/settings.json|json:mcpServers"
+            "$base_dir/.kiro/settings/mcp.json|json:mcpServers"
+        )
+        hook_targets=("$base_dir/.claude/settings.json")
+    fi
+
+    # ── Build the plan (paths that actually exist / contain our entries) ──
+    local -a plan_skills=() plan_mcp=() plan_hooks=() plan_runtime=() plan_state=()
+    local root name
+    for root in "${skill_roots[@]}"; do
+        [ -d "$root" ] || continue
+        for name in $UNINSTALL_SKILL_NAMES; do
+            [ -d "$root/$name" ] && plan_skills+=("$root/$name")
+        done
+    done
+    local entry path kind
+    for entry in "${mcp_targets[@]}"; do
+        path="${entry%%|*}"; kind="${entry#*|}"
+        case "$kind" in
+            json:*) [ -f "$path" ] && grep -q '"databricks"' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
+            toml)   [ -f "$path" ] && grep -q 'mcp_servers.databricks' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
+        esac
+    done
+    for path in "${hook_targets[@]}"; do
+        [ -f "$path" ] && grep -q 'check_update.sh' "$path" 2>/dev/null && plan_hooks+=("$path")
+    done
+    # The shared MCP runtime (~/.ai-dev-kit) is global; only remove it on a global
+    # uninstall, or when the user explicitly points --mcp-path at it. A project
+    # uninstall leaves it so other projects/global keep working.
+    if [ "$SCOPE" = "global" ] || [ -n "$USER_MCP_PATH" ]; then
+        [ -d "$install_dir" ] && plan_runtime+=("$install_dir")
+    fi
+    for path in "$state_dir/.installed-skills" "$state_dir/.skills-profile" "$state_dir/version"; do
+        [ -f "$path" ] && plan_state+=("$path")
+    done
+    # Project-scope leftover marker dir
+    [ "$SCOPE" = "project" ] && [ -d "$base_dir/.ai-dev-kit" ] && plan_state+=("$base_dir/.ai-dev-kit/")
+
+    local total=$(( ${#plan_skills[@]} + ${#plan_mcp[@]} + ${#plan_hooks[@]} + ${#plan_runtime[@]} + ${#plan_state[@]} ))
+    if [ "$total" -eq 0 ]; then
+        ok "Nothing to uninstall for ${B}$SCOPE${N} scope at ${D}${base_dir}${N} — no AI Dev Kit artifacts found."
+        [ "$SCOPE" = "project" ] && msg "${D}Tip: pass --global to remove a global install.${N}"
+        exit 0
+    fi
+
+    step "Uninstall plan (${SCOPE} scope)"
+    [ ${#plan_skills[@]}  -gt 0 ] && { echo -e "  ${B}Skill folders (${#plan_skills[@]}):${N}"; for p in "${plan_skills[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ ${#plan_mcp[@]}     -gt 0 ] && { echo -e "  ${B}MCP config — remove 'databricks' entry (${#plan_mcp[@]}):${N}"; for e in "${plan_mcp[@]}"; do echo "    ${e%%|*}" | sed "s#$HOME#~#"; done; }
+    [ ${#plan_hooks[@]}   -gt 0 ] && { echo -e "  ${B}Claude update hook (${#plan_hooks[@]}):${N}"; for p in "${plan_hooks[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ ${#plan_runtime[@]} -gt 0 ] && { echo -e "  ${B}MCP server runtime:${N}"; for p in "${plan_runtime[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ ${#plan_state[@]}   -gt 0 ] && { echo -e "  ${B}State files:${N}"; for p in "${plan_state[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    echo ""
+    msg "${D}Config files are backed up to <file>.bak before editing.${N}"
+
+    if [ "$DRY_RUN" = true ]; then
+        ok "Dry run — nothing was changed. Re-run without --dry-run to apply."
+        exit 0
+    fi
+
+    if [ "$ASSUME_YES" != true ]; then
+        printf "  ${Y}Remove these %d item(s)?${N} [y/N] " "$total"
+        local reply; read -r reply </dev/tty || reply=""
+        case "$reply" in [yY]|[yY][eE][sS]) ;; *) die "Aborted — nothing removed." ;; esac
+    fi
+
+    step "Removing"
+    local p e
+    for p in "${plan_skills[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
+    for e in "${plan_mcp[@]}"; do
+        path="${e%%|*}"; kind="${e#*|}"
+        case "$kind" in
+            json:*) uninstall_remove_json_key "$path" "${kind#json:}" && msg "cleaned ${path/#$HOME/~}" ;;
+            toml)   uninstall_remove_toml_block "$path" && msg "cleaned ${path/#$HOME/~}" ;;
+        esac
+    done
+    for p in "${plan_hooks[@]}"; do uninstall_remove_claude_hook "$p" && msg "cleaned hook in ${p/#$HOME/~}"; done
+    for p in "${plan_runtime[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
+    for p in "${plan_state[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
+
+    echo ""
+    ok "AI Dev Kit uninstalled (${SCOPE} scope)."
+    msg "${D}Other scopes (e.g. --global) and per-editor .bak backups were left untouched.${N}"
+    exit 0
+}
+
+if [ "$UNINSTALL" = true ]; then
+    run_uninstall
 fi
 
 # Set configuration URLs after parsing branch argument

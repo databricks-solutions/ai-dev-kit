@@ -76,6 +76,9 @@ $script:ProfileProvided = $false
 $script:SkillsProfile = ""
 $script:UserSkills   = ""
 $script:ListSkills   = $false
+$script:Uninstall    = $false
+$script:DryRun       = $false
+$script:AssumeYes    = $false
 $script:Channel      = if ($env:DEVKIT_CHANNEL) { $env:DEVKIT_CHANNEL } else { "stable" }  # stable or experimental
 
 # Databricks skills (bundled in repo)
@@ -233,6 +236,9 @@ while ($i -lt $args.Count) {
         { $_ -in "--list-skills", "-ListSkills" } { $script:ListSkills = $true; $i++ }
         { $_ -in "--experimental", "-Experimental" } { $script:Channel = "experimental"; $i++ }
         { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
+        { $_ -in "--uninstall", "-Uninstall" } { $script:Uninstall = $true; $i++ }
+        { $_ -in "--dry-run", "-DryRun" }      { $script:DryRun = $true; $i++ }
+        { $_ -in "-y", "--yes", "-Yes" }       { $script:AssumeYes = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
             Write-Host ""
@@ -252,6 +258,9 @@ while ($i -lt $args.Count) {
             Write-Host "  --list-skills         List available skills and profiles, then exit"
             Write-Host "  --experimental        Install from experimental branch (early access features)"
             Write-Host "  -f, --force           Force reinstall"
+            Write-Host "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, and MCP config"
+            Write-Host "  --dry-run             With --uninstall: print what would be removed, change nothing"
+            Write-Host "  -y, --yes             With --uninstall: skip the confirmation prompt"
             Write-Host "  -h, --help            Show this help"
             Write-Host ""
             Write-Host "Environment Variables:"
@@ -274,6 +283,190 @@ while ($i -lt $args.Count) {
         default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
     }
 }
+
+# ─── --uninstall ───────────────────────────────────────────────
+# Every skill directory name ever shipped (current + historical renames/removals),
+# so old installs — e.g. the removed databricks-lakebase-provisioned or renamed
+# databricks-app-python — are swept, not just the current release's skills.
+$script:UninstallSkillNames = @(
+    "databricks-agent-bricks","databricks-ai-functions","databricks-aibi-dashboards",
+    "databricks-bundles","databricks-asset-bundles","databricks-apps-python","databricks-app-python",
+    "databricks-app-apx","databricks-config","databricks-dbsql","databricks-docs",
+    "databricks-execution-compute","databricks-genie","databricks-iceberg","databricks-jobs",
+    "databricks-lakebase-autoscale","databricks-lakebase-provisioned","databricks-metric-views",
+    "databricks-ml-training-serving","databricks-model-serving","databricks-mlflow-evaluation",
+    "databricks-parsing","databricks-python-sdk","databricks-spark-declarative-pipelines",
+    "databricks-spark-structured-streaming","databricks-synthetic-data-gen","databricks-synthetic-data-generation",
+    "databricks-unity-catalog","databricks-unstructured-pdf-generation","databricks-vector-search",
+    "databricks-zerobus-ingest","spark-python-data-source",
+    "databricks","databricks-apps","databricks-lakebase",
+    "agent-evaluation","analyze-mlflow-chat-session","analyze-mlflow-trace",
+    "instrumenting-with-mlflow-tracing","mlflow-onboarding","querying-mlflow-metrics",
+    "retrieving-mlflow-traces","searching-mlflow-docs"
+)
+
+function Remove-McpJsonKey {
+    param([string]$Path, [string]$Top)
+    if (-not (Test-Path $Path)) { return $false }
+    if (-not (Select-String -Path $Path -Pattern '"databricks"' -Quiet)) { return $false }
+    if ($script:DryRun) { return $true }
+    Copy-Item $Path "$Path.bak" -Force
+    try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
+    if ($cfg.$Top -and $cfg.$Top.PSObject.Properties.Name -contains 'databricks') {
+        $cfg.$Top.PSObject.Properties.Remove('databricks')
+        if (-not $cfg.$Top.PSObject.Properties.Name) { $cfg.PSObject.Properties.Remove($Top) }
+    }
+    $cfg | ConvertTo-Json -Depth 20 | Set-Content $Path -Encoding UTF8
+    return $true
+}
+
+function Remove-McpTomlBlock {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $false }
+    if (-not (Select-String -Path $Path -Pattern 'mcp_servers\.databricks' -Quiet)) { return $false }
+    if ($script:DryRun) { return $true }
+    Copy-Item $Path "$Path.bak" -Force
+    $out = New-Object System.Collections.Generic.List[string]
+    $skip = $false
+    foreach ($line in Get-Content "$Path.bak") {
+        if ($line -match '^\[mcp_servers\.databricks\]') { $skip = $true; continue }
+        if ($line -match '^\[' -and $skip) { $skip = $false }
+        if (-not $skip) { $out.Add($line) }
+    }
+    $out | Set-Content $Path -Encoding UTF8
+    return $true
+}
+
+function Remove-ClaudeHook {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $false }
+    if (-not (Select-String -Path $Path -Pattern 'check_update' -Quiet)) { return $false }
+    if ($script:DryRun) { return $true }
+    Copy-Item $Path "$Path.bak" -Force
+    try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
+    $ss = $cfg.hooks.SessionStart
+    if ($ss) {
+        foreach ($group in $ss) {
+            $group.hooks = @($group.hooks | Where-Object { $_.command -notmatch 'check_update' })
+        }
+        $cfg.hooks.SessionStart = @($ss | Where-Object { $_.hooks -and $_.hooks.Count -gt 0 })
+        if (-not $cfg.hooks.SessionStart -or $cfg.hooks.SessionStart.Count -eq 0) {
+            $cfg.hooks.PSObject.Properties.Remove('SessionStart')
+        }
+    }
+    $cfg | ConvertTo-Json -Depth 20 | Set-Content $Path -Encoding UTF8
+    return $true
+}
+
+function Invoke-Uninstall {
+    $home_ = $env:USERPROFILE
+    if ($script:Scope -eq "global") { $baseDir = $home_ } else { $baseDir = (Get-Location).Path }
+    $installDir = if ($script:UserMcpPath) { $script:UserMcpPath }
+                  elseif ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME }
+                  else { Join-Path $home_ ".ai-dev-kit" }
+    if ($script:Scope -eq "global") { $stateDir = $installDir } else { $stateDir = Join-Path $baseDir ".ai-dev-kit" }
+
+    # Scope strictly gates locations (mirror of install.sh).
+    if ($script:Scope -eq "global") {
+        $skillRoots = @(
+            (Join-Path $home_ ".claude\skills"), (Join-Path $home_ ".cursor\skills"),
+            (Join-Path $home_ ".github\skills"), (Join-Path $home_ ".agents\skills"),
+            (Join-Path $home_ ".gemini\skills"), (Join-Path $home_ ".gemini\antigravity\skills"),
+            (Join-Path $home_ ".codeium\windsurf\skills"), (Join-Path $home_ ".config\opencode\skills"),
+            (Join-Path $home_ ".kiro\skills")
+        )
+        $mcpTargets = @(
+            @{ Path=(Join-Path $home_ ".claude\mcp.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".codex\config.toml"); Kind="toml" },
+            @{ Path=(Join-Path $home_ ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".gemini\antigravity\mcp_config.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".codeium\windsurf\mcp_config.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+        )
+        $hookTargets = @( (Join-Path $home_ ".claude\settings.json") )
+    } else {
+        $skillRoots = @(
+            (Join-Path $baseDir ".claude\skills"), (Join-Path $baseDir ".cursor\skills"),
+            (Join-Path $baseDir ".github\skills"), (Join-Path $baseDir ".agents\skills"),
+            (Join-Path $baseDir ".gemini\skills"), (Join-Path $baseDir ".windsurf\skills"),
+            (Join-Path $baseDir ".opencode\skills"), (Join-Path $baseDir ".kiro\skills")
+        )
+        $mcpTargets = @(
+            @{ Path=(Join-Path $baseDir ".mcp.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $baseDir ".cursor\mcp.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $baseDir ".vscode\mcp.json"); Kind="json"; Top="servers" },
+            @{ Path=(Join-Path $baseDir ".codex\config.toml"); Kind="toml" },
+            @{ Path=(Join-Path $baseDir ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $baseDir ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+        )
+        $hookTargets = @( (Join-Path $baseDir ".claude\settings.json") )
+    }
+
+    # Build plan
+    $planSkills = @(); $planMcp = @(); $planHooks = @(); $planRuntime = @(); $planState = @()
+    foreach ($root in $skillRoots) {
+        if (-not (Test-Path $root)) { continue }
+        foreach ($name in $script:UninstallSkillNames) {
+            $p = Join-Path $root $name
+            if (Test-Path $p) { $planSkills += $p }
+        }
+    }
+    foreach ($t in $mcpTargets) {
+        if (-not (Test-Path $t.Path)) { continue }
+        if ($t.Kind -eq "json" -and (Select-String -Path $t.Path -Pattern '"databricks"' -Quiet)) { $planMcp += $t }
+        elseif ($t.Kind -eq "toml" -and (Select-String -Path $t.Path -Pattern 'mcp_servers\.databricks' -Quiet)) { $planMcp += $t }
+    }
+    foreach ($h in $hookTargets) {
+        if ((Test-Path $h) -and (Select-String -Path $h -Pattern 'check_update' -Quiet)) { $planHooks += $h }
+    }
+    if ($script:Scope -eq "global" -or $script:UserMcpPath) {
+        if (Test-Path $installDir) { $planRuntime += $installDir }
+    }
+    foreach ($s in @((Join-Path $stateDir ".installed-skills"), (Join-Path $stateDir ".skills-profile"), (Join-Path $stateDir "version"))) {
+        if (Test-Path $s) { $planState += $s }
+    }
+    $projMarker = Join-Path $baseDir ".ai-dev-kit"
+    if ($script:Scope -eq "project" -and (Test-Path $projMarker)) { $planState += $projMarker }
+
+    $total = $planSkills.Count + $planMcp.Count + $planHooks.Count + $planRuntime.Count + $planState.Count
+    if ($total -eq 0) {
+        Write-Ok "Nothing to uninstall for $($script:Scope) scope at $baseDir - no AI Dev Kit artifacts found."
+        if ($script:Scope -eq "project") { Write-Msg "Tip: pass --global to remove a global install." }
+        return
+    }
+
+    Write-Step "Uninstall plan ($($script:Scope) scope)"
+    if ($planSkills.Count) { Write-Host "  Skill folders ($($planSkills.Count)):" -ForegroundColor White; $planSkills | ForEach-Object { Write-Host "    $_" } }
+    if ($planMcp.Count)    { Write-Host "  MCP config - remove 'databricks' entry ($($planMcp.Count)):" -ForegroundColor White; $planMcp | ForEach-Object { Write-Host "    $($_.Path)" } }
+    if ($planHooks.Count)  { Write-Host "  Claude update hook ($($planHooks.Count)):" -ForegroundColor White; $planHooks | ForEach-Object { Write-Host "    $_" } }
+    if ($planRuntime.Count){ Write-Host "  MCP server runtime:" -ForegroundColor White; $planRuntime | ForEach-Object { Write-Host "    $_" } }
+    if ($planState.Count)  { Write-Host "  State files:" -ForegroundColor White; $planState | ForEach-Object { Write-Host "    $_" } }
+    Write-Host ""
+    Write-Msg "Config files are backed up to <file>.bak before editing."
+
+    if ($script:DryRun) { Write-Ok "Dry run - nothing was changed. Re-run without --dry-run to apply."; return }
+
+    if (-not $script:AssumeYes) {
+        $reply = Read-Host "  Remove these $total item(s)? [y/N]"
+        if ($reply -notmatch '^(y|yes)$') { Write-Warn "Aborted - nothing removed."; return }
+    }
+
+    Write-Step "Removing"
+    foreach ($p in $planSkills)  { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
+    foreach ($t in $planMcp) {
+        if ($t.Kind -eq "json") { if (Remove-McpJsonKey -Path $t.Path -Top $t.Top) { Write-Msg "cleaned $($t.Path)" } }
+        else { if (Remove-McpTomlBlock -Path $t.Path) { Write-Msg "cleaned $($t.Path)" } }
+    }
+    foreach ($p in $planHooks)   { if (Remove-ClaudeHook -Path $p) { Write-Msg "cleaned hook in $p" } }
+    foreach ($p in $planRuntime) { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
+    foreach ($p in $planState)   { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
+
+    Write-Host ""
+    Write-Ok "AI Dev Kit uninstalled ($($script:Scope) scope)."
+    Write-Msg "Other scopes (e.g. --global) and per-editor .bak backups were left untouched."
+}
+
+if ($script:Uninstall) { Invoke-Uninstall; return }
 
 # ─── Interactive helpers ──────────────────────────────────────
 

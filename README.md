@@ -197,6 +197,34 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 **Next steps:** Respond to interactive prompts and follow the on-screen instructions.
 - Note: Cursor and Copilot require updating settings manually after install.
 
+### Uninstall
+
+Run the same script with `--uninstall`. It removes the installed skill folders (including ones from older versions), the MCP server runtime (`~/.ai-dev-kit`), and the `databricks` MCP entry from each editor's config — leaving your other MCP servers, skills, and settings untouched. Editor config files are backed up to `<file>.bak` first.
+
+```bash
+# Preview what would be removed (changes nothing)
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --uninstall --dry-run
+
+# Uninstall the project-scope install in the current directory
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --uninstall
+
+# Uninstall a global install (add -y to skip the confirmation prompt)
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --uninstall --global -y
+```
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+.\install.ps1 -Uninstall -DryRun     # preview
+.\install.ps1 -Uninstall             # project scope
+.\install.ps1 -Uninstall -Global -Yes  # global, no prompt
+```
+
+</details>
+
+Scope mirrors install: a project uninstall touches only the current directory's config; `--global` touches only the per-user (`$HOME`) config. Run it once per scope you installed into.
+
 
 ### Visual Builder App
 
