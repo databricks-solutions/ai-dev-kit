@@ -45,6 +45,9 @@ databricks genie list-spaces
 
 # Create a Genie Space from a local file
 # IMPORTANT: sample_questions require a 32-char hex "id" and "question" must be an array
+# IMPORTANT: parent_path must ALREADY EXIST — create it first, or create fails with
+#   "Tree node with path ... does not exist":
+databricks workspace mkdirs /Workspace/Users/you@company.com/genie_spaces
 databricks genie create-space --json "{
   \"warehouse_id\": \"WAREHOUSE_ID\",
   \"title\": \"Sales Analytics\",
