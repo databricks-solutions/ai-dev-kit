@@ -378,9 +378,9 @@ run_uninstall() {
     # Mirror install: if scope wasn't set explicitly, ask (interactive, non --yes)
     # so a user who did a global install isn't silently told "nothing to uninstall
     # for project scope". Non-interactive/--yes keeps the documented 'project' default.
-    if [ "$SCOPE_EXPLICIT" = false ] && [ "$ASSUME_YES" != true ] && [ -t 0 ]; then
+    if [ "$SCOPE_EXPLICIT" = false ] && [ "$ASSUME_YES" != true ] && { exec 3</dev/tty; } 2>/dev/null; then
         printf "  Uninstall scope — [p]roject (this directory) or [g]lobal (\$HOME)? [P/g] "
-        local sreply; read -r sreply </dev/tty || sreply=""
+        local sreply; read -r sreply <&3 || sreply=""; exec 3<&-
         case "$sreply" in [gG]|[gG][lL][oO][bB][aA][lL]) SCOPE="global" ;; *) SCOPE="project" ;; esac
     fi
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
@@ -480,8 +480,14 @@ run_uninstall() {
     fi
 
     if [ "$ASSUME_YES" != true ]; then
-        printf "  ${Y}Remove these %d item(s)?${N} [y/N] " "$total"
-        local reply; read -r reply </dev/tty || reply=""
+        local reply=""
+        if { exec 3</dev/tty; } 2>/dev/null; then
+            printf "  ${Y}Remove these %d item(s)?${N} [y/N] " "$total"
+            read -r reply <&3 || reply=""
+            exec 3<&-
+        else
+            die "No terminal to confirm on. Re-run with -y/--yes to proceed non-interactively (or --dry-run to preview)."
+        fi
         case "$reply" in [yY]|[yY][eE][sS]) ;; *) die "Aborted — nothing removed." ;; esac
     fi
 

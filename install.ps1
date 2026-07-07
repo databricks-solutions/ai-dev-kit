@@ -310,13 +310,18 @@ function Remove-McpJsonKey {
     if (-not (Test-Path $Path)) { return $false }
     if (-not (Select-String -Path $Path -Pattern '"databricks"' -Quiet)) { return $false }
     if ($script:DryRun) { return $true }
-    Copy-Item $Path "$Path.bak" -Force
     try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
-    if ($cfg.$Top -and $cfg.$Top.PSObject.Properties.Name -contains 'databricks') {
-        $cfg.$Top.PSObject.Properties.Remove('databricks')
-        if (-not $cfg.$Top.PSObject.Properties.Name) { $cfg.PSObject.Properties.Remove($Top) }
+    # Only rewrite (and back up) when the exact top-level 'databricks' key is
+    # present. Otherwise a stray '"databricks"' elsewhere (a foreign server's
+    # path, a project named 'databricks') would trigger a lossy no-op rewrite —
+    # and ConvertTo-Json's -Depth would truncate deep configs like ~/.claude.json.
+    if (-not ($cfg.$Top -and $cfg.$Top.PSObject.Properties.Name -contains 'databricks')) {
+        return $false
     }
-    $cfg | ConvertTo-Json -Depth 20 | Set-Content $Path -Encoding UTF8
+    Copy-Item $Path "$Path.bak" -Force
+    $cfg.$Top.PSObject.Properties.Remove('databricks')
+    if (-not $cfg.$Top.PSObject.Properties.Name) { $cfg.PSObject.Properties.Remove($Top) }
+    $cfg | ConvertTo-Json -Depth 100 | Set-Content $Path -Encoding UTF8
     return $true
 }
 
@@ -344,19 +349,18 @@ function Remove-ClaudeHook {
     if (-not (Test-Path $Path)) { return $false }
     if (-not (Select-String -Path $Path -Pattern 'check_update' -Quiet)) { return $false }
     if ($script:DryRun) { return $true }
-    Copy-Item $Path "$Path.bak" -Force
     try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
     $ss = $cfg.hooks.SessionStart
-    if ($ss) {
-        foreach ($group in $ss) {
-            $group.hooks = @($group.hooks | Where-Object { $_.command -notmatch 'check_update' })
-        }
-        $cfg.hooks.SessionStart = @($ss | Where-Object { $_.hooks -and $_.hooks.Count -gt 0 })
-        if (-not $cfg.hooks.SessionStart -or $cfg.hooks.SessionStart.Count -eq 0) {
-            $cfg.hooks.PSObject.Properties.Remove('SessionStart')
-        }
+    if (-not $ss) { return $false }   # nothing to change — don't rewrite/back up
+    foreach ($group in $ss) {
+        $group.hooks = @($group.hooks | Where-Object { $_.command -notmatch 'check_update' })
     }
-    $cfg | ConvertTo-Json -Depth 20 | Set-Content $Path -Encoding UTF8
+    $cfg.hooks.SessionStart = @($ss | Where-Object { $_.hooks -and $_.hooks.Count -gt 0 })
+    if (-not $cfg.hooks.SessionStart -or $cfg.hooks.SessionStart.Count -eq 0) {
+        $cfg.hooks.PSObject.Properties.Remove('SessionStart')
+    }
+    Copy-Item $Path "$Path.bak" -Force
+    $cfg | ConvertTo-Json -Depth 100 | Set-Content $Path -Encoding UTF8
     return $true
 }
 
