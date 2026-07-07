@@ -329,8 +329,10 @@ function Remove-McpTomlBlock {
     $out = New-Object System.Collections.Generic.List[string]
     $skip = $false
     foreach ($line in Get-Content "$Path.bak") {
-        if ($line -match '^\[mcp_servers\.databricks\]') { $skip = $true; continue }
-        if ($line -match '^\[' -and $skip) { $skip = $false }
+        # Consume the databricks table AND its dotted subtables (e.g. .env);
+        # any other section header ends the skip.
+        if ($line -match '^\[mcp_servers\.databricks(\.|\])') { $skip = $true; continue }
+        if ($line -match '^\[') { $skip = $false }
         if (-not $skip) { $out.Add($line) }
     }
     $out | Set-Content $Path -Encoding UTF8

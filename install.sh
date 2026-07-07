@@ -294,39 +294,50 @@ retrieving-mlflow-traces searching-mlflow-docs
 uninstall_remove_json_key() {
     local path=$1 top=$2
     [ -f "$path" ] || return 1
-    grep -q '"databricks"' "$path" 2>/dev/null || return 1
+    grep -qF '"databricks"' "$path" 2>/dev/null || return 1
     if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
     local py=""
     command -v python3 >/dev/null 2>&1 && py=python3
     [ -z "$py" ] && [ -f "$VENV_PYTHON" ] && py="$VENV_PYTHON"
     if [ -z "$py" ]; then warn "No Python to edit $path — remove the 'databricks' entry manually."; return 1; fi
+    # Python decides whether the exact top-level 'databricks' key is present; it
+    # writes (and the shell backs up) only when a key is actually removed, so a
+    # stray '"databricks"' elsewhere in the file doesn't trigger a no-op rewrite.
     cp "$path" "${path}.bak"
-    "$py" - "$path" "$top" <<'PYEOF'
+    if "$py" - "$path" "$top" <<'PYEOF'
 import json, sys
 path, top = sys.argv[1], sys.argv[2]
 try:
     with open(path) as f: cfg = json.load(f)
-except Exception: sys.exit(0)
-if isinstance(cfg.get(top), dict):
-    cfg[top].pop('databricks', None)
-    if not cfg[top]: cfg.pop(top, None)
+except Exception: sys.exit(2)
+if not (isinstance(cfg.get(top), dict) and 'databricks' in cfg[top]):
+    sys.exit(1)  # nothing to remove
+cfg[top].pop('databricks', None)
+if not cfg[top]: cfg.pop(top, None)
 with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+sys.exit(0)
 PYEOF
-    return 0
+    then
+        return 0
+    else
+        rm -f "${path}.bak"   # nothing changed — don't leave a spurious backup
+        return 1
+    fi
 }
 
 # Remove the [mcp_servers.databricks] block from a Codex TOML config.
 uninstall_remove_toml_block() {
     local path=$1
     [ -f "$path" ] || return 1
-    grep -q 'mcp_servers.databricks' "$path" 2>/dev/null || return 1
+    grep -qF 'mcp_servers.databricks' "$path" 2>/dev/null || return 1
     if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
     cp "$path" "${path}.bak"
-    # Delete the [mcp_servers.databricks] header through the line before the next
+    # Delete the [mcp_servers.databricks] table AND its dotted subtables
+    # (e.g. [mcp_servers.databricks.env]) through to the next unrelated
     # [section] header (or EOF). awk keeps everything outside that block.
     awk '
-        /^\[mcp_servers\.databricks\]/ { skip=1; next }
-        /^\[/ && skip { skip=0 }
+        /^\[mcp_servers\.databricks(\.|\])/ { skip=1; next }
+        /^\[/ { skip=0 }
         !skip { print }
     ' "${path}.bak" > "$path"
     return 0
@@ -364,6 +375,14 @@ PYEOF
 
 run_uninstall() {
     local base_dir install_dir state_dir
+    # Mirror install: if scope wasn't set explicitly, ask (interactive, non --yes)
+    # so a user who did a global install isn't silently told "nothing to uninstall
+    # for project scope". Non-interactive/--yes keeps the documented 'project' default.
+    if [ "$SCOPE_EXPLICIT" = false ] && [ "$ASSUME_YES" != true ] && [ -t 0 ]; then
+        printf "  Uninstall scope — [p]roject (this directory) or [g]lobal (\$HOME)? [P/g] "
+        local sreply; read -r sreply </dev/tty || sreply=""
+        case "$sreply" in [gG]|[gG][lL][oO][bB][aA][lL]) SCOPE="global" ;; *) SCOPE="project" ;; esac
+    fi
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
     install_dir="${USER_MCP_PATH:-${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}}"
     [ "$SCOPE" = "global" ] && state_dir="$install_dir" || state_dir="$base_dir/.ai-dev-kit"
@@ -420,8 +439,8 @@ run_uninstall() {
     for entry in "${mcp_targets[@]}"; do
         path="${entry%%|*}"; kind="${entry#*|}"
         case "$kind" in
-            json:*) [ -f "$path" ] && grep -q '"databricks"' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
-            toml)   [ -f "$path" ] && grep -q 'mcp_servers.databricks' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
+            json:*) [ -f "$path" ] && grep -qF '"databricks"' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
+            toml)   [ -f "$path" ] && grep -qF 'mcp_servers.databricks' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
         esac
     done
     for path in "${hook_targets[@]}"; do
