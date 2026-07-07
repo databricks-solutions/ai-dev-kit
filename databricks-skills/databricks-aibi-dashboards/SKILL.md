@@ -93,10 +93,8 @@ DATABRICKS_WAREHOUSE_ID=<WH> databricks experimental aitools tools query --outpu
   "SELECT MIN(ts), MAX(ts) FROM catalog.schema.orders"
 ```
 
-- **`--output json` is mandatory** in multi-query mode (the command errors without it — it does not default).
-- Returns a JSON array, one object per statement: `{sql, statement_id, state, elapsed_ms, columns, rows}`, plus `error: {message, error_code}` on failure. Order: `--file` inputs first (flag order), then positional SQLs (arg order).
-- Failures are **per-statement** — a bad query returns `state: "FAILED"` with its error while the others still succeed.
-- ⚠️ **Do not trust the exit code** — a failed statement can still exit `0`. Gate on each object's `state != "SUCCEEDED"` in the JSON, not on `$?`.
+- **`--output json` is mandatory** in multi-query mode. Returns one object per statement: `{sql, state, rows, error}`; failures are per-statement (`state: "FAILED"`), others still succeed.
+- ⚠️ **Don't trust the exit code** (a failed statement can still exit `0`) — gate on each object's `state != "SUCCEEDED"`.
 
 > **Dashboard queries are different** — inside the dashboard JSON, the `FROM` clause must reference ONLY the table name, with no catalog or schema prefix:
 > - ✅ Correct: `FROM trips`
