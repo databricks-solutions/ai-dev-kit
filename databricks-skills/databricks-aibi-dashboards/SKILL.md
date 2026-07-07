@@ -84,14 +84,19 @@ Sample rows alone don't tell you what to build. you can write aggregate SQL thro
 - **Trend viability** at daily/weekly/monthly grain → picks the right trend granularity.
 - **Story confirmation** — run the aggregations you plan to put in the dashboard and check they're not flat, empty, or uninteresting. Fix the query or adjust the story before moving on.
 
-Fan out independent probes (state ∈ `PENDING|RUNNING|SUCCEEDED|FAILED|CANCELED|CLOSED`):
+Fan out independent probes in one call — pass several positional SQLs (and/or repeated `--file`) and they run in parallel (default `--concurrency 8`):
 
 ```bash
-submit() { databricks api post /api/2.0/sql/statements --json "$(jq -nc --arg w "$1" --arg s "$2" '{warehouse_id:$w,statement:$s,wait_timeout:"0s",on_wait_timeout:"CONTINUE"}')" | jq -r .statement_id; }
-SIDS=(); for q in "$@"; do SIDS+=( "$(submit "$WH" "$q")" ); done
-for s in "${SIDS[@]}"; do databricks api get "/api/2.0/sql/statements/$s" | jq '{state:.status.state, rows:.result.data_array}'; done
-# cancel: databricks api post "/api/2.0/sql/statements/$SID/cancel"
+DATABRICKS_WAREHOUSE_ID=<WH> databricks experimental aitools tools query --output json \
+  "SELECT COUNT(*) FROM catalog.schema.orders" \
+  "SELECT region, COUNT(*) FROM catalog.schema.orders GROUP BY region ORDER BY 2 DESC LIMIT 10" \
+  "SELECT MIN(ts), MAX(ts) FROM catalog.schema.orders"
 ```
+
+- **`--output json` is mandatory** in multi-query mode (the command errors without it — it does not default).
+- Returns a JSON array, one object per statement: `{sql, statement_id, state, elapsed_ms, columns, rows}`, plus `error: {message, error_code}` on failure. Order: `--file` inputs first (flag order), then positional SQLs (arg order).
+- Failures are **per-statement** — a bad query returns `state: "FAILED"` with its error while the others still succeed.
+- ⚠️ **Do not trust the exit code** — a failed statement can still exit `0`. Gate on each object's `state != "SUCCEEDED"` in the JSON, not on `$?`.
 
 > **Dashboard queries are different** — inside the dashboard JSON, the `FROM` clause must reference ONLY the table name, with no catalog or schema prefix:
 > - ✅ Correct: `FROM trips`
