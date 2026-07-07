@@ -117,7 +117,8 @@ The `serialized_space` field is a JSON string containing the full space configur
 - **`version: 2`** — integer, not a string.
 - **All text fields are arrays of strings.** `question`, `content`, `sql`, and `answer[].content` are always lists, never bare strings. Single-element arrays are fine; the platform concatenates them.
 - **Every item needs a unique `id`** — 32-character lowercase hex. Uniqueness is enforced **across all lists combined** (a duplicate between e.g. `text_instructions` and `example_question_sqls` is rejected). The platform reassigns IDs server-side on create, so exact values don't matter for creation — only that they're present, 32 chars, and unique.
-- **Sort order matters:** `data_sources.tables` must be sorted by `identifier`; `example_question_sqls`, `text_instructions`, `sql_functions`, and `benchmarks.questions` must be sorted by `id`. (`sample_questions` is silently re-sorted server-side.)
+- **Sort order matters:** `data_sources.tables` must be sorted by `identifier`, and each table's `column_configs` must be sorted by `column_name`; `example_question_sqls`, `text_instructions`, `sql_functions`, and `benchmarks.questions` must be sorted by `id`. (`sample_questions` is silently re-sorted server-side.)
+- **`text_instructions` accepts at most one item** — the API rejects more than one (`text_instructions must contain at most one item`). Merge all guidance (persona, table guide, investigation flow, answer style) into a single entry.
 - **Omit empty sections entirely** rather than including `[]` — both work, but live exports omit them when empty.
 - **Author-time ID convention** (optional, recommended): prefix the 32 chars by section to keep them readable and sorted in authoring order — `1…0001` for sample_questions, `2…` for example_question_sqls, `3…` for text_instructions, `4…` for sql_functions, `5…` for benchmarks. The platform doesn't enforce this; it's just convenient.
 
@@ -189,12 +190,8 @@ A populated space exercising every construct (`version`, `data_sources` with `co
         "content": [
           "Revenue / sales questions: use gold_daily_sales; sale_date is the grain, truncate to WEEK/MONTH/QUARTER as needed.\n",
           "Product-level questions: use gold_product_perf.\n",
-          "Customer questions (churn, LTV, segmentation): use gold_customers."
-        ]
-      },
-      {
-        "id": "30000000000000000000000000000002",
-        "content": [
+          "Customer questions (churn, LTV, segmentation): use gold_customers.\n",
+          "\n",
           "When asked 'last month' / 'this quarter', always anchor on current_date() — never hard-code dates.\n",
           "Default LIMIT 100 on unbounded queries. Default 'top N' to 10 if unspecified.\n",
           "Monetary values are USD. Round percentages to 1 decimal place."
