@@ -378,10 +378,11 @@ run_uninstall() {
     # Mirror install: if scope wasn't set explicitly, ask (interactive, non --yes)
     # so a user who did a global install isn't silently told "nothing to uninstall
     # for project scope". Non-interactive/--yes keeps the documented 'project' default.
-    if [ "$SCOPE_EXPLICIT" = false ] && [ "$ASSUME_YES" != true ] && { exec 3</dev/tty; } 2>/dev/null; then
-        printf "  Uninstall scope — [p]roject (this directory) or [g]lobal (\$HOME)? [P/g] "
-        local sreply; read -r sreply <&3 || sreply=""; exec 3<&-
-        case "$sreply" in [gG]|[gG][lL][oO][bB][aA][lL]) SCOPE="global" ;; *) SCOPE="project" ;; esac
+    # Ask for scope with the same selector install uses, unless it was set
+    # explicitly (-g/--global, DEVKIT_SCOPE) or we're non-interactive/--yes.
+    if [ "$SCOPE_EXPLICIT" = false ] && [ "$ASSUME_YES" != true ]; then
+        SCOPE_PROMPT_TITLE="Select uninstall scope" SCOPE_PROMPT_VERB="Remove from" prompt_scope
+        # renders: "Remove from current directory ..." / "Remove from home directory ..."
     fi
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
     install_dir="${USER_MCP_PATH:-${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}}"
@@ -510,10 +511,6 @@ run_uninstall() {
     msg "${D}Other scopes (e.g. --global) and per-editor .bak backups were left untouched.${N}"
     exit 0
 }
-
-if [ "$UNINSTALL" = true ]; then
-    run_uninstall
-fi
 
 # Set configuration URLs after parsing branch argument
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
@@ -2039,13 +2036,18 @@ prompt_scope() {
         return
     fi
 
+    # Verb defaults to install wording; uninstall passes "Uninstall"/"Remove" via
+    # SCOPE_PROMPT_TITLE / SCOPE_PROMPT_VERB so the same selector reads correctly.
+    local title="${SCOPE_PROMPT_TITLE:-Select installation scope}"
+    local verb="${SCOPE_PROMPT_VERB:-Install in}"
+
     echo ""
-    echo -e "  ${B}Select installation scope${N}"
-    
+    echo -e "  ${B}${title}${N}"
+
     # Simple radio selector without Confirm button
     local -a labels=("Project" "Global")
     local -a values=("project" "global")
-    local -a hints=("Install in current directory (.cursor/, .claude/, .gemini/)" "Install in home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
+    local -a hints=("$verb current directory (.cursor/, .claude/, .gemini/)" "$verb home directory (~/.cursor/, ~/.claude/, ~/.gemini/)")
     local count=2
     local selected=0
     local cursor=0
@@ -2339,5 +2341,11 @@ main() {
     # Done
     summary
 }
+
+# Uninstall short-circuits before install runs. Placed here (after all helpers,
+# e.g. prompt_scope / is_interactive, are defined) so run_uninstall can reuse them.
+if [ "$UNINSTALL" = true ]; then
+    run_uninstall
+fi
 
 main "$@"
