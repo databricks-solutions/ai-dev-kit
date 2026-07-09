@@ -170,7 +170,7 @@ while [ $# -gt 0 ]; do
             echo "  --list-skills         List available skills and profiles, then exit"
             echo "  --experimental        Install from experimental branch (early access features)"
             echo "  -f, --force           Force reinstall"
-            echo "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, and MCP config"
+            echo "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, MCP config, and Claude Code plugin"
             echo "  --dry-run             With --uninstall: print what would be removed, change nothing"
             echo "  -y, --yes             With --uninstall: skip the confirmation prompt"
             echo "  -h, --help            Show this help"
@@ -289,6 +289,15 @@ instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics
 retrieving-mlflow-traces searching-mlflow-docs
 "
 
+# The Claude Code plugin (installed via the marketplace, separate from the skills
+# this script drops directly). Its on-disk state lives across several shared
+# files (~/.claude/plugins/installed_plugins.json, enabledPlugins in
+# settings.json, known_marketplaces.json, the cache dir) that are shared with
+# the user's OTHER plugins — so we never hand-edit them. Detection is read-only;
+# removal is delegated to the official `claude` CLI (or shown as a command).
+PLUGIN_KEY="databricks-ai-dev-kit@databricks-ai-dev-kit"
+PLUGIN_MARKETPLACE="databricks-ai-dev-kit"
+
 # Remove the 'databricks' MCP server entry from a JSON config, preserving all
 # other servers and settings. $2 is the top-level key ('mcpServers' or 'servers').
 uninstall_remove_json_key() {
@@ -371,6 +380,64 @@ if isinstance(sh, list):
 with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
 PYEOF
     return 0
+}
+
+# Read-only detection of the Claude Code plugin per scope. The scope is recorded
+# by which settings.json enables it: user scope in ~/.claude/settings.json, project
+# scope in the project's .claude/settings.json(.local). (installed_plugins.json is
+# user-level and lists ALL scopes together, so it can't distinguish them.)
+plugin_installed_global() {
+    grep -qF "$PLUGIN_KEY" "$HOME/.claude/settings.json" 2>/dev/null
+}
+plugin_installed_project() {
+    local dir=$1 s
+    for s in "$dir/.claude/settings.json" "$dir/.claude/settings.local.json"; do
+        grep -qF "$PLUGIN_KEY" "$s" 2>/dev/null && return 0
+    done
+    return 1
+}
+
+# Warn that the plugin also exists in the scope we're NOT uninstalling, and print
+# the command to remove it there too. Leads with a blank line to separate it from
+# whatever preceded it (the plan, or the "Nothing to uninstall" tip).
+warn_plugin_other_scope() {
+    echo ""
+    if [ "$SCOPE" = "project" ]; then
+        warn "The Claude Code plugin is also installed ${B}globally${N} — this project uninstall leaves it. To remove that too:"
+        msg  "${B}  claude plugin uninstall ${PLUGIN_KEY} --scope user${N} ${D}(or re-run with --global)${N}"
+    else
+        warn "The Claude Code plugin is also installed at ${B}project${N} scope — this global uninstall leaves it. To remove that too:"
+        msg  "${B}  claude plugin uninstall ${PLUGIN_KEY} --scope project${N} ${D}(or re-run --uninstall from the project without --global)${N}"
+    fi
+}
+
+# Remove the plugin from the CURRENT uninstall scope via the official CLI (atomic
+# across the shared plugin state — we never hand-edit it). A project install can be
+# either 'project' (.claude/settings.json) or 'local' (.claude/settings.local.json),
+# so a project uninstall tries both CLI scopes. If nothing could be removed (CLI
+# missing or every attempt failed) this is a hard error that reports whether the
+# rest of the uninstall completed and prints the exact command to run manually.
+# $1 = count of other AI Dev Kit artifacts already removed this run.
+remove_claude_plugin() {
+    local others_removed=$1
+    local scopes cmd_scope
+    if [ "$SCOPE" = "project" ]; then scopes="project local"; cmd_scope="project"; else scopes="user"; cmd_scope="user"; fi
+    if command -v claude >/dev/null 2>&1; then
+        local sc removed=false
+        for sc in $scopes; do
+            # Subcommand name has varied across versions (uninstall vs remove) — try both.
+            if claude plugin uninstall "$PLUGIN_KEY" -y --scope "$sc" >/dev/null 2>&1 \
+               || claude plugin remove "$PLUGIN_KEY" -y --scope "$sc" >/dev/null 2>&1; then
+                msg "removed Claude Code plugin ${PLUGIN_KEY} (${sc} scope)"
+                removed=true
+            fi
+        done
+        [ "$removed" = true ] && return 0
+    fi
+    local partial="" alt=""
+    [ "$others_removed" -gt 0 ] && partial="Skills, MCP server, and config WERE removed (partial uninstall). "
+    [ "$SCOPE" = "project" ] && alt=" (or --scope local)"
+    die "Could not remove the Claude Code plugin. ${partial}Finish it manually: ${B}claude plugin uninstall ${PLUGIN_KEY} --scope ${cmd_scope}${N}${alt}"
 }
 
 run_uninstall() {
@@ -459,10 +526,25 @@ run_uninstall() {
     # Project-scope leftover marker dir
     [ "$SCOPE" = "project" ] && [ -d "$base_dir/.ai-dev-kit" ] && plan_state+=("$base_dir/.ai-dev-kit/")
 
+    # Claude Code plugin — detect at BOTH scopes (read-only). We only remove the
+    # current uninstall scope; presence in the other scope is a warning. Project
+    # detection uses the invocation dir ($PWD) — for a global uninstall base_dir is
+    # $HOME, which is not the project we'd be warning about.
+    local plan_plugin=false plugin_other=false
+    if [ "$SCOPE" = "global" ]; then
+        plugin_installed_global && plan_plugin=true
+        plugin_installed_project "$PWD" && plugin_other=true
+    else
+        plugin_installed_project "$base_dir" && plan_plugin=true
+        plugin_installed_global && plugin_other=true
+    fi
+
     local total=$(( ${#plan_skills[@]} + ${#plan_mcp[@]} + ${#plan_hooks[@]} + ${#plan_runtime[@]} + ${#plan_state[@]} ))
+    [ "$plan_plugin" = true ] && total=$(( total + 1 ))
     if [ "$total" -eq 0 ]; then
         ok "Nothing to uninstall for ${B}$SCOPE${N} scope at ${D}${base_dir}${N} — no AI Dev Kit artifacts found."
         [ "$SCOPE" = "project" ] && msg "${D}Tip: pass --global to remove a global install.${N}"
+        [ "$plugin_other" = true ] && warn_plugin_other_scope
         exit 0
     fi
 
@@ -472,6 +554,12 @@ run_uninstall() {
     [ ${#plan_hooks[@]}   -gt 0 ] && { echo -e "  ${B}Claude update hook (${#plan_hooks[@]}):${N}"; for p in "${plan_hooks[@]}"; do echo "    ${p/#$HOME/~}"; done; }
     [ ${#plan_runtime[@]} -gt 0 ] && { echo -e "  ${B}MCP server runtime:${N}"; for p in "${plan_runtime[@]}"; do echo "    ${p/#$HOME/~}"; done; }
     [ ${#plan_state[@]}   -gt 0 ] && { echo -e "  ${B}State files:${N}"; for p in "${plan_state[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ "$plan_plugin" = true ] && {
+        echo -e "  ${B}Claude Code plugin:${N}"
+        echo -e "    ${PLUGIN_KEY} ${D}(removed via the claude CLI, ${SCOPE} scope)${N}"
+        echo -e "  ${Y}${B}⚠  Heads up: the AI Dev Kit Claude Code plugin will also be removed.${N}"
+    }
+    [ "$plugin_other" = true ] && warn_plugin_other_scope
     echo ""
     msg "${D}Config files are backed up to <file>.bak before editing.${N}"
 
@@ -505,6 +593,7 @@ run_uninstall() {
     for p in "${plan_hooks[@]}"; do uninstall_remove_claude_hook "$p" && msg "cleaned hook in ${p/#$HOME/~}"; done
     for p in "${plan_runtime[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
     for p in "${plan_state[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
+    [ "$plan_plugin" = true ] && remove_claude_plugin "$(( total - 1 ))"
 
     echo ""
     ok "AI Dev Kit uninstalled (${SCOPE} scope)."
