@@ -19,25 +19,35 @@ def _load_skills_manager():
 
 
 def _load_live_mcp_tool_names() -> set[str]:
-  """Return the set of tool names currently registered with the MCP server.
-
-  Uses the same import/enumeration pattern as ``databricks_tools.py`` so the
-  test reflects the tools the running app actually exposes.
-  """
+  """Return the set of tool names currently registered with the vendored MCP server."""
   import asyncio
+  import sys
+  from pathlib import Path
 
-  from databricks_mcp_server.server import mcp
-  from databricks_mcp_server.tools import (  # noqa: F401
+  # Ensure vendored packages win over any sibling-repo installs on sys.path.
+  packages_dir = Path(__file__).resolve().parents[1] / 'packages'
+  packages_root = str(packages_dir)
+  if packages_root not in sys.path:
+    sys.path.insert(0, packages_root)
+
+  from databricks_agent_tools.server import mcp
+  from databricks_agent_tools.tools import (  # noqa: F401
+    agent_bricks,
+    aibi_dashboards,
+    apps,
     compute,
     file,
+    genie,
+    jobs,
+    lakebase,
     pipelines,
+    serving,
     sql,
+    unity_catalog,
+    vector_search,
+    volume_files,
+    workspace,
   )
-
-  tool_manager = getattr(mcp, '_tool_manager', None)
-  registered = getattr(tool_manager, '_tools', None)
-  if registered:
-    return set(registered.keys())
 
   tools_list = asyncio.run(mcp.list_tools())
   return {t.name for t in tools_list}
@@ -86,4 +96,27 @@ def test_get_allowed_mcp_tools_blocks_disabled_skill():
   assert 'mcp__databricks__manage_jobs' not in allowed
   assert 'mcp__databricks__manage_job_runs' not in allowed
   assert 'mcp__databricks__manage_dashboard' in allowed
+  assert 'mcp__databricks__execute_sql' in allowed
+
+
+def test_normalize_skill_name_migrates_legacy_names():
+  """Legacy skill names from older installs map to databricks-agent-skills names."""
+  sm = _load_skills_manager()
+  assert sm.normalize_skill_name('databricks-spark-declarative-pipelines') == 'databricks-pipelines'
+  assert sm.normalize_skill_name('databricks-lakebase-autoscale') == 'databricks-lakebase'
+  assert sm.normalize_skill_name('databricks-bundles') == 'databricks-dabs'
+
+
+def test_get_allowed_mcp_tools_honors_legacy_skill_names():
+  """Enabled skills saved under legacy names still gate the renamed skill's tools."""
+  sm = _load_skills_manager()
+  all_tools = [
+    'mcp__databricks__manage_pipeline',
+    'mcp__databricks__execute_sql',
+  ]
+  allowed = sm.get_allowed_mcp_tools(
+    all_tools,
+    enabled_skills=['databricks-spark-declarative-pipelines'],
+  )
+  assert 'mcp__databricks__manage_pipeline' in allowed
   assert 'mcp__databricks__execute_sql' in allowed

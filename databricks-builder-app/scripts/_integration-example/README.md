@@ -64,7 +64,7 @@ python example_integration.py
 
 This integration uses:
 - **Claude Agent SDK** (`claude-agent-sdk`) - Anthropic's SDK for running Claude as an agentic assistant
-- **Databricks MCP Tools** (`databricks-mcp-server`) - Tools loaded in-process via MCP protocol
+- **Databricks tools** (`packages/databricks_tools_core` + `packages/databricks_agent_tools`) - Tools loaded in-process via the Claude Agent SDK
 - **Skills** - Markdown files in `.claude/skills/` that provide domain-specific guidance
 
 The `stream_agent_response` function is the same one used by `databricks-builder-app`.

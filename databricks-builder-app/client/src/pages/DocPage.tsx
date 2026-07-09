@@ -49,15 +49,15 @@ function OverviewSection() {
         <ul className="mt-4 space-y-2">
           <li className="flex items-start gap-3">
             <BookOpen className="h-5 w-5 text-[var(--color-accent-primary)] mt-0.5 flex-shrink-0" />
-            <span><code className="font-mono text-sm bg-[var(--color-background)] px-1.5 py-0.5 rounded">databricks-skills/</code> - Teach AI assistants best practices, patterns, and which tools to use</span>
+            <span><code className="font-mono text-sm bg-[var(--color-background)] px-1.5 py-0.5 rounded">databricks-agent-skills</code> (via <code className="font-mono text-sm bg-[var(--color-background)] px-1.5 py-0.5 rounded">databricks aitools</code>) - Teach AI assistants best practices, patterns, and which tools to use</span>
           </li>
           <li className="flex items-start gap-3">
             <Database className="h-5 w-5 text-[var(--color-accent-primary)] mt-0.5 flex-shrink-0" />
-            <span><code className="font-mono text-sm bg-[var(--color-background)] px-1.5 py-0.5 rounded">databricks-tools-core/</code> - Python functions for sql/, unity_catalog/, compute/, spark_declarative_pipelines/, agent_bricks/</span>
+            <span><code className="font-mono text-sm bg-[var(--color-background)] px-1.5 py-0.5 rounded">packages/databricks_tools_core/</code> - Python functions for sql/, unity_catalog/, compute/, pipelines/, agent_bricks/</span>
           </li>
           <li className="flex items-start gap-3">
             <Server className="h-5 w-5 text-[var(--color-accent-primary)] mt-0.5 flex-shrink-0" />
-            <span><code className="font-mono text-sm bg-[var(--color-background)] px-1.5 py-0.5 rounded">databricks-mcp-server/</code> - Wraps tools and exposes them via MCP protocol</span>
+            <span><code className="font-mono text-sm bg-[var(--color-background)] px-1.5 py-0.5 rounded">packages/databricks_agent_tools/</code> - In-process tool wrappers for the Claude Agent SDK</span>
           </li>
           <li className="flex items-start gap-3">
             <Sparkles className="h-5 w-5 text-[var(--color-accent-primary)] mt-0.5 flex-shrink-0" />
@@ -85,14 +85,14 @@ function OverviewSection() {
               <div className="rounded-xl border-2 border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)]/5 p-4 h-fit">
                 <div className="flex items-center gap-2 mb-3">
                   <BookOpen className="h-5 w-5 text-[var(--color-accent-primary)]" />
-                  <h3 className="font-semibold text-[var(--color-text-heading)] font-mono">databricks-skills/</h3>
+                  <h3 className="font-semibold text-[var(--color-text-heading)] font-mono">databricks-agent-skills/</h3>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-accent-primary)]/20 text-[var(--color-accent-primary)]">Knowledge</span>
                 </div>
                 <p className="text-sm text-[var(--color-text-muted)] mb-3">
-                  Skills explain <em>how</em> to do things and reference the tools from databricks-tools-core.
+                  Installed via <code className="font-mono text-xs">databricks aitools</code>. Skills explain <em>how</em> to do things and reference the vendored tools.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {['databricks-bundles/', 'databricks-apps-python/', 'databricks-python-sdk/', 'databricks-mlflow-evaluation/', 'databricks-spark-declarative-pipelines/', 'databricks-synthetic-data-gen/'].map((skill) => (
+                  {['databricks-dabs/', 'databricks-apps-python/', 'databricks-python-sdk/', 'databricks-mlflow-evaluation/', 'databricks-pipelines/', 'databricks-synthetic-data-gen/'].map((skill) => (
                     <span key={skill} className="text-xs px-2 py-1 rounded bg-[var(--color-accent-primary)]/10 text-[var(--color-text-secondary)] font-mono">
                       {skill}
                     </span>
@@ -100,22 +100,22 @@ function OverviewSection() {
                 </div>
               </div>
 
-              {/* MCP Server wraps Tools Core - Right */}
+              {/* Agent tools wrap tools core - Right */}
               <div className="rounded-xl border-2 border-dashed border-green-500/40 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Server className="h-5 w-5 text-green-400" />
-                  <h3 className="font-semibold text-[var(--color-text-heading)] font-mono">databricks-mcp-server/</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">MCP Protocol</span>
+                  <h3 className="font-semibold text-[var(--color-text-heading)] font-mono">packages/databricks_agent_tools/</h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">In-process tools</span>
                 </div>
                 <p className="text-sm text-[var(--color-text-muted)] mb-3">
-                  Wraps databricks-tools-core, exposing functions via MCP protocol.
+                  Vendored FastMCP wrappers registered with the Claude Agent SDK (no separate MCP server process).
                 </p>
 
-                {/* Tools Core Layer (nested inside MCP Server) */}
+                {/* Tools Core Layer (nested inside tool server) */}
                 <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Database className="h-5 w-5 text-[var(--color-accent-primary)]" />
-                    <h3 className="font-semibold text-[var(--color-text-heading)] font-mono">databricks-tools-core/</h3>
+                    <h3 className="font-semibold text-[var(--color-text-heading)] font-mono">packages/databricks_tools_core/</h3>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-accent-primary)]/20 text-[var(--color-accent-primary)]">Python</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -493,7 +493,7 @@ function AppSection() {
                 <h3 className="font-semibold text-[var(--color-text-heading)]">Project Creation</h3>
                 <p className="text-sm text-[var(--color-text-muted)] mt-1">
                   Each project is user-scoped with a UUID. A directory <code className="px-1.5 py-0.5 rounded bg-[var(--color-background)] text-xs font-mono">project/&lt;project_id&gt;/</code> is created on disk.
-                  Skills from <code className="px-1.5 py-0.5 rounded bg-[var(--color-background)] text-xs font-mono">databricks-skills/</code> are copied to <code className="px-1.5 py-0.5 rounded bg-[var(--color-background)] text-xs font-mono">.claude/skills/</code> in the project folder.
+                  Skills from <code className="px-1.5 py-0.5 rounded bg-[var(--color-background)] text-xs font-mono">install_builder_skills.sh</code> (aitools + MLflow) are copied to <code className="px-1.5 py-0.5 rounded bg-[var(--color-background)] text-xs font-mono">.claude/skills/</code> in the project folder.
                 </p>
               </div>
             </div>

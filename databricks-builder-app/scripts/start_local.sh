@@ -148,10 +148,12 @@ echo -e "${YELLOW}[3/${TOTAL_STEPS}] Provisioning Lakebase...${NC}"
 
 if [ "$SKIP_LAKEBASE" = true ]; then
   echo -e "  ${GREEN}✓${NC} Skipped (--skip-lakebase)"
+elif databricks postgres get-project "projects/${LAKEBASE_PROJECT_ID}" --profile "$PROFILE" &> /dev/null; then
+  echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' already exists — reusing"
 else
   cd "$PROJECT_DIR"
   databricks bundle deploy --profile "$PROFILE" --var "lakebase_project_id=${LAKEBASE_PROJECT_ID}" 2>&1
-  echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' ready"
+  echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' deployed"
 fi
 cd "$PROJECT_DIR"
 echo ""
@@ -178,7 +180,6 @@ LLM_PROVIDER=DATABRICKS
 DATABRICKS_MODEL=databricks-meta-llama-3-3-70b-instruct
 DATABRICKS_MODEL_MINI=databricks-gemini-3-flash
 ENABLED_SKILLS=
-SKILLS_ONLY_MODE=false
 ENV=development
 PROJECTS_BASE_DIR=./projects
 CLAUDE_CODE_STREAM_CLOSE_TIMEOUT=3600000
@@ -202,11 +203,11 @@ else
   echo -e "  ${GREEN}✓${NC} Backend dependencies installed"
 fi
 
-if [ -d "$REPO_ROOT/databricks-tools-core" ] && [ -d "$REPO_ROOT/databricks-mcp-server" ]; then
-  uv pip install -e "$REPO_ROOT/databricks-tools-core" -e "$REPO_ROOT/databricks-mcp-server" --quiet 2>/dev/null
-  echo -e "  ${GREEN}✓${NC} Sibling packages installed"
+if [ -d "$PROJECT_DIR/packages/databricks_tools_core" ] && [ -d "$PROJECT_DIR/packages/databricks_agent_tools" ]; then
+  echo -e "  ${GREEN}✓${NC} Vendored Databricks tool packages present"
 else
-  echo -e "  ${YELLOW}⚠${NC} Sibling packages not found at repo root"
+  echo -e "  ${RED}Error: packages/databricks_tools_core or packages/databricks_agent_tools missing${NC}"
+  exit 1
 fi
 echo ""
 
@@ -230,29 +231,29 @@ echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 echo -e "${YELLOW}[7/${TOTAL_STEPS}] Installing skills...${NC}"
 
-# Run install_skills.sh from the project dir — installs to .claude/skills/
-INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
+INSTALL_SKILLS_SCRIPT="$PROJECT_DIR/scripts/install_builder_skills.sh"
 
 if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
-  echo -e "  ${YELLOW}⚠${NC} install_skills.sh not found — using existing skills only"
+  echo -e "  ${YELLOW}⚠${NC} install_builder_skills.sh not found — using existing skills only"
 else
-  # Run from PROJECT_DIR so skills install to databricks-builder-app/.claude/skills/
   cd "$PROJECT_DIR"
-  bash "$INSTALL_SKILLS_SCRIPT"
+  if [ -n "$PROFILE" ]; then
+    bash "$INSTALL_SKILLS_SCRIPT" --profile "$PROFILE"
+  else
+    bash "$INSTALL_SKILLS_SCRIPT"
+  fi
   cd "$PROJECT_DIR"
 fi
 
-# Scan skills from .claude/skills/ (where install_skills.sh puts them)
-# and from ../databricks-skills/ (local repo skills) — union of both
+# Scan skills from .claude/skills/ and .databricks/aitools/skills/
 SKILL_NAMES=""
 SKILL_COUNT=0
-for skills_root in "$PROJECT_DIR/.claude/skills" "$REPO_ROOT/databricks-skills"; do
+for skills_root in "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.databricks/aitools/skills" "$PROJECT_DIR/skills"; do
   [ -d "$skills_root" ] || continue
   for skill_dir in "$skills_root"/*/; do
     [ -d "$skill_dir" ] || continue
     if [ -f "$skill_dir/SKILL.md" ]; then
       name=$(basename "$skill_dir")
-      # Avoid duplicates
       if ! echo ",$SKILL_NAMES," | grep -q ",$name,"; then
         if [ -n "$SKILL_NAMES" ]; then SKILL_NAMES="${SKILL_NAMES},${name}"; else SKILL_NAMES="${name}"; fi
         SKILL_COUNT=$((SKILL_COUNT + 1))

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = [".", "packages"]
-include = ["server*", "databricks_tools_core*", "databricks_mcp_server*"]
+include = ["server*", "databricks_tools_core*", "databricks_agent_tools*"]
 exclude = ["client*", "tests*", "scripts*"]
 
 [project]
@@ -29,10 +29,11 @@ dependencies = [
   # Claude Agent SDK (successor to claude-code-sdk)
   "claude-agent-sdk>=0.1.19",
   "anthropic>=0.94.1",
-  # Databricks MCP tools (databricks-mcp-server installed from sibling dir in dev)
+  # In-process Databricks tools (FastMCP wrappers vendored in packages/)
   "mcp>=1.0.0",
   "fastmcp>=3.2.4,<4",
-  # databricks-tools-core and databricks-mcp-server are bundled in packages/ directory
+  "pyyaml>=6.0",
+  # databricks_tools_core and databricks_agent_tools are vendored under packages/
   "requests>=2.31.0",
   # MLflow 3+ for Claude Code tracing (not mlflow[databricks] to avoid litellm)
   # Cap at <3.11 to avoid pre-release resolution via tool.uv.prerelease=allow
