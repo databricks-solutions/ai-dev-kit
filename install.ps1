@@ -305,68 +305,78 @@ $script:UninstallSkillNames = @(
     "retrieving-mlflow-traces","searching-mlflow-docs"
 )
 
-# The Claude Code plugin (installed via the marketplace, separate from the skills
+# The Claude Code plugin (installed via a marketplace, separate from the skills
 # this script drops directly). Its on-disk state lives across several shared files
 # (installed_plugins.json, enabledPlugins in settings.json, known_marketplaces.json,
 # the cache dir) shared with the user's OTHER plugins — so we never hand-edit them.
 # Detection is read-only; removal is delegated to the official `claude` CLI.
-$script:PluginKey = "databricks-ai-dev-kit@databricks-ai-dev-kit"
-$script:PluginMarketplace = "databricks-ai-dev-kit"
+#
+# The plugin can be installed from ANY marketplace, so we match by plugin name and
+# discover the actual "name@marketplace" key(s) rather than assuming a marketplace.
+$script:PluginName = "databricks-ai-dev-kit"
 
 # Read-only detection of the plugin per scope. The scope is recorded by which
-# settings.json enables it: user scope in ~/.claude/settings.json, project scope
-# in the project's .claude/settings.json(.local). (installed_plugins.json is
-# user-level and lists ALL scopes together, so it can't distinguish them.)
-function Test-PluginInstalledGlobal {
-    $f = Join-Path $env:USERPROFILE ".claude\settings.json"
-    return ((Test-Path $f) -and (Select-String -Path $f -Pattern ([regex]::Escape($script:PluginKey)) -Quiet))
-}
-function Test-PluginInstalledProject {
-    param([string]$Dir)
-    foreach ($s in @((Join-Path $Dir ".claude\settings.json"), (Join-Path $Dir ".claude\settings.local.json"))) {
-        if ((Test-Path $s) -and (Select-String -Path $s -Pattern ([regex]::Escape($script:PluginKey)) -Quiet)) { return $true }
+# settings.json enables it: user scope in ~/.claude/settings.json, project scope in
+# the project's .claude/settings.json(.local). (installed_plugins.json is user-level
+# and lists ALL scopes together, so it can't distinguish them.) Returns the enabled
+# "name@marketplace" key(s) — any marketplace is matched.
+function Get-PluginKeys {
+    param([string[]]$Files)
+    $pattern = '"' + [regex]::Escape($script:PluginName) + '@[A-Za-z0-9._-]+"'
+    $keys = @()
+    foreach ($f in $Files) {
+        if (Test-Path $f) {
+            foreach ($m in [regex]::Matches((Get-Content $f -Raw), $pattern)) { $keys += $m.Value.Trim('"') }
+        }
     }
-    return $false
+    return @($keys | Sort-Object -Unique)
 }
+function Get-PluginKeysGlobal { Get-PluginKeys -Files @((Join-Path $env:USERPROFILE ".claude\settings.json")) }
+function Get-PluginKeysProject { param([string]$Dir) Get-PluginKeys -Files @((Join-Path $Dir ".claude\settings.json"), (Join-Path $Dir ".claude\settings.local.json")) }
 
 # Warn that the plugin also exists in the scope we're NOT uninstalling, and print
-# the command to remove it there too. Leads with a blank line to separate it from
-# whatever preceded it (the plan, or the "Nothing to uninstall" tip).
+# the command to remove each detected key there too. Leads with a blank line to
+# separate it from whatever preceded it (the plan, or the "Nothing to uninstall" tip).
 function Show-PluginOtherScopeWarning {
+    param([string[]]$OtherKeys)
     Write-Host ""
     if ($script:Scope -eq "project") {
         Write-Warn "The Claude Code plugin is also installed globally - this project uninstall leaves it. To remove that too:"
-        Write-Host "    claude plugin uninstall $($script:PluginKey) --scope user" -ForegroundColor White
+        foreach ($k in $OtherKeys) { Write-Host "    claude plugin uninstall $k --scope user" -ForegroundColor White }
     } else {
         Write-Warn "The Claude Code plugin is also installed at project scope - this global uninstall leaves it. To remove that too:"
-        Write-Host "    claude plugin uninstall $($script:PluginKey) --scope project" -ForegroundColor White
+        foreach ($k in $OtherKeys) { Write-Host "    claude plugin uninstall $k --scope project" -ForegroundColor White }
     }
 }
 
 # Remove the plugin from the CURRENT uninstall scope via the official CLI (atomic
-# across the shared plugin state - we never hand-edit it). A project install can be
-# either 'project' (.claude/settings.json) or 'local' (.claude/settings.local.json),
+# across the shared plugin state - we never hand-edit it). Removes every detected
+# "name@marketplace" key (the plugin may come from any marketplace). A project
+# install can be 'project' (.claude/settings.json) or 'local' (settings.local.json),
 # so a project uninstall tries both CLI scopes. If nothing could be removed this is a
 # hard error that reports whether the rest of the uninstall completed and prints the
 # exact command to run manually. $OthersRemoved = other artifacts removed this run.
 function Remove-ClaudePlugin {
-    param([int]$OthersRemoved)
+    param([int]$OthersRemoved, [string[]]$Keys)
     if ($script:Scope -eq "project") { $scopes = @("project","local"); $cmdScope = "project" }
     else { $scopes = @("user"); $cmdScope = "user" }
     if (Get-Command claude -ErrorAction SilentlyContinue) {
         $removed = $false
-        foreach ($sc in $scopes) {
-            # Subcommand name has varied across versions (uninstall vs remove) — try both.
-            & claude plugin uninstall $script:PluginKey -y --scope $sc *>$null
-            if ($LASTEXITCODE -ne 0) { & claude plugin remove $script:PluginKey -y --scope $sc *>$null }
-            if ($LASTEXITCODE -eq 0) { Write-Msg "removed Claude Code plugin $($script:PluginKey) ($sc scope)"; $removed = $true }
+        foreach ($k in $Keys) {
+            foreach ($sc in $scopes) {
+                # Subcommand name has varied across versions (uninstall vs remove) — try both.
+                & claude plugin uninstall $k -y --scope $sc *>$null
+                if ($LASTEXITCODE -ne 0) { & claude plugin remove $k -y --scope $sc *>$null }
+                if ($LASTEXITCODE -eq 0) { Write-Msg "removed Claude Code plugin $k ($sc scope)"; $removed = $true }
+            }
         }
         if ($removed) { return }
     }
     $partial = ""; $alt = ""
     if ($OthersRemoved -gt 0) { $partial = "Skills, MCP server, and config WERE removed (partial uninstall). " }
     if ($script:Scope -eq "project") { $alt = " (or --scope local)" }
-    Write-Err "Could not remove the Claude Code plugin. ${partial}Finish it manually: claude plugin uninstall $($script:PluginKey) --scope $cmdScope$alt"
+    $manual = (($Keys | ForEach-Object { "claude plugin uninstall $_ --scope $cmdScope" }) -join "; ")
+    Write-Err "Could not remove the Claude Code plugin. ${partial}Finish it manually: $manual$alt"
 }
 
 function Remove-McpJsonKey {
@@ -498,22 +508,24 @@ function Invoke-Uninstall {
     $projMarker = Join-Path $baseDir ".ai-dev-kit"
     if ($script:Scope -eq "project" -and (Test-Path $projMarker)) { $planState += $projMarker }
 
-    # Claude Code plugin — detect at BOTH scopes (read-only). We only remove the
+    # Claude Code plugin — detect at BOTH scopes (read-only), collecting the enabled
+    # "name@marketplace" key(s) so any marketplace is matched. We only remove the
     # current uninstall scope; presence in the other scope is a warning.
     if ($script:Scope -eq "global") {
-        $planPlugin  = Test-PluginInstalledGlobal
-        $pluginOther = Test-PluginInstalledProject -Dir (Get-Location).Path
+        $pluginKeys      = Get-PluginKeysGlobal
+        $pluginOtherKeys = Get-PluginKeysProject -Dir (Get-Location).Path
     } else {
-        $planPlugin  = Test-PluginInstalledProject -Dir $baseDir
-        $pluginOther = Test-PluginInstalledGlobal
+        $pluginKeys      = Get-PluginKeysProject -Dir $baseDir
+        $pluginOtherKeys = Get-PluginKeysGlobal
     }
+    $planPlugin  = ($pluginKeys.Count -gt 0)
+    $pluginOther = ($pluginOtherKeys.Count -gt 0)
 
-    $total = $planSkills.Count + $planMcp.Count + $planHooks.Count + $planRuntime.Count + $planState.Count
-    if ($planPlugin) { $total += 1 }
+    $total = $planSkills.Count + $planMcp.Count + $planHooks.Count + $planRuntime.Count + $planState.Count + $pluginKeys.Count
     if ($total -eq 0) {
         Write-Ok "Nothing to uninstall for $($script:Scope) scope at $baseDir - no AI Dev Kit artifacts found."
         if ($script:Scope -eq "project") { Write-Msg "Tip: pass --global to remove a global install." }
-        if ($pluginOther) { Show-PluginOtherScopeWarning }
+        if ($pluginOther) { Show-PluginOtherScopeWarning -OtherKeys $pluginOtherKeys }
         return
     }
 
@@ -525,10 +537,10 @@ function Invoke-Uninstall {
     if ($planState.Count)  { Write-Host "  State files:" -ForegroundColor White; $planState | ForEach-Object { Write-Host "    $_" } }
     if ($planPlugin) {
         Write-Host "  Claude Code plugin:" -ForegroundColor White
-        Write-Host "    $($script:PluginKey) (removed via the claude CLI, $($script:Scope) scope)" -ForegroundColor DarkGray
+        foreach ($k in $pluginKeys) { Write-Host "    $k (removed via the claude CLI, $($script:Scope) scope)" -ForegroundColor DarkGray }
         Write-Host "  !  Heads up: the AI Dev Kit Claude Code plugin will also be removed." -ForegroundColor Yellow
     }
-    if ($pluginOther) { Show-PluginOtherScopeWarning }
+    if ($pluginOther) { Show-PluginOtherScopeWarning -OtherKeys $pluginOtherKeys }
     Write-Host ""
     Write-Msg "Config files are backed up to <file>.bak before editing."
 
@@ -548,7 +560,7 @@ function Invoke-Uninstall {
     foreach ($p in $planHooks)   { if (Remove-ClaudeHook -Path $p) { Write-Msg "cleaned hook in $p" } }
     foreach ($p in $planRuntime) { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
     foreach ($p in $planState)   { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
-    if ($planPlugin) { Remove-ClaudePlugin -OthersRemoved ($total - 1) }
+    if ($planPlugin) { Remove-ClaudePlugin -OthersRemoved ($total - $pluginKeys.Count) -Keys $pluginKeys }
 
     Write-Host ""
     Write-Ok "AI Dev Kit uninstalled ($($script:Scope) scope)."
