@@ -479,6 +479,7 @@ run_uninstall() {
             "$HOME/.gemini/settings.json|json:mcpServers"
             "$HOME/.gemini/antigravity/mcp_config.json|json:mcpServers"
             "$HOME/.codeium/windsurf/mcp_config.json|json:mcpServers"
+            "$HOME/.config/opencode/opencode.json|json:mcp"
             "$HOME/.kiro/settings/mcp.json|json:mcpServers"
         )
         hook_targets=("$HOME/.claude/settings.json")
@@ -493,6 +494,7 @@ run_uninstall() {
             "$base_dir/.cursor/mcp.json|json:mcpServers" "$base_dir/.vscode/mcp.json|json:servers"
             "$base_dir/.codex/config.toml|toml"
             "$base_dir/.gemini/settings.json|json:mcpServers"
+            "$base_dir/opencode.json|json:mcp"
             "$base_dir/.kiro/settings/mcp.json|json:mcpServers"
         )
         hook_targets=("$base_dir/.claude/settings.json")

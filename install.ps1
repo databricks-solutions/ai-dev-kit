@@ -461,6 +461,7 @@ function Invoke-Uninstall {
             @{ Path=(Join-Path $home_ ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
             @{ Path=(Join-Path $home_ ".gemini\antigravity\mcp_config.json"); Kind="json"; Top="mcpServers" },
             @{ Path=(Join-Path $home_ ".codeium\windsurf\mcp_config.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".config\opencode\opencode.json"); Kind="json"; Top="mcp" },
             @{ Path=(Join-Path $home_ ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
         )
         $hookTargets = @( (Join-Path $home_ ".claude\settings.json") )
@@ -477,6 +478,7 @@ function Invoke-Uninstall {
             @{ Path=(Join-Path $baseDir ".vscode\mcp.json"); Kind="json"; Top="servers" },
             @{ Path=(Join-Path $baseDir ".codex\config.toml"); Kind="toml" },
             @{ Path=(Join-Path $baseDir ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $baseDir "opencode.json"); Kind="json"; Top="mcp" },
             @{ Path=(Join-Path $baseDir ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
         )
         $hookTargets = @( (Join-Path $baseDir ".claude\settings.json") )
