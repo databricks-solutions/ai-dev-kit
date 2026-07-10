@@ -334,19 +334,81 @@ function Get-PluginKeys {
 function Get-PluginKeysGlobal { Get-PluginKeys -Files @((Join-Path $env:USERPROFILE ".claude\settings.json")) }
 function Get-PluginKeysProject { param([string]$Dir) Get-PluginKeys -Files @((Join-Path $Dir ".claude\settings.json"), (Join-Path $Dir ".claude\settings.local.json")) }
 
-# Warn that the plugin also exists in the scope we're NOT uninstalling, and print
-# the command to remove each detected key there too. Leads with a blank line to
-# separate it from whatever preceded it (the plan, or the "Nothing to uninstall" tip).
-function Show-PluginOtherScopeWarning {
-    param([string[]]$OtherKeys)
-    Write-Host ""
-    if ($script:Scope -eq "project") {
-        Write-Warn "The Claude Code plugin is also installed globally - this project uninstall leaves it. To remove that too:"
-        foreach ($k in $OtherKeys) { Write-Host "    claude plugin uninstall $k --scope user" -ForegroundColor White }
-    } else {
-        Write-Warn "The Claude Code plugin is also installed at project scope - this global uninstall leaves it. To remove that too:"
-        foreach ($k in $OtherKeys) { Write-Host "    claude plugin uninstall $k --scope project" -ForegroundColor White }
+# Count skill folders + 'databricks' MCP entries under the given roots/targets, plus
+# hook/state/plugin, returning one "  - ..." summary line each. Shared by the project-
+# and global-scope summaries below. Read-only.
+function Get-LeftoversSummary {
+    param([string]$Hook, [string]$StateDir, [string]$StateLabel, [string[]]$PluginKeys, [string[]]$SkillRoots, [hashtable[]]$McpTargets)
+    $lines = @()
+    $n = 0
+    foreach ($root in $SkillRoots) {
+        if (Test-Path $root) { foreach ($name in $script:UninstallSkillNames) { if (Test-Path (Join-Path $root $name)) { $n++ } } }
     }
+    if ($n -gt 0) { $lines += "  - $n skill folder(s)" }
+    $n = 0
+    foreach ($t in $McpTargets) {
+        if (-not (Test-Path $t.Path)) { continue }
+        if ($t.Kind -eq "json" -and (Test-McpJsonHasDatabricks -Path $t.Path -Top $t.Top)) { $n++ }
+        elseif ($t.Kind -eq "toml" -and (Select-String -Path $t.Path -Pattern 'mcp_servers\.databricks' -Quiet)) { $n++ }
+    }
+    if ($n -gt 0) { $lines += "  - $n MCP config file(s) with the 'databricks' server" }
+    if ($Hook -and (Test-Path $Hook) -and (Select-String -Path $Hook -Pattern 'check_update' -Quiet)) { $lines += "  - Claude update hook" }
+    if ($StateDir -and (Test-Path $StateDir)) { $lines += "  - $StateLabel" }
+    if ($PluginKeys.Count -gt 0) { $lines += "  - Claude Code plugin: $($PluginKeys -join ' ')" }
+    return @($lines)
+}
+
+# Project-scope artifacts under $Dir (what a project uninstall from that dir removes).
+function Get-ProjectLeftoversSummary {
+    param([string]$Dir)
+    $skillRoots = @("\.claude\skills","\.cursor\skills","\.github\skills","\.agents\skills","\.gemini\skills","\.windsurf\skills","\.opencode\skills","\.kiro\skills") | ForEach-Object { Join-Path $Dir $_.TrimStart('\') }
+    $mcpTargets = @(
+        @{ Path=(Join-Path $Dir ".mcp.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $Dir ".cursor\mcp.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $Dir ".vscode\mcp.json"); Kind="json"; Top="servers" },
+        @{ Path=(Join-Path $Dir ".codex\config.toml"); Kind="toml" }, @{ Path=(Join-Path $Dir ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+        @{ Path=(Join-Path $Dir "opencode.json"); Kind="json"; Top="mcp" }, @{ Path=(Join-Path $Dir ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+    )
+    Get-LeftoversSummary -Hook (Join-Path $Dir ".claude\settings.json") -StateDir (Join-Path $Dir ".ai-dev-kit") -StateLabel "state files (.ai-dev-kit/)" `
+        -PluginKeys (Get-PluginKeysProject -Dir $Dir) -SkillRoots $skillRoots -McpTargets $mcpTargets
+}
+
+# Global/user-scope artifacts (what a --global uninstall removes).
+function Get-GlobalLeftoversSummary {
+    $h = $env:USERPROFILE
+    $installDir = if ($script:UserMcpPath) { $script:UserMcpPath } elseif ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $h ".ai-dev-kit" }
+    $skillRoots = @(".claude\skills",".cursor\skills",".github\skills",".agents\skills",".gemini\skills",".gemini\antigravity\skills",".codeium\windsurf\skills",".config\opencode\skills",".kiro\skills") | ForEach-Object { Join-Path $h $_ }
+    $mcpTargets = @(
+        @{ Path=(Join-Path $h ".claude.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $h ".codex\config.toml"); Kind="toml" }, @{ Path=(Join-Path $h ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+        @{ Path=(Join-Path $h ".gemini\antigravity\mcp_config.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $h ".codeium\windsurf\mcp_config.json"); Kind="json"; Top="mcpServers" },
+        @{ Path=(Join-Path $h ".config\opencode\opencode.json"); Kind="json"; Top="mcp" }, @{ Path=(Join-Path $h ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+    )
+    Get-LeftoversSummary -Hook (Join-Path $h ".claude\settings.json") -StateDir $installDir -StateLabel "MCP server runtime / state ($installDir)" `
+        -PluginKeys (Get-PluginKeysGlobal) -SkillRoots $skillRoots -McpTargets $mcpTargets
+}
+
+# Very noticeable end-of-run box warning that files remain in the OTHER scope.
+function Show-LeftoversBox {
+    param([string]$Headline, [string]$Detail, [string[]]$Summary, [string]$Action)
+    $bar = "  ------------------------------------------------------------"
+    Write-Host ""
+    Write-Host $bar -ForegroundColor Yellow
+    Write-Host "  $Headline" -ForegroundColor Yellow
+    Write-Host $bar -ForegroundColor Yellow
+    Write-Host "  $Detail" -ForegroundColor DarkGray
+    foreach ($l in $Summary) { Write-Host $l }
+    Write-Host "  $Action" -ForegroundColor Yellow
+    Write-Host $bar -ForegroundColor Yellow
+}
+function Show-ProjectLeftoversWarning {
+    param([string]$Dir, [string[]]$Summary)
+    Show-LeftoversBox -Headline "!  PROJECT-LEVEL AI DEV KIT FILES STILL REMAIN" `
+        -Detail "This global uninstall did not touch project-scoped files in: $Dir" `
+        -Summary $Summary -Action "Re-run the uninstaller from that folder WITHOUT --global to remove them."
+}
+function Show-GlobalLeftoversWarning {
+    param([string[]]$Summary)
+    Show-LeftoversBox -Headline "!  GLOBAL AI DEV KIT FILES STILL REMAIN" `
+        -Detail "This project uninstall did not touch global (user-level) files:" `
+        -Summary $Summary -Action "Re-run the uninstaller with --global to remove them."
 }
 
 # Remove the plugin from the CURRENT uninstall scope via the official CLI (atomic
@@ -377,6 +439,17 @@ function Remove-ClaudePlugin {
     if ($script:Scope -eq "project") { $alt = " (or --scope local)" }
     $manual = (($Keys | ForEach-Object { "claude plugin uninstall $_ --scope $cmdScope" }) -join "; ")
     Write-Err "Could not remove the Claude Code plugin. ${partial}Finish it manually: $manual$alt"
+}
+
+# Read-only: true only if the EXACT top-level server key ($Top) contains a
+# 'databricks' entry - the same thing removal targets. Does NOT match nested
+# occurrences (e.g. ~/.claude.json's projects.<path>.mcpServers.databricks, a
+# project-scoped server we never touch) that a plain match would flag.
+function Test-McpJsonHasDatabricks {
+    param([string]$Path, [string]$Top)
+    if (-not (Test-Path $Path)) { return $false }
+    try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
+    return ($cfg.$Top -and $cfg.$Top.PSObject.Properties.Name -contains 'databricks')
 }
 
 function Remove-McpJsonKey {
@@ -495,7 +568,7 @@ function Invoke-Uninstall {
     }
     foreach ($t in $mcpTargets) {
         if (-not (Test-Path $t.Path)) { continue }
-        if ($t.Kind -eq "json" -and (Select-String -Path $t.Path -Pattern '"databricks"' -Quiet)) { $planMcp += $t }
+        if ($t.Kind -eq "json" -and (Test-McpJsonHasDatabricks -Path $t.Path -Top $t.Top)) { $planMcp += $t }
         elseif ($t.Kind -eq "toml" -and (Select-String -Path $t.Path -Pattern 'mcp_servers\.databricks' -Quiet)) { $planMcp += $t }
     }
     foreach ($h in $hookTargets) {
@@ -510,24 +583,29 @@ function Invoke-Uninstall {
     $projMarker = Join-Path $baseDir ".ai-dev-kit"
     if ($script:Scope -eq "project" -and (Test-Path $projMarker)) { $planState += $projMarker }
 
-    # Claude Code plugin — detect at BOTH scopes (read-only), collecting the enabled
-    # "name@marketplace" key(s) so any marketplace is matched. We only remove the
-    # current uninstall scope; presence in the other scope is a warning.
+    # Claude Code plugin at the CURRENT scope — collect the enabled "name@marketplace"
+    # key(s) so any marketplace is matched; these are what we remove.
+    if ($script:Scope -eq "global") { $pluginKeys = Get-PluginKeysGlobal } else { $pluginKeys = Get-PluginKeysProject -Dir $baseDir }
+    $planPlugin = ($pluginKeys.Count -gt 0)
+
+    # Warn about artifacts left behind in the OTHER scope. A global uninstall looks
+    # for project-scope files in the current folder; a project uninstall looks for
+    # global/user-level files. Skip the $cwd scan when it is $HOME (there project and
+    # global paths coincide and are already handled by the global side).
+    $projectLeftovers = @(); $globalLeftovers = @()
+    $cwd = (Get-Location).Path
     if ($script:Scope -eq "global") {
-        $pluginKeys      = Get-PluginKeysGlobal
-        $pluginOtherKeys = Get-PluginKeysProject -Dir (Get-Location).Path
+        if ($cwd -ne $env:USERPROFILE) { $projectLeftovers = Get-ProjectLeftoversSummary -Dir $cwd }
     } else {
-        $pluginKeys      = Get-PluginKeysProject -Dir $baseDir
-        $pluginOtherKeys = Get-PluginKeysGlobal
+        if ($baseDir -ne $env:USERPROFILE) { $globalLeftovers = Get-GlobalLeftoversSummary }
     }
-    $planPlugin  = ($pluginKeys.Count -gt 0)
-    $pluginOther = ($pluginOtherKeys.Count -gt 0)
 
     $total = $planSkills.Count + $planMcp.Count + $planHooks.Count + $planRuntime.Count + $planState.Count + $pluginKeys.Count
     if ($total -eq 0) {
         Write-Ok "Nothing to uninstall for $($script:Scope) scope at $baseDir - no AI Dev Kit artifacts found."
-        if ($script:Scope -eq "project") { Write-Msg "Tip: pass --global to remove a global install." }
-        if ($pluginOther) { Show-PluginOtherScopeWarning -OtherKeys $pluginOtherKeys }
+        if ($script:Scope -eq "project" -and -not $globalLeftovers.Count) { Write-Msg "Tip: pass --global to remove a global install." }
+        if ($projectLeftovers.Count) { Show-ProjectLeftoversWarning -Dir $cwd -Summary $projectLeftovers }
+        if ($globalLeftovers.Count)  { Show-GlobalLeftoversWarning -Summary $globalLeftovers }
         return
     }
 
@@ -542,11 +620,15 @@ function Invoke-Uninstall {
         foreach ($k in $pluginKeys) { Write-Host "    $k (removed via the claude CLI, $($script:Scope) scope)" -ForegroundColor DarkGray }
         Write-Host "  !  Heads up: the AI Dev Kit Claude Code plugin will also be removed." -ForegroundColor Yellow
     }
-    if ($pluginOther) { Show-PluginOtherScopeWarning -OtherKeys $pluginOtherKeys }
     Write-Host ""
     Write-Msg "Config files are backed up to <file>.bak before editing."
 
-    if ($script:DryRun) { Write-Ok "Dry run - nothing was changed. Re-run without --dry-run to apply."; return }
+    if ($script:DryRun) {
+        if ($projectLeftovers.Count) { Show-ProjectLeftoversWarning -Dir $cwd -Summary $projectLeftovers }
+        if ($globalLeftovers.Count)  { Show-GlobalLeftoversWarning -Summary $globalLeftovers }
+        Write-Ok "Dry run - nothing was changed. Re-run without --dry-run to apply."
+        return
+    }
 
     if (-not $script:AssumeYes) {
         $reply = Read-Host "  Remove these $total item(s)? [y/N]"
@@ -566,7 +648,9 @@ function Invoke-Uninstall {
 
     Write-Host ""
     Write-Ok "AI Dev Kit uninstalled ($($script:Scope) scope)."
-    Write-Msg "Other scopes (e.g. --global) and per-editor .bak backups were left untouched."
+    Write-Msg "Other scopes and per-editor .bak backups were left untouched."
+    if ($projectLeftovers.Count) { Show-ProjectLeftoversWarning -Dir $cwd -Summary $projectLeftovers }
+    if ($globalLeftovers.Count)  { Show-GlobalLeftoversWarning -Summary $globalLeftovers }
 }
 
 if ($script:Uninstall) { Invoke-Uninstall; return }
