@@ -626,9 +626,14 @@ run_uninstall() {
     if [ "$SCOPE" = "global" ] || [ -n "$USER_MCP_PATH" ]; then
         [ -d "$install_dir" ] && plan_runtime+=("$install_dir")
     fi
-    for path in "$state_dir/.installed-skills" "$state_dir/.skills-profile" "$state_dir/version"; do
-        [ -f "$path" ] && plan_state+=("$path")
-    done
+    # On a global uninstall state_dir IS the runtime dir; when that dir is already in
+    # plan_runtime the state files inside it are removed along with it — planning them
+    # separately would double-delete (and double-list them in the plan).
+    if [[ " ${plan_runtime[*]} " != *" $state_dir "* ]]; then
+        for path in "$state_dir/.installed-skills" "$state_dir/.skills-profile" "$state_dir/version"; do
+            [ -f "$path" ] && plan_state+=("$path")
+        done
+    fi
     # Project-scope leftover marker dir
     [ "$SCOPE" = "project" ] && [ -d "$base_dir/.ai-dev-kit" ] && plan_state+=("$base_dir/.ai-dev-kit/")
 

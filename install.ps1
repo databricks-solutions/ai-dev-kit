@@ -577,8 +577,13 @@ function Invoke-Uninstall {
     if ($script:Scope -eq "global" -or $script:UserMcpPath) {
         if (Test-Path $installDir) { $planRuntime += $installDir }
     }
-    foreach ($s in @((Join-Path $stateDir ".installed-skills"), (Join-Path $stateDir ".skills-profile"), (Join-Path $stateDir "version"))) {
-        if (Test-Path $s) { $planState += $s }
+    # On a global uninstall $stateDir IS the runtime dir; when that dir is already in
+    # $planRuntime the state files inside it are removed along with it - planning them
+    # separately would make Remove-Item fail on the already-deleted paths.
+    if ($planRuntime -notcontains $stateDir) {
+        foreach ($s in @((Join-Path $stateDir ".installed-skills"), (Join-Path $stateDir ".skills-profile"), (Join-Path $stateDir "version"))) {
+            if (Test-Path $s) { $planState += $s }
+        }
     }
     $projMarker = Join-Path $baseDir ".ai-dev-kit"
     if ($script:Scope -eq "project" -and (Test-Path $projMarker)) { $planState += $projMarker }
