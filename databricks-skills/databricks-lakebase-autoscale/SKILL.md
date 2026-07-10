@@ -9,6 +9,21 @@ Next-generation managed PostgreSQL on Databricks — autoscaling compute (0.5-11
 
 **Interface: Databricks CLI (`databricks postgres ...`).** Every admin command below uses the CLI. The only place SDK is preferred is inside an application that needs to refresh 1-hour OAuth tokens — see [connection-patterns.md](references/connection-patterns.md).
 
+> **Provisioned Lakebase no longer exists — never create it.** The old Provisioned tier (static, non-scalable Postgres; `databricks database` CLI / `w.database` SDK) is being migrated to Autoscaling over summer 2026, with no customer action required. Lakebase today is Autoscaling-only (`databricks postgres` / `w.postgres`). Do not attempt to create Provisioned instances; if a user asks for one, tell them Provisioned instances don't exist anymore and point them to Autoscaling.
+
+For context when reading older configs or docs, here is how the retired Provisioned tier maps to Autoscaling:
+
+| Aspect | Provisioned (retired) | Autoscaling (current) |
+|--------|-----------------------|-----------------------|
+| CLI group | `databricks database` | `databricks postgres` |
+| Top-level resource | Instance | Project |
+| Capacity | CU_1–CU_8 (16 GB/CU) | 0.5–112 CU (2 GB/CU) |
+| Branching | Not supported | Full support |
+| Scale-to-zero | Not supported | Configurable |
+| HA | Readable secondaries | 1–3 secondaries + read replicas |
+| Data API | Not available | PostgREST HTTP API |
+| Cloud | AWS only | AWS and Azure |
+
 ## Hierarchy
 
 ```
