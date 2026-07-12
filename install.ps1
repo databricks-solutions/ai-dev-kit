@@ -2862,6 +2862,105 @@ function Invoke-BranchHandoff {
     exit 0
 }
 
+# ─── Pre-install check: an OLD install that predates the aitools flow ──────────
+# The current installer delegates skills to `databricks aitools`, which manages
+# them in a store (.databricks\aitools\skills\.state.json) and links them into each
+# tool's skills dir. Older AI Dev Kit installs instead COPIED real skill directories
+# in place and/or installed the Claude Code plugin — neither is managed by aitools,
+# so reinstalling over them can leave stale/duplicate skills. We detect that (for the
+# scope we're installing into) and offer a full uninstall first. Skills already
+# managed by aitools — a CLI upgrade OR a prior run of THIS installer — are NOT
+# flagged: the aitools store is our evidence they did not come from the old flow.
+function Test-PriorInstall {
+    $script:PriorInstallKind = ""
+    $script:PriorInstallSummary = @()
+    $home_ = $env:USERPROFILE
+    if ($script:Scope -eq "global") { $baseDir = $home_ } else { $baseDir = (Get-Location).Path }
+    $aitoolsState = Join-Path $baseDir ".databricks\aitools\skills\.state.json"
+
+    if ($script:Scope -eq "global") {
+        $roots = @(
+            (Join-Path $home_ ".claude\skills"), (Join-Path $home_ ".cursor\skills"),
+            (Join-Path $home_ ".github\skills"), (Join-Path $home_ ".agents\skills"),
+            (Join-Path $home_ ".gemini\skills"), (Join-Path $home_ ".gemini\antigravity\skills"),
+            (Join-Path $home_ ".codeium\windsurf\skills"), (Join-Path $home_ ".config\opencode\skills"),
+            (Join-Path $home_ ".kiro\skills")
+        )
+    } else {
+        $roots = @(
+            (Join-Path $baseDir ".claude\skills"), (Join-Path $baseDir ".cursor\skills"),
+            (Join-Path $baseDir ".github\skills"), (Join-Path $baseDir ".agents\skills"),
+            (Join-Path $baseDir ".gemini\skills"), (Join-Path $baseDir ".windsurf\skills"),
+            (Join-Path $baseDir ".opencode\skills"), (Join-Path $baseDir ".kiro\skills")
+        )
+    }
+
+    # Count real (non-reparse-point) skill dirs under known names. aitools links its
+    # skills and always writes .state.json, so when that store exists the skills are
+    # CLI-managed (upgrade path) and are NOT flagged — the "current flow" evidence.
+    $legacy = 0
+    if (-not (Test-Path $aitoolsState)) {
+        foreach ($root in $roots) {
+            if (-not (Test-Path $root)) { continue }
+            foreach ($name in $script:UninstallSkillNames) {
+                $p = Join-Path $root $name
+                if (Test-Path $p -PathType Container) {
+                    $isLink = (((Get-Item $p -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+                    if (-not $isLink) { $legacy++ }
+                }
+            }
+        }
+    }
+
+    if ($script:Scope -eq "global") { $pluginKeys = Get-PluginKeysGlobal } else { $pluginKeys = Get-PluginKeysProject -Dir $baseDir }
+
+    $kinds = @()
+    if ($pluginKeys.Count -gt 0) {
+        $kinds += "plugin"
+        $script:PriorInstallSummary += "  - Claude Code plugin: $($pluginKeys -join ' ')"
+    }
+    if ($legacy -gt 0) {
+        $kinds += "legacy-skills"
+        $script:PriorInstallSummary += "  - $legacy directly-installed skill folder(s) (not managed by databricks aitools)"
+    }
+    $script:PriorInstallKind = ($kinds -join "+")
+}
+
+# If an old-style install is detected for the target scope, recommend a full
+# uninstall and (interactively) offer to run it before installing.
+function Invoke-PriorInstallCheck {
+    Test-PriorInstall
+    if ([string]::IsNullOrEmpty($script:PriorInstallKind)) { return }
+
+    $scopeFlag = ""
+    if ($script:Scope -eq "global") { $scopeFlag = " -Global" }
+
+    Show-LeftoversBox -Headline "!  PREVIOUS AI DEV KIT INSTALL DETECTED ($($script:Scope) scope)" `
+        -Detail "This looks like an older install (skills copied directly and/or the Claude Code plugin) that predates the current 'databricks aitools' flow. Reinstalling over it can leave stale or duplicate skills." `
+        -Summary $script:PriorInstallSummary `
+        -Action "Recommended: remove it first with  install.ps1 -Uninstall$scopeFlag"
+
+    # Non-interactive / silent: never auto-remove; warn and continue.
+    if ($script:Silent -or -not (Test-Interactive)) {
+        Write-Warn "Skipping cleanup (non-interactive). Re-run with -Uninstall$scopeFlag to remove the old install."
+        return
+    }
+
+    $ans = Read-Prompt -PromptText "Remove the previous install now (recommended) before continuing? [Y/n]" -Default "Y"
+    if ($ans -match '^(n|no)$') {
+        Write-Warn "Leaving the previous install in place - some skills may be stale or duplicated."
+        return
+    }
+    # Full uninstall for THIS scope. Invoke-Uninstall RETURNS (it does not exit), so
+    # the install continues afterward on a freshly cleaned slate. Force AssumeYes so
+    # it doesn't ask a second time (we already confirmed), then restore it.
+    $savedAssumeYes = $script:AssumeYes
+    $script:AssumeYes = $true
+    try { Invoke-Uninstall } catch { Write-Warn "Cleanup reported an issue - continuing with the install." }
+    $script:AssumeYes = $savedAssumeYes
+    Write-Ok "Previous install removed - continuing with a fresh install."
+}
+
 function Invoke-Main {
     # An explicit --branch hands off to that version's own installer
     Invoke-BranchHandoff
@@ -2904,6 +3003,9 @@ function Invoke-Main {
     } else {
         $script:StateDir = Join-Path (Get-Location) ".ai-dev-kit"
     }
+
+    # Offer to remove an older, non-aitools install for this scope before we install
+    Invoke-PriorInstallCheck
 
     # Skill profile selection
     if ($script:InstallSkills) {

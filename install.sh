@@ -2739,6 +2739,108 @@ handoff_to_branch() {
     exit 0
 }
 
+# ─── Pre-install check: an OLD install that predates the aitools flow ──────────
+# The current installer delegates skills to `databricks aitools`, which manages
+# them in a store (.databricks/aitools/skills/.state.json) and symlinks them into
+# each tool's skills dir. Older AI Dev Kit installs instead COPIED real skill
+# directories in place and/or installed the Claude Code plugin — neither is
+# managed by aitools, so reinstalling over them can leave stale/duplicate skills.
+# We detect that (for the scope we're installing into) and offer a full uninstall
+# first. Skills already managed by aitools — a CLI upgrade OR a prior run of THIS
+# installer — are deliberately NOT flagged: the aitools store is our evidence that
+# they did not come from the old flow.
+#
+# Sets PRIOR_INSTALL_KIND ("" when there's nothing to clean up) and _SUMMARY.
+detect_prior_install() {
+    PRIOR_INSTALL_KIND=""
+    PRIOR_INSTALL_SUMMARY=""
+    local base_dir aitools_state plugin_keys
+    [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+    aitools_state="$base_dir/.databricks/aitools/skills/.state.json"
+
+    local -a roots
+    if [ "$SCOPE" = "global" ]; then
+        roots=(
+            "$HOME/.claude/skills" "$HOME/.cursor/skills" "$HOME/.github/skills"
+            "$HOME/.agents/skills" "$HOME/.gemini/skills" "$HOME/.gemini/antigravity/skills"
+            "$HOME/.codeium/windsurf/skills" "$HOME/.config/opencode/skills" "$HOME/.kiro/skills"
+        )
+    else
+        roots=(
+            "$base_dir/.claude/skills" "$base_dir/.cursor/skills" "$base_dir/.github/skills"
+            "$base_dir/.agents/skills" "$base_dir/.gemini/skills" "$base_dir/.windsurf/skills"
+            "$base_dir/.opencode/skills" "$base_dir/.kiro/skills"
+        )
+    fi
+
+    # Count real (non-symlink) skill dirs under known names. aitools SYMLINKS its
+    # skills, so a real directory is evidence of an old direct copy. When an aitools
+    # store exists for the scope, the skills are CLI-managed (upgrade path) and are
+    # NOT flagged — this is the "installed via the current flow" evidence.
+    local legacy=0 root name p
+    if [ ! -f "$aitools_state" ]; then
+        for root in "${roots[@]}"; do
+            [ -d "$root" ] || continue
+            for name in $UNINSTALL_SKILL_NAMES; do
+                p="$root/$name"
+                [ -d "$p" ] && [ ! -L "$p" ] && legacy=$((legacy + 1))
+            done
+        done
+    fi
+
+    if [ "$SCOPE" = "global" ]; then plugin_keys="$(plugin_keys_global)"; else plugin_keys="$(plugin_keys_project "$base_dir")"; fi
+
+    local -a kinds=()
+    if [ -n "$plugin_keys" ]; then
+        kinds+=("plugin")
+        PRIOR_INSTALL_SUMMARY="${PRIOR_INSTALL_SUMMARY}  - Claude Code plugin: $(printf '%s' "$plugin_keys" | tr '\n' ' ')\n"
+    fi
+    if [ "$legacy" -gt 0 ]; then
+        kinds+=("legacy-skills")
+        PRIOR_INSTALL_SUMMARY="${PRIOR_INSTALL_SUMMARY}  - ${legacy} directly-installed skill folder(s) (not managed by databricks aitools)\n"
+    fi
+    PRIOR_INSTALL_KIND="$(IFS=+; echo "${kinds[*]}")"
+    return 0
+}
+
+# If an old-style install is detected for the target scope, recommend a full
+# uninstall and (interactively) offer to run it before installing.
+check_prior_install() {
+    detect_prior_install
+    [ -z "$PRIOR_INSTALL_KIND" ] && return 0
+
+    local scope_flag=""
+    [ "$SCOPE" = "global" ] && scope_flag=" --global"
+
+    leftovers_box "⚠  PREVIOUS AI DEV KIT INSTALL DETECTED (${SCOPE} scope)" \
+        "This looks like an older install (skills copied directly and/or the Claude Code plugin) that predates the current ${B}databricks aitools${N}${Y} flow. Reinstalling over it can leave stale or duplicate skills." \
+        "$(printf '%b' "$PRIOR_INSTALL_SUMMARY")" \
+        "Recommended: remove it first with  install.sh --uninstall${scope_flag}"
+
+    # Non-interactive / silent: never auto-remove; warn and continue.
+    if [ "$SILENT" = true ] || ! is_interactive; then
+        warn "Skipping cleanup (non-interactive). Re-run with ${B}--uninstall${scope_flag}${N} to remove the old install."
+        return 0
+    fi
+
+    local ans
+    ans=$(prompt "Remove the previous install now (recommended) before continuing? [Y/n]" "Y")
+    case "$ans" in
+        [Nn]*)
+            warn "Leaving the previous install in place — some skills may be stale or duplicated."
+            ;;
+        *)
+            # Full uninstall for THIS scope, no extra scope/confirm prompt. Runs in a
+            # subshell because run_uninstall exits on completion; the subshell absorbs
+            # that exit so the install continues on a freshly cleaned slate.
+            ( SCOPE_EXPLICIT=true; ASSUME_YES=true; run_uninstall ) \
+                || warn "Cleanup reported an issue — continuing with the install."
+            ok "Previous install removed — continuing with a fresh install."
+            ;;
+    esac
+    return 0
+}
+
 # Main
 main() {
     # An explicit --branch hands off to that version's own installer
@@ -2782,6 +2884,9 @@ main() {
     else
         STATE_DIR="$(pwd)/.ai-dev-kit"
     fi
+
+    # Offer to remove an older, non-aitools install for this scope before we install
+    check_prior_install
 
     # ── Step 4: Skill profile selection ──
     if [ "$INSTALL_SKILLS" = true ]; then
