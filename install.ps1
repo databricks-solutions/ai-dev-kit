@@ -86,6 +86,8 @@ $script:SkillsProfile = if ($env:DEVKIT_SKILLS_PROFILE) { $env:DEVKIT_SKILLS_PRO
 $script:UserSkills   = if ($env:DEVKIT_SKILLS) { $env:DEVKIT_SKILLS } else { "" }
 $script:ListSkills   = $false
 $script:DryRun       = ($env:DRY_RUN -in @("true", "1"))
+$script:Uninstall    = $false
+$script:AssumeYes    = $false
 # Include experimental agent skills in profile/"all" selections (default: true).
 # Pass --experimental false (or DEVKIT_EXPERIMENTAL=false) for stable only.
 # Explicit --skills requests are always honored as named.
@@ -283,6 +285,22 @@ function Write-Err  {
 }
 function Write-Step { param([string]$Text) if (-not $script:Silent) { Write-Host ""; Write-Host "$Text" -ForegroundColor White } }
 
+# Deprecation notice - shown on every install/upgrade while skills still ship
+# from this repo. The next major release installs skills via the Databricks CLI
+# from the official databricks/databricks-agent-skills set.
+function Show-DeprecationNotice {
+    if ($script:Silent) { return }
+    $bar = "  ------------------------------------------------------------"
+    Write-Host ""
+    Write-Host $bar -ForegroundColor Yellow
+    Write-Host "  !  Heads up: skills are moving" -ForegroundColor Yellow
+    Write-Host "  In the next release, the skills for AI Dev Kit will be" -ForegroundColor DarkGray
+    Write-Host "  promoted to a shared, engineering-supported repository." -ForegroundColor DarkGray
+    Write-Host "  In future releases, this installer will set up skills" -ForegroundColor DarkGray
+    Write-Host "  using the Databricks CLI." -ForegroundColor DarkGray
+    Write-Host $bar -ForegroundColor Yellow
+}
+
 # ─── Parse arguments ─────────────────────────────────────────
 $i = 0
 while ($i -lt $args.Count) {
@@ -308,6 +326,8 @@ while ($i -lt $args.Count) {
         }
         { $_ -in "--dry-run", "-DryRun" }      { $script:DryRun = $true; $i++ }
         { $_ -in "-f", "--force", "-Force" }   { $script:Force = $true; $i++ }
+        { $_ -in "--uninstall", "-Uninstall" } { $script:Uninstall = $true; $i++ }
+        { $_ -in "-y", "--yes", "-Yes" }       { $script:AssumeYes = $true; $i++ }
         { $_ -in "-h", "--help", "-Help" } {
             Write-Host "Databricks AI Dev Kit Installer (Windows)"
             Write-Host ""
@@ -330,6 +350,9 @@ while ($i -lt $args.Count) {
             Write-Host "  --experimental BOOL   Include experimental agent skills (default: true; 'false' = stable only)"
             Write-Host "  --dry-run             Print what would be installed (resolved refs, aitools command) and exit"
             Write-Host "  -f, --force           Force reinstall"
+            Write-Host "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, MCP config, and Claude Code plugin"
+            Write-Host "  --dry-run             With --uninstall: print what would be removed, change nothing"
+            Write-Host "  -y, --yes             With --uninstall: skip the confirmation prompt"
             Write-Host "  -h, --help            Show this help"
             Write-Host ""
             Write-Host "Environment Variables:"
@@ -365,6 +388,382 @@ while ($i -lt $args.Count) {
         default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
     }
 }
+
+# ─── --uninstall ───────────────────────────────────────────────
+# Every skill directory name ever shipped (current + historical renames/removals),
+# so old installs — e.g. the removed databricks-lakebase-provisioned or renamed
+# databricks-app-python — are swept, not just the current release's skills.
+$script:UninstallSkillNames = @(
+    "databricks-agent-bricks","databricks-ai-functions","databricks-aibi-dashboards",
+    "databricks-bundles","databricks-asset-bundles","databricks-apps-python","databricks-app-python",
+    "databricks-app-apx","databricks-config","databricks-dbsql","databricks-docs",
+    "databricks-execution-compute","databricks-genie","databricks-iceberg","databricks-jobs",
+    "databricks-lakebase-autoscale","databricks-lakebase-provisioned","databricks-metric-views",
+    "databricks-ml-training-serving","databricks-model-serving","databricks-mlflow-evaluation",
+    "databricks-parsing","databricks-python-sdk","databricks-spark-declarative-pipelines",
+    "databricks-spark-structured-streaming","databricks-synthetic-data-gen","databricks-synthetic-data-generation",
+    "databricks-unity-catalog","databricks-unstructured-pdf-generation","databricks-vector-search",
+    "databricks-zerobus-ingest","spark-python-data-source",
+    "databricks","databricks-apps","databricks-lakebase",
+    "agent-evaluation","analyze-mlflow-chat-session","analyze-mlflow-trace",
+    "instrumenting-with-mlflow-tracing","mlflow-onboarding","querying-mlflow-metrics",
+    "retrieving-mlflow-traces","searching-mlflow-docs"
+)
+
+# The Claude Code plugin (installed via a marketplace, separate from the skills
+# this script drops directly). Its on-disk state lives across several shared files
+# (installed_plugins.json, enabledPlugins in settings.json, known_marketplaces.json,
+# the cache dir) shared with the user's OTHER plugins — so we never hand-edit them.
+# Detection is read-only; removal is delegated to the official `claude` CLI.
+#
+# The plugin can be installed from ANY marketplace, so we match by plugin name and
+# discover the actual "name@marketplace" key(s) rather than assuming a marketplace.
+$script:PluginName = "databricks-ai-dev-kit"
+
+# Read-only detection of the plugin per scope. The scope is recorded by which
+# settings.json enables it: user scope in ~/.claude/settings.json, project scope in
+# the project's .claude/settings.json(.local). (installed_plugins.json is user-level
+# and lists ALL scopes together, so it can't distinguish them.) Returns the enabled
+# "name@marketplace" key(s) — any marketplace is matched.
+function Get-PluginKeys {
+    param([string[]]$Files)
+    $pattern = '"' + [regex]::Escape($script:PluginName) + '@[A-Za-z0-9._-]+"'
+    $keys = @()
+    foreach ($f in $Files) {
+        if (Test-Path $f) {
+            foreach ($m in [regex]::Matches((Get-Content $f -Raw), $pattern)) { $keys += $m.Value.Trim('"') }
+        }
+    }
+    return @($keys | Sort-Object -Unique)
+}
+function Get-PluginKeysGlobal { Get-PluginKeys -Files @((Join-Path $env:USERPROFILE ".claude\settings.json")) }
+function Get-PluginKeysProject { param([string]$Dir) Get-PluginKeys -Files @((Join-Path $Dir ".claude\settings.json"), (Join-Path $Dir ".claude\settings.local.json")) }
+
+# Count skill folders + 'databricks' MCP entries under the given roots/targets, plus
+# hook/state/plugin, returning one "  - ..." summary line each. Shared by the project-
+# and global-scope summaries below. Read-only.
+function Get-LeftoversSummary {
+    param([string]$Hook, [string]$StateDir, [string]$StateLabel, [string[]]$PluginKeys, [string[]]$SkillRoots, [hashtable[]]$McpTargets)
+    $lines = @()
+    $n = 0
+    foreach ($root in $SkillRoots) {
+        if (Test-Path $root) { foreach ($name in $script:UninstallSkillNames) { if (Test-Path (Join-Path $root $name)) { $n++ } } }
+    }
+    if ($n -gt 0) { $lines += "  - $n skill folder(s)" }
+    $n = 0
+    foreach ($t in $McpTargets) {
+        if (-not (Test-Path $t.Path)) { continue }
+        if ($t.Kind -eq "json" -and (Test-McpJsonHasDatabricks -Path $t.Path -Top $t.Top)) { $n++ }
+        elseif ($t.Kind -eq "toml" -and (Select-String -Path $t.Path -Pattern 'mcp_servers\.databricks' -Quiet)) { $n++ }
+    }
+    if ($n -gt 0) { $lines += "  - $n MCP config file(s) with the 'databricks' server" }
+    if ($Hook -and (Test-Path $Hook) -and (Select-String -Path $Hook -Pattern 'check_update' -Quiet)) { $lines += "  - Claude update hook" }
+    if ($StateDir -and (Test-Path $StateDir)) { $lines += "  - $StateLabel" }
+    if ($PluginKeys.Count -gt 0) { $lines += "  - Claude Code plugin: $($PluginKeys -join ' ')" }
+    return @($lines)
+}
+
+# Project-scope artifacts under $Dir (what a project uninstall from that dir removes).
+function Get-ProjectLeftoversSummary {
+    param([string]$Dir)
+    $skillRoots = @("\.claude\skills","\.cursor\skills","\.github\skills","\.agents\skills","\.gemini\skills","\.windsurf\skills","\.opencode\skills","\.kiro\skills") | ForEach-Object { Join-Path $Dir $_.TrimStart('\') }
+    $mcpTargets = @(
+        @{ Path=(Join-Path $Dir ".mcp.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $Dir ".cursor\mcp.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $Dir ".vscode\mcp.json"); Kind="json"; Top="servers" },
+        @{ Path=(Join-Path $Dir ".codex\config.toml"); Kind="toml" }, @{ Path=(Join-Path $Dir ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+        @{ Path=(Join-Path $Dir "opencode.json"); Kind="json"; Top="mcp" }, @{ Path=(Join-Path $Dir ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+    )
+    Get-LeftoversSummary -Hook (Join-Path $Dir ".claude\settings.json") -StateDir (Join-Path $Dir ".ai-dev-kit") -StateLabel "state files (.ai-dev-kit/)" `
+        -PluginKeys (Get-PluginKeysProject -Dir $Dir) -SkillRoots $skillRoots -McpTargets $mcpTargets
+}
+
+# Global/user-scope artifacts (what a --global uninstall removes).
+function Get-GlobalLeftoversSummary {
+    $h = $env:USERPROFILE
+    $installDir = if ($script:UserMcpPath) { $script:UserMcpPath } elseif ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $h ".ai-dev-kit" }
+    $skillRoots = @(".claude\skills",".cursor\skills",".github\skills",".agents\skills",".gemini\skills",".gemini\antigravity\skills",".codeium\windsurf\skills",".config\opencode\skills",".kiro\skills") | ForEach-Object { Join-Path $h $_ }
+    $mcpTargets = @(
+        @{ Path=(Join-Path $h ".claude.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $h ".codex\config.toml"); Kind="toml" }, @{ Path=(Join-Path $h ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+        @{ Path=(Join-Path $h ".gemini\antigravity\mcp_config.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $h ".codeium\windsurf\mcp_config.json"); Kind="json"; Top="mcpServers" },
+        @{ Path=(Join-Path $h ".config\opencode\opencode.json"); Kind="json"; Top="mcp" }, @{ Path=(Join-Path $h ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+    )
+    Get-LeftoversSummary -Hook (Join-Path $h ".claude\settings.json") -StateDir $installDir -StateLabel "MCP server runtime / state ($installDir)" `
+        -PluginKeys (Get-PluginKeysGlobal) -SkillRoots $skillRoots -McpTargets $mcpTargets
+}
+
+# Very noticeable end-of-run box warning that files remain in the OTHER scope.
+function Show-LeftoversBox {
+    param([string]$Headline, [string]$Detail, [string[]]$Summary, [string]$Action)
+    $bar = "  ------------------------------------------------------------"
+    Write-Host ""
+    Write-Host $bar -ForegroundColor Yellow
+    Write-Host "  $Headline" -ForegroundColor Yellow
+    Write-Host $bar -ForegroundColor Yellow
+    Write-Host "  $Detail" -ForegroundColor DarkGray
+    foreach ($l in $Summary) { Write-Host $l }
+    Write-Host "  $Action" -ForegroundColor Yellow
+    Write-Host $bar -ForegroundColor Yellow
+}
+function Show-ProjectLeftoversWarning {
+    param([string]$Dir, [string[]]$Summary)
+    Show-LeftoversBox -Headline "!  PROJECT-LEVEL AI DEV KIT FILES STILL REMAIN" `
+        -Detail "This global uninstall did not touch project-scoped files in: $Dir" `
+        -Summary $Summary -Action "Re-run the uninstaller from that folder WITHOUT --global to remove them."
+}
+function Show-GlobalLeftoversWarning {
+    param([string[]]$Summary)
+    Show-LeftoversBox -Headline "!  GLOBAL AI DEV KIT FILES STILL REMAIN" `
+        -Detail "This project uninstall did not touch global (user-level) files:" `
+        -Summary $Summary -Action "Re-run the uninstaller with --global to remove them."
+}
+
+# Remove the plugin from the CURRENT uninstall scope via the official CLI (atomic
+# across the shared plugin state - we never hand-edit it). Removes every detected
+# "name@marketplace" key (the plugin may come from any marketplace). A project
+# install can be 'project' (.claude/settings.json) or 'local' (settings.local.json),
+# so a project uninstall tries both CLI scopes. If nothing could be removed this is a
+# hard error that reports whether the rest of the uninstall completed and prints the
+# exact command to run manually. $OthersRemoved = other artifacts removed this run.
+function Remove-ClaudePlugin {
+    param([int]$OthersRemoved, [string[]]$Keys)
+    if ($script:Scope -eq "project") { $scopes = @("project","local"); $cmdScope = "project" }
+    else { $scopes = @("user"); $cmdScope = "user" }
+    if (Get-Command claude -ErrorAction SilentlyContinue) {
+        $removed = $false
+        foreach ($k in $Keys) {
+            foreach ($sc in $scopes) {
+                # Subcommand name has varied across versions (uninstall vs remove) — try both.
+                & claude plugin uninstall $k -y --scope $sc *>$null
+                if ($LASTEXITCODE -ne 0) { & claude plugin remove $k -y --scope $sc *>$null }
+                if ($LASTEXITCODE -eq 0) { Write-Msg "removed Claude Code plugin $k ($sc scope)"; $removed = $true }
+            }
+        }
+        if ($removed) { return }
+    }
+    $partial = ""; $alt = ""
+    if ($OthersRemoved -gt 0) { $partial = "Skills, MCP server, and config WERE removed (partial uninstall). " }
+    if ($script:Scope -eq "project") { $alt = " (or --scope local)" }
+    $manual = (($Keys | ForEach-Object { "claude plugin uninstall $_ --scope $cmdScope" }) -join "; ")
+    Write-Err "Could not remove the Claude Code plugin. ${partial}Finish it manually: $manual$alt"
+}
+
+# Read-only: true only if the EXACT top-level server key ($Top) contains a
+# 'databricks' entry - the same thing removal targets. Does NOT match nested
+# occurrences (e.g. ~/.claude.json's projects.<path>.mcpServers.databricks, a
+# project-scoped server we never touch) that a plain match would flag.
+function Test-McpJsonHasDatabricks {
+    param([string]$Path, [string]$Top)
+    if (-not (Test-Path $Path)) { return $false }
+    try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
+    return ($cfg.$Top -and $cfg.$Top.PSObject.Properties.Name -contains 'databricks')
+}
+
+function Remove-McpJsonKey {
+    param([string]$Path, [string]$Top)
+    if (-not (Test-Path $Path)) { return $false }
+    if (-not (Select-String -Path $Path -Pattern '"databricks"' -Quiet)) { return $false }
+    if ($script:DryRun) { return $true }
+    try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
+    # Only rewrite (and back up) when the exact top-level 'databricks' key is
+    # present. Otherwise a stray '"databricks"' elsewhere (a foreign server's
+    # path, a project named 'databricks') would trigger a lossy no-op rewrite —
+    # and ConvertTo-Json's -Depth would truncate deep configs like ~/.claude.json.
+    if (-not ($cfg.$Top -and $cfg.$Top.PSObject.Properties.Name -contains 'databricks')) {
+        return $false
+    }
+    Copy-Item $Path "$Path.bak" -Force
+    $cfg.$Top.PSObject.Properties.Remove('databricks')
+    if (-not $cfg.$Top.PSObject.Properties.Name) { $cfg.PSObject.Properties.Remove($Top) }
+    $cfg | ConvertTo-Json -Depth 100 | Set-Content $Path -Encoding UTF8
+    return $true
+}
+
+function Remove-McpTomlBlock {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $false }
+    if (-not (Select-String -Path $Path -Pattern 'mcp_servers\.databricks' -Quiet)) { return $false }
+    if ($script:DryRun) { return $true }
+    Copy-Item $Path "$Path.bak" -Force
+    $out = New-Object System.Collections.Generic.List[string]
+    $skip = $false
+    foreach ($line in Get-Content "$Path.bak") {
+        # Consume the databricks table AND its dotted subtables (e.g. .env);
+        # any other section header ends the skip.
+        if ($line -match '^\[mcp_servers\.databricks(\.|\])') { $skip = $true; continue }
+        if ($line -match '^\[') { $skip = $false }
+        if (-not $skip) { $out.Add($line) }
+    }
+    $out | Set-Content $Path -Encoding UTF8
+    return $true
+}
+
+function Remove-ClaudeHook {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $false }
+    if (-not (Select-String -Path $Path -Pattern 'check_update' -Quiet)) { return $false }
+    if ($script:DryRun) { return $true }
+    try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { return $false }
+    $ss = $cfg.hooks.SessionStart
+    if (-not $ss) { return $false }   # nothing to change — don't rewrite/back up
+    foreach ($group in $ss) {
+        $group.hooks = @($group.hooks | Where-Object { $_.command -notmatch 'check_update' })
+    }
+    $cfg.hooks.SessionStart = @($ss | Where-Object { $_.hooks -and $_.hooks.Count -gt 0 })
+    if (-not $cfg.hooks.SessionStart -or $cfg.hooks.SessionStart.Count -eq 0) {
+        $cfg.hooks.PSObject.Properties.Remove('SessionStart')
+    }
+    Copy-Item $Path "$Path.bak" -Force
+    $cfg | ConvertTo-Json -Depth 100 | Set-Content $Path -Encoding UTF8
+    return $true
+}
+
+function Invoke-Uninstall {
+    $home_ = $env:USERPROFILE
+    if ($script:Scope -eq "global") { $baseDir = $home_ } else { $baseDir = (Get-Location).Path }
+    $installDir = if ($script:UserMcpPath) { $script:UserMcpPath }
+                  elseif ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME }
+                  else { Join-Path $home_ ".ai-dev-kit" }
+    if ($script:Scope -eq "global") { $stateDir = $installDir } else { $stateDir = Join-Path $baseDir ".ai-dev-kit" }
+
+    # Scope strictly gates locations (mirror of install.sh).
+    if ($script:Scope -eq "global") {
+        $skillRoots = @(
+            (Join-Path $home_ ".claude\skills"), (Join-Path $home_ ".cursor\skills"),
+            (Join-Path $home_ ".github\skills"), (Join-Path $home_ ".agents\skills"),
+            (Join-Path $home_ ".gemini\skills"), (Join-Path $home_ ".gemini\antigravity\skills"),
+            (Join-Path $home_ ".codeium\windsurf\skills"), (Join-Path $home_ ".config\opencode\skills"),
+            (Join-Path $home_ ".kiro\skills")
+        )
+        $mcpTargets = @(
+            @{ Path=(Join-Path $home_ ".claude\mcp.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".codex\config.toml"); Kind="toml" },
+            @{ Path=(Join-Path $home_ ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".gemini\antigravity\mcp_config.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".codeium\windsurf\mcp_config.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $home_ ".config\opencode\opencode.json"); Kind="json"; Top="mcp" },
+            @{ Path=(Join-Path $home_ ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+        )
+        $hookTargets = @( (Join-Path $home_ ".claude\settings.json") )
+    } else {
+        $skillRoots = @(
+            (Join-Path $baseDir ".claude\skills"), (Join-Path $baseDir ".cursor\skills"),
+            (Join-Path $baseDir ".github\skills"), (Join-Path $baseDir ".agents\skills"),
+            (Join-Path $baseDir ".gemini\skills"), (Join-Path $baseDir ".windsurf\skills"),
+            (Join-Path $baseDir ".opencode\skills"), (Join-Path $baseDir ".kiro\skills")
+        )
+        $mcpTargets = @(
+            @{ Path=(Join-Path $baseDir ".mcp.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $baseDir ".cursor\mcp.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $baseDir ".vscode\mcp.json"); Kind="json"; Top="servers" },
+            @{ Path=(Join-Path $baseDir ".codex\config.toml"); Kind="toml" },
+            @{ Path=(Join-Path $baseDir ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
+            @{ Path=(Join-Path $baseDir "opencode.json"); Kind="json"; Top="mcp" },
+            @{ Path=(Join-Path $baseDir ".kiro\settings\mcp.json"); Kind="json"; Top="mcpServers" }
+        )
+        $hookTargets = @( (Join-Path $baseDir ".claude\settings.json") )
+    }
+
+    # Build plan
+    $planSkills = @(); $planMcp = @(); $planHooks = @(); $planRuntime = @(); $planState = @()
+    foreach ($root in $skillRoots) {
+        if (-not (Test-Path $root)) { continue }
+        foreach ($name in $script:UninstallSkillNames) {
+            $p = Join-Path $root $name
+            if (Test-Path $p) { $planSkills += $p }
+        }
+    }
+    foreach ($t in $mcpTargets) {
+        if (-not (Test-Path $t.Path)) { continue }
+        if ($t.Kind -eq "json" -and (Test-McpJsonHasDatabricks -Path $t.Path -Top $t.Top)) { $planMcp += $t }
+        elseif ($t.Kind -eq "toml" -and (Select-String -Path $t.Path -Pattern 'mcp_servers\.databricks' -Quiet)) { $planMcp += $t }
+    }
+    foreach ($h in $hookTargets) {
+        if ((Test-Path $h) -and (Select-String -Path $h -Pattern 'check_update' -Quiet)) { $planHooks += $h }
+    }
+    if ($script:Scope -eq "global" -or $script:UserMcpPath) {
+        if (Test-Path $installDir) { $planRuntime += $installDir }
+    }
+    # On a global uninstall $stateDir IS the runtime dir; when that dir is already in
+    # $planRuntime the state files inside it are removed along with it - planning them
+    # separately would make Remove-Item fail on the already-deleted paths.
+    if ($planRuntime -notcontains $stateDir) {
+        foreach ($s in @((Join-Path $stateDir ".installed-skills"), (Join-Path $stateDir ".skills-profile"), (Join-Path $stateDir "version"))) {
+            if (Test-Path $s) { $planState += $s }
+        }
+    }
+    $projMarker = Join-Path $baseDir ".ai-dev-kit"
+    if ($script:Scope -eq "project" -and (Test-Path $projMarker)) { $planState += $projMarker }
+
+    # Claude Code plugin at the CURRENT scope — collect the enabled "name@marketplace"
+    # key(s) so any marketplace is matched; these are what we remove.
+    if ($script:Scope -eq "global") { $pluginKeys = Get-PluginKeysGlobal } else { $pluginKeys = Get-PluginKeysProject -Dir $baseDir }
+    $planPlugin = ($pluginKeys.Count -gt 0)
+
+    # Warn about artifacts left behind in the OTHER scope. A global uninstall looks
+    # for project-scope files in the current folder; a project uninstall looks for
+    # global/user-level files. Skip the $cwd scan when it is $HOME (there project and
+    # global paths coincide and are already handled by the global side).
+    $projectLeftovers = @(); $globalLeftovers = @()
+    $cwd = (Get-Location).Path
+    if ($script:Scope -eq "global") {
+        if ($cwd -ne $env:USERPROFILE) { $projectLeftovers = Get-ProjectLeftoversSummary -Dir $cwd }
+    } else {
+        if ($baseDir -ne $env:USERPROFILE) { $globalLeftovers = Get-GlobalLeftoversSummary }
+    }
+
+    $total = $planSkills.Count + $planMcp.Count + $planHooks.Count + $planRuntime.Count + $planState.Count + $pluginKeys.Count
+    if ($total -eq 0) {
+        Write-Ok "Nothing to uninstall for $($script:Scope) scope at $baseDir - no AI Dev Kit artifacts found."
+        if ($script:Scope -eq "project" -and -not $globalLeftovers.Count) { Write-Msg "Tip: pass --global to remove a global install." }
+        if ($projectLeftovers.Count) { Show-ProjectLeftoversWarning -Dir $cwd -Summary $projectLeftovers }
+        if ($globalLeftovers.Count)  { Show-GlobalLeftoversWarning -Summary $globalLeftovers }
+        return
+    }
+
+    Write-Step "Uninstall plan ($($script:Scope) scope)"
+    if ($planSkills.Count) { Write-Host "  Skill folders ($($planSkills.Count)):" -ForegroundColor White; $planSkills | ForEach-Object { Write-Host "    $_" } }
+    if ($planMcp.Count)    { Write-Host "  MCP config - remove 'databricks' entry ($($planMcp.Count)):" -ForegroundColor White; $planMcp | ForEach-Object { Write-Host "    $($_.Path)" } }
+    if ($planHooks.Count)  { Write-Host "  Claude update hook ($($planHooks.Count)):" -ForegroundColor White; $planHooks | ForEach-Object { Write-Host "    $_" } }
+    if ($planRuntime.Count){ Write-Host "  MCP server runtime:" -ForegroundColor White; $planRuntime | ForEach-Object { Write-Host "    $_" } }
+    if ($planState.Count)  { Write-Host "  State files:" -ForegroundColor White; $planState | ForEach-Object { Write-Host "    $_" } }
+    if ($planPlugin) {
+        Write-Host "  Claude Code plugin:" -ForegroundColor White
+        foreach ($k in $pluginKeys) { Write-Host "    $k (removed via the claude CLI, $($script:Scope) scope)" -ForegroundColor DarkGray }
+        Write-Host "  !  Heads up: the AI Dev Kit Claude Code plugin will also be removed." -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Msg "Config files are backed up to <file>.bak before editing."
+
+    if ($script:DryRun) {
+        if ($projectLeftovers.Count) { Show-ProjectLeftoversWarning -Dir $cwd -Summary $projectLeftovers }
+        if ($globalLeftovers.Count)  { Show-GlobalLeftoversWarning -Summary $globalLeftovers }
+        Write-Ok "Dry run - nothing was changed. Re-run without --dry-run to apply."
+        return
+    }
+
+    if (-not $script:AssumeYes) {
+        $reply = Read-Host "  Remove these $total item(s)? [y/N]"
+        if ($reply -notmatch '^(y|yes)$') { Write-Warn "Aborted - nothing removed."; return }
+    }
+
+    Write-Step "Removing"
+    foreach ($p in $planSkills)  { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
+    foreach ($t in $planMcp) {
+        if ($t.Kind -eq "json") { if (Remove-McpJsonKey -Path $t.Path -Top $t.Top) { Write-Msg "cleaned $($t.Path)" } }
+        else { if (Remove-McpTomlBlock -Path $t.Path) { Write-Msg "cleaned $($t.Path)" } }
+    }
+    foreach ($p in $planHooks)   { if (Remove-ClaudeHook -Path $p) { Write-Msg "cleaned hook in $p" } }
+    foreach ($p in $planRuntime) { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
+    foreach ($p in $planState)   { Remove-Item -Recurse -Force $p; Write-Msg "removed $p" }
+    if ($planPlugin) { Remove-ClaudePlugin -OthersRemoved ($total - $pluginKeys.Count) -Keys $pluginKeys }
+
+    Write-Host ""
+    Write-Ok "AI Dev Kit uninstalled ($($script:Scope) scope)."
+    Write-Msg "Other scopes and per-editor .bak backups were left untouched."
+    if ($projectLeftovers.Count) { Show-ProjectLeftoversWarning -Dir $cwd -Summary $projectLeftovers }
+    if ($globalLeftovers.Count)  { Show-GlobalLeftoversWarning -Summary $globalLeftovers }
+}
+
+if ($script:Uninstall) { Invoke-Uninstall; return }
 
 # ─── Interactive helpers ──────────────────────────────────────
 

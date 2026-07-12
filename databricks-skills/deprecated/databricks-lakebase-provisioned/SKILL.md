@@ -345,7 +345,6 @@ databricks database start-database-instance --name my-lakebase-instance
 
 ## Related Skills
 
-- **[databricks-app-apx](../databricks-app-apx/SKILL.md)** - full-stack apps that can use Lakebase for persistence
 - **[databricks-apps-python](../databricks-apps-python/SKILL.md)** - Python apps with Lakebase backend
 - **[databricks-python-sdk](../databricks-python-sdk/SKILL.md)** - SDK used for instance management and token generation
 - **[databricks-bundles](../databricks-bundles/SKILL.md)** - deploying apps with Lakebase resources

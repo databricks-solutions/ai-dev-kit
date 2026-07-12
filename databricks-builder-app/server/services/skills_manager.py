@@ -45,9 +45,6 @@ SKILL_TOOL_MAPPING: dict[str, list[str]] = {
     'manage_lakebase_database', 'manage_lakebase_sync', 'generate_lakebase_credential',
     'manage_lakebase_branch',
   ],
-  # APX (FastAPI+React) and Python (Dash/Streamlit/etc.) share the same
-  # app lifecycle tools — the skill content differs, not the MCP operations.
-  'databricks-app-apx': ['manage_app'],
   'databricks-apps-python': ['manage_app'],
 }
 
@@ -92,7 +89,7 @@ def get_allowed_mcp_tools(
 
 
 # Skills source directories.  install_skills.sh aggregates skills from
-# multiple repos (this repo's databricks-skills/, mlflow/skills, apx) into
+# multiple repos (this repo's databricks-skills/, mlflow/skills) into
 # the app's .claude/skills/ directory.  We check several locations so that
 # the server works both in local development and when deployed.
 #

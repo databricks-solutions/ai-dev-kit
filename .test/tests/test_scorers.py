@@ -99,22 +99,14 @@ class TestDetectSkillsFromPrompt:
         skills = detect_skills_from_prompt(prompt)
         assert "databricks-apps-python" in skills
 
-    def test_detect_app_apx(self):
-        """Test detection of databricks-app-apx."""
-        prompt = "Create a full-stack app with APX"
-        skills = detect_skills_from_prompt(prompt)
-        assert "databricks-app-apx" in skills
+    def test_detect_fastapi_react_matches_python(self):
+        """Test that a 'FastAPI React' prompt matches the Python app skill.
 
-    def test_detect_fastapi_react_matches_both(self):
-        """Test that 'FastAPI React' matches both APX and Python app skills.
-
-        'fastapi react' triggers APX, while bare 'fastapi' also triggers
-        databricks-apps-python. This is intentional — the router sees both
-        and picks the best fit.
+        Bare 'fastapi' triggers databricks-apps-python, which covers the
+        Python app frameworks (Dash, Streamlit, Flask, FastAPI).
         """
         prompt = "Create a FastAPI React app for my dashboard"
         skills = detect_skills_from_prompt(prompt)
-        assert "databricks-app-apx" in skills
         assert "databricks-apps-python" in skills
 
     def test_detect_lakebase(self):
@@ -170,7 +162,6 @@ class TestSkillTriggers:
         """Verify all expected skills have trigger keywords."""
         expected_skills = [
             "databricks-spark-declarative-pipelines",
-            "databricks-app-apx",
             "databricks-apps-python",
             "databricks-bundles",
             "databricks-python-sdk",

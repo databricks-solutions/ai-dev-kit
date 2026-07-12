@@ -47,6 +47,9 @@ SCOPE="${DEVKIT_SCOPE:-project}"
 SCOPE_EXPLICIT=false  # Track if --global was explicitly passed
 FORCE="${DEVKIT_FORCE:-false}"
 IS_UPDATE=false
+UNINSTALL=false
+DRY_RUN=false
+ASSUME_YES=false
 SILENT="${DEVKIT_SILENT:-false}"
 TOOLS="${DEVKIT_TOOLS:-}"
 USER_TOOLS=""
@@ -156,6 +159,21 @@ warn() { [ "$SILENT" = true ] || echo -e "  ${Y}!${N} $*"; }
 die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
 step() { [ "$SILENT" = true ] || echo -e "\n${B}$*${N}"; }
 
+# Deprecation notice — shown on every install/upgrade while skills still ship
+# from this repo. The next major release installs skills via the Databricks CLI
+# from the official databricks/databricks-agent-skills set.
+deprecation_notice() {
+    [ "$SILENT" = true ] && return
+    echo ""
+    echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+    echo -e "  ${Y}${B}⚠  Heads up: skills are moving${N}"
+    echo -e "  ${D}In the next release, the skills for AI Dev Kit will be${N}"
+    echo -e "  ${D}promoted to a shared, engineering-supported repository.${N}"
+    echo -e "  ${D}In future releases, this installer will set up skills${N}"
+    echo -e "  ${D}using the Databricks CLI.${N}"
+    echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+}
+
 # Parse arguments
 while [ $# -gt 0 ]; do
     case $1 in
@@ -179,7 +197,9 @@ while [ $# -gt 0 ]; do
         --tools)          USER_TOOLS="$2"; shift 2 ;;
         --dry-run)        DRY_RUN=true; shift ;;
         -f|--force)       FORCE=true; shift ;;
-        -h|--help)        
+        --uninstall)      UNINSTALL=true; shift ;;
+        -y|--yes)         ASSUME_YES=true; shift ;;
+        -h|--help)
             echo "Databricks AI Dev Kit Installer"
             echo ""
             echo "Usage: bash <(curl -sL .../install.sh) [OPTIONS]"
@@ -200,6 +220,9 @@ while [ $# -gt 0 ]; do
             echo "  --experimental BOOL   Include experimental agent skills (default: true; 'false' = stable only)"
             echo "  --dry-run             Print what would be installed (resolved refs, aitools command) and exit"
             echo "  -f, --force           Force reinstall"
+            echo "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, MCP config, and Claude Code plugin"
+            echo "  --dry-run             With --uninstall: print what would be removed, change nothing"
+            echo "  -y, --yes             With --uninstall: skip the confirmation prompt"
             echo "  -h, --help            Show this help"
             echo ""
             echo "Environment Variables (alternative to flags):"
@@ -327,6 +350,458 @@ list_skills_and_exit() {
     echo -e "${D}Usage: bash install.sh --skills-profile data-engineer,ai-ml-engineer${N}"
     echo -e "${D}       bash install.sh --skills databricks-jobs,databricks-dbsql${N}"
     echo ""
+    exit 0
+}
+
+# ─── --uninstall handler ───────────────────────────────────────
+# All skill directory names the installer has EVER shipped (current + historical
+# renames/removals). Uninstall sweeps this union so old installs — e.g. the
+# removed databricks-lakebase-provisioned or the renamed databricks-app-python —
+# are cleaned up, not just whatever the current release ships.
+UNINSTALL_SKILL_NAMES="
+databricks-agent-bricks databricks-ai-functions databricks-aibi-dashboards
+databricks-bundles databricks-asset-bundles databricks-apps-python databricks-app-python
+databricks-app-apx databricks-config databricks-dbsql databricks-docs
+databricks-execution-compute databricks-genie databricks-iceberg databricks-jobs
+databricks-lakebase-autoscale databricks-lakebase-provisioned databricks-metric-views
+databricks-ml-training-serving databricks-model-serving databricks-mlflow-evaluation
+databricks-parsing databricks-python-sdk databricks-spark-declarative-pipelines
+databricks-spark-structured-streaming databricks-synthetic-data-gen databricks-synthetic-data-generation
+databricks-unity-catalog databricks-unstructured-pdf-generation databricks-vector-search
+databricks-zerobus-ingest spark-python-data-source
+databricks databricks-apps databricks-lakebase
+agent-evaluation analyze-mlflow-chat-session analyze-mlflow-trace
+instrumenting-with-mlflow-tracing mlflow-onboarding querying-mlflow-metrics
+retrieving-mlflow-traces searching-mlflow-docs
+"
+
+# The Claude Code plugin (installed via a marketplace, separate from the skills
+# this script drops directly). Its on-disk state lives across several shared
+# files (~/.claude/plugins/installed_plugins.json, enabledPlugins in
+# settings.json, known_marketplaces.json, the cache dir) that are shared with
+# the user's OTHER plugins — so we never hand-edit them. Detection is read-only;
+# removal is delegated to the official `claude` CLI (or shown as a command).
+#
+# The plugin can be installed from ANY marketplace, so we match by plugin name and
+# discover the actual "name@marketplace" key(s) rather than assuming a marketplace.
+PLUGIN_NAME="databricks-ai-dev-kit"
+
+# Read-only: true only if the EXACT top-level server key ($2) contains a
+# 'databricks' entry — the same thing removal targets. This deliberately does NOT
+# match nested occurrences (e.g. ~/.claude.json's projects.<path>.mcpServers.databricks,
+# which is a project-scoped server we never touch) that a plain grep would flag.
+mcp_json_has_databricks() {
+    local path=$1 top=$2 py=""
+    [ -f "$path" ] || return 1
+    command -v python3 >/dev/null 2>&1 && py=python3
+    [ -z "$py" ] && [ -f "$VENV_PYTHON" ] && py="$VENV_PYTHON"
+    # No Python: fall back to a loose grep (best effort; may over-match).
+    [ -z "$py" ] && { grep -qF '"databricks"' "$path" 2>/dev/null; return; }
+    "$py" - "$path" "$top" <<'PYEOF'
+import json, sys
+try:
+    cfg = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+top = cfg.get(sys.argv[2])
+sys.exit(0 if (isinstance(top, dict) and "databricks" in top) else 1)
+PYEOF
+}
+
+# Remove the 'databricks' MCP server entry from a JSON config, preserving all
+# other servers and settings. $2 is the top-level key ('mcpServers' or 'servers').
+uninstall_remove_json_key() {
+    local path=$1 top=$2
+    [ -f "$path" ] || return 1
+    grep -qF '"databricks"' "$path" 2>/dev/null || return 1
+    if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
+    local py=""
+    command -v python3 >/dev/null 2>&1 && py=python3
+    [ -z "$py" ] && [ -f "$VENV_PYTHON" ] && py="$VENV_PYTHON"
+    if [ -z "$py" ]; then warn "No Python to edit $path — remove the 'databricks' entry manually."; return 1; fi
+    # Python decides whether the exact top-level 'databricks' key is present; it
+    # writes (and the shell backs up) only when a key is actually removed, so a
+    # stray '"databricks"' elsewhere in the file doesn't trigger a no-op rewrite.
+    cp "$path" "${path}.bak"
+    if "$py" - "$path" "$top" <<'PYEOF'
+import json, sys
+path, top = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as f: cfg = json.load(f)
+except Exception: sys.exit(2)
+if not (isinstance(cfg.get(top), dict) and 'databricks' in cfg[top]):
+    sys.exit(1)  # nothing to remove
+cfg[top].pop('databricks', None)
+if not cfg[top]: cfg.pop(top, None)
+with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+sys.exit(0)
+PYEOF
+    then
+        return 0
+    else
+        rm -f "${path}.bak"   # nothing changed — don't leave a spurious backup
+        return 1
+    fi
+}
+
+# Remove the [mcp_servers.databricks] block from a Codex TOML config.
+uninstall_remove_toml_block() {
+    local path=$1
+    [ -f "$path" ] || return 1
+    grep -qF 'mcp_servers.databricks' "$path" 2>/dev/null || return 1
+    if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
+    cp "$path" "${path}.bak"
+    # Delete the [mcp_servers.databricks] table AND its dotted subtables
+    # (e.g. [mcp_servers.databricks.env]) through to the next unrelated
+    # [section] header (or EOF). awk keeps everything outside that block.
+    awk '
+        /^\[mcp_servers\.databricks(\.|\])/ { skip=1; next }
+        /^\[/ { skip=0 }
+        !skip { print }
+    ' "${path}.bak" > "$path"
+    return 0
+}
+
+# Remove the AI Dev Kit SessionStart hook (identified by check_update.sh) from a
+# Claude settings.json, leaving other hooks intact.
+uninstall_remove_claude_hook() {
+    local path=$1
+    [ -f "$path" ] || return 1
+    grep -q 'check_update.sh' "$path" 2>/dev/null || return 1
+    if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
+    local py=""
+    command -v python3 >/dev/null 2>&1 && py=python3
+    [ -z "$py" ] && [ -f "$VENV_PYTHON" ] && py="$VENV_PYTHON"
+    [ -z "$py" ] && { warn "No Python to edit $path — remove the check_update.sh hook manually."; return 1; }
+    cp "$path" "${path}.bak"
+    "$py" - "$path" <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f: cfg = json.load(f)
+except Exception: sys.exit(0)
+sh = cfg.get('hooks', {}).get('SessionStart')
+if isinstance(sh, list):
+    for group in sh:
+        group['hooks'] = [h for h in group.get('hooks', []) if 'check_update.sh' not in h.get('command', '')]
+    sh[:] = [g for g in sh if g.get('hooks')]
+    if not sh: cfg['hooks'].pop('SessionStart', None)
+    if not cfg.get('hooks'): cfg.pop('hooks', None)
+with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+PYEOF
+    return 0
+}
+
+# Read-only detection of the plugin per scope. The scope is recorded by which
+# settings.json enables it: user scope in ~/.claude/settings.json, project scope in
+# the project's .claude/settings.json(.local). (installed_plugins.json is user-level
+# and lists ALL scopes together, so it can't distinguish them.) Prints the enabled
+# "name@marketplace" key(s) — one per line — so any marketplace is matched.
+plugin_keys_in() {
+    grep -hoE "\"${PLUGIN_NAME}@[A-Za-z0-9._-]+\"" "$@" 2>/dev/null | tr -d '"' | sort -u
+}
+plugin_keys_global()  { plugin_keys_in "$HOME/.claude/settings.json"; }
+plugin_keys_project() { plugin_keys_in "$1/.claude/settings.json" "$1/.claude/settings.local.json"; }
+
+# Warn that the plugin also exists in the scope we're NOT uninstalling, and print
+# the command to remove each detected key there too. $1 = newline-separated keys.
+# Leads with a blank line to separate it from whatever preceded it.
+# Count skill folders and 'databricks' MCP entries under the given roots/targets,
+# plus hook/state/plugin, emitting one "  - ..." summary line each. Shared by the
+# project- and global-scope summaries below. Read-only; always returns 0.
+_leftovers_summary() {
+    local hook=$1 state_dir=$2 plugin_keys=$3; shift 3
+    local root name entry path kind n=0
+    # Remaining args: skill roots, then a "--" separator, then "path|kind" MCP targets.
+    local -a roots=() targets=(); local sep=false a
+    for a in "$@"; do
+        [ "$a" = "--" ] && { sep=true; continue; }
+        $sep && targets+=("$a") || roots+=("$a")
+    done
+    for root in "${roots[@]}"; do
+        [ -d "$root" ] || continue
+        for name in $UNINSTALL_SKILL_NAMES; do [ -d "$root/$name" ] && n=$((n + 1)); done
+    done
+    [ "$n" -gt 0 ] && echo "  - ${n} skill folder(s)"
+    n=0
+    for entry in "${targets[@]}"; do
+        path="${entry%%|*}"; kind="${entry#*|}"
+        [ -f "$path" ] || continue
+        case "$kind" in
+            json:*) mcp_json_has_databricks "$path" "${kind#json:}" && n=$((n + 1)) ;;
+            toml)   grep -qF 'mcp_servers.databricks' "$path" 2>/dev/null && n=$((n + 1)) ;;
+        esac
+    done
+    [ "$n" -gt 0 ] && echo "  - ${n} MCP config file(s) with the 'databricks' server"
+    [ -n "$hook" ] && grep -q 'check_update.sh' "$hook" 2>/dev/null && echo "  - Claude update hook"
+    [ -n "$state_dir" ] && [ -d "$state_dir" ] && echo "  - MCP server runtime / state ($(printf '%s' "$state_dir" | sed "s#$HOME#~#"))"
+    [ -n "$plugin_keys" ] && echo "  - Claude Code plugin: $(printf '%s' "$plugin_keys" | tr '\n' ' ')"
+    return 0  # never let the last test's exit status trip `set -e` in the caller
+}
+
+# Project-scope artifacts under $1 (what a project uninstall from that dir removes).
+project_leftovers_summary() {
+    local dir=$1
+    _leftovers_summary "$dir/.claude/settings.json" "$dir/.ai-dev-kit" "$(plugin_keys_project "$dir")" \
+        "$dir/.claude/skills" "$dir/.cursor/skills" "$dir/.github/skills" \
+        "$dir/.agents/skills" "$dir/.gemini/skills" "$dir/.windsurf/skills" \
+        "$dir/.opencode/skills" "$dir/.kiro/skills" \
+        -- \
+        "$dir/.mcp.json|json:mcpServers" "$dir/.cursor/mcp.json|json:mcpServers" "$dir/.vscode/mcp.json|json:servers" \
+        "$dir/.codex/config.toml|toml" "$dir/.gemini/settings.json|json:mcpServers" \
+        "$dir/opencode.json|json:mcp" "$dir/.kiro/settings/mcp.json|json:mcpServers"
+}
+
+# Global/user-scope artifacts (what a --global uninstall removes).
+global_leftovers_summary() {
+    local install_dir="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
+    _leftovers_summary "$HOME/.claude/settings.json" "$install_dir" "$(plugin_keys_global)" \
+        "$HOME/.claude/skills" "$HOME/.cursor/skills" "$HOME/.github/skills" \
+        "$HOME/.agents/skills" "$HOME/.gemini/skills" "$HOME/.gemini/antigravity/skills" \
+        "$HOME/.codeium/windsurf/skills" "$HOME/.config/opencode/skills" "$HOME/.kiro/skills" \
+        -- \
+        "$HOME/.claude.json|json:mcpServers" "$HOME/.codex/config.toml|toml" "$HOME/.gemini/settings.json|json:mcpServers" \
+        "$HOME/.gemini/antigravity/mcp_config.json|json:mcpServers" "$HOME/.codeium/windsurf/mcp_config.json|json:mcpServers" \
+        "$HOME/.config/opencode/opencode.json|json:mcp" "$HOME/.kiro/settings/mcp.json|json:mcpServers"
+}
+
+# Very noticeable end-of-run box warning that files remain in the OTHER scope.
+# $1 = headline, $2 = detail line, $3 = summary lines, $4 = how-to-remove action.
+leftovers_box() {
+    local headline=$1 detail=$2 summary=$3 action=$4
+    local bar="  ${Y}${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+    echo ""
+    echo -e "$bar"
+    echo -e "  ${Y}${B}${headline}${N}"
+    echo -e "$bar"
+    echo -e "  ${D}${detail}${N}"
+    echo -e "$summary"
+    echo -e "  ${Y}${action}${N}"
+    echo -e "$bar"
+}
+
+# Warn (after a global uninstall) that project-scoped files remain in $1.
+warn_project_leftovers() {
+    leftovers_box "⚠  PROJECT-LEVEL AI DEV KIT FILES STILL REMAIN" \
+        "This global uninstall did not touch project-scoped files in: ${B}$1${N}" \
+        "$2" \
+        "Re-run the uninstaller from that folder ${B}without --global${N}${Y} to remove them."
+}
+
+# Warn (after a project uninstall) that global/user-level files remain.
+warn_global_leftovers() {
+    leftovers_box "⚠  GLOBAL AI DEV KIT FILES STILL REMAIN" \
+        "This project uninstall did not touch global (user-level) files:" \
+        "$1" \
+        "Re-run the uninstaller with ${B}--global${N}${Y} to remove them."
+}
+
+# Remove the plugin from the CURRENT uninstall scope via the official CLI (atomic
+# across the shared plugin state — we never hand-edit it). Removes every detected
+# "name@marketplace" key (the plugin may come from any marketplace). A project
+# install can be 'project' (.claude/settings.json) or 'local' (settings.local.json),
+# so a project uninstall tries both CLI scopes. If nothing could be removed (CLI
+# missing or every attempt failed) this is a hard error that reports whether the
+# rest of the uninstall completed and prints the exact command to run manually.
+# $1 = count of other AI Dev Kit artifacts already removed this run; $2 = keys.
+remove_claude_plugin() {
+    local others_removed=$1 keys=$2
+    local scopes cmd_scope
+    if [ "$SCOPE" = "project" ]; then scopes="project local"; cmd_scope="project"; else scopes="user"; cmd_scope="user"; fi
+    if command -v claude >/dev/null 2>&1; then
+        local k sc removed=false
+        while IFS= read -r k; do
+            [ -z "$k" ] && continue
+            for sc in $scopes; do
+                # Subcommand name has varied across versions (uninstall vs remove) — try both.
+                if claude plugin uninstall "$k" -y --scope "$sc" >/dev/null 2>&1 \
+                   || claude plugin remove "$k" -y --scope "$sc" >/dev/null 2>&1; then
+                    msg "removed Claude Code plugin ${k} (${sc} scope)"
+                    removed=true
+                fi
+            done
+        done <<< "$keys"
+        [ "$removed" = true ] && return 0
+    fi
+    local partial="" alt="" manual="" k
+    [ "$others_removed" -gt 0 ] && partial="Skills, MCP server, and config WERE removed (partial uninstall). "
+    [ "$SCOPE" = "project" ] && alt=" (or --scope local)"
+    while IFS= read -r k; do [ -n "$k" ] && manual="${manual:+$manual; }claude plugin uninstall ${k} --scope ${cmd_scope}"; done <<< "$keys"
+    die "Could not remove the Claude Code plugin. ${partial}Finish it manually: ${B}${manual}${N}${alt}"
+}
+
+run_uninstall() {
+    local base_dir install_dir state_dir
+    # Mirror install: if scope wasn't set explicitly, ask (interactive, non --yes)
+    # so a user who did a global install isn't silently told "nothing to uninstall
+    # for project scope". Non-interactive/--yes keeps the documented 'project' default.
+    # Ask for scope with the same selector install uses, unless it was set
+    # explicitly (-g/--global, DEVKIT_SCOPE) or we're non-interactive/--yes.
+    if [ "$SCOPE_EXPLICIT" = false ] && [ "$ASSUME_YES" != true ]; then
+        SCOPE_PROMPT_TITLE="Select uninstall scope" SCOPE_PROMPT_VERB="Remove from" prompt_scope
+        # renders: "Remove from current directory ..." / "Remove from home directory ..."
+    fi
+    [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+    install_dir="${USER_MCP_PATH:-${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}}"
+    [ "$SCOPE" = "global" ] && state_dir="$install_dir" || state_dir="$base_dir/.ai-dev-kit"
+    VENV_PYTHON="$install_dir/.venv/bin/python"
+
+    # Scope strictly gates locations. The installer writes project artifacts under
+    # the project dir and global artifacts under $HOME; a project uninstall must
+    # never touch $HOME configs (and vice-versa), or it would clobber the other
+    # scope's install. The few tools that always use $HOME even for project scope
+    # (antigravity/windsurf/opencode/kiro) are therefore only cleaned in --global.
+    local skill_roots mcp_targets hook_targets
+    if [ "$SCOPE" = "global" ]; then
+        skill_roots=(
+            "$HOME/.claude/skills" "$HOME/.cursor/skills" "$HOME/.github/skills"
+            "$HOME/.agents/skills" "$HOME/.gemini/skills"
+            "$HOME/.gemini/antigravity/skills" "$HOME/.codeium/windsurf/skills"
+            "$HOME/.config/opencode/skills" "$HOME/.kiro/skills"
+        )
+        mcp_targets=(
+            "$HOME/.claude.json|json:mcpServers"
+            "$HOME/.codex/config.toml|toml"
+            "$HOME/.gemini/settings.json|json:mcpServers"
+            "$HOME/.gemini/antigravity/mcp_config.json|json:mcpServers"
+            "$HOME/.codeium/windsurf/mcp_config.json|json:mcpServers"
+            "$HOME/.config/opencode/opencode.json|json:mcp"
+            "$HOME/.kiro/settings/mcp.json|json:mcpServers"
+        )
+        hook_targets=("$HOME/.claude/settings.json")
+    else
+        skill_roots=(
+            "$base_dir/.claude/skills" "$base_dir/.cursor/skills" "$base_dir/.github/skills"
+            "$base_dir/.agents/skills" "$base_dir/.gemini/skills" "$base_dir/.windsurf/skills"
+            "$base_dir/.opencode/skills" "$base_dir/.kiro/skills"
+        )
+        mcp_targets=(
+            "$base_dir/.mcp.json|json:mcpServers"
+            "$base_dir/.cursor/mcp.json|json:mcpServers" "$base_dir/.vscode/mcp.json|json:servers"
+            "$base_dir/.codex/config.toml|toml"
+            "$base_dir/.gemini/settings.json|json:mcpServers"
+            "$base_dir/opencode.json|json:mcp"
+            "$base_dir/.kiro/settings/mcp.json|json:mcpServers"
+        )
+        hook_targets=("$base_dir/.claude/settings.json")
+    fi
+
+    # ── Build the plan (paths that actually exist / contain our entries) ──
+    local -a plan_skills=() plan_mcp=() plan_hooks=() plan_runtime=() plan_state=()
+    local root name
+    for root in "${skill_roots[@]}"; do
+        [ -d "$root" ] || continue
+        for name in $UNINSTALL_SKILL_NAMES; do
+            [ -d "$root/$name" ] && plan_skills+=("$root/$name")
+        done
+    done
+    local entry path kind
+    for entry in "${mcp_targets[@]}"; do
+        path="${entry%%|*}"; kind="${entry#*|}"
+        case "$kind" in
+            json:*) mcp_json_has_databricks "$path" "${kind#json:}" && plan_mcp+=("$entry") ;;
+            toml)   [ -f "$path" ] && grep -qF 'mcp_servers.databricks' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
+        esac
+    done
+    for path in "${hook_targets[@]}"; do
+        [ -f "$path" ] && grep -q 'check_update.sh' "$path" 2>/dev/null && plan_hooks+=("$path")
+    done
+    # The shared MCP runtime (~/.ai-dev-kit) is global; only remove it on a global
+    # uninstall, or when the user explicitly points --mcp-path at it. A project
+    # uninstall leaves it so other projects/global keep working.
+    if [ "$SCOPE" = "global" ] || [ -n "$USER_MCP_PATH" ]; then
+        [ -d "$install_dir" ] && plan_runtime+=("$install_dir")
+    fi
+    # On a global uninstall state_dir IS the runtime dir; when that dir is already in
+    # plan_runtime the state files inside it are removed along with it — planning them
+    # separately would double-delete (and double-list them in the plan).
+    if [[ " ${plan_runtime[*]} " != *" $state_dir "* ]]; then
+        for path in "$state_dir/.installed-skills" "$state_dir/.skills-profile" "$state_dir/version"; do
+            [ -f "$path" ] && plan_state+=("$path")
+        done
+    fi
+    # Project-scope leftover marker dir
+    [ "$SCOPE" = "project" ] && [ -d "$base_dir/.ai-dev-kit" ] && plan_state+=("$base_dir/.ai-dev-kit/")
+
+    # Claude Code plugin at the CURRENT scope — collect the enabled "name@marketplace"
+    # key(s) so any marketplace is matched; these are what we remove.
+    local plugin_keys="" plan_plugin=false plugin_count=0 k
+    if [ "$SCOPE" = "global" ]; then plugin_keys=$(plugin_keys_global); else plugin_keys=$(plugin_keys_project "$base_dir"); fi
+    [ -n "$plugin_keys" ] && { plan_plugin=true; plugin_count=$(printf '%s\n' "$plugin_keys" | grep -c .); }
+
+    # Warn about artifacts left behind in the OTHER scope. A global uninstall looks
+    # for project-scope files in the current folder ($PWD); a project uninstall looks
+    # for global/user-level files. Skip the $PWD scan when $PWD is $HOME (there the
+    # project and global paths coincide and are already handled by the global side).
+    local project_leftovers="" global_leftovers=""
+    if [ "$SCOPE" = "global" ]; then
+        [ "$PWD" != "$HOME" ] && project_leftovers=$(project_leftovers_summary "$PWD")
+    else
+        [ "$base_dir" != "$HOME" ] && global_leftovers=$(global_leftovers_summary)
+    fi
+
+    local total=$(( ${#plan_skills[@]} + ${#plan_mcp[@]} + ${#plan_hooks[@]} + ${#plan_runtime[@]} + ${#plan_state[@]} + plugin_count ))
+    if [ "$total" -eq 0 ]; then
+        ok "Nothing to uninstall for ${B}$SCOPE${N} scope at ${D}${base_dir}${N} — no AI Dev Kit artifacts found."
+        [ "$SCOPE" = "project" ] && [ -z "$global_leftovers" ] && msg "${D}Tip: pass --global to remove a global install.${N}"
+        [ -n "$project_leftovers" ] && warn_project_leftovers "$PWD" "$project_leftovers"
+        [ -n "$global_leftovers" ]  && warn_global_leftovers "$global_leftovers"
+        exit 0
+    fi
+
+    step "Uninstall plan (${SCOPE} scope)"
+    [ ${#plan_skills[@]}  -gt 0 ] && { echo -e "  ${B}Skill folders (${#plan_skills[@]}):${N}"; for p in "${plan_skills[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ ${#plan_mcp[@]}     -gt 0 ] && { echo -e "  ${B}MCP config — remove 'databricks' entry (${#plan_mcp[@]}):${N}"; for e in "${plan_mcp[@]}"; do echo "    ${e%%|*}" | sed "s#$HOME#~#"; done; }
+    [ ${#plan_hooks[@]}   -gt 0 ] && { echo -e "  ${B}Claude update hook (${#plan_hooks[@]}):${N}"; for p in "${plan_hooks[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ ${#plan_runtime[@]} -gt 0 ] && { echo -e "  ${B}MCP server runtime:${N}"; for p in "${plan_runtime[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ ${#plan_state[@]}   -gt 0 ] && { echo -e "  ${B}State files:${N}"; for p in "${plan_state[@]}"; do echo "    ${p/#$HOME/~}"; done; }
+    [ "$plan_plugin" = true ] && {
+        echo -e "  ${B}Claude Code plugin:${N}"
+        while IFS= read -r k; do [ -n "$k" ] && echo -e "    ${k} ${D}(removed via the claude CLI, ${SCOPE} scope)${N}"; done <<< "$plugin_keys"
+        echo -e "  ${Y}${B}⚠  Heads up: the AI Dev Kit Claude Code plugin will also be removed.${N}"
+    }
+    echo ""
+    msg "${D}Config files are backed up to <file>.bak before editing.${N}"
+
+    if [ "$DRY_RUN" = true ]; then
+        [ -n "$project_leftovers" ] && warn_project_leftovers "$PWD" "$project_leftovers"
+        [ -n "$global_leftovers" ]  && warn_global_leftovers "$global_leftovers"
+        ok "Dry run — nothing was changed. Re-run without --dry-run to apply."
+        exit 0
+    fi
+
+    if [ "$ASSUME_YES" != true ]; then
+        local reply=""
+        if { exec 3</dev/tty; } 2>/dev/null; then
+            printf "  ${Y}Remove these %d item(s)?${N} [y/N] " "$total"
+            read -r reply <&3 || reply=""
+            exec 3<&-
+        else
+            die "No terminal to confirm on. Re-run with -y/--yes to proceed non-interactively (or --dry-run to preview)."
+        fi
+        case "$reply" in [yY]|[yY][eE][sS]) ;; *) die "Aborted — nothing removed." ;; esac
+    fi
+
+    step "Removing"
+    local p e
+    for p in "${plan_skills[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
+    for e in "${plan_mcp[@]}"; do
+        path="${e%%|*}"; kind="${e#*|}"
+        case "$kind" in
+            json:*) uninstall_remove_json_key "$path" "${kind#json:}" && msg "cleaned ${path/#$HOME/~}" ;;
+            toml)   uninstall_remove_toml_block "$path" && msg "cleaned ${path/#$HOME/~}" ;;
+        esac
+    done
+    for p in "${plan_hooks[@]}"; do uninstall_remove_claude_hook "$p" && msg "cleaned hook in ${p/#$HOME/~}"; done
+    for p in "${plan_runtime[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
+    for p in "${plan_state[@]}"; do rm -rf "$p" && msg "removed ${p/#$HOME/~}"; done
+    [ "$plan_plugin" = true ] && remove_claude_plugin "$(( total - plugin_count ))" "$plugin_keys"
+
+    echo ""
+    ok "AI Dev Kit uninstalled (${SCOPE} scope)."
+    msg "${D}Other scopes and per-editor .bak backups were left untouched.${N}"
+    [ -n "$project_leftovers" ] && warn_project_leftovers "$PWD" "$project_leftovers"
+    [ -n "$global_leftovers" ]  && warn_global_leftovers "$global_leftovers"
     exit 0
 }
 
@@ -2169,6 +2644,11 @@ prompt_scope() {
         return
     fi
 
+    # Verb defaults to install wording; uninstall passes "Uninstall"/"Remove" via
+    # SCOPE_PROMPT_TITLE / SCOPE_PROMPT_VERB so the same selector reads correctly.
+    local title="${SCOPE_PROMPT_TITLE:-Select installation scope}"
+    local verb="${SCOPE_PROMPT_VERB:-Install in}"
+
     echo ""
     echo -e "  ${B}Select installation scope${N}"
 
@@ -2410,5 +2890,11 @@ main() {
     # Done
     summary
 }
+
+# Uninstall short-circuits before install runs. Placed here (after all helpers,
+# e.g. prompt_scope / is_interactive, are defined) so run_uninstall can reuse them.
+if [ "$UNINSTALL" = true ]; then
+    run_uninstall
+fi
 
 main "$@"

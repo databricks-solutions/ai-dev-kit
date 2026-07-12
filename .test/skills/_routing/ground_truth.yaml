@@ -120,29 +120,6 @@ test_cases:
       difficulty: "hard"
       reasoning: "Combines 'medallion' (SDP) with 'Genie space' (databricks-agent-bricks)"
 
-  # Single-skill routing - Databricks App APX
-  - id: "routing_apx_001"
-    inputs:
-      prompt: "Build an APX app with a FastAPI React frontend"
-    expectations:
-      expected_skills: ["databricks-app-apx"]
-      is_multi_skill: false
-    metadata:
-      category: "single_skill"
-      difficulty: "easy"
-      reasoning: "Mentions 'APX' and 'FastAPI React' - clear APX trigger"
-
-  - id: "routing_apx_002"
-    inputs:
-      prompt: "Create a full-stack app with APX"
-    expectations:
-      expected_skills: ["databricks-app-apx"]
-      is_multi_skill: false
-    metadata:
-      category: "single_skill"
-      difficulty: "easy"
-      reasoning: "Mentions 'APX' and 'full-stack app' - APX triggers"
-
   # Single-skill routing - Databricks App Python
   - id: "routing_app_python_001"
     inputs:
@@ -239,19 +216,18 @@ test_cases:
       difficulty: "medium"
       reasoning: "Combines 'Gradio' (app-python) with 'model serving' (model-serving)"
 
-  # Edge case - FastAPI React matches both APX and Python app
-  - id: "routing_multi_fastapi_react_001"
+  # FastAPI React maps to the Python app skill (Dash, Streamlit, Flask, FastAPI, etc.)
+  - id: "routing_fastapi_react_001"
     inputs:
       prompt: "Create a FastAPI React app for my dashboard"
     expectations:
       expected_skills:
-        - "databricks-app-apx"
         - "databricks-apps-python"
-      is_multi_skill: true
+      is_multi_skill: false
     metadata:
-      category: "multi_skill"
+      category: "single_skill"
       difficulty: "medium"
-      reasoning: "'fastapi react' triggers APX, bare 'fastapi' also triggers app-python. Router picks best fit."
+      reasoning: "'fastapi' triggers databricks-apps-python, which covers the Python app frameworks (Dash, Streamlit, Flask, FastAPI)."
 
   # No skill match
   - id: "routing_no_match_001"

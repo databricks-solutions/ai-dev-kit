@@ -5,6 +5,35 @@
 </p>
 
 ---
+> 📣 **Heads up: a major evolution is coming**
+>
+> This will be the **last release where AI Dev Kit skills are installed from the skill files in this
+> repository.** AI Dev Kit skills are becoming part of the official, engineering-supported Databricks
+> skills set, and the skill files in this repo will soon be deprecated. In the next release you'll
+> install these skills directly from the official Databricks set — either straight from the CLI, or
+> through the AI Dev Kit installer, which will continue to guide you through the process.
+>
+>
+> **What stays:** The MCP server and Builder App will remain in this repository. The Builder App will
+> keep being developed and improved, and the MCP server will be maintained and updated on a
+> best-effort basis as GitHub issues are filed.
+>
+>
+> **What's next:** AI Dev Kit will continue to guide you through setting up your AI coding
+> environment and be a place to find experimental tools developed by Field Engineering. Beyond the
+> skills installs, we plan to add several tutorials to help you get started using coding agents for
+> building on Databricks, including getting started with Genie Code or Omnigent.
+>
+> **A few skills will be renamed or merged** in the official install. Most names are unchanged; the
+> exceptions are:
+>
+> | Today (AI Dev Kit) | Official Databricks skills |
+> |---|---|
+> | `databricks-bundles` | `databricks-dabs` |
+> | `databricks-spark-declarative-pipelines` | `databricks-pipelines` |
+> | `databricks-lakebase-autoscale`, `databricks-lakebase-provisioned` | `databricks-lakebase` (merged) |
+> | `databricks-config` | folded into `databricks-core` |
+---
 > 🔒 Proactive Dependency Security  
 > As part of our commitment to supply chain integrity, we continually monitor our dependency tree against known vulnerabilities and industry advisories. In response to a recently disclosed supply chain incident affecting litellm versions 1.82.7–1.82.8, we have audited our packages and removed the litellm dependency for most usage. It is solely used in the test directory for skills evaluation and optimization, and has been pinned to a safe version.  
 > For full third-party attribution, see NOTICE.txt.
@@ -85,6 +114,8 @@ Curated by Databricks field experts. Brings the patterns, skills, and 40+ execut
 - **Model Serving** (deploy ML models and AI agents to endpoints)
 - **Databricks Apps** (full-stack web applications with foundation model integration)
 - ...and more
+
+> **Building a Databricks App?** The `databricks-apps-python` skill defaults to AppKit (TypeScript + React) — the recommended path for most Apps use cases — and falls back to the Python frameworks (Dash, Streamlit, Flask, FastAPI, Gradio, Reflex) when you need a specific one. If you specifically need the APX (FastAPI + React) framework, that skill now lives in the [databricks-solutions/apx](https://github.com/databricks-solutions/apx) repo.
 
 ---
 
@@ -223,6 +254,34 @@ The installer also records what it installed (resolved refs, commit SHAs, `aitoo
 
 </details>
 
+### Uninstall
+
+Run the same script with `--uninstall`. It removes the installed skill folders (including ones from older versions), the MCP server runtime (`~/.ai-dev-kit`), and the `databricks` MCP entry from each editor's config — leaving your other MCP servers, skills, and settings untouched. Editor config files are backed up to `<file>.bak` first.
+
+```bash
+# Preview what would be removed (changes nothing)
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --uninstall --dry-run
+
+# Uninstall the project-scope install in the current directory
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --uninstall
+
+# Uninstall a global install (add -y to skip the confirmation prompt)
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --uninstall --global -y
+```
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+.\install.ps1 -Uninstall -DryRun     # preview
+.\install.ps1 -Uninstall             # project scope
+.\install.ps1 -Uninstall -Global -Yes  # global, no prompt
+```
+
+</details>
+
+Scope mirrors install: a project uninstall touches only the current directory's config; `--global` touches only the per-user (`$HOME`) config. Run it once per scope you installed into.
+
 ### Visual Builder App
 
 Full-stack web application with a chat UI for Databricks development. Its setup is **self-contained** — you do not need to run the kit-wide `install.sh` first; the scripts build their own environment, install the sibling packages, and generate config.
@@ -307,11 +366,11 @@ your own skill folders (each with a `SKILL.md`) that Genie Code will use automat
 
 ### Breaking change: skill sources and names
 
-Skills are no longer bundled in this repository. They now come from
+Skills are no longer bundled in this repository — they come from
 [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) via
-`databricks aitools install`, and some skills were **renamed or consolidated** in the move (for
-example, several core skills are now installed together under `databricks-core`). To see the current
-skill names, run `databricks aitools list` (CLI v1.0.0+) or browse the
+`databricks aitools install`, and a few were **renamed or consolidated** in the move (see the rename
+table in the notice at the top of this README). To see the current skill names, run
+`databricks aitools list` (CLI v1.0.0+) or browse the
 [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) repo. To reproduce
 the old bundled layout and names exactly, use git tag `v0.1.12` (the frozen copies also remain under
 [`databricks-skills/deprecated/`](databricks-skills/deprecated/)).

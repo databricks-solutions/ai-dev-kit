@@ -545,7 +545,6 @@ def write_skill_tests(
 # ---------------------------------------------------------------------------
 
 MISSING_SKILLS = [
-    "databricks-app-apx",
     "databricks-config",
     "databricks-dbsql",
     "databricks-docs",

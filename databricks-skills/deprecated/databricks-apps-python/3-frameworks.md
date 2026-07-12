@@ -198,7 +198,7 @@ async def get_data(request: Request):
 **Databricks tips**:
 - Auto-generates OpenAPI docs at `/docs` (Swagger) and `/redoc`
 - Databricks SQL connector is synchronous — use `asyncio.to_thread()` for async endpoints
-- Good choice for API backends that serve APX (FastAPI + React) apps
+- Good choice for API backends that serve a React/TypeScript frontend
 
 **Cookbook**: [apps-cookbook.dev/docs/category/fastapi](https://apps-cookbook.dev/docs/category/fastapi) — getting started, endpoint examples.
 
