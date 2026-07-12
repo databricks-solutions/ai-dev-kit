@@ -329,6 +329,13 @@ delegates to:
 databricks aitools install
 ```
 
+By default `databricks aitools install` installs the official **`databricks` plugin** through each
+agent's own plugin CLI for the agents that support one — **Claude Code, Codex, and GitHub Copilot** —
+and writes **raw skill files** for the agents that don't (**Cursor, OpenCode, Antigravity**). Pass
+`--skills-only` to force raw skill files for every agent. (This official `databricks` plugin is
+separate from — and replaces — the retired `databricks-ai-dev-kit` plugin this repo used to publish;
+see [`.claude-plugin/DEPRECATED.md`](.claude-plugin/DEPRECATED.md).)
+
 Skills come from [github.com/databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills).
 The skill copies that used to be bundled in this repo are deprecated and frozen under
 [`databricks-skills/deprecated/`](databricks-skills/deprecated/); if you need the exact historical
