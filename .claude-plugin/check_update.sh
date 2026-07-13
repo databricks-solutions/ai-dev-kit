@@ -47,10 +47,9 @@ if [ -z "$remote_ver" ]; then
     fi
 fi
 
-# If versions differ, emit a calm, informational update notice for Claude to relay.
-# Deliberately avoids urgent/imperative "you MUST / do this FIRST" phrasing: that
-# framing reads like a prompt-injection attempt and has alarmed users into thinking
-# the Dev Kit is unsafe. This is a routine, first-party update notice — keep it low-key.
+# If versions differ, emit an informational update notice for Claude to relay.
+# Deliberately avoids urgent/imperative  phrasing so it does not alarm users.
+# This is a routine, first-party update notice.
 if [ -n "$remote_ver" ] && [ "$remote_ver" != "$local_ver" ]; then
     cat <<EOF
 [Databricks AI Dev Kit] Update notice from the Dev Kit's own SessionStart version check:
