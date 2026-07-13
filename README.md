@@ -339,7 +339,7 @@ see [`.claude-plugin/DEPRECATED.md`](.claude-plugin/DEPRECATED.md).)
 Skills come from [github.com/databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills).
 The skill copies that used to be bundled in this repo are deprecated and frozen under
 [`databricks-skills/deprecated/`](databricks-skills/deprecated/); if you need the exact historical
-files, use git tag `v0.1.12`. Some skills were renamed in the move — see the breaking-change note
+files, use git tag `v0.1.13`. Some skills were renamed in the move — see the breaking-change note
 below. (APX and Genie-specific skills are no longer bundled here; they live in their own repos.)
 
 ### Genie Code Skills
@@ -353,16 +353,17 @@ Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/inst
 into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them via the
 Databricks SDK. Works on any compute, including serverless.
 
-**From a local checkout (deprecated fallback):** the
-[`databricks-skills/install_skills.sh`](databricks-skills/install_skills.sh) script still supports the
-upload flow. It sources the frozen legacy skill copies (from `databricks-skills/deprecated/` with
-`--local`, or a `v0.1.12`-pinned download otherwise). Requires the
-[Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for your workspace.
+**Shell-script fallback (downloads from the last release):** the
+[`databricks-skills/install_skills.sh`](databricks-skills/install_skills.sh) script also supports the
+upload flow. By default it downloads the frozen legacy skills from the last release that shipped them
+(`v0.1.13`); pass `--local` to source from `databricks-skills/deprecated/` instead (e.g. offline).
+Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for
+your workspace.
 
 ```bash
 # Run from the directory where you want ./.claude/skills created
-./databricks-skills/install_skills.sh --local --install-to-genie
 ./databricks-skills/install_skills.sh --install-to-genie --profile YOUR_PROFILE
+./databricks-skills/install_skills.sh --local --install-to-genie   # offline fallback
 ```
 
 See [databricks-skills/README.md](databricks-skills/README.md) for details.
@@ -379,7 +380,7 @@ Skills are no longer bundled in this repository — they come from
 table in the notice at the top of this README). To see the current skill names, run
 `databricks aitools list` (CLI v1.0.0+) or browse the
 [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) repo. To reproduce
-the old bundled layout and names exactly, use git tag `v0.1.12` (the frozen copies also remain under
+the old bundled layout and names exactly, use git tag `v0.1.13` (the frozen copies also remain under
 [`databricks-skills/deprecated/`](databricks-skills/deprecated/)).
 
 ## Architecture

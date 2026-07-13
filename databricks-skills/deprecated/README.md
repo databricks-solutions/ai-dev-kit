@@ -26,24 +26,25 @@ If you specifically need the files exactly as they were bundled, check out the l
 that shipped them:
 
 ```bash
-git checkout v0.1.12 -- databricks-skills
+git checkout v0.1.13 -- databricks-skills
 ```
 
 ## Migration notes
 
 - Some skills were **renamed** when they moved to `databricks-agent-skills`. The mapping and
   other breaking changes are documented in the root [`README.md`](../../README.md) "breaking change" note.
-- APX and Genie-specific skills are **no longer bundled** here; they moved to their own repos
-  (see the root README).
+- APX skills has been removed in favor of other app skills (see the root README).
 
 ## Genie Code (workspace upload)
-
-The one flow `databricks aitools install` does not fully cover is uploading skills to a
+Genie Code already has coverage for most skills available publicly and we will continue to sync improvements
+whenever possible. The one flow `databricks aitools install` does not fully cover is uploading skills to a
 Databricks workspace for **Genie Code**. Keep that simple — do not clone this tree to copy files:
 
 - **Recommended:** run the notebook uploader
   [`../install_genie_code_skills.py`](../install_genie_code_skills.py) in your workspace. It
-  downloads skills from GitHub and uploads them via the SDK — no local clone needed.
-- **Fallback:** [`../install_skills.sh --local --install-to-genie`](../install_skills.sh) sources
-  files from this `deprecated/` folder and uploads them. Use this only if you must upload from a
-  local checkout.
+  downloads skills from GitHub (pinned to release `v0.1.13`) and uploads them via the SDK — no
+  local clone needed.
+- **Fallback:** [`../install_skills.sh --install-to-genie`](../install_skills.sh) downloads the
+  skills from the last release that shipped them (`v0.1.13`) and uploads them. Use this when the
+  notebook path is not available. (Add `--local` to source from this `deprecated/` folder instead
+  of downloading, e.g. when working fully offline.)

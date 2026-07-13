@@ -35,12 +35,12 @@ Import [`install_genie_code_skills.py`](install_genie_code_skills.py) into your 
 notebook and run it. It downloads skills from GitHub and uploads them via the Databricks SDK. Works
 on any compute, including serverless.
 
-**Fallback — shell script from a local checkout:**
+**Fallback — shell script (downloads from the last release):**
 
 ```bash
 # Run from the directory where you want ./.claude/skills created
-./install_skills.sh --local --install-to-genie                 # source frozen local copies, then upload
-./install_skills.sh --install-to-genie --profile YOUR_PROFILE  # download (pinned to v0.1.12), then upload
+./install_skills.sh --install-to-genie --profile YOUR_PROFILE  # download (pinned to v0.1.13), then upload
+./install_skills.sh --local --install-to-genie                 # offline: source frozen deprecated/ copies instead
 ```
 
 Run `./install_skills.sh --help` for all options.
@@ -50,7 +50,7 @@ Run `./install_skills.sh --help` for all options.
 The skill folders that used to live here are frozen legacy copies under
 [`deprecated/`](deprecated/). They are **no longer maintained** and exist only so older tooling keeps
 working. Prefer `databricks aitools install`. If you need the exact historical files, use git tag
-`v0.1.12`. See [`deprecated/README.md`](deprecated/README.md) for migration guidance (skill renames
+`v0.1.13`. See [`deprecated/README.md`](deprecated/README.md) for migration guidance (skill renames
 are documented in the root README "breaking change" note).
 
 ## Custom / Genie Code skills

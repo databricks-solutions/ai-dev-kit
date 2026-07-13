@@ -10,9 +10,10 @@
 #     This script remains only for the Genie Code workspace-upload flow
 #     (--install-to-genie), which `databricks aitools install` does not cover.
 #     For that, prefer the notebook uploader install_genie_code_skills.py
-#     (no local clone needed). The skill files it sources are the FROZEN
-#     legacy copies under databricks-skills/deprecated/ (and, for the default
-#     non-local download, the v0.1.12 git tag). They are no longer maintained.
+#     (no local clone needed). When that is not possible, this script's default
+#     downloads the skills from the last release that shipped the bundled tree
+#     (git tag v0.1.13). The frozen local copies under databricks-skills/deprecated/
+#     are only used with --local. Either way the skills are no longer maintained.
 #
 # Usage:
 #   # Install then upload ./.claude/skills to workspace (Genie Code / Assistant)
@@ -40,9 +41,9 @@ NC='\033[0m' # No Color
 # Configuration
 # NOTE: The bundled skill tree was removed from `main` and frozen under
 # databricks-skills/deprecated/. The default (non-local) download therefore pins
-# to the last release that still bundled the tree at its original paths: v0.1.12.
+# to the last release that still bundled the tree at its original paths: v0.1.13.
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit"
-REPO_REF="v0.1.12"
+REPO_REF="v0.1.13"
 REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/${REPO_REF}"
 SKILLS_DIR=".claude/skills"
 INSTALL_FROM_LOCAL=false
@@ -551,8 +552,9 @@ echo -e "  This script is kept only for the ${GREEN}--install-to-genie${NC} work
 echo -e "  upload flow. For that, the notebook uploader is simpler:"
 echo -e "    ${GREEN}databricks-skills/install_genie_code_skills.py${NC} (no local clone)"
 echo ""
-echo -e "  Skill files here are ${YELLOW}frozen legacy copies${NC} (deprecated/ folder;"
-echo -e "  default download pinned to tag ${REPO_REF}) and are no longer maintained."
+echo -e "  Skill files are ${YELLOW}frozen legacy copies${NC}, no longer maintained:"
+echo -e "  the default downloads them from release tag ${REPO_REF}; ${GREEN}--local${NC} uses"
+echo -e "  the deprecated/ folder instead."
 echo -e "${YELLOW}────────────────────────────────────────────────────────────${NC}"
 echo ""
 

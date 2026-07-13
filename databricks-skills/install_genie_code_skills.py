@@ -15,7 +15,7 @@
 # MAGIC > github.com/databricks/databricks-agent-skills). This notebook remains the simplest way to
 # MAGIC > upload skills to a workspace for **Genie Code**, which the CLI does not cover. Because the
 # MAGIC > bundled tree was removed from `main`, the AI Dev Kit source below is pinned to the last
-# MAGIC > release that shipped it (tag `v0.1.12`); MLflow skills still track `main`.
+# MAGIC > release that shipped it (tag `v0.1.13`); MLflow skills still track `main`.
 
 # COMMAND ----------
 
@@ -36,7 +36,7 @@ INSTALL_SKILLS = "all"
 # INSTALL_SKILLS = ["databricks-agent-bricks", "agent-evaluation"]
 
 # Default source branch or tag. Used for any source that does not set its own "ref".
-# The AI Dev Kit source pins to v0.1.12 (see SKILL_SOURCES) because the bundled skill
+# The AI Dev Kit source pins to v0.1.13 (see SKILL_SOURCES) because the bundled skill
 # tree was removed from `main`; MLflow skills still track `main`.
 GITHUB_REF = "main"
 
@@ -59,9 +59,9 @@ from databricks.sdk.service.workspace import ImportFormat
 
 SKILL_SOURCES = [
     # AI Dev Kit skills are frozen; pin to the last release that bundled the tree
-    # at databricks-skills/<name>/ (v0.1.12). `main` no longer contains it.
+    # at databricks-skills/<name>/ (v0.1.13). `main` no longer contains it.
     {"owner": "databricks-solutions", "repo": "ai-dev-kit", "path": "databricks-skills",
-     "ref": "v0.1.12", "skip": {"TEMPLATE", "deprecated"}},
+     "ref": "v0.1.13", "skip": {"TEMPLATE", "deprecated"}},
     {"owner": "mlflow",               "repo": "skills",      "path": ""},
 ]
 
