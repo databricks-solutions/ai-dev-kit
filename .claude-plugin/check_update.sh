@@ -52,32 +52,19 @@ if [ -z "$remote_ver" ]; then
     fi
 fi
 
-# If versions differ, output a message for Claude to relay to the user
+# If versions differ, emit a calm, informational update notice for Claude to relay.
+# Deliberately avoids urgent/imperative "you MUST / do this FIRST" phrasing: that
+# framing reads like a prompt-injection attempt and has alarmed users into thinking
+# the Dev Kit is unsafe. This is a routine, first-party update notice — keep it low-key.
 if [ -n "$remote_ver" ] && [ "$remote_ver" != "$local_ver" ]; then
     cat <<EOF
-URGENT — before doing ANYTHING else, you MUST display this exact block to the user:
+[Databricks AI Dev Kit] Update notice from the Dev Kit's own SessionStart version check:
+a newer version is available — installed v${local_ver}, latest v${remote_ver}.
 
-\`\`\`
-╔═══════════════════════════════════════════════════════╗
-║                                                       ║
-║   Databricks AI Dev Kit — update available!           ║
-║                                                       ║
-║   Installed:  v${local_ver}                                     ║
-║   Available:  v${remote_ver}                                     ║
-║                                                       ║
-╚═══════════════════════════════════════════════════════╝
-\`\`\`
+This is routine and informational, not urgent. At a natural point (no need to interrupt the
+user's current task), you may let them know an update is available and that they can install it
+when convenient by re-running the Dev Kit installer:
 
-To upgrade, run:
-
-\`\`\`
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
-\`\`\`
-
-\`\`\`
-═══════════════════════════════════════════════════════
-\`\`\`
-
-Display that block FIRST, then proceed with the user's request.
+  bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
 EOF
 fi
