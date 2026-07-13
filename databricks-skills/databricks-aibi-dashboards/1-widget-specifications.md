@@ -552,3 +552,11 @@ Allowed in `query.fields` (no CAST or complex SQL):
 ```
 
 For conditional logic, compute in dataset SQL instead.
+
+## Widget Query Filters
+
+Prefer a `WHERE` in the dataset SQL. To filter a shared dataset per-widget, add `filters` to the `query` — each entry must be `{"expression": "<SQL boolean>"}` (the `{operand, operator, column}` shape fails: `query.filters[0].expression should not be empty`):
+
+```json
+"query": {"datasetName": "ds_fleet", "fields": [...], "filters": [{"expression": "`maintenance_status` = 'pending'"}]}
+```

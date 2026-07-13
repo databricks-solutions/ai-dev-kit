@@ -60,6 +60,8 @@
           "queryName": "ds_data_region"  // Must match queries[].name above!
         }]
       },
+      // Optional: pre-select a default value (users can still change it)
+      "selection": {"defaultSelection": {"values": {"dataType": "STRING", "values": [{"value": "EMEA"}]}}},
       "frame": {"showTitle": true, "title": "Region"}
     }
   },
