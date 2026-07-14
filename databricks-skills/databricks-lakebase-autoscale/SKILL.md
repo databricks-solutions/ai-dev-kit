@@ -178,6 +178,21 @@ conn = psycopg.connect(
 
 ---
 
+## Roles & Ownership
+
+Each Databricks identity that connects (a user, or the service principal behind an app) gets a Postgres role. Objects that role creates (tables, schemas) are **owned** by it. If that identity is later deleted — e.g. the app and its SP are removed — the objects are left owned by a role that no longer exists, and **nobody can `GRANT` or `ALTER` them** (only the owner or a superuser can, and the owner is gone). You're locked out of modifying those tables until ownership is reassigned to a live role.
+
+```bash
+# Reassign everything the orphaned role owns to a live role — CLI equivalent of the
+# UI's "reassign owned objects". Role paths are projects/{id}/branches/{id}/roles/{id}.
+databricks postgres delete-role projects/my-app/branches/production/roles/OLD_SP \
+    --reassign-owned-to projects/my-app/branches/production/roles/NEW_SP
+```
+
+This is the fix when a deleted app/SP has stranded ownership of its Lakebase objects. (Beta command.)
+
+---
+
 ## Reverse ETL (Synced Tables)
 
 Syncs Unity Catalog Delta tables into Lakebase as Postgres tables via managed Lakeflow pipelines. Modes: `SNAPSHOT` (one-shot) | `TRIGGERED` (scheduled, needs CDF) | `CONTINUOUS` (~15s latency, needs CDF).
