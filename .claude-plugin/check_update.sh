@@ -47,18 +47,14 @@ if [ -z "$remote_ver" ]; then
     fi
 fi
 
-# If versions differ, emit an informational update notice for Claude to relay.
-# Deliberately avoids urgent/imperative  phrasing so it does not alarm users.
-# This is a routine, first-party update notice.
+# If versions differ, print a plain status line for Claude to see. No
+# instructions directed at the assistant and no embedded install command —
+# testing showed that combination still reads as a prompt injection even with
+# calm wording, since it's the "here's how/when to tell the user" framing
+# (not the tone) that trips the heuristic.
 if [ -n "$remote_ver" ] && [ "$remote_ver" != "$local_ver" ]; then
     cat <<EOF
-[Databricks AI Dev Kit] Update notice from the Dev Kit's own SessionStart version check:
-a newer version is available — installed v${local_ver}, latest v${remote_ver}.
-
-This is routine and informational, not urgent. At a natural point (no need to interrupt the
-user's current task), you may let them know an update is available and that they can install it
-when convenient by re-running the Dev Kit installer:
-
-  bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+[ai-dev-kit] Note: installed version is v${local_ver}; v${remote_ver} is now available.
+See the "Update" section of the ai-dev-kit README: https://github.com/databricks-solutions/ai-dev-kit#update
 EOF
 fi
