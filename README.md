@@ -133,7 +133,6 @@ Curated by Databricks field experts. Brings tutorials, patterns, and the officia
 
 ### Prerequisites
 
-- [uv](https://github.com/astral-sh/uv) - Python package manager
 - [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) **v1.0.0+** - Command line interface for Databricks (v1.0.0+ ships `databricks aitools`, which installs most skills)
 - AI coding environment (one or more):
   - [Claude Code](https://claude.ai/code)
@@ -148,8 +147,8 @@ Curated by Databricks field experts. Brings tutorials, patterns, and the officia
 
 
 ### Install in existing project
-By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, .kiro, or opencode.json_
+By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install. You can install for your user across all projects on the machine by passing `--global` or setting the scope to global in the interactive install.
+_Note: Project configuration files can be found under these folder: .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, .kiro, or opencode.json_
 
 #### Mac / Linux
 
@@ -168,16 +167,10 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --global --force
 ```
 
-**Specify profile and force reinstall**
+**Install specific skills only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --profile DEFAULT --force
-```
-
-**Install for specific tools only**
-
-```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity,windsurf,opencode
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills databricks-core,databricks-bundles,databricks-pipelines
 ```
 
 </details>
@@ -206,12 +199,6 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 
 ```powershell
 .\install.ps1 -Global -Force
-```
-
-**Specify profile and force reinstall**
-
-```powershell
-.\install.ps1 -Profile DEFAULT -Force
 ```
 
 **Install for specific tools only**
