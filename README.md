@@ -330,25 +330,12 @@ below. (APX and Genie-specific skills are no longer bundled here; they live in t
 
 To use skills inside **Genie Code** in a Databricks workspace, upload them to
 `/Workspace/Users/<you>/.assistant/skills`. `databricks aitools install` does not cover this yet, so
-use one of these:
+use the provided notebook to install:
 
 **From a Databricks notebook (recommended — no local clone):**
-Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py)
+Import [`install_genie_code_skills.py`](install_genie_code_skills.py)
 into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them via the
 Databricks SDK. Works on any compute, including serverless.
-
-**Shell-script fallback (downloads from the last release):** the
-[`databricks-skills/install_skills.sh`](databricks-skills/install_skills.sh) script also supports the
-upload flow. By default it downloads the frozen legacy skills from the last release that shipped them
-(`v0.1.13`); pass `--local` to source from `DEPRECATED-databricks-skills/` instead (e.g. offline).
-Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for
-your workspace.
-
-```bash
-# Run from the directory where you want ./.claude/skills created
-./databricks-skills/install_skills.sh --install-to-genie --profile YOUR_PROFILE
-./databricks-skills/install_skills.sh --local --install-to-genie   # offline fallback
-```
 
 See [databricks-skills/README.md](databricks-skills/README.md) for details.
 

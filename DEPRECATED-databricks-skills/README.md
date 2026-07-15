@@ -41,10 +41,6 @@ whenever possible. The one flow `databricks aitools install` does not fully cove
 Databricks workspace for **Genie Code**. Keep that simple — do not clone this tree to copy files:
 
 - **Recommended:** run the notebook uploader
-  [`../databricks-skills/install_genie_code_skills.py`](../databricks-skills/install_genie_code_skills.py)
+  [`../install_genie_code_skills.py`](../install_genie_code_skills.py)
   in your workspace. It downloads skills from GitHub (pinned to release `v0.1.13`) and uploads them
   via the SDK — no local clone needed.
-- **Fallback:** [`../databricks-skills/install_skills.sh --install-to-genie`](../databricks-skills/install_skills.sh)
-  downloads the skills from the last release that shipped them (`v0.1.13`) and uploads them. Use this
-  when the notebook path is not available. (Add `--local` to source from this
-  `DEPRECATED-databricks-skills/` folder instead of downloading, e.g. when working fully offline.)
