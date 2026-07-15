@@ -5,29 +5,32 @@
 </p>
 
 ---
-> 📣 **Heads up: a major evolution is coming**
+> 📣 **The move is complete: Install now pulls the official Databricks Agent Skills**
 >
-> This will be the **last release where AI Dev Kit skills are installed from the skill files in this
-> repository.** AI Dev Kit skills are becoming part of the official, engineering-supported Databricks
-> skills set, and the skill files in this repo will soon be deprecated. In the next release you'll
-> install these skills directly from the official Databricks set — either straight from the CLI, or
-> through the AI Dev Kit installer, which will continue to guide you through the process.
+> AI Dev Kit skills are **no longer installed from skill files in this repository.** They are now part
+> of the official, engineering-supported Databricks skills set, installed directly from the CLI
+> (`databricks aitools install`) or through the AI Dev Kit installer, which delegates to the CLI and
+> still guides you through the process. The bundled skill files in this repo are deprecated and kept
+> for reference only.
 >
->
-> **What stays:** The MCP server and Builder App will remain in this repository. The Builder App will
-> keep being developed and improved, and the MCP server will be maintained and updated on a
-> best-effort basis as GitHub issues are filed.
+> **Already installed?** Re-run the installer script in this repo to uninstall older skills and MCP 
+> server before installing the official skills — see [Where Skills Come From](#where-skills-come-from). 
 >
 >
-> **What's next:** AI Dev Kit will continue to guide you through setting up your AI coding
-> environment and be a place to find experimental tools developed by Field Engineering. Beyond the
-> skills installs, we plan to add several tutorials to help you get started using coding agents for
-> building on Databricks, including getting started with Genie Code or Omnigent.
+> **What stays:** The MCP server and Builder App remain in this repository. The Builder App will keep
+> being developed and improved, and the MCP server will be maintained and updated on a best-effort
+> basis as GitHub issues are filed.
 >
-> **A few skills will be renamed or merged** in the official install. Most names are unchanged; the
+>
+> **What's next:** AI Dev Kit will continue to guide you through setting up your AI coding environment
+> and be a place to find experimental tools developed by Field Engineering. We're working on several
+> tutorials to help you get started using coding agents for building on Databricks — including getting
+> started with Genie Code and Omnigent — which will land in a future update.
+>
+> **A few skills were renamed or merged** in the official install. Most names are unchanged; the
 > exceptions are:
 >
-> | Today (AI Dev Kit) | Official Databricks skills |
+> | Previously (AI Dev Kit) | Official Databricks skills |
 > |---|---|
 > | `databricks-bundles` | `databricks-dabs` |
 > | `databricks-spark-declarative-pipelines` | `databricks-pipelines` |
