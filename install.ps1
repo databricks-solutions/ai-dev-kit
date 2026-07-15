@@ -1934,28 +1934,31 @@ function Install-AgentBSkills {
     }
 
     Resolve-AitoolsAgents
+    # We always install a named subset via --skills, which the CLI only allows
+    # with --skills-only (or --path): the default plugin install is all-or-nothing.
+    # --skills-only writes raw skill files and the .databricks/aitools/skills store
+    # that deliver logic mirrors into every other selected tool.
     $skillsCsv = $script:SelectedAgentBSkills -join ','
     $needsExperimental = Test-AgentBNeedsExperimental
     $count = $script:SelectedAgentBSkills.Count
 
     if ($script:AitoolsAgents) {
         Write-Msg "Delegating $count agent skills to databricks aitools (agents: $($script:AitoolsAgents))"
-        $aitoolsArgs = @("aitools", "install", "--scope", $script:Scope, "--agents", $script:AitoolsAgents, "--skills", $skillsCsv)
+        $aitoolsArgs = @("aitools", "install", "--scope", $script:Scope, "--agents", $script:AitoolsAgents, "--skills", $skillsCsv, "--skills-only")
         if ($needsExperimental) { $aitoolsArgs += "--experimental" }
         $aitoolsArgs += @("-p", $script:Profile_)
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-        if ($script:Silent) {
-            & databricks @aitoolsArgs 2>&1 | Out-Null
-        } else {
-            # Drop aitools' "Skipped <agent>: does not support project-scoped
-            # skills" notices -- we deliver to those tools ourselves.
-            & databricks @aitoolsArgs 2>&1 |
-                Where-Object { "$_" -notmatch 'does not support project-scoped skills' } |
-                ForEach-Object { Write-Host "$_" }
-        }
+        # Capture so we can drop aitools' "Skipped <agent>: does not support
+        # project-scoped skills" notices -- Send-AgentSkills below covers
+        # those agents itself, so that alone isn't a real failure.
+        $aitoolsOut = & databricks @aitoolsArgs 2>&1
         $installOk = ($LASTEXITCODE -eq 0)
         $ErrorActionPreference = $prevEAP
-        if (-not $installOk) {
+        $aitoolsResidual = $aitoolsOut | Where-Object { "$_" -notmatch 'does not support project-scoped skills' }
+        if (-not $script:Silent -and $aitoolsResidual) {
+            $aitoolsResidual | ForEach-Object { Write-Host "$_" }
+        }
+        if (-not $installOk -and ($aitoolsResidual | Where-Object { "$_" -match '^Error:' })) {
             if ($script:Silent) { Write-Err "databricks aitools install failed" }
             Write-Warn "databricks aitools install failed -- agent skills not installed"
             return
@@ -2001,7 +2004,7 @@ function Send-AgentSkills {
         $mode = "copy"
         $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-dev-kit-aitools-" + [System.IO.Path]::GetRandomFileName())
         New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
-        $stageArgs = @("aitools", "install", "--scope", "project", "--agents", "claude-code", "--skills", $SkillsCsv)
+        $stageArgs = @("aitools", "install", "--scope", "project", "--agents", "claude-code", "--skills", $SkillsCsv, "--skills-only")
         if ($NeedsExperimental) { $stageArgs += "--experimental" }
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
         Push-Location $tmpDir
@@ -2200,7 +2203,7 @@ function Show-DryRunReport {
         $releaseSuffix = if ($script:AgentBRelease) { " @ $($script:AgentBRelease)" } else { "" }
         Write-Msg "Agent skills (databricks-agent-skills$releaseSuffix): $($script:SelectedAgentBSkills -join ' ')"
         if ($script:AitoolsAgents) {
-            Write-Msg "Would run: databricks aitools install --scope $($script:Scope) --agents $($script:AitoolsAgents) --skills $skillsCsv$expFlag -p $($script:Profile_)"
+            Write-Msg "Would run: databricks aitools install --scope $($script:Scope) --agents $($script:AitoolsAgents) --skills $skillsCsv --skills-only$expFlag -p $($script:Profile_)"
         }
         $mode = if ($script:AitoolsAgents) { "symlink from the aitools canonical store" } else { "copy via a temp-dir aitools install" }
         Write-Msg "Would deliver agent skills to every selected tool ($mode); entries aitools creates are left to aitools:"
@@ -2224,11 +2227,7 @@ function Install-Skills {
     foreach ($tool in ($script:Tools -split ' ')) {
         switch ($tool) {
             "claude" { $dirs += Join-Path $BaseDir ".claude\skills" }
-            "cursor" {
-                if ($script:Tools -notmatch 'claude') {
-                    $dirs += Join-Path $BaseDir ".cursor\skills"
-                }
-            }
+            "cursor" { $dirs += Join-Path $BaseDir ".cursor\skills" }
             "copilot" { $dirs += Join-Path $BaseDir ".github\skills" }
             "codex"   { $dirs += Join-Path $BaseDir ".agents\skills" }
             "gemini"  { $dirs += Join-Path $BaseDir ".gemini\skills" }
@@ -2701,6 +2700,11 @@ function Save-Version {
     }
     if ($ver -match '(404|Not Found|error)') { $ver = "dev" }
 
+    # $script:InstallDir is only created during MCP setup; a skills-only run never
+    # clones, so ensure it exists before writing the version file.
+    if (-not (Test-Path $script:InstallDir)) {
+        New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
+    }
     Set-Content -Path (Join-Path $script:InstallDir "version") -Value $ver -Encoding UTF8
 
     if ($script:Scope -eq "project") {

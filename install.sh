@@ -1818,6 +1818,10 @@ install_agent_b_skills() {
     fi
 
     map_aitools_agents
+    # We always install a named subset via --skills, which the CLI only allows
+    # with --skills-only (or --path): the default plugin install is all-or-nothing.
+    # --skills-only writes raw skill files and the .databricks/aitools/skills store
+    # that deliver_agent_skills mirrors into every other selected tool.
     local skills_csv exp_flag=""
     skills_csv=$(echo "$SELECTED_AGENT_B_SKILLS" | tr -s ' ' ',' | sed 's/^,//;s/,$//')
     agent_b_needs_experimental && exp_flag="--experimental"
@@ -1826,19 +1830,19 @@ install_agent_b_skills() {
 
     if [ -n "$AITOOLS_AGENTS" ]; then
         msg "Delegating ${B}${count}${N} agent skills to ${B}databricks aitools${N} (agents: ${AITOOLS_AGENTS})"
-        if [ "$SILENT" = true ]; then
-            databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" $exp_flag -p "$PROFILE" >/dev/null 2>&1 \
-                || die "databricks aitools install failed"
-        else
-            # Capture so we can drop aitools' "Skipped <agent>: does not support
-            # project-scoped skills" notices — we deliver to those tools ourselves.
-            local aitools_out aitools_rc
-            aitools_out=$(databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" $exp_flag -p "$PROFILE" 2>&1) && aitools_rc=0 || aitools_rc=$?
-            [ -n "$aitools_out" ] && echo "$aitools_out" | grep -v 'does not support project-scoped skills' || true
-            if [ "$aitools_rc" -ne 0 ]; then
-                warn "databricks aitools install failed — agent skills not installed"
-                return
-            fi
+        # Capture so we can drop aitools' "Skipped <agent>: does not support
+        # project-scoped skills" notices — deliver_agent_skills below covers
+        # those agents itself, so that alone isn't a real failure.
+        local aitools_out aitools_rc aitools_residual
+        aitools_out=$(databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" --skills "$skills_csv" --skills-only $exp_flag -p "$PROFILE" 2>&1) && aitools_rc=0 || aitools_rc=$?
+        aitools_residual=$(echo "$aitools_out" | grep -v 'does not support project-scoped skills' || true)
+        if [ "$SILENT" != true ] && [ -n "$aitools_residual" ]; then
+            echo "$aitools_residual"
+        fi
+        if [ "$aitools_rc" -ne 0 ] && echo "$aitools_residual" | grep -q '^Error:'; then
+            [ "$SILENT" = true ] && die "databricks aitools install failed"
+            warn "databricks aitools install failed — agent skills not installed"
+            return
         fi
         ok "Agent skills ($count) installed — manage with ${B}databricks aitools list|update|uninstall${N}"
     fi
@@ -1872,7 +1876,7 @@ deliver_agent_skills() {
     if [ -z "$AITOOLS_AGENTS" ]; then
         mode="copy"
         tmp_dir=$(mktemp -d)
-        if ! (cd "$tmp_dir" && databricks aitools install --scope project --agents claude-code --skills "$skills_csv" $exp_flag >/dev/null 2>&1); then
+        if ! (cd "$tmp_dir" && databricks aitools install --scope project --agents claude-code --skills "$skills_csv" --skills-only $exp_flag >/dev/null 2>&1); then
             rm -rf "$tmp_dir"
             warn "Could not stage agent skills for: $(echo "$TOOLS" | tr ' ' ',')"
             return
@@ -2013,7 +2017,7 @@ dry_run_report() {
         agent_b_needs_experimental && exp_flag=" --experimental"
         msg "Agent skills (databricks-agent-skills${AGENT_B_RELEASE:+ @ $AGENT_B_RELEASE}): ${SELECTED_AGENT_B_SKILLS}"
         if [ -n "$AITOOLS_AGENTS" ]; then
-            msg "Would run: ${B}databricks aitools install --scope ${SCOPE} --agents ${AITOOLS_AGENTS} --skills ${skills_csv}${exp_flag} -p ${PROFILE}${N}"
+            msg "Would run: ${B}databricks aitools install --scope ${SCOPE} --agents ${AITOOLS_AGENTS} --skills ${skills_csv} --skills-only${exp_flag} -p ${PROFILE}${N}"
         fi
         local mode="symlink from the aitools canonical store"
         [ -z "$AITOOLS_AGENTS" ] && mode="copy via a temp-dir aitools install"
@@ -2152,7 +2156,7 @@ install_skills() {
     for tool in $TOOLS; do
         case $tool in
             claude) dirs+=("$base_dir/.claude/skills") ;;
-            cursor) echo "$TOOLS" | grep -q claude || dirs+=("$base_dir/.cursor/skills") ;;
+            cursor) dirs+=("$base_dir/.cursor/skills") ;;
             copilot) dirs+=("$base_dir/.github/skills") ;;
             codex) dirs+=("$base_dir/.agents/skills") ;;
             gemini) dirs+=("$base_dir/.gemini/skills") ;;
@@ -2577,6 +2581,9 @@ save_version() {
     local ver=$(curl -fsSL "$RAW_URL/VERSION" 2>/dev/null || echo "dev")
     # Validate version format
     [[ "$ver" =~ (404|Not Found|error) ]] && ver="dev"
+    # $INSTALL_DIR is only created during MCP setup (clone_repo); a skills-only
+    # run never clones, so ensure it exists before writing the version file.
+    mkdir -p "$INSTALL_DIR"
     echo "$ver" > "$INSTALL_DIR/version"
     if [ "$SCOPE" = "project" ]; then
         mkdir -p ".ai-dev-kit"
