@@ -55,7 +55,7 @@ Databricks offers two paths for AI-assisted coding. Choose the one that matches 
 
 **Free, first-party AI coding inside Databricks**
 
-Built into every Databricks workspace at no extra cost, with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks.
+Built into every Databricks workspace with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks workspace.
 
 </td>
 <td width="50%" align="center" valign="top">
@@ -68,7 +68,7 @@ Built into every Databricks workspace at no extra cost, with deep native product
 
 **Databricks expertise, in the editor you already use**
 
-Curated by Databricks field experts. Brings the patterns, skills, and 40+ executable tools your AI assistant needs to build on Databricks — wherever you're already coding.
+Curated by Databricks field experts. Brings tutorials, patterns, and the official Databricks agent skills to your AI coding tools to build on Databricks — wherever you're already coding.
 
 <br>
 
@@ -123,13 +123,10 @@ Curated by Databricks field experts. Brings the patterns, skills, and 40+ execut
 
 | Adventure                        | Best For | Start Here |
 |----------------------------------|----------|------------|
-| :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | [Quick Start (install)](#install-in-existing-project)
+| :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add Databricks skills for your user or existing project folder | [Quick Start (install)](#install-in-existing-project)
+| [**Genie Code Skills**](databricks-skills/) | Upload selected skills into your workspace for Genie Code. Note: much of the content in the public Databricks skills is already included in Genie Code. | [Genie Code skills (install)](#genie-code-skills) |
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
-| [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
-| [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
-| [**Skills Only**](databricks-skills/) | Databricks patterns and best practices (without MCP functions) | `databricks aitools install` |
-| [**Genie Code Skills**](databricks-skills/) | Upload skills into your workspace for Genie Code | [Genie Code skills (install)](#genie-code-skills) |
-| [**MCP Tools Only**](databricks-mcp-server/) | Standalone MCP server exposing Databricks actions to AI clients (no skills required) | [Register MCP server](databricks-mcp-server/) |
+| [**MCP Tools**](databricks-mcp-server/) | Standalone MCP server exposing Databricks actions to AI clients. Note: We recommend skills instead, but maintain this as a good foundation if a custom MCP serer is required. | [Register MCP server](databricks-mcp-server/) |
 ---
 
 ## Quick Start
@@ -301,7 +298,7 @@ cd ai-dev-kit/databricks-builder-app
 
 With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing the 40+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
 
-> **Current dependencies (to be removed later):** the Builder App currently relies on the in-repo MCP server (`databricks-mcp-server` + `databricks-tools-core`) and a bundled, frozen skills snapshot under [`databricks-skills/deprecated/`](databricks-skills/deprecated/). Both are temporary couplings scheduled to be decoupled from the kit.
+> **Current dependencies (to be removed later):** the Builder App currently relies on the in-repo MCP server (`databricks-mcp-server` + `databricks-tools-core`) and a bundled, frozen skills snapshot under [`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/). Both are temporary couplings scheduled to be decoupled from the kit.
 
 See [`databricks-builder-app/`](databricks-builder-app/) for full documentation.
 
@@ -338,7 +335,7 @@ see [`.claude-plugin/DEPRECATED.md`](.claude-plugin/DEPRECATED.md).)
 
 Skills come from [github.com/databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills).
 The skill copies that used to be bundled in this repo are deprecated and frozen under
-[`databricks-skills/deprecated/`](databricks-skills/deprecated/); if you need the exact historical
+[`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/); if you need the exact historical
 files, use git tag `v0.1.13`. Some skills were renamed in the move — see the breaking-change note
 below. (APX and Genie-specific skills are no longer bundled here; they live in their own repos.)
 
@@ -356,7 +353,7 @@ Databricks SDK. Works on any compute, including serverless.
 **Shell-script fallback (downloads from the last release):** the
 [`databricks-skills/install_skills.sh`](databricks-skills/install_skills.sh) script also supports the
 upload flow. By default it downloads the frozen legacy skills from the last release that shipped them
-(`v0.1.13`); pass `--local` to source from `databricks-skills/deprecated/` instead (e.g. offline).
+(`v0.1.13`); pass `--local` to source from `DEPRECATED-databricks-skills/` instead (e.g. offline).
 Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for
 your workspace.
 
@@ -381,7 +378,7 @@ table in the notice at the top of this README). To see the current skill names, 
 `databricks aitools list` (CLI v1.0.0+) or browse the
 [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) repo. To reproduce
 the old bundled layout and names exactly, use git tag `v0.1.13` (the frozen copies also remain under
-[`databricks-skills/deprecated/`](databricks-skills/deprecated/)).
+[`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/)).
 
 ## Architecture
 

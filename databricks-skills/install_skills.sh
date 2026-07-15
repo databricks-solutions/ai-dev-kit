@@ -12,7 +12,7 @@
 #     For that, prefer the notebook uploader install_genie_code_skills.py
 #     (no local clone needed). When that is not possible, this script's default
 #     downloads the skills from the last release that shipped the bundled tree
-#     (git tag v0.1.13). The frozen local copies under databricks-skills/deprecated/
+#     (git tag v0.1.13). The frozen local copies under DEPRECATED-databricks-skills/
 #     are only used with --local. Either way the skills are no longer maintained.
 #
 # Usage:
@@ -24,7 +24,7 @@
 #   ./install_skills.sh                              # Install all skills
 #   ./install_skills.sh databricks-bundles agent-evaluation  # Install specific skills
 #   ./install_skills.sh --mlflow-version v1.0.0      # Pin MLflow skills version
-#   ./install_skills.sh --local                      # Install Databricks skills from deprecated/ folder
+#   ./install_skills.sh --local                      # Install Databricks skills from DEPRECATED-databricks-skills/ folder
 #   ./install_skills.sh --list                       # List available skills
 #   ./install_skills.sh --help                       # Show help
 #
@@ -40,7 +40,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 # NOTE: The bundled skill tree was removed from `main` and frozen under
-# databricks-skills/deprecated/. The default (non-local) download therefore pins
+# DEPRECATED-databricks-skills/. The default (non-local) download therefore pins
 # to the last release that still bundled the tree at its original paths: v0.1.13.
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit"
 REPO_REF="v0.1.13"
@@ -175,7 +175,7 @@ show_help() {
     echo "  --help, -h              Show this help message"
     echo "  --list, -l              List all available skills"
     echo "  --all, -a               Install all skills (default if no skills specified)"
-    echo "  --local                 Install from the frozen local copies under deprecated/ instead of downloading"
+    echo "  --local                 Install from the frozen local copies under DEPRECATED-databricks-skills/ instead of downloading"
     echo "  --install-to-genie      After install, upload ./.claude/skills to workspace"
     echo "                          /Users/<you>/.assistant/skills for Genie Code (uses cwd; requires databricks CLI)"
     echo "  --profile <name>        Databricks config profile for workspace upload (default: DEFAULT or \$DATABRICKS_CONFIG_PROFILE)"
@@ -326,9 +326,9 @@ download_databricks_skill() {
     local skill_dir="$SKILLS_DIR/$skill_name"
 
     if [ "$INSTALL_FROM_LOCAL" = true ]; then
-        # Copy from the frozen legacy copies under deprecated/
-        echo -e "  Copying from local (deprecated/)..."
-        local source_dir="$SCRIPT_DIR/deprecated/${skill_name}"
+        # Copy from the frozen legacy copies under DEPRECATED-databricks-skills/
+        echo -e "  Copying from local (DEPRECATED-databricks-skills/)..."
+        local source_dir="$SCRIPT_DIR/../DEPRECATED-databricks-skills/${skill_name}"
 
         # Check if source directory exists
         if [ ! -d "$source_dir" ]; then
@@ -554,7 +554,7 @@ echo -e "    ${GREEN}databricks-skills/install_genie_code_skills.py${NC} (no loc
 echo ""
 echo -e "  Skill files are ${YELLOW}frozen legacy copies${NC}, no longer maintained:"
 echo -e "  the default downloads them from release tag ${REPO_REF}; ${GREEN}--local${NC} uses"
-echo -e "  the deprecated/ folder instead."
+echo -e "  the DEPRECATED-databricks-skills/ folder instead."
 echo -e "${YELLOW}────────────────────────────────────────────────────────────${NC}"
 echo ""
 

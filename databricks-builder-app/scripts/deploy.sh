@@ -19,19 +19,16 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(dirname "$PROJECT_DIR")"
 
 # Repo-local bundled (frozen) Databricks skills snapshot.  The bundled skill
-# copies moved under databricks-skills/deprecated/; older checkouts still keep
-# them directly under databricks-skills/.  Prefer deprecated/, fall back to the
-# legacy location so this works before and after the move.
-SKILLS_SNAPSHOT_DIR="$REPO_ROOT/databricks-skills/deprecated"
+# copies moved to DEPRECATED-databricks-skills/ at the repo root; older checkouts
+# still keep them directly under databricks-skills/.  Prefer the new location,
+# fall back to the legacy one so this works before and after the move.
+SKILLS_SNAPSHOT_DIR="$REPO_ROOT/DEPRECATED-databricks-skills"
 if [ ! -d "$SKILLS_SNAPSHOT_DIR" ]; then
   SKILLS_SNAPSHOT_DIR="$REPO_ROOT/databricks-skills"
 fi
 
 # install_skills.sh (adds MLflow skills fetched from github.com/mlflow/skills).
-INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/deprecated/install_skills.sh"
-if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
-  INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
-fi
+INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
 
 APP_NAME="${APP_NAME:-}"
 PROFILE="${PROFILE:-}"
@@ -263,7 +260,7 @@ else
       [ -d "$skill_dir" ] || continue
       [ -f "$skill_dir/SKILL.md" ] || continue
       skill_name=$(basename "$skill_dir")
-      # Skip non-skill scaffolding (template, the deprecated/ container).
+      # Skip non-skill scaffolding (TEMPLATE, dotfiles; deprecated kept defensively).
       case "$skill_name" in TEMPLATE|deprecated|.*) continue ;; esac
       mkdir -p "$STAGING_DIR/skills/$skill_name"
       cp -r "$skill_dir"* "$STAGING_DIR/skills/$skill_name/"

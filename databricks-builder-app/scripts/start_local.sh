@@ -231,12 +231,7 @@ echo ""
 echo -e "${YELLOW}[7/${TOTAL_STEPS}] Installing skills...${NC}"
 
 # Run install_skills.sh from the project dir — installs to .claude/skills/.
-# The bundled skill copies moved under databricks-skills/deprecated/; check
-# there first, then fall back to the legacy databricks-skills/ location.
-INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/deprecated/install_skills.sh"
-if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
-  INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
-fi
+INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
 
 if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then
   echo -e "  ${YELLOW}⚠${NC} install_skills.sh not found — using bundled skills snapshot only"
@@ -248,17 +243,17 @@ else
 fi
 
 # Scan skills from .claude/skills/ (where install_skills.sh puts them) and from
-# the repo-local skills snapshot (databricks-skills/deprecated/ preferred, with
+# the repo-local skills snapshot (DEPRECATED-databricks-skills/ preferred, with
 # the legacy databricks-skills/ location as a fallback) — union of all.
 SKILL_NAMES=""
 SKILL_COUNT=0
-for skills_root in "$PROJECT_DIR/.claude/skills" "$REPO_ROOT/databricks-skills/deprecated" "$REPO_ROOT/databricks-skills"; do
+for skills_root in "$PROJECT_DIR/.claude/skills" "$REPO_ROOT/DEPRECATED-databricks-skills" "$REPO_ROOT/databricks-skills"; do
   [ -d "$skills_root" ] || continue
   for skill_dir in "$skills_root"/*/; do
     [ -d "$skill_dir" ] || continue
     if [ -f "$skill_dir/SKILL.md" ]; then
       name=$(basename "$skill_dir")
-      # Skip non-skill scaffolding (template, the deprecated/ container).
+      # Skip non-skill scaffolding (TEMPLATE, dotfiles; deprecated kept defensively).
       case "$name" in TEMPLATE|deprecated|.*) continue ;; esac
       # Avoid duplicates
       if ! echo ",$SKILL_NAMES," | grep -q ",$name,"; then

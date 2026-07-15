@@ -20,8 +20,10 @@ import yaml
 SKILLS_DIR = Path("databricks-skills")
 INSTALL_SCRIPT = SKILLS_DIR / "install_skills.sh"
 # The bundled skill copies are frozen/deprecated and now live under
-# databricks-skills/deprecated/. Fall back to the top-level dir for older checkouts.
-SKILL_DIRS_ROOT = SKILLS_DIR / "deprecated" if (SKILLS_DIR / "deprecated").is_dir() else SKILLS_DIR
+# DEPRECATED-databricks-skills/ at the repo root. Fall back to the top-level
+# databricks-skills/ dir for older checkouts.
+_DEPRECATED_SKILLS_ROOT = Path("DEPRECATED-databricks-skills")
+SKILL_DIRS_ROOT = _DEPRECATED_SKILLS_ROOT if _DEPRECATED_SKILLS_ROOT.is_dir() else SKILLS_DIR
 SKIP_DIRS = {"TEMPLATE", "deprecated"}
 
 RESERVED_WORDS = {"anthropic", "claude"}

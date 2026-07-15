@@ -45,9 +45,9 @@ SKILLS_DIR="$SCRIPT_DIR/.claude/skills"
 mkdir -p "$SKILLS_DIR"
 
 # Copy all skills from the bundled skills snapshot (excluding non-skill dirs).
-# The bundled skill copies moved under databricks-skills/deprecated/; prefer
-# that snapshot and fall back to the legacy databricks-skills/ location.
-SKILLS_SRC="$SCRIPT_DIR/../../../databricks-skills/deprecated"
+# The bundled skill copies moved to DEPRECATED-databricks-skills/ at the repo
+# root; prefer that snapshot and fall back to the legacy databricks-skills/ location.
+SKILLS_SRC="$SCRIPT_DIR/../../../DEPRECATED-databricks-skills"
 if [ ! -d "$SKILLS_SRC" ]; then
     SKILLS_SRC="$SCRIPT_DIR/../../../databricks-skills"
 fi

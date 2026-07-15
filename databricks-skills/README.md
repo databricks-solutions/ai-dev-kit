@@ -40,7 +40,7 @@ on any compute, including serverless.
 ```bash
 # Run from the directory where you want ./.claude/skills created
 ./install_skills.sh --install-to-genie --profile YOUR_PROFILE  # download (pinned to v0.1.13), then upload
-./install_skills.sh --local --install-to-genie                 # offline: source frozen deprecated/ copies instead
+./install_skills.sh --local --install-to-genie                 # offline: source frozen DEPRECATED-databricks-skills/ copies instead
 ```
 
 Run `./install_skills.sh --help` for all options.
@@ -48,9 +48,11 @@ Run `./install_skills.sh --help` for all options.
 ## Deprecated: bundled skill copies
 
 The skill folders that used to live here are frozen legacy copies under
-[`deprecated/`](deprecated/). They are **no longer maintained** and exist only so older tooling keeps
-working. Prefer `databricks aitools install`. If you need the exact historical files, use git tag
-`v0.1.13`. See [`deprecated/README.md`](deprecated/README.md) for migration guidance (skill renames
+[`DEPRECATED-databricks-skills/`](../DEPRECATED-databricks-skills/). They are **no longer maintained**
+and exist only so older tooling keeps working. Prefer `databricks aitools install`. If you need the
+exact historical files, use git tag `v0.1.13`. See
+[`DEPRECATED-databricks-skills/README.md`](../DEPRECATED-databricks-skills/README.md) for migration
+guidance (skill renames
 are documented in the root README "breaking change" note).
 
 ## Custom / Genie Code skills
