@@ -1,16 +1,15 @@
 # Python Data Ingestion
 
-Data ingestion patterns using the modern `pyspark.pipelines` API.
+Data ingestion patterns using the modern `pyspark.pipelines` API. This file shows SDP-specific wrappers around Auto Loader and Kafka. For Auto Loader fundamentals (options, discovery modes, schema management, troubleshooting) see [auto-loader.md](../auto-loader.md).
 
 **Official Documentation:**
-- [Auto Loader options](https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/options)
 - [Structured Streaming + Kafka](https://docs.databricks.com/aws/en/structured-streaming/kafka)
 
 ---
 
 ## Auto Loader (Cloud Files)
 
-Auto Loader incrementally processes new files. In SDP pipelines, schema location and checkpoints are managed automatically.
+Auto Loader incrementally processes new files. In SDP pipelines, schema location and checkpoints are managed automatically — [auto-loader.md](../auto-loader.md) covers the standalone case where you manage them explicitly.
 
 ### Basic Pattern
 

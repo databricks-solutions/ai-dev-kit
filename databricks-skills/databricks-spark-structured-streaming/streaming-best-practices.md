@@ -28,17 +28,11 @@ stream.writeStream \
 
 **Why**: Fast processing (<1 sec) repeats listing operations, causing unintended costs.
 
-### 2. Use Auto Loader Notification Mode
+### 2. Use Auto Loader for File Ingestion
 
-```python
-# Switch from file listing to event-based
-spark.readStream \
-    .format("cloudFiles") \
-    .option("cloudFiles.useNotifications", "true") \
-    .load("/path/to/data")
-```
+When ingesting files from cloud storage, use Auto Loader (`cloudFiles`) instead of generic file streams. It tracks processed files in a checkpoint and supports schema inference, evolution, and file notification mode for high file counts.
 
-[Auto Loader File Notification Mode](https://docs.databricks.com/ingestion/auto-loader/file-notification-mode.html)
+→ See [`databricks-spark-declarative-pipelines/references/auto-loader.md`](../databricks-spark-declarative-pipelines/references/auto-loader.md). The patterns apply to raw Structured Streaming too; outside SDP, set `cloudFiles.schemaLocation` and `checkpointLocation` explicitly.
 
 ### 3. Disable S3 Versioning
 
