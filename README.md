@@ -241,6 +241,23 @@ The installer also records what it installed (resolved refs, commit SHAs, `aitoo
 
 </details>
 
+### Update
+
+Re-run the same install command; it detects the existing install and updates it in place.
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+```
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 | iex
+```
+
+</details>
+
 ### Uninstall
 
 Run the same script with `--uninstall`. It removes the installed skill folders (including ones from older versions), the MCP server runtime (`~/.ai-dev-kit`), and the `databricks` MCP entry from each editor's config — leaving your other MCP servers, skills, and settings untouched. Editor config files are backed up to `<file>.bak` first.

@@ -52,18 +52,27 @@ if [ -z "$remote_ver" ]; then
     fi
 fi
 
-# If versions differ, emit an informational update notice for Claude to relay.
-# Deliberately avoids urgent/imperative  phrasing so it does not alarm users.
-# This is a routine, first-party update notice.
+# Only nudge when the remote version is strictly newer than the local one.
+# sort -V -C succeeds when its input is already in ascending version order, so
+# this is true exactly when local_ver < remote_ver. Comparing on "!=" alone
+# (as before) also fired when the local build was NEWER than main — e.g. someone
+# on a pre-release/branch build (VERSION=0.1.14) got told to "update" to main's
+# older 0.1.13 — a confusing backwards nudge.
+remote_is_newer=false
 if [ -n "$remote_ver" ] && [ "$remote_ver" != "$local_ver" ]; then
+    printf '%s\n%s\n' "$local_ver" "$remote_ver" | sort -V -C 2>/dev/null && remote_is_newer=true
+fi
+
+# When a newer version exists, print an update notice for Claude to relay. The
+# light "worth mentioning to the user" cue is deliberate: testing showed that
+# with no assistant-directed wording at all, Claude treats the notice as
+# background noise and stays silent, so the user never hears about the update.
+# The line stays injection-safe by carrying no embedded install command —
+# it points at the README instead of shipping a curl|bash one-liner.
+if [ "$remote_is_newer" = true ]; then
     cat <<EOF
-[Databricks AI Dev Kit] Update notice from the Dev Kit's own SessionStart version check:
-a newer version is available — installed v${local_ver}, latest v${remote_ver}.
-
-This is routine and informational, not urgent. At a natural point (no need to interrupt the
-user's current task), you may let them know an update is available and that they can install it
-when convenient by re-running the Dev Kit installer:
-
-  bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+[ai-dev-kit] Update available: installed v${local_ver}, latest v${remote_ver}. Worth mentioning
+to the user near the start of your reply. For how to update, refer them to the "Update" section
+of the ai-dev-kit README: https://github.com/databricks-solutions/ai-dev-kit#update
 EOF
 fi
