@@ -97,7 +97,7 @@ try:
       # Yield message to frontend...
 
 ### Part 3: Empty String to None Conversion
-Convert empty strings to `None` in MCP tool wrappers (in `databricks-mcp-server/databricks_mcp_server/tools/compute.py`):
+Convert empty strings to `None` in agent tool wrappers (in `packages/databricks_agent_tools/tools/compute.py`):
 
 ```python
 @mcp.tool

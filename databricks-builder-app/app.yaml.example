@@ -33,8 +33,6 @@ env:
   # To override, set a specific list here before deploying.
   - name: ENABLED_SKILLS
     value: ""
-  - name: SKILLS_ONLY_MODE
-    value: "false"
   
   # =============================================================================
   # Database Configuration (Lakebase)

@@ -1,6 +1,6 @@
 """Dynamic tool loader for Databricks tools.
 
-Scans FastMCP tools from databricks-mcp-server and creates
+Scans FastMCP tools from the vendored databricks_agent_tools package and creates
 in-process SDK tools for the Claude Code Agent SDK.
 
 Includes async handoff for long-running operations to prevent
@@ -67,8 +67,8 @@ def _get_all_sdk_tools():
         return _all_sdk_tools, _all_tool_names
 
     # Import triggers @mcp.tool registration
-    from databricks_mcp_server.server import mcp
-    from databricks_mcp_server.tools import compute, file, pipelines, sql  # noqa: F401
+    from databricks_agent_tools.server import mcp
+    from databricks_agent_tools.tools import compute, file, pipelines, sql  # noqa: F401
 
     sdk_tools = []
     tool_names = []

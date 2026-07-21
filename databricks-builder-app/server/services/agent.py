@@ -3,7 +3,7 @@
 Uses the claude-agent-sdk to create and manage Claude Code agent sessions
 with directory-scoped file permissions and Databricks tools.
 
-Databricks tools are loaded in-process from databricks-mcp-server using
+Databricks tools are loaded in-process from the vendored databricks_agent_tools package using
 the SDK tool wrapper. Auth is handled via contextvars for multi-user support.
 
 MLflow Tracing:

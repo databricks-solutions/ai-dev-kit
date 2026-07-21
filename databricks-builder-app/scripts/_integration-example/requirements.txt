@@ -1,10 +1,7 @@
 # AI Dev Kit Integration Dependencies
-# Install from local ai-dev-kit repository
+# Install from local databricks-builder-app (vendored tool packages)
 
-# Core packages (from ai-dev-kit repo)
--e ../../../databricks-tools-core
--e ../../../databricks-mcp-server
--e ../../  # databricks-builder-app
+-e ../..  # databricks-builder-app (includes packages/databricks_tools_core + databricks_agent_tools)
 
 # Claude Agent SDK
 claude-agent-sdk>=0.1.0

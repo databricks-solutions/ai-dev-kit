@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from ..db import get_lakebase_project_id, is_postgres_configured, test_database_connection
 from ..services.system_prompt import get_system_prompt
+from ..services.project_access import require_owned_project
 from ..services.user import get_current_user, get_workspace_url
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ async def health_check():
 
 @router.get('/system_prompt')
 async def get_system_prompt_endpoint(
+  request: Request,
   cluster_id: Optional[str] = Query(None),
   warehouse_id: Optional[str] = Query(None),
   default_catalog: Optional[str] = Query(None),
@@ -55,6 +57,7 @@ async def get_system_prompt_endpoint(
   """Get the system prompt with current configuration."""
   enabled_skills = None
   if project_id:
+    await require_owned_project(request, project_id)
     from ..services.agent import get_project_directory
     from ..services.skills_manager import get_project_enabled_skills
     project_dir = get_project_directory(project_id)

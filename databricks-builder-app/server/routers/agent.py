@@ -23,6 +23,7 @@ from ..services.agent import get_project_directory, stream_agent_response
 from ..services.backup_manager import mark_for_backup
 from ..services.storage import ConversationStorage, ProjectStorage
 from ..services.title_generator import generate_title_async
+from ..services.project_access import require_stream_owner
 from ..services.user import get_current_user, get_current_token, get_fmapi_token, get_workspace_url
 
 logger = logging.getLogger(__name__)
@@ -393,7 +394,7 @@ async def invoke_agent(request: Request, body: InvokeAgentRequest):
 
 
 @router.post('/stream_progress/{execution_id}')
-async def stream_progress(execution_id: str, body: StreamProgressRequest):
+async def stream_progress(request: Request, execution_id: str, body: StreamProgressRequest):
     """Stream events from an active execution via SSE.
 
     This endpoint streams events as Server-Sent Events (SSE).
@@ -415,6 +416,8 @@ async def stream_progress(execution_id: str, body: StreamProgressRequest):
             status_code=404,
             detail=f'Stream not found: {execution_id}'
         )
+
+    await require_stream_owner(request, stream.user_email)
 
     async def generate_events():
         """Generate SSE stream of events with 50-second window."""
@@ -476,7 +479,7 @@ async def stream_progress(execution_id: str, body: StreamProgressRequest):
 
 
 @router.post('/stop_stream/{execution_id}', response_model=StopStreamResponse)
-async def stop_stream(execution_id: str):
+async def stop_stream(request: Request, execution_id: str):
     """Stop/cancel an active stream.
 
     Args:
@@ -493,6 +496,8 @@ async def stop_stream(execution_id: str):
             status_code=404,
             detail=f'Stream not found: {execution_id}'
         )
+
+    await require_stream_owner(request, stream.user_email)
 
     if stream.is_complete:
         return StopStreamResponse(

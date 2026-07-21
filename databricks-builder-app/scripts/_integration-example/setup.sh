@@ -38,32 +38,16 @@ else
     pip install -r requirements.txt
 fi
 
-# Install skills
+# Install skills via builder app installer (requires Databricks CLI v1.0.0+)
 echo ""
-echo "Installing all skills..."
-SKILLS_DIR="$SCRIPT_DIR/.claude/skills"
-mkdir -p "$SKILLS_DIR"
-
-# Copy all skills from databricks-skills (excluding non-skill directories)
-SKILLS_SRC="$SCRIPT_DIR/../../../databricks-skills"
-if [ -d "$SKILLS_SRC" ]; then
-    # Find all directories containing SKILL.md (these are actual skills)
-    for skill_dir in "$SKILLS_SRC"/*/; do
-        skill_name=$(basename "$skill_dir")
-        # Skip non-skill directories
-        if [ "$skill_name" = "TEMPLATE" ]; then
-            continue
-        fi
-        # Only copy if it has a SKILL.md (confirms it's a real skill)
-        if [ -f "$skill_dir/SKILL.md" ]; then
-            echo "  Installing: $skill_name"
-            cp -r "$skill_dir" "$SKILLS_DIR/"
-        fi
-    done
-    echo "Skills installed to $SKILLS_DIR"
+echo "Installing skills..."
+BUILDER_ROOT="$SCRIPT_DIR/../.."
+if [ -f "$BUILDER_ROOT/scripts/install_builder_skills.sh" ]; then
+  PROJECT_DIR="$SCRIPT_DIR" bash "$BUILDER_ROOT/scripts/install_builder_skills.sh" || {
+    echo "Warning: install_builder_skills.sh failed — ensure Databricks CLI v1.0.0+ is installed"
+  }
 else
-    echo "Warning: databricks-skills not found at $SKILLS_SRC"
-    echo "Skills will need to be installed manually"
+  echo "Warning: install_builder_skills.sh not found"
 fi
 
 # Copy .env.example to .env if it doesn't exist

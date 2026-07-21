@@ -1,11 +1,12 @@
-# Skills (copied from databricks-skills on startup)
+# Skills (runtime cache / deploy bundle — built by install_builder_skills.sh)
 skills/
+
+# Aitools / Claude skill installs (local + deploy-time, not source)
+.claude/
+.databricks/
 
 # Projects directory (local development)
 projects/
-
-# Packages (copied from sibling dirs during deployment)
-packages/
 
 # Conda environment (for Databricks Apps deployment)
 conda-env/
@@ -15,11 +16,13 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.pytest_cache/
 
 # Environment
 .env
 .env.local
 app.yaml
+app.yaml_backup
 
 # Node (client)
 client/node_modules/

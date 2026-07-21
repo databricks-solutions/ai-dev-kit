@@ -24,7 +24,6 @@ STAGING_DIR=""
 SKIP_BUILD="${SKIP_BUILD:-false}"
 SKIP_LAKEBASE="${SKIP_LAKEBASE:-false}"
 SKIP_SKILLS="${SKIP_SKILLS:-false}"
-ENABLE_MCP_GATEWAY="${ENABLE_MCP_GATEWAY:-false}"
 LAKEBASE_PROJECT_ID="${LAKEBASE_PROJECT_ID:-builder-app-db}"
 
 usage() {
@@ -40,19 +39,17 @@ usage() {
   echo "  app-name              Name of the Databricks App (required)"
   echo ""
   echo "Options:"
-  echo "  --profile PROFILE     Databricks CLI profile to use"
+  echo "  --profile PROFILE     Databricks CLI profile (required)"
   echo "  --skip-build          Skip frontend build (use existing build)"
   echo "  --skip-lakebase       Skip Lakebase provisioning (already exists)"
   echo "  --skip-skills        Skip skills installation (reuse cached skills)"
-  echo "  --enable-mcp          Enable MCP Gateway at /mcp (for Genie Code / AI Playground)"
   echo "  --lakebase-id ID      Lakebase project ID (default: builder-app-db)"
   echo "  --staging-dir DIR     Custom staging directory"
   echo "  -h, --help            Show this help message"
   echo ""
   echo "Example:"
   echo "  $0 my-builder-app --profile dbx_shared_demo"
-  echo "  $0 my-builder-app --skip-lakebase --skip-build"
-  echo "  $0 mcp-builder-app --enable-mcp --profile demo  # With MCP Gateway (Genie Code compatible)"
+  echo "  $0 my-builder-app --profile dbx_shared_demo --skip-lakebase --skip-build"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -62,7 +59,6 @@ while [[ $# -gt 0 ]]; do
     --skip-build) SKIP_BUILD=true; shift ;;
     --skip-lakebase) SKIP_LAKEBASE=true; shift ;;
     --skip-skills) SKIP_SKILLS=true; shift ;;
-    --enable-mcp) ENABLE_MCP_GATEWAY=true; shift ;;
     --lakebase-id) LAKEBASE_PROJECT_ID="$2"; shift 2 ;;
     --staging-dir) STAGING_DIR="$2"; shift 2 ;;
     -*) echo -e "${RED}Error: Unknown option $1${NC}"; usage; exit 1 ;;
@@ -76,39 +72,11 @@ if [ -z "$APP_NAME" ]; then
   echo -e "${RED}Error: App name is required${NC}"; echo ""; usage; exit 1
 fi
 
-# Validate app name for Genie Code MCP compatibility
-if [ "$ENABLE_MCP_GATEWAY" = true ] && [[ ! "$APP_NAME" == mcp-* ]]; then
-  echo ""
-  echo -e "${YELLOW}╔════════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${YELLOW}║  ⚠  Genie Code MCP Naming Requirement                     ║${NC}"
-  echo -e "${YELLOW}╚════════════════════════════════════════════════════════════╝${NC}"
-  echo ""
-  echo -e "  Your app name is: ${RED}${APP_NAME}${NC}"
-  echo -e "  Genie Code only discovers apps whose names start with ${GREEN}mcp-${NC}"
-  echo ""
-  echo -e "  Suggested name: ${GREEN}mcp-${APP_NAME}${NC}"
-  echo ""
-  echo -e "  Without the ${GREEN}mcp-${NC} prefix, the app will still work as an MCP"
-  echo -e "  server, but it ${RED}will not appear${NC} in the Genie Code MCP picker."
-  echo ""
-  read -r -p "  Continue with '$APP_NAME' anyway? [y/N] " response
-  case "$response" in
-    [yY][eE][sS]|[yY])
-      echo -e "  Continuing with '${APP_NAME}'..."
-      echo ""
-      ;;
-    *)
-      echo ""
-      echo -e "  Aborting. Re-run with a name starting with ${GREEN}mcp-${NC}:"
-      echo -e "    $0 mcp-${APP_NAME} --enable-mcp ${PROFILE:+--profile $PROFILE}"
-      echo ""
-      exit 0
-      ;;
-  esac
+if [ -z "$PROFILE" ]; then
+  echo -e "${RED}Error: --profile is required${NC}"; echo ""; usage; exit 1
 fi
 
-CLI_ARGS=""
-if [ -n "$PROFILE" ]; then CLI_ARGS="--profile $PROFILE"; fi
+CLI_ARGS="--profile $PROFILE"
 
 STAGING_DIR="${STAGING_DIR:-/tmp/${APP_NAME}-deploy}"
 SKILLS_CACHE_DIR="/tmp/${APP_NAME}-skills-cache"
@@ -121,11 +89,10 @@ echo ""
 echo -e "  App Name:          ${GREEN}${APP_NAME}${NC}"
 echo -e "  Lakebase ID:       ${LAKEBASE_PROJECT_ID}"
 echo -e "  Lakebase Endpoint: ${LAKEBASE_ENDPOINT}"
-echo -e "  Profile:           ${PROFILE:-<default>}"
+echo -e "  Profile:           ${GREEN}${PROFILE}${NC}"
 echo -e "  Skip Build:        ${SKIP_BUILD}"
 echo -e "  Skip Lakebase:     ${SKIP_LAKEBASE}"
 echo -e "  Skip Skills:       ${SKIP_SKILLS}"
-echo -e "  MCP Gateway:       ${ENABLE_MCP_GATEWAY}"
 echo ""
 
 TOTAL_STEPS=8
@@ -149,7 +116,7 @@ if [ -n "$cli_version" ]; then
 fi
 
 if ! databricks auth describe $CLI_ARGS &> /dev/null; then
-  echo -e "${RED}Error: Not authenticated. Run: databricks auth login${NC}"; exit 1
+  echo -e "${RED}Error: Not authenticated for profile '${PROFILE}'. Run: databricks auth login --profile ${PROFILE}${NC}"; exit 1
 fi
 
 WORKSPACE_HOST=$(databricks auth describe $CLI_ARGS --output json 2>/dev/null | python3 -c "
@@ -181,9 +148,7 @@ elif databricks postgres get-project "projects/${LAKEBASE_PROJECT_ID}" $CLI_ARGS
   echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' already exists — reusing"
 else
   cd "$PROJECT_DIR"
-  BUNDLE_ARGS=""
-  if [ -n "$PROFILE" ]; then BUNDLE_ARGS="--profile $PROFILE"; fi
-  databricks bundle deploy $BUNDLE_ARGS --var "lakebase_project_id=${LAKEBASE_PROJECT_ID}" 2>&1
+  databricks bundle deploy --profile "$PROFILE" --var "lakebase_project_id=${LAKEBASE_PROJECT_ID}" 2>&1
   echo -e "  ${GREEN}✓${NC} Lakebase project '${LAKEBASE_PROJECT_ID}' deployed"
 fi
 echo ""
@@ -228,23 +193,24 @@ cp -r client/out "$STAGING_DIR/client/"
 
 echo "  Copying Databricks packages..."
 mkdir -p "$STAGING_DIR/packages/databricks_tools_core"
-cp -r "$REPO_ROOT/databricks-tools-core/databricks_tools_core/"* "$STAGING_DIR/packages/databricks_tools_core/"
-mkdir -p "$STAGING_DIR/packages/databricks_mcp_server"
-cp -r "$REPO_ROOT/databricks-mcp-server/databricks_mcp_server/"* "$STAGING_DIR/packages/databricks_mcp_server/"
+cp -r "$PROJECT_DIR/packages/databricks_tools_core/"* "$STAGING_DIR/packages/databricks_tools_core/"
+mkdir -p "$STAGING_DIR/packages/databricks_agent_tools"
+cp -r "$PROJECT_DIR/packages/databricks_agent_tools/"* "$STAGING_DIR/packages/databricks_agent_tools/"
 
 if [ "$SKIP_SKILLS" = true ] && [ -d "$SKILLS_CACHE_DIR" ] && [ "$(ls -A "$SKILLS_CACHE_DIR" 2>/dev/null)" ]; then
   mkdir -p "$STAGING_DIR/skills"
   echo -e "  ${GREEN}✓${NC} Reusing cached skills from ${SKILLS_CACHE_DIR} (--skip-skills)"
   cp -r "$SKILLS_CACHE_DIR"/* "$STAGING_DIR/skills/"
 else
-  echo "  Installing skills via install_skills.sh..."
-INSTALL_SKILLS_SCRIPT="$REPO_ROOT/databricks-skills/install_skills.sh"
-if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then echo -e "${RED}Error: install_skills.sh not found${NC}"; exit 1; fi
+  echo "  Installing skills via install_builder_skills.sh..."
+INSTALL_SKILLS_SCRIPT="$PROJECT_DIR/scripts/install_builder_skills.sh"
+if [ ! -f "$INSTALL_SKILLS_SCRIPT" ]; then echo -e "${RED}Error: install_builder_skills.sh not found${NC}"; exit 1; fi
 
 SKILLS_TEMP_DIR=$(mktemp -d)
 trap "rm -rf '$SKILLS_TEMP_DIR'" EXIT
 touch "$SKILLS_TEMP_DIR/databricks.yml"
-(cd "$SKILLS_TEMP_DIR" && bash "$INSTALL_SKILLS_SCRIPT")
+# Run installer in temp dir so we don't pollute the dev tree; copy results to staging.
+(cd "$SKILLS_TEMP_DIR" && PROJECT_DIR="$SKILLS_TEMP_DIR" bash "$INSTALL_SKILLS_SCRIPT" --silent --profile "$PROFILE")
 
 mkdir -p "$STAGING_DIR/skills"
 INSTALLED_SKILLS_DIR="$SKILLS_TEMP_DIR/.claude/skills"
@@ -298,8 +264,6 @@ env:
     value: "databricks_postgres"
   - name: ENABLED_SKILLS
     value: "${SKILL_NAMES}"
-  - name: SKILLS_ONLY_MODE
-    value: "false"
   - name: LLM_PROVIDER
     value: "DATABRICKS"
   - name: DATABRICKS_MODEL
@@ -315,17 +279,6 @@ env:
   - name: AUTO_GRANT_PERMISSIONS_TO
     value: "account users"
 APPYAML
-
-# Append MCP Gateway env vars if enabled
-if [ "$ENABLE_MCP_GATEWAY" = true ]; then
-  cat >> "$STAGING_DIR/app.yaml" << 'MCPYAML'
-  - name: ENABLE_MCP_GATEWAY
-    value: "true"
-  - name: FASTMCP_STATELESS_HTTP
-    value: "true"
-MCPYAML
-  echo -e "  ${GREEN}✓${NC} MCP Gateway env vars added to app.yaml"
-fi
 
 echo -e "  ${GREEN}✓${NC} app.yaml generated with LAKEBASE_ENDPOINT=${LAKEBASE_ENDPOINT}"
 
@@ -378,8 +331,6 @@ fi
 
 # Grant PostgreSQL permissions via Python (uses project venv — faster than uv run)
 echo "  Granting PostgreSQL permissions..."
-PROFILE_ENV=""
-if [ -n "$PROFILE" ]; then PROFILE_ENV="DATABRICKS_CONFIG_PROFILE=$PROFILE"; fi
 
 # Use existing venv if available, fall back to uv run
 PYTHON_CMD="uv run python3"
@@ -387,7 +338,7 @@ if [ -f "$PROJECT_DIR/.venv/bin/python3" ]; then
   PYTHON_CMD="$PROJECT_DIR/.venv/bin/python3"
 fi
 
-GRANT_OUTPUT=$(env $PROFILE_ENV $PYTHON_CMD -c "
+GRANT_OUTPUT=$(env DATABRICKS_CONFIG_PROFILE="$PROFILE" $PYTHON_CMD -c "
 import sys
 from urllib.parse import quote
 from databricks.sdk import WorkspaceClient
@@ -442,7 +393,16 @@ echo -e "${YELLOW}[8/${TOTAL_STEPS}] Deploying app...${NC}"
 DEPLOY_OUTPUT=$(databricks apps deploy "$APP_NAME" --source-code-path "$WORKSPACE_PATH" $CLI_ARGS 2>&1)
 echo "$DEPLOY_OUTPUT"
 
-if echo "$DEPLOY_OUTPUT" | grep -q '"state":"SUCCEEDED"'; then
+DEPLOY_STATE=$(echo "$DEPLOY_OUTPUT" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('status', {}).get('state', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+
+if [ "$DEPLOY_STATE" = "SUCCEEDED" ]; then
   echo ""
   echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
   echo -e "${GREEN}║                 Deployment Successful!                     ║${NC}"
@@ -454,26 +414,6 @@ if echo "$DEPLOY_OUTPUT" | grep -q '"state":"SUCCEEDED"'; then
   echo -e "  Lakebase Project:  ${LAKEBASE_PROJECT_ID}"
   echo -e "  Lakebase Endpoint: ${LAKEBASE_ENDPOINT}"
   echo -e "  Service Principal: ${SP_CLIENT_ID}"
-  if [ "$ENABLE_MCP_GATEWAY" = true ]; then
-    echo -e "  MCP Endpoint:      ${GREEN}${APP_URL}/mcp${NC}"
-    echo -e "  MCP Info Page:     ${APP_URL}/mcp/info"
-    echo ""
-    echo -e "${BLUE}  ── Genie Code Setup ──────────────────────────────────────${NC}"
-    if [[ "$APP_NAME" == mcp-* ]]; then
-      echo -e "  ${GREEN}✓${NC} App name starts with 'mcp-' — visible to Genie Code"
-    else
-      echo -e "  ${YELLOW}⚠${NC} App name does NOT start with 'mcp-' — not visible to Genie Code"
-    fi
-    echo ""
-    echo -e "  To use with Genie Code:"
-    echo -e "    1. Open a Genie Space in the Databricks UI"
-    echo -e "    2. Click the ${BOLD}gear icon${NC} (Settings) > ${BOLD}MCP Servers${NC}"
-    echo -e "    3. Select ${GREEN}${APP_NAME}${NC} from the app list"
-    echo -e "    4. Also add skills to the space via ${BOLD}Instructions${NC}"
-    echo ""
-    echo -e "  To use with AI Playground or other MCP clients:"
-    echo -e "    MCP URL: ${GREEN}${APP_URL}/mcp${NC}"
-  fi
   echo ""
 
   # Clean up old deployments

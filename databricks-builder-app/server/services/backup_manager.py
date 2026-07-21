@@ -6,7 +6,6 @@ Runs a background loop every 10 minutes to process pending backups.
 
 import asyncio
 import logging
-import os
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -17,16 +16,26 @@ from sqlalchemy.dialects.postgresql import insert
 
 from ..db.database import session_scope
 from ..db.models import ProjectBackup
+from .project_paths import PROJECTS_BASE_DIR, resolve_project_dir
 
 logger = logging.getLogger(__name__)
 
 # Configuration
 BACKUP_INTERVAL = 600  # 10 minutes
-PROJECTS_BASE_DIR = os.getenv('PROJECTS_BASE_DIR', './projects')
 
 # In-memory queue of project IDs needing backup
 _backup_queue: set[str] = set()
 _backup_task: Optional[asyncio.Task] = None
+
+
+def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: Path) -> None:
+  """Extract zip contents, rejecting path-traversal entries (zip slip)."""
+  dest_root = dest_dir.resolve()
+  for member in zf.namelist():
+    target = (dest_root / member).resolve()
+    if not target.is_relative_to(dest_root):
+      raise ValueError(f'Unsafe zip entry: {member!r}')
+  zf.extractall(dest_root)
 
 
 def mark_for_backup(project_id: str) -> None:
@@ -53,7 +62,7 @@ async def create_backup(project_id: str) -> bool:
   Returns:
       True if backup was created, False if project folder doesn't exist
   """
-  project_dir = Path(PROJECTS_BASE_DIR).resolve() / project_id
+  project_dir = resolve_project_dir(project_id)
 
   if not project_dir.exists():
     logger.warning(f'Project directory does not exist: {project_dir}')
@@ -116,13 +125,13 @@ async def restore_backup(project_id: str) -> bool:
     backup_data = row
 
   # Create project directory
-  project_dir = Path(PROJECTS_BASE_DIR).resolve() / project_id
+  project_dir = resolve_project_dir(project_id)
   project_dir.mkdir(parents=True, exist_ok=True)
 
   # Extract zip
   buffer = BytesIO(backup_data)
   with zipfile.ZipFile(buffer, 'r') as zf:
-    zf.extractall(project_dir)
+    _safe_extract_zip(zf, project_dir)
 
   logger.info(f'Restored project {project_id} from backup')
   return True
@@ -190,7 +199,7 @@ def ensure_project_directory(project_id: str) -> Path:
   """
   from .skills_manager import copy_skills_to_project
 
-  project_dir = Path(PROJECTS_BASE_DIR).resolve() / project_id
+  project_dir = resolve_project_dir(project_id)
   needs_skills = not project_dir.exists() or not (project_dir / '.claude' / 'skills').exists()
   is_new_project = not project_dir.exists()
 
@@ -237,7 +246,7 @@ async def ensure_project_directory_async(project_id: str) -> Path:
   Returns:
       Path to the project directory
   """
-  project_dir = Path(PROJECTS_BASE_DIR).resolve() / project_id
+  project_dir = resolve_project_dir(project_id)
 
   if not project_dir.exists():
     restored = await restore_backup(project_id)

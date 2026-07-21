@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from ..services import (
@@ -14,6 +14,7 @@ from ..services import (
   set_project_enabled_skills,
   sync_project_skills,
 )
+from ..services.project_access import require_owned_project
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -60,8 +61,9 @@ def _build_tree_node(path: Path, base_path: Path) -> dict:
 
 
 @router.get('/projects/{project_id}/skills/tree')
-async def get_skills_tree(project_id: str):
+async def get_skills_tree(request: Request, project_id: str):
   """Get the skills directory tree for a project."""
+  await require_owned_project(request, project_id)
   skills_dir = _get_skills_dir(project_id)
 
   if not skills_dir.exists():
@@ -80,16 +82,18 @@ async def get_skills_tree(project_id: str):
 
 @router.get('/projects/{project_id}/skills/file')
 async def get_skill_file(
+  request: Request,
   project_id: str,
   path: str = Query(..., description='Relative path to the file within the skills folder'),
 ):
   """Get the content of a skill file."""
+  await require_owned_project(request, project_id)
   skills_dir = _get_skills_dir(project_id)
 
   try:
     requested_path = (skills_dir / path).resolve()
 
-    if not str(requested_path).startswith(str(skills_dir.resolve())):
+    if not requested_path.is_relative_to(skills_dir.resolve()):
       raise HTTPException(status_code=403, detail='Access denied: path outside skills directory')
 
     if not requested_path.exists():
@@ -109,12 +113,13 @@ async def get_skill_file(
     raise
   except Exception as e:
     logger.error(f'Failed to read skill file: {e}')
-    raise HTTPException(status_code=500, detail=f'Failed to read file: {str(e)}')
+    raise HTTPException(status_code=500, detail='Failed to read file')
 
 
 @router.get('/projects/{project_id}/skills/available')
-async def get_available_skills_for_project(project_id: str):
+async def get_available_skills_for_project(request: Request, project_id: str):
   """Get all available skills with their enabled/disabled status for a project."""
+  await require_owned_project(request, project_id)
   project_dir = get_project_directory(project_id)
   enabled_skills = get_project_enabled_skills(project_dir)
 
@@ -140,12 +145,17 @@ async def get_available_skills_for_project(project_id: str):
 
 
 @router.put('/projects/{project_id}/skills/enabled')
-async def update_enabled_skills(project_id: str, body: UpdateEnabledSkillsRequest):
+async def update_enabled_skills(
+  request: Request,
+  project_id: str,
+  body: UpdateEnabledSkillsRequest,
+):
   """Update the list of enabled skills for a project.
 
   Setting enabled_skills to null re-enables all skills.
   After updating, syncs the project's .claude/skills directory.
   """
+  await require_owned_project(request, project_id)
   project_dir = get_project_directory(project_id)
 
   # Write to filesystem
@@ -164,9 +174,10 @@ async def update_enabled_skills(project_id: str, body: UpdateEnabledSkillsReques
 
 
 @router.post('/projects/{project_id}/skills/reload')
-async def reload_skills(project_id: str):
+async def reload_skills(request: Request, project_id: str):
   """Reload skills for a project (respects enabled skills)."""
   try:
+    await require_owned_project(request, project_id)
     project_dir = get_project_directory(project_id)
     enabled_skills = get_project_enabled_skills(project_dir)
 
@@ -181,4 +192,4 @@ async def reload_skills(project_id: str):
     raise
   except Exception as e:
     logger.error(f'Failed to reload skills: {e}')
-    raise HTTPException(status_code=500, detail=f'Failed to reload skills: {str(e)}')
+    raise HTTPException(status_code=500, detail='Failed to reload skills')
