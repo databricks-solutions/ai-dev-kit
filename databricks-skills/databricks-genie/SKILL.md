@@ -174,6 +174,7 @@ manage_genie(
 ## Reference Files
 
 - [spaces.md](spaces.md) - Creating and managing Genie Spaces
+- [spaces-authoring.md](spaces-authoring.md) - Building rich spaces with joins, SQL snippets, example SQL, text instructions, and benchmarks via the `GenieSpaceBuilder` helper
 - [conversation.md](conversation.md) - Asking questions via the Conversation API
 
 ## Prerequisites
