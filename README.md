@@ -55,7 +55,7 @@ Databricks offers two paths for AI-assisted coding. Choose the one that matches 
 
 **Free, first-party AI coding inside Databricks**
 
-Built into every Databricks workspace at no extra cost, with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks.
+Every Databricks workspace includes this built-in feature with a [free quota](https://www.databricks.com/product/pricing/genie), with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks.
 
 </td>
 <td width="50%" align="center" valign="top">
