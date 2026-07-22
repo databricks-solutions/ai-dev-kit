@@ -1,0 +1,9 @@
+# Test fixtures directory
+
+Add JSON or CSV files here. In tests, use them with `load_fixture()`:
+
+```
+def test_using_fixture(load_fixture):
+    data = load_fixture("my_data.json")
+    assert len(data) >= 1
+```

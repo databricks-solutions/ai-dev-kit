@@ -1,0 +1,40 @@
+# Databricks Asset Bundle definition for mcp_databricks_filtering.
+# https://docs.databricks.com/dev-tools/bundles/index.html
+bundle:
+  name: mcp_databricks_filtering
+
+include:
+  - resources/*.yml
+  - resources/*/*.yml
+
+artifacts:
+  python_artifact:
+    type: whl
+    build: uv build --wheel
+
+variables:
+  workspace_host:
+    description: Databricks workspace URL (e.g. https://adb-xxxx.azuredatabricks.net)
+  catalog:
+    description: Default catalog
+    default: main
+  schema:
+    description: Default schema
+    default: default
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${var.workspace_host}
+    variables:
+      schema: ${workspace.current_user.short_name}
+
+  prod:
+    mode: production
+    workspace:
+      host: ${var.workspace_host}
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      schema: prod
