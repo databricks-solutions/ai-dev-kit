@@ -15,6 +15,7 @@ Genie Spaces allow users to ask natural language questions about structured data
 
 Use this skill when:
 - Creating a new Genie Space for data exploration
+- Authoring a high-quality, production-grade space with curated instructions, synonyms, example SQL, join specs, and benchmarks (see [authoring.md](authoring.md))
 - Adding sample questions to guide users
 - Connecting Unity Catalog tables to a conversational interface
 - Asking questions to a Genie Space programmatically (Conversation API)
@@ -135,6 +136,12 @@ manage_genie(
 )
 ```
 
+> **For a production-grade space, don't stop here.** The call above creates a basic
+> space. To get accurate answers, author a curated `serialized_space` with column
+> synonyms, structured instructions, certified example SQL, join specs, reusable
+> measures/filters, and benchmarks — all grounded in the table's real values. See
+> [authoring.md](authoring.md).
+
 ### 3. Ask Questions (Conversation API)
 
 ```
@@ -174,6 +181,7 @@ manage_genie(
 ## Reference Files
 
 - [spaces.md](spaces.md) - Creating and managing Genie Spaces
+- [authoring.md](authoring.md) - Authoring a high-quality space: curated instructions, synonyms, example SQL, join specs, measures/filters, and benchmarks (data-grounded)
 - [conversation.md](conversation.md) - Asking questions via the Conversation API
 
 ## Prerequisites
