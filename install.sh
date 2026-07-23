@@ -151,6 +151,12 @@ PROFILE_APP_DEVELOPER="databricks-apps databricks-apps-python databricks-lakebas
 # Selected skills (populated during profile selection)
 SELECTED_MLFLOW_SKILLS=""
 SELECTED_AGENT_B_SKILLS=""
+# True when the user selected *all* agent skills (the "all" profile). In that case
+# we skip the fragile per-skill enumeration and let `databricks aitools install`
+# define the full set itself (its native default = every stable skill; add
+# --experimental for the rest). A partial selection (a profile subset or --skills)
+# keeps the enumerated --skills path.
+SELECTED_ALL_AGENT_B=false
 
 # Output helpers
 msg()  { [ "$SILENT" = true ] || echo -e "  $*"; }
@@ -1361,6 +1367,7 @@ resolve_skills() {
     if [ -z "$SKILLS_PROFILE" ] || [ "$SKILLS_PROFILE" = "all" ]; then
         mlflow_skills="$MLFLOW_SKILLS"
         _default_agent_b
+        SELECTED_ALL_AGENT_B=true
         _store_selection
         return
     fi
@@ -1374,6 +1381,7 @@ resolve_skills() {
                 mlflow_skills="$MLFLOW_SKILLS"
                 agent_b_skills=""
                 _default_agent_b
+                SELECTED_ALL_AGENT_B=true
                 _store_selection
                 return
                 ;;
@@ -1818,6 +1826,20 @@ install_agent_b_skills() {
     fi
 
     map_aitools_agents
+
+    # "All" path: skip the fragile per-skill enumeration and let the native
+    # `databricks aitools install` define the full set itself (its default = every
+    # stable skill; --experimental adds the rest). This installs the plugin for
+    # agents that support it (Claude Code / Codex / Copilot) and raw files for the
+    # others, exactly as the CLI intends. Tools aitools can't target
+    # (Gemini/Windsurf/Kiro) are still mirrored the same set.
+    if [ "$SELECTED_ALL_AGENT_B" = true ]; then
+        install_agent_b_all "$base_dir"
+        mkdir -p "$STATE_DIR"
+        echo "$SELECTED_AGENT_B_SKILLS" | tr ' ' '\n' | sed '/^$/d' > "$prev_file"
+        return
+    fi
+
     # We always install a named subset via --skills, which the CLI only allows
     # with --skills-only (or --path): the default plugin install is all-or-nothing.
     # --skills-only writes raw skill files and the .databricks/aitools/skills store
@@ -1854,6 +1876,131 @@ install_agent_b_skills() {
     # Record the selection so a future profile change can uninstall dropped skills
     mkdir -p "$STATE_DIR"
     echo "$SELECTED_AGENT_B_SKILLS" | tr ' ' '\n' | sed '/^$/d' > "$prev_file"
+}
+
+# Plugin-capable agents: `databricks aitools install` registers a marketplace
+# plugin for these instead of writing raw skill files, so their skills dir stays
+# empty. When the plugin install succeeds we must NOT also mirror raw files into
+# that dir (it would double-install every skill). Map each to the skills dir it
+# would otherwise use, so we can exclude it from the mirror.
+#   claude-code → .claude/skills   codex → .agents/skills   copilot → .github/skills
+plugin_agent_skills_dir() {
+    local base_dir=$1 tool=$2
+    case $tool in
+        claude)  echo "$base_dir/.claude/skills" ;;
+        codex)   echo "$base_dir/.agents/skills" ;;
+        copilot) echo "$base_dir/.github/skills" ;;
+    esac
+}
+
+# "All skills" install: delegate to the native `databricks aitools install` with
+# no --skills list, so the CLI installs its full default set (plus experimental
+# when enabled). Unlike the enumerated path this uses the agents' native install
+# (marketplace plugin for Claude Code / Codex / Copilot; raw files for the rest),
+# then mirrors the same full set into every tool the native install did NOT cover.
+install_agent_b_all() {
+    local base_dir=$1
+
+    # Experimental skills are part of "all" unless the user opted out.
+    local exp_flag=""
+    [ "$INSTALL_EXPERIMENTAL" = true ] && exp_flag="--experimental"
+
+    # Skills dirs owned by a plugin — filled by the plugin, not by us. Any plugin
+    # agent whose install is refused in this scope (project-scope Codex/Copilot)
+    # is left out, so the mirror below still covers it (matching prior coverage).
+    local plugin_dirs=""
+
+    if [ -n "$AITOOLS_AGENTS" ]; then
+        msg "Installing ${B}all${N} agent skills via ${B}databricks aitools${N} (agents: ${AITOOLS_AGENTS})"
+        # Drop the "Skipped <agent>: ... project scope" / "user-only" notices that
+        # aitools prints for agents it can't target in this scope — the mirror below
+        # covers those tools, so those alone aren't real failures.
+        local aitools_out aitools_rc aitools_residual
+        aitools_out=$(databricks aitools install --scope "$SCOPE" --agents "$AITOOLS_AGENTS" $exp_flag -p "$PROFILE" 2>&1) && aitools_rc=0 || aitools_rc=$?
+        aitools_residual=$(echo "$aitools_out" | grep -vE 'does not support project-scoped skills|is user-only; project scope is not supported' || true)
+        if [ "$SILENT" != true ] && [ -n "$aitools_residual" ]; then
+            echo "$aitools_residual"
+        fi
+        if [ "$aitools_rc" -ne 0 ] && echo "$aitools_residual" | grep -q '^Error:'; then
+            [ "$SILENT" = true ] && die "databricks aitools install failed"
+            warn "databricks aitools install failed — agent skills not installed"
+            return
+        fi
+        ok "Agent skills (all) installed — manage with ${B}databricks aitools list|update|uninstall${N}"
+
+        # A plugin agent counts as plugin-owned only if it wasn't skipped/refused.
+        local tool disp
+        for tool in $TOOLS; do
+            case $tool in
+                claude)  disp="Claude Code" ;;
+                codex)   disp="Codex CLI" ;;
+                copilot) disp="GitHub Copilot" ;;
+                *)       continue ;;
+            esac
+            if ! echo "$aitools_out" | grep -q "Skipped ${disp}:"; then
+                plugin_dirs="${plugin_dirs:+$plugin_dirs
+}$(plugin_agent_skills_dir "$base_dir" "$tool")"
+            fi
+        done
+    fi
+
+    # Mirror the full set into every selected tool's skills dir that the native
+    # install did NOT cover (plugin-owned dirs are excluded). Files come from a
+    # throwaway --path staging so the set matches what the CLI just installed.
+    deliver_agent_b_all "$base_dir" "$exp_flag" "$plugin_dirs"
+}
+
+# Stage the full "all" skill set to a temp dir via `aitools install --path` and
+# copy real skill files into every selected tool's skills dir that the native
+# install didn't already populate. Plugin-owned dirs ($plugin_dirs, newline-
+# separated) are skipped so plugin agents aren't double-installed. Uses the CLI's
+# own resolved set as the source of truth so every tool gets the identical skills.
+deliver_agent_b_all() {
+    local base_dir=$1 exp_flag=$2 plugin_dirs=$3
+    local manifest="$STATE_DIR/.installed-skills"
+
+    local tmp_dir store
+    tmp_dir=$(mktemp -d)
+    if ! databricks aitools install --path "$tmp_dir" $exp_flag >/dev/null 2>&1; then
+        rm -rf "$tmp_dir"
+        warn "Could not stage agent skills for: $(echo "$TOOLS" | tr ' ' ',')"
+        return
+    fi
+    store="$tmp_dir"
+
+    # The full set the CLI resolved (real skill dirs only, no dotfiles).
+    local all_skills=""
+    local d
+    for d in "$store"/*/; do
+        [ -d "$d" ] || continue
+        all_skills="${all_skills:+$all_skills }$(basename "$d")"
+    done
+
+    local dir skill made
+    while IFS= read -r dir; do
+        [ -z "$dir" ] && continue
+        # Skip dirs a plugin owns — the plugin serves those agents, so raw copies
+        # here would double-install every skill.
+        if [ -n "$plugin_dirs" ] && printf '%s\n' "$plugin_dirs" | grep -Fxq "$dir"; then
+            continue
+        fi
+        mkdir -p "$dir"
+        made=0
+        for skill in $all_skills; do
+            # Leave anything the native install already placed (real dir or symlink)
+            # to aitools — it owns and updates those.
+            if [ -e "$dir/$skill" ] || [ -L "$dir/$skill" ]; then
+                continue
+            fi
+            cp -R "$store/$skill" "$dir/$skill"
+            echo "$dir|$skill" >> "$manifest"
+            made=$((made + 1))
+        done
+        [ "$made" -gt 0 ] && ok "Agent skills ($made, copy) → ${dir#$HOME/}"
+    done < <(agent_skill_target_dirs "$base_dir")
+
+    rm -rf "$tmp_dir"
+    return 0
 }
 
 # Link the agent skills into every selected tool's skills dir from the canonical
@@ -2011,7 +2158,22 @@ dry_run_report() {
     echo -e "${B}Dry run — nothing was installed${N}"
     echo "────────────────────────────────"
     msg "MLflow skills @ ${MLFLOW_RESOLVED_REF:-n/a}: ${SELECTED_MLFLOW_SKILLS:-<none>}"
-    if [ -n "$SELECTED_AGENT_B_SKILLS" ]; then
+    if [ "$SELECTED_ALL_AGENT_B" = true ]; then
+        # "All" path: native install (plugin for Claude/Codex/Copilot, raw files
+        # for the rest) with no --skills list; --experimental unless opted out.
+        local exp_flag=""
+        [ "$INSTALL_EXPERIMENTAL" = true ] && exp_flag=" --experimental"
+        msg "Agent skills (databricks-agent-skills${AGENT_B_RELEASE:+ @ $AGENT_B_RELEASE}): ${B}all${N}"
+        if [ -n "$AITOOLS_AGENTS" ]; then
+            msg "Would run: ${B}databricks aitools install --scope ${SCOPE} --agents ${AITOOLS_AGENTS}${exp_flag} -p ${PROFILE}${N}"
+        fi
+        msg "Would mirror the full set (copy from a temp-dir 'aitools install --path') into every selected tool the native install didn't cover; plugin-owned dirs are left to the plugin:"
+        local dir base_dir
+        [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
+        while IFS= read -r dir; do
+            [ -n "$dir" ] && msg "  → $dir"
+        done < <(agent_skill_target_dirs "$base_dir")
+    elif [ -n "$SELECTED_AGENT_B_SKILLS" ]; then
         local skills_csv exp_flag=""
         skills_csv=$(echo "$SELECTED_AGENT_B_SKILLS" | tr -s ' ' ',' | sed 's/^,//;s/,$//')
         agent_b_needs_experimental && exp_flag=" --experimental"
@@ -2722,6 +2884,7 @@ prompt_auth() {
 handoff_to_branch() {
     [ "$BRANCH_EXPLICIT" = true ] || return 0
     [ -n "${DEVKIT_BOOTSTRAPPED:-}" ] && return 0
+    [ -f "${BASH_SOURCE[0]:-}" ] && return 0  # skip if local install file
 
     local url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/install.sh"
 

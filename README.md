@@ -224,7 +224,7 @@ The installer assembles skills from two upstream sources — nothing is bundled 
 | [databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) | Most Databricks skills (jobs, pipelines, DABs, SQL, Unity Catalog, apps, Genie, …) | Delegated to `databricks aitools install` — requires **Databricks CLI v1.0.0+** |
 | [mlflow/skills](https://github.com/mlflow/skills) | MLflow skills | Fetched from `main` (override with `MLFLOW_REF`) |
 
-Skills installed via `databricks aitools` are managed by the CLI afterwards — update them with `databricks aitools update` and remove them with `databricks aitools uninstall`. For tools the CLI can't target yet (Gemini CLI, Windsurf, Kiro), the installer links the same skills into each tool's skills directory.
+Skills installed via `databricks aitools` are managed by the CLI afterwards — update them with `databricks aitools update` and remove them with `databricks aitools uninstall`. For tools the CLI can't target yet (Gemini CLI, Windsurf, Kiro), the installer installs the same skills into each tool's skills directory.
 
 Use `--list-skills` to see every skill and profile, and `--dry-run` to preview exactly what an install would do (resolved refs and the `aitools` command) without changing anything. Some skills were renamed or consolidated in the move — see [Breaking change: skill sources and names](#breaking-change-skill-sources-and-names) below.
 

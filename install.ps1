@@ -178,6 +178,12 @@ $script:ProfileAppDeveloper = @(
 # Selected skills (populated during profile selection)
 $script:SelectedMlflowSkills = @()
 $script:SelectedAgentBSkills = @()
+# True when the user selected *all* agent skills (the "all" profile). In that case
+# we skip the fragile per-skill enumeration and let `databricks aitools install`
+# define the full set itself (its native default = every stable skill; add
+# --experimental for the rest). A partial selection (a profile subset or --skills)
+# keeps the enumerated --skills path.
+$script:SelectedAllAgentB = $false
 
 # Resolved raw-fetch refs (populated by Resolve-FetchRefs)
 $script:MlflowResolvedRef = ""
@@ -1423,6 +1429,7 @@ function Resolve-Skills {
     if ([string]::IsNullOrWhiteSpace($script:SkillsProfile) -or $script:SkillsProfile -eq "all" -or ($script:SkillsProfile -split ',' | ForEach-Object { $_.Trim() }) -contains "all") {
         $script:SelectedMlflowSkills = @($script:MlflowSkills)
         $script:SelectedAgentBSkills = @($defaultAgentB)
+        $script:SelectedAllAgentB = $true
         return
     }
 
@@ -1934,6 +1941,22 @@ function Install-AgentBSkills {
     }
 
     Resolve-AitoolsAgents
+
+    # "All" path: skip the fragile per-skill enumeration and let the native
+    # `databricks aitools install` define the full set itself (its default = every
+    # stable skill; --experimental adds the rest). This installs the plugin for
+    # agents that support it (Claude Code / Codex / Copilot) and raw files for the
+    # others, exactly as the CLI intends. Tools aitools can't target
+    # (Gemini/Windsurf/Kiro) are still mirrored the same set.
+    if ($script:SelectedAllAgentB) {
+        Install-AgentBAll -BaseDir $BaseDir
+        if (-not (Test-Path $script:StateDir)) {
+            New-Item -ItemType Directory -Path $script:StateDir -Force | Out-Null
+        }
+        Set-Content -Path $prevFile -Value ($script:SelectedAgentBSkills -join "`n") -Encoding UTF8
+        return
+    }
+
     # We always install a named subset via --skills, which the CLI only allows
     # with --skills-only (or --path): the default plugin install is all-or-nothing.
     # --skills-only writes raw skill files and the .databricks/aitools/skills store
@@ -1975,6 +1998,136 @@ function Install-AgentBSkills {
         New-Item -ItemType Directory -Path $script:StateDir -Force | Out-Null
     }
     Set-Content -Path $prevFile -Value ($script:SelectedAgentBSkills -join "`n") -Encoding UTF8
+}
+
+# Plugin-capable agents: `databricks aitools install` registers a marketplace
+# plugin for these instead of writing raw skill files, so their skills dir stays
+# empty. When the plugin install succeeds we must NOT also mirror raw files into
+# that dir (it would double-install every skill). Map each to the skills dir it
+# would otherwise use, so we can exclude it from the mirror.
+#   claude-code -> .claude\skills   codex -> .agents\skills   copilot -> .github\skills
+function Get-PluginAgentSkillsDir {
+    param([string]$BaseDir, [string]$Tool)
+    switch ($Tool) {
+        "claude"  { return (Join-Path $BaseDir ".claude\skills") }
+        "codex"   { return (Join-Path $BaseDir ".agents\skills") }
+        "copilot" { return (Join-Path $BaseDir ".github\skills") }
+    }
+    return $null
+}
+
+# "All skills" install: delegate to the native `databricks aitools install` with
+# no --skills list, so the CLI installs its full default set (plus experimental
+# when enabled). Unlike the enumerated path this uses the agents' native install
+# (marketplace plugin for Claude Code / Codex / Copilot; raw files for the rest),
+# then mirrors the same full set into every tool the native install did NOT cover.
+function Install-AgentBAll {
+    param([string]$BaseDir)
+
+    # Experimental skills are part of "all" unless the user opted out.
+    $needsExperimental = [bool]$script:InstallExperimental
+
+    # Skills dirs owned by a plugin -- filled by the plugin, not by us. Any plugin
+    # agent whose install is refused in this scope (project-scope Codex/Copilot)
+    # is left out, so the mirror below still covers it (matching prior coverage).
+    $pluginDirs = @()
+
+    if ($script:AitoolsAgents) {
+        Write-Msg "Installing all agent skills via databricks aitools (agents: $($script:AitoolsAgents))"
+        $aitoolsArgs = @("aitools", "install", "--scope", $script:Scope, "--agents", $script:AitoolsAgents)
+        if ($needsExperimental) { $aitoolsArgs += "--experimental" }
+        $aitoolsArgs += @("-p", $script:Profile_)
+        $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        # Drop the "Skipped <agent>: ... project scope" / "user-only" notices that
+        # aitools prints for agents it can't target in this scope -- the mirror below
+        # covers those tools, so those alone aren't real failures.
+        $aitoolsOut = & databricks @aitoolsArgs 2>&1
+        $installOk = ($LASTEXITCODE -eq 0)
+        $ErrorActionPreference = $prevEAP
+        $aitoolsResidual = $aitoolsOut | Where-Object { "$_" -notmatch 'does not support project-scoped skills' -and "$_" -notmatch 'is user-only; project scope is not supported' }
+        if (-not $script:Silent -and $aitoolsResidual) {
+            $aitoolsResidual | ForEach-Object { Write-Host "$_" }
+        }
+        if (-not $installOk -and ($aitoolsResidual | Where-Object { "$_" -match '^Error:' })) {
+            if ($script:Silent) { Write-Err "databricks aitools install failed" }
+            Write-Warn "databricks aitools install failed -- agent skills not installed"
+            return
+        }
+        Write-Ok "Agent skills (all) installed -- manage with databricks aitools list|update|uninstall"
+
+        # A plugin agent counts as plugin-owned only if it wasn't skipped/refused.
+        $dispMap = @{ "claude" = "Claude Code"; "codex" = "Codex CLI"; "copilot" = "GitHub Copilot" }
+        foreach ($tool in ($script:Tools -split ' ')) {
+            if (-not $dispMap.ContainsKey($tool)) { continue }
+            $disp = $dispMap[$tool]
+            if (-not ($aitoolsOut | Where-Object { "$_" -match "Skipped $([regex]::Escape($disp)):" })) {
+                $d = Get-PluginAgentSkillsDir -BaseDir $BaseDir -Tool $tool
+                if ($d) { $pluginDirs += $d }
+            }
+        }
+    }
+
+    # Mirror the full set into every selected tool's skills dir that the native
+    # install did NOT cover (plugin-owned dirs are excluded). Files come from a
+    # throwaway --path staging so the set matches what the CLI just installed.
+    Send-AgentBAll -BaseDir $BaseDir -NeedsExperimental $needsExperimental -PluginDirs $pluginDirs
+}
+
+# Stage the full "all" skill set to a temp dir via `aitools install --path` and
+# copy real skill files into every selected tool's skills dir that the native
+# install didn't already populate. Plugin-owned dirs ($PluginDirs) are skipped so
+# plugin agents aren't double-installed. Uses the CLI's own resolved set as the
+# source of truth so every tool gets the identical skills.
+function Send-AgentBAll {
+    param([string]$BaseDir, [bool]$NeedsExperimental, [string[]]$PluginDirs)
+
+    $manifest = Join-Path $script:StateDir ".installed-skills"
+    if (-not (Test-Path $script:StateDir)) {
+        New-Item -ItemType Directory -Path $script:StateDir -Force | Out-Null
+    }
+
+    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-dev-kit-aitools-" + [System.IO.Path]::GetRandomFileName())
+    New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+    $stageArgs = @("aitools", "install", "--path", $tmpDir)
+    if ($NeedsExperimental) { $stageArgs += "--experimental" }
+    $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    & databricks @stageArgs 2>&1 | Out-Null
+    $stageOk = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = $prevEAP
+    if (-not $stageOk) {
+        Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+        Write-Warn "Could not stage agent skills for: $(($script:Tools -split ' ') -join ',')"
+        return
+    }
+
+    # The full set the CLI resolved (real skill dirs only, no dotfiles).
+    $allSkills = @(Get-ChildItem -LiteralPath $tmpDir -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+
+    foreach ($dir in (Get-AgentSkillTargetDirs -BaseDir $BaseDir)) {
+        if ([string]::IsNullOrWhiteSpace($dir)) { continue }
+        # Skip dirs a plugin owns -- the plugin serves those agents, so raw copies
+        # here would double-install every skill.
+        if ($PluginDirs -contains $dir) { continue }
+        if (-not (Test-Path $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        }
+        $made = 0
+        foreach ($skill in $allSkills) {
+            $destPath = Join-Path $dir $skill
+            # Leave anything the native install already placed (real dir or link)
+            # to aitools -- it owns and updates those.
+            if (Get-Item -LiteralPath $destPath -Force -ErrorAction SilentlyContinue) { continue }
+            Copy-Item -Recurse (Join-Path $tmpDir $skill) $destPath
+            Add-Content -Path $manifest -Value "$dir|$skill" -Encoding UTF8
+            $made++
+        }
+        if ($made -gt 0) {
+            $shortDir = $dir -replace [regex]::Escape($env:USERPROFILE), '~'
+            Write-Ok "Agent skills ($made, copy) -> $shortDir"
+        }
+    }
+
+    Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 }
 
 # Link the agent skills into every selected tool's skills dir from the canonical
@@ -2197,7 +2350,21 @@ function Show-DryRunReport {
     $mlflowList = if ($script:SelectedMlflowSkills.Count -gt 0) { $script:SelectedMlflowSkills -join ' ' } else { "<none>" }
     $mlflowRefDisplay = if ($script:MlflowResolvedRef) { $script:MlflowResolvedRef } else { "n/a" }
     Write-Msg "MLflow skills @ ${mlflowRefDisplay}: $mlflowList"
-    if ($script:SelectedAgentBSkills.Count -gt 0) {
+    if ($script:SelectedAllAgentB) {
+        # "All" path: native install (plugin for Claude/Codex/Copilot, raw files
+        # for the rest) with no --skills list; --experimental unless opted out.
+        $expFlag = if ($script:InstallExperimental) { " --experimental" } else { "" }
+        $releaseSuffix = if ($script:AgentBRelease) { " @ $($script:AgentBRelease)" } else { "" }
+        Write-Msg "Agent skills (databricks-agent-skills$releaseSuffix): all"
+        if ($script:AitoolsAgents) {
+            Write-Msg "Would run: databricks aitools install --scope $($script:Scope) --agents $($script:AitoolsAgents)$expFlag -p $($script:Profile_)"
+        }
+        Write-Msg "Would mirror the full set (copy from a temp-dir 'aitools install --path') into every selected tool the native install didn't cover; plugin-owned dirs are left to the plugin:"
+        $dryBaseDir = if ($script:Scope -eq "global") { $env:USERPROFILE } else { (Get-Location).Path }
+        foreach ($dir in (Get-AgentSkillTargetDirs -BaseDir $dryBaseDir)) {
+            Write-Msg "  -> $dir"
+        }
+    } elseif ($script:SelectedAgentBSkills.Count -gt 0) {
         $skillsCsv = $script:SelectedAgentBSkills -join ','
         $expFlag = if (Test-AgentBNeedsExperimental) { " --experimental" } else { "" }
         $releaseSuffix = if ($script:AgentBRelease) { " @ $($script:AgentBRelease)" } else { "" }
@@ -2838,6 +3005,10 @@ function Invoke-PromptAuth {
 function Invoke-BranchHandoff {
     if (-not $script:BranchExplicit) { return }
     if ($env:DEVKIT_BOOTSTRAPPED) { return }
+    # Skip if we're running from a local install file (not piped via irm/iex):
+    # $PSCommandPath is the script's path when run as `.\install.ps1`, and empty
+    # when the script body is executed inline (e.g. `iex (irm <url>)`).
+    if ($PSCommandPath) { return }
 
     $url = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch/install.ps1"
 
