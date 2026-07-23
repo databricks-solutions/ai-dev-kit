@@ -1,4 +1,4 @@
-# End-to-End RAG with Vector Search
+# End-to-End RAG with AI Search
 
 Build a complete Retrieval-Augmented Generation pipeline: prepare documents, create a vector index, query it, and wire it into an agent.
 
@@ -48,7 +48,7 @@ execute_sql(sql_query="""
 """)
 ```
 
-## Step 2: Create Vector Search Endpoint
+## Step 2: Create AI Search Endpoint
 
 ```python
 manage_vs_endpoint(
@@ -121,7 +121,7 @@ query_vs_index(
 The filter syntax depends on the endpoint type used when creating the index.
 
 ```python
-# Storage-Optimized endpoint (used in this walkthrough): SQL-like filter syntax
+# Storage-Optimized endpoint (used in this walkthrough): SQL-like string
 query_vs_index(
     index_name="catalog.schema.knowledge_base_index",
     columns=["doc_id", "title", "content"],
@@ -130,13 +130,13 @@ query_vs_index(
     filters="category = 'governance'"
 )
 
-# Standard endpoint (if you created a Standard endpoint instead): JSON filters_json
+# Standard endpoint: dict-format filters
 query_vs_index(
     index_name="catalog.schema.my_standard_index",
     columns=["doc_id", "title", "content"],
     query_text="How do I govern my data?",
     num_results=3,
-    filters_json='{"category": "governance"}'
+    filters={"category": "governance"}
 )
 ```
 
@@ -148,7 +148,7 @@ query_vs_index(
     columns=["doc_id", "title", "content"],
     query_text="Delta Lake ACID transactions",
     num_results=5,
-    query_type="HYBRID"
+    query_type="hybrid"
 )
 ```
 
@@ -158,43 +158,35 @@ query_vs_index(
 
 ### As a Tool in a ChatAgent
 
-Use `VectorSearchRetrieverTool` to wire the index into an agent deployed on Model Serving:
+Use `AISearchClient` to wire the index into an agent deployed on Model Serving:
 
 ```python
 from databricks.agents import ChatAgent
-from databricks.agents.tools import VectorSearchRetrieverTool
+from databricks.ai_search.client import AISearchClient
 from databricks.sdk import WorkspaceClient
-
-# Define the retriever tool
-retriever_tool = VectorSearchRetrieverTool(
-    index_name="catalog.schema.knowledge_base_index",
-    columns=["doc_id", "title", "content"],
-    num_results=3,
-)
 
 class RAGAgent(ChatAgent):
     def __init__(self):
+        self.search_client = AISearchClient()
         self.w = WorkspaceClient()
 
     def predict(self, messages, context=None):
         query = messages[-1].content
 
-        results = self.w.vector_search_indexes.query_index(
-            index_name="catalog.schema.knowledge_base_index",
-            columns=["title", "content"],
-            query_text=query,
-            num_results=3,
+        index = self.search_client.get_index(
+            endpoint_name="my-rag-endpoint",
+            index_name="catalog.schema.knowledge_base_index"
         )
-
-        context_docs = "\n\n".join(
-            f"**{row[0]}**: {row[1]}"
-            for row in results.result.data_array
+        results = index.similarity_search(
+            query_text=query,
+            columns=["title", "content"],
+            num_results=3,
         )
 
         response = self.w.serving_endpoints.query(
             name="databricks-meta-llama-3-3-70b-instruct",
             messages=[
-                {"role": "system", "content": f"Answer using this context:\n{context_docs}"},
+                {"role": "system", "content": "Answer using the retrieved context."},
                 {"role": "user", "content": query},
             ],
         )
@@ -238,4 +230,4 @@ Then sync — the index automatically handles deletions via Delta change data fe
 | **"Column not found in index"** | Column must be in `columns_to_sync`. Recreate index with the column included |
 | **Embeddings not computed** | Ensure `embedding_model_endpoint_name` is a valid serving endpoint |
 | **Stale results after table update** | For TRIGGERED pipelines, you must call `manage_vs_index(action="sync")` manually |
-| **Filter not working** | Standard endpoints use dict-format filters (`filters_json`), Storage-Optimized use SQL-like string filters (`filters`) |
+| **Filters not working** | Standard endpoints use dict-format `filters`; Storage-Optimized use SQL-like string `filters`. See [filtering.md](filtering.md) |
