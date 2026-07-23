@@ -12,7 +12,7 @@
 #     For that, prefer the notebook uploader install_genie_code_skills.py
 #     (no local clone needed). When that is not possible, this script's default
 #     downloads the skills from the last release that shipped the bundled tree
-#     (git tag v0.1.13). The frozen local copies under DEPRECATED-databricks-skills/
+#     (git tag v0.1.14). The frozen local copies under DEPRECATED-databricks-skills/
 #     are only used with --local. Either way the skills are no longer maintained.
 #
 # Usage:
@@ -41,9 +41,9 @@ NC='\033[0m' # No Color
 # Configuration
 # NOTE: The bundled skill tree was removed from `main` and frozen under
 # DEPRECATED-databricks-skills/. The default (non-local) download therefore pins
-# to the last release that still bundled the tree at its original paths: v0.1.13.
+# to the last release that still bundled the tree at its original paths: v0.1.14.
 REPO_URL="https://github.com/databricks-solutions/ai-dev-kit"
-REPO_REF="v0.1.13"
+REPO_REF="v0.1.14"
 REPO_RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/${REPO_REF}"
 SKILLS_DIR=".claude/skills"
 INSTALL_FROM_LOCAL=false

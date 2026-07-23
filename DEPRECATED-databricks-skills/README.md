@@ -26,7 +26,7 @@ If you specifically need the files exactly as they were bundled, check out the l
 that shipped them:
 
 ```bash
-git checkout v0.1.13 -- databricks-skills
+git checkout v0.1.14 -- databricks-skills
 ```
 
 ## Migration notes
@@ -42,5 +42,5 @@ Databricks workspace for **Genie Code**. Keep that simple — do not clone this 
 
 - **Recommended:** run the notebook uploader
   [`../install_genie_code_skills.py`](../install_genie_code_skills.py)
-  in your workspace. It downloads skills from GitHub (pinned to release `v0.1.13`) and uploads them
+  in your workspace. It downloads skills from GitHub (pinned to release `v0.1.14`) and uploads them
   via the SDK — no local clone needed.

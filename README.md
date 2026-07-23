@@ -129,7 +129,7 @@ Curated by Databricks field experts. Brings tutorials, patterns, and the officia
 | :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add Databricks skills for your user or existing project folder | [Quick Start (install)](#install-in-existing-project)
 | [**Genie Code Skills**](databricks-skills/) | Upload selected skills into your workspace for Genie Code. Note: much of the content in the public Databricks skills is already included in Genie Code. | [Genie Code skills (install)](#genie-code-skills) |
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
-| [**MCP Tools**](databricks-mcp-server/) | Standalone MCP server exposing Databricks actions to AI clients. Note: We recommend skills instead, but maintain this as a good foundation if a custom MCP serer is required. | [Register MCP server](databricks-mcp-server/) |
+!| [**MCP Tools**](databricks-mcp-server/) | Standalone MCP server exposing Databricks actions to AI clients. Note: We recommend skills instead, but maintain this as a good foundation if a custom MCP server is required. | [Register MCP server](databricks-mcp-server/) |
 ---
 
 ## Quick Start
@@ -343,7 +343,7 @@ see [`.claude-plugin/DEPRECATED.md`](.claude-plugin/DEPRECATED.md).)
 Skills come from [github.com/databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills).
 The skill copies that used to be bundled in this repo are deprecated and frozen under
 [`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/); if you need the exact historical
-files, use git tag `v0.1.13`. Some skills were renamed in the move — see the breaking-change note
+files, use git tag `v0.1.14`. Some skills were renamed in the move — see the breaking-change note
 below. (APX and Genie-specific skills are no longer bundled here; they live in their own repos.)
 
 ### Genie Code Skills
@@ -371,7 +371,7 @@ Skills are no longer bundled in this repository — they come from
 table in the notice at the top of this README). To see the current skill names, run
 `databricks aitools list` (CLI v1.0.0+) or browse the
 [databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) repo. To reproduce
-the old bundled layout and names exactly, use git tag `v0.1.13` (the frozen copies also remain under
+the old bundled layout and names exactly, use git tag `v0.1.14` (the frozen copies also remain under
 [`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/)).
 
 ## Architecture

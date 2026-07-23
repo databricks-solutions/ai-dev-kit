@@ -639,9 +639,9 @@ After deploying with `--enable-mcp` and an `mcp-` prefixed name:
 You can also install skills to the Genie Space for additional context:
 
 ```bash
-# Downloads the frozen legacy skills from the last release (v0.1.13),
+# Downloads the frozen legacy skills from the last release (v0.1.14),
 # then uploads them to your workspace for Genie Code.
-bash ../databricks-skills/install_skills.sh --install-to-genie --profile <profile>
+bash ../DEPRECATED-databricks-skills/install_skills.sh --install-to-genie --profile <profile>
 ```
 
 #### Using with Other MCP Clients

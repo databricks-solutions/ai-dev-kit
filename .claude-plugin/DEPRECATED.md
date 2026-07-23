@@ -52,6 +52,6 @@ Use either of the following to get the up-to-date skills:
 
 ## Notes
 
-- The frozen historical copies of the bundled skills live at git tag `v0.1.13`.
+- The frozen historical copies of the bundled skills live at git tag `v0.1.14`.
 - Files under `.claude-plugin/` remain in the repo for reference only; they are
   no longer installed or published.
