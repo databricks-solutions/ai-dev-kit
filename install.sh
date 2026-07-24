@@ -1867,12 +1867,28 @@ plugin_agent_skills_dir() {
     esac
 }
 
+# Print a "did NOT install" failure block and abort. $1 = the stage that failed,
+# $2 = the exact command that was tried, $3 = short guidance on what to fix.
+# Stops the whole installer (non-zero) so it's unambiguous nothing was installed —
+# the user fixes the marketplace, then re-runs this installer.
+die_plugin_setup() {
+    local stage=$1 cmd=$2 fix=$3
+    echo "" >&2
+    echo -e "  ${R}✗ Install stopped — ${stage} failed. Agent skills were NOT installed.${N}" >&2
+    echo -e "  ${D}Command tried:${N}" >&2
+    echo -e "    ${B}${cmd}${N}" >&2
+    echo -e "  ${D}${fix}${N}" >&2
+    echo -e "  ${D}Once that succeeds, re-run this installer to finish.${N}" >&2
+    exit 1
+}
+
 # Ensure Claude Code's official plugin marketplace is present and fresh before the
 # native aitools install runs `claude plugin install databricks@claude-plugins-official`.
 # aitools only runs `marketplace update` (refresh), never `marketplace add`, so it
 # assumes the marketplace is already registered — which fails on installs where it
-# isn't (older/removed). We add it if missing, or update it if stale. Best-effort:
-# any failure warns and returns; the subsequent aitools install surfaces the real error.
+# isn't (older/removed). We add it if missing, or update it if stale. A failure here
+# means the plugin install downstream cannot succeed, so we stop with clear guidance
+# rather than let it fail vaguely later.
 ensure_claude_marketplace() {
     # Only relevant when Claude Code is a selected tool (it's the plugin agent we own).
     _in_list "claude" "$TOOLS" || return 0
@@ -1887,12 +1903,40 @@ ensure_claude_marketplace() {
     if [ -z "$present" ]; then
         msg "Adding Claude Code plugin marketplace (${B}${mp}${N})"
         if ! claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1; then
-            warn "Could not add Claude plugin marketplace — ${B}databricks aitools${N} may fail to install the Claude plugin"
+            die_plugin_setup \
+                "adding the Claude plugin marketplace" \
+                "claude plugin marketplace add anthropics/claude-plugins-official" \
+                "Run that command yourself and confirm it succeeds (it needs a working 'claude' CLI)."
         fi
     else
         # Present but possibly stale — refresh so the databricks plugin resolves.
-        claude plugin marketplace update "$mp" >/dev/null 2>&1 \
-            || warn "Could not refresh Claude plugin marketplace '${mp}' (continuing)"
+        if ! claude plugin marketplace update "$mp" >/dev/null 2>&1; then
+            die_plugin_setup \
+                "refreshing the Claude plugin marketplace" \
+                "claude plugin marketplace update ${mp}" \
+                "Run that command yourself and confirm it succeeds (it needs a working 'claude' CLI)."
+        fi
+    fi
+}
+
+# Verify the databricks plugin actually landed for Claude Code after the aitools
+# install. aitools can report success while the underlying `claude plugin install`
+# silently no-ops (e.g. a wrapped/older CLI), so we confirm the plugin is registered
+# and stop with clear guidance if it isn't — otherwise the user thinks it installed.
+verify_claude_plugin() {
+    _in_list "claude" "$TOOLS" || return 0
+    command -v claude >/dev/null 2>&1 || return 0  # can't verify without the CLI; don't block
+
+    local id="databricks@claude-plugins-official"
+    local found=""
+    found=$(claude plugin list --json 2>/dev/null | grep -o "\"id\"[[:space:]]*:[[:space:]]*\"${id}\"" | head -1)
+    [ -z "$found" ] && found=$(claude plugin list 2>/dev/null | grep -F "$id")
+
+    if [ -z "$found" ]; then
+        die_plugin_setup \
+            "installing the Claude plugin (${id})" \
+            "claude plugin install ${id} --scope ${SCOPE}" \
+            "databricks aitools reported success but the plugin is not registered — run that command yourself and confirm it succeeds (it needs a working 'claude' CLI)."
     fi
 }
 
@@ -1948,6 +1992,13 @@ install_agent_b_all() {
 }$(plugin_agent_skills_dir "$base_dir" "$tool")"
             fi
         done
+
+        # Confirm the Claude plugin actually registered (unless aitools skipped it
+        # for this scope). Catches wrappers/older CLIs where the plugin install
+        # silently no-ops even though aitools reported success.
+        if ! echo "$aitools_out" | grep -q "Skipped Claude Code:"; then
+            verify_claude_plugin
+        fi
     fi
 
     # Mirror the full set into every selected tool's skills dir that the native

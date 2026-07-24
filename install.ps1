@@ -2001,8 +2001,28 @@ function Get-PluginAgentSkillsDir {
 # native aitools install runs `claude plugin install databricks@claude-plugins-official`.
 # aitools only runs `marketplace update` (refresh), never `marketplace add`, so it
 # assumes the marketplace is already registered -- which fails on installs where it
-# isn't (older/removed). We add it if missing, or update it if stale. Best-effort:
-# any failure warns and returns; the subsequent aitools install surfaces the real error.
+# isn't (older/removed). We add it if missing, or update it if stale. A failure here
+# means the plugin install downstream cannot succeed, so we stop with clear guidance
+# rather than let it fail vaguely later.
+#
+# Print a "did NOT install" failure block and abort. $Stage = the stage that failed,
+# $Cmd = the exact command that was tried, $Fix = short guidance on what to fix.
+# Stops the whole installer (non-zero) so it's unambiguous nothing was installed --
+# the user fixes the marketplace, then re-runs this installer.
+function Deny-PluginSetup {
+    param([string]$Stage, [string]$Cmd, [string]$Fix)
+    Write-Host ""
+    Write-Host "  Install stopped -- $Stage failed. Agent skills were NOT installed." -ForegroundColor Red
+    Write-Host "  Command tried:" -ForegroundColor DarkGray
+    Write-Host "    $Cmd"
+    Write-Host "  $Fix" -ForegroundColor DarkGray
+    Write-Host "  Once that succeeds, re-run this installer to finish." -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  Press any key to exit..." -ForegroundColor DarkGray
+    try { $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") } catch {}
+    exit 1
+}
+
 function Confirm-ClaudeMarketplace {
     # Only relevant when Claude Code is a selected tool (it's the plugin agent we own).
     if (($script:Tools -split ' ') -notcontains "claude") { return }
@@ -2021,16 +2041,49 @@ function Confirm-ClaudeMarketplace {
         Write-Msg "Adding Claude Code plugin marketplace ($mp)"
         & claude plugin marketplace add anthropics/claude-plugins-official 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            Write-Warn "Could not add Claude plugin marketplace -- databricks aitools may fail to install the Claude plugin"
+            $ErrorActionPreference = $prevEAP
+            Deny-PluginSetup `
+                -Stage "adding the Claude plugin marketplace" `
+                -Cmd "claude plugin marketplace add anthropics/claude-plugins-official" `
+                -Fix "Run that command yourself and confirm it succeeds (it needs a working 'claude' CLI)."
         }
     } else {
         # Present but possibly stale -- refresh so the databricks plugin resolves.
         & claude plugin marketplace update $mp 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            Write-Warn "Could not refresh Claude plugin marketplace '$mp' (continuing)"
+            $ErrorActionPreference = $prevEAP
+            Deny-PluginSetup `
+                -Stage "refreshing the Claude plugin marketplace" `
+                -Cmd "claude plugin marketplace update $mp" `
+                -Fix "Run that command yourself and confirm it succeeds (it needs a working 'claude' CLI)."
         }
     }
     $ErrorActionPreference = $prevEAP
+}
+
+# Verify the databricks plugin actually landed for Claude Code after the aitools
+# install. aitools can report success while the underlying `claude plugin install`
+# silently no-ops (e.g. a wrapped/older CLI), so we confirm the plugin is registered
+# and stop with clear guidance if it isn't -- otherwise the user thinks it installed.
+function Confirm-ClaudePlugin {
+    if (($script:Tools -split ' ') -notcontains "claude") { return }
+    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { return }  # can't verify without the CLI; don't block
+
+    $id = "databricks@claude-plugins-official"
+    $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    $listing = & claude plugin list --json 2>$null | Out-String
+    if ([string]::IsNullOrWhiteSpace($listing)) {
+        $listing = & claude plugin list 2>$null | Out-String
+    }
+    $found = $listing -match [regex]::Escape($id)
+    $ErrorActionPreference = $prevEAP
+
+    if (-not $found) {
+        Deny-PluginSetup `
+            -Stage "installing the Claude plugin ($id)" `
+            -Cmd "claude plugin install $id --scope $($script:Scope)" `
+            -Fix "databricks aitools reported success but the plugin is not registered -- run that command yourself and confirm it succeeds (it needs a working 'claude' CLI)."
+    }
 }
 
 # "All skills" install: delegate to the native `databricks aitools install` with
@@ -2084,6 +2137,13 @@ function Install-AgentBAll {
                 $d = Get-PluginAgentSkillsDir -BaseDir $BaseDir -Tool $tool
                 if ($d) { $pluginDirs += $d }
             }
+        }
+
+        # Confirm the Claude plugin actually registered (unless aitools skipped it
+        # for this scope). Catches wrappers/older CLIs where the plugin install
+        # silently no-ops even though aitools reported success.
+        if (-not ($aitoolsOut | Where-Object { "$_" -match "Skipped Claude Code:" })) {
+            Confirm-ClaudePlugin
         }
     }
 
