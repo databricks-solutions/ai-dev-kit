@@ -1897,8 +1897,10 @@ ensure_claude_marketplace() {
     local mp="claude-plugins-official"
     local present=""
     # `marketplace list --json` is stable; fall back to plain text if --json is unsupported.
-    present=$(claude plugin marketplace list --json 2>/dev/null | grep -o "\"name\"[[:space:]]*:[[:space:]]*\"${mp}\"" | head -1)
-    [ -z "$present" ] && present=$(claude plugin marketplace list 2>/dev/null | grep -F "$mp")
+    # `|| true` keeps a no-match grep (exit 1) from tripping `set -e` when the
+    # marketplace is legitimately absent — that's the ADD case, not an error.
+    present=$(claude plugin marketplace list --json 2>/dev/null | grep -o "\"name\"[[:space:]]*:[[:space:]]*\"${mp}\"" | head -1 || true)
+    [ -z "$present" ] && present=$(claude plugin marketplace list 2>/dev/null | grep -F "$mp" || true) || true
 
     if [ -z "$present" ]; then
         msg "Adding Claude Code plugin marketplace (${B}${mp}${N})"
@@ -1929,8 +1931,10 @@ verify_claude_plugin() {
 
     local id="databricks@claude-plugins-official"
     local found=""
-    found=$(claude plugin list --json 2>/dev/null | grep -o "\"id\"[[:space:]]*:[[:space:]]*\"${id}\"" | head -1)
-    [ -z "$found" ] && found=$(claude plugin list 2>/dev/null | grep -F "$id")
+    # `|| true` so a no-match grep (exit 1) doesn't trip `set -e` before we get to
+    # the explicit "not registered" check below.
+    found=$(claude plugin list --json 2>/dev/null | grep -o "\"id\"[[:space:]]*:[[:space:]]*\"${id}\"" | head -1 || true)
+    [ -z "$found" ] && found=$(claude plugin list 2>/dev/null | grep -F "$id" || true) || true
 
     if [ -z "$found" ]; then
         die_plugin_setup \
