@@ -1203,29 +1203,10 @@ function Invoke-PromptProfile {
     }
 }
 
-# ─── MCP path selection ──────────────────────────────────────
-# ─── MCP server installation prompt (deprecated/optional) ──────
-# Skills work via the Databricks CLI, so MCP is opt-in. Matches the radio-style
-# prompt used on the experimental branch and defaults to "Do not install".
-function Invoke-PromptMcpInstall {
-    # Already opted in via -Mcp / -McpPath / -McpOnly / env var
-    if ($script:InstallMcp) { return }
-    # Silent or non-interactive runs leave MCP off
-    if ($script:Silent -or -not (Test-Interactive)) { return }
-
-    Write-Host ""
-    Write-Host "  Deprecated MCP Server" -ForegroundColor White
-    Write-Host "  Skills now work via the Databricks CLI for better performance. The MCP" -ForegroundColor DarkGray
-    Write-Host "  server is optional and only needed for backwards compatibility." -ForegroundColor DarkGray
-
-    $items = @(
-        @{ Label = "Do not install";     Value = "no";  Selected = $true;  Hint = "Recommended -- skills work without MCP" }
-        @{ Label = "Install MCP server"; Value = "yes"; Selected = $false; Hint = "Legacy -- requires a Python venv (uv)" }
-    )
-    $selected = Select-Radio -Items $items
-    if ($selected -eq "yes") { $script:InstallMcp = $true }
-}
-
+# ─── MCP path selection (deprecated/optional MCP server) ───────
+# Skills work via the Databricks CLI, so the MCP server is opt-in only -- there is
+# no interactive opt-in prompt. This runs solely when the user passed -Mcp /
+# -McpOnly / -McpPath / DEVKIT_INSTALL_MCP to choose where the runtime lands.
 function Invoke-PromptMcpPath {
     if (-not [string]::IsNullOrWhiteSpace($script:UserMcpPath)) {
         $script:InstallDir = $script:UserMcpPath
@@ -2974,6 +2955,10 @@ function Show-Summary {
     $step++
     Write-Msg "$step. Start prompting your AI assistant to interact with Databricks"
     Write-Host ""
+    Write-Host "  Optional components: the MCP server and Visual Builder App are not" -ForegroundColor DarkGray
+    Write-Host "  installed by default. If you want them, see the setup instructions in the" -ForegroundColor DarkGray
+    Write-Host "  repo README: https://github.com/databricks-solutions/ai-dev-kit" -ForegroundColor DarkGray
+    Write-Host ""
 }
 
 # ─── Scope prompt ─────────────────────────────────────────────
@@ -3236,8 +3221,9 @@ function Invoke-Main {
         }
     }
 
-    # MCP server opt-in (deprecated), then path if opted in
-    Invoke-PromptMcpInstall
+    # MCP path (only when explicitly opted in via -Mcp/-McpOnly/-McpPath/DEVKIT_INSTALL_MCP).
+    # The interactive MCP opt-in prompt was removed -- the MCP server is a
+    # deprecated/optional component (see the end-of-install note).
     if ($script:InstallMcp) {
         Invoke-PromptMcpPath
         Write-Ok "MCP path: $($script:InstallDir)"

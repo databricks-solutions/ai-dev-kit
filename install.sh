@@ -1236,36 +1236,10 @@ prompt_profile() {
     fi
 }
 
-# ─── MCP server installation prompt (deprecated/optional) ──────
-# Skills work via the Databricks CLI, so MCP is opt-in. Matches the radio-style
-# prompt used on the experimental branch and defaults to "Do not install".
-prompt_mcp_install() {
-    # Already opted in via --mcp / --mcp-path / --mcp-only / env var
-    [ "$INSTALL_MCP" = true ] && return
-    # Silent or non-interactive runs leave MCP off
-    if [ "$SILENT" = true ] || ! is_interactive; then
-        return
-    fi
-
-    echo ""
-    echo -e "  ${B}Deprecated MCP Server${N}"
-    echo -e "  ${D}Skills now work via the Databricks CLI for better performance. The MCP"
-    echo -e "  server is optional and only needed for backwards compatibility.${N}"
-
-    local selected
-    selected=$(radio_select \
-        "Do not install|no|on|Recommended — skills work without MCP" \
-        "Install MCP server|yes|off|Legacy — requires a Python venv (uv)" \
-    )
-
-    # Note: an `&& INSTALL_MCP=true` one-liner here would return 1 when the user
-    # picks "no", and `set -e` would abort the installer. Use an if-block.
-    if [ "$selected" = "yes" ]; then
-        INSTALL_MCP=true
-    fi
-}
-
-# ─── MCP path selection ────────────────────────────────────────
+# ─── MCP path selection (deprecated/optional MCP server) ───────
+# Skills work via the Databricks CLI, so the MCP server is opt-in only — there is
+# no interactive opt-in prompt. This runs solely when the user passed --mcp /
+# --mcp-only / --mcp-path / DEVKIT_INSTALL_MCP to choose where the runtime lands.
 prompt_mcp_path() {
     # If provided via --mcp-path flag, skip prompt
     if [ -n "$USER_MCP_PATH" ]; then
@@ -2836,6 +2810,10 @@ summary() {
         step=$((step + 1))
         msg "${step}. Start prompting your AI assistant to interact with Databricks"
         echo ""
+        msg "${D}Optional components: the ${B}MCP server${N}${D} and ${B}Visual Builder App${N}${D} are not${N}"
+        msg "${D}installed by default. If you want them, see the setup instructions in the${N}"
+        msg "${D}repo README: ${N}${B}https://github.com/databricks-solutions/ai-dev-kit${N}"
+        echo ""
     fi
 }
 
@@ -3106,10 +3084,9 @@ main() {
         fi
     fi
 
-    # ── Step 4.5: MCP server opt-in (deprecated) ──
-    prompt_mcp_install
-
-    # ── Step 5: Interactive MCP path ──
+    # ── Step 5: MCP path (only when explicitly opted in via --mcp/--mcp-only/
+    # --mcp-path/DEVKIT_INSTALL_MCP). The interactive MCP opt-in prompt was removed —
+    # the MCP server is a deprecated/optional component (see the end-of-install note). ──
     if [ "$INSTALL_MCP" = true ]; then
         prompt_mcp_path
         ok "MCP path: $INSTALL_DIR"
