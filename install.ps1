@@ -2016,6 +2016,42 @@ function Get-PluginAgentSkillsDir {
     return $null
 }
 
+# Ensure Claude Code's official plugin marketplace is present and fresh before the
+# native aitools install runs `claude plugin install databricks@claude-plugins-official`.
+# aitools only runs `marketplace update` (refresh), never `marketplace add`, so it
+# assumes the marketplace is already registered -- which fails on installs where it
+# isn't (older/removed). We add it if missing, or update it if stale. Best-effort:
+# any failure warns and returns; the subsequent aitools install surfaces the real error.
+function Confirm-ClaudeMarketplace {
+    # Only relevant when Claude Code is a selected tool (it's the plugin agent we own).
+    if (($script:Tools -split ' ') -notcontains "claude") { return }
+    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { return }  # no Claude CLI -- aitools handles the miss
+
+    $mp = "claude-plugins-official"
+    $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    # `marketplace list --json` is stable; fall back to plain text if --json is unsupported.
+    $listing = & claude plugin marketplace list --json 2>$null | Out-String
+    if ([string]::IsNullOrWhiteSpace($listing)) {
+        $listing = & claude plugin marketplace list 2>$null | Out-String
+    }
+    $present = $listing -match [regex]::Escape($mp)
+
+    if (-not $present) {
+        Write-Msg "Adding Claude Code plugin marketplace ($mp)"
+        & claude plugin marketplace add anthropics/claude-plugins-official 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "Could not add Claude plugin marketplace -- databricks aitools may fail to install the Claude plugin"
+        }
+    } else {
+        # Present but possibly stale -- refresh so the databricks plugin resolves.
+        & claude plugin marketplace update $mp 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "Could not refresh Claude plugin marketplace '$mp' (continuing)"
+        }
+    }
+    $ErrorActionPreference = $prevEAP
+}
+
 # "All skills" install: delegate to the native `databricks aitools install` with
 # no --skills list, so the CLI installs its full default set (plus experimental
 # when enabled). Unlike the enumerated path this uses the agents' native install
@@ -2033,6 +2069,9 @@ function Install-AgentBAll {
     $pluginDirs = @()
 
     if ($script:AitoolsAgents) {
+        # Make sure Claude Code's official marketplace is registered/fresh so the
+        # native plugin install below can resolve databricks@claude-plugins-official.
+        Confirm-ClaudeMarketplace
         Write-Msg "Installing all agent skills via databricks aitools (agents: $($script:AitoolsAgents))"
         $aitoolsArgs = @("aitools", "install", "--scope", $script:Scope, "--agents", $script:AitoolsAgents)
         if ($needsExperimental) { $aitoolsArgs += "--experimental" }

@@ -1893,6 +1893,35 @@ plugin_agent_skills_dir() {
     esac
 }
 
+# Ensure Claude Code's official plugin marketplace is present and fresh before the
+# native aitools install runs `claude plugin install databricks@claude-plugins-official`.
+# aitools only runs `marketplace update` (refresh), never `marketplace add`, so it
+# assumes the marketplace is already registered — which fails on installs where it
+# isn't (older/removed). We add it if missing, or update it if stale. Best-effort:
+# any failure warns and returns; the subsequent aitools install surfaces the real error.
+ensure_claude_marketplace() {
+    # Only relevant when Claude Code is a selected tool (it's the plugin agent we own).
+    _in_list "claude" "$TOOLS" || return 0
+    command -v claude >/dev/null 2>&1 || return 0  # no Claude CLI — aitools handles the miss
+
+    local mp="claude-plugins-official"
+    local present=""
+    # `marketplace list --json` is stable; fall back to plain text if --json is unsupported.
+    present=$(claude plugin marketplace list --json 2>/dev/null | grep -o "\"name\"[[:space:]]*:[[:space:]]*\"${mp}\"" | head -1)
+    [ -z "$present" ] && present=$(claude plugin marketplace list 2>/dev/null | grep -F "$mp")
+
+    if [ -z "$present" ]; then
+        msg "Adding Claude Code plugin marketplace (${B}${mp}${N})"
+        if ! claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1; then
+            warn "Could not add Claude plugin marketplace — ${B}databricks aitools${N} may fail to install the Claude plugin"
+        fi
+    else
+        # Present but possibly stale — refresh so the databricks plugin resolves.
+        claude plugin marketplace update "$mp" >/dev/null 2>&1 \
+            || warn "Could not refresh Claude plugin marketplace '${mp}' (continuing)"
+    fi
+}
+
 # "All skills" install: delegate to the native `databricks aitools install` with
 # no --skills list, so the CLI installs its full default set (plus experimental
 # when enabled). Unlike the enumerated path this uses the agents' native install
@@ -1911,6 +1940,9 @@ install_agent_b_all() {
     local plugin_dirs=""
 
     if [ -n "$AITOOLS_AGENTS" ]; then
+        # Make sure Claude Code's official marketplace is registered/fresh so the
+        # native plugin install below can resolve databricks@claude-plugins-official.
+        ensure_claude_marketplace
         msg "Installing ${B}all${N} agent skills via ${B}databricks aitools${N} (agents: ${AITOOLS_AGENTS})"
         # Drop the "Skipped <agent>: ... project scope" / "user-only" notices that
         # aitools prints for agents it can't target in this scope — the mirror below
