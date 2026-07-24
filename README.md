@@ -5,29 +5,32 @@
 </p>
 
 ---
-> 📣 **Heads up: a major evolution is coming**
+> 📣 **The move is complete: Install now pulls the official Databricks Agent Skills**
 >
-> This will be the **last release where AI Dev Kit skills are installed from the skill files in this
-> repository.** AI Dev Kit skills are becoming part of the official, engineering-supported Databricks
-> skills set, and the skill files in this repo will soon be deprecated. In the next release you'll
-> install these skills directly from the official Databricks set — either straight from the CLI, or
-> through the AI Dev Kit installer, which will continue to guide you through the process.
+> AI Dev Kit skills are **no longer installed from skill files in this repository.** They are now part
+> of the official, engineering-supported Databricks skills set, installed directly from the CLI
+> (`databricks aitools install`) or through the AI Dev Kit installer, which delegates to the CLI and
+> still guides you through the process. The bundled skill files in this repo are deprecated and kept
+> for reference only.
 >
->
-> **What stays:** The MCP server and Builder App will remain in this repository. The Builder App will
-> keep being developed and improved, and the MCP server will be maintained and updated on a
-> best-effort basis as GitHub issues are filed.
+> **Already installed?** Re-run the installer script in this repo to uninstall older skills and MCP 
+> server before installing the official skills — see [Where Skills Come From](#where-skills-come-from). 
 >
 >
-> **What's next:** AI Dev Kit will continue to guide you through setting up your AI coding
-> environment and be a place to find experimental tools developed by Field Engineering. Beyond the
-> skills installs, we plan to add several tutorials to help you get started using coding agents for
-> building on Databricks, including getting started with Genie Code or Omnigent.
+> **What stays:** The MCP server and Builder App remain in this repository. The Builder App will keep
+> being developed and improved, and the MCP server will be maintained and updated on a best-effort
+> basis as GitHub issues are filed.
 >
-> **A few skills will be renamed or merged** in the official install. Most names are unchanged; the
+>
+> **What's next:** AI Dev Kit will continue to guide you through setting up your AI coding environment
+> and be a place to find experimental tools developed by Field Engineering. We're working on several
+> tutorials to help you get started using coding agents for building on Databricks — including getting
+> started with Genie Code and Omnigent — which will land in a future update.
+>
+> **A few skills were renamed or merged** in the official install. Most names are unchanged; the
 > exceptions are:
 >
-> | Today (AI Dev Kit) | Official Databricks skills |
+> | Previously (AI Dev Kit) | Official Databricks skills |
 > |---|---|
 > | `databricks-bundles` | `databricks-dabs` |
 > | `databricks-spark-declarative-pipelines` | `databricks-pipelines` |
@@ -55,7 +58,7 @@ Databricks offers two paths for AI-assisted coding. Choose the one that matches 
 
 **Free, first-party AI coding inside Databricks**
 
-Built into every Databricks workspace at no extra cost, with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks.
+Built into every Databricks workspace with deep native product context — your notebooks, jobs, and Unity Catalog data are already in scope. Ideal for users who have not started using AI-driven development tools or that are comfortable in Databricks workspace.
 
 </td>
 <td width="50%" align="center" valign="top">
@@ -68,7 +71,7 @@ Built into every Databricks workspace at no extra cost, with deep native product
 
 **Databricks expertise, in the editor you already use**
 
-Curated by Databricks field experts. Brings the patterns, skills, and 75+ executable tools your AI assistant needs to build on Databricks — wherever you're already coding.
+Curated by Databricks field experts. Brings tutorials, patterns, and the official Databricks agent skills to your AI coding tools to build on Databricks — wherever you're already coding.
 
 <br>
 
@@ -123,21 +126,17 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
 
 | Adventure                        | Best For | Start Here |
 |----------------------------------|----------|------------|
-| :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add to your existing project folder | [Quick Start (install)](#install-in-existing-project)
+| :star: [**Install AI Dev Kit**](#install-in-existing-project) | **Start here!** Follow quick install instructions to add Databricks skills for your user or existing project folder | [Quick Start (install)](#install-in-existing-project)
+| [**Genie Code Skills**](databricks-skills/) | Upload selected skills into your workspace for Genie Code. Note: much of the content in the public Databricks skills is already included in Genie Code. | [Genie Code skills (install)](#genie-code-skills) |
 | [**Visual Builder App**](#visual-builder-app) | Web-based UI for Databricks development | `databricks-builder-app/` |
-| [**Builder App + Genie Code MCP**](#visual-builder-app) | Builder UI + MCP server for Genie Code in one deployment | `deploy.sh --enable-mcp` |
-| [**Core Library**](#core-library) | Building custom integrations (LangChain, OpenAI, etc.) | `pip install` |
-| [**Skills Only**](databricks-skills/) | Provide Databricks patterns and best practices (without MCP functions) | Install skills |
-| [**Genie Code Skills**](databricks-skills/install_skills.sh) | Install skills into your workspace for Genie Code (`--install-to-genie`) | [Genie Code skills (install)](#genie-code-skills) |
-| [**MCP Tools Only**](databricks-mcp-server/) | Just executable actions (no guidance) | Register MCP server |
+!| [**MCP Tools**](databricks-mcp-server/) | Standalone MCP server exposing Databricks actions to AI clients. Note: We recommend skills instead, but maintain this as a good foundation if a custom MCP server is required. | [Register MCP server](databricks-mcp-server/) |
 ---
 
 ## Quick Start
 
 ### Prerequisites
 
-- [uv](https://github.com/astral-sh/uv) - Python package manager
-- [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) - Command line interface for Databricks
+- [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) **v1.0.0+** - Command line interface for Databricks (v1.0.0+ ships `databricks aitools`, which installs most skills)
 - AI coding environment (one or more):
   - [Claude Code](https://claude.ai/code)
   - [Cursor](https://cursor.com)
@@ -151,8 +150,8 @@ Curated by Databricks field experts. Brings the patterns, skills, and 75+ execut
 
 
 ### Install in existing project
-By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install.
-_Note: Project configuration files can be re-used in other projects. You find these configs under .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, .kiro, or opencode.json_
+By default this will install at a project level rather than a user level. This is often a good fit, but requires you to run your client from the exact directory that was used for the install. You can install for your user across all projects on the machine by passing `--global` or setting the scope to global in the interactive install.
+_Note: Project configuration files can be found under these folder: .claude, .cursor, .gemini, .codex, .github, .agents, .windsurf, .codeium, .opencode, .kiro, or opencode.json_
 
 #### Mac / Linux
 
@@ -171,16 +170,10 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --global --force
 ```
 
-**Specify profile and force reinstall**
+**Install specific skills only**
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --profile DEFAULT --force
-```
-
-**Install for specific tools only**
-
-```bash
-bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,gemini,antigravity,windsurf,opencode
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills databricks-core,databricks-bundles,databricks-pipelines
 ```
 
 </details>
@@ -211,12 +204,6 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 .\install.ps1 -Global -Force
 ```
 
-**Specify profile and force reinstall**
-
-```powershell
-.\install.ps1 -Profile DEFAULT -Force
-```
-
 **Install for specific tools only**
 
 ```powershell
@@ -227,6 +214,32 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 
 **Next steps:** Respond to interactive prompts and follow the on-screen instructions.
 - Note: Cursor and Copilot require updating settings manually after install.
+
+### Where Skills Come From
+
+The installer assembles skills from two upstream sources — nothing is bundled in this repo anymore:
+
+| Source | Skills | Mechanism |
+|--------|--------|-----------|
+| [databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) | Most Databricks skills (jobs, pipelines, DABs, SQL, Unity Catalog, apps, Genie, …) | Delegated to `databricks aitools install` — requires **Databricks CLI v1.0.0+** |
+| [mlflow/skills](https://github.com/mlflow/skills) | MLflow skills | Fetched from `main` (override with `MLFLOW_REF`) |
+
+Skills installed via `databricks aitools` are managed by the CLI afterwards — update them with `databricks aitools update` and remove them with `databricks aitools uninstall`. For tools the CLI can't target yet (Gemini CLI, Windsurf, Kiro), the installer installs the same skills into each tool's skills directory.
+
+Use `--list-skills` to see every skill and profile, and `--dry-run` to preview exactly what an install would do (resolved refs and the `aitools` command) without changing anything. Some skills were renamed or consolidated in the move — see [Breaking change: skill sources and names](#breaking-change-skill-sources-and-names) below.
+
+<details>
+<summary><strong>Installer environment variables</strong> (click to expand)</summary>
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MLFLOW_REF` | `main` | Ref for the MLflow skills fetch (the repo is tagless) |
+| `INCLUDE_PRERELEASES` | `0` | Set to `1` to allow `-rc`/`-beta` tags when resolving `latest` |
+| `DRY_RUN` | `false` | Set to `1` to print the install plan and exit |
+
+The installer also records what it installed (resolved refs, commit SHAs, `aitools` release) in `skills.lock` inside the scope-local `.ai-dev-kit/` state directory.
+
+</details>
 
 ### Update
 
@@ -273,30 +286,26 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 
 Scope mirrors install: a project uninstall touches only the current directory's config; `--global` touches only the per-user (`$HOME`) config. Run it once per scope you installed into.
 
-
 ### Visual Builder App
 
-Full-stack web application with chat UI for Databricks development. Deploys a Lakebase database and Databricks App with a single command:
+Full-stack web application with a chat UI for Databricks development. Its setup is **self-contained** — you do not need to run the kit-wide `install.sh` first; the scripts build their own environment, install the sibling packages, and generate config.
 
 ```bash
 cd ai-dev-kit/databricks-builder-app
 
-# Deploy everything (Lakebase + app + permissions)
+# Local development (provisions Lakebase, installs deps, generates .env.local, starts servers)
+./scripts/start_local.sh --profile <your-profile>
+
+# Deploy to Databricks Apps (Lakebase + app + permissions)
 ./scripts/deploy.sh my-builder-app --profile <your-profile>
 
-# Deploy with MCP Gateway for Genie Code (name must start with mcp-)
+# Deploy with the MCP gateway enabled (name must start with mcp- for Genie Code)
 ./scripts/deploy.sh mcp-builder-app --enable-mcp --profile <your-profile>
 ```
 
-With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
+With `--enable-mcp`, the app also serves as an **MCP server** at `/mcp`, exposing the 40+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. The builder UI and MCP server run in a single deployment.
 
-For local development:
-
-```bash
-./scripts/setup.sh        # Install dependencies
-# Edit .env.local with your credentials
-./scripts/start_dev.sh    # Start locally at http://localhost:3000
-```
+> **Current dependencies (to be removed later):** the Builder App currently relies on the in-repo MCP server (`databricks-mcp-server` + `databricks-tools-core`) and a bundled, frozen skills snapshot under [`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/). Both are temporary couplings scheduled to be decoupled from the kit.
 
 See [`databricks-builder-app/`](databricks-builder-app/) for full documentation.
 
@@ -314,42 +323,56 @@ results = execute_sql("SELECT * FROM my_catalog.schema.table LIMIT 10")
 Works with LangChain, OpenAI Agents SDK, or any Python framework. See [databricks-tools-core/](databricks-tools-core/) for details.
 
 ---
-## Genie Code Skills
+## Skills
 
-Install skills into `./.claude/skills` (relative to the directory where you run the script), then upload them to your workspace at `/Workspace/Users/<you>/.assistant/skills` so Genie Code can use them in the UI. Requires the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/) authenticated for your workspace.
-
-**Always run from the project directory** where you want `.claude/skills` created (for example your repo root or `ai-dev-kit`).
-
-**From this repo (recommended if you have a clone):**
+Skills teach your AI assistant Databricks patterns and best practices. For your **editor**, they are
+installed and kept up to date by the Databricks CLI (v1.0.0+), which the AI Dev Kit installer already
+delegates to:
 
 ```bash
-# Databricks skills from this checkout + upload (DEFAULT CLI profile)
-./databricks-skills/install_skills.sh --local --install-to-genie
-
-# Download all skills from GitHub, then upload
-./databricks-skills/install_skills.sh --install-to-genie
-
-# Explicit Databricks CLI profile
-./databricks-skills/install_skills.sh --install-to-genie --profile YOUR_PROFILE
+databricks aitools install
 ```
 
-**Without cloning** (run from the directory that should contain `.claude/skills`):
+By default `databricks aitools install` installs the official **`databricks` plugin** through each
+agent's own plugin CLI for the agents that support one — **Claude Code, Codex, and GitHub Copilot** —
+and writes **raw skill files** for the agents that don't (**Cursor, OpenCode, Antigravity**). Pass
+`--skills-only` to force raw skill files for every agent. (This official `databricks` plugin is
+separate from — and replaces — the retired `databricks-ai-dev-kit` plugin this repo used to publish;
+see [`.claude-plugin/DEPRECATED.md`](.claude-plugin/DEPRECATED.md).)
 
-```bash
-curl -sSL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/databricks-skills/install_skills.sh | bash -s -- --install-to-genie
-```
+Skills come from [github.com/databricks/databricks-agent-skills](https://github.com/databricks/databricks-agent-skills).
+The skill copies that used to be bundled in this repo are deprecated and frozen under
+[`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/); if you need the exact historical
+files, use git tag `v0.1.14`. Some skills were renamed in the move — see the breaking-change note
+below. (APX and Genie-specific skills are no longer bundled here; they live in their own repos.)
 
-Combine `--profile`, `--local`, specific skill names, `--mlflow-version`, etc. as needed; see `./databricks-skills/install_skills.sh --help` or [databricks-skills/README.md](databricks-skills/README.md).
+### Genie Code Skills
 
-**From a Databricks notebook** (no local terminal needed):
+To use skills inside **Genie Code** in a Databricks workspace, upload them to
+`/Workspace/Users/<you>/.assistant/skills`. `databricks aitools install` does not cover this yet, so
+use the provided notebook to install:
 
-Import [`databricks-skills/install_genie_code_skills.py`](databricks-skills/install_genie_code_skills.py) into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them to your workspace using the Databricks SDK. This works on any compute, including serverless.
+**From a Databricks notebook (recommended — no local clone):**
+Import [`install_genie_code_skills.py`](install_genie_code_skills.py)
+into your workspace as a notebook and run it. It downloads skills from GitHub and uploads them via the
+Databricks SDK. Works on any compute, including serverless.
 
-**Skill modification or Custom Skill**
+See [databricks-skills/README.md](databricks-skills/README.md) for details.
 
-After the script successfully installs the skills to your workspace, you may find the skills under `/Workspace/Users/<your_user_name>/.assistant/skills`.
+**Customizing skills:** after upload, skills live under
+`/Workspace/Users/<your_user_name>/.assistant/skills`. You can modify or remove skills there, or add
+your own skill folders (each with a `SKILL.md`) that Genie Code will use automatically in any session.
 
-This directory is customizable if you wish to only use certain skills or even create custom skills that are related to your organization to make Genie Code even better.  You can modify/remove existing skills or create new skills folders that Genie Code will automatically use in any session.
+### Breaking change: skill sources and names
+
+Skills are no longer bundled in this repository — they come from
+[databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) via
+`databricks aitools install`, and a few were **renamed or consolidated** in the move (see the rename
+table in the notice at the top of this README). To see the current skill names, run
+`databricks aitools list` (CLI v1.0.0+) or browse the
+[databricks-agent-skills](https://github.com/databricks/databricks-agent-skills) repo. To reproduce
+the old bundled layout and names exactly, use git tag `v0.1.14` (the frozen copies also remain under
+[`DEPRECATED-databricks-skills/`](DEPRECATED-databricks-skills/)).
 
 ## Architecture
 
@@ -364,8 +387,8 @@ The AI Dev Kit ships as four composable pieces — install the whole kit, or pic
 | Component | Description |
 |-----------|-------------|
 | [`databricks-tools-core/`](databricks-tools-core/) | Python library with high-level Databricks functions |
-| [`databricks-mcp-server/`](databricks-mcp-server/) | MCP server exposing 50+ tools for AI assistants |
-| [`databricks-skills/`](databricks-skills/) | 20 markdown skills teaching Databricks patterns |
+| [`databricks-mcp-server/`](databricks-mcp-server/) | Standalone MCP server exposing 40+ Databricks tools for AI assistants (installs independently of skills) |
+| [`databricks-skills/`](databricks-skills/) | Skills that teach Databricks patterns (installed via `databricks aitools`; bundled copies are deprecated) |
 | [`databricks-builder-app/`](databricks-builder-app/) | Full-stack web app with Claude Code integration |
 
 ---

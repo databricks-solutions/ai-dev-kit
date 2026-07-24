@@ -4,15 +4,8 @@
     "name": "Databricks Solutions"
   },
   "metadata": {
-    "description": "Official Databricks AI Dev Kit plugin marketplace",
+    "description": "DEPRECATED — the databricks-ai-dev-kit plugin is no longer published. Install skills with install.sh or `databricks aitools install` (which installs the official `databricks` plugin for Claude Code/Codex/Copilot, or skill files for other agents). See .claude-plugin/DEPRECATED.md.",
     "version": "1.1.9"
   },
-  "plugins": [
-    {
-      "name": "databricks-ai-dev-kit",
-      "source": "./",
-      "description": "Databricks development toolkit with 19 skills and MCP tools for direct Databricks operations",
-      "version": "1.1.9"
-    }
-  ]
+  "plugins": []
 }

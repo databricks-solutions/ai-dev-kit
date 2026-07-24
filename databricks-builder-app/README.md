@@ -4,7 +4,7 @@
 
 A web application that provides a Claude Code agent interface with integrated Databricks tools. Users interact with Claude through a chat interface, and the agent can execute SQL queries, manage pipelines, upload files, and more on their Databricks workspace.
 
-Optionally, the app can also serve as an **MCP server** for [Genie Code](https://docs.databricks.com/en/genie/genie-code.html) and other MCP clients, exposing all 75+ Databricks tools via the MCP protocol at `/mcp`.
+Optionally, the app can also serve as an **MCP server** for [Genie Code](https://docs.databricks.com/en/genie/genie-code.html) and other MCP clients, exposing all 40+ Databricks tools via the MCP protocol at `/mcp`.
 
 > **✅ Event Loop Fix Implemented**
 >
@@ -172,7 +172,7 @@ Tools are exposed as `mcp__databricks__<tool_name>` and include:
 Skills provide specialized guidance for Databricks development tasks. They are markdown files with instructions and examples that Claude can load on demand.
 
 **Skill loading flow:**
-1. On startup, skills are copied from `../databricks-skills/` to `./skills/`
+1. On startup, skills are copied from the bundled snapshot (`../DEPRECATED-databricks-skills/`, falling back to `../databricks-skills/`) to `./skills/`
 2. When a project is created, skills are copied to `project/.claude/skills/`
 3. The agent can invoke skills using the `Skill` tool: `skill: "sdp"`
 
@@ -205,16 +205,40 @@ projects/
 
 ## Setup
 
+> **Standalone setup.** This app is self-contained — you do **not** need to run
+> the kit-wide `install.sh` at the repo root first. The scripts under
+> `scripts/` build their own Python virtualenv (`uv sync`), install the sibling
+> `databricks-tools-core` / `databricks-mcp-server` packages, install skills,
+> and generate their own config (`.env.local` / `app.yaml`). Just clone the repo
+> and run the commands below from `databricks-builder-app/`.
+
+### Current dependencies (to be removed later)
+
+The Builder App is being decoupled from the rest of the kit. Until that work
+lands, it still relies on two in-repo dependencies that ship alongside the app:
+
+- **In-process MCP server** — Databricks tools are loaded from the sibling
+  `databricks-mcp-server` (backed by `databricks-tools-core`) packages. The
+  setup/deploy scripts install these from the repo automatically. This is a
+  temporary coupling; the tool layer will be replaced later.
+- **Bundled (frozen) skills snapshot** — Databricks skills are read from the
+  in-repo snapshot at `DEPRECATED-databricks-skills/` (with a fallback to the
+  legacy `databricks-skills/` location for older checkouts). This snapshot is
+  frozen and shipped with the app; MLflow skills are still fetched from
+  `github.com/mlflow/skills` by `install_skills.sh`. A future change will
+  migrate the app off these bundled copies (e.g. to `databricks aitools`).
+
 ### Prerequisites
 
 - Python 3.11+
 - Node.js 18+
 - [uv](https://github.com/astral-sh/uv) package manager
+- Databricks CLI v0.287.0+ (with an authenticated profile: `databricks auth login --profile <name>`)
 - Databricks workspace with:
   - SQL warehouse (for SQL queries)
   - Cluster (for Python/PySpark execution)
   - Unity Catalog enabled (recommended)
-- PostgreSQL database (Lakebase) for project persistence — autoscale or provisioned
+  - Lakebase enabled (autoscale or provisioned) for project persistence
 
 ### Quick Start (Local Development)
 
@@ -306,7 +330,7 @@ The app supports two authentication modes:
 
 #### Skills Configuration
 
-Skills are loaded from `../databricks-skills/` and filtered by the `ENABLED_SKILLS` environment variable:
+Skills are loaded from the bundled snapshot (`../DEPRECATED-databricks-skills/`, falling back to `../databricks-skills/`) and filtered by the `ENABLED_SKILLS` environment variable:
 
 - `databricks-python-sdk`: Patterns for using the Databricks Python SDK
 - `databricks-spark-declarative-pipelines`: SDP/DLT pipeline development
@@ -314,7 +338,7 @@ Skills are loaded from `../databricks-skills/` and filtered by the `ENABLED_SKIL
 - `databricks-apps-python`: Python apps with Dash, Streamlit, Flask
 
 **Adding custom skills:**
-1. Create a new directory in `../databricks-skills/`
+1. Create a new directory in the bundled snapshot (`../DEPRECATED-databricks-skills/`)
 2. Add a `SKILL.md` file with frontmatter:
    ```markdown
    ---
@@ -359,7 +383,7 @@ See [EVENT_LOOP_FIX.md](./EVENT_LOOP_FIX.md) for technical details.
 
 Check:
 1. `ENABLED_SKILLS` environment variable in `.env.local`
-2. Skill names match directory names in `../databricks-skills/`
+2. Skill names match directory names in the bundled snapshot (`../DEPRECATED-databricks-skills/`, or the legacy `../databricks-skills/`)
 3. Each skill has a `SKILL.md` file with proper frontmatter
 4. Check logs: `Copied X skills to ./skills`
 
@@ -568,7 +592,7 @@ databricks bundle destroy --profile <profile>
 
 ### MCP Gateway for Genie Code
 
-The Builder App can optionally serve as an **MCP server** at `/mcp`, exposing all 75+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. This turns the app into a dual-purpose deployment: **visual builder UI** at `/` and **MCP server** at `/mcp`.
+The Builder App can optionally serve as an **MCP server** at `/mcp`, exposing all 40+ Databricks tools to [Genie Code](https://docs.databricks.com/en/genie/genie-code.html), AI Playground, and other MCP clients. This turns the app into a dual-purpose deployment: **visual builder UI** at `/` and **MCP server** at `/mcp`.
 
 #### How It Works
 
@@ -615,8 +639,9 @@ After deploying with `--enable-mcp` and an `mcp-` prefixed name:
 You can also install skills to the Genie Space for additional context:
 
 ```bash
-# From the repo root — installs skills to your workspace for Genie Code
-./databricks-skills/install_skills_to_genie_code.sh
+# Downloads the frozen legacy skills from the last release (v0.1.14),
+# then uploads them to your workspace for Genie Code.
+bash ../DEPRECATED-databricks-skills/install_skills.sh --install-to-genie --profile <profile>
 ```
 
 #### Using with Other MCP Clients
@@ -640,7 +665,7 @@ The MCP gateway does **not** activate during local development unless you explic
 
 ```bash
 # Normal local dev (no MCP gateway)
-./scripts/start_dev.sh
+./scripts/start_local.sh --profile <your-profile>
 
 # Local dev with MCP gateway (for testing)
 ENABLE_MCP_GATEWAY=true uvicorn server.app:app --reload --port 8000 --reload-dir server
@@ -689,4 +714,4 @@ This provides a minimal working example with setup instructions for integrating 
 
 - **databricks-tools-core**: Core MCP functionality and SQL operations
 - **databricks-mcp-server**: MCP server exposing Databricks tools
-- **databricks-skills**: Skill definitions for Databricks development
+- **DEPRECATED-databricks-skills**: Bundled (frozen) skill definitions the app ships with (falls back to `databricks-skills/` on older checkouts)

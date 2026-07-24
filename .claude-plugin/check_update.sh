@@ -1,4 +1,9 @@
 #!/bin/bash
+# DEPRECATED: The databricks-ai-dev-kit Claude Code plugin is no longer published
+# (see .claude-plugin/DEPRECATED.md). Install skills via install.sh or
+# `databricks aitools install`. This script is kept for reference and still runs
+# if invoked directly.
+#
 # Version update check for Databricks AI Dev Kit.
 # Stdout from this script is injected as context Claude can see at session start.
 # Silent on success (up to date) or failure (network error, missing files).
