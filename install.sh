@@ -2,7 +2,11 @@
 #
 # Databricks AI Dev Kit - Unified Installer
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
+# Installs Databricks skills and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
+#
+# The (deprecated, optional) MCP server has its own installer:
+#   databricks-mcp-server/mcp_install.sh   (macOS/Linux)
+#   databricks-mcp-server/mcp_install.ps1  (Windows)
 #
 # Usage: bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) [OPTIONS]
 #
@@ -18,9 +22,6 @@
 #
 #   # Install for specific tools only
 #   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools cursor,codex,copilot,gemini
-#
-#   # Skills only (skip MCP server)
-#   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-only
 #
 #   # Install skills for a specific profile
 #   bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --skills-profile data-engineer
@@ -53,7 +54,6 @@ ASSUME_YES=false
 SILENT="${DEVKIT_SILENT:-false}"
 TOOLS="${DEVKIT_TOOLS:-}"
 USER_TOOLS=""
-USER_MCP_PATH="${DEVKIT_MCP_PATH:-}"
 SKILLS_PROFILE="${DEVKIT_SKILLS_PROFILE:-}"
 USER_SKILLS="${DEVKIT_SKILLS:-}"
 DRY_RUN="${DRY_RUN:-false}"
@@ -97,17 +97,14 @@ else
   [ -z "$BRANCH" ] && BRANCH="main"
 fi
 
-# Installation mode defaults. The MCP server is deprecated/optional — skills
-# now work directly via the Databricks CLI, so MCP defaults OFF and is opt-in
-# (--mcp / --mcp-path / DEVKIT_INSTALL_MCP=true). When opted in, the venv build
-# is delegated to databricks-mcp-server/setup.sh.
+# Installation mode. This installer sets up skills only. The (deprecated,
+# optional) MCP server has moved to its own installer:
+#   databricks-mcp-server/mcp_install.sh   (macOS/Linux)
+#   databricks-mcp-server/mcp_install.ps1  (Windows)
 INSTALL_SKILLS=true
-INSTALL_MCP="${DEVKIT_INSTALL_MCP:-false}"
-[ "$INSTALL_MCP" = "true" ] || [ "$INSTALL_MCP" = "1" ] && INSTALL_MCP=true || INSTALL_MCP=false
 
 # Minimum required versions
 MIN_CLI_VERSION="0.278.0"
-# (MCP server SDK minimum is enforced by databricks-mcp-server/setup.sh)
 # Agent skills are delegated to `databricks aitools`, which ships with CLI v1.0.0+
 MIN_AITOOLS_CLI_VERSION="1.0.0"
 
@@ -193,10 +190,9 @@ while [ $# -gt 0 ]; do
         -p|--profile)     PROFILE="$2"; shift 2 ;;
         -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
         -b|--branch)      BRANCH="$2"; BRANCH_EXPLICIT=true; shift 2 ;;
-        --skills-only)    INSTALL_MCP=false; shift ;;
-        --mcp-only)       INSTALL_SKILLS=false; INSTALL_MCP=true; shift ;;
-        --mcp)            INSTALL_MCP=true; shift ;;
-        --mcp-path)       USER_MCP_PATH="$2"; INSTALL_MCP=true; shift 2 ;;
+        --skills-only)    shift ;;  # accepted for backward compat (skills-only is now the only mode)
+        --mcp|--mcp-only|--mcp-path)
+            die "The MCP server has moved to its own installer. Run: bash databricks-mcp-server/mcp_install.sh (or mcp_install.ps1 on Windows)." ;;
         --skills-profile) SKILLS_PROFILE="$2"; shift 2 ;;
         --skills)         USER_SKILLS="$2"; shift 2 ;;
         --list-skills)    LIST_SKILLS=true; shift ;;
@@ -221,10 +217,6 @@ while [ $# -gt 0 ]; do
             echo "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
             echo "  -b, --branch NAME     Install a specific release/branch (runs that version's own installer)"
             echo "  -g, --global          Install globally for all projects"
-            echo "  --skills-only         Install skills only (default; MCP server is opt-in)"
-            echo "  --mcp                 Install the deprecated MCP server (default: no)"
-            echo "  --mcp-only            Install the MCP server only, skip skills"
-            echo "  --mcp-path PATH       MCP server install path (implies --mcp; default: ~/.ai-dev-kit)"
             echo "  --silent              Silent mode (no output except errors)"
             echo "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             echo "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
@@ -233,7 +225,7 @@ while [ $# -gt 0 ]; do
             echo "  --experimental BOOL   Include experimental agent skills (default: true; 'false' = stable only)"
             echo "  --dry-run             Print what would be installed (resolved refs, aitools command) and exit"
             echo "  -f, --force           Force reinstall"
-            echo "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, MCP config, and Claude Code plugin"
+            echo "  --uninstall           Remove AI Dev Kit: skills, Claude Code plugin, and any leftover MCP config from older installs"
             echo "  --dry-run             With --uninstall: print what would be removed, change nothing"
             echo "  -y, --yes             With --uninstall: skip the confirmation prompt"
             echo "  -h, --help            Show this help"
@@ -241,11 +233,9 @@ while [ $# -gt 0 ]; do
             echo "Environment Variables (alternative to flags):"
             echo "  DEVKIT_PROFILE        Databricks config profile"
             echo "  DEVKIT_BRANCH         Git branch/tag to install (alias: AIDEVKIT_BRANCH; default: latest release)"
-            echo "  DEVKIT_INSTALL_MCP    Set to 'true' to install the deprecated MCP server (default: false)"
             echo "  DEVKIT_SCOPE          'project' or 'global'"
             echo "  DEVKIT_TOOLS          Comma-separated list of tools"
             echo "  DEVKIT_FORCE          Set to 'true' to force reinstall"
-            echo "  DEVKIT_MCP_PATH       Path to MCP server installation"
             echo "  DEVKIT_SKILLS_PROFILE Comma-separated skill profiles"
             echo "  DEVKIT_SKILLS         Comma-separated skill names"
             echo "  DEVKIT_SILENT         Set to 'true' for silent mode"
@@ -257,7 +247,8 @@ while [ $# -gt 0 ]; do
             echo "Notes:"
             echo "  Most Databricks skills are installed via 'databricks aitools' (Databricks CLI v1.0.0+)"
             echo "  and are updated/uninstalled with 'databricks aitools update|uninstall', not this script."
-            echo "  The MCP server is deprecated/optional — skills work without it. Opt in with --mcp."
+            echo "  The MCP server is deprecated/optional and has its own installer:"
+            echo "  bash databricks-mcp-server/mcp_install.sh (or mcp_install.ps1 on Windows)."
             echo "  Renamed skills: databricks-bundles -> databricks-dabs,"
             echo "  databricks-spark-declarative-pipelines -> databricks-pipelines."
             echo "  Replaced skills: databricks-config -> databricks-core,"
@@ -655,7 +646,7 @@ run_uninstall() {
         # renders: "Remove from current directory ..." / "Remove from home directory ..."
     fi
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
-    install_dir="${USER_MCP_PATH:-${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}}"
+    install_dir="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
     [ "$SCOPE" = "global" ] && state_dir="$install_dir" || state_dir="$base_dir/.ai-dev-kit"
     VENV_PYTHON="$install_dir/.venv/bin/python"
 
@@ -719,10 +710,10 @@ run_uninstall() {
     for path in "${hook_targets[@]}"; do
         [ -f "$path" ] && grep -q 'check_update.sh' "$path" 2>/dev/null && plan_hooks+=("$path")
     done
-    # The shared MCP runtime (~/.ai-dev-kit) is global; only remove it on a global
-    # uninstall, or when the user explicitly points --mcp-path at it. A project
-    # uninstall leaves it so other projects/global keep working.
-    if [ "$SCOPE" = "global" ] || [ -n "$USER_MCP_PATH" ]; then
+    # The shared MCP runtime (~/.ai-dev-kit) left by older installs is global; only
+    # remove it on a global uninstall. A project uninstall leaves it so other
+    # projects/global keep working.
+    if [ "$SCOPE" = "global" ]; then
         [ -d "$install_dir" ] && plan_runtime+=("$install_dir")
     fi
     # On a global uninstall state_dir IS the runtime dir; when that dir is already in
@@ -819,13 +810,12 @@ run_uninstall() {
 }
 
 # Set configuration URLs after parsing branch argument
-REPO_URL="https://github.com/databricks-solutions/ai-dev-kit.git"
 RAW_URL="https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/${BRANCH}"
 INSTALL_DIR="${AIDEVKIT_HOME:-$HOME/.ai-dev-kit}"
-REPO_DIR="$INSTALL_DIR/repo"
+# VENV_PYTHON is used by --uninstall as a fallback Python interpreter for safely
+# editing leftover JSON config from older installs that included the MCP server.
 VENV_DIR="$INSTALL_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
-MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 
 # ─── Interactive helpers ────────────────────────────────────────
 # Reads from /dev/tty so prompts work even when piped via curl | bash
@@ -1241,35 +1231,6 @@ prompt_profile() {
         selected=$(prompt "Profile name" "DEFAULT")
         PROFILE="$selected"
     fi
-}
-
-# ─── MCP path selection (deprecated/optional MCP server) ───────
-# Skills work via the Databricks CLI, so the MCP server is opt-in only — there is
-# no interactive opt-in prompt. This runs solely when the user passed --mcp /
-# --mcp-only / --mcp-path / DEVKIT_INSTALL_MCP to choose where the runtime lands.
-prompt_mcp_path() {
-    # If provided via --mcp-path flag, skip prompt
-    if [ -n "$USER_MCP_PATH" ]; then
-        INSTALL_DIR="$USER_MCP_PATH"
-    elif [ "$SILENT" = false ] && is_interactive; then
-        [ "$SILENT" = false ] && echo ""
-        [ "$SILENT" = false ] && echo -e "  ${B}MCP server location${N}"
-        [ "$SILENT" = false ] && echo -e "  ${D}The MCP server runtime (Python venv + source) will be installed here.${N}"
-        [ "$SILENT" = false ] && echo -e "  ${D}Shared across all your projects — only the config files are per-project.${N}"
-        [ "$SILENT" = false ] && echo ""
-
-        local selected
-        selected=$(prompt "Install path" "$INSTALL_DIR")
-
-        # Expand ~ to $HOME
-        INSTALL_DIR="${selected/#\~/$HOME}"
-    fi
-
-    # Update derived paths
-    REPO_DIR="$INSTALL_DIR/repo"
-    VENV_DIR="$INSTALL_DIR/.venv"
-    VENV_PYTHON="$VENV_DIR/bin/python"
-    MCP_ENTRY="$REPO_DIR/databricks-mcp-server/run_server.py"
 }
 
 # ─── Skill profile selection ──────────────────────────────────
@@ -2292,17 +2253,6 @@ check_deps() {
         warn "Databricks CLI not found. Install: ${B}curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh${N}"
         msg "${D}You can still install, but authentication will require the CLI later.${N}"
     fi
-
-    if [ "$INSTALL_MCP" = true ]; then
-        if command -v uv >/dev/null 2>&1; then
-            PKG="uv"
-            ok "$PKG ($(uv --version 2>/dev/null || echo 'unknown version'))"
-        else
-            die "uv is required but not found on your PATH.
-   Install it with: ${B}curl -LsSf https://astral.sh/uv/install.sh | sh${N}
-   Then re-run this installer."
-        fi
-    fi
 }
 
 # Check if update needed
@@ -2338,41 +2288,6 @@ check_version() {
             exit 0
         fi
     fi
-}
-
-# Clone or update the repo sources into $REPO_DIR (needed for bundled skills
-# and the MCP server setup script). Idempotent.
-clone_repo() {
-    if [ -d "$REPO_DIR/.git" ]; then
-        git -C "$REPO_DIR" fetch -q --depth 1 origin "$BRANCH" 2>/dev/null || true
-        git -C "$REPO_DIR" reset --hard FETCH_HEAD 2>/dev/null || {
-            rm -rf "$REPO_DIR"
-            git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
-                || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
-        }
-    else
-        mkdir -p "$INSTALL_DIR"
-        git -c advice.detachedHead=false clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$REPO_DIR" \
-            || die "Could not clone branch '$BRANCH' from $REPO_URL — check your network and that the branch exists."
-    fi
-    ok "Repository cloned ($BRANCH)"
-}
-
-# Setup the (deprecated, opt-in) MCP server by delegating the venv build to
-# databricks-mcp-server/setup.sh — that script is the single source of truth for
-# the Python environment, so the installer doesn't duplicate venv/pip logic here.
-setup_mcp() {
-    step "Setting up MCP server"
-    clone_repo
-
-    local setup_script="$REPO_DIR/databricks-mcp-server/setup.sh"
-    [ -f "$setup_script" ] || die "MCP setup script not found at $setup_script"
-
-    msg "Building MCP server environment (databricks-mcp-server/setup.sh)..."
-    local quiet_flag=""
-    [ "$SILENT" = true ] && quiet_flag="--quiet"
-    bash "$setup_script" --venv-dir "$VENV_DIR" $quiet_flag || die "MCP server setup failed"
-    ok "MCP server ready"
 }
 
 # Install skills
@@ -2499,143 +2414,13 @@ install_skills() {
     fi
 }
 
-# Write MCP configs
-# Write/merge an MCP server entry into a JSON config.
-#   $1 path        target config file
-#   $2 root_key    top-level key: "mcpServers" (Claude/Cursor/Gemini/Windsurf/Kiro)
-#                  or "servers" (Copilot)
-#   $3 defer       "true" to include Claude's defer_loading hint, else "false"
-# Replaces the old write_mcp_json / write_copilot_mcp_json / write_gemini_mcp_json
-# trio, which differed only in those two parameters.
-write_mcp_json_config() {
-    local path=$1 root_key=$2 defer=$3
-    mkdir -p "$(dirname "$path")"
-
-    # Backup existing file before any modifications
-    if [ -f "$path" ]; then
-        cp "$path" "${path}.bak"
-        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
-    fi
-
-    local defer_py="" defer_json=""
-    if [ "$defer" = "true" ]; then
-        defer_py="'defer_loading': True, "
-        defer_json='
-      "defer_loading": true,'
-    fi
-
-    if [ -f "$VENV_PYTHON" ]; then
-        "$VENV_PYTHON" -c "
-import json
-try:
-    with open('$path') as f: cfg = json.load(f)
-except: cfg = {}
-cfg.setdefault('$root_key', {})['databricks'] = {'command': '$VENV_PYTHON', 'args': ['$MCP_ENTRY'], ${defer_py}'env': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'}}
-with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
-" 2>/dev/null && return
-    fi
-
-    # Fallback: only safe for new files — refuse to overwrite existing files
-    # that may contain other settings (e.g. ~/.claude.json)
-    if [ -f "$path" ]; then
-        warn "Cannot merge MCP config into $path without Python. Add manually."
-        return
-    fi
-
-    cat > "$path" << EOF
-{
-  "$root_key": {
-    "databricks": {
-      "command": "$VENV_PYTHON",
-      "args": ["$MCP_ENTRY"],${defer_json}
-      "env": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"}
-    }
-  }
-}
-EOF
-}
-
-write_mcp_toml() {
-    local path=$1
-    mkdir -p "$(dirname "$path")"
-    grep -q "mcp_servers.databricks" "$path" 2>/dev/null && return
-    if [ -f "$path" ]; then
-        cp "$path" "${path}.bak"
-        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
-    fi
-    cat >> "$path" << EOF
-
-[mcp_servers.databricks]
-command = "$VENV_PYTHON"
-args = ["$MCP_ENTRY"]
-EOF
-}
-
-write_opencode_json() {
-    local path=$1
-    mkdir -p "$(dirname "$path")"
-
-    # Backup existing file before any modifications
-    if [ -f "$path" ]; then
-        cp "$path" "${path}.bak"
-        msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
-    fi
-
-    if [ -f "$VENV_PYTHON" ]; then
-        "$VENV_PYTHON" -c "
-import json
-try:
-    with open('$path') as f: cfg = json.load(f)
-except: cfg = {}
-cfg.setdefault('\$schema', 'https://opencode.ai/config.json')
-cfg.setdefault('mcp', {})['databricks'] = {
-    'type': 'local',
-    'command': ['$VENV_PYTHON', '$MCP_ENTRY'],
-    'environment': {'DATABRICKS_CONFIG_PROFILE': '$PROFILE'},
-    'enabled': True
-}
-with open('$path', 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
-" 2>/dev/null && return
-    fi
-
-    # Fallback: only safe for new files
-    if [ -f "$path" ]; then
-        warn "Cannot merge MCP config into $path without Python. Add manually."
-        return
-    fi
-
-    cat > "$path" << EOF
-{
-  "\$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "databricks": {
-      "type": "local",
-      "command": ["$VENV_PYTHON", "$MCP_ENTRY"],
-      "environment": {"DATABRICKS_CONFIG_PROFILE": "$PROFILE"},
-      "enabled": true
-    }
-  }
-}
-EOF
-}
-
 write_gemini_md() {
     local path=$1
     [ -f "$path" ] && return  # Don't overwrite existing file
     cat > "$path" << 'GEMINIEOF'
 # Databricks AI Dev Kit
 
-You have access to Databricks skills and MCP tools installed by the Databricks AI Dev Kit.
-
-## Available MCP Tools
-
-The `databricks` MCP server provides 50+ tools for interacting with Databricks, including:
-- SQL execution and warehouse management
-- Unity Catalog operations (tables, volumes, schemas)
-- Jobs and workflow management
-- Model serving endpoints
-- Genie spaces and AI/BI dashboards
-- Databricks Apps deployment
+You have access to Databricks skills installed by the Databricks AI Dev Kit.
 
 ## Available Skills
 
@@ -2655,164 +2440,13 @@ GEMINIEOF
     ok "GEMINI.md"
 }
 
-write_claude_hook() {
-    local path=$1
-    local script=$2
-    mkdir -p "$(dirname "$path")"
-
-    # Merge into existing settings.json if present, using Python for safe JSON handling
-    if [ -f "$path" ] && [ -f "$VENV_PYTHON" ]; then
-        "$VENV_PYTHON" -c "
-import json
-path = '$path'
-script = '$script'
-hook_entry = {'type': 'command', 'command': 'bash ' + script, 'timeout': 5}
-try:
-    with open(path) as f: cfg = json.load(f)
-except: cfg = {}
-hooks = cfg.setdefault('hooks', {})
-session_hooks = hooks.setdefault('SessionStart', [])
-# Check if hook already exists
-for group in session_hooks:
-    for h in group.get('hooks', []):
-        if 'check_update.sh' in h.get('command', ''):
-            exit(0)  # Already configured
-# Append new hook group
-session_hooks.append({'hooks': [hook_entry]})
-with open(path, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
-" 2>/dev/null && return
-    fi
-
-    # Fallback: write new file (only if no existing file)
-    [ -f "$path" ] && return  # Don't overwrite existing settings without Python
-    cat > "$path" << EOF
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $script",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
-}
-EOF
-}
-
-write_mcp_configs() {
-    step "Configuring MCP"
-    
-    local base_dir=$1
-    for tool in $TOOLS; do
-        case $tool in
-            claude)
-                [ "$SCOPE" = "global" ] && write_mcp_json_config "$HOME/.claude.json" mcpServers true || write_mcp_json_config "$base_dir/.mcp.json" mcpServers true
-                ok "Claude MCP config"
-                # Add version check hook to Claude settings
-                local check_script="$REPO_DIR/.claude-plugin/check_update.sh"
-                if [ "$SCOPE" = "global" ]; then
-                    write_claude_hook "$HOME/.claude/settings.json" "$check_script"
-                else
-                    write_claude_hook "$base_dir/.claude/settings.json" "$check_script"
-                fi
-                ok "Claude update check hook"
-                ;;
-            cursor)
-                if [ "$SCOPE" = "global" ]; then
-                    warn "Cursor global: manual MCP configuration required"
-                    msg "  1. Open ${B}Cursor → Settings → Cursor Settings → Tools & MCP${N}"
-                    msg "  2. Click ${B}New MCP Server${N}"
-                    msg "  3. Add the following JSON config:"
-                    msg "     {"
-                    msg "       \"mcpServers\": {"
-                    msg "         \"databricks\": {"
-                    msg "           \"command\": \"$VENV_PYTHON\","
-                    msg "           \"args\": [\"$MCP_ENTRY\"],"
-                    msg "           \"env\": {\"DATABRICKS_CONFIG_PROFILE\": \"$PROFILE\"}"
-                    msg "         }"
-                    msg "       }"
-                    msg "     }"
-                else
-                    write_mcp_json_config "$base_dir/.cursor/mcp.json" mcpServers true
-                    ok "Cursor MCP config"
-                fi
-                warn "Cursor: MCP servers are disabled by default."
-                msg "  Enable in: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
-                ;;
-            copilot)
-                if [ "$SCOPE" = "global" ]; then
-                    warn "Copilot global: configure MCP in VS Code settings (Ctrl+Shift+P → 'MCP: Open User Configuration')"
-                    msg "  Command: $VENV_PYTHON | Args: $MCP_ENTRY"
-                else
-                    write_mcp_json_config "$base_dir/.vscode/mcp.json" servers false
-                    ok "Copilot MCP config (.vscode/mcp.json)"
-                fi
-                warn "Copilot: MCP servers must be enabled manually."
-                msg "  In Copilot Chat, click ${B}Configure Tools${N} (tool icon, bottom-right) and enable ${B}databricks${N}"
-                ;;
-            codex)
-                [ "$SCOPE" = "global" ] && write_mcp_toml "$HOME/.codex/config.toml" || write_mcp_toml "$base_dir/.codex/config.toml"
-                ok "Codex MCP config"
-                ;;
-            gemini)
-                if [ "$SCOPE" = "global" ]; then
-                    write_mcp_json_config "$HOME/.gemini/settings.json" mcpServers false
-                else
-                    write_mcp_json_config "$base_dir/.gemini/settings.json" mcpServers false
-                fi
-                ok "Gemini CLI MCP config"
-                ;;
-            antigravity)
-                if [ "$SCOPE" = "project" ]; then
-                    warn "Antigravity only supports global MCP configuration."
-                    msg "  Config written to ${B}~/.gemini/antigravity/mcp_config.json${N}"
-                fi
-                write_mcp_json_config "$HOME/.gemini/antigravity/mcp_config.json" mcpServers false
-                ok "Antigravity MCP config"
-                ;;
-            windsurf)
-                if [ "$SCOPE" = "project" ]; then
-                    warn "Windsurf only supports global MCP configuration."
-                    msg "  Config written to ${B}~/.codeium/windsurf/mcp_config.json${N}"
-                fi
-                write_mcp_json_config "$HOME/.codeium/windsurf/mcp_config.json" mcpServers true
-                ok "Windsurf MCP config"
-                ;;
-            opencode)
-                if [ "$SCOPE" = "global" ]; then
-                    write_opencode_json "$HOME/.config/opencode/opencode.json"
-                else
-                    write_opencode_json "$base_dir/opencode.json"
-                fi
-                ok "OpenCode MCP config"
-                ;;
-            kiro)
-                if [ "$SCOPE" = "global" ]; then
-                    mkdir -p "$HOME/.kiro/settings"
-                    write_mcp_json_config "$HOME/.kiro/settings/mcp.json" mcpServers true
-                else
-                    mkdir -p "$base_dir/.kiro/settings"
-                    write_mcp_json_config "$base_dir/.kiro/settings/mcp.json" mcpServers true
-                fi
-                ok "Kiro MCP config"
-                ;;
-        esac
-    done
-}
-
 # Save version
 save_version() {
     # Use -f to fail on HTTP errors (like 404)
     local ver=$(curl -fsSL "$RAW_URL/VERSION" 2>/dev/null || echo "dev")
     # Validate version format
     [[ "$ver" =~ (404|Not Found|error) ]] && ver="dev"
-    # $INSTALL_DIR is only created during MCP setup (clone_repo); a skills-only
-    # run never clones, so ensure it exists before writing the version file.
+    # Ensure the state dir exists before writing the version file.
     mkdir -p "$INSTALL_DIR"
     echo "$ver" > "$INSTALL_DIR/version"
     if [ "$SCOPE" = "project" ]; then
@@ -2836,15 +2470,7 @@ summary() {
         echo ""
         msg "${B}Next steps:${N}"
         local step=1
-        if [ "$INSTALL_MCP" = true ] && echo "$TOOLS" | grep -q cursor; then
-            msg "${R}${step}. Enable MCP in Cursor: ${B}Cursor → Settings → Cursor Settings → Tools & MCP → Toggle 'databricks'${N}"
-            step=$((step + 1))
-        fi
         if echo "$TOOLS" | grep -q copilot; then
-            if [ "$INSTALL_MCP" = true ]; then
-                msg "${step}. In Copilot Chat, click ${B}Configure Tools${N} (tool icon, bottom-right) and enable ${B}databricks${N}"
-                step=$((step + 1))
-            fi
             msg "${step}. Use Copilot in ${B}Agent mode${N} to access Databricks skills"
             step=$((step + 1))
         fi
@@ -2853,11 +2479,7 @@ summary() {
             step=$((step + 1))
         fi
         if echo "$TOOLS" | grep -q antigravity; then
-            msg "${step}. Open your project in Antigravity to use Databricks skills and MCP tools"
-            step=$((step + 1))
-        fi
-        if [ "$INSTALL_MCP" = true ] && echo "$TOOLS" | grep -q windsurf; then
-            msg "${step}. Restart Windsurf to pick up the ${B}databricks${N} MCP server (Windsurf → Settings → Windsurf Settings → MCP)"
+            msg "${step}. Open your project in Antigravity to use Databricks skills"
             step=$((step + 1))
         fi
         if echo "$TOOLS" | grep -q opencode; then
@@ -2865,7 +2487,7 @@ summary() {
             step=$((step + 1))
         fi
         if echo "$TOOLS" | grep -q kiro; then
-            msg "${step}. Open your project in Kiro to use Databricks skills and MCP tools"
+            msg "${step}. Open your project in Kiro to use Databricks skills"
             step=$((step + 1))
         fi
         msg "${step}. Open your project in your tool of choice"
@@ -3146,15 +2768,7 @@ main() {
         fi
     fi
 
-    # ── Step 5: MCP path (only when explicitly opted in via --mcp/--mcp-only/
-    # --mcp-path/DEVKIT_INSTALL_MCP). The interactive MCP opt-in prompt was removed —
-    # the MCP server is a deprecated/optional component (see the end-of-install note). ──
-    if [ "$INSTALL_MCP" = true ]; then
-        prompt_mcp_path
-        ok "MCP path: $INSTALL_DIR"
-    fi
-
-    # ── Step 6: Confirm before proceeding ──
+    # ── Step 5: Confirm before proceeding ──
     if [ "$SILENT" = false ]; then
         echo ""
         echo -e "  ${B}Summary${N}"
@@ -3162,7 +2776,6 @@ main() {
         echo -e "  Tools:       ${G}$(echo "$TOOLS" | tr ' ' ', ')${N}"
         echo -e "  Profile:     ${G}${PROFILE}${N}"
         echo -e "  Scope:       ${G}${SCOPE}${N}"
-        [ "$INSTALL_MCP" = true ]    && echo -e "  MCP server:  ${G}${INSTALL_DIR}${N}"
         if [ "$INSTALL_SKILLS" = true ]; then
             if [ -n "$USER_SKILLS" ]; then
                 echo -e "  Skills:      ${G}custom selection${N} ${Y}(will be overwritten, backup your changes first)${N}"
@@ -3174,7 +2787,6 @@ main() {
             [ -n "$SELECTED_AGENT_B_SKILLS" ] && echo -e "  Agent skills: ${G}via databricks aitools${N} ${D}(requires Databricks CLI v${MIN_AITOOLS_CLI_VERSION}+)${N}"
             [ "$INSTALL_EXPERIMENTAL" = false ] && echo -e "  Experimental: ${Y}excluded${N} ${D}(--experimental false)${N}"
         fi
-        [ "$INSTALL_MCP" = true ]    && echo -e "  MCP config:  ${G}yes${N}"
         echo ""
     fi
 
@@ -3194,17 +2806,12 @@ main() {
         fi
     fi
 
-    # ── Step 7: Version check (may exit early if up to date) ──
+    # ── Step 6: Version check (may exit early if up to date) ──
     check_version
-    
+
     # Determine base directory
     local base_dir
     [ "$SCOPE" = "global" ] && base_dir="$HOME" || base_dir="$(pwd)"
-    
-    # Setup MCP server (opt-in). The repo is only needed for the MCP server now.
-    if [ "$INSTALL_MCP" = true ]; then
-        setup_mcp
-    fi
 
     # Install skills managed by this installer (MLflow)
     [ "$INSTALL_SKILLS" = true ] && install_skills "$base_dir"
@@ -3224,9 +2831,6 @@ main() {
         fi
     fi
 
-    # Write MCP configs
-    [ "$INSTALL_MCP" = true ] && write_mcp_configs "$base_dir"
-    
     # Save version
     save_version
     

@@ -1,7 +1,11 @@
 #
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
-# Installs skills, MCP server, and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
+# Installs Databricks skills and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
+#
+# The (deprecated, optional) MCP server has its own installer:
+#   databricks-mcp-server\mcp_install.ps1  (Windows)
+#   databricks-mcp-server/mcp_install.sh   (macOS/Linux)
 #
 # Usage: irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 #        .\install.ps1 [OPTIONS]
@@ -21,9 +25,6 @@
 #
 #   # Install for specific tools only
 #   .\install.ps1 -Tools cursor
-#
-#   # Skills only (skip MCP server)
-#   .\install.ps1 -SkillsOnly
 #
 #   # Install specific branch or tag
 #   $env:AIDEVKIT_BRANCH = '0.1.0'; .\install.ps1
@@ -52,17 +53,15 @@ if ($env:AIDEVKIT_BRANCH -or $env:DEVKIT_BRANCH) {
     }
 }
 
-$RepoUrl   = "https://github.com/$Owner/$Repo.git"
 $RawUrl    = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
 $InstallDir = if ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $env:USERPROFILE ".ai-dev-kit" }
-$RepoDir   = Join-Path $InstallDir "repo"
+# $VenvPython is used by -Uninstall as a fallback Python interpreter for safely
+# editing leftover JSON config from older installs that included the MCP server.
 $VenvDir   = Join-Path $InstallDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
-$McpEntry  = Join-Path $RepoDir "databricks-mcp-server\run_server.py"
 
 # Minimum required versions
 $MinCliVersion = "0.278.0"
-# (MCP server SDK minimum is enforced by databricks-mcp-server/setup.ps1)
 # Agent skills are delegated to `databricks aitools`, which ships with CLI v1.0.0+
 $MinAitoolsCliVersion = "1.0.0"
 
@@ -71,16 +70,13 @@ $MinAitoolsCliVersion = "1.0.0"
 $script:Profile_     = if ($env:DEVKIT_PROFILE) { $env:DEVKIT_PROFILE } else { "DEFAULT" }
 $script:Scope        = if ($env:DEVKIT_SCOPE) { $env:DEVKIT_SCOPE } else { "project" }
 $script:ScopeExplicit = [bool]$env:DEVKIT_SCOPE  # Track if scope was explicitly set
-# The MCP server is deprecated/optional — skills work via the Databricks CLI, so
-# MCP defaults OFF and is opt-in (-Mcp / --mcp / DEVKIT_INSTALL_MCP=true). When
-# opted in, the venv build is delegated to databricks-mcp-server/setup.ps1.
+# This installer sets up skills only. The (deprecated, optional) MCP server has
+# moved to its own installer: databricks-mcp-server\mcp_install.ps1.
 $script:InstallSkills = $true
-$script:InstallMcp   = ($env:DEVKIT_INSTALL_MCP -in @("true", "1"))
 $script:Force        = ($env:DEVKIT_FORCE -in @("true", "1"))
 $script:Silent       = ($env:DEVKIT_SILENT -in @("true", "1"))
 $script:UserTools    = if ($env:DEVKIT_TOOLS) { $env:DEVKIT_TOOLS } else { "" }
 $script:Tools        = ""
-$script:UserMcpPath  = if ($env:DEVKIT_MCP_PATH) { $env:DEVKIT_MCP_PATH } else { "" }
 $script:ProfileProvided = [bool]$env:DEVKIT_PROFILE
 $script:SkillsProfile = if ($env:DEVKIT_SKILLS_PROFILE) { $env:DEVKIT_SKILLS_PROFILE } else { "" }
 $script:UserSkills   = if ($env:DEVKIT_SKILLS) { $env:DEVKIT_SKILLS } else { "" }
@@ -92,9 +88,6 @@ $script:AssumeYes    = $false
 # Pass --experimental false (or DEVKIT_EXPERIMENTAL=false) for stable only.
 # Explicit --skills requests are always honored as named.
 $script:InstallExperimental = ($env:DEVKIT_EXPERIMENTAL -notin @("false", "0"))
-
-# -McpPath / DEVKIT_MCP_PATH implies opting into the MCP server
-if ($script:UserMcpPath) { $script:InstallMcp = $true }
 
 # Raw-fetch ref override for MLflow skills (mlflow/skills is tagless -- main is intentional)
 $script:MlflowRef = if ($env:MLFLOW_REF) { $env:MLFLOW_REF } else { "main" }
@@ -323,10 +316,10 @@ while ($i -lt $args.Count) {
         { $_ -in "-b", "--branch", "-Branch" } { $Branch = $args[$i + 1]; $script:BranchExplicit = $true; $RawUrl = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"; $i += 2 }
         { $_ -in "-p", "--profile" }  { $script:Profile_ = $args[$i + 1]; $script:ProfileProvided = $true; $i += 2 }
         { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $script:ScopeExplicit = $true; $i++ }
-        { $_ -in "--skills-only", "-SkillsOnly" } { $script:InstallMcp = $false; $i++ }
-        { $_ -in "--mcp", "-Mcp" }              { $script:InstallMcp = $true; $i++ }
-        { $_ -in "--mcp-only", "-McpOnly" }    { $script:InstallSkills = $false; $script:InstallMcp = $true; $i++ }
-        { $_ -in "--mcp-path", "-McpPath" }    { $script:UserMcpPath = $args[$i + 1]; $script:InstallMcp = $true; $i += 2 }
+        { $_ -in "--skills-only", "-SkillsOnly" } { $i++ }  # accepted for backward compat (skills-only is now the only mode)
+        { $_ -in "--mcp", "-Mcp", "--mcp-only", "-McpOnly", "--mcp-path", "-McpPath" } {
+            Write-Err "The MCP server has moved to its own installer. Run: .\databricks-mcp-server\mcp_install.ps1 (or mcp_install.sh on macOS/Linux)."
+        }
         { $_ -in "--silent", "-Silent" }       { $script:Silent = $true; $i++ }
         { $_ -in "--tools", "-Tools" }         { $script:UserTools = $args[$i + 1]; $i += 2 }
         { $_ -in "--skills-profile", "-SkillsProfile" } { $script:SkillsProfile = $args[$i + 1]; $i += 2 }
@@ -353,10 +346,6 @@ while ($i -lt $args.Count) {
             Write-Host "  -b, --branch NAME     Install a specific release/branch (runs that version's own installer)"
             Write-Host "  -p, --profile NAME    Databricks profile (default: DEFAULT)"
             Write-Host "  -g, --global          Install globally for all projects"
-            Write-Host "  --skills-only         Install skills only (default; MCP server is opt-in)"
-            Write-Host "  --mcp                 Install the deprecated MCP server (default: no)"
-            Write-Host "  --mcp-only            Install the MCP server only, skip skills"
-            Write-Host "  --mcp-path PATH       MCP server install path (implies --mcp)"
             Write-Host "  --silent              Silent mode (no output except errors)"
             Write-Host "  --tools LIST          Comma-separated: claude,cursor,copilot,codex,gemini,antigravity,windsurf,opencode,kiro"
             Write-Host "  --skills-profile LIST Comma-separated profiles: all,data-engineer,analyst,ai-ml-engineer,app-developer"
@@ -365,7 +354,7 @@ while ($i -lt $args.Count) {
             Write-Host "  --experimental BOOL   Include experimental agent skills (default: true; 'false' = stable only)"
             Write-Host "  --dry-run             Print what would be installed (resolved refs, aitools command) and exit"
             Write-Host "  -f, --force           Force reinstall"
-            Write-Host "  --uninstall           Remove AI Dev Kit: skills, MCP server runtime, MCP config, and Claude Code plugin"
+            Write-Host "  --uninstall           Remove AI Dev Kit: skills, Claude Code plugin, and any leftover MCP config from older installs"
             Write-Host "  --dry-run             With --uninstall: print what would be removed, change nothing"
             Write-Host "  -y, --yes             With --uninstall: skip the confirmation prompt"
             Write-Host "  -h, --help            Show this help"
@@ -373,8 +362,7 @@ while ($i -lt $args.Count) {
             Write-Host "Environment Variables:"
             Write-Host "  AIDEVKIT_BRANCH       Branch or tag to install (alias: DEVKIT_BRANCH; default: latest release)"
             Write-Host "  AIDEVKIT_HOME         Installation directory (default: ~/.ai-dev-kit)"
-            Write-Host "  DEVKIT_INSTALL_MCP    Set to 'true' to install the deprecated MCP server (default: false)"
-            Write-Host "  DEVKIT_PROFILE/SCOPE/TOOLS/SKILLS/SKILLS_PROFILE/MCP_PATH/FORCE/SILENT  (mirror the bash installer)"
+            Write-Host "  DEVKIT_PROFILE/SCOPE/TOOLS/SKILLS/SKILLS_PROFILE/FORCE/SILENT  (mirror the bash installer)"
             Write-Host "  DEVKIT_EXPERIMENTAL   'true' (default) or 'false' to skip experimental agent skills"
             Write-Host "  MLFLOW_REF            Ref for MLflow skills fetch (default: main)"
             Write-Host "  DRY_RUN               Set to '1' to print the install plan and exit"
@@ -382,7 +370,8 @@ while ($i -lt $args.Count) {
             Write-Host "Notes:"
             Write-Host "  Most Databricks skills are installed via 'databricks aitools' (Databricks CLI v1.0.0+)"
             Write-Host "  and are updated/uninstalled with 'databricks aitools update|uninstall', not this script."
-            Write-Host "  The MCP server is deprecated/optional — skills work without it. Opt in with --mcp."
+            Write-Host "  The MCP server is deprecated/optional and has its own installer:"
+            Write-Host "  .\databricks-mcp-server\mcp_install.ps1 (or mcp_install.sh on macOS/Linux)."
             Write-Host "  Renamed skills: databricks-bundles -> databricks-dabs,"
             Write-Host "  databricks-spark-declarative-pipelines -> databricks-pipelines."
             Write-Host "  Replaced skills: databricks-config -> databricks-core,"
@@ -494,7 +483,7 @@ function Get-ProjectLeftoversSummary {
 # Global/user-scope artifacts (what a --global uninstall removes).
 function Get-GlobalLeftoversSummary {
     $h = $env:USERPROFILE
-    $installDir = if ($script:UserMcpPath) { $script:UserMcpPath } elseif ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $h ".ai-dev-kit" }
+    $installDir = if ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $h ".ai-dev-kit" }
     $skillRoots = @(".claude\skills",".cursor\skills",".github\skills",".agents\skills",".gemini\skills",".gemini\antigravity\skills",".codeium\windsurf\skills",".config\opencode\skills",".kiro\skills") | ForEach-Object { Join-Path $h $_ }
     $mcpTargets = @(
         @{ Path=(Join-Path $h ".claude.json"); Kind="json"; Top="mcpServers" }, @{ Path=(Join-Path $h ".codex\config.toml"); Kind="toml" }, @{ Path=(Join-Path $h ".gemini\settings.json"); Kind="json"; Top="mcpServers" },
@@ -634,8 +623,7 @@ function Remove-ClaudeHook {
 function Invoke-Uninstall {
     $home_ = $env:USERPROFILE
     if ($script:Scope -eq "global") { $baseDir = $home_ } else { $baseDir = (Get-Location).Path }
-    $installDir = if ($script:UserMcpPath) { $script:UserMcpPath }
-                  elseif ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME }
+    $installDir = if ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME }
                   else { Join-Path $home_ ".ai-dev-kit" }
     if ($script:Scope -eq "global") { $stateDir = $installDir } else { $stateDir = Join-Path $baseDir ".ai-dev-kit" }
 
@@ -694,7 +682,7 @@ function Invoke-Uninstall {
     foreach ($h in $hookTargets) {
         if ((Test-Path $h) -and (Select-String -Path $h -Pattern 'check_update' -Quiet)) { $planHooks += $h }
     }
-    if ($script:Scope -eq "global" -or $script:UserMcpPath) {
+    if ($script:Scope -eq "global") {
         if (Test-Path $installDir) { $planRuntime += $installDir }
     }
     # On a global uninstall $stateDir IS the runtime dir; when that dir is already in
@@ -1212,31 +1200,6 @@ function Invoke-PromptProfile {
     }
 }
 
-# ─── MCP path selection (deprecated/optional MCP server) ───────
-# Skills work via the Databricks CLI, so the MCP server is opt-in only -- there is
-# no interactive opt-in prompt. This runs solely when the user passed -Mcp /
-# -McpOnly / -McpPath / DEVKIT_INSTALL_MCP to choose where the runtime lands.
-function Invoke-PromptMcpPath {
-    if (-not [string]::IsNullOrWhiteSpace($script:UserMcpPath)) {
-        $script:InstallDir = $script:UserMcpPath
-    } elseif (-not $script:Silent) {
-        Write-Host ""
-        Write-Host "  MCP server location" -ForegroundColor White
-        Write-Host "  The MCP server runtime (Python venv + source) will be installed here." -ForegroundColor DarkGray
-        Write-Host "  Shared across all your projects -- only the config files are per-project." -ForegroundColor DarkGray
-        Write-Host ""
-
-        $selected = Read-Prompt -PromptText "Install path" -Default $InstallDir
-        $script:InstallDir = $selected
-    }
-
-    # Update derived paths
-    $script:RepoDir    = Join-Path $script:InstallDir "repo"
-    $script:VenvDir    = Join-Path $script:InstallDir ".venv"
-    $script:VenvPython = Join-Path $script:VenvDir "Scripts\python.exe"
-    $script:McpEntry   = Join-Path $script:RepoDir "databricks-mcp-server\run_server.py"
-}
-
 # ─── Check prerequisites ─────────────────────────────────────
 function Test-Dependencies {
     # Git
@@ -1268,8 +1231,8 @@ function Test-Dependencies {
         Write-Msg "You can still install, but authentication will require the CLI later."
     }
 
-    # The MCP server's Python environment (and its uv/pip requirement) is built
-    # by databricks-mcp-server/setup.ps1 when the user opts in — not here.
+    # The (deprecated, optional) MCP server has its own installer
+    # (databricks-mcp-server\mcp_install.ps1); this installer sets up skills only.
 }
 
 # ─── Check version ───────────────────────────────────────────
@@ -1310,59 +1273,6 @@ function Test-Version {
             exit 0
         }
     }
-}
-
-# ─── Clone repo sources ──────────────────────────────────────
-# Needed for bundled skills and the MCP server setup script. Idempotent.
-function Get-RepoSources {
-    $prevEAP = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-
-    if (Test-Path (Join-Path $script:RepoDir ".git")) {
-        & git -C $script:RepoDir fetch -q --depth 1 origin $Branch 2>&1 | Out-Null
-        & git -C $script:RepoDir reset --hard FETCH_HEAD 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Remove-Item -Recurse -Force $script:RepoDir -ErrorAction SilentlyContinue
-            & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
-        }
-    } else {
-        if (-not (Test-Path $script:InstallDir)) {
-            New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
-        }
-        & git -c advice.detachedHead=false clone -q --depth 1 --branch $Branch $RepoUrl $script:RepoDir 2>&1 | Out-Null
-    }
-    if ($LASTEXITCODE -ne 0) {
-        $ErrorActionPreference = $prevEAP
-        Write-Err "Failed to clone repository"
-    }
-    $ErrorActionPreference = $prevEAP
-    Write-Ok "Repository cloned ($Branch)"
-}
-
-# ─── Setup MCP server (deprecated, opt-in) ───────────────────
-# Delegates the venv build to databricks-mcp-server/setup.ps1 — the single
-# source of truth for the Python environment — so the installer doesn't
-# duplicate venv/pip logic here.
-function Install-McpServer {
-    Write-Step "Setting up MCP server"
-    Get-RepoSources
-
-    $setupScript = Join-Path $script:RepoDir "databricks-mcp-server\setup.ps1"
-    if (-not (Test-Path $setupScript)) {
-        Write-Err "MCP setup script not found at $setupScript"
-    }
-
-    Write-Msg "Building MCP server environment (databricks-mcp-server/setup.ps1)..."
-    $setupArgs = @("-VenvDir", $script:VenvDir)
-    if ($script:Silent) { $setupArgs += "-Quiet" }
-
-    $prevEAP = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    & $setupScript @setupArgs
-    $setupOk = ($LASTEXITCODE -eq 0)
-    $ErrorActionPreference = $prevEAP
-    if (-not $setupOk) { Write-Err "MCP server setup failed" }
-    Write-Ok "MCP server ready"
 }
 
 # ─── Skill profile selection ──────────────────────────────────
@@ -2615,151 +2525,6 @@ function Install-Skills {
     }
 }
 
-# ─── Write MCP configs ───────────────────────────────────────
-# Write/merge an MCP server entry into a JSON config.
-#   -Path     target config file
-#   -RootKey  top-level key: "mcpServers" (Claude/Cursor/Gemini/Windsurf/Kiro)
-#             or "servers" (Copilot)
-#   -Defer    include Claude's defer_loading hint
-# Replaces the old Write-McpJson / Write-CopilotMcpJson / Write-GeminiMcpJson
-# trio, which differed only in those two parameters. Merging is decoupled from
-# whether the venv exists yet, so an existing config is never clobbered.
-function Write-McpJsonConfig {
-    param([string]$Path, [string]$RootKey, [bool]$Defer)
-
-    $dir = Split-Path $Path -Parent
-    if (-not (Test-Path $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    }
-
-    # Backup existing
-    if (Test-Path $Path) {
-        Copy-Item $Path "$Path.bak" -Force
-        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
-    }
-
-    # Try to merge with existing config (independent of whether the venv exists)
-    $existing = $null
-    if (Test-Path $Path) {
-        try { $existing = Get-Content $Path -Raw | ConvertFrom-Json } catch { $existing = $null }
-    }
-
-    # Use forward slashes for cross-platform JSON compatibility
-    $pythonPath = $script:VenvPython -replace '\\', '/'
-    $entryPath  = $script:McpEntry -replace '\\', '/'
-
-    if ($existing) {
-        if (-not $existing.$RootKey) {
-            $existing | Add-Member -NotePropertyName $RootKey -NotePropertyValue ([PSCustomObject]@{}) -Force
-        }
-        $dbProps = [ordered]@{ command = $pythonPath; args = @($entryPath) }
-        if ($Defer) { $dbProps.defer_loading = $true }
-        $dbProps.env = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
-        $existing.$RootKey | Add-Member -NotePropertyName "databricks" -NotePropertyValue ([PSCustomObject]$dbProps) -Force
-        $existing | ConvertTo-Json -Depth 10 | Set-Content $Path -Encoding UTF8
-    } else {
-        $deferLine = if ($Defer) { "`n      `"defer_loading`": true," } else { "" }
-        $json = @"
-{
-  "$RootKey": {
-    "databricks": {
-      "command": "$pythonPath",
-      "args": ["$entryPath"],$deferLine
-      "env": {"DATABRICKS_CONFIG_PROFILE": "$($script:Profile_)"}
-    }
-  }
-}
-"@
-        Set-Content -Path $Path -Value $json -Encoding UTF8
-    }
-}
-
-function Write-McpToml {
-    param([string]$Path)
-
-    $dir = Split-Path $Path -Parent
-    if (-not (Test-Path $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    }
-
-    # Check if already configured
-    if (Test-Path $Path) {
-        $content = Get-Content $Path -Raw
-        if ($content -match 'mcp_servers\.databricks') { return }
-        Copy-Item $Path "$Path.bak" -Force
-        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
-    }
-
-    $pythonPath = $script:VenvPython -replace '\\', '/'
-    $entryPath  = $script:McpEntry -replace '\\', '/'
-    $tomlBlock = @"
-
-[mcp_servers.databricks]
-command = "$pythonPath"
-args = ["$entryPath"]
-"@
-    Add-Content -Path $Path -Value $tomlBlock -Encoding UTF8
-}
-
-function Write-OpenCodeJson {
-    param([string]$Path)
-
-    $dir = Split-Path $Path -Parent
-    if (-not (Test-Path $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    }
-
-    # Backup existing
-    if (Test-Path $Path) {
-        Copy-Item $Path "$Path.bak" -Force
-        Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
-    }
-
-    # Try to merge with existing config
-    $existing = $null
-    if ((Test-Path $Path) -and (Test-Path $script:VenvPython)) {
-        try {
-            $existing = Get-Content $Path -Raw | ConvertFrom-Json
-        } catch {
-            $existing = $null
-        }
-    }
-
-    if ($existing) {
-        if (-not $existing.'$schema') {
-            $existing | Add-Member -NotePropertyName '$schema' -NotePropertyValue 'https://opencode.ai/config.json' -Force
-        }
-        if (-not $existing.mcp) {
-            $existing | Add-Member -NotePropertyName "mcp" -NotePropertyValue ([PSCustomObject]@{}) -Force
-        }
-        $dbEntry = [PSCustomObject]@{
-            type        = "local"
-            command     = @($script:VenvPython -replace '\\', '/', $script:McpEntry -replace '\\', '/')
-            environment = [PSCustomObject]@{ DATABRICKS_CONFIG_PROFILE = $script:Profile_ }
-            enabled     = $true
-        }
-        $existing.mcp | Add-Member -NotePropertyName "databricks" -NotePropertyValue $dbEntry -Force
-        $existing | ConvertTo-Json -Depth 10 | Set-Content $Path -Encoding UTF8
-    } else {
-        $pythonPath = $script:VenvPython -replace '\\', '/'
-        $entryPath  = $script:McpEntry -replace '\\', '/'
-        $json = @"
-{
-  "`$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "databricks": {
-      "type": "local",
-      "command": ["$pythonPath", "$entryPath"],
-      "environment": {"DATABRICKS_CONFIG_PROFILE": "$($script:Profile_)"},
-      "enabled": true
-    }
-  }
-}
-"@
-        Set-Content -Path $Path -Value $json -Encoding UTF8
-    }
-}
-
 function Write-GeminiMd {
     param([string]$Path)
 
@@ -2768,17 +2533,7 @@ function Write-GeminiMd {
     $content = @"
 # Databricks AI Dev Kit
 
-You have access to Databricks skills and MCP tools installed by the Databricks AI Dev Kit.
-
-## Available MCP Tools
-
-The ``databricks`` MCP server provides 50+ tools for interacting with Databricks, including:
-- SQL execution and warehouse management
-- Unity Catalog operations (tables, volumes, schemas)
-- Jobs and workflow management
-- Model serving endpoints
-- Genie spaces and AI/BI dashboards
-- Databricks Apps deployment
+You have access to Databricks skills installed by the Databricks AI Dev Kit.
 
 ## Available Skills
 
@@ -2790,161 +2545,9 @@ Skills are installed in ``.gemini/skills/`` and provide patterns and best practi
 - Model Serving, Vector Search
 - Databricks Apps
 - And more
-
-## Getting Started
-
-Try asking: "List my SQL warehouses" or "Show my Unity Catalog schemas"
 "@
     Set-Content -Path $Path -Value $content -Encoding UTF8
     Write-Ok "GEMINI.md"
-}
-
-# Merge a SessionStart version-check hook into a Claude settings.json (parity
-# with the bash installer's write_claude_hook). The command runs check_update.sh
-# via bash; forward slashes keep it working under Git Bash on Windows.
-function Write-ClaudeHook {
-    param([string]$Path, [string]$Script)
-
-    $dir = Split-Path $Path -Parent
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-
-    $cmd = "bash " + ($Script -replace '\\', '/')
-
-    $cfg = $null
-    if (Test-Path $Path) {
-        try { $cfg = Get-Content $Path -Raw | ConvertFrom-Json } catch { $cfg = $null }
-    }
-    if (-not $cfg) { $cfg = [PSCustomObject]@{} }
-
-    if (-not $cfg.hooks) {
-        $cfg | Add-Member -NotePropertyName "hooks" -NotePropertyValue ([PSCustomObject]@{}) -Force
-    }
-    if (-not $cfg.hooks.SessionStart) {
-        $cfg.hooks | Add-Member -NotePropertyName "SessionStart" -NotePropertyValue @() -Force
-    }
-
-    # Already configured? (look for an existing check_update.sh hook)
-    foreach ($group in @($cfg.hooks.SessionStart)) {
-        foreach ($h in @($group.hooks)) {
-            if ($h.command -and ($h.command -match 'check_update\.sh')) { return }
-        }
-    }
-
-    $hookEntry = [PSCustomObject]@{ type = "command"; command = $cmd; timeout = 5 }
-    $cfg.hooks.SessionStart = @($cfg.hooks.SessionStart) + [PSCustomObject]@{ hooks = @($hookEntry) }
-    $cfg | ConvertTo-Json -Depth 10 | Set-Content $Path -Encoding UTF8
-}
-
-function Write-McpConfigs {
-    param([string]$BaseDir)
-
-    Write-Step "Configuring MCP"
-
-    foreach ($tool in ($script:Tools -split ' ')) {
-        switch ($tool) {
-            "claude" {
-                # Global config lives in ~/.claude.json (the file Claude Code reads),
-                # matching the bash installer.
-                if ($script:Scope -eq "global") {
-                    Write-McpJsonConfig (Join-Path $env:USERPROFILE ".claude.json") "mcpServers" $true
-                } else {
-                    Write-McpJsonConfig (Join-Path $BaseDir ".mcp.json") "mcpServers" $true
-                }
-                Write-Ok "Claude MCP config"
-                # Add the version-check SessionStart hook (parity with bash)
-                $checkScript = Join-Path $script:RepoDir ".claude-plugin\check_update.sh"
-                if ($script:Scope -eq "global") {
-                    Write-ClaudeHook (Join-Path $env:USERPROFILE ".claude\settings.json") $checkScript
-                } else {
-                    Write-ClaudeHook (Join-Path $BaseDir ".claude\settings.json") $checkScript
-                }
-                Write-Ok "Claude update check hook"
-            }
-            "cursor" {
-                if ($script:Scope -eq "global") {
-                    Write-Warn "Cursor global: manual MCP configuration required"
-                    Write-Msg "  1. Open Cursor -> Settings -> Cursor Settings -> Tools & MCP"
-                    Write-Msg "  2. Click New MCP Server"
-                    Write-Msg "  3. Add the following JSON config:"
-                    Write-Msg "     {"
-                    Write-Msg "       `"mcpServers`": {"
-                    Write-Msg "         `"databricks`": {"
-                    Write-Msg "           `"command`": `"$($script:VenvPython)`","
-                    Write-Msg "           `"args`": [`"$($script:McpEntry)`"],"
-                    Write-Msg "           `"env`": {`"DATABRICKS_CONFIG_PROFILE`": `"$($script:Profile_)`"}"
-                    Write-Msg "         }"
-                    Write-Msg "       }"
-                    Write-Msg "     }"
-                } else {
-                    Write-McpJsonConfig (Join-Path $BaseDir ".cursor\mcp.json") "mcpServers" $true
-                    Write-Ok "Cursor MCP config"
-                }
-                Write-Warn "Cursor: MCP servers are disabled by default."
-                Write-Msg "  Enable in: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
-            }
-            "copilot" {
-                if ($script:Scope -eq "global") {
-                    Write-Warn "Copilot global: configure MCP in VS Code settings (Ctrl+Shift+P -> 'MCP: Open User Configuration')"
-                    Write-Msg "  Command: $($script:VenvPython) | Args: $($script:McpEntry)"
-                } else {
-                    Write-McpJsonConfig (Join-Path $BaseDir ".vscode\mcp.json") "servers" $false
-                    Write-Ok "Copilot MCP config (.vscode/mcp.json)"
-                }
-                Write-Warn "Copilot: MCP servers must be enabled manually."
-                Write-Msg "  In Copilot Chat, click 'Configure Tools' (tool icon, bottom-right) and enable 'databricks'"
-            }
-            "codex" {
-                if ($script:Scope -eq "global") {
-                    Write-McpToml (Join-Path $env:USERPROFILE ".codex\config.toml")
-                } else {
-                    Write-McpToml (Join-Path $BaseDir ".codex\config.toml")
-                }
-                Write-Ok "Codex MCP config"
-            }
-            "gemini" {
-                if ($script:Scope -eq "global") {
-                    Write-McpJsonConfig (Join-Path $env:USERPROFILE ".gemini\settings.json") "mcpServers" $false
-                } else {
-                    Write-McpJsonConfig (Join-Path $BaseDir ".gemini\settings.json") "mcpServers" $false
-                }
-                Write-Ok "Gemini CLI MCP config"
-            }
-            "antigravity" {
-                if ($script:Scope -eq "project") {
-                    Write-Warn "Antigravity only supports global MCP configuration."
-                    Write-Msg "  Config written to ~/.gemini/antigravity/mcp_config.json"
-                }
-                Write-McpJsonConfig (Join-Path $env:USERPROFILE ".gemini\antigravity\mcp_config.json") "mcpServers" $false
-                Write-Ok "Antigravity MCP config"
-            }
-            "windsurf" {
-                if ($script:Scope -eq "project") {
-                    Write-Warn "Windsurf only supports global MCP configuration."
-                    Write-Msg "  Config written to ~/.codeium/windsurf/mcp_config.json"
-                }
-                Write-McpJsonConfig (Join-Path $env:USERPROFILE ".codeium\windsurf\mcp_config.json") "mcpServers" $true
-                Write-Ok "Windsurf MCP config"
-            }
-            "opencode" {
-                if ($script:Scope -eq "global") {
-                    Write-OpenCodeJson (Join-Path $env:USERPROFILE ".config\opencode\opencode.json")
-                } else {
-                    Write-OpenCodeJson (Join-Path $BaseDir "opencode.json")
-                }
-                Write-Ok "OpenCode MCP config"
-            }
-            "kiro" {
-                if ($script:Scope -eq "global") {
-                    $kiroSettings = Join-Path $env:USERPROFILE ".kiro\settings"
-                } else {
-                    $kiroSettings = Join-Path $BaseDir ".kiro\settings"
-                }
-                if (-not (Test-Path $kiroSettings)) { New-Item -ItemType Directory -Path $kiroSettings -Force | Out-Null }
-                Write-McpJsonConfig (Join-Path $kiroSettings "mcp.json") "mcpServers" $true
-                Write-Ok "Kiro MCP config"
-            }
-        }
-    }
 }
 
 # ─── Save version ────────────────────────────────────────────
@@ -2956,8 +2559,7 @@ function Save-Version {
     }
     if ($ver -match '(404|Not Found|error)') { $ver = "dev" }
 
-    # $script:InstallDir is only created during MCP setup; a skills-only run never
-    # clones, so ensure it exists before writing the version file.
+    # Ensure the install dir exists before writing the version file.
     if (-not (Test-Path $script:InstallDir)) {
         New-Item -ItemType Directory -Path $script:InstallDir -Force | Out-Null
     }
@@ -2988,15 +2590,7 @@ function Show-Summary {
     Write-Host ""
     Write-Msg "Next steps:"
     $step = 1
-    if ($script:InstallMcp -and ($script:Tools -match 'cursor')) {
-        Write-Msg "$step. Enable MCP in Cursor: Cursor -> Settings -> Cursor Settings -> Tools & MCP -> Toggle 'databricks'"
-        $step++
-    }
     if ($script:Tools -match 'copilot') {
-        if ($script:InstallMcp) {
-            Write-Msg "$step. In Copilot Chat, click 'Configure Tools' (tool icon, bottom-right) and enable 'databricks'"
-            $step++
-        }
         Write-Msg "$step. Use Copilot in Agent mode to access Databricks skills"
         $step++
     }
@@ -3005,11 +2599,7 @@ function Show-Summary {
         $step++
     }
     if ($script:Tools -match 'antigravity') {
-        Write-Msg "$step. Open your project in Antigravity to use Databricks skills and MCP tools"
-        $step++
-    }
-    if ($script:InstallMcp -and ($script:Tools -match 'windsurf')) {
-        Write-Msg "$step. Restart Windsurf to pick up the databricks MCP server (Windsurf -> Settings -> Windsurf Settings -> MCP)"
+        Write-Msg "$step. Open your project in Antigravity to use Databricks skills"
         $step++
     }
     if ($script:Tools -match 'opencode') {
@@ -3017,7 +2607,7 @@ function Show-Summary {
         $step++
     }
     if ($script:Tools -match 'kiro') {
-        Write-Msg "$step. Open your project in Kiro to use Databricks skills and MCP tools"
+        Write-Msg "$step. Open your project in Kiro to use Databricks skills"
         $step++
     }
     Write-Msg "$step. Open your project in your tool of choice"
@@ -3290,14 +2880,6 @@ function Invoke-Main {
         }
     }
 
-    # MCP path (only when explicitly opted in via -Mcp/-McpOnly/-McpPath/DEVKIT_INSTALL_MCP).
-    # The interactive MCP opt-in prompt was removed -- the MCP server is a
-    # deprecated/optional component (see the end-of-install note).
-    if ($script:InstallMcp) {
-        Invoke-PromptMcpPath
-        Write-Ok "MCP path: $($script:InstallDir)"
-    }
-
     # Confirmation summary
     if (-not $script:Silent) {
         Write-Host ""
@@ -3306,9 +2888,6 @@ function Invoke-Main {
         Write-Host "  Tools:       " -NoNewline; Write-Host "$(($script:Tools -split ' ') -join ', ')" -ForegroundColor Green
         Write-Host "  Profile:     " -NoNewline; Write-Host $script:Profile_ -ForegroundColor Green
         Write-Host "  Scope:       " -NoNewline; Write-Host $script:Scope -ForegroundColor Green
-        if ($script:InstallMcp) {
-            Write-Host "  MCP server:  " -NoNewline; Write-Host $script:InstallDir -ForegroundColor Green
-        }
         if ($script:InstallSkills) {
             $skTotal = $script:SelectedMlflowSkills.Count + $script:SelectedAgentBSkills.Count
             if (-not [string]::IsNullOrWhiteSpace($script:UserSkills)) {
@@ -3331,9 +2910,6 @@ function Invoke-Main {
                 Write-Host "excluded" -ForegroundColor Yellow -NoNewline
                 Write-Host " (--experimental false)" -ForegroundColor DarkGray
             }
-        }
-        if ($script:InstallMcp) {
-            Write-Host "  MCP config:  " -NoNewline; Write-Host "yes" -ForegroundColor Green
         }
         Write-Host ""
     }
@@ -3363,11 +2939,6 @@ function Invoke-Main {
         $baseDir = (Get-Location).Path
     }
 
-    # Setup MCP server (opt-in). The repo is only needed for the MCP server now.
-    if ($script:InstallMcp) {
-        Install-McpServer
-    }
-
     # Install skills managed by this installer (MLflow)
     if ($script:InstallSkills) {
         Install-Skills -BaseDir $baseDir
@@ -3386,11 +2957,6 @@ function Invoke-Main {
         } else {
             Write-GeminiMd (Join-Path $baseDir "GEMINI.md")
         }
-    }
-
-    # Write MCP configs
-    if ($script:InstallMcp) {
-        Write-McpConfigs -BaseDir $baseDir
     }
 
     # Save version

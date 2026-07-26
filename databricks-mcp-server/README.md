@@ -55,7 +55,19 @@ python -c "import databricks_mcp_server; print('OK')"
 
 ### Step 3: Configure your MCP client
 
-Point your MCP client at the server's `run_server.py`. Use the Python interpreter from the `.venv` you just created (replace `/path/to/ai-dev-kit` with the absolute path where you cloned the repo).
+**Recommended:** use the bundled installer to build the venv *and* register the server with your MCP clients in one step. It wraps `setup.sh`/`setup.ps1` (the venv build) and writes the client config for you, prompting for scope, which clients to configure, and which Databricks profile to inject.
+
+```bash
+# macOS / Linux
+./databricks-mcp-server/mcp_install.sh
+
+# Windows (PowerShell)
+.\databricks-mcp-server\mcp_install.ps1
+```
+
+It supports Claude Code, Cursor, GitHub Copilot, OpenAI Codex, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro, and can be reverted with `--uninstall` (`-Uninstall` on PowerShell).
+
+**Manual configuration (fallback):** if you'd rather edit the config yourself, point your MCP client at the server's `run_server.py`. Use the Python interpreter from the `.venv` you built in Step 2 (replace `/path/to/ai-dev-kit` with the absolute path where you cloned the repo).
 
 **Claude Code** — add to your project's `.mcp.json` (create the file if it doesn't exist):
 
@@ -65,6 +77,7 @@ Point your MCP client at the server's `run_server.py`. Use the Python interprete
     "databricks": {
       "command": "/path/to/ai-dev-kit/.venv/bin/python",
       "args": ["/path/to/ai-dev-kit/databricks-mcp-server/run_server.py"],
+      "env": {"DATABRICKS_CONFIG_PROFILE": "your-profile"},
       "defer_loading": true
     }
   }
@@ -74,12 +87,12 @@ Point your MCP client at the server's `run_server.py`. Use the Python interprete
 Or register it from the CLI:
 
 ```bash
-claude mcp add-json databricks '{"command":"/path/to/ai-dev-kit/.venv/bin/python","args":["/path/to/ai-dev-kit/databricks-mcp-server/run_server.py"]}'
+claude mcp add-json databricks '{"command":"/path/to/ai-dev-kit/.venv/bin/python","args":["/path/to/ai-dev-kit/databricks-mcp-server/run_server.py"],"env":{"DATABRICKS_CONFIG_PROFILE":"your-profile"}}'
 ```
 
 **Cursor / Genie Code** — use the same JSON in your client's MCP config (e.g. Cursor's `.cursor/mcp.json`).
 
-**Note:** `"defer_loading": true` improves startup time by not loading all tools upfront.
+**Note:** the `env` block pins the Databricks profile the server authenticates with (see Step 4); `"defer_loading": true` improves startup time by not loading all tools upfront.
 
 ### Step 4: Authenticate
 
