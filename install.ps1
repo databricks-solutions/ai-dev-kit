@@ -293,6 +293,12 @@ function Write-Err  {
 }
 function Write-Step { param([string]$Text) if (-not $script:Silent) { Write-Host ""; Write-Host "$Text" -ForegroundColor White } }
 
+# Deprecation notice for the removed MCP flags/env. Always written to stderr
+# (even in silent mode) since the user explicitly passed a now-removed option.
+function Show-McpMovedNotice {
+    [Console]::Error.WriteLine("  ! MCP setup has moved out of this installer. Run databricks-mcp-server\mcp_install.ps1 (or mcp_install.sh on macOS/Linux) to install and register the Databricks MCP server.")
+}
+
 # Deprecation notice - shown on every install/upgrade while skills still ship
 # from this repo. The next major release installs skills via the Databricks CLI
 # from the official databricks/databricks-agent-skills set.
@@ -317,9 +323,14 @@ while ($i -lt $args.Count) {
         { $_ -in "-p", "--profile" }  { $script:Profile_ = $args[$i + 1]; $script:ProfileProvided = $true; $i += 2 }
         { $_ -in "-g", "--global", "-Global" }  { $script:Scope = "global"; $script:ScopeExplicit = $true; $i++ }
         { $_ -in "--skills-only", "-SkillsOnly" } { $i++ }  # accepted for backward compat (skills-only is now the only mode)
-        { $_ -in "--mcp", "-Mcp", "--mcp-only", "-McpOnly", "--mcp-path", "-McpPath" } {
-            Write-Err "The MCP server has moved to its own installer. Run: .\databricks-mcp-server\mcp_install.ps1 (or mcp_install.sh on macOS/Linux)."
-        }
+        # Removed MCP flags — handled gracefully. --mcp warns and continues with
+        # the normal (skills-only) install; --mcp-path also consumes its value so
+        # arg-parsing doesn't choke on the now-unknown argument.
+        { $_ -in "--mcp", "-Mcp" }             { Show-McpMovedNotice; $i++ }
+        { $_ -in "--mcp-path", "-McpPath" }    { Show-McpMovedNotice; $i += 2 }
+        # --mcp-only had no non-MCP work to do, so just point the user and exit
+        # cleanly (informative, not a crash).
+        { $_ -in "--mcp-only", "-McpOnly" }    { Show-McpMovedNotice; exit 0 }
         { $_ -in "--silent", "-Silent" }       { $script:Silent = $true; $i++ }
         { $_ -in "--tools", "-Tools" }         { $script:UserTools = $args[$i + 1]; $i += 2 }
         { $_ -in "--skills-profile", "-SkillsProfile" } { $script:SkillsProfile = $args[$i + 1]; $i += 2 }
@@ -391,6 +402,11 @@ while ($i -lt $args.Count) {
         }
         default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
     }
+}
+
+# Removed MCP env var — warn and continue with the normal (skills-only) install.
+if ($env:DEVKIT_INSTALL_MCP -in @("true", "1")) {
+    Show-McpMovedNotice
 }
 
 # ─── --uninstall ───────────────────────────────────────────────

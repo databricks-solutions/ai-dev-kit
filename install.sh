@@ -169,6 +169,12 @@ warn() { [ "$SILENT" = true ] || echo -e "  ${Y}!${N} $*"; }
 die()  { echo -e "  ${R}✗${N} $*" >&2; exit 1; }  # Always show errors
 step() { [ "$SILENT" = true ] || echo -e "\n${B}$*${N}"; }
 
+# Deprecation notice for the removed MCP flags/env. Always printed to stderr
+# (even in silent mode) since the user explicitly passed a now-removed option.
+mcp_moved_notice() {
+    echo -e "  ${Y}!${N} MCP setup has moved out of this installer. Run databricks-mcp-server/mcp_install.sh (or mcp_install.ps1 on Windows) to install and register the Databricks MCP server." >&2
+}
+
 # Deprecation notice — shown on every install/upgrade while skills still ship
 # from this repo. The next major release installs skills via the Databricks CLI
 # from the official databricks/databricks-agent-skills set.
@@ -191,8 +197,14 @@ while [ $# -gt 0 ]; do
         -g|--global)      SCOPE="global"; SCOPE_EXPLICIT=true; shift ;;
         -b|--branch)      BRANCH="$2"; BRANCH_EXPLICIT=true; shift 2 ;;
         --skills-only)    shift ;;  # accepted for backward compat (skills-only is now the only mode)
-        --mcp|--mcp-only|--mcp-path)
-            die "The MCP server has moved to its own installer. Run: bash databricks-mcp-server/mcp_install.sh (or mcp_install.ps1 on Windows)." ;;
+        # Removed MCP flags — handled gracefully. --mcp warns and continues with
+        # the normal (skills-only) install; --mcp-path also consumes its value so
+        # arg-parsing doesn't choke on the now-unknown argument.
+        --mcp)            mcp_moved_notice; shift ;;
+        --mcp-path)       mcp_moved_notice; shift; [ $# -gt 0 ] && shift || true ;;
+        # --mcp-only had no non-MCP work to do, so just point the user and exit
+        # cleanly (informative, not a crash).
+        --mcp-only)       mcp_moved_notice; exit 0 ;;
         --skills-profile) SKILLS_PROFILE="$2"; shift 2 ;;
         --skills)         USER_SKILLS="$2"; shift 2 ;;
         --list-skills)    LIST_SKILLS=true; shift ;;
@@ -262,6 +274,11 @@ while [ $# -gt 0 ]; do
         *) die "Unknown option: $1 (use -h for help)" ;;
     esac
 done
+
+# Removed MCP env var — warn and continue with the normal (skills-only) install.
+if [ "${DEVKIT_INSTALL_MCP:-}" = "true" ] || [ "${DEVKIT_INSTALL_MCP:-}" = "1" ]; then
+    mcp_moved_notice
+fi
 
 # ─── --list-skills handler ─────────────────────────────────────
 # (function — needs fetch_agent_b_inventory; invoked after function definitions below)
