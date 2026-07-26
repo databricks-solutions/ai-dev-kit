@@ -55,8 +55,10 @@ DRY_RUN=false
 ASSUME_YES=false
 
 # Convert string booleans from env vars to actual booleans
-[ "$SILENT" = "true" ] || [ "$SILENT" = "1" ] && SILENT=true || SILENT=false
-[ -n "${DEVKIT_SCOPE:-}" ] && SCOPE_EXPLICIT=true
+if [ "$SILENT" = "true" ] || [ "$SILENT" = "1" ]; then SILENT=true; else SILENT=false; fi
+# Guarded so a false test can't abort the script under `set -e` on older bash
+# (e.g. macOS /bin/bash 3.2), where a bare `[ ... ] && VAR=...` at top level exits.
+if [ -n "${DEVKIT_SCOPE:-}" ]; then SCOPE_EXPLICIT=true; fi
 
 # Colors
 G='\033[0;32m' Y='\033[1;33m' R='\033[0;31m' B='\033[1m' D='\033[2m' N='\033[0m'
@@ -567,7 +569,9 @@ EOF
 write_mcp_toml() {
     local path=$1
     mkdir -p "$(dirname "$path")"
-    grep -q "mcp_servers.databricks" "$path" 2>/dev/null && return
+    # Anchor to the table header so a match in a comment/value can't be mistaken
+    # for an existing registration (matches the removal awk's anchor).
+    grep -qE '^\[mcp_servers\.databricks' "$path" 2>/dev/null && return
     if [ -f "$path" ]; then
         cp "$path" "${path}.bak"
         msg "${D}Backed up ${path##*/} → ${path##*/}.bak${N}"
@@ -765,7 +769,7 @@ PYEOF
 uninstall_remove_toml_block() {
     local path=$1
     [ -f "$path" ] || return 1
-    grep -qF 'mcp_servers.databricks' "$path" 2>/dev/null || return 1
+    grep -qE '^\[mcp_servers\.databricks' "$path" 2>/dev/null || return 1
     if [ "$DRY_RUN" = true ]; then echo "$path"; return 0; fi
     cp "$path" "${path}.bak"
     awk '
@@ -842,7 +846,7 @@ run_uninstall() {
         path="${entry%%|*}"; kind="${entry#*|}"
         case "$kind" in
             json:*) mcp_json_has_databricks "$path" "${kind#json:}" && plan_mcp+=("$entry") ;;
-            toml)   [ -f "$path" ] && grep -qF 'mcp_servers.databricks' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
+            toml)   [ -f "$path" ] && grep -qE '^\[mcp_servers\.databricks' "$path" 2>/dev/null && plan_mcp+=("$entry") ;;
         esac
     done < <(mcp_targets_for_scope "$base_dir")
 

@@ -57,7 +57,6 @@ $script:McpEntry  = Join-Path $script:ScriptDir "run_server.py"
 if ($Profile_)       { $script:Profile_ = $Profile_ }
 elseif ($env:DEVKIT_PROFILE) { $script:Profile_ = $env:DEVKIT_PROFILE }
 else                 { $script:Profile_ = "DEFAULT" }
-$script:ProfileProvided = [bool]$Profile_
 
 if ($Global)         { $script:Scope = "global"; $script:ScopeExplicit = $true }
 elseif ($env:DEVKIT_SCOPE) { $script:Scope = $env:DEVKIT_SCOPE; $script:ScopeExplicit = $true }
@@ -550,6 +549,15 @@ function Invoke-PromptScope {
 function Write-McpJsonConfig {
     param([string]$Path, [string]$RootKey, [bool]$Defer)
 
+    # No-clobber parity with the bash installer: only merge into an existing
+    # config when the venv python is present. Without it the server can't run, so
+    # refuse to modify a file that may hold other settings and tell the user to
+    # add the entry manually. A brand-new file is always safe to write.
+    if ((Test-Path $Path) -and -not (Test-Path $script:VenvPython)) {
+        Write-Warn "Cannot merge MCP config into $Path without the venv python at $($script:VenvPython). Add manually."
+        return
+    }
+
     $dir = Split-Path $Path -Parent
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
@@ -608,7 +616,9 @@ function Write-McpToml {
 
     if (Test-Path $Path) {
         $content = Get-Content $Path -Raw
-        if ($content -match 'mcp_servers\.databricks') { return }
+        # Anchor to the table header so a match in a comment/value can't be
+        # mistaken for an existing registration (matches the removal loop's anchor).
+        if ($content -match '(?m)^\[mcp_servers\.databricks') { return }
         Copy-Item $Path "$Path.bak" -Force
         Write-Msg "Backed up $(Split-Path $Path -Leaf) -> $(Split-Path $Path -Leaf).bak"
     }
@@ -630,6 +640,12 @@ DATABRICKS_CONFIG_PROFILE = "$($script:Profile_)"
 # Write/merge the OpenCode config (root key 'mcp', type 'local', command-as-array).
 function Write-OpenCodeJson {
     param([string]$Path)
+
+    # No-clobber parity with the bash installer (see Write-McpJsonConfig).
+    if ((Test-Path $Path) -and -not (Test-Path $script:VenvPython)) {
+        Write-Warn "Cannot merge MCP config into $Path without the venv python at $($script:VenvPython). Add manually."
+        return
+    }
 
     $dir = Split-Path $Path -Parent
     if (-not (Test-Path $dir)) {
@@ -819,7 +835,7 @@ function Remove-McpJsonKey {
 function Remove-McpTomlBlock {
     param([string]$Path)
     if (-not (Test-Path $Path)) { return $false }
-    if (-not (Select-String -Path $Path -Pattern 'mcp_servers\.databricks' -Quiet)) { return $false }
+    if (-not (Select-String -Path $Path -Pattern '^\[mcp_servers\.databricks' -Quiet)) { return $false }
     if ($script:DryRun) { return $true }
     Copy-Item $Path "$Path.bak" -Force
     $out = New-Object System.Collections.Generic.List[string]
@@ -878,7 +894,7 @@ function Invoke-Uninstall {
         switch ($target.Kind) {
             "json" { if (Test-McpJsonHasDatabricks $target.Path $target.Top) { $plan += $target } }
             "toml" {
-                if ((Test-Path $target.Path) -and (Select-String -Path $target.Path -Pattern 'mcp_servers\.databricks' -Quiet)) {
+                if ((Test-Path $target.Path) -and (Select-String -Path $target.Path -Pattern '^\[mcp_servers\.databricks' -Quiet)) {
                     $plan += $target
                 }
             }
