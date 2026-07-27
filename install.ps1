@@ -55,10 +55,6 @@ if ($env:AIDEVKIT_BRANCH -or $env:DEVKIT_BRANCH) {
 
 $RawUrl    = "https://raw.githubusercontent.com/$Owner/$Repo/$Branch"
 $InstallDir = if ($env:AIDEVKIT_HOME) { $env:AIDEVKIT_HOME } else { Join-Path $env:USERPROFILE ".ai-dev-kit" }
-# $VenvPython is used by -Uninstall as a fallback Python interpreter for safely
-# editing leftover JSON config from older installs that included the MCP server.
-$VenvDir   = Join-Path $InstallDir ".venv"
-$VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 
 # Minimum required versions
 $MinCliVersion = "0.278.0"
@@ -300,22 +296,6 @@ function Show-McpMovedNotice {
     [Console]::Error.WriteLine("  ! MCP setup has moved out of this installer. Run databricks-mcp-server\mcp_install.ps1 (or mcp_install.sh on macOS/Linux) to install and register the Databricks MCP server.")
 }
 
-# Deprecation notice - shown on every install/upgrade while skills still ship
-# from this repo. The next major release installs skills via the Databricks CLI
-# from the official databricks/databricks-agent-skills set.
-function Show-DeprecationNotice {
-    if ($script:Silent) { return }
-    $bar = "  ------------------------------------------------------------"
-    Write-Host ""
-    Write-Host $bar -ForegroundColor Yellow
-    Write-Host "  !  Heads up: skills are moving" -ForegroundColor Yellow
-    Write-Host "  In the next release, the skills for AI Dev Kit will be" -ForegroundColor DarkGray
-    Write-Host "  promoted to a shared, engineering-supported repository." -ForegroundColor DarkGray
-    Write-Host "  In future releases, this installer will set up skills" -ForegroundColor DarkGray
-    Write-Host "  using the Databricks CLI." -ForegroundColor DarkGray
-    Write-Host $bar -ForegroundColor Yellow
-}
-
 # ─── Parse arguments ─────────────────────────────────────────
 $i = 0
 while ($i -lt $args.Count) {
@@ -401,7 +381,7 @@ while ($i -lt $args.Count) {
             Write-Host "  .\install.ps1 -Profile DEFAULT -Force"
             return
         }
-        default { Write-Err "Unknown option: $($args[$i]) (use -h for help)"; $i++ }
+        default { Write-Err "Unknown option: $($args[$i]) (use -h for help)" }
     }
 }
 
@@ -879,7 +859,6 @@ function Select-Checkbox {
     $drawCheckbox = {
         [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - $totalRows))
         for ($j = 0; $j -lt $count; $j++) {
-            $line = "  "
             if ($j -eq $cursor) {
                 Write-Host "  " -NoNewline
                 Write-Host ">" -ForegroundColor Blue -NoNewline

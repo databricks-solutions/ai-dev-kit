@@ -175,21 +175,6 @@ mcp_moved_notice() {
     echo -e "  ${Y}!${N} MCP setup has moved out of this installer. Run databricks-mcp-server/mcp_install.sh (or mcp_install.ps1 on Windows) to install and register the Databricks MCP server." >&2
 }
 
-# Deprecation notice — shown on every install/upgrade while skills still ship
-# from this repo. The next major release installs skills via the Databricks CLI
-# from the official databricks/databricks-agent-skills set.
-deprecation_notice() {
-    [ "$SILENT" = true ] && return
-    echo ""
-    echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
-    echo -e "  ${Y}${B}⚠  Heads up: skills are moving${N}"
-    echo -e "  ${D}In the next release, the skills for AI Dev Kit will be${N}"
-    echo -e "  ${D}promoted to a shared, engineering-supported repository.${N}"
-    echo -e "  ${D}In future releases, this installer will set up skills${N}"
-    echo -e "  ${D}using the Databricks CLI.${N}"
-    echo -e "  ${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
-}
-
 # Parse arguments
 while [ $# -gt 0 ]; do
     case $1 in
