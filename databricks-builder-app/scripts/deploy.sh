@@ -407,18 +407,32 @@ echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 echo -e "${YELLOW}[8/${TOTAL_STEPS}] Deploying app...${NC}"
 
-# Apps rejects deploy unless compute is RUNNING. Refresh status and start if needed.
-APP_INFO=$(databricks apps get "$APP_NAME" $CLI_ARGS --output json 2>/dev/null) || true
-COMPUTE_STATE=$(printf '%s' "$APP_INFO" | python3 -c "
+# Apps rejects deploy unless the app compute is started. Note the CLI uses two
+# different vocabularies: compute_status.state is ACTIVE/STOPPED while
+# app_status.state is RUNNING/UNAVAILABLE — compute_status is the deploy gate.
+get_compute_state() {
+  databricks apps get "$APP_NAME" $CLI_ARGS --output json 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
 except Exception:
     sys.exit(0)
 print((data.get('compute_status') or {}).get('state') or '')
-" 2>/dev/null || echo "")
+" 2>/dev/null || true
+}
 
-if [ "$COMPUTE_STATE" != "RUNNING" ]; then
+compute_is_started() {
+  case "$1" in
+    ACTIVE|RUNNING) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+COMPUTE_STATE=$(get_compute_state)
+
+if compute_is_started "$COMPUTE_STATE"; then
+  echo -e "  ${GREEN}✓${NC} App compute already started (${COMPUTE_STATE})"
+else
   echo -e "  App compute is '${COMPUTE_STATE:-unknown}' — starting before deploy..."
   set +e
   START_OUT=$(databricks apps start "$APP_NAME" $CLI_ARGS --output json 2>&1)
@@ -430,22 +444,12 @@ if [ "$COMPUTE_STATE" != "RUNNING" ]; then
     echo -e "  Start manually with: databricks apps start ${APP_NAME} ${CLI_ARGS}"
     exit 1
   fi
-  APP_INFO=$(databricks apps get "$APP_NAME" $CLI_ARGS --output json 2>/dev/null) || true
-  COMPUTE_STATE=$(printf '%s' "$APP_INFO" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(0)
-print((data.get('compute_status') or {}).get('state') or '')
-" 2>/dev/null || echo "")
-  if [ "$COMPUTE_STATE" != "RUNNING" ]; then
-    echo -e "${RED}App '${APP_NAME}' is still not RUNNING after start (state='${COMPUTE_STATE:-unknown}').${NC}"
+  COMPUTE_STATE=$(get_compute_state)
+  if ! compute_is_started "$COMPUTE_STATE"; then
+    echo -e "${RED}App '${APP_NAME}' compute did not start (state='${COMPUTE_STATE:-unknown}').${NC}"
     exit 1
   fi
-  echo -e "  ${GREEN}✓${NC} App compute is RUNNING"
-else
-  echo -e "  ${GREEN}✓${NC} App compute already RUNNING"
+  echo -e "  ${GREEN}✓${NC} App compute started (${COMPUTE_STATE})"
 fi
 
 # Capture JSON on stdout only. Do not merge stderr (progress/spinner) into the
