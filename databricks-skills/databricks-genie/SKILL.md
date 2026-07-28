@@ -175,6 +175,8 @@ manage_genie(
 
 - [spaces.md](spaces.md) - Creating and managing Genie Spaces
 - [conversation.md](conversation.md) - Asking questions via the Conversation API
+- [references/schema.md](references/schema.md) - `serialized_space` JSON schema and field reference
+- [references/best-practices.md](references/best-practices.md) - Instruction authoring, prompt matching, benchmarks, troubleshooting, and validation checklist
 
 ## Prerequisites
 
