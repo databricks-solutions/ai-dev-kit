@@ -1907,9 +1907,14 @@ verify_claude_plugin() {
     [ -z "$found" ] && found=$(claude plugin list 2>/dev/null | grep -F "$id" || true) || true
 
     if [ -z "$found" ]; then
+        # The `claude` CLI only accepts user|project|local scopes — not the installer's
+        # own "global". Translate the same way remove_claude_plugin() does so the
+        # command we hand the user actually runs: global → user, project → project.
+        local claude_scope
+        [ "$SCOPE" = "project" ] && claude_scope="project" || claude_scope="user"
         die_plugin_setup \
             "installing the Claude plugin (${id})" \
-            "claude plugin install ${id} --scope ${SCOPE}" \
+            "claude plugin install ${id} --scope ${claude_scope}" \
             "databricks aitools reported success but the plugin is not registered — run that command yourself and confirm it succeeds (it needs a working 'claude' CLI)."
     fi
 }
