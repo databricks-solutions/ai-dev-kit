@@ -1,0 +1,79 @@
+site_name: Databricks AI Dev Kit
+site_description: Quickstart — AI-Driven Development on Databricks
+site_url: https://databricks-solutions.github.io/ai-dev-kit/
+repo_url: https://github.com/databricks-solutions/ai-dev-kit
+repo_name: databricks-solutions/ai-dev-kit
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: DM Sans
+    code: JetBrains Mono
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.highlight
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Reference:
+    - Skills Catalog: reference/skills.md
+    - MCP Tools: reference/mcp-tools.md
+    - Core Library: reference/tools-core.md
+    - Visual Builder: reference/builder-app.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/databricks-solutions/ai-dev-kit
