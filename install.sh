@@ -1907,9 +1907,7 @@ verify_claude_plugin() {
     [ -z "$found" ] && found=$(claude plugin list 2>/dev/null | grep -F "$id" || true) || true
 
     if [ -z "$found" ]; then
-        # The `claude` CLI only accepts user|project|local scopes — not the installer's
-        # own "global". Translate the same way remove_claude_plugin() does so the
-        # command we hand the user actually runs: global → user, project → project.
+        # The `claude` CLI only accepts user|project|local scopes
         local claude_scope
         [ "$SCOPE" = "project" ] && claude_scope="project" || claude_scope="user"
         die_plugin_setup \
