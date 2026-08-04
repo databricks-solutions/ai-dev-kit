@@ -10,15 +10,19 @@ run Omnigent, or read both to understand the trade-offs.
 > The Databricks experience is currently a **Beta** workspace preview.
 
 ---
+##  Install
+Follow instructions at [Omnigent](https://omnigent.ai) to install using `uv`, `homebrew`, or your preferred option.
+
+---
 
 ## 🖥️ Local track — run it all on your machine
 
 | Part | What it covers |
 |---|---|
-| [1 · Running locally](local/01-running-locally.md) | Two ways to start locally, what local mode buys you, and its caveats |
-| [2 · Approvals & auto-approve](local/02-approvals-local.md) | Making the agent stop (or stop asking): per-prompt, in-session, and permanent defaults |
-| [3 · Writing your own agent](local/03-writing-your-own-agent.md) | The agent YAML anatomy: prompt, harness, tools, sub-agents, and baked-in guardrails |
-| [4 · Collaboration](local/04-collaboration.md) | Share, co-drive (`attach`), and fork a session; `run` vs `attach` vs `resume` |
+| [1 · Running locally](local_omnigent/01-running-locally.md) | Two ways to start locally, what local mode buys you, and its caveats |
+| [2 · Approvals & auto-approve](local_omnigent/02-approvals-local.md) | Making the agent stop (or stop asking): per-prompt, in-session, and permanent defaults |
+| [3 · Writing your own agent](local_omnigent/03-writing-your-own-agent.md) | The agent YAML anatomy: prompt, harness, tools, sub-agents, and baked-in guardrails |
+| [4 · Collaboration](local_omnigent/04-collaboration.md) | Share, co-drive (`attach`), and fork a session; `run` vs `attach` vs `resume` |
 
 **Start here if:** you're solo, want private/offline work, need custom policy
 code, or just want the fastest way to understand the product.
