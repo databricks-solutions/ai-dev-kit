@@ -81,9 +81,9 @@ Every mode is a choice of **where the server lives** (state + web UI) and
 | Mode | Server | Host | Best for |
 |---|---|---|---|
 | **Local** | your laptop (SQLite) | your laptop | solo, private, custom policies |
-| **Databricks managed (Beta)** | Workspace-managed (Beta) | Databricks Sandbox | no local install, governed, collaborative |
-| **Hybrid** | Workspace-managed (Beta) | your laptop | local runner and filesystem, access from outside local network |
-| **Custom** | Custom server or Databricks App | laptop / sandbox | custom always-on team environment |
+| **Databricks managed (Beta)** | [Omnigent on Databricks (Beta)](https://docs.databricks.com/aws/en/omnigent/) | [Databricks Sandbox](https://docs.databricks.com/aws/en/compute/serverless/sandbox) | no local install, governed, collaborative |
+| **Databricks Hybrid** | Omnigent on Databricks (Beta) | your laptop | local runner and filesystem, access from outside local network |
+| **Other** |  [Databricks App](https://omnigent.ai/docs/deploy/overview#databricks) or [Shared Server](https://omnigent.ai/docs/deploy/overview#shared-server) | laptop / sandbox | custom always-on team environment |
 
 Full reasoning in section "Which Mode?" (coming soon)
 
