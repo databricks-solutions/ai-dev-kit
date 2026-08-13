@@ -99,28 +99,6 @@ starts the server explicitly and leaves it running in the background so the web
 UI is the primary surface. Same server, same database, same host — just a
 different first click.
 
-### Choosing and switching models
-
-```bash
-omnigent setup          # add/remove credentials, set per-agent defaults
-omnigent config list    # show effective defaults + configured credentials
-```
-
-Omnigent works with four credential kinds, all first-class:
-
-| | Kind | What it is |
-|---|---|---|
-| 🔑 | **API key** | A first-party vendor key (Anthropic, OpenAI, …) |
-| 🎟️ | **Subscription** | A Claude Pro/Max or ChatGPT plan via the official `claude` / `codex` CLIs |
-| 🌐 | **Gateway** | Any OpenAI-/Anthropic-compatible `base_url` + key (OpenRouter, LiteLLM, **Ollama**, vLLM, Azure) |
-| 🧱 | **Databricks** | A Databricks workspace profile (needs the `databricks` extra) |
-
-Defaults are per-agent, so a Claude default and a Codex default coexist. You can
-also switch mid-session with the `/model` command. Note the Ollama row: with a
-local model server behind a Gateway credential, even the *model calls* can stay
-on your machine — that's as local as it gets.
-
----
 
 ## 2. What running locally buys you
 

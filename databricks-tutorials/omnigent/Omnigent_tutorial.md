@@ -11,7 +11,81 @@ run Omnigent, or read both to understand the trade-offs.
 
 ---
 ##  Install
-Follow instructions at [Omnigent](https://omnigent.ai) to install using `uv`, `homebrew`, or your preferred option.
+Follow instructions at [Omnigent](https://omnigent.ai) to install using `uv`, `homebrew`, or your preferred option. You can also choose to install
+the desktop application and mobile app.
+
+### Suggested install
+To make sure you have dependencies to work with a Databricks managed Omnigent, you can install the additional databricks dependencies:
+`uv tool install "omnigent[databricks]"`
+
+### Verify
+
+```bash
+omnigent --version
+```
+
+Expected output:
+
+```
+omnigent x.y.z
+```
+
+If the command isn't found, try starting a new termainal session then make sure `~/.local/bin` is on your `PATH`.
+
+## Set up
+
+### Choosing and switching models
+Start by selecting how you will connect to your LLM and agent defaults:
+```bash
+omnigent setup          # add/remove credentials, set per-agent defaults
+```
+
+### Smoke test
+
+Once credentials are configured, confirm they're wired up correctly:
+
+```bash
+omnigent config list
+```
+
+Expected output (example with a Databricks credential):
+
+```
+Credential     Kind          Details
+─────────────────────────────────────────────────────
+my-workspace   Databricks    https://adb-xxxx.azuredatabricks.net
+anthropickey   API key       Anthropic  ·  claude-sonnet-4-5
+```
+
+Each configured credential appears as a row. If a row is missing or shows an error, re-run `omnigent setup` to update it. 
+
+
+Omnigent works with four credential kinds, all first-class (but each with their own cost implications):
+| | Kind | What it is |
+|---|---|---|
+| 🎟️ | **Subscription** | A Claude Pro/Max or ChatGPT plan via the official `claude` / `codex` CLIs |
+| 🧱 | **Databricks** | A Databricks workspace profile (needs the `databricks` extra) |
+| 🔑 | **API key** | A first-party vendor key (Anthropic, OpenAI, …) |
+| 🌐 | **Gateway** | Any OpenAI-/Anthropic-compatible `base_url` + key (OpenRouter, Ollama, LiteLLM, Azure, etc) |
+
+Defaults are per-agent, so a Claude default and a Codex default coexist. You can
+also switch mid-session with the `/model` command.
+
+---
+
+## Choose a Mode
+
+Every mode is a choice of **where the server lives** (state + web UI) and
+**where the host lives** (where the agent's terminals actually run):
+
+| Mode | Server | Host | Best for |
+|---|---|---|---|
+| **Local** | your laptop (SQLite) | your laptop | solo, private, custom policies |
+| **Databricks managed (Beta)** | Workspace-managed (Beta) | Databricks Sandbox | no local install, governed, collaborative |
+| **Hybrid** | Workspace-managed (Beta) | your laptop | local runner and filesystem, access from outside local network |
+| **Custom** | Custom server or Databricks App | laptop / sandbox | custom always-on team environment |
+
+Full reasoning in section "Which Mode?" (coming soon)
 
 ---
 
@@ -32,16 +106,3 @@ code, or just want the fastest way to understand the product.
 Stay tuned.
 
 ---
-
-## The one-diagram summary
-
-Every mode is a choice of **where the server lives** (state + web UI) and
-**where the host lives** (where the agent's terminals actually run):
-
-| | Server | Host | Best for |
-|---|---|---|---|
-| **Local** | your laptop (SQLite) | your laptop | solo, private, custom policies |
-| **Databricks Sandbox** | managed | serverless sandbox | zero-install trial, laptop-free, governed |
-| **Your own Databricks App** | your App (Lakebase) | laptop / sandbox / managed host | always-on team tool |
-
-Full reasoning in [Databricks track, Part 2](databricks/02-which-mode.md).
