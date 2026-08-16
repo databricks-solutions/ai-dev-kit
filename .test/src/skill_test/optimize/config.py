@@ -54,7 +54,7 @@ def _configure_litellm_retries() -> None:
 
 
 def _register_litellm_models() -> None:
-    """Register Databricks model context windows with litellm."""
+    """Register Databricks and OrcaRouter model context windows with litellm."""
     try:
         import litellm
 
@@ -118,6 +118,36 @@ def _register_litellm_models() -> None:
                 "max_input_tokens": 200_000,
                 "max_output_tokens": 16_000,
                 "litellm_provider": "databricks",
+                "mode": "chat",
+                "input_cost_per_token": 0,
+                "output_cost_per_token": 0,
+            },
+            # OrcaRouter: OpenAI-compatible gateway (https://api.orcarouter.ai/v1).
+            # Model ids are fully namespaced (openai/..., deepseek/...); see
+            # judges.py `_to_litellm_model` for routing and ORCAROUTER_API_KEY auth.
+            "orcarouter/openai/gpt-4o-mini": {
+                "max_tokens": 16_384,
+                "max_input_tokens": 128_000,
+                "max_output_tokens": 16_384,
+                "litellm_provider": "openai",
+                "mode": "chat",
+                "input_cost_per_token": 0,
+                "output_cost_per_token": 0,
+            },
+            "orcarouter/openai/gpt-4o": {
+                "max_tokens": 16_384,
+                "max_input_tokens": 128_000,
+                "max_output_tokens": 16_384,
+                "litellm_provider": "openai",
+                "mode": "chat",
+                "input_cost_per_token": 0,
+                "output_cost_per_token": 0,
+            },
+            "orcarouter/deepseek/deepseek-v4-flash-0731": {
+                "max_tokens": 32_768,
+                "max_input_tokens": 128_000,
+                "max_output_tokens": 32_768,
+                "litellm_provider": "openai",
                 "mode": "chat",
                 "input_cost_per_token": 0,
                 "output_cost_per_token": 0,
@@ -254,12 +284,13 @@ def validate_reflection_context(
             f"Fix: use a model with a larger context window:\n"
             f"  --reflection-lm 'databricks/databricks-claude-opus-4-6'   (200K)\n"
             f"  --reflection-lm 'openai/gpt-4o'                           (128K)\n"
+            f"  --reflection-lm 'orcarouter/openai/gpt-4o'                (128K)\n"
             f"  --reflection-lm 'anthropic/claude-sonnet-4-5-20250514'    (200K)\n\n"
             f"Or set the environment variable:\n"
             f"  export GEPA_REFLECTION_LM='databricks/databricks-claude-opus-4-6'\n\n"
             f"If you already use a large-context model and still see 'max_model_len'\n"
             f"errors, the Databricks serving endpoint itself has a low context limit.\n"
-            f"Switch to a non-Databricks provider (openai/ or anthropic/) instead.\n\n"
+            f"Switch to a non-Databricks provider (openai/, orcarouter/, or anthropic/) instead.\n\n"
             f"  Current GEPA_REFLECTION_LM={os.environ.get('GEPA_REFLECTION_LM', '(not set)')}"
         )
 
