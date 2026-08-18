@@ -399,11 +399,11 @@ aude Code integration |
 
 ## Star History
 
-<a href="https://star-history.com/#databricks-solutions/ai-dev-kit&Date">
+<a href="https://star-history.dera.page/#databricks-solutions/ai-dev-kit&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=databricks-solutions/ai-dev-kit&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=databricks-solutions/ai-dev-kit&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=databricks-solutions/ai-dev-kit&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=databricks-solutions/ai-dev-kit&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=databricks-solutions/ai-dev-kit&type=Date" />
+   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=databricks-solutions/ai-dev-kit&type=Date" />
  </picture>
 </a>
 
