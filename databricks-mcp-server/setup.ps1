@@ -1,4 +1,4 @@
-#
+﻿#
 # Setup script for databricks-mcp-server (Windows).
 #
 # Creates the Python virtual environment and installs the MCP server (plus its
