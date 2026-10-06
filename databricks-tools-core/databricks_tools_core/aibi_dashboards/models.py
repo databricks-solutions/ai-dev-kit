@@ -16,6 +16,8 @@ class DashboardDeploymentResult:
     dashboard_id: Optional[str] = None
     path: Optional[str] = None
     url: Optional[str] = None
+    published: bool = False
+    publish_error: Optional[str] = None
     error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -26,5 +28,7 @@ class DashboardDeploymentResult:
             "dashboard_id": self.dashboard_id,
             "path": self.path,
             "url": self.url,
+            "published": self.published,
+            "publish_error": self.publish_error,
             "error": self.error,
         }
