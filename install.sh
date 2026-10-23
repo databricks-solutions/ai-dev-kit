@@ -526,10 +526,14 @@ gemini_global_skills_dir() {
 
 # The relocated Gemini skills dir when GEMINI_CLI_HOME moves it, else empty.
 # Scans add it on top of ~/.gemini/skills, which can still hold older installs.
+# The default drops a trailing slash from HOME just as gemini_global_skills_dir
+# does, and -ef catches any other spelling of an existing dir ("$HOME/.",
+# "$HOME//", a symlink to $HOME), which would otherwise be scanned twice. The
+# scans skip dirs that don't exist, so those spellings only matter once it does.
 gemini_relocated_skills_dir() {
-    local dir
+    local dir default="${HOME%/}/.gemini/skills"
     dir=$(gemini_global_skills_dir)
-    [ "$dir" != "$HOME/.gemini/skills" ] && echo "$dir"
+    [ "$dir" = "$default" ] || [ "$dir" -ef "$default" ] || echo "$dir"
     return 0
 }
 

@@ -167,18 +167,51 @@ RELOCATED_CASES = [
     pytest.param(None, False, id="unset"),
     pytest.param("{home}", False, id="same-as-home"),
     pytest.param("{home}/", False, id="same-as-home-trailing-slash"),
+    pytest.param("{home}/.", False, id="same-as-home-dot-segment"),
+    pytest.param("{home}//", False, id="same-as-home-double-slash"),
     pytest.param("{home}/gem", True, id="relocated"),
 ]
 
 
 @pytest.mark.parametrize("gemini_home,relocated", RELOCATED_CASES)
 def test_install_sh_relocated_gemini_dir_only_when_moved(tmp_path, gemini_home, relocated):
-    # GEMINI_CLI_HOME naming $HOME is not a relocation, so scans must not count ~/.gemini twice
+    # GEMINI_CLI_HOME naming $HOME is not a relocation, so scans must not count ~/.gemini twice.
+    # The scans skip missing dirs, so the spelling only matters once ~/.gemini/skills exists.
     home = str(tmp_path.resolve())
+    (tmp_path / ".gemini" / "skills").mkdir(parents=True)
     env = {"HOME": home} | ({"GEMINI_CLI_HOME": gemini_home.format(home=home)} if gemini_home else {})
     result = _run_bash(tmp_path, None, "gemini_relocated_skills_dir\n", env)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == (f"{home}/gem/.gemini/skills" if relocated else "")
+
+
+@pytest.mark.parametrize("home_suffix", ["", "/"], ids=["home", "home-trailing-slash"])
+def test_install_sh_unmoved_gemini_dir_is_not_reported_before_it_exists(tmp_path, home_suffix):
+    # a fresh machine: no ~/.gemini yet and GEMINI_CLI_HOME unset is still "not moved"
+    env = {"HOME": f"{tmp_path.resolve()}{home_suffix}"}
+    result = _run_bash(tmp_path, None, "gemini_relocated_skills_dir\n", env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ""
+
+
+def test_install_sh_trailing_slash_home_is_not_a_relocation(tmp_path):
+    # HOME="/x/" with GEMINI_CLI_HOME unset names the same ~/.gemini/skills as HOME="/x"
+    home = tmp_path.resolve()
+    (home / ".gemini" / "skills").mkdir(parents=True)
+    result = _run_bash(tmp_path, None, "gemini_relocated_skills_dir\n", {"HOME": f"{home}/"})
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ""
+
+
+def test_install_sh_gemini_cli_home_symlinked_to_home_is_not_a_relocation(tmp_path):
+    # a spelling no string compare can catch: the same directory reached through a symlink
+    home = tmp_path.resolve()
+    (home / ".gemini" / "skills").mkdir(parents=True)
+    (home / "home-link").symlink_to(home, target_is_directory=True)
+    env = {"HOME": str(home), "GEMINI_CLI_HOME": str(home / "home-link")}
+    result = _run_bash(tmp_path, None, "gemini_relocated_skills_dir\n", env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ""
 
 
 def test_install_sh_install_skills_uses_gemini_cli_home(tmp_path):
@@ -278,6 +311,16 @@ def test_install_sh_uninstall_finds_both_gemini_dirs(tmp_path):
     assert "Skill folders (2):" in out
     assert str(relocated) in out
     assert "~/.gemini/skills/databricks-jobs" in out
+
+
+def test_install_sh_uninstall_lists_gemini_skills_once_with_trailing_slash_home(tmp_path):
+    # the user-visible effect: a respelled HOME used to plan every ~/.gemini skill twice
+    home = tmp_path / "home"
+    skill = home / ".gemini" / "skills" / "databricks-jobs"
+    skill.mkdir(parents=True)
+    out = _run_sh_dry_run(tmp_path, None, {"HOME": f"{home}/"}, args=("--global", "--uninstall"))
+    assert "Skill folders (1):" in out
+    assert out.count(".gemini/skills/databricks-jobs") == 1
 
 
 def test_install_sh_dry_run_explicit_agent_skills_previews_upgrade(tmp_path):
@@ -422,11 +465,7 @@ def test_install_ps1_dry_run_previews_what_a_real_run_does(tmp_path, version, ag
 
 
 @needs_pwsh
-@pytest.mark.parametrize(
-    "gemini_home,relocated",
-    # a "." segment is another spelling of the profile dir that only full-path normalization catches
-    [*RELOCATED_CASES, pytest.param("{home}/.", False, id="same-as-home-dot-segment")],
-)
+@pytest.mark.parametrize("gemini_home,relocated", RELOCATED_CASES)
 def test_install_ps1_relocated_gemini_dir_only_when_moved(tmp_path, gemini_home, relocated):
     home = str(tmp_path.resolve())
     env = {"USERPROFILE": home} | ({"GEMINI_CLI_HOME": gemini_home.format(home=home)} if gemini_home else {})
