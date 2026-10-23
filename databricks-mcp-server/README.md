@@ -46,6 +46,8 @@ You can do this in one shot with the installer script, which creates a `.venv`, 
 
 It supports Claude Code, Cursor, GitHub Copilot, OpenAI Codex, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro, and can be reverted with `--uninstall` (`-Uninstall` on PowerShell).
 
+> **Encoding note:** `mcp_install.ps1` and `setup.ps1` are stored as UTF-8 **with BOM**. Keep that encoding if you edit them — Windows PowerShell 5.1 decodes BOM-less files as ANSI, which garbles the scripts' `─`/`✓` output. PowerShell 7+ is unaffected.
+
 The installer prompts for **scope** (project vs. global), **which clients** to configure, and **which Databricks profile** to inject. Where it writes each client's config depends on the scope you choose:
 
 | Client | Project scope | Global scope |
