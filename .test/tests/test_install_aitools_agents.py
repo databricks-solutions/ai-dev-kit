@@ -30,6 +30,8 @@ CASES = [
     ("1.19.9", "cursor,gemini"),
     ("1.20.0", "cursor,gemini,kiro"),
     ("1.100.0", "cursor,gemini,kiro"),
+    # a part past Int32: both installers compare it as a number
+    ("99999999999.0.0", "cursor,gemini,kiro"),
 ]
 
 
@@ -67,6 +69,7 @@ def _run_bash(tmp_path: Path, version: str | None, script: str, env: dict | None
         _bash_functions(
             "version_gte",
             "databricks_cli_version",
+            "check_cli_version",
             "map_aitools_agents",
             "gemini_global_skills_dir",
             "gemini_relocated_skills_dir",
@@ -101,6 +104,32 @@ def test_install_sh_skipped_last_agent_does_not_trip_set_e(tmp_path):
     assert result.stdout.strip() == "cursor"
 
 
+# CLIs that print an update notice before their version line. The installed CLI is
+# v1.11.0 in each, so it is too old for Gemini (1.12.0) and Kiro (1.20.0).
+def _cli_stub(version_text: str, json_version: str | None, json_preamble: str = "") -> str:
+    """A `databricks` stub: `version -o json` reports json_version, or fails like a CLI without it."""
+    json_doc = f'{{\n  "ProjectName": "cli",\n  "Version": "{json_version}",\n  "Major": 1\n}}'
+    json_branch = (
+        f"{json_preamble}  echo '{json_doc}'; exit 0" if json_version else '  echo "Error: unknown command" >&2; exit 1'
+    )
+    return f'#!/bin/sh\nif [ "$1" = version ]; then\n{json_branch}\nfi\n{version_text}'
+
+
+NOTICE_STUBS = {
+    # `version -o json` reports the version as data, whatever the notice says
+    "json-notice-names-the-cli": _cli_stub(
+        'echo "Databricks CLI v1.21.0 is available"\necho "Databricks CLI v1.21.0"\n', "1.11.0"
+    ),
+    # a notice on stdout ahead of the JSON doesn't hide the "Version" field
+    "json-after-a-notice-on-stdout": _cli_stub(
+        'echo "Databricks CLI v1.21.0"\n', "1.11.0", '  echo "Databricks CLI v1.21.0 is available"\n'
+    ),
+    # a CLI without `version -o json` falls back to the "Databricks CLI vX.Y.Z" line
+    "legacy-notice-before-version": _cli_stub(
+        'echo "Version 1.21.0 is available"\necho "Databricks CLI v1.11.0"\n', None
+    ),
+}
+
 # (stub `databricks` script, expected --agents for TOOLS="cursor kiro")
 NOISY_CLI_CASES = [
     # an update notice on stderr: PS merged it with 2>&1 into an array (and throws on PS 5.1)
@@ -118,11 +147,7 @@ NOISY_CLI_CASES = [
     # no semver at all: version unknown, so the gated agents are left out
     pytest.param('#!/bin/sh\necho "dev build"\n', "cursor", id="no-semver"),
     # a newer version in a notice before the version line must not lift an old CLI over the floors
-    pytest.param(
-        '#!/bin/sh\necho "Version 1.21.0 is available"\necho "Databricks CLI v1.11.0"\n',
-        "cursor",
-        id="notice-before-version",
-    ),
+    *(pytest.param(stub, "cursor", id=name) for name, stub in NOTICE_STUBS.items()),
 ]
 
 
@@ -132,6 +157,34 @@ def test_install_sh_cli_version_survives_noisy_output(tmp_path, stub, expected):
     result = _run_bash(tmp_path, None, _map_agents("cursor kiro"))
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == expected
+
+
+# (stub `databricks` script, minimum CLI version, expected message, reported as OK?)
+# Shared by install.sh's check_cli_version and install.ps1's Test-Dependencies.
+CHECK_CLI_CASES = [
+    pytest.param('#!/bin/sh\necho "Databricks CLI v0.200.0"\n', "0.278.0",
+                 "Databricks CLI v0.200.0 is outdated (minimum: v0.278.0)", False, id="outdated"),
+    pytest.param('#!/bin/sh\necho "Databricks CLI v1.20.0"\n', "0.278.0", "Databricks CLI v1.20.0", True, id="current"),
+    pytest.param(
+        "#!/bin/sh\necho dev\n", "0.278.0", "Could not determine Databricks CLI version", False, id="no-semver"
+    ),
+    pytest.param('#!/bin/sh\necho "Databricks CLI v99999999999.0.0"\n', "0.278.0",
+                 "Databricks CLI v99999999999.0.0", True, id="past-int32"),
+    *(pytest.param(stub, "1.12.0", "Databricks CLI v1.11.0 is outdated (minimum: v1.12.0)", False, id=name)
+      for name, stub in NOTICE_STUBS.items()),
+]
+
+
+@pytest.mark.parametrize("stub,minimum,message,is_ok", CHECK_CLI_CASES)
+def test_install_sh_check_cli_version_reports_cli_version(tmp_path, stub, minimum, message, is_ok):
+    _stub_cli(tmp_path, None, stub)
+    script = (
+        'ok() { echo "OK $*"; }; warn() { echo "WARN $*"; }; msg() { :; }\n'
+        f"MIN_CLI_VERSION={minimum}\ncheck_cli_version\n"
+    )
+    result = _run_bash(tmp_path, None, script)
+    assert result.returncode == 0, result.stderr
+    assert f"{'OK' if is_ok else 'WARN'} {message}" in result.stdout, result.stdout
 
 
 def test_install_sh_version_argument_overrides_installed_cli(tmp_path):
@@ -351,12 +404,18 @@ def _run_pwsh(tmp_path: Path, names: list[str], body: str, env: dict | None = No
 needs_pwsh = pytest.mark.skipif(PWSH is None, reason="pwsh not installed")
 
 
+PS_AGENT_FNS = ["Get-DatabricksCliVersion", "Test-CliVersionAtLeast", "Resolve-AitoolsAgents"]
+
+
 @needs_pwsh
 @pytest.mark.parametrize("version,expected", CASES)
 def test_install_ps1_maps_agents_by_cli_version(tmp_path, version, expected):
     stub = f'function databricks {{ "Databricks CLI v{version}" }}\n' if version else ""
-    body = f'{stub}$script:Tools = "{TOOLS}"\nResolve-AitoolsAgents\n$script:AitoolsAgents\n'
-    result = _run_pwsh(tmp_path, ["Get-DatabricksCliVersion", "Resolve-AitoolsAgents"], body)
+    body = (
+        f'$ErrorActionPreference = "Stop"\n{stub}$script:Tools = "{TOOLS}"\n'
+        "Resolve-AitoolsAgents\n$script:AitoolsAgents\n"
+    )
+    result = _run_pwsh(tmp_path, PS_AGENT_FNS, body)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == expected
 
@@ -367,7 +426,7 @@ def test_install_ps1_cli_version_survives_noisy_output(tmp_path, stub, expected)
     _stub_cli(tmp_path, None, stub)
     body = '$ErrorActionPreference = "Stop"\n$script:Tools = "cursor kiro"\n'
     body += "Resolve-AitoolsAgents\n$script:AitoolsAgents\n"
-    result = _run_pwsh(tmp_path, ["Get-DatabricksCliVersion", "Resolve-AitoolsAgents"], body)
+    result = _run_pwsh(tmp_path, PS_AGENT_FNS, body)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == expected
 
@@ -383,10 +442,74 @@ def test_install_ps1_gemini_skills_dir_follows_gemini_cli_home(tmp_path, scope, 
     assert result.stdout.strip().replace("\\", "/") == str(tmp_path / expected)
 
 
+@needs_pwsh
+@pytest.mark.parametrize(
+    "version,minimum,expected",
+    [
+        ("1.20.0", "1.20.0", "True"),
+        ("1.100.0", "1.20.0", "True"),
+        ("1.19.9", "1.20.0", "False"),
+        ("2.0", "1.20.0", "True"),
+        ("", "1.20.0", "False"),
+        ("1.2.x", "1.0.0", "False"),
+        # a part past Int32 (or past [decimal]) compares as a number instead of throwing
+        ("99999999999.0.0", "1.0.0", "True"),
+        ("1" + "0" * 29 + ".0.0", "1.0.0", "True"),
+        ("1.99999999999.0", "2.0.0", "False"),
+        # a shorter version that is a prefix of the other is older, as with install.sh's version_gte
+        ("1.20", "1.20.0", "False"),
+        ("1.20.0", "1.20", "True"),
+        # a bad minimum is never met rather than a throw
+        ("1.20.0", "1.20.0-rc1", "False"),
+        ("1.20.0", "", "False"),
+        # only ASCII digits are a version part
+        ("\u0661.20.0", "1.0.0", "False"),
+    ],
+)
+def test_install_ps1_cli_version_at_least(tmp_path, version, minimum, expected):
+    body = f"$ErrorActionPreference = 'Stop'\nTest-CliVersionAtLeast '{version}' '{minimum}'\n"
+    result = _run_pwsh(tmp_path, ["Test-CliVersionAtLeast"], body)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected
+
+
+OVERSIZED_CLI = 'function databricks { "Databricks CLI v99999999999.0.0" }\n'
+
+
+@needs_pwsh
+def test_install_ps1_cli_version_argument_past_int32_maps_agents(tmp_path):
+    # the -CliVersion path the dry run uses compares the same way as the installed-CLI path
+    body = (
+        '$ErrorActionPreference = "Stop"\n$script:Tools = "cursor kiro"\n'
+        "Resolve-AitoolsAgents -CliVersion '99999999999.0.0'\n$script:AitoolsAgents\n"
+    )
+    result = _run_pwsh(tmp_path, PS_AGENT_FNS, body)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "cursor,kiro"
+
+
+@needs_pwsh
+def test_install_ps1_cli_gate_accepts_a_version_past_int32(tmp_path):
+    # under the installer's EAP=Stop, the old [version] cast here ended the install
+    body = f"$ErrorActionPreference = 'Stop'\n{OVERSIZED_CLI}$script:Silent = $true\nConfirm-AitoolsCli\n"
+    names = ["Write-Err", "Write-Warn", "Get-DatabricksCliVersion", "Test-CliVersionAtLeast", "Confirm-AitoolsCli"]
+    result = _run_pwsh(tmp_path, names, body)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == "True"
+
+
+@needs_pwsh
+def test_install_ps1_dry_run_accepts_a_version_past_int32(tmp_path):
+    out = _ps_dry_run(tmp_path, "99999999999.0.0", all_agent_skills=True)
+    assert "Would run: databricks aitools install --scope global --agents kiro,gemini" in out
+    assert "too old" not in out
+
+
 PS_DRY_RUN_FNS = [
     "Write-Msg",
     "Write-Warn",
     "Get-DatabricksCliVersion",
+    "Test-CliVersionAtLeast",
     "Resolve-AitoolsAgents",
     "Get-GeminiGlobalSkillsDir",
     "Get-AgentSkillTargetDirs",
@@ -399,6 +522,7 @@ def _ps_dry_run(tmp_path: Path, version: str | None, all_agent_skills: bool, age
     stub = f'function databricks {{ "Databricks CLI v{version}" }}\n' if version else ""
     skills = ", ".join(f"'{name}'" for name in agent_skills)
     body = (
+        "$ErrorActionPreference = 'Stop'\n"
         f"{stub}$script:Tools = 'kiro gemini windsurf'; $script:Scope = 'global'; $script:Profile_ = 'DEFAULT'\n"
         f"$script:SelectedAllAgentB = ${str(all_agent_skills).lower()}; $script:SelectedAgentBSkills = @({skills})\n"
         "$script:SelectedMlflowSkills = @(); $script:InstallExperimental = $false; $script:AgentBRelease = ''\n"
@@ -502,20 +626,13 @@ def test_install_ps1_flags_old_copy_in_relocated_gemini_dir(tmp_path):
 
 
 @needs_pwsh
-@pytest.mark.parametrize(
-    "version,expected",
-    [
-        ("0.200.0", "Databricks CLI v0.200.0 is outdated (minimum: v0.278.0)"),
-        ("1.20.0", "Databricks CLI v1.20.0"),
-        (None, "Could not determine Databricks CLI version"),
-        # a component past Int32 makes the [version] cast throw under EAP=Stop
-        ("99999999999.0.0", "Could not determine Databricks CLI version"),
-    ],
-)
-def test_install_ps1_test_dependencies_reports_cli_version(tmp_path, version, expected):
-    # None = a CLI whose --version has no semver at all
-    _stub_cli(tmp_path, None, f'#!/bin/sh\necho "Databricks CLI v{version}"\n' if version else "#!/bin/sh\necho dev\n")
-    names = ["Write-Msg", "Write-Ok", "Write-Warn", "Write-Err", "Get-DatabricksCliVersion", "Test-Dependencies"]
-    result = _run_pwsh(tmp_path, names, '$MinCliVersion = "0.278.0"\nTest-Dependencies\n')
+@pytest.mark.parametrize("stub,minimum,message,is_ok", CHECK_CLI_CASES)
+def test_install_ps1_test_dependencies_reports_cli_version(tmp_path, stub, minimum, message, is_ok):
+    # the PowerShell twin of test_install_sh_check_cli_version_reports_cli_version
+    _stub_cli(tmp_path, None, stub)
+    names = ["Write-Msg", "Write-Ok", "Write-Warn", "Write-Err", "Get-DatabricksCliVersion", "Test-CliVersionAtLeast",
+             "Test-Dependencies"]
+    body = f'$ErrorActionPreference = "Stop"\n$MinCliVersion = "{minimum}"\nTest-Dependencies\n'
+    result = _run_pwsh(tmp_path, names, body)
     assert result.returncode == 0, result.stderr
-    assert expected in ANSI.sub("", result.stdout)
+    assert f"{'v' if is_ok else '!'} {message}" in ANSI.sub("", result.stdout), result.stdout

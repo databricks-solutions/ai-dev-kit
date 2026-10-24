@@ -1237,10 +1237,9 @@ function Test-Dependencies {
     # Databricks CLI
     if (Get-Command databricks -ErrorAction SilentlyContinue) {
         $cliVersion = Get-DatabricksCliVersion
-        $parsed = $null
-        if (-not $cliVersion -or -not [version]::TryParse($cliVersion, [ref]$parsed)) {
+        if (-not $cliVersion) {
             Write-Warn "Could not determine Databricks CLI version"
-        } elseif ($parsed -ge [version]$MinCliVersion) {
+        } elseif (Test-CliVersionAtLeast $cliVersion $MinCliVersion) {
             Write-Ok "Databricks CLI v$cliVersion"
         } else {
             Write-Warn "Databricks CLI v$cliVersion is outdated (minimum: v$MinCliVersion)"
@@ -1699,23 +1698,47 @@ function Get-AgentBInventory {
 }
 
 # Installed Databricks CLI version (e.g. 1.20.0), or "" if the CLI is missing.
-# stderr is dropped (not merged) so an update notice can't throw under the
-# script's EAP=Stop on Windows PowerShell 5.1, and the output is joined so
-# -match runs on one string and sets $Matches. Prefers the "Databricks CLI vX.Y.Z"
-# line so a version in an update notice can't be picked up instead.
+# Reads the "Version" field of `databricks version -o json`, as install.sh does,
+# so nothing in an update notice (even one on stdout) can stand in for it. CLIs
+# without that command fall back to the --version text,
+# preferring the "Databricks CLI vX.Y.Z" line and matching case like install.sh.
+# stderr is dropped (not merged) so a notice can't throw under the script's
+# EAP=Stop on Windows PowerShell 5.1.
 function Get-DatabricksCliVersion {
     if (-not (Get-Command databricks -ErrorAction SilentlyContinue)) { return "" }
     $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    $version = ""
     try {
-        $cliOutput = (& databricks --version 2>$null) -join "`n"
-    } catch {
-        $cliOutput = ""
+        $json = ""
+        try { $json = (& databricks version -o json 2>$null) -join "`n" } catch {}
+        if ($json -cmatch '"Version":\s*"([0-9]+\.[0-9]+\.[0-9]+)') { $version = $Matches[1] }
+        if (-not $version) {
+            $cliOutput = ""
+            try { $cliOutput = (& databricks --version 2>$null) -join "`n" } catch {}
+            if ($cliOutput -cmatch 'Databricks CLI v([0-9]+\.[0-9]+\.[0-9]+)') { $version = $Matches[1] }
+            elseif ($cliOutput -cmatch '([0-9]+\.[0-9]+\.[0-9]+)') { $version = $Matches[1] }
+        }
     } finally {
         $ErrorActionPreference = $prevEAP
     }
-    if ($cliOutput -match 'Databricks CLI v(\d+\.\d+\.\d+)') { return $Matches[1] }
-    if ($cliOutput -match '(\d+\.\d+\.\d+)') { return $Matches[1] }
-    return ""
+    return $version
+}
+
+# True when $Version is at or above $Minimum, comparing each dot-separated part as
+# a whole number ([bigint], so parts past Int32 compare instead of making a
+# [version] cast throw under EAP=Stop). When one is a prefix of the other, the
+# shorter one is older, as with install.sh's version_gte. An empty or non-numeric
+# version or minimum (the floors are plain X.Y.Z) is never "at least".
+function Test-CliVersionAtLeast {
+    param([string]$Version, [string]$Minimum)
+    $numeric = '^[0-9]+(\.[0-9]+)*$'
+    if ($Version -cnotmatch $numeric -or $Minimum -cnotmatch $numeric) { return $false }
+    $have = $Version.Split('.'); $need = $Minimum.Split('.')
+    for ($i = 0; $i -lt [Math]::Min($have.Count, $need.Count); $i++) {
+        $a = [System.Numerics.BigInteger]::Parse($have[$i]); $b = [System.Numerics.BigInteger]::Parse($need[$i])
+        if ($a -ne $b) { return $a -gt $b }
+    }
+    return $have.Count -ge $need.Count
 }
 
 # Gate for `databricks aitools` (ships with the Databricks CLI v1.0.0+).
@@ -1726,7 +1749,7 @@ function Confirm-AitoolsCli {
     $attempts = 0
     while ($true) {
         $cliVersion = Get-DatabricksCliVersion
-        if ($cliVersion -and ([version]$cliVersion -ge [version]$MinAitoolsCliVersion)) {
+        if (Test-CliVersionAtLeast $cliVersion $MinAitoolsCliVersion) {
             return $true
         }
 
@@ -1787,8 +1810,8 @@ function Resolve-AitoolsAgents {
             "codex"       { $agents += "codex" }
             "opencode"    { $agents += "opencode" }
             "antigravity" { $agents += "antigravity" }
-            "gemini"      { if ($cliVersion -and ([version]$cliVersion -ge [version]$MinAitoolsGeminiCliVersion)) { $agents += "gemini" } }
-            "kiro"        { if ($cliVersion -and ([version]$cliVersion -ge [version]$MinAitoolsKiroCliVersion)) { $agents += "kiro" } }
+            "gemini"      { if (Test-CliVersionAtLeast $cliVersion $MinAitoolsGeminiCliVersion) { $agents += "gemini" } }
+            "kiro"        { if (Test-CliVersionAtLeast $cliVersion $MinAitoolsKiroCliVersion) { $agents += "kiro" } }
         }
     }
     $script:AitoolsAgents = ($agents -join ',')
@@ -2387,7 +2410,7 @@ function Show-DryRunReport {
     $upgradeFirst = $false
     if ($script:SelectedAllAgentB -or $script:SelectedAgentBSkills.Count -gt 0) {
         $cliVersion = Get-DatabricksCliVersion
-        $upgradeFirst = -not ($cliVersion -and ([version]$cliVersion -ge [version]$MinAitoolsCliVersion))
+        $upgradeFirst = -not (Test-CliVersionAtLeast $cliVersion $MinAitoolsCliVersion)
     }
     if ($upgradeFirst) { Resolve-AitoolsAgents -CliVersion $MinAitoolsKiroCliVersion } else { Resolve-AitoolsAgents }
     Write-Host ""

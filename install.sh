@@ -1671,14 +1671,20 @@ fetch_agent_b_inventory() {
 }
 
 # Installed Databricks CLI version (e.g. 1.20.0), or empty if the CLI is missing.
-# Prefers the "Databricks CLI vX.Y.Z" line so a version in an update notice
-# can't be picked up instead.
+# Reads the "Version" field of `databricks version -o json`, so nothing in an
+# update notice (even one on stdout) can stand in for it. CLIs without that
+# command fall back to the --version text, preferring the "Databricks CLI vX.Y.Z" line.
 databricks_cli_version() {
     command -v databricks >/dev/null 2>&1 || return 0
-    local out
-    out=$(databricks --version 2>/dev/null || true)
-    { echo "$out" | grep -oE 'Databricks CLI v[0-9]+\.[0-9]+\.[0-9]+' || echo "$out" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true; } \
-        | head -1 | sed 's/^Databricks CLI v//'
+    local out found
+    out=$(databricks version -o json 2>/dev/null || true)
+    found=$(echo "$out" | grep -oE '"Version": *"[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+    if [ -z "$found" ]; then
+        out=$(databricks --version 2>/dev/null || true)
+        found=$(echo "$out" | grep -oE 'Databricks CLI v[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+        [ -n "$found" ] || found=$(echo "$out" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+    fi
+    echo "$found" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true
 }
 
 # Gate for `databricks aitools` (ships with the Databricks CLI v1.0.0+).
@@ -2306,7 +2312,7 @@ dry_run_report() {
 # Check Databricks CLI version meets minimum requirement
 check_cli_version() {
     local cli_version
-    cli_version=$(databricks --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    cli_version=$(databricks_cli_version)
 
     if [ -z "$cli_version" ]; then
         warn "Could not determine Databricks CLI version"
