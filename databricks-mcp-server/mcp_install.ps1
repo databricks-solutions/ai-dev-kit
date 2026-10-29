@@ -1,4 +1,4 @@
-#
+﻿#
 # Databricks MCP Server - Client Registration Installer (Windows)
 #
 # Builds the MCP server runtime (by delegating to setup.ps1) and registers the

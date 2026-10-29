@@ -1,4 +1,4 @@
-#
+﻿#
 # Databricks AI Dev Kit - Unified Installer (Windows)
 #
 # Installs Databricks skills and configuration for Claude Code, Cursor, OpenAI Codex, GitHub Copilot, Gemini CLI, Antigravity, Windsurf, OpenCode, and Kiro.
