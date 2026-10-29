@@ -46,6 +46,18 @@ export GEPA_REFLECTION_LM="openai/gpt-4o"
 export GEPA_GEN_LM="openai/gpt-4o"
 ```
 
+**OrcaRouter**
+
+[OrcaRouter](https://www.orcarouter.ai) is an OpenAI-compatible gateway. Use the `orcarouter/` provider prefix with a fully namespaced model id (e.g. `orcarouter/openai/gpt-4o-mini`):
+
+```bash
+export ORCAROUTER_API_KEY="sk-orca-..."
+export GEPA_REFLECTION_LM="orcarouter/openai/gpt-4o-mini"
+export GEPA_GEN_LM="orcarouter/openai/gpt-4o-mini"
+```
+
+When using a non-Databricks provider, set `GEPA_FALLBACK_MODELS` to models on the same provider (the default fallback chain points at Databricks endpoints):
+
 ### 3. Configure the Claude Code agent (for `--agent-eval`)
 
 Agent evaluation runs a real Claude Code instance via the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python). The agent's environment is configured in `.test/claude_agent_settings.json`:
@@ -189,7 +201,7 @@ uv run python .test/scripts/optimize.py <skill_name> [options]
 | `--reflection-lm` | `GEPA_REFLECTION_LM` | `databricks/databricks-claude-opus-4-6` | GEPA's reflection/mutation model |
 | `--judge-model` | `GEPA_JUDGE_LM` | `databricks/databricks-claude-sonnet-4-6` | MLflow quality judge |
 
-Proxy evaluator models use [litellm provider prefixes](https://docs.litellm.ai/docs/providers): `databricks/`, `openai/`, `anthropic/`.
+Proxy evaluator models use [litellm provider prefixes](https://docs.litellm.ai/docs/providers): `databricks/`, `openai/`, `anthropic/`. OrcaRouter is supported through the `orcarouter/` prefix (e.g. `orcarouter/openai/gpt-4o-mini`), which routes to `https://api.orcarouter.ai/v1` with `ORCAROUTER_API_KEY`.
 
 ### Tool Optimization
 

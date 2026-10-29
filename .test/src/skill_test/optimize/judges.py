@@ -192,6 +192,17 @@ def _get_gateway_base_url() -> str | None:
     return url.rstrip("/")
 
 
+# OrcaRouter: OpenAI-compatible gateway. Model ids are fully namespaced
+# (e.g. ``openai/gpt-4o-mini``, ``deepseek/deepseek-v4-flash-0731``), so the
+# id after the ``orcarouter/`` prefix is passed through verbatim.
+ORCAROUTER_BASE_URL = "https://api.orcarouter.ai/v1"
+
+
+def _orcarouter_api_key() -> str:
+    """Return the OrcaRouter API key, or an empty string if not configured."""
+    return os.environ.get("ORCAROUTER_API_KEY", "")
+
+
 def _to_litellm_model(model: str) -> tuple[str, str | None, str | None]:
     """Convert a model string to (litellm_model, base_url, api_key) for completion calls.
 
@@ -199,6 +210,10 @@ def _to_litellm_model(model: str) -> tuple[str, str | None, str | None]:
     through the gateway as an OpenAI-compatible endpoint.  The OpenAI
     provider in litellm does not auto-read ``DATABRICKS_TOKEN``, so we
     pass it explicitly as ``api_key``.
+
+    ``orcarouter/<namespaced-model>`` models (e.g. ``orcarouter/openai/gpt-4o-mini``)
+    are routed through OrcaRouter as an OpenAI-compatible endpoint using
+    ``ORCAROUTER_API_KEY``.
 
     Returns:
         (model_string, base_url_or_None, api_key_or_None)
@@ -209,6 +224,14 @@ def _to_litellm_model(model: str) -> tuple[str, str | None, str | None]:
         endpoint_name = model.split("/", 1)[1]
         api_key = os.environ.get("DATABRICKS_TOKEN") or os.environ.get("DATABRICKS_API_KEY", "")
         return f"openai/{endpoint_name}", gateway, api_key or None
+    if model.startswith("orcarouter/"):
+        # Route through OrcaRouter as an OpenAI-compatible endpoint.
+        # litellm appends /chat/completions to the base URL, and OrcaRouter
+        # requires the fully namespaced model id (openai/..., anthropic/...,
+        # deepseek/...), so the rest of the id is passed through verbatim.
+        model_id = model.split("/", 1)[1]
+        api_key = _orcarouter_api_key()
+        return f"openai/{model_id}", ORCAROUTER_BASE_URL, api_key or None
     return model, None, None
 
 
@@ -249,6 +272,9 @@ def _to_judge_model_and_params(model: str) -> tuple[str, dict[str, Any] | None]:
     If AI Gateway is configured, uses ``openai:/endpoint-name`` with
     ``inference_params.base_url`` pointing to the gateway. Otherwise
     uses standard ``provider:/model`` format.
+
+    ``orcarouter/<namespaced-model>`` models map to ``openai:/<model-id>``
+    with ``inference_params.base_url`` pointing at OrcaRouter.
     """
     gateway = _get_gateway_base_url()
     if gateway and model.startswith(("databricks/", "databricks:/")):
@@ -262,6 +288,13 @@ def _to_judge_model_and_params(model: str) -> tuple[str, dict[str, Any] | None]:
         if api_key:
             params["api_key"] = api_key
         return f"openai:/{endpoint_name}", params
+    if model.startswith("orcarouter/"):
+        model_id = model.split("/", 1)[1]
+        api_key = _orcarouter_api_key()
+        params = {"base_url": ORCAROUTER_BASE_URL}
+        if api_key:
+            params["api_key"] = api_key
+        return f"openai:/{model_id}", params
     return _to_judge_uri(model), _judge_inference_params()
 
 
