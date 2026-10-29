@@ -57,8 +57,9 @@ def manage_dashboard(
     Actions:
     - create_or_update: Create/update dashboard from JSON.
       Requires display_name, parent_path, serialized_dashboard, warehouse_id.
-      publish=True (default) auto-publishes after create.
-      Returns: {success, dashboard_id, path, url, published, error}.
+      publish=True (default) publishes after create or update; publish=False saves a
+      draft and leaves the published version unchanged.
+      Returns: {success, dashboard_id, path, url, published, publish_error, error}.
     - get: Get dashboard details. Requires dashboard_id.
       Returns: dashboard config and metadata.
     - list: List all dashboards.

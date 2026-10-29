@@ -321,13 +321,14 @@ def deploy_dashboard(
     genie_space_id: Optional[str] = None,
     dataset_catalog: Optional[str] = None,
     dataset_schema: Optional[str] = None,
+    publish: bool = True,
 ) -> DashboardDeploymentResult:
     """Deploy a dashboard to Databricks workspace.
 
     This is a high-level function that handles create-or-update logic:
     - Checks if a dashboard exists at the path
     - Creates new or updates existing dashboard
-    - Publishes the dashboard
+    - Publishes the dashboard when publish is True
 
     Args:
         dashboard_content: Dashboard JSON content as string or dict
@@ -337,6 +338,7 @@ def deploy_dashboard(
         genie_space_id: Optional Genie space ID to link to dashboard
         dataset_catalog: Default catalog for datasets (doesn't affect fully qualified names)
         dataset_schema: Default schema for datasets (doesn't affect fully qualified names)
+        publish: Publish after create/update; False leaves the change as a draft
 
     Returns:
         DashboardDeploymentResult with deployment status and details
@@ -404,16 +406,20 @@ def deploy_dashboard(
 
         dashboard_url = f"{w.config.host}/sql/dashboardsv3/{dashboard_id}"
 
-        # Publish (best-effort)
-        try:
-            w.lakeview.publish(
-                dashboard_id=dashboard_id,
-                warehouse_id=warehouse_id,
-                embed_credentials=True,
-            )
-            logger.info(f"Dashboard {dashboard_id} published successfully")
-        except Exception as e:
-            logger.warning(f"Failed to publish dashboard {dashboard_id}: {e}")
+        published = False
+        publish_error = None
+        if publish:
+            try:
+                w.lakeview.publish(
+                    dashboard_id=dashboard_id,
+                    warehouse_id=warehouse_id,
+                    embed_credentials=True,
+                )
+                published = True
+                logger.info(f"Dashboard {dashboard_id} published successfully")
+            except Exception as e:
+                publish_error = str(e)
+                logger.warning(f"Failed to publish dashboard {dashboard_id}: {e}")
 
         return DashboardDeploymentResult(
             success=True,
@@ -421,6 +427,8 @@ def deploy_dashboard(
             dashboard_id=dashboard_id,
             path=dashboard_path,
             url=dashboard_url,
+            published=published,
+            publish_error=publish_error,
         )
 
     except Exception as e:
@@ -468,7 +476,8 @@ def create_or_update_dashboard(
         - status: 'created' or 'updated'
         - dashboard_id: Dashboard ID
         - url: Dashboard URL
-        - published: Whether dashboard was published
+        - published: Whether the dashboard was actually published
+        - publish_error: Why publishing failed, if it was requested and failed
     """
     result = deploy_dashboard(
         dashboard_content=serialized_dashboard,
@@ -478,6 +487,7 @@ def create_or_update_dashboard(
         genie_space_id=genie_space_id,
         dataset_catalog=catalog,
         dataset_schema=schema,
+        publish=publish,
     )
 
     return {
@@ -486,6 +496,7 @@ def create_or_update_dashboard(
         "dashboard_id": result.dashboard_id,
         "path": result.path,
         "url": result.url,
-        "published": result.success and publish,
+        "published": result.published,
+        "publish_error": result.publish_error,
         "error": result.error,
     }
