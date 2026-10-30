@@ -77,10 +77,10 @@ def execute_code(
         {"environments": [{"environment_key": "env", "spec": {"client": "4", "dependencies": ["pandas", "sklearn"]}}]}
 
     Timeouts (default `timeout`): serverless=1800s, cluster=120s, file=600s.
-    Serverless: `timeout` caps the run itself (sent as timeout_seconds); if the run
-    is still going when it expires it is cancelled (state CANCELED). STILL_RUNNING
-    means cancellation failed and the run is still incurring cost: cancel it at run_url.
-    Override only the run cap with job_extra_params={"timeout_seconds": N}.
+    Serverless: `timeout` caps the run itself (sent as timeout_seconds); a run still
+    active after it is cancelled (state CANCELED). STILL_RUNNING means cancellation
+    failed and the run is still incurring cost: cancel it at run_url.
+    job_extra_params={"timeout_seconds": N} sets a different run cap and waits for it.
     Returns: {success, output, error, cluster_id, context_id} or {run_id, run_url}."""
     # Normalize empty strings to None
     code = _none_if_empty(code)
