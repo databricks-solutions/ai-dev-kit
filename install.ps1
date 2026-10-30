@@ -85,6 +85,8 @@ $script:ListSkills   = $false
 $script:DryRun       = ($env:DRY_RUN -in @("true", "1"))
 $script:Uninstall    = $false
 $script:AssumeYes    = $false
+# Set only while Invoke-PriorInstallCheck runs its cleanup (see Write-Err)
+$script:InPriorInstallCleanup = $false
 # Include experimental agent skills in profile/"all" selections (default: true).
 # Pass --experimental false (or DEVKIT_EXPERIMENTAL=false) for stable only.
 # Explicit --skills requests are always honored as named.
@@ -288,6 +290,9 @@ function Write-Warn { param([string]$Text) if (-not $script:Silent) { Write-Host
 function Write-Err  {
     param([string]$Text)
     Write-Host "  " -NoNewline; Write-Host "x" -ForegroundColor Red -NoNewline; Write-Host " $Text"
+    # During the prior-install cleanup, throw instead of exiting so Invoke-PriorInstallCheck
+    # can report it and carry on with the install, as install.sh's subshell does.
+    if ($script:InPriorInstallCleanup) { throw $Text }
     Write-Host ""
     Write-Host "  Press any key to exit..." -ForegroundColor DarkGray
     try { $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") } catch {}
@@ -560,14 +565,23 @@ function Remove-ClaudePlugin {
     else { $scopes = @("user"); $cmdScope = "user" }
     if (Get-Command claude -ErrorAction SilentlyContinue) {
         $removed = $false
-        foreach ($k in $Keys) {
-            foreach ($sc in $scopes) {
-                # Subcommand name has varied across versions (uninstall vs remove) — try both.
-                & claude plugin uninstall $k -y --scope $sc *>$null
-                if ($LASTEXITCODE -ne 0) { & claude plugin remove $k -y --scope $sc *>$null }
-                if ($LASTEXITCODE -eq 0) { Write-Msg "removed Claude Code plugin $k ($sc scope)"; $removed = $true }
+        # The CLI writes to stderr for a scope the plugin isn't in. Under the script's
+        # EAP=Stop that throws on Windows PowerShell 5.1, skipping the fallback and the
+        # remaining scopes, so run these calls with EAP=Continue. LASTEXITCODE is set to 1
+        # first: a call that doesn't run (or a script shim that returns without an exit
+        # code) leaves it as it was, and a stale 0 would read as a removal.
+        $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        try {
+            foreach ($k in $Keys) {
+                foreach ($sc in $scopes) {
+                    # Subcommand name has varied across versions (uninstall vs remove) — try both.
+                    $global:LASTEXITCODE = 1
+                    & claude plugin uninstall $k -y --scope $sc *>$null
+                    if ($LASTEXITCODE -ne 0) { & claude plugin remove $k -y --scope $sc *>$null }
+                    if ($LASTEXITCODE -eq 0) { Write-Msg "removed Claude Code plugin $k ($sc scope)"; $removed = $true }
+                }
             }
-        }
+        } finally { $ErrorActionPreference = $prevEAP }
         if ($removed) { return }
     }
     $partial = ""; $alt = ""
@@ -2886,14 +2900,20 @@ function Invoke-PriorInstallCheck {
         Write-Warn "Leaving the previous install in place - some skills may be stale or duplicated."
         return
     }
-    # Full uninstall for THIS scope. Invoke-Uninstall RETURNS (it does not exit), so
-    # the install continues afterward on a freshly cleaned slate. Force AssumeYes so
-    # it doesn't ask a second time (we already confirmed), then restore it.
+    # Full uninstall for THIS scope, then the install continues on a freshly cleaned
+    # slate. Force AssumeYes so it doesn't ask a second time (we already confirmed),
+    # then restore it. While InPriorInstallCleanup is set, Write-Err throws instead of
+    # exiting, so a failed step lands in the catch rather than ending the installer.
+    # The warning names the error, since only Write-Err prints its own message.
+    # A dry run only previews the removal, so it doesn't claim the old install is gone.
     $savedAssumeYes = $script:AssumeYes
     $script:AssumeYes = $true
-    try { Invoke-Uninstall } catch { Write-Warn "Cleanup reported an issue - continuing with the install." }
-    $script:AssumeYes = $savedAssumeYes
-    Write-Ok "Previous install removed - continuing with a fresh install."
+    $script:InPriorInstallCleanup = $true
+    $cleaned = $true
+    try { Invoke-Uninstall }
+    catch { $cleaned = $false; Write-Warn "Cleanup reported an issue ($($_.Exception.Message.TrimEnd('.'))) - continuing with the install." }
+    finally { $script:AssumeYes = $savedAssumeYes; $script:InPriorInstallCleanup = $false }
+    if ($cleaned -and -not $script:DryRun) { Write-Ok "Previous install removed - continuing with a fresh install." }
 }
 
 function Invoke-Main {

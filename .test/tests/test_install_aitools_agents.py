@@ -675,3 +675,148 @@ def test_install_ps1_test_dependencies_reports_cli_version(tmp_path, stub, minim
     result = _run_pwsh(tmp_path, names, body)
     assert result.returncode == 0, result.stderr
     assert f"{'v' if is_ok else '!'} {message}" in ANSI.sub("", result.stdout), result.stdout
+
+
+# Stubs for the prior-install check: an old install is found and the user accepts the cleanup.
+SH_PRIOR_INSTALL_STUBS = r"""
+ok()   { echo "OK: $*"; }
+warn() { echo "WARN: $*"; }
+die()  { echo "ERR: $*" >&2; exit 1; }
+detect_prior_install() { PRIOR_INSTALL_KIND=plugin; PRIOR_INSTALL_SUMMARY="the Claude Code plugin"; }
+leftovers_box() { :; }
+is_interactive() { return 0; }
+prompt() { echo "Y"; }
+"""
+
+
+@pytest.mark.parametrize(
+    "uninstall,dry_run,removed,warned",
+    [
+        ("exit 0", "false", True, False),
+        # remove_claude_plugin's failure path
+        ('die "Could not remove the Claude Code plugin."', "false", False, True),
+        ("exit 0", "true", False, False),  # a dry run only previews the removal
+    ],
+)
+def test_install_sh_prior_install_cleanup_reports_its_result(tmp_path, uninstall, dry_run, removed, warned):
+    # the install carries on either way, but only says the old install is gone when it was removed
+    fns = tmp_path / "fns.sh"
+    fns.write_text(_bash_functions("check_prior_install"))
+    script = (
+        f'set -e\n. "{fns}"\n{SH_PRIOR_INSTALL_STUBS}\n'
+        f"run_uninstall() {{ {uninstall}; }}\n"
+        f'SILENT=false; SCOPE=project; DRY_RUN={dry_run}\ncheck_prior_install\necho "install continues"\n'
+    )
+    result = subprocess.run(
+        ["bash", "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={"PATH": SYSTEM_PATH, "HOME": str(tmp_path)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert "install continues" in result.stdout
+    assert ("OK: Previous install removed" in result.stdout) is removed
+    assert ("WARN: Cleanup reported an issue" in result.stdout) is warned
+
+
+PS_PRIOR_INSTALL_STUBS = r"""
+function Test-PriorInstall {
+    $script:PriorInstallKind = 'plugin'; $script:PriorInstallSummary = 'the Claude Code plugin'
+}
+function Show-LeftoversBox { param($Headline, $Detail, $Summary, $Action) }
+function Test-Interactive { $true }
+function Read-Prompt { param($PromptText, $Default) 'Y' }
+$script:Scope = 'project'; $script:Silent = $false; $script:AssumeYes = $false
+"""
+
+
+@needs_pwsh
+@pytest.mark.parametrize(
+    "uninstall,dry_run,removed,reason",
+    [
+        ("", "$false", True, None),
+        # Remove-ClaudePlugin's failure path
+        (
+            "Write-Err 'Could not remove the Claude Code plugin.'",
+            "$false",
+            False,
+            "Could not remove the Claude Code plugin",
+        ),
+        # any other error, e.g. Remove-Item under ErrorActionPreference Stop, which prints nothing of its own
+        ("throw 'Access to the path is denied.'", "$false", False, "Access to the path is denied"),
+        ("", "$true", False, None),  # a dry run only previews the removal
+    ],
+)
+def test_install_ps1_prior_install_cleanup_reports_its_result(tmp_path, uninstall, dry_run, removed, reason):
+    # the PowerShell twin: a failed cleanup must not end the installer, and Write-Err exits again afterwards
+    body = (
+        f'$ErrorActionPreference = "Stop"\n{PS_PRIOR_INSTALL_STUBS}\n$script:DryRun = {dry_run}\n'
+        f"function Invoke-Uninstall {{ {uninstall} }}\n"
+        'Invoke-PriorInstallCheck\nWrite-Host "install continues, AssumeYes=$($script:AssumeYes)"\n'
+        "Write-Err 'a later error'\nWrite-Host 'unreachable'\n"
+    )
+    result = _run_pwsh(tmp_path, ["Write-Ok", "Write-Warn", "Write-Err", "Invoke-PriorInstallCheck"], body)
+    out = ANSI.sub("", result.stdout)
+    assert "install continues, AssumeYes=False" in out, out + result.stderr
+    assert ("v Previous install removed" in out) is removed
+    # the warning says what failed
+    if reason:
+        assert f"! Cleanup reported an issue ({reason}) - continuing with the install." in out, out
+    else:
+        assert "! Cleanup reported an issue" not in out
+    # outside the cleanup, Write-Err still ends the installer through its own exit, not a stray throw
+    assert result.returncode == 1, out + result.stderr
+    assert "x a later error" in out
+    assert "Press any key to exit" in out
+    assert "unreachable" not in out
+
+
+@needs_pwsh
+def test_install_ps1_remove_claude_plugin_survives_native_errors(tmp_path):
+    # Windows PowerShell 5.1 turns a native command's stderr into a terminating error under the
+    # installer's EAP=Stop. PowerShell 7 doesn't, so this uses its closest equivalent: with
+    # $PSNativeCommandUseErrorActionPreference set (pwsh 7.4+), a failing native command throws
+    # under Stop. A probe call checks that it does here, so the test can't pass vacuously.
+    log = tmp_path / "claude.log"
+    claude = _stub_cli(tmp_path, None) / "claude"
+    # `uninstall` fails in every scope, `remove` works only in the project scope
+    claude.write_text(
+        f'#!/bin/sh\necho "$2 $6" >> "{log}"\n'
+        '[ "$2" = remove ] && [ "$6" = project ] && exit 0\necho "not installed in $6" >&2\nexit 1\n'
+    )
+    claude.chmod(0o755)
+    body = (
+        '$ErrorActionPreference = "Stop"; $PSNativeCommandUseErrorActionPreference = $true\n'
+        "try { & claude plugin uninstall probe -y --scope probe *>$null; Write-Host 'probe: no throw' }\n"
+        "catch { Write-Host 'probe: throws' }\n"
+        "$script:Scope = 'project'; $script:Silent = $false\n"
+        "Remove-ClaudePlugin -OthersRemoved 0 -Keys @('databricks-ai-dev-kit')\n"
+    )
+    result = _run_pwsh(tmp_path, ["Write-Msg", "Write-Err", "Remove-ClaudePlugin"], body)
+    out = ANSI.sub("", result.stdout)
+    if "probe: no throw" in out:
+        pytest.skip("this pwsh doesn't make a failing native command terminating")
+    assert "probe: throws" in out, out + result.stderr
+    assert result.returncode == 0, out + result.stderr
+    assert "removed Claude Code plugin databricks-ai-dev-kit (project scope)" in out
+    # the fallback and the remaining scope both ran
+    calls = log.read_text().split("\n")[1:5]
+    assert calls == ["uninstall project", "remove project", "uninstall local", "remove local"]
+
+
+@needs_pwsh
+def test_install_ps1_remove_claude_plugin_ignores_a_stale_exit_code(tmp_path):
+    # a `claude` that returns without setting an exit code (a script shim, or a call that never
+    # ran) must not count as a removal just because an earlier native call left LASTEXITCODE at 0
+    (_stub_cli(tmp_path, None) / "claude.ps1").write_text("# returns without an exit code\n")
+    body = (
+        '$ErrorActionPreference = "Stop"\n$global:LASTEXITCODE = 0\n'
+        "$script:Scope = 'user'; $script:Silent = $false\n"
+        "Remove-ClaudePlugin -OthersRemoved 0 -Keys @('databricks-ai-dev-kit')\n"
+    )
+    result = _run_pwsh(tmp_path, ["Write-Msg", "Write-Err", "Remove-ClaudePlugin"], body)
+    out = ANSI.sub("", result.stdout)
+    assert "removed Claude Code plugin" not in out, out
+    assert "x Could not remove the Claude Code plugin." in out, out + result.stderr
+    assert result.returncode == 1

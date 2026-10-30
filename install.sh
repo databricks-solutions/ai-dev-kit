@@ -2794,10 +2794,15 @@ check_prior_install() {
         *)
             # Full uninstall for THIS scope, no extra scope/confirm prompt. Runs in a
             # subshell because run_uninstall exits on completion; the subshell absorbs
-            # that exit so the install continues on a freshly cleaned slate.
-            ( SCOPE_EXPLICIT=true; ASSUME_YES=true; run_uninstall ) \
-                || warn "Cleanup reported an issue — continuing with the install."
-            ok "Previous install removed — continuing with a fresh install."
+            # that exit so the install continues on a freshly cleaned slate. A dry run
+            # only previews the removal, so it doesn't claim the old install is gone.
+            if ( SCOPE_EXPLICIT=true; ASSUME_YES=true; run_uninstall ); then
+                if [ "$DRY_RUN" != true ]; then
+                    ok "Previous install removed — continuing with a fresh install."
+                fi
+            else
+                warn "Cleanup reported an issue — continuing with the install."
+            fi
             ;;
     esac
     return 0
