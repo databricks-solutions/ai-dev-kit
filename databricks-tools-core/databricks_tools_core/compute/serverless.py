@@ -225,40 +225,54 @@ def _get_finished_run(w: Any, run_id: Optional[int]) -> Optional[Run]:
     return None
 
 
-def _handle_client_timeout(
+def _run_state_str(run: Run) -> str:
+    """Best available final state: result_state, else life_cycle_state (e.g. INTERNAL_ERROR)."""
+    if run.state and run.state.result_state:
+        return run.state.result_state.value
+    if run.state and run.state.life_cycle_state:
+        return run.state.life_cycle_state.value
+    return "UNKNOWN"
+
+
+def _handle_unfinished_run(
     w: Any,
     run_id: Optional[int],
     run_url: Optional[str],
-    timeout: int,
+    reason: str,
     cancel_on_timeout: bool,
 ) -> Tuple[str, str]:
-    """Decide what happens to a run that is still active when the client wait expired.
+    """Decide what happens to a run that may still be active when the client stopped waiting.
 
     Args:
         w: WorkspaceClient used to cancel the run.
         run_id: The submitted run's ID (may be None if it could not be read).
         run_url: Run page URL for messages (may be None).
-        timeout: The run's timeout in seconds, for messages.
+        reason: Why the client stopped waiting, e.g. "did not complete within 1800s".
         cancel_on_timeout: Whether to try cancelling the run.
 
     Returns:
         ``(state, message)``. ``state`` is "CANCELED" when the run was confirmed
-        stopped, or "STILL_RUNNING" when it may still be consuming compute. The
-        message is shown to the agent/user and says plainly which one happened.
+        cancelled, the run's final state if it turns out to have stopped anyway,
+        or "STILL_RUNNING" when it may still be consuming compute. The message is
+        shown to the agent/user and says plainly which one happened.
     """
     where = run_url or "the Jobs UI (Job runs)"
     if cancel_on_timeout and run_id:
         try:
             w.jobs.cancel_run(run_id=run_id).result(timeout=datetime.timedelta(seconds=_CANCEL_CONFIRM_SECONDS))
-            return "CANCELED", (
-                f"Serverless run {run_id} did not complete within {timeout}s and was cancelled. Details: {where}"
-            )
+            return "CANCELED", f"Serverless run {run_id} {reason} and was cancelled. Details: {where}"
         except Exception as e:
-            logger.warning(f"Failed to cancel serverless run {run_id} after client timeout: {e}")
+            # The cancel waiter also raises when a run ends in INTERNAL_ERROR, which is how a
+            # run that hit its own timeout can end. Check before assuming it is still running.
+            stopped = _get_finished_run(w, run_id)
+            if stopped is not None:
+                state = _run_state_str(stopped)
+                return state, f"Serverless run {run_id} {reason} and has stopped (state {state}). Details: {where}"
+            logger.warning(f"Failed to cancel serverless run {run_id}: {e}")
 
-    logger.warning(f"Serverless run {run_id} is still active past its timeout of {timeout}s")
+    logger.warning(f"Serverless run {run_id} {reason} and may still be running")
     return "STILL_RUNNING", (
-        f"Serverless run {run_id} did not complete within {timeout}s and is STILL RUNNING, "
+        f"Serverless run {run_id} {reason} and is STILL RUNNING, "
         f"incurring compute cost. Cancel it at {where} if it is not needed."
     )
 
@@ -312,8 +326,9 @@ def run_code_on_serverless(
         job_extra_params: Optional dict of extra parameters to pass to jobs.submit().
             Use for custom environments with dependencies, e.g.:
             {"environments": [{"environment_key": "my_env", "spec": {"client": "4", "dependencies": ["pandas"]}}]}
-        cancel_on_timeout: Cancel the run if it is still active when the client
-            wait expires (default: True). If False, or if cancellation fails, the
+        cancel_on_timeout: Cancel the run if it is still active when the tool
+            stops waiting, because the client wait expired or the run could not
+            be monitored (default: True). If False, or if cancellation fails, the
             result state is STILL_RUNNING and the notebook is kept.
 
     Returns:
@@ -416,7 +431,15 @@ def run_code_on_serverless(
 
             # Merge any extra params (environments, timeout_seconds, etc.)
             submit_kwargs.update(extra)
-            run_timeout = submit_kwargs.get("timeout_seconds") or timeout
+            run_timeout = submit_kwargs.get("timeout_seconds", timeout)
+            # Validate after merging job_extra_params: timeout_seconds=0 means "no limit" to the Jobs API.
+            if isinstance(run_timeout, bool) or not isinstance(run_timeout, int) or run_timeout <= 0:
+                return ServerlessRunResult(
+                    success=False,
+                    error=f"timeout_seconds must be a positive integer, got {run_timeout!r}.",
+                    state="INVALID_INPUT",
+                    message="job_extra_params.timeout_seconds must be a positive number of seconds.",
+                )
 
             wait = w.jobs.submit(**submit_kwargs)
             # Extract run_id from the Wait object
@@ -444,17 +467,21 @@ def run_code_on_serverless(
         # --- Step 3: Wait for completion ---
         try:
             run = wait.result(timeout=datetime.timedelta(seconds=run_timeout + _CLIENT_WAIT_GRACE_SECONDS))
-        except TimeoutError:
-            # If the run just finished (e.g. hit its own timeout_seconds), report
-            # its real result below instead of cancelling it.
+        except Exception as e:
+            # Client wait expired, polling failed, or the SDK waiter raised on INTERNAL_ERROR.
+            # If the run finished, report its real result below; otherwise don't leave it running unseen.
             run = _get_finished_run(w, run_id)
             if run is None:
-                state, message = _handle_client_timeout(w, run_id, run_url, run_timeout, cancel_on_timeout)
+                if isinstance(e, TimeoutError):
+                    reason = f"did not complete within {run_timeout}s"
+                else:
+                    reason = f"could not be monitored ({e})"
+                state, message = _handle_unfinished_run(w, run_id, run_url, reason, cancel_on_timeout)
                 run_finished = state != "STILL_RUNNING"
                 elapsed = time.time() - start_time
                 return ServerlessRunResult(
                     success=False,
-                    error=f"Run did not complete within {run_timeout}s.",
+                    error=f"Run {reason}.",
                     run_id=run_id,
                     run_url=run_url,
                     duration_seconds=round(elapsed, 2),
@@ -462,31 +489,6 @@ def run_code_on_serverless(
                     message=message,
                     workspace_path=notebook_path if (workspace_path or not run_finished) else None,
                 )
-        except Exception as e:
-            elapsed = time.time() - start_time
-            error_text = str(e)
-
-            # Best-effort: retrieve the actual error traceback from run output
-            if run_id:
-                try:
-                    failed_run = w.jobs.get_run(run_id=run_id)
-                    if failed_run.tasks:
-                        task_run_id = failed_run.tasks[0].run_id
-                        output_data = _get_run_output(task_run_id)
-                        if output_data.get("error"):
-                            error_text = output_data["error"]
-                except Exception:
-                    pass  # Fall back to the original exception message
-
-            return ServerlessRunResult(
-                success=False,
-                error=error_text,
-                run_id=run_id,
-                run_url=run_url,
-                duration_seconds=round(elapsed, 2),
-                state="FAILED",
-                message=f"Run {run_id} failed: {e}",
-            )
 
         elapsed = time.time() - start_time
 
@@ -502,7 +504,7 @@ def run_code_on_serverless(
             run_url = run.run_page_url
 
         is_success = result_state == RunResultState.SUCCESS
-        state_str = result_state.value if result_state else "UNKNOWN"
+        state_str = _run_state_str(run)
 
         # --- Step 5: Retrieve output ---
         task_run_id = None

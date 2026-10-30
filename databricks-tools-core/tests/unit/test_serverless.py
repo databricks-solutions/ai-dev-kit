@@ -4,6 +4,7 @@ import datetime
 from unittest import mock
 
 import pytest
+from databricks.sdk.errors import OperationFailed
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 
 from databricks_tools_core.compute import serverless
@@ -81,6 +82,14 @@ class TestRunTimeoutSeconds:
         assert result.state == "INVALID_INPUT"
         mock_ws.jobs.submit.assert_not_called()
 
+    @pytest.mark.parametrize("bad", [0, -1, "3600", True])
+    def test_invalid_job_extra_params_timeout_seconds_is_rejected(self, mock_ws, bad):
+        result = run_code_on_serverless("print(1)", timeout=60, job_extra_params={"timeout_seconds": bad})
+
+        assert result.state == "INVALID_INPUT"
+        mock_ws.jobs.submit.assert_not_called()
+        mock_ws.cleanup.assert_called_once_with(NOTEBOOK_PATH)
+
     def test_success_cleans_up_notebook(self, mock_ws):
         _make_successful_run(mock_ws)
 
@@ -148,4 +157,59 @@ class TestClientTimeout:
 
         assert result.state == "CANCELED"
         assert result.workspace_path == saved
+        mock_ws.cleanup.assert_not_called()
+
+    def test_cancel_waiter_error_on_stopped_run_reports_real_state(self, mock_ws):
+        active = _make_run(RunLifeCycleState.RUNNING, None)
+        stopped = _make_run(RunLifeCycleState.INTERNAL_ERROR, RunResultState.TIMEDOUT)
+        # get_run calls: run URL after submit, finished check, re-check after the cancel error.
+        mock_ws.jobs.get_run.side_effect = [active, active, stopped]
+        mock_ws.jobs.cancel_run.return_value.result.side_effect = OperationFailed("got INTERNAL_ERROR")
+
+        result = run_code_on_serverless("print(1)", timeout=60)
+
+        assert result.state == "TIMEDOUT"
+        assert "STILL RUNNING" not in result.message
+        mock_ws.cleanup.assert_called_once_with(NOTEBOOK_PATH)
+
+
+class TestMonitoringError:
+    """A non-timeout error while waiting must not hide or orphan the run."""
+
+    def test_internal_error_run_reports_result_state(self, mock_ws):
+        mock_ws.jobs.submit.return_value.result.side_effect = OperationFailed("got INTERNAL_ERROR: Run timed out")
+        mock_ws.jobs.get_run.return_value = _make_run(RunLifeCycleState.INTERNAL_ERROR, RunResultState.TIMEDOUT)
+
+        result = run_code_on_serverless("print(1)", timeout=60)
+
+        mock_ws.jobs.cancel_run.assert_not_called()
+        assert result.state == "TIMEDOUT"
+        mock_ws.cleanup.assert_called_once_with(NOTEBOOK_PATH)
+
+    def test_internal_error_run_without_result_state_reports_life_cycle_state(self, mock_ws):
+        mock_ws.jobs.submit.return_value.result.side_effect = OperationFailed("got INTERNAL_ERROR")
+        mock_ws.jobs.get_run.return_value = _make_run(RunLifeCycleState.INTERNAL_ERROR, None)
+
+        result = run_code_on_serverless("print(1)", timeout=60)
+
+        assert result.state == "INTERNAL_ERROR"
+
+    def test_polling_error_on_active_run_cancels_it(self, mock_ws):
+        mock_ws.jobs.submit.return_value.result.side_effect = ConnectionError("connection reset")
+
+        result = run_code_on_serverless("print(1)", timeout=60)
+
+        mock_ws.jobs.cancel_run.assert_called_once_with(run_id=RUN_ID)
+        assert result.state == "CANCELED"
+        assert "could not be monitored" in result.message
+        mock_ws.cleanup.assert_called_once_with(NOTEBOOK_PATH)
+
+    def test_polling_error_when_cancel_fails_keeps_notebook(self, mock_ws):
+        mock_ws.jobs.submit.return_value.result.side_effect = ConnectionError("connection reset")
+        mock_ws.jobs.cancel_run.side_effect = ConnectionError("connection reset")
+
+        result = run_code_on_serverless("print(1)", timeout=60)
+
+        assert result.state == "STILL_RUNNING"
+        assert result.workspace_path == NOTEBOOK_PATH
         mock_ws.cleanup.assert_not_called()
