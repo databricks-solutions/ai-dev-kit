@@ -18,12 +18,14 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from databricks.sdk.service.compute import Environment
 from databricks.sdk.service.jobs import (
     JobEnvironment,
     NotebookTask,
+    Run,
+    RunLifeCycleState,
     RunResultState,
     SubmitTask,
 )
@@ -39,6 +41,19 @@ _LANGUAGE_MAP = {
     "sql": Language.SQL,
 }
 
+# The client waits this much longer than the run's timeout_seconds, so the server
+# normally ends an over-long run and its real final state is reported.
+_CLIENT_WAIT_GRACE_SECONDS = 60
+
+# How long to wait for a cancelled run to actually stop.
+_CANCEL_CONFIRM_SECONDS = 60
+
+_FINISHED_LIFE_CYCLE_STATES = (
+    RunLifeCycleState.TERMINATED,
+    RunLifeCycleState.SKIPPED,
+    RunLifeCycleState.INTERNAL_ERROR,
+)
+
 
 @dataclass
 class ServerlessRunResult:
@@ -52,6 +67,8 @@ class ServerlessRunResult:
         run_url: URL to the run in the Databricks UI.
         duration_seconds: Wall-clock duration of the execution.
         state: Final state string (SUCCESS, FAILED, TIMEDOUT, CANCELED, etc.).
+            STILL_RUNNING means the client stopped waiting but the run could not
+            be cancelled and may still be consuming compute.
         message: Human-readable summary of the result.
     """
 
@@ -105,9 +122,7 @@ def _is_ipynb(content: str) -> bool:
         return False
 
 
-def _upload_temp_notebook(
-    code: str, language: str, workspace_path: str, is_jupyter: bool = False
-) -> None:
+def _upload_temp_notebook(code: str, language: str, workspace_path: str, is_jupyter: bool = False) -> None:
     """Upload code as a temporary notebook to the Databricks workspace.
 
     Args:
@@ -196,6 +211,72 @@ def _get_run_output(task_run_id: int) -> Dict[str, Optional[str]]:
     return result
 
 
+def _get_finished_run(w: Any, run_id: Optional[int]) -> Optional[Run]:
+    """Return the run if it has already finished, else None (also None on lookup errors)."""
+    if not run_id:
+        return None
+    try:
+        run = w.jobs.get_run(run_id=run_id)
+    except Exception as e:
+        logger.debug(f"Failed to get state of run {run_id}: {e}")
+        return None
+    if run.state and run.state.life_cycle_state in _FINISHED_LIFE_CYCLE_STATES:
+        return run
+    return None
+
+
+def _run_state_str(run: Run) -> str:
+    """Best available final state: result_state, else life_cycle_state (e.g. INTERNAL_ERROR)."""
+    if run.state and run.state.result_state:
+        return run.state.result_state.value
+    if run.state and run.state.life_cycle_state:
+        return run.state.life_cycle_state.value
+    return "UNKNOWN"
+
+
+def _handle_unfinished_run(
+    w: Any,
+    run_id: Optional[int],
+    run_url: Optional[str],
+    reason: str,
+    cancel_on_timeout: bool,
+) -> Tuple[str, str]:
+    """Decide what happens to a run that may still be active when the client stopped waiting.
+
+    Args:
+        w: WorkspaceClient used to cancel the run.
+        run_id: The submitted run's ID (may be None if it could not be read).
+        run_url: Run page URL for messages (may be None).
+        reason: Why the client stopped waiting, e.g. "did not complete within 1800s".
+        cancel_on_timeout: Whether to try cancelling the run.
+
+    Returns:
+        ``(state, message)``. ``state`` is "CANCELED" when the run was confirmed
+        cancelled, the run's final state if it turns out to have stopped anyway,
+        or "STILL_RUNNING" when it may still be consuming compute. The message is
+        shown to the agent/user and says plainly which one happened.
+    """
+    where = run_url or "the Jobs UI (Job runs)"
+    if cancel_on_timeout and run_id:
+        try:
+            w.jobs.cancel_run(run_id=run_id).result(timeout=datetime.timedelta(seconds=_CANCEL_CONFIRM_SECONDS))
+            return "CANCELED", f"Serverless run {run_id} {reason} and was cancelled. Details: {where}"
+        except Exception as e:
+            # The cancel waiter also raises when a run ends in INTERNAL_ERROR, which is how a
+            # run that hit its own timeout can end. Check before assuming it is still running.
+            stopped = _get_finished_run(w, run_id)
+            if stopped is not None:
+                state = _run_state_str(stopped)
+                return state, f"Serverless run {run_id} {reason} and has stopped (state {state}). Details: {where}"
+            logger.warning(f"Failed to cancel serverless run {run_id}: {e}")
+
+    logger.warning(f"Serverless run {run_id} {reason} and may still be running")
+    return "STILL_RUNNING", (
+        f"Serverless run {run_id} {reason} and is STILL RUNNING, "
+        f"incurring compute cost. Cancel it at {where} if it is not needed."
+    )
+
+
 def run_code_on_serverless(
     code: str,
     language: str = "python",
@@ -204,6 +285,7 @@ def run_code_on_serverless(
     cleanup: bool = True,
     workspace_path: Optional[str] = None,
     job_extra_params: Optional[Dict[str, Any]] = None,
+    cancel_on_timeout: bool = True,
 ) -> ServerlessRunResult:
     """Execute code on serverless compute via Jobs API runs/submit.
 
@@ -229,7 +311,11 @@ def run_code_on_serverless(
     Args:
         code: Code to execute, or raw .ipynb JSON content (auto-detected).
         language: Programming language ("python" or "sql"). Ignored for .ipynb.
-        timeout: Maximum wait time in seconds (default: 1800 = 30 minutes).
+        timeout: Maximum run duration in seconds (default: 1800 = 30 minutes).
+            Must be positive. Sent to runs/submit as ``timeout_seconds`` so the
+            run is stopped server-side even if this process exits.
+            ``job_extra_params={"timeout_seconds": N}`` replaces it as the run
+            limit. The client waits for the run limit plus a short grace period.
         run_name: Optional human-readable run name. Auto-generated if omitted.
         cleanup: Delete the notebook after execution (default: True).
             Ignored when ``workspace_path`` is provided (persistent mode never cleans up).
@@ -240,6 +326,10 @@ def run_code_on_serverless(
         job_extra_params: Optional dict of extra parameters to pass to jobs.submit().
             Use for custom environments with dependencies, e.g.:
             {"environments": [{"environment_key": "my_env", "spec": {"client": "4", "dependencies": ["pandas"]}}]}
+        cancel_on_timeout: Cancel the run if it is still active when the tool
+            stops waiting, because the client wait expired or the run could not
+            be monitored (default: True). If False, or if cancellation fails, the
+            result state is STILL_RUNNING and the notebook is kept.
 
     Returns:
         ServerlessRunResult with output, error, run_id, run_url, and timing info.
@@ -262,6 +352,15 @@ def run_code_on_serverless(
             error=f"Unsupported language: {language!r}. Must be 'python' or 'sql'.",
             state="INVALID_INPUT",
             message=f"Unsupported language {language!r}. Use 'python' or 'sql'.",
+        )
+
+    # timeout_seconds=0 means "no limit" to the Jobs API, so never send it.
+    if timeout <= 0:
+        return ServerlessRunResult(
+            success=False,
+            error=f"timeout must be a positive number of seconds, got {timeout}.",
+            state="INVALID_INPUT",
+            message=f"Invalid timeout {timeout}. Use a positive number of seconds.",
         )
 
     unique_id = uuid.uuid4().hex[:12]
@@ -291,6 +390,9 @@ def run_code_on_serverless(
 
     run_id = None
     run_url = None
+    # Cleared when the run may still be active, so the notebook is not deleted
+    # out from under it.
+    run_finished = True
 
     try:
         # --- Step 2: Submit serverless run ---
@@ -306,6 +408,9 @@ def run_code_on_serverless(
 
             submit_kwargs = {
                 "run_name": run_name,
+                # Bound the run server-side; without this it can run for days
+                # after the client gives up (issue #607).
+                "timeout_seconds": timeout,
                 "tasks": [
                     SubmitTask(
                         task_key="main",
@@ -326,6 +431,15 @@ def run_code_on_serverless(
 
             # Merge any extra params (environments, timeout_seconds, etc.)
             submit_kwargs.update(extra)
+            run_timeout = submit_kwargs.get("timeout_seconds", timeout)
+            # Validate after merging job_extra_params: timeout_seconds=0 means "no limit" to the Jobs API.
+            if isinstance(run_timeout, bool) or not isinstance(run_timeout, int) or run_timeout <= 0:
+                return ServerlessRunResult(
+                    success=False,
+                    error=f"timeout_seconds must be a positive integer, got {run_timeout!r}.",
+                    state="INVALID_INPUT",
+                    message="job_extra_params.timeout_seconds must be a positive number of seconds.",
+                )
 
             wait = w.jobs.submit(**submit_kwargs)
             # Extract run_id from the Wait object
@@ -352,43 +466,29 @@ def run_code_on_serverless(
 
         # --- Step 3: Wait for completion ---
         try:
-            run = wait.result(timeout=datetime.timedelta(seconds=timeout))
-        except TimeoutError:
-            elapsed = time.time() - start_time
-            return ServerlessRunResult(
-                success=False,
-                error=f"Run timed out after {timeout}s.",
-                run_id=run_id,
-                run_url=run_url,
-                duration_seconds=round(elapsed, 2),
-                state="TIMEDOUT",
-                message=(f"Serverless run {run_id} did not complete within {timeout}s. Check status at {run_url}"),
-            )
+            run = wait.result(timeout=datetime.timedelta(seconds=run_timeout + _CLIENT_WAIT_GRACE_SECONDS))
         except Exception as e:
-            elapsed = time.time() - start_time
-            error_text = str(e)
-
-            # Best-effort: retrieve the actual error traceback from run output
-            if run_id:
-                try:
-                    failed_run = w.jobs.get_run(run_id=run_id)
-                    if failed_run.tasks:
-                        task_run_id = failed_run.tasks[0].run_id
-                        output_data = _get_run_output(task_run_id)
-                        if output_data.get("error"):
-                            error_text = output_data["error"]
-                except Exception:
-                    pass  # Fall back to the original exception message
-
-            return ServerlessRunResult(
-                success=False,
-                error=error_text,
-                run_id=run_id,
-                run_url=run_url,
-                duration_seconds=round(elapsed, 2),
-                state="FAILED",
-                message=f"Run {run_id} failed: {e}",
-            )
+            # Client wait expired, polling failed, or the SDK waiter raised on INTERNAL_ERROR.
+            # If the run finished, report its real result below; otherwise don't leave it running unseen.
+            run = _get_finished_run(w, run_id)
+            if run is None:
+                if isinstance(e, TimeoutError):
+                    reason = f"did not complete within {run_timeout}s"
+                else:
+                    reason = f"could not be monitored ({e})"
+                state, message = _handle_unfinished_run(w, run_id, run_url, reason, cancel_on_timeout)
+                run_finished = state != "STILL_RUNNING"
+                elapsed = time.time() - start_time
+                return ServerlessRunResult(
+                    success=False,
+                    error=f"Run {reason}.",
+                    run_id=run_id,
+                    run_url=run_url,
+                    duration_seconds=round(elapsed, 2),
+                    state=state,
+                    message=message,
+                    workspace_path=notebook_path if (workspace_path or not run_finished) else None,
+                )
 
         elapsed = time.time() - start_time
 
@@ -404,7 +504,7 @@ def run_code_on_serverless(
             run_url = run.run_page_url
 
         is_success = result_state == RunResultState.SUCCESS
-        state_str = result_state.value if result_state else "UNKNOWN"
+        state_str = _run_state_str(run)
 
         # --- Step 5: Retrieve output ---
         task_run_id = None
@@ -444,5 +544,5 @@ def run_code_on_serverless(
 
     finally:
         # --- Step 6: Cleanup temporary notebook ---
-        if cleanup:
+        if cleanup and run_finished:
             _cleanup_temp_notebook(notebook_path)
