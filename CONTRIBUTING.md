@@ -31,6 +31,26 @@ This repository is maintained by Databricks and intended for contributions from 
 - **Documentation**: Update relevant SKILL.md files when adding or modifying functionality
 - **Type hints**: Include type annotations for public functions
 - **Naming**: Use lowercase with hyphens for directories (e.g., `databricks-tools-core`)
+- **PowerShell**: Save every `.ps1` file as **UTF-8 with BOM** (see below)
+
+### PowerShell script encoding
+
+The `.ps1` scripts (`install.ps1`, `databricks-mcp-server/setup.ps1`, `databricks-mcp-server/mcp_install.ps1`) contain non-ASCII output characters such as `─` and `✓`. Windows PowerShell 5.1 — still the default shell on Windows — decodes BOM-less script files as ANSI/Windows-1252, which garbles those characters. A UTF-8 byte order mark (`EF BB BF`) forces correct decoding; PowerShell 7+ defaults to UTF-8 and is unaffected either way.
+
+Many editors and tools strip the BOM on save, so verify before committing:
+
+```bash
+# Should print "efbbbf" for each script
+for f in install.ps1 databricks-mcp-server/setup.ps1 databricks-mcp-server/mcp_install.ps1; do
+  printf '%s: ' "$f"; head -c 3 "$f" | xxd -p
+done
+```
+
+To re-add a missing BOM:
+
+```bash
+printf '\xEF\xBB\xBF' | cat - script.ps1 > script.ps1.tmp && mv script.ps1.tmp script.ps1
+```
 
 ## Linting
 

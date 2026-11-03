@@ -205,6 +205,8 @@ irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/insta
 irm https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.ps1 -OutFile install.ps1
 ```
 
+> **Encoding note:** `install.ps1` ships as UTF-8 **with BOM**. If you save or edit a local copy, preserve that encoding — Windows PowerShell 5.1 reads BOM-less files as ANSI and the installer's progress characters will be garbled. In VS Code, use *Save with Encoding → UTF-8 with BOM*. PowerShell 7+ is unaffected.
+
 **Global installation with force reinstall**
 
 ```powershell
