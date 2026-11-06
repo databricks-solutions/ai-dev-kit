@@ -41,12 +41,15 @@ _LANGUAGE_MAP = {
     "sql": Language.SQL,
 }
 
+# Serverless can take over a minute to stop a run after its timeout or a cancel
+# request (66-73s observed), so both windows below leave a wide margin.
+
 # The client waits this much longer than the run's timeout_seconds, so the server
 # normally ends an over-long run and its real final state is reported.
-_CLIENT_WAIT_GRACE_SECONDS = 60
+_CLIENT_WAIT_GRACE_SECONDS = 180
 
 # How long to wait for a cancelled run to actually stop.
-_CANCEL_CONFIRM_SECONDS = 60
+_CANCEL_CONFIRM_SECONDS = 180
 
 _FINISHED_LIFE_CYCLE_STATES = (
     RunLifeCycleState.TERMINATED,
@@ -315,7 +318,8 @@ def run_code_on_serverless(
             Must be positive. Sent to runs/submit as ``timeout_seconds`` so the
             run is stopped server-side even if this process exits.
             ``job_extra_params={"timeout_seconds": N}`` replaces it as the run
-            limit. The client waits for the run limit plus a short grace period.
+            limit. The client waits for the run limit plus a grace period
+            (``_CLIENT_WAIT_GRACE_SECONDS``) so the server normally stops the run.
         run_name: Optional human-readable run name. Auto-generated if omitted.
         cleanup: Delete the notebook after execution (default: True).
             Ignored when ``workspace_path`` is provided (persistent mode never cleans up).
