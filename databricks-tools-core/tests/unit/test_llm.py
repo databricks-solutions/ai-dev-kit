@@ -9,10 +9,6 @@ from databricks_tools_core.pdf.llm import _discover_databricks_gpt_endpoints, _g
 class TestEndpointDiscovery:
     """Test dynamic databricks-gpt endpoint discovery."""
 
-    def setup_method(self):
-        """Clear the lru_cache before each test."""
-        _discover_databricks_gpt_endpoints.cache_clear()
-
     @patch("databricks_tools_core.pdf.llm.list_serving_endpoints")
     def test_discover_latest_gpt_endpoints(self, mock_list):
         """Test discovering the latest databricks-gpt endpoints."""
@@ -68,6 +64,28 @@ class TestEndpointDiscovery:
         assert nano_model is None
 
     @patch("databricks_tools_core.pdf.llm.list_serving_endpoints")
+    def test_discovery_uses_current_workspace_endpoints(self, mock_list):
+        """Discovery must not reuse endpoints from an earlier workspace."""
+        mock_list.side_effect = [
+            [{"name": "databricks-gpt-5-3", "state": "READY"}],
+            [{"name": "databricks-gpt-5-4", "state": "READY"}],
+        ]
+
+        assert _discover_databricks_gpt_endpoints() == ("databricks-gpt-5-3", "databricks-gpt-5-3")
+        assert _discover_databricks_gpt_endpoints() == ("databricks-gpt-5-4", "databricks-gpt-5-4")
+
+    @patch("databricks_tools_core.pdf.llm.list_serving_endpoints")
+    def test_discovery_recovers_after_api_error(self, mock_list):
+        """A temporary listing error must not prevent later discovery."""
+        mock_list.side_effect = [
+            Exception("Temporary API error"),
+            [{"name": "databricks-gpt-5-4", "state": "READY"}],
+        ]
+
+        assert _discover_databricks_gpt_endpoints() == (None, None)
+        assert _discover_databricks_gpt_endpoints() == ("databricks-gpt-5-4", "databricks-gpt-5-4")
+
+    @patch("databricks_tools_core.pdf.llm.list_serving_endpoints")
     def test_discover_handles_api_error(self, mock_list):
         """Test graceful handling of API errors."""
         mock_list.side_effect = Exception("API error")
@@ -80,10 +98,6 @@ class TestEndpointDiscovery:
 
 class TestGetModelName:
     """Test model name resolution with priority order."""
-
-    def setup_method(self):
-        """Clear the lru_cache before each test."""
-        _discover_databricks_gpt_endpoints.cache_clear()
 
     def test_explicit_model_name_takes_priority(self):
         """Test that explicit model_name parameter wins."""
