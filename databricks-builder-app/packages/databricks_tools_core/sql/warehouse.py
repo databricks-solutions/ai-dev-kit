@@ -96,7 +96,11 @@ def _sort_within_tier(warehouses: list, current_user: Optional[str]) -> list:
 
 def get_best_warehouse() -> Optional[str]:
     """
-    Select the best available SQL warehouse based on priority rules.
+    Return the configured SQL warehouse, or select one based on priority rules.
+
+    A warehouse_id configured on the active SDK profile or through
+    DATABRICKS_WAREHOUSE_ID takes priority and is returned without validation.
+    The following rules apply only when no warehouse is configured.
 
     Within each priority tier, serverless warehouses are preferred first
     (instant start, auto-scale, no idle costs), then warehouses created
@@ -116,6 +120,10 @@ def get_best_warehouse() -> Optional[str]:
         Exception: If API request fails
     """
     client = get_workspace_client()
+    configured = getattr(client.config, "warehouse_id", None)
+    if configured:
+        return configured
+
     current_user = get_current_username()
 
     try:
