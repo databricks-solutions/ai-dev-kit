@@ -2,6 +2,8 @@
 
 from unittest import mock
 
+import pytest
+
 from databricks.sdk.service.sql import QueryTag, State, StatementState
 
 from databricks_tools_core.sql import execute_sql, execute_sql_multi
@@ -29,6 +31,7 @@ class TestExecuteSQLQueryTags:
         mock_executor.execute.assert_called_once()
         call_kwargs = mock_executor.execute.call_args.kwargs
         assert call_kwargs["query_tags"] == "team:eng,cost_center:701"
+        mock_warehouse.assert_not_called()
 
     @mock.patch("databricks_tools_core.sql.sql.get_best_warehouse", return_value="wh-123")
     @mock.patch("databricks_tools_core.sql.sql.SQLExecutor")
@@ -64,6 +67,7 @@ class TestExecuteSQLQueryTags:
         mock_executor.execute.assert_called_once()
         call_kwargs = mock_executor.execute.call_args.kwargs
         assert call_kwargs["query_tags"] == "app:agent,env:dev"
+        mock_warehouse.assert_not_called()
 
 
 class TestSQLExecutorQueryTags:
@@ -181,6 +185,47 @@ class TestSortWithinTier:
         assert result[0].id == "s1"
 
 
+class TestGetBestWarehouseConfigured:
+    """Configured warehouses take priority over automatic selection."""
+
+    @mock.patch("databricks_tools_core.sql.warehouse.get_current_username", return_value="me@example.com")
+    @mock.patch("databricks_tools_core.sql.warehouse.get_workspace_client")
+    def test_configured_warehouse_wins_over_running_shared(self, mock_client_fn, mock_user):
+        client = mock.Mock()
+        client.config.warehouse_id = "configured-stopped"
+        client.warehouses.list.return_value = [
+            _make_warehouse("running-shared", "Shared endpoint", State.RUNNING),
+            _make_warehouse("configured-stopped", "Private WH", State.STOPPED),
+        ]
+        mock_client_fn.return_value = client
+
+        assert get_best_warehouse() == "configured-stopped"
+
+    @mock.patch("databricks_tools_core.sql.warehouse.get_current_username", return_value="me@example.com")
+    @mock.patch("databricks_tools_core.sql.warehouse.get_workspace_client")
+    def test_configured_warehouse_does_not_require_listing_permission(self, mock_client_fn, mock_user):
+        client = mock.Mock()
+        client.config.warehouse_id = "configured-private"
+        client.warehouses.list.side_effect = PermissionError("Cannot list warehouses")
+        mock_client_fn.return_value = client
+
+        assert get_best_warehouse() == "configured-private"
+
+    @pytest.mark.parametrize("configured", [None, ""])
+    @mock.patch("databricks_tools_core.sql.warehouse.get_current_username", return_value="me@example.com")
+    @mock.patch("databricks_tools_core.sql.warehouse.get_workspace_client")
+    def test_unset_or_blank_configuration_falls_back(self, mock_client_fn, mock_user, configured):
+        client = mock.Mock()
+        client.config.warehouse_id = configured
+        client.warehouses.list.return_value = [
+            _make_warehouse("stopped-private", "Private WH", State.STOPPED),
+            _make_warehouse("running-shared", "Shared endpoint", State.RUNNING),
+        ]
+        mock_client_fn.return_value = client
+
+        assert get_best_warehouse() == "running-shared"
+
+
 class TestGetBestWarehouseServerless:
     """Tests for serverless preference in get_best_warehouse."""
 
@@ -191,6 +236,7 @@ class TestGetBestWarehouseServerless:
         classic_shared = _make_warehouse("c1", "Shared WH", State.RUNNING)
         serverless_shared = _make_warehouse("s1", "Shared Serverless", State.RUNNING, enable_serverless_compute=True)
         mock_client = mock.Mock()
+        mock_client.config.warehouse_id = None
         mock_client.warehouses.list.return_value = [classic_shared, serverless_shared]
         mock_client_fn.return_value = mock_client
 
@@ -204,6 +250,7 @@ class TestGetBestWarehouseServerless:
         classic = _make_warehouse("c1", "My WH", State.RUNNING)
         serverless = _make_warehouse("s1", "Fast WH", State.RUNNING, enable_serverless_compute=True)
         mock_client = mock.Mock()
+        mock_client.config.warehouse_id = None
         mock_client.warehouses.list.return_value = [classic, serverless]
         mock_client_fn.return_value = mock_client
 
@@ -217,6 +264,7 @@ class TestGetBestWarehouseServerless:
         running_shared_classic = _make_warehouse("c1", "Shared WH", State.RUNNING)
         stopped_serverless = _make_warehouse("s1", "Fast WH", State.STOPPED, enable_serverless_compute=True)
         mock_client = mock.Mock()
+        mock_client.config.warehouse_id = None
         mock_client.warehouses.list.return_value = [stopped_serverless, running_shared_classic]
         mock_client_fn.return_value = mock_client
 
