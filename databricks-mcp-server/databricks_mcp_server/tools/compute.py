@@ -81,6 +81,8 @@ def execute_code(
     active after it is cancelled (state CANCELED). STILL_RUNNING means cancellation
     failed and the run is still incurring cost: cancel it at run_url.
     job_extra_params={"timeout_seconds": N} sets a different run cap and waits for it.
+    Serverless `output`: printed stdout and display() tables of every cell, then the
+    dbutils.notebook.exit() value if set. Prints in the same cell as exit() are lost.
     Returns: {success, output, error, cluster_id, context_id} or {run_id, run_url}."""
     # Normalize empty strings to None
     code = _none_if_empty(code)

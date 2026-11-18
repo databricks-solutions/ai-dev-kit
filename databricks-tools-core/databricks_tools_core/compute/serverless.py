@@ -15,7 +15,9 @@ import base64
 import datetime
 import json
 import logging
+import re
 import time
+import urllib.parse
 import uuid
 from dataclasses import dataclass
 from typing import Dict, Any, Optional, Tuple
@@ -28,12 +30,16 @@ from databricks.sdk.service.jobs import (
     RunLifeCycleState,
     RunResultState,
     SubmitTask,
+    ViewsToExport,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
 from ..auth import get_workspace_client, get_current_username
 
 logger = logging.getLogger(__name__)
+
+_NOTEBOOK_MODEL_PATTERN = re.compile(r"__DATABRICKS_NOTEBOOK_MODEL = '([^']+)'")
+_MAX_CELL_OUTPUT_CHARS = 100_000
 
 # Language string to workspace Language enum
 _LANGUAGE_MAP = {
@@ -174,6 +180,57 @@ def _cleanup_temp_notebook(workspace_path: str) -> None:
         logger.debug(f"Cleanup of {workspace_path} failed (non-fatal): {e}")
 
 
+def _format_table(item: Dict[str, Any]) -> str:
+    header = [col.get("name", "") for col in item.get("schema") or []]
+    lines = ["\t".join(header)] if header else []
+    lines.extend("\t".join("" if v is None else str(v) for v in row) for row in item.get("data") or [])
+    if item.get("overflow"):
+        lines.append("(table truncated by display)")
+    return "\n".join(lines)
+
+
+def _format_result_item(item: Dict[str, Any]) -> Optional[str]:
+    item_type = item.get("type")
+    if item_type in ("ansi", "text") and isinstance(item.get("data"), str):
+        return item["data"].rstrip("\n")
+    if item_type == "table":
+        return _format_table(item)
+    return None
+
+
+def _get_cell_output(task_run_id: int) -> Optional[str]:
+    """Return printed stdout and displayed tables from every cell of a finished notebook run."""
+    w = get_workspace_client()
+    try:
+        export = w.jobs.export_run(run_id=task_run_id, views_to_export=ViewsToExport.CODE)
+        content = export.views[0].content if export.views else None
+        match = _NOTEBOOK_MODEL_PATTERN.search(content or "")
+        if not match:
+            return None
+        model = json.loads(urllib.parse.unquote(base64.b64decode(match.group(1)).decode("utf-8")))
+    except Exception as e:
+        logger.debug(f"Failed to export cell output for task run {task_run_id}: {e}")
+        return None
+
+    parts = []
+    for command in model.get("commands") or []:
+        results = command.get("results") or {}
+        items = results.get("data") if results.get("type") == "listResults" else [results]
+        for item in items or []:
+            if isinstance(item, dict):
+                text = _format_result_item(item)
+                if text:
+                    parts.append(text)
+
+    if not parts:
+        return None
+    output = "\n".join(parts)
+    if len(output) > _MAX_CELL_OUTPUT_CHARS:
+        notice = f"\n... (cell output truncated at {_MAX_CELL_OUTPUT_CHARS} characters)"
+        output = output[:_MAX_CELL_OUTPUT_CHARS] + notice
+    return output
+
+
 def _get_run_output(task_run_id: int) -> Dict[str, Optional[str]]:
     """Retrieve output and error text from a completed task run.
 
@@ -189,9 +246,15 @@ def _get_run_output(task_run_id: int) -> Dict[str, Optional[str]]:
     try:
         run_output = w.jobs.get_run_output(run_id=task_run_id)
 
-        # Notebook output (from dbutils.notebook.exit() or last cell)
+        exit_value = None
         if run_output.notebook_output and run_output.notebook_output.result:
-            result["output"] = run_output.notebook_output.result
+            exit_value = run_output.notebook_output.result
+
+        cell_output = _get_cell_output(task_run_id)
+        if exit_value and cell_output:
+            result["output"] = f"{cell_output}\n\n--- Exit value ---\n{exit_value}"
+        else:
+            result["output"] = exit_value or cell_output
 
         # Logs (stdout/stderr, typically for spark_python_task)
         if run_output.logs:
@@ -307,9 +370,10 @@ def run_code_on_serverless(
     parameter is ignored in this case since the notebook carries its own
     kernel metadata.
 
-    SQL is supported but SELECT query results are NOT captured in the output.
-    SQL via this tool is only useful for DDL/DML (CREATE TABLE, INSERT, MERGE).
-    For SQL that needs result rows, use execute_sql() instead.
+    Output holds the stdout and displayed tables of every cell (SQL SELECT
+    results included), followed by the ``dbutils.notebook.exit()`` value if one
+    was set. Output printed in the same cell as ``dbutils.notebook.exit()`` is
+    lost. For SQL that needs result rows, prefer execute_sql().
 
     Args:
         code: Code to execute, or raw .ipynb JSON content (auto-detected).

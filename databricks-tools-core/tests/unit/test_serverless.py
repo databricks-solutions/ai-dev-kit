@@ -1,11 +1,22 @@
-"""Unit tests for serverless code execution (run timeout and timeout handling)."""
+"""Unit tests for serverless code execution (run timeout, timeout handling and run output)."""
 
+import base64
 import datetime
+import json
+import urllib.parse
 from unittest import mock
 
 import pytest
 from databricks.sdk.errors import OperationFailed
-from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
+from databricks.sdk.service.jobs import (
+    ExportRunOutput,
+    NotebookOutput,
+    RunLifeCycleState,
+    RunOutput,
+    RunResultState,
+    ViewItem,
+    ViewsToExport,
+)
 
 from databricks_tools_core.compute import serverless
 from databricks_tools_core.compute.serverless import run_code_on_serverless
@@ -213,3 +224,84 @@ class TestMonitoringError:
         assert result.state == "STILL_RUNNING"
         assert result.workspace_path == NOTEBOOK_PATH
         mock_ws.cleanup.assert_not_called()
+
+
+def _export_run(commands):
+    model = json.dumps({"commands": commands})
+    encoded = base64.b64encode(urllib.parse.quote(model).encode()).decode()
+    html = f"<html><script>var __DATABRICKS_NOTEBOOK_MODEL = '{encoded}';</script></html>"
+    return ExportRunOutput(views=[ViewItem(content=html, name="nb")])
+
+
+def _stdout_cell(text):
+    return {"results": {"type": "listResults", "data": [{"type": "ansi", "data": text, "name": "stdout"}]}}
+
+
+CELLS = [
+    _stdout_cell("cell one\n"),
+    {
+        "results": {
+            "type": "listResults",
+            "data": [
+                {
+                    "type": "table",
+                    "data": [[1, "x"], [2, None]],
+                    "schema": [{"name": "a"}, {"name": "b"}],
+                    "overflow": False,
+                }
+            ],
+        }
+    },
+    {"results": {"type": "raw", "data": "exit-value"}},
+    {"results": None},
+    _stdout_cell("+---+\n| id|\n+---+\n\n"),
+]
+
+
+class TestRunOutput:
+    """Printed output and displayed tables are returned, not only the dbutils.notebook.exit() value."""
+
+    TASK_RUN_ID = 42
+
+    def _get_run_output(self, cells, exit_value=None, export_error=None):
+        w = mock.Mock()
+        w.jobs.get_run_output.return_value = RunOutput(
+            notebook_output=NotebookOutput(result=exit_value) if exit_value else None
+        )
+        if export_error:
+            w.jobs.export_run.side_effect = export_error
+        else:
+            w.jobs.export_run.return_value = _export_run(cells)
+        with mock.patch.object(serverless, "get_workspace_client", return_value=w):
+            return w, serverless._get_run_output(self.TASK_RUN_ID)
+
+    def test_printed_output_and_tables_are_returned(self):
+        w, result = self._get_run_output(CELLS)
+        w.jobs.export_run.assert_called_once_with(run_id=self.TASK_RUN_ID, views_to_export=ViewsToExport.CODE)
+        assert result["output"] == "cell one\na\tb\n1\tx\n2\t\n+---+\n| id|\n+---+"
+        assert result["error"] is None
+
+    def test_exit_value_follows_cell_output(self):
+        _, result = self._get_run_output(CELLS, exit_value="exit-value")
+        assert result["output"].startswith("cell one\n")
+        assert result["output"].endswith("\n\n--- Exit value ---\nexit-value")
+        assert result["output"].count("exit-value") == 1
+
+    def test_exit_value_alone_is_unchanged(self):
+        _, result = self._get_run_output([{"results": {"type": "raw", "data": "exit-value"}}], exit_value="exit-value")
+        assert result["output"] == "exit-value"
+
+    def test_export_failure_falls_back_to_exit_value(self):
+        _, result = self._get_run_output(CELLS, exit_value="exit-value", export_error=RuntimeError("boom"))
+        assert result["output"] == "exit-value"
+        assert result["error"] is None
+
+    def test_no_output_at_all(self):
+        _, result = self._get_run_output([])
+        assert result["output"] is None
+
+    def test_large_output_is_truncated(self):
+        big = "x" * (serverless._MAX_CELL_OUTPUT_CHARS + 10)
+        _, result = self._get_run_output([_stdout_cell(big)])
+        assert result["output"].endswith("characters)")
+        assert len(result["output"]) < serverless._MAX_CELL_OUTPUT_CHARS + 100
